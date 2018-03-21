@@ -11,15 +11,13 @@ Game::~Game()
 }
 
 int Game::run()
-{
-	Config * config = Config::getInstance();	
-	if (Engine::getInstance()->init(gameTitle, 1280, 720, config->fullScreen) != initOK)
-	//if (Engine::getInstance()->init(gameTitle, 1280, 720, false/*config->fullScreen*/) != initOK)
+{	
+	if (Engine::getInstance()->init(gameTitle, 1280, 720, Config::getInstance()->fullScreen) != initOK)
 	{
 		return -1;
 	}
 
-	//设置字体,s的空间交给引擎处理，无需delete
+	//设置字体，s的空间交给引擎处理，无需delete
 	char * s = NULL;
 	int len = PakFile::readFile(gameFont, &s);
 	if (s != NULL && len > 0)
