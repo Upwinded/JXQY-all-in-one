@@ -1,0 +1,20 @@
+SHF is created by Upwinded@www.upwinded.com.
+
+Special thanks to Scarsty(SunTY, Weyl, BT, SB500), XiaoShiDaoJian,DaWuXiaLunTan(www.dawuxia.net),JianXiaQingYuanTieBa@tieba.baidu.com.
+
+The source codes are distributed under zlib license, with two additional clauses:
+1.Full right of the codes is granted if they are used in non-KYS related and non-SHF related games.
+2.If the codes are used in KYS related or SHF related games, the game itself shall not involve any sort of profit making aspect.
+(KYS means Kum Yung's Stories, and SHF means Sword Heroes' Fate.)
+
+This library is distributed under the terms of the zlib license:
+http://www.zlib.net/zlib_license.html
+
+The license only has the following points to be accounted for:
+Software is used on 'as-is' basis. Authors are not liable for any damages arising from its use.
+
+The distribution of a modified version of the software is subject to the following restrictions:
+   1.The authorship of the original software must not be misrepresented,
+   2.Altered source versions must not be misrepresented as being the original software, and
+   3.The license notice must not be removed from source distributions.
+The license does not require source code to be made available if distributing binary code.

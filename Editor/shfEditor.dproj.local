@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>2017/12/06 20:08:18.388.dproj,D:\project\shf\Editor\MDIAPP.dproj=D:\project\shf\Editor\shfEditor.dproj</Transaction>
+    <Transaction>2017/12/06 20:13:34.629.PAS,D:\project\shf\Editor\CHILDWIN.PAS=</Transaction>
+    <Transaction>2017/12/06 20:13:34.639.dfm,D:\project\shf\Editor\CHILDWIN.dfm=</Transaction>
+    <Transaction>2017/12/07 08:16:46.544.pas,E:\proj\shf\Editor\Unit1.pas=E:\proj\shf\Editor\RePack.pas</Transaction>
+    <Transaction>2017/12/07 08:16:46.544.dfm,E:\proj\shf\Editor\Unit1.dfm=E:\proj\shf\Editor\RePack.dfm</Transaction>
+    <Transaction>2017/12/07 16:08:37.966.png,E:\proj\shf\shf-cpp\resource\Logo.png=</Transaction>
+    <Transaction>2017/12/07 20:42:06.625.png,D:\project\shf\Editor\HecOpen.png=</Transaction>
+    <Transaction>2017/12/08 08:46:38.178.pas,E:\proj\shf\Editor\Unit1.pas=E:\proj\shf\Editor\Head.pas</Transaction>
+    <Transaction>2017/12/08 09:17:33.808.pas,E:\proj\shf\Editor\about.pas=</Transaction>
+    <Transaction>2017/12/08 09:17:33.808.dfm,E:\proj\shf\Editor\about.dfm=</Transaction>
+    <Transaction>2018/03/01 08:57:07.081.pas,E:\proj\shf\Editor\Unit1.pas=E:\proj\shf\Editor\ImageForm.pas</Transaction>
+    <Transaction>2018/03/01 08:57:07.081.dfm,E:\proj\shf\Editor\Unit1.dfm=E:\proj\shf\Editor\ImageForm.dfm</Transaction>
+  </Transactions>  <ProjectSortOrder AutoSort="0" SortType="0">
+    <File Path="about.pas"/>
+    <File Path="about.dfm"/>
+    <File Path="Head.pas"/>
+    <File Path="ImageForm.pas"/>
+    <File Path="ImageForm.dfm"/>
+    <File Path="lazlzo.pas"/>
+    <File Path="lzoobj.pas"/>
+    <File Path="Main.pas"/>
+    <File Path="Main.dfm"/>
+    <File Path="mouse.pas"/>
+    <File Path="opendisplay.pas"/>
+    <File Path="opendisplay.dfm"/>
+    <File Path="PakFile.pas"/>
+    <File Path="PicFile.pas"/>
+    <File Path="RePack.pas"/>
+    <File Path="RePack.dfm"/>
+  </ProjectSortOrder>
+</BorlandProject>

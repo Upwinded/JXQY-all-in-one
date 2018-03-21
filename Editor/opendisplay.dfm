@@ -1,0 +1,29 @@
+object FlashForm: TFlashForm
+  Left = 0
+  Top = 0
+  BorderStyle = bsNone
+  Caption = 'FlashForm'
+  ClientHeight = 384
+  ClientWidth = 512
+  Color = clBtnFace
+  DoubleBuffered = True
+  Font.Charset = DEFAULT_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -11
+  Font.Name = 'Tahoma'
+  Font.Style = []
+  OldCreateOrder = False
+  Position = poDesktopCenter
+  OnClick = FormClick
+  OnClose = FormClose
+  OnCreate = FormCreate
+  PixelsPerInch = 96
+  TextHeight = 13
+  object Timer1: TTimer
+    Enabled = False
+    Interval = 10
+    OnTimer = Timer1Timer
+    Left = 16
+    Top = 8
+  end
+end

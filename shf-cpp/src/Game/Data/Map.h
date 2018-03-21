@@ -1,0 +1,124 @@
+#pragma once
+#include "../GameTypes.h"
+#include "../../File/PakFile.h"
+#include "../../Engine/Engine.h"
+#include "../../Element/Element.h"
+#include <deque>
+
+/*
+位置（10进制）	大小（bytes）	说明
+00 - 15	16	MAP File Ver2.0
+16 - 31	16	null
+32 - 63	32	mpc文件路径（最多31字节 + 1个null）
+64 - 67	4	地图宽 * 地图高 * 10
+68 - 71	4	地图宽
+72 - 75	4	地图高
+76 - 79	4	推测是每个MPC的信息长度，一般为0x40(不确定)
+80 - 83	4	推测是每个MPC的文件名长度，一般为0x20(不确定)
+84 - 191	108	null
+192 - 16511	64 * 255 = 16320	"255个mpc文件信息，一般每个64字节。这里有些地方不太确定，没验证。mpc文件名一般占32个字节，是文件名+null的格式。后面的应该是索引（1，2，3.。。）。还有：生命体设置： 00-静态 01-循环
+障碍设置：00 - 空 01 - 透明 02 - 实体"
+16512 - 文件末	地图宽 * 地图高 * 10	"各个地图块（10bytes）的情况，
+（0，0），（1，0），（2，0）。。。。
+（0，1），（1，1），（2，1）。。。。（0，2），（1，2），（2，2）。。。。
+2bytes: 图层第一层[第几帧][第几个mpc文件]
+2bytes：图层第二层[第几帧][第几个mpc文件]
+2bytes：图层第三层[第几帧][第几个mpc文件]
+1byte ：障碍： 0x80 - 障   0xA0 - 跳障（只可以跳）  0x40 - 透（只可以飞过技能） 0x60 - 跳透（可以飞过技能和跳过）
+1byte ：陷阱 : 01 - 19（陷阱索引）
+2bytes : 0x00 0x1F"
+*/
+
+struct PathTile
+{
+	int index = -1;
+	Point from = { 0, 0 };
+};
+
+struct PathMap
+{
+	int w = 0;
+	int h = 0;
+	std::vector<std::vector<PathTile>> map;
+};
+
+#define MAX_STEP 255
+
+class Map:
+	public Element
+{
+public:
+	Map();
+	~Map();
+
+	MapData * data = NULL;
+	MapMpc * mapMpc = NULL;
+
+	bool load(const std::string & fileName);
+	bool load(char * d, int len);
+
+	static Point getElementPosition(Point pos, Point cenTile, Point cenScreen, PointEx offset);
+	static Point getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx offset);
+	static Point getTilePosition(Point tile, Point cenTile, Point cenScreen = { 0, 0 }, PointEx offset = { 0, 0 });
+	static Point getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx offset);
+
+	void loadMapMpc();
+	std::deque<Point> getPath(Point from, Point to);
+	//得到距离to为radius歩数范围的点
+	std::deque<Point> getRadiusPath(Point from, Point to, int radius);
+	//获得单步路径叠加
+	std::deque<Point> getStepPath(Point from, Point to, int stepCount);
+	//向某点方向移动一步的路径
+	std::deque<Point> getStep(Point from, Point to);
+	//得到起止之间的所有点
+	std::deque<Point> getPassPath(Point from, Point to, Point flyDirection, Point dest);
+
+	Point getJumpPath(Point from, Point to);
+	bool canView(Point from, Point to);
+
+	int getTrapIndex(Point pos);
+	std::string getTrapName(Point pos);
+	bool haveTraps(Point pos);
+	bool canWalk(Point pos);
+	bool canJump(Point pos);
+	bool canFly(Point pos);
+	bool canViewTile(Point pos);
+	bool canPass(Point pos);
+
+	static Point getSubPoint(Point from, int direction);
+	static std::vector<Point> getSubPointEx(Point from, int direction);
+
+	static int calDistance(Point from, Point to);
+
+	DataMap dataMap;
+
+	void drawMap();
+
+	void createDataMap();
+
+	void deleteObjecFromDataMap(Point pos, int idx);
+	void addObjectToDtataMap(Point pos, int idx);
+	void changeObjectataMap(Point pos, int idx, int newIdx);
+
+	void deleteStepFromDataMap(Point pos, int idx);
+	void addStepToDataMap(Point pos, int idx);
+	void changeStepDataMap(Point pos, int idx, int newIdx);
+
+	void deleteNPCFromDataMap(Point pos, int idx);
+	void addNPCToDataMap(Point pos, int idx);
+	void changeNPCDataMap(Point pos, int idx, int newIdx);
+
+	virtual void freeResource();
+	void freeMpc();
+	void freeData();
+	void drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset);
+
+	bool isInMap(Point pos);
+private:
+	std::vector<Point> getLineSubStep(Point from, Point to, double angle);
+	std::vector<Point> getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex);
+	bool isInMap(PathMap * pathMap, Point pos);
+	bool cmpMapHead(MapData * md);
+
+};
+
