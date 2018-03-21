@@ -6,7 +6,7 @@
 	The source codes are distributed under zlib license, with two additional clauses:
 	1.Full right of the codes is granted if they are used in non-KYS related and non-SHF related games.
 	2.If the codes are used in KYS related or SHF related games, the game itself shall not involve any sort of profit making aspect.
-	(KYS means Kum Yung's Stories, and SHF means Sword Heroes' Fate.)
+	(KYS means Kam Yung's Stories, and SHF means Sword Heroes' Fate.)
 */
 
 #include "shf-cpp.h"
