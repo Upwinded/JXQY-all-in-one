@@ -3,9 +3,19 @@ Sword Heroes' Fate
 
 # 说明
 
-引擎使用C++编写，运行游戏需要安装VC2015运行库。
+引擎使用C++编写，工程使用VS2017创建。
 
 编辑器和启动器使用Delphi编写，可以使用Delphi2010以上的版本编译。
+
+完整游戏下载：https://pan.baidu.com/s/1WB8mQ4X6ocCgCjEpCpdkDg
+
+目录结构说明：
+
+（1）shf-cpp文件夹：游戏引擎代码。
+
+（2）Starter文件夹：游戏启动器代码。
+
+（3）Editor文件夹：游戏编辑器代码。
  
 # 感谢
  
