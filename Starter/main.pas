@@ -133,7 +133,7 @@ begin
   if isWOW64() then
     VCRedistExeName := VCRedistExePath + VCRedistExe64
   else
-    VCRedistExeName := VCRedistExeName + VCRedistExe32;
+    VCRedistExeName := VCRedistExePath + VCRedistExe32;
   runExe(VCRedistExeName, VCRedistExePath, '安装程序启动失败！');
 end;
 
