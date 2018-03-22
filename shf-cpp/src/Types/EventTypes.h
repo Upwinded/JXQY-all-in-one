@@ -136,6 +136,5 @@ struct AEvent
 
 struct EventList
 {
-	int eventCount;
 	std::vector<AEvent> event;
 };

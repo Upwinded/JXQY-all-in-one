@@ -1102,26 +1102,17 @@ void EngineBase::handleEvent()
 		{
 			case SDL_QUIT:
 			{
-				eventList.eventCount ++;
-				eventList.event.resize(eventList.eventCount);
-				eventList.event[eventList.eventCount - 1].eventType= QUIT;
-				eventList.event[eventList.eventCount - 1].eventData = 0;
+				eventList.event.push_back({ QUIT , 0 });
 				break;
 			}
 			case SDL_KEYDOWN: case SDL_KEYUP:
 			{
-				eventList.eventCount ++;
-				eventList.event.resize(eventList.eventCount);
-				eventList.event[eventList.eventCount - 1].eventType = (EventType)e.type;
-				eventList.event[eventList.eventCount - 1].eventData = e.key.keysym.scancode;
+				eventList.event.push_back({ (EventType)e.type , e.key.keysym.scancode });
 				break;
 			}
 			case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
 			{
-				eventList.eventCount ++;
-				eventList.event.resize(eventList.eventCount);
-				eventList.event[eventList.eventCount - 1].eventType = (EventType)e.type;
-				eventList.event[eventList.eventCount - 1].eventData = e.button.button;
+				eventList.event.push_back({ (EventType)e.type , e.button.button });
 				break;
 			}
 			default:
@@ -1141,18 +1132,17 @@ void EngineBase::copyEvent(AEvent* s, AEvent* d)
 
 void EngineBase::clearEventList()
 {
-	eventList.eventCount = 0;
 	eventList.event.resize(0);
 }
 
 int EngineBase::getEventCount()
 {
-	return eventList.eventCount;
+	return (int)eventList.event.size();
 }
 
 int EngineBase::getEvent(AEvent * event)
 {
-	if (eventList.eventCount <= 0)
+	if (eventList.event.size() == 0)
 	{
 		return 0;
 	}
@@ -1160,13 +1150,12 @@ int EngineBase::getEvent(AEvent * event)
 	{
 		copyEvent(&eventList.event[0], event);
 	}	
-	for (int i = 0; i < eventList.eventCount - 1; i++)
+	for (size_t i = 0; i < eventList.event.size() - 1; i++)
 	{
 		copyEvent(&eventList.event[i + 1], &eventList.event[i]);
 	}
-	eventList.eventCount -= 1;
-	eventList.event.resize(eventList.eventCount);
-	return eventList.eventCount + 1;
+	eventList.event.erase(eventList.event.begin());
+	return (int)eventList.event.size() + 1;
 }
 
 void EngineBase::pushEvent(AEvent * event)
@@ -1175,26 +1164,23 @@ void EngineBase::pushEvent(AEvent * event)
 	{
 		return;
 	}
-	eventList.eventCount ++;
-	eventList.event.resize(eventList.event.size() + 1);
-	eventList.event[eventList.event.size() - 1].eventType = event->eventType;
-	eventList.event[eventList.event.size() - 1].eventData = event->eventData;
+	eventList.event.push_back(*event);
 }
 
 //需要自己释放
 int EngineBase::readEventList(EventList * eList)
 {
-	if (!eList->eventCount)
+	if (!eList->event.size())
 	{
 		return 0;
 	}
-	eList->eventCount = eventList.eventCount;
-	eList->event.resize(eList->eventCount);
-	for (int i = 0; i < eList->eventCount; i++)
+
+	eList->event.resize(eventList.event.size());
+	for (size_t i = 0; i < eList->event.size(); i++)
 	{
 		copyEvent(&(eventList.event[i]), &(eList->event[i]));
 	}
-	return eList->eventCount;
+	return eList->event.size();
 }
 
 bool EngineBase::getKeyPress(KeyCode key)
