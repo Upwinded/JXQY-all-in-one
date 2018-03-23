@@ -426,6 +426,7 @@ void Magic::addCircleEffect(GameElement * user, Point from, Point to, int lvl, i
 		{
 			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
+
 		if (e->waitTime > 0)
 		{
 			e->doing = ekHiding;
@@ -470,6 +471,37 @@ void Magic::addHeartCircleEffect(GameElement * user, Point from, Point to, int l
 		{
 			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
+
+		if (i < CIRCLE_COUNT / 4)
+		{
+			int count = i;
+			e->waitTime += (CIRCLE_COUNT / 4 - count) * HEART_DELAY;
+			e->speed = int(floor(e->speed * (1.0 - count * HEART_DECAY) + 0.5));
+		}
+		else if (i < CIRCLE_COUNT / 2)
+		{
+			int count = i - CIRCLE_COUNT / 4;
+			e->waitTime += count * HEART_DELAY;
+			e->speed = int(floor(e->speed * (1.0 - (CIRCLE_COUNT / 4 - count) * HEART_DECAY) + 0.5));
+		}
+		else if (i < 3 * CIRCLE_COUNT / 4)
+		{
+			int count = i - CIRCLE_COUNT / 2;
+			e->waitTime += count * HEART_DELAY + HEART_DELAY * CIRCLE_COUNT / 4;
+			e->speed = int(floor(e->speed * (1.0 + count * HEART_DECAY) + 0.5));
+		}
+		else
+		{
+			int count = i - 3 * CIRCLE_COUNT / 4;
+			e->waitTime += (CIRCLE_COUNT / 4 - count) * HEART_DELAY + HEART_DELAY * CIRCLE_COUNT / 4;
+			e->speed = int(floor(e->speed * (1.0 + (CIRCLE_COUNT / 4 - count) * HEART_DECAY) + 0.5));
+		}
+
+		if (e->speed <= 0)
+		{
+			e->speed = 1;
+		}
+
 		if (e->waitTime > 0)
 		{
 			e->doing = ekHiding;
@@ -489,8 +521,13 @@ void Magic::addHeartCircleEffect(GameElement * user, Point from, Point to, int l
 void Magic::addHelixCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
 	gm->effectManager.setPaused(true);
-	int dir = calDirection(from, to);
-	dir *= CIRCLE_COUNT / 16;
+	int startDir = calDirection(from, to, CIRCLE_COUNT);
+	startDir -= CIRCLE_COUNT / 4;
+	if (startDir < 0)
+	{
+		startDir += CIRCLE_COUNT;
+	}
+	startDir = CIRCLE_COUNT - startDir;
 	double angle = -pi;
 	for (int i = 0; i < CIRCLE_COUNT; i++)
 	{
@@ -516,7 +553,12 @@ void Magic::addHelixCircleEffect(GameElement * user, Point from, Point to, int l
 		{
 			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
-		e->waitTime += i * CIRCLE_HELIX_INTERVAL;
+		int count = i - startDir;
+		if (count < 0)
+		{
+			count += CIRCLE_COUNT;
+		}
+		e->waitTime += count * CIRCLE_HELIX_INTERVAL;
 
 		if (e->waitTime > 0)
 		{
@@ -1125,18 +1167,32 @@ void Magic::addFullScreenEffect(GameElement * user, Point from, Point to, int lv
 	delete oriE;
 }
 
-int Magic::calDirection(Point from, Point to)
+double Magic::calAngle(Point from, Point to)
 {
 	Point pos = Map::getTilePosition(to, from, { 0, 0 }, { 0, 0 });
 	PointEx dir;
 	dir.x = ((double)pos.x) / TILE_WIDTH;
 	dir.y = ((double)pos.y) / TILE_HEIGHT;
-	dir.x = - dir.x;
-	double angle = atan2(dir.x, dir.y);
-	return calDirection(angle);
+	dir.x = -dir.x;
+	return atan2(dir.x, dir.y);
+}
+
+int Magic::calDirection(Point from, Point to)
+{
+	return calDirection(calAngle(from, to));
 }
 
 int Magic::calDirection(double angle)
+{
+	return calDirection(angle, 16);
+}
+
+int Magic::calDirection(Point from, Point to, int maxDir)
+{
+	return calDirection(calAngle(from, to), maxDir);
+}
+
+int Magic::calDirection(double angle, int maxDir)
 {
 #ifdef pi
 #undef pi
@@ -1147,11 +1203,11 @@ int Magic::calDirection(double angle)
 	{
 		angle += 2 * pi;
 	}
-	angle += pi / 16;
-	int result = (int)(angle / (pi / 8));
-	if (result > 16)
+	angle += pi / maxDir;
+	int result = (int)(angle / (2 * pi / maxDir));
+	if (result > maxDir)
 	{
-		result -= 16;
+		result -= maxDir;
 	}
 	return result;
 }

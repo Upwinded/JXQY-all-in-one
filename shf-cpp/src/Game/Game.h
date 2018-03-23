@@ -8,7 +8,7 @@ public:
 	Game();
 	~Game();
 
-	std::string gameTitle = "Sword Heroes' Fate 2 Ver.Alpha1.02 -- By Upwinded";
+	std::string gameTitle = "Sword Heroes' Fate 2 -- By Upwinded";
 	std::string gameFont = "Font\\Font.ttf";
 
 public:

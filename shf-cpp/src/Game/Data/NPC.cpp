@@ -1261,9 +1261,8 @@ void NPC::beginHurt(Point dest)
 
 void NPC::beginHurt()
 {
-	if (!canDoAction(acHurt))
+	if (isHurting() || !canDoAction(acHurt))
 	{
-		beginStand();
 		return;
 	}
 	deleteStep();

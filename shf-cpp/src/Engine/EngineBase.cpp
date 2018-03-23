@@ -1170,7 +1170,7 @@ void EngineBase::pushEvent(AEvent * event)
 //需要自己释放
 int EngineBase::readEventList(EventList * eList)
 {
-	if (!eList->event.size())
+	if (!eventList.event.size())
 	{
 		return 0;
 	}
@@ -1326,14 +1326,14 @@ _image EngineBase::createText(const std::string& text, int size, unsigned int co
 	c.r = (color & 0xFF0000) >> 16;	
 	c.a = (color & 0xFF000000) >> 24;
 
-    auto text_s = TTF_RenderUTF8_Blended(_font, text.c_str(), c);
-    auto text_t = SDL_CreateTextureFromSurface(renderer, text_s);
+	auto text_s = TTF_RenderUTF8_Blended(_font, text.c_str(), c);
+	auto text_t = SDL_CreateTextureFromSurface(renderer, text_s);
 	setImageAlpha(text_t, c.a);
 
-    SDL_FreeSurface(text_s);
-    TTF_CloseFont(_font);
+	SDL_FreeSurface(text_s);
+	TTF_CloseFont(_font);
 	textureMutex.unlock();
-    return (_image)text_t;
+	return (_image)text_t;
 }
 
 void EngineBase::drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color)
@@ -1775,7 +1775,7 @@ _music EngineBase::createVideoRAW(FMOD_SYSTEM * system, char * data, int size, b
 	exinfo.format = format; //FMOD_SOUND_FORMAT_PCM16
 	exinfo.numchannels = numchannels;
 	exinfo.defaultfrequency = defaultfrequency;
-    exinfo.suggestedsoundtype = FMOD_SOUND_TYPE_RAW;
+	exinfo.suggestedsoundtype = FMOD_SOUND_TYPE_RAW;
 	FMOD_SYSTEM * tempSystem = system;
 	if (tempSystem == NULL)
 	{
@@ -3134,6 +3134,7 @@ int EngineBase::lzoCompress(const void * src, unsigned int srcLen, void * dst, u
 		return -1;
 	}
 	int ret = lzo1x_1_compress((const unsigned char *)src, srcLen, (unsigned char *)dst, (lzo_uint *)dstLen, lzoMem);
+	freeMem(lzoMem);
 	if (ret == LZO_E_OK)
 	{
 		return 0;

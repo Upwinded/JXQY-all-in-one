@@ -1510,7 +1510,7 @@ void Player::beginAttack(Point dest)
 
 void Player::beginHurt(Point dest)
 {
-	if (!canDoAction(acHurt) || !canHurt() || frozen)
+	if (isHurting() || !canDoAction(acHurt) || !canHurt() || frozen)
 	{
 		return;
 	}

@@ -82,8 +82,11 @@ public:
 	void addSelfEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind);
 	void addFullScreenEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 
+	double calAngle(Point from, Point to);
 	int calDirection(Point from, Point to);
 	int calDirection(double angle);
+	int calDirection(Point from, Point to, int maxDir);
+	int calDirection(double angle, int maxDir);
 
 	void copy(Magic * magic);
 	virtual void freeResource();
@@ -130,5 +133,6 @@ public:
 	MagicLevel level[MAGIC_MAX_LEVEL + 1];
 
 	double limitAngle(double angle);
+	int getDir(double angle, int maxDir);
 };
 

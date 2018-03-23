@@ -102,13 +102,16 @@
 //武功类延迟时间
 
 //连续型飞行技能每个effect的施放间隔
-#define CONTINUOUS_INTERVAL 30
+#define CONTINUOUS_INTERVAL 20
 //圆形技能的effect个数
 #define CIRCLE_COUNT 32
 //圆形技能的相隔角度
 #define CIRCLE_ANGLE_SPACE (2 * pi / CIRCLE_COUNT)
+//心形技能施放延迟等参数
+#define HEART_DELAY 10
+#define HEART_DECAY 0.1
 //螺旋技能每个effect的施放间隔
-#define CIRCLE_HELIX_INTERVAL 20
+#define CIRCLE_HELIX_INTERVAL 10
 
 enum TileObstacle
 {
