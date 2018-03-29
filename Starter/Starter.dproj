@@ -20,6 +20,7 @@
 			<Base>true</Base>
 		</PropertyGroup>
 		<PropertyGroup Condition="'$(Base)'!=''">
+			<BRCC_IncludePath>Pascal-SDL-2-Headers-master;$(BRCC_IncludePath)</BRCC_IncludePath>
 			<DCC_DcuOutput>../Debug/Starter/dcu/</DCC_DcuOutput>
 			<DCC_UsePackage>vclx;vcl;vclimg;dbrtl;Rave77VCL;bdertl;rtl;vclactnband;vcldb;vcldbx;vcltouch;xmlrtl;dsnap;dsnapcon;TeeUI;TeeDB;Tee;vclib;ibxpress;adortl;IndyCore;IndySystem;IndyProtocols;inet;intrawebdb_100_140;Intraweb_100_140;VclSmp;vclie;websnap;webdsnap;inetdb;inetdbbde;inetdbxpress;soaprtl;vclribbon;dbexpress;DbxCommonDriver;DataSnapIndy10ServerTransport;DataSnapProviderClient;DbxClientDriver;DataSnapServer;DBXInterBaseDriver;DBXMySQLDriver;dbxcds;DBXFirebirdDriver;DBXSybaseASEDriver;DBXSybaseASADriver;DBXOracleDriver;DBXMSSQLDriver;DBXInformixDriver;DBXDb2Driver;dclOffice2k;Package1</DCC_UsePackage>
 			<DCC_ExeOutput>../Debug/Starter/</DCC_ExeOutput>
@@ -49,6 +50,7 @@
 			<DCCReference Include="main.pas">
 				<Form>StarterForm</Form>
 			</DCCReference>
+			<DCCReference Include="Pascal-SDL-2-Headers-master\sdl2.pas"/>
 			<BuildConfiguration Include="Base">
 				<Key>Base</Key>
 			</BuildConfiguration>

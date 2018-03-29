@@ -41,7 +41,7 @@ void StateMenu::init()
 	labLife = addLabel("ini\\ui\\state\\Lab生命.ini");
 	labThew = addLabel("ini\\ui\\state\\Lab体力.ini");
 	labMana = addLabel("ini\\ui\\state\\Lab内力.ini");
-	setChildRect(1024);
+	setChildRect();
 }
 
 void StateMenu::onEvent()

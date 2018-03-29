@@ -25,7 +25,7 @@ void System::init()
 	optionBtn = addButton("ini\\ui\\system\\Option.ini");
 	quitBtn = addButton("ini\\ui\\system\\Quit.ini");
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void System::freeResource()

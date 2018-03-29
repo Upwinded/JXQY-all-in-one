@@ -26,6 +26,7 @@ int Script::runScript(char * s, int len)
 {
 	if (s != NULL && len > 0)
 	{
+		printf("RunScript:\n%s\n", s);
 		luaL_loadbuffer(luaState, s, len, name.c_str());
 		return lua_pcall(luaState, 0, 1, 0);
 	}

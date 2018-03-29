@@ -143,7 +143,7 @@ void BottomMenu::init()
 		magicItem[i]->canShowHint = true;
 	}
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void BottomMenu::onEvent()

@@ -45,7 +45,7 @@ void ColumnMenu::init()
 	columnMana = addColumnImage("ini\\ui\\column\\colMana.ini");
 	image = addTransImage("ini\\ui\\column\\column.ini");
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void ColumnMenu::freeResource()

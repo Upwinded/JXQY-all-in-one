@@ -20,7 +20,7 @@ public:
 	void setChildActivated(Element * child, bool activated);
 
 	//按照自身x,y位置设置子元素的区域
-	void setChildRect(int setLevel);
+	void setChildRect(int setLevel = -1);
 	unsigned int getResult();
 	bool getResult(unsigned int ret);
 	int index = -1;

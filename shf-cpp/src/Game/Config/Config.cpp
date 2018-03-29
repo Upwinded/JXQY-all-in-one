@@ -25,6 +25,9 @@ void Config::load()
 	fullScreen = ini.GetBoolean("Game", "FullScreen", fullScreen);
 	playerAlpha = ini.GetBoolean("Game", "PlayerAlpha", playerAlpha);
 
+	windowWidth = ini.GetInteger("Game", "WindowWidth", windowWidth);
+	windowHeight = ini.GetInteger("Game", "WindowHeight", windowHeight);
+
 	float musicVolume = ((float)ini.GetInteger("Game", "MusicVolume", 100)) / 100.0f;
 	float soundVolume = ((float)ini.GetInteger("Game", "SoundVolume", 100)) / 100.0f;
 	if (musicVolume < 0.0f)
@@ -73,6 +76,8 @@ void Config::save()
 	}
 	ini.SetInteger("Game", "MusicVolume", (int)(musicVolume * 100));
 	ini.SetInteger("Game", "SoundVolume", (int)(soundVolume * 100));
+	ini.SetInteger("Game", "WindowWidth", windowWidth);
+	ini.SetInteger("Game", "WindowHeight", windowHeight);
 	ini.saveToFile(fileName);
 }
 
@@ -96,5 +101,17 @@ float Config::setSoundVolume(float volume)
 {
 	Engine::getInstance()->setSoundVolume(volume);
 	return getSoundVolume();
+}
+
+void Config::getWindowSize(int * w, int * h)
+{
+	if (w != NULL)
+	{
+		*w = windowWidth;
+	}
+	if (h != NULL)
+	{
+		*h = windowHeight;
+	}
 }
 

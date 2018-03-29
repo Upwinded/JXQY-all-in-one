@@ -71,7 +71,7 @@ void ToolTip::init()
 	intro2->autoNextLine = true;
 	name = addLabel("ini\\ui\\tooltip\\Name.ini");
 	cost = addLabel("ini\\ui\\tooltip\\Cost.ini");
-	setChildRect(1024);
+	setChildRect();
 }
 
 void ToolTip::freeResource()

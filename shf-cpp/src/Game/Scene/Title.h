@@ -15,6 +15,7 @@ public:
 	void playTitleBGM();
 	void init();
 	virtual void freeResource();
+	void setTitleAlign();
 private:
 	virtual void onEvent();
 	virtual bool onInitial();

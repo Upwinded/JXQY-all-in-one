@@ -54,7 +54,7 @@ void MemoMenu::init()
 	scrollbar = addScrollbar("ini\\ui\\memo\\scrollbar.ini");
 	memoText = addMemo("ini\\ui\\memo\\memo.ini");
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void MemoMenu::freeResource()

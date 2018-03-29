@@ -29,7 +29,7 @@ void SaveLoad::init()
 	snap->stretch = true;
 	listBox = addListBox("ini\\ui\\saveload\\ListBox.ini");
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void SaveLoad::onEvent()

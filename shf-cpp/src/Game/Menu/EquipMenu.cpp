@@ -165,7 +165,7 @@ void EquipMenu::init()
 		item[i]->dragIndex = GOODS_TOOLBAR_COUNT + GOODS_COUNT + i;
 		item[i]->canShowHint = true;
 	}
-	setChildRect(1024);
+	setChildRect();
 }
 
 void EquipMenu::freeResource()

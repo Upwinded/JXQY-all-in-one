@@ -19,6 +19,8 @@ void Dialog::init()
 	label = addTalkLabel("ini\\ui\\dialog\\label.ini");
 	head1 = addImageContainer("ini\\ui\\dialog\\Head1.ini");
 	head2 = addImageContainer("ini\\ui\\dialog\\Head2.ini");
+	setChildRect();
+
 }
 
 void Dialog::setTalkStr(const std::wstring & wstr)

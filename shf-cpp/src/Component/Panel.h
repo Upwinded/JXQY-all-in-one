@@ -27,7 +27,9 @@ public:
 	~Panel();
 
 	Align align = alNone;
-
+	int alignX = 0;
+	int alignY = 0;
+	void setAlign();
 	Button * addButton(const std::string& fileName);
 	Scrollbar * addScrollbar(const std::string& fileName);
 	ImageContainer * addImageContainer(const std::string& fileName);

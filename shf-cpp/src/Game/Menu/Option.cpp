@@ -34,7 +34,7 @@ void Option::init()
 	shadowBg = addImageContainer("ini\\ui\\Option\\LBShadow.ini");
 	dyLoadBg = addImageContainer("ini\\ui\\Option\\LBDyLoad.ini");
 
-	setChildRect(1024);
+	setChildRect();
 
 	if (config->getMusicVolume() <= 0)
 	{

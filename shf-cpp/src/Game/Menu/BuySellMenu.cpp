@@ -386,7 +386,7 @@ void BuySellMenu::init()
 		item[i]->canShowHint = true;
 	}
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void BuySellMenu::freeResource()

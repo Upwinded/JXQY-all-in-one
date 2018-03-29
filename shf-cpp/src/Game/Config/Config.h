@@ -22,8 +22,13 @@ public:
 	float setMusicVolume(float volume);
 	float setSoundVolume(float volume);
 
+	void getWindowSize(int * w, int * h);
+
 private:
 	static Config config;
 	static Config * this_;
+
+	int windowWidth = DEFAULT_WINDOW_WIDTH;
+	int windowHeight = DEFAULT_WINDOW_HEIGHT;
 };
 

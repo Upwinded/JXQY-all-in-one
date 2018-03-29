@@ -130,7 +130,7 @@ void PracticeMenu::init()
 	magic->dragIndex = MAGIC_TOOLBAR_COUNT + MAGIC_COUNT;
 	magic->dragType = dtMagic;
 	magic->canShowHint = true;
-	setChildRect(1024);
+	setChildRect();
 }
 
 void PracticeMenu::freeResource()

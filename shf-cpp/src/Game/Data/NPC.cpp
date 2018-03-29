@@ -344,6 +344,16 @@ void NPC::calOffset(int nowTime, int totalTime)
 	}
 }
 
+int NPC::getInvertDirection(int dir)
+{
+	int result = dir + 4;
+	if (result > 7)
+	{
+		result -= 8;
+	}
+	return result;
+}
+
 int NPC::calDirection(Point dest)
 {
 	return calDirection(position, dest);

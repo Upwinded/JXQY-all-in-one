@@ -12,7 +12,9 @@ Game::~Game()
 
 int Game::run()
 {	
-	if (Engine::getInstance()->init(gameTitle, 1280, 720, Config::getInstance()->fullScreen) != initOK)
+	int w = DEFAULT_WINDOW_WIDTH, h = DEFAULT_WINDOW_HEIGHT;
+	Config::getInstance()->getWindowSize(&w, &h);
+	if (Engine::getInstance()->init(gameTitle, w, h, Config::getInstance()->fullScreen) != initOK)
 	{
 		return -1;
 	}

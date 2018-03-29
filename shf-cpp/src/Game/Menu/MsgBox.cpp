@@ -20,7 +20,7 @@ void MsgBox::showMessage(const std::wstring & wstr)
 	{
 		label = addLabel("ini\\ui\\Message\\label.ini");
 		label->coverMouse = false;
-		setChildRect(1024);
+		setChildRect();
 	}
 	label->setStr(wstr);
 	beginTime = getTime();
@@ -44,7 +44,7 @@ void MsgBox::init()
 	label = addLabel("ini\\ui\\Message\\label.ini");
 	label->coverMouse = false;
 	label->autoNextLine = true;
-	setChildRect(1024);
+	setChildRect();
 }
 
 void MsgBox::freeResource()

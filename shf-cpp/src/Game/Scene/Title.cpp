@@ -54,6 +54,7 @@ void Title::init()
 		impImage->frame[0].data = s;
 		impImage->frame[0].dataLen = len;
 	}
+	setTitleAlign();
 }
 
 void Title::freeResource()
@@ -74,6 +75,25 @@ void Title::freeResource()
 	}
 	result = erNone;
 	removeAllChild();
+}
+
+void Title::setTitleAlign()
+{
+	int w = 0, h = 0;
+	engine->getWindowSize(&w, &h);
+#define setBtnAlign(btn); \
+	if (btn != NULL) \
+	{\
+		btn->rect.x = (int)(((double)btn->rect.x) / DEFAULT_WINDOW_WIDTH * w + 0.5);\
+		btn->rect.y = (int)(((double)btn->rect.y) / DEFAULT_WINDOW_HEIGHT * h + 0.5);\
+		btn->rect.w = (int)(((double)btn->rect.w) / DEFAULT_WINDOW_WIDTH * w + 0.5);\
+		btn->rect.h = (int)(((double)btn->rect.h) / DEFAULT_WINDOW_HEIGHT * h + 0.5);\
+	}
+
+	setBtnAlign(initBtn);
+	setBtnAlign(exitBtn);
+	setBtnAlign(loadBtn);
+	setBtnAlign(teamBtn);
 }
 
 void Title::onEvent()

@@ -295,7 +295,7 @@ void GoodsMenu::init()
 		item[i]->canShowHint = true;
 	}
 
-	setChildRect(1024);
+	setChildRect();
 }
 
 void GoodsMenu::freeResource()

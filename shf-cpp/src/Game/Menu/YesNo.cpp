@@ -22,7 +22,7 @@ void YesNo::init(const std::wstring & ws)
 	no = addButton("ini\\ui\\yesno\\BtnNo.ini");
 	label = addLabel("ini\\ui\\yesno\\Label.ini");
 	label->setStr(ws);
-	setChildRect(1024);
+	setChildRect();
 }
 
 void YesNo::freeResource()

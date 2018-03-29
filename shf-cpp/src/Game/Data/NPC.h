@@ -141,6 +141,7 @@ public:
 
 	Point attackDest = { 0, 0 };
 	void calOffset(int nowTime, int totalTime);
+	int getInvertDirection(int dir);
 	int calDirection(Point dest);
 	static int calDirection(double angle);
 	static int calDirection(Point src, Point dest);

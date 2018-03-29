@@ -93,7 +93,10 @@ void EngineBase::setMouse(MouseImage * mouse)
 
 void EngineBase::showMouse()
 {
-	SDL_ShowCursor(1);
+	if (hardwareCursor)
+	{
+		SDL_ShowCursor(1);
+	}
 	mouseHide = false;
 }
 
@@ -3019,7 +3022,6 @@ void EngineBase::stopVideo(_video video)
 
 void EngineBase::frameBegin()
 {	
-	countFPS();
 	updateState();
 	clearScreen();
 	handleEvent();
@@ -3028,8 +3030,8 @@ void EngineBase::frameBegin()
 void EngineBase::frameEnd()
 {
 	updateSoundSystem();
-
 	displayScreen();
+	countFPS();
 }
 
 void EngineBase::clearScreen()
