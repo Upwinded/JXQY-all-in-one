@@ -14,6 +14,7 @@ public:
 
 	bool fullScreen = true;
 	bool playerAlpha = true;
+	bool canChangeDisplayMode = false;
 
 	void load();
 	void save();

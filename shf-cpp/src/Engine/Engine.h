@@ -51,6 +51,8 @@ public:
 	bool getWindowFullScreen();
 	//设置是否全屏
 	bool setWindowFullScreen(bool full);
+	//设置全屏显示模式，是否改变分辨率
+	bool setWindowDisplayMode(bool dm);
 
 	//设置鼠标样式
 	void setMouseFromImpImage(IMPImage* impImage);

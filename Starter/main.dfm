@@ -74,7 +74,7 @@ object StarterForm: TStarterForm
   end
   object AlphaCheckBox: TCheckBox
     Left = 258
-    Top = 178
+    Top = 188
     Width = 136
     Height = 17
     Caption = #20027#35282#36974#25377#37096#20998#21322#36879#26126
@@ -147,5 +147,13 @@ object StarterForm: TStarterForm
     Caption = #33258#23450#20041#20998#36776#29575
     TabOrder = 10
     OnClick = DisplayButtonClick
+  end
+  object DisplayModeCheckBox: TCheckBox
+    Left = 258
+    Top = 165
+    Width = 136
+    Height = 17
+    Caption = #20840#23631#26102#26356#25913#20998#36776#29575
+    TabOrder = 11
   end
 end

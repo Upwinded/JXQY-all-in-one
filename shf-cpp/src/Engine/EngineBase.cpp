@@ -1427,10 +1427,22 @@ bool EngineBase::setFullScreen(bool full)
 	}
 	if (fullScreen)
 	{
-		SDL_DisplayMode dm;
-		SDL_GetDisplayMode(0, 0, &dm);
-		SDL_SetWindowSize(window, dm.w, dm.h);
-		SDL_SetWindowFullscreen(window, flags);
+		if (canChangeDisplayMode)
+		{
+			SDL_DisplayMode dm;
+			SDL_GetDisplayMode(0, 0, &dm);
+			dm.w = width;
+			dm.h = height;
+			SDL_SetWindowSize(window, dm.w, dm.h);
+			SDL_SetWindowFullscreen(window, flags);
+		}
+		else
+		{
+			SDL_DisplayMode dm;
+			SDL_GetDisplayMode(0, 0, &dm);
+			SDL_SetWindowSize(window, dm.w, dm.h);
+			SDL_SetWindowFullscreen(window, flags);
+		}	
 	}
 	else
 	{
@@ -1451,6 +1463,12 @@ bool EngineBase::setFullScreen(bool full)
 	updateState();
 	flags = SDL_GetWindowFlags(window);
 	return fullScreen = ((flags & SDL_WINDOW_FULLSCREEN) == SDL_WINDOW_FULLSCREEN);
+}
+
+bool EngineBase::setDisplayMode(bool dm)
+{
+	canChangeDisplayMode = dm;
+	return dm;
 }
 
 void EngineBase::setWindowSize(int w, int h)

@@ -13,6 +13,7 @@ Game::~Game()
 int Game::run()
 {	
 	int w = DEFAULT_WINDOW_WIDTH, h = DEFAULT_WINDOW_HEIGHT;
+	Engine::getInstance()->setWindowDisplayMode(Config::getInstance()->canChangeDisplayMode);
 	Config::getInstance()->getWindowSize(&w, &h);
 	if (Engine::getInstance()->init(gameTitle, w, h, Config::getInstance()->fullScreen) != initOK)
 	{

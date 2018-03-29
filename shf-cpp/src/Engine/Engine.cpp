@@ -81,6 +81,11 @@ bool Engine::setWindowFullScreen(bool full)
 	return fullScreen = engineBase->setFullScreen(full);
 }
 
+bool Engine::setWindowDisplayMode(bool dm)
+{
+	return engineBase->setDisplayMode(dm);
+}
+
 bool Engine::getWindowFullScreen()
 {
 	return fullScreen;

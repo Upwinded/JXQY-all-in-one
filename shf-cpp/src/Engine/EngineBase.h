@@ -168,7 +168,9 @@ public:
 	int width;
 	int height;
 	bool fullScreen;
+	bool canChangeDisplayMode = false;
 	bool setFullScreen(bool full);
+	bool setDisplayMode(bool dm);
 	void setWindowSize(int w, int h);
 	bool hardwareCursor = true;
 

@@ -24,6 +24,7 @@ void Config::load()
 	INIReader ini = INIReader::INIReader(fileName);
 	fullScreen = ini.GetBoolean("Game", "FullScreen", fullScreen);
 	playerAlpha = ini.GetBoolean("Game", "PlayerAlpha", playerAlpha);
+	canChangeDisplayMode = ini.GetBoolean("Game", "CanChangeDisplayMode", canChangeDisplayMode);
 
 	windowWidth = ini.GetInteger("Game", "WindowWidth", windowWidth);
 	windowHeight = ini.GetInteger("Game", "WindowHeight", windowHeight);
@@ -55,6 +56,7 @@ void Config::save()
 	std::string fileName = CONFIG_INI;
 	INIReader ini = INIReader::INIReader(fileName);
 	ini.SetBoolean("Game", "FullScreen", fullScreen);
+	ini.SetBoolean("Game", "CanChangeDisplayMode", canChangeDisplayMode);
 	ini.SetBoolean("Game", "PlayerAlpha", playerAlpha);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();

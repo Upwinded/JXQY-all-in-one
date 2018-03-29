@@ -32,6 +32,7 @@ type
     DisplayLabel: TLabel;
     DisplayComboBox: TComboBox;
     DisplayButton: TButton;
+    DisplayModeCheckBox: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure MusicScrollbarChange(Sender: TObject);
     procedure SoundScrollbarChange(Sender: TObject);
@@ -97,7 +98,7 @@ procedure TStarterForm.loadConfig();
 var
   ini: TIniFile;
   musicVolume, soundVolume: Integer;
-  fullScreen, playerAlpha: Boolean;
+  fullScreen, playerAlpha, canChangeDisplayMode: Boolean;
 begin
   if (not FileExists(configFileName)) then
   begin
@@ -107,12 +108,14 @@ begin
   musicVolume := ini.ReadInteger('Game', 'MusicVolume', 100);
   soundVolume := ini.ReadInteger('Game', 'SoundVolume', 100);
   fullScreen := ini.ReadBool('Game', 'FullScreen', true);
+  canChangeDisplayMode := ini.ReadBool('Game', 'CanChangeDisplayMode', false);
   playerAlpha := ini.ReadBool('Game', 'PlayerAlpha', true);
   displayMode.w := ini.ReadInteger('Game', 'WindowWidth', 1280);
   displayMode.h := ini.ReadInteger('Game', 'WindowHeight', 720);
   MusicScrollbar.Position := musicVolume;
   SoundScrollbar.Position := soundVolume;
   FullScreenCheckBox.Checked := fullScreen;
+  DisplayModeCheckBox.Checked := canChangeDisplayMode;
   AlphaCheckBox.Checked := playerAlpha;
   MusicScrollbarChange(self);
   SoundScrollbarChange(self);
@@ -123,16 +126,18 @@ procedure TStarterForm.saveConfig();
 var
   ini: TIniFile;
   musicVolume, soundVolume: Integer;
-  fullScreen, playerAlpha: Boolean;
+  fullScreen, canChangeDisplayMode, playerAlpha: Boolean;
 begin
   musicVolume := MusicScrollbar.Position;
   soundVolume := SoundScrollbar.Position;
   fullScreen := FullScreenCheckBox.Checked;
+  canChangeDisplayMode := DisplayModeCheckBox.Checked;
   playerAlpha := AlphaCheckBox.Checked;
   ini := TIniFile.Create(configFileName);
   ini.WriteInteger('Game', 'MusicVolume', musicVolume);
   ini.WriteInteger('Game', 'SoundVolume', soundVolume);
   ini.WriteBool('Game', 'FullScreen', fullScreen);
+  ini.WriteBool('Game', 'CanChangeDisplayMode', canChangeDisplayMode);
   ini.WriteBool('Game', 'PlayerAlpha', playerAlpha);
   ini.WriteInteger('Game', 'WindowWidth', displayMode.w);
   ini.WriteInteger('Game', 'WindowHeight', displayMode.h);
