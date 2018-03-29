@@ -1537,17 +1537,21 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	dm.w = wWidth;
 	dm.h = wHeight;
 
+	flags |= SDL_WINDOW_HIDDEN;
 	if (fullScreen)
 	{
 		flags |= SDL_WINDOW_FULLSCREEN;
-		SDL_GetDisplayMode(0, 0, &dm);
-	}
-	else
-	{
-		flags |= SDL_WINDOW_HIDDEN;
+		if (!canChangeDisplayMode)
+		{
+			SDL_GetCurrentDisplayMode(0, &dm);
+		}
 	}
 
 	window = SDL_CreateWindow(windowCaption.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, dm.w, dm.h, flags);
+	if (fullScreen && canChangeDisplayMode)
+	{
+		SDL_SetWindowDisplayMode(window, &dm);
+	}
 
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	
