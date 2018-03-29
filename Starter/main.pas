@@ -217,6 +217,7 @@ begin
   else
     ShowMessage('·Ö±æÂÊÊäÈë´íÎó£¡');
   strList.Free;
+  DisplayComboBoxChange(Sender);
 end;
 
 procedure TStarterForm.DisplayComboBoxChange(Sender: TObject);
@@ -320,7 +321,7 @@ begin
   if index < 0 then
   begin
     index := Length(displayModeList.displayMode);
-    SetLength(displayModeList.displayMode, Length(displayModeList.displayMode) + 1);
+    SetLength(displayModeList.displayMode, index + 1);
     displayModeList.displayMode[index] := displayMode;
   end;
 
