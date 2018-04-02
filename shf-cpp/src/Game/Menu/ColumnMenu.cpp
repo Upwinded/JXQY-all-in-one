@@ -31,7 +31,7 @@ void ColumnMenu::updateState()
 	
 }
 
-void ColumnMenu::onEvent()
+void ColumnMenu::onUpdate()
 {
 	updateState();
 }

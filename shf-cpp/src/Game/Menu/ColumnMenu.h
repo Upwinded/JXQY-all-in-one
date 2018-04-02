@@ -16,7 +16,7 @@ public:
 	void updateState();
 
 private:
-	virtual void onEvent();
+	virtual void onUpdate();
 	virtual void init();
 	virtual void freeResource();
 };
