@@ -359,21 +359,6 @@ int NPC::calDirection(Point dest)
 	return calDirection(position, dest);
 }
 
-unsigned int NPC::calStepLastTime()
-{
-	int speed = walkSpeed;
-	if (isRunning())
-	{
-		speed = runSpeed;
-	}
-	stepLastTime = (unsigned int)(0.5 / ((double)speed) / (double)speedTime);
-	if (direction % 2 != 0)
-	{
-		stepLastTime = (unsigned int)(1.414 / 2 * stepLastTime + 0.5);
-	}
-	return stepLastTime;
-}
-
 int NPC::calDirection(double angle)
 {
 #ifdef pi
@@ -1254,8 +1239,7 @@ void NPC::beginWalk(Point dest)
 		stepList = tempList;
 		direction = calDirection(stepList[0]);
 		stepState = ssOut;
-		nowAction = acWalk;
-		calStepLastTime();
+		stepLastTime = (unsigned int)(0.5 / ((double)walkSpeed) / (double)speedTime);
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
 		gm->map.addStepToDataMap(stepList[0], npcIndex);
@@ -1457,8 +1441,7 @@ void NPC::beginRun(Point dest)
 		stepList = tempList;
 		direction = calDirection(stepList[0]);
 		stepState = ssOut;
-		nowAction = acRun;
-		calStepLastTime();
+		stepLastTime = (unsigned int)(0.5 / ((double)runSpeed) / (double)speedTime);
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
 		gm->map.addStepToDataMap(stepList[0], npcIndex);
@@ -1492,8 +1475,7 @@ void NPC::beginRadiusStep(Point dest, int radius)
 		stepList = tempList;
 		direction = calDirection(stepList[0]);
 		stepState = ssOut;
-		nowAction = acWalk;
-		calStepLastTime();
+		stepLastTime = (unsigned int)(0.5 / ((double)walkSpeed) / (double)speedTime);
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
 		gm->map.addStepToDataMap(stepList[0], npcIndex);
@@ -1526,9 +1508,9 @@ void NPC::changeRadiusStep(Point dest, int radius)
 		stepList = tempList;
 		direction = calDirection(stepList[0]);
 		stepState = ssOut;
+		stepLastTime = (unsigned int)(0.5 / ((double)walkSpeed) / (double)speedTime);
 		stepBeginTime += stepLastTime;
-		nowAction = acWalk;
-		calStepLastTime();
+		//actionBeginTime = getUpdateTime();
 		gm->map.addStepToDataMap(stepList[0], npcIndex);
 		if (fight > 0 && canDoAction(acAWalk))
 		{
@@ -1560,8 +1542,7 @@ void NPC::beginRadiusWalk(Point dest, int radius)
 		stepList = tempList;
 		direction = calDirection(stepList[0]);
 		stepState = ssOut;
-		nowAction = acWalk;
-		calStepLastTime();
+		stepLastTime = (unsigned int)(0.5 / ((double)walkSpeed) / (double)speedTime);
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
 		gm->map.addStepToDataMap(stepList[0], npcIndex);
@@ -2147,7 +2128,6 @@ void NPC::updateAction(unsigned int frameTime)
 							gm->map.addStepToDataMap(stepList[0], npcIndex);
 							direction = calDirection(stepList[0]);
 							stepBeginTime += stepLastTime;
-							calStepLastTime();
 							calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
 						}
 						else
@@ -2159,10 +2139,9 @@ void NPC::updateAction(unsigned int frameTime)
 					{
 						canWalkNextStep = true;
 						stepState = ssOut;
-						stepBeginTime += stepLastTime;
 						gm->map.addStepToDataMap(stepList[0], npcIndex);
-						direction = calDirection(stepList[0]);	
-						calStepLastTime();
+						direction = calDirection(stepList[0]);
+						stepBeginTime += stepLastTime;
 						calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
 					}
 					

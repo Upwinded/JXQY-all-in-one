@@ -1960,7 +1960,7 @@ void GameManager::onEvent()
 				act.dest = pos;
 				player.addNextAction(&act);
 			}
-		}
+		}		
 	}
 	else if (!dragging && MouseAlreadyDown && engine->getMousePress(MOUSE_LEFT) && npcManager.clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
 	{
@@ -1987,7 +1987,7 @@ void GameManager::onEvent()
 			act.dest = npcManager.npcList[npcManager.clickIndex]->position;
 			player.addNextAction(&act);
 		}
-
+		
 	}
 	else if (!dragging && MouseAlreadyDown && engine->getMousePress(MOUSE_LEFT) && objectManager.clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
 	{
@@ -2004,66 +2004,6 @@ void GameManager::onEvent()
 		act.destGE = objectManager.objectList[objectManager.clickIndex];
 		act.type = ndObj;
 		act.dest = objectManager.objectList[objectManager.clickIndex]->position;
-		player.addNextAction(&act);
-	}
-
-	bool KeyStep = true;
-	Point dest = player.position;
-	int line = std::abs(dest.y % 2);
-	NextAction act;
-	if (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT))
-	{
-		act.action = acARun;
-	}
-	else
-	{
-		act.action = acAWalk;
-	}
-
-	if (engine->getKeyPress(KEY_UP) && engine->getKeyPress(KEY_LEFT))
-	{
-		dest.x += -1 + line;
-		dest.y -= 1;
-	}
-	else if (engine->getKeyPress(KEY_UP) && engine->getKeyPress(KEY_RIGHT))
-	{
-		dest.x += line;
-		dest.y -= 1;
-	}
-	else if (engine->getKeyPress(KEY_DOWN) && engine->getKeyPress(KEY_LEFT))
-	{
-		dest.x += -1 + line;
-		dest.y += 1;
-	}
-	else if (engine->getKeyPress(KEY_DOWN) && engine->getKeyPress(KEY_RIGHT))
-	{
-		dest.x += line;
-		dest.y += 1;
-	}
-	else if (engine->getKeyPress(KEY_UP))
-	{
-		dest.y -= 2;
-	}
-	else if (engine->getKeyPress(KEY_DOWN))
-	{
-		dest.y += 2;
-	}
-	else if (engine->getKeyPress(KEY_LEFT))
-	{
-		dest.x -= 1;
-	}
-	else if (engine->getKeyPress(KEY_RIGHT))
-	{
-		dest.x += 1;
-	}
-	else
-	{
-		KeyStep = false;
-	}
-
-	if (KeyStep && map.canWalk(dest))
-	{
-		act.dest = dest;
 		player.addNextAction(&act);
 	}
 }

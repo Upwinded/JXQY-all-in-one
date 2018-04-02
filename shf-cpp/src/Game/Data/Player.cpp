@@ -366,7 +366,6 @@ void Player::updateAction(unsigned int frameTime)
 								gm->map.addStepToDataMap(stepList[0], npcIndex);
 								direction = calDirection(stepList[0]);
 								stepBeginTime += stepLastTime;
-								calStepLastTime();
 								calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
 							}
 							else
@@ -389,7 +388,6 @@ void Player::updateAction(unsigned int frameTime)
 							gm->map.addStepToDataMap(stepList[0], npcIndex);
 							direction = calDirection(stepList[0]);
 							stepBeginTime += stepLastTime;
-							calStepLastTime();
 							calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
 						}					
 					}		
@@ -1048,8 +1046,7 @@ void Player::changeWalk(Point dest)
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
 			stepBeginTime += stepLastTime;
-			nowAction = acWalk;
-			calStepLastTime();
+			stepLastTime = (unsigned int)(0.5 / ((double)walkSpeed) / (double)speedTime);
 			gm->map.addStepToDataMap(stepList[0], npcIndex);
 			if (fight > 0 && canDoAction(acAWalk))
 			{
@@ -1130,8 +1127,7 @@ void Player::changeRun(Point dest)
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
 			stepBeginTime += stepLastTime;
-			nowAction = acRun;
-			calStepLastTime();
+			stepLastTime = (unsigned int)(0.5 / ((double)runSpeed) / (double)speedTime);
 			gm->map.addStepToDataMap(stepList[0], npcIndex);
 			if (fight > 0 && canDoAction(acARun))
 			{
@@ -1279,8 +1275,7 @@ void Player::beginWalk(Point dest)
 			stepList = tempList;
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
-			nowAction = acWalk;
-			calStepLastTime();
+			stepLastTime = (unsigned int)(0.5 / ((double)walkSpeed) / (double)speedTime);
 			stepBeginTime = getUpdateTime();
 			actionBeginTime = getUpdateTime();
 			gm->map.addStepToDataMap(stepList[0], npcIndex);
@@ -1422,8 +1417,7 @@ void Player::beginRun(Point dest)
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
 			actionBeginTime = getUpdateTime();
-			nowAction = acRun;
-			calStepLastTime();
+			stepLastTime = (unsigned int)(0.5 / ((double)runSpeed) / (double)speedTime);
 			stepBeginTime = getUpdateTime();
 			actionBeginTime = getUpdateTime();
 			gm->map.addStepToDataMap(stepList[0], npcIndex);
