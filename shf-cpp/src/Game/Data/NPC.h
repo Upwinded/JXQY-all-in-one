@@ -143,6 +143,7 @@ public:
 	void calOffset(int nowTime, int totalTime);
 	int getInvertDirection(int dir);
 	int calDirection(Point dest);
+	unsigned int calStepLastTime();
 	static int calDirection(double angle);
 	static int calDirection(Point src, Point dest);
 	unsigned int walkTime = 0;

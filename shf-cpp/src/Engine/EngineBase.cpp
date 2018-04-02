@@ -1109,7 +1109,7 @@ void EngineBase::handleEvent()
 				break;
 			}
 			case SDL_KEYDOWN: case SDL_KEYUP:
-			{
+			{				
 				eventList.event.push_back({ (EventType)e.type , e.key.keysym.scancode });
 				break;
 			}

@@ -94,13 +94,18 @@ enum KeyCode
 	KEY_F11 = 68,
 	KEY_F12 = 69,
 
+	KEY_RIGHT = 79,
+	KEY_LEFT = 80,
+	KEY_DOWN = 81,
+	KEY_UP = 82,
+
 	KEY_LCTRL = 224,
 	KEY_LSHIFT = 225,
 	KEY_LALT = 226,
 
 	KEY_RCTRL = 228,
 	KEY_RSHIFT = 229,
-	KEY_RALT = 230
+	KEY_RALT = 230,
 };
 
 enum InitErrorType
