@@ -264,7 +264,7 @@ void Map::loadMapMpc()
 				mpcName += "\\";
 			}
 			mpcName += data->mpc.mpc[i].name;
-			mapMpc->mpc[i].img = IMP::createIMPImage(mpcName);			
+			mapMpc->mpc[i].img = IMP::createIMPImage(mpcName);
 		}
 
 	}

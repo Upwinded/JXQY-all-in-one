@@ -1171,8 +1171,8 @@ double Magic::calAngle(Point from, Point to)
 {
 	Point pos = Map::getTilePosition(to, from, { 0, 0 }, { 0, 0 });
 	PointEx dir;
-	dir.x = ((double)pos.x) / TILE_WIDTH;
-	dir.y = ((double)pos.y) / TILE_HEIGHT;
+	dir.x = ((double)pos.x);// / TILE_WIDTH;
+	dir.y = ((double)pos.y);// / TILE_HEIGHT;
 	dir.x = -dir.x;
 	return atan2(dir.x, dir.y);
 }

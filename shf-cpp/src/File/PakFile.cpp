@@ -404,10 +404,10 @@ int PakFile::readFile(const std::string & fileName, char ** s)
 	{
 		fName = fName.c_str() + 1;
 	}
-	if (File::fileExist(fileName))
+	if (File::fileExist(fName))
 	{
 		int len;
-		return readFile(fileName, s, &len);
+		return readFile(fName, s, &len);
 	}
 	int fileID = hashFileName(fName);
 	return readFile(fileID, s);
