@@ -20,4 +20,3 @@ private:
 	virtual void init();
 	virtual void freeResource();
 };
-
