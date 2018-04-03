@@ -63,7 +63,7 @@ The source codes are distributed under zlib license, with two additional clauses
 
 2.If the codes are used in KYS related or SHF related games, the game itself shall not involve any sort of profit making aspect.
 
-(KYS means Kam Yung's Stories, and SHF means Sword Heroes' Fate.)
+(KYS means All Heroes in Kam Yung's Stories, and SHF means Sword Heroes' Fate.)
 
 The zlib license is as followes：
 
