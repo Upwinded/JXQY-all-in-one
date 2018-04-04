@@ -39,7 +39,6 @@ end;
 
 var
   appI: integer;
-
   MutexHandle, FileMutexHandle: THandle;
   pramstr: widestring;
   paramcountI: integer;
@@ -47,7 +46,6 @@ var
   Appstr: Ansistring;
   Appchar: PAnsichar;
   Apph, formh: HWND;
-
 
 begin
   titleStr := Appname + VersionString;

@@ -13,21 +13,23 @@ type
     ScrollBar: TScrollBar;
     Image: TImage;
     OpenDialog: TOpenDialog;
-    Panel3: TPanel;
-    FileNameLabel: TLabel;
-    FileNameEdit: TEdit;
-    OpenBtn: TButton;
-    Panel4: TPanel;
     PopupMenu: TPopupMenu;
-    DirectionEdit: TEdit;
-    DirectionLabel: TLabel;
-    IntervalLabel: TLabel;
-    IntervalEdit: TEdit;
-    SaveBtn: TButton;
     InsertItem: TMenuItem;
     EditItem: TMenuItem;
     DeleteItem: TMenuItem;
     AddItem: TMenuItem;
+    FileNameLabel: TLabel;
+    FileNameEdit: TEdit;
+    OpenBtn: TButton;
+    SaveBtn: TButton;
+    DirectionEdit: TEdit;
+    IntervalEdit: TEdit;
+    IntervalLabel: TLabel;
+    DirectionLabel: TLabel;
+    Panel3: TPanel;
+    DynamicImage: TImage;
+    DynamicCheckBox: TCheckBox;
+    Timer: TTimer;
     procedure FormResize(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -42,6 +44,10 @@ type
     procedure InsertItemClick(Sender: TObject);
     procedure AddItemClick(Sender: TObject);
     procedure EditItemClick(Sender: TObject);
+    procedure TimerTimer(Sender: TObject);
+    procedure DynamicCheckBoxClick(Sender: TObject);
+    procedure IntervalEditChange(Sender: TObject);
+    procedure DirectionEditChange(Sender: TObject);
   private
     { Private declarations }
     FBuffer: TBitmap;
@@ -51,6 +57,7 @@ type
     FLineWidth: Integer;
     FSelectedIndex: Integer;
     PopupSelectedIndex: Integer;
+    TimerCount: Integer;
     procedure DrawBuffer();
     procedure BufferPresent();
     procedure DrawSquare(x, y: Integer);
@@ -86,6 +93,7 @@ begin
   CImageEditor := False;
   FIMPImageFile.Free();
   FIMPImageFile := nil;
+  Timer.Enabled := False;
 end;
 
 procedure TImageEditor.FormCreate(Sender: TObject);
@@ -94,6 +102,7 @@ begin
   FIMPImageFile := TIMPImageFile.Create;
   Col := clRed;
   BGCol := clWhite;
+  TimerCount := 0;
 end;
 
 procedure TImageEditor.FormResize(Sender: TObject);
@@ -113,6 +122,14 @@ procedure TImageEditor.DeleteItemClick(Sender: TObject);
 begin
   FIMPImageFile.DeleteFrame(PopupSelectedIndex);
   ReDraw();
+end;
+
+procedure TImageEditor.DirectionEditChange(Sender: TObject);
+begin
+  try
+    FIMPImageFile.directions := StrToInt(DirectionEdit.Text);
+  except
+  end;
 end;
 
 procedure TImageEditor.DrawBuffer();
@@ -180,6 +197,12 @@ begin
     Image.Canvas.Pixels[x, y + i] := clRed;
     Image.Canvas.Pixels[x + FLineWidth, y + i] := Col;
   end;
+end;
+
+procedure TImageEditor.DynamicCheckBoxClick(Sender: TObject);
+begin
+  Timer.Enabled := DynamicCheckBox.Checked and (FIMPImageFile.interval > 0);
+  Timer.Interval := FIMPImageFile.interval;
 end;
 
 procedure TImageEditor.EditItemClick(Sender: TObject);
@@ -298,6 +321,16 @@ begin
     ReDraw();
 end;
 
+procedure TImageEditor.IntervalEditChange(Sender: TObject);
+begin
+  try
+    FIMPImageFile.interval := StrToInt(IntervalEdit.Text);
+  except
+  end;
+  Timer.Enabled := DynamicCheckBox.Checked and (FIMPImageFile.interval > 0);
+  Timer.Interval := FIMPImageFile.interval;
+end;
+
 procedure TImageEditor.OpenBtnClick(Sender: TObject);
 begin
   if OpenDialog.Execute() then
@@ -327,6 +360,26 @@ procedure TImageEditor.ScrollBarChange(Sender: TObject);
 begin
   FNowFirstPicNum := ScrollBar.Position * FLinePicNum;
   ReDraw();
+end;
+
+procedure TImageEditor.TimerTimer(Sender: TObject);
+var
+  bmp: TBitmap;
+begin
+  if (FIMPImageFile = nil) or (FIMPImageFile.imageCount <= 0) then
+    exit;
+  if TimerCount >= FIMPImageFile.imageCount then
+    TimerCount := 0;
+  bmp := TBitmap.Create();
+  bmp.Width := DynamicImage.Width;
+  bmp.Height := DynamicImage.Height;
+  bmp.Canvas.Brush.Color := BGCol;
+  bmp.Canvas.Brush.Style := bsSolid;
+  bmp.Canvas.FillRect(bmp.Canvas.ClipRect);
+  FIMPImageFile.DrawFrameWithOffset(@bmp, TimerCount, bmp.Width div 2, bmp.Height div 2);
+  DynamicImage.Canvas.CopyRect(DynamicImage.Canvas.ClipRect, bmp.Canvas, bmp.Canvas.ClipRect);
+  bmp.Free;
+  Inc(TimerCount);
 end;
 
 end.
