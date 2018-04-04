@@ -519,7 +519,7 @@ begin
         end;
       end;
     end;
-    //æ¸…é™¤label
+    //Çå³ılabel
     for I := 0 to str.Count - 1 do
     begin
       if (length(str.Strings[I]) > 1) and (str.Strings[I][1] = '@') then
@@ -535,7 +535,7 @@ begin
       if labelLine[I] > 0 then
       begin
         if labelLine[I] <= ifLine[I] then
-          showmessage('å­˜åœ¨å‘å›è·³è½¬ï¼' + fileName);
+          showmessage('´æÔÚÏò»ØÌø×ª£¡' + fileName);
         for I2 := labelLine[I] to str.Count - 1 do
         begin
           haveIf := false;
@@ -660,7 +660,7 @@ begin
     end;
   end;
   str.Free;
-  showmessage('è½¬æ¢æ ¼å¼å®Œæˆï¼');
+  showmessage('×ª»»¸ñÊ½Íê³É£¡');
 end;
 
 procedure TRepackForm.Button11Click(Sender: TObject);
@@ -670,14 +670,14 @@ var
   dir, tempname, relativepath: string;
   fileList: TStringList;
 begin
-  if SelectFolderDialog(self.handle, 'é€‰æ‹©è¦æ·»åŠ çš„ç›®å½•', '', dir) then
+  if SelectFolderDialog(self.handle, 'Ñ¡ÔñÒªÌí¼ÓµÄÄ¿Â¼', '', dir) then
   begin
     if (dir[length(dir)] <> '\') and (dir[length(dir)] <> '/') then
         dir := dir + '\';
     if not DirectoryExists(dir) then
       exit;
     fileList := GetAllFile(dir, '.TXT');
-    if SelectFolderDialog(self.handle, 'é€‰æ‹©ç›¸å¯¹è·¯å¾„', dir, dir) then
+    if SelectFolderDialog(self.handle, 'Ñ¡ÔñÏà¶ÔÂ·¾¶', dir, dir) then
     begin
       if (dir[length(dir)] <> '\') and (dir[length(dir)] <> '/') then
         dir := dir + '\';
@@ -685,7 +685,7 @@ begin
       begin
         if not ForceDirectories(dir) then
         begin
-          showmessage('ç›¸å¯¹è·¯å¾„é”™è¯¯ï¼');
+          showmessage('Ïà¶ÔÂ·¾¶´íÎó£¡');
           fileList.Free;
           exit;
         end;
@@ -774,19 +774,19 @@ begin
     end;
   end;
   str.Free;
-  showmessage('è½¬æ¢æ ¼å¼å®Œæˆï¼');
+  showmessage('×ª»»¸ñÊ½Íê³É£¡');
 end;
 
 procedure TRepackForm.Button14Click(Sender: TObject);
 var
   I: integer;
 begin
-    //å‰ªè£å›¾ç‰‡
+    //¼ô²ÃÍ¼Æ¬
   for I := 1 to ValueListEditor1.RowCount - 1 do
   begin
     cutFile(ValueListEditor1.Keys[I]);
   end;
-  showmessage('è½¬æ¢æ ¼å¼å®Œæˆï¼');
+  showmessage('×ª»»¸ñÊ½Íê³É£¡');
 end;
 
 procedure TRepackForm.Button1Click(Sender: TObject);
@@ -798,7 +798,7 @@ begin
   begin
     if fileExists(OpenDialog1.fileName) then
     begin
-      if SelectFolderDialog(self.handle, 'é€‰æ‹©ä¿å­˜æ–‡ä»¶å¤¹', '', dir) then
+      if SelectFolderDialog(self.handle, 'Ñ¡Ôñ±£´æÎÄ¼ş¼Ğ', '', dir) then
       begin
         if dir[length(dir)] <> '\' then
           dir := dir + '\';
@@ -806,24 +806,24 @@ begin
         begin
           if not ForceDirectories(dir) then
           begin
-            showmessage('ä¿å­˜è·¯å¾„é”™è¯¯ï¼');
+            showmessage('±£´æÂ·¾¶´íÎó£¡');
             exit;
           end;
         end;
         if unpakFile(OpenDialog1.fileName, dir) then
         begin
-          showmessage('è§£åŒ…æ–‡ä»¶ï¼š' + OpenDialog1.fileName + ' æˆåŠŸï¼');
+          showmessage('½â°üÎÄ¼ş£º' + OpenDialog1.fileName + ' ³É¹¦£¡');
           addFileList(OpenDialog1.fileName, dir);
         end
         else
         begin
-          showmessage('è§£åŒ…æ–‡ä»¶ï¼š' + OpenDialog1.fileName + ' å‡ºé”™ï¼');
+          showmessage('½â°üÎÄ¼ş£º' + OpenDialog1.fileName + ' ³ö´í£¡');
         end;
       end;
     end
     else
     begin
-      showmessage('æ–‡ä»¶ï¼š' + OpenDialog1.fileName + ' ä¸å­˜åœ¨ï¼');
+      showmessage('ÎÄ¼ş£º' + OpenDialog1.fileName + ' ²»´æÔÚ£¡');
     end;
   end;
 end;
@@ -1377,7 +1377,7 @@ begin
   OpenDialog1.Options := OpenDialog1.Options + [ofAllowMultiSelect];
   if OpenDialog1.Execute then
   begin
-    if SelectFolderDialog(self.handle, 'é€‰æ‹©ç›¸å¯¹è·¯å¾„', ExtractFilePath(OpenDialog1.FileName), dir) then
+    if SelectFolderDialog(self.handle, 'Ñ¡ÔñÏà¶ÔÂ·¾¶', ExtractFilePath(OpenDialog1.FileName), dir) then
     begin
       if (dir[length(dir)] <> '\') and (dir[length(dir)] <> '/') then
         dir := dir + '\';
@@ -1385,7 +1385,7 @@ begin
       begin
         if not ForceDirectories(dir) then
         begin
-          showmessage('ç›¸å¯¹è·¯å¾„é”™è¯¯ï¼');
+          showmessage('Ïà¶ÔÂ·¾¶´íÎó£¡');
           exit;
         end;
       end;
@@ -1441,7 +1441,7 @@ begin
   begin
     transFileFormat(ValueListEditor1.Keys[I], false);
   end;
-  showmessage('è½¬æ¢æ ¼å¼å®Œæˆï¼');
+  showmessage('×ª»»¸ñÊ½Íê³É£¡');
 end;
 
 procedure TRepackForm.Button6Click(Sender: TObject);
@@ -1476,7 +1476,7 @@ begin
       end;
     end;
   except
-    showmessage('æ–‡ä»¶IDé”™è¯¯ï¼Œç¼–å·ï¼š' + inttostr(I));
+    showmessage('ÎÄ¼şID´íÎó£¬±àºÅ£º' + inttostr(I));
     setlength(pakDataHead, 0);
     exit;
   end;
@@ -1524,7 +1524,7 @@ begin
     setlength(pakDataHead, 0);
     fileclose(fph);
     Pak.Destroy;
-    showmessage('æ‰“åŒ…å®Œæˆï¼');
+    showmessage('´ò°üÍê³É£¡');
   end;
 end;
 
@@ -1546,7 +1546,7 @@ begin
   begin
     transFileFormat(ValueListEditor1.Keys[I], true);
   end;
-  showmessage('è½¬æ¢æ ¼å¼å®Œæˆï¼');
+  showmessage('×ª»»¸ñÊ½Íê³É£¡');
 end;
 
 procedure TRepackForm.Button9Click(Sender: TObject);
@@ -1556,14 +1556,14 @@ var
   dir, tempname, relativepath: string;
   fileList: TStringList;
 begin
-  if SelectFolderDialog(self.handle, 'é€‰æ‹©è¦æ·»åŠ çš„ç›®å½•', '', dir) then
+  if SelectFolderDialog(self.handle, 'Ñ¡ÔñÒªÌí¼ÓµÄÄ¿Â¼', '', dir) then
   begin
     if (dir[length(dir)] <> '\') and (dir[length(dir)] <> '/') then
         dir := dir + '\';
     if not DirectoryExists(dir) then
       exit;
     fileList := GetAllFile(dir);
-    if SelectFolderDialog(self.handle, 'é€‰æ‹©ç›¸å¯¹è·¯å¾„', dir, dir) then
+    if SelectFolderDialog(self.handle, 'Ñ¡ÔñÏà¶ÔÂ·¾¶', dir, dir) then
     begin
       if (dir[length(dir)] <> '\') and (dir[length(dir)] <> '/') then
         dir := dir + '\';
@@ -1571,7 +1571,7 @@ begin
       begin
         if not ForceDirectories(dir) then
         begin
-          showmessage('ç›¸å¯¹è·¯å¾„é”™è¯¯ï¼');
+          showmessage('Ïà¶ÔÂ·¾¶´íÎó£¡');
           fileList.Free;
           exit;
         end;

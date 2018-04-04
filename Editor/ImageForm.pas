@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ExtCtrls, StdCtrls, PNGImage, PicFile, Head;
+  Dialogs, ExtCtrls, StdCtrls, PNGImage, PicFile, Head, Menus;
 
 type
   TImageEditor = class(TForm)
@@ -12,10 +12,22 @@ type
     Panel2: TPanel;
     ScrollBar: TScrollBar;
     Image: TImage;
-    FileNameEdit: TEdit;
-    FileNameLabel: TLabel;
-    OpenBtn: TButton;
     OpenDialog: TOpenDialog;
+    Panel3: TPanel;
+    FileNameLabel: TLabel;
+    FileNameEdit: TEdit;
+    OpenBtn: TButton;
+    Panel4: TPanel;
+    PopupMenu: TPopupMenu;
+    DirectionEdit: TEdit;
+    DirectionLabel: TLabel;
+    IntervalLabel: TLabel;
+    IntervalEdit: TEdit;
+    SaveBtn: TButton;
+    InsertItem: TMenuItem;
+    EditItem: TMenuItem;
+    DeleteItem: TMenuItem;
+    AddItem: TMenuItem;
     procedure FormResize(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
@@ -23,6 +35,13 @@ type
     procedure ScrollBarChange(Sender: TObject);
     procedure ImageMouseMove(Sender: TObject; Shift: TShiftState; X,
       Y: Integer);
+    procedure SaveBtnClick(Sender: TObject);
+    procedure ImageMouseUp(Sender: TObject; Button: TMouseButton;
+      Shift: TShiftState; X, Y: Integer);
+    procedure DeleteItemClick(Sender: TObject);
+    procedure InsertItemClick(Sender: TObject);
+    procedure AddItemClick(Sender: TObject);
+    procedure EditItemClick(Sender: TObject);
   private
     { Private declarations }
     FBuffer: TBitmap;
@@ -31,13 +50,20 @@ type
     FLineNum: Integer;
     FLineWidth: Integer;
     FSelectedIndex: Integer;
+    PopupSelectedIndex: Integer;
     procedure DrawBuffer();
     procedure BufferPresent();
+    procedure DrawSquare(x, y: Integer);
+    procedure ReDraw();
+    function InsertFrame(idx: Integer): Boolean;
+    function EditFrame(idx: Integer): Boolean;
   const
     FLinePicNum: Integer = 10;
     FLineHeight: Integer = 150;
   public
     { Public declarations }
+    Col: Cardinal;
+    BGCol: Cardinal;
     function GetNowFirstPicNum(): Integer;
     property nowFirstPicNum: Integer read GetNowFirstPicNum;
     function GetPicCount(): Integer;
@@ -47,32 +73,46 @@ type
 
 implementation
 
+uses
+  ImageEdit;
+
 {$R *.dfm}
 
 procedure TImageEditor.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-  FBuffer.Free;
-  FIMPImageFile.Free;
+  FBuffer.Free();
+  FBuffer := nil;
   Action := caFree;
-  CImageEditor := false;
+  CImageEditor := False;
+  FIMPImageFile.Free();
+  FIMPImageFile := nil;
 end;
 
 procedure TImageEditor.FormCreate(Sender: TObject);
 begin
   FBuffer := TBitmap.Create;
   FIMPImageFile := TIMPImageFile.Create;
+  Col := clRed;
+  BGCol := clWhite;
 end;
 
 procedure TImageEditor.FormResize(Sender: TObject);
 begin
+  if FBuffer = nil then
+    exit;
   Image.Picture.Bitmap.Width := Image.Width;
   Image.Picture.Bitmap.Height := Image.Height;
   FBuffer.Width := Image.Width;
   FBuffer.Height := Image.Height;
   FLineNum := Image.Height div FLineHeight + 1;
   FLineWidth := Image.Width div FLinePicNum;
-  DrawBuffer();
-  BufferPresent();
+  ReDraw();
+end;
+
+procedure TImageEditor.DeleteItemClick(Sender: TObject);
+begin
+  FIMPImageFile.DeleteFrame(PopupSelectedIndex);
+  ReDraw();
 end;
 
 procedure TImageEditor.DrawBuffer();
@@ -89,10 +129,12 @@ begin
   begin
     totalNum := picCount;
   end;
-  FBuffer.Canvas.Brush.Color := clWhite;
+  if FBuffer = nil then
+    exit;
+  FBuffer.Canvas.Brush.Color := BGCol;
   FBuffer.Canvas.FillRect(FBuffer.Canvas.ClipRect);
   FBuffer.Canvas.Brush.Style := bsClear;
-  FBuffer.Canvas.Font.Color := clred;
+  FBuffer.Canvas.Font.Color := Col;
   FBuffer.Canvas.Font.Size := 10;
   for I := FNowFirstPicNum to totalNum - 1 do
   begin
@@ -111,9 +153,92 @@ begin
   end;
 end;
 
+procedure TImageEditor.AddItemClick(Sender: TObject);
+begin
+  if InsertFrame(picCount) then
+    ReDraw();
+end;
+
 procedure TImageEditor.BufferPresent();
 begin
+  if FBuffer = nil then
+    exit;
   Image.Canvas.CopyRect(Image.Canvas.ClipRect, FBuffer.Canvas, FBuffer.Canvas.ClipRect);
+end;
+
+procedure TImageEditor.DrawSquare(x, y: Integer);
+var
+  i: Integer;
+begin
+  for i := 0 to FLineWidth - 1 do
+  begin
+    Image.Canvas.Pixels[x + i, y] := clRed;
+    Image.Canvas.Pixels[x + i, y + FLineHeight] := Col;
+  end;
+  for i := 1 to FLineHeight - 2 do
+  begin
+    Image.Canvas.Pixels[x, y + i] := clRed;
+    Image.Canvas.Pixels[x + FLineWidth, y + i] := Col;
+  end;
+end;
+
+procedure TImageEditor.EditItemClick(Sender: TObject);
+begin
+  if EditFrame(PopupSelectedIndex) then
+    ReDraw();
+end;
+
+procedure TImageEditor.ReDraw;
+begin
+  DrawBuffer();
+  BufferPresent();
+  FSelectedIndex := -1;
+end;
+
+function TImageEditor.InsertFrame(idx: Integer): Boolean;
+var
+  data: array of Byte;
+  len, count, i: Integer;
+  FH: Cardinal;
+begin
+  Result := false;
+  OpenDialog.Filter := 'PNG files (*.png)|*.png|All files (*.*)|*.*';
+  if OpenDialog.Execute() then
+  begin
+    count := 0;
+    for i := 0 to OpenDialog.Files.Count - 1 do
+    begin
+      if FileExists(OpenDialog.Files[i]) then
+      begin
+        FH := FileOpen(OpenDialog.Files[i], fmOpenRead);
+        len := FileSeek(FH, 0, 2);
+        FileSeek(FH, 0, 0);
+        if len <= 0 then
+        begin
+          FIMPImageFile.InsertFrame(idx + count, nil, 0, 0, 0);
+        end
+        else
+        begin
+          SetLength(data, len);
+          FileRead(FH, data[0], len);
+          FIMPImageFile.InsertFrame(idx + count, @data[0], len, 0, 0);
+        end;
+        SetLength(data, 0);
+        FileClose(FH);
+        Inc(count);
+        Result := true;
+      end;
+    end;
+  end;
+end;
+
+function TImageEditor.EditFrame(idx: Integer): Boolean;
+var
+  ImageEditForm: TImageEditForm;
+begin
+  ImageEditForm := TImageEditForm.Create(Self);
+  Result := ImageEditForm.doEdit(idx, @FIMPImageFile);
+  ImageEditForm.Free();
 end;
 
 function TImageEditor.GetNowFirstPicNum(): Integer;
@@ -123,7 +248,10 @@ end;
 
 function TImageEditor.GetPicCount(): Integer;
 begin
-  result := FIMPImageFile.imageCount;
+  if FIMPImageFile <> nil then
+    result := FIMPImageFile.imageCount
+  else
+    result := 0;
 end;
 
 procedure TImageEditor.ImageMouseMove(Sender: TObject; Shift: TShiftState; X,
@@ -131,30 +259,74 @@ procedure TImageEditor.ImageMouseMove(Sender: TObject; Shift: TShiftState; X,
 var
   temp: Integer;
 begin
-  //FSelectedIndex
+  if x >= FLinePicNum * FLineWidth then
+  begin
+    temp := -1;
+  end
+  else
+  begin
+    temp := x div FLineWidth + (y div FLineHeight) * FLinePicNum;
+    if (FIMPImageFile <> nil) and (temp + FNowFirstPicNum >= FIMPImageFile.imageCount) then
+      temp := -1;
+  end;
+
+  if temp <> FSelectedIndex then
+  begin
+    FSelectedIndex := temp;
+    BufferPresent();
+    if FSelectedIndex >= 0 then
+      DrawSquare(FSelectedIndex mod FLinePicNum * FLineWidth, FSelectedIndex div FLinePicNum * FLineHeight);
+  end;
+end;
+
+procedure TImageEditor.ImageMouseUp(Sender: TObject; Button: TMouseButton;
+  Shift: TShiftState; X, Y: Integer);
+var
+  pt: TPoint;
+begin
+  GetCursorPos(pt);
+  if (FSelectedIndex >= 0) and (Button = mbRight) then
+  begin
+    PopupSelectedIndex := FSelectedIndex + FNowFirstPicNum;
+    PopupMenu.Popup(pt.X, pt.Y);
+  end;
+end;
+
+procedure TImageEditor.InsertItemClick(Sender: TObject);
+begin
+  if InsertFrame(PopupSelectedIndex) then
+    ReDraw();
 end;
 
 procedure TImageEditor.OpenBtnClick(Sender: TObject);
 begin
   if OpenDialog.Execute() then
   begin
+    OpenDialog.Filter :=  'All files (*.*)|*.*';
     if FIMPImageFile.Load(OpenDialog.FileName) then
     begin
       FileNameEdit.Text := OpenDialog.FileName;
       ScrollBar.Max := FIMPImageFile.imageCount div FLinePicNum;
       ScrollBar.Position := 0;
       FNowFirstPicNum := 0;
-      DrawBuffer();
-      BufferPresent();
+      DirectionEdit.Text := IntToStr(FIMPImageFile.directions);
+      IntervalEdit.Text := IntToStr(FIMPImageFile.interval);
+      ReDraw();
     end;
   end;
+end;
+
+procedure TImageEditor.SaveBtnClick(Sender: TObject);
+begin
+  FIMPImageFile.directions := StrToInt(DirectionEdit.Text);
+  FIMPImageFile.interval := StrToInt(IntervalEdit.Text);
+  FIMPImageFile.Save(FileNameEdit.Text);
 end;
 
 procedure TImageEditor.ScrollBarChange(Sender: TObject);
 begin
   FNowFirstPicNum := ScrollBar.Position * FLinePicNum;
-  DrawBuffer();
-  BufferPresent();
+  ReDraw();
 end;
 
 end.

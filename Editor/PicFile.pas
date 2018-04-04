@@ -158,10 +158,17 @@ Type
 
   PBitmap = ^TBitmap;
 
+  PPByte = ^PByte;
+
   TIMPImageFile = class
-    Destructor Destroy; overload; virtual;
+    Destructor Destroy;
   private
     FIMPImage: TIMPImage;
+    function GetImageCount(): Integer;
+    function GetInterval(): Integer;
+    procedure SetInterval(itv: Integer);
+    function GetDirection(): Integer;
+    procedure SetDirection(dir: Integer);
   public
     procedure Clear();
     procedure Save(fileName: String);
@@ -169,9 +176,14 @@ Type
     procedure DrawFrame(dest: PBitmap; index, x, y: Integer);
     procedure DrawFrameWithOffset(dest: PBitmap; index, x, y: Integer);
     procedure StretchDrawFrame(dest: PBitmap; index: Integer; rect: TRect);
-    function GetImageCount(): Integer;
+    function GetFrameData(index: Integer; data: PPByte; len: PInteger): Boolean;
+    procedure GetFrameOffset(index: Integer; x, y: PInteger);
+    property directions: Integer read GetDirection write SetDirection;
+    property interval: Integer read GetInterval write SetInterval;
     property imageCount: Integer read GetImageCount;
     procedure SetFrame(index: Integer; data: PByte; len, xOffset, yOffset: Integer);
+    procedure SetFrameData(index: Integer; data: PByte; len: Integer);
+    procedure SetFrameOffset(index: Integer; xOffset, yOffset: Integer);
     procedure CopyFrame(dest, source: Integer);
     procedure InsertFrame(index: Integer; data: PByte; len, xOffset, yOffset: Integer);
     procedure AddFrame(data: PByte; len, xOffset, yOffset: Integer);
@@ -179,6 +191,8 @@ Type
   const
     IMGHead: AnsiString = 'IMG File Ver1.0' + #0;
   end;
+
+  PIMPImageFile = ^TIMPImageFile;
 
 implementation
 
@@ -323,6 +337,33 @@ begin
   png.Free;
 end;
 
+function TIMPImageFile.GetFrameData(index: Integer; data: PPByte; len: PInteger): Boolean;
+begin
+  Result := False;
+  if (data = nil) or (len = nil) then
+    Exit();
+  if (index >= 0) and (index < imageCount) then
+  begin
+    len^ := FIMPImage.frame[index].dataLen;
+    if len^ > 0 then
+      data^ := @FIMPImage.frame[index].data[0]
+    else
+      data^ := nil;
+    Result := True;
+  end;
+end;
+
+procedure TIMPImageFile.GetFrameOffset(index: Integer; x, y: PInteger);
+begin
+  if (index >= 0) and (index < imageCount) then
+  begin
+    if x <> nil then
+      x^ := FIMPImage.frame[index].xOffset;
+    if y <> nil then
+      y^ := FIMPImage.frame[index].yOffset;
+  end;
+end;
+
 procedure TIMPImageFile.DrawFrameWithOffset(dest: PBitmap; index, x, y: Integer);
 begin
   //
@@ -332,6 +373,8 @@ begin
   dec(y, FIMPImage.frame[index].yOffset);
   DrawFrame(dest, index, x, y);
 end;
+
+
 
 procedure TIMPImageFile.StretchDrawFrame(dest: PBitmap; index: Integer; rect: TRect);
 var
@@ -369,6 +412,25 @@ begin
   end;
   png.Free;
 end;
+function TIMPImageFile.GetInterval(): Integer;
+begin
+  Result := FIMPImage.interval;
+end;
+
+procedure TIMPImageFile.SetInterval(itv: Integer);
+begin
+  FIMPImage.interval := itv;
+end;
+
+function TIMPImageFile.GetDirection(): Integer;
+begin
+  Result := FIMPImage.directions;
+end;
+
+procedure TIMPImageFile.SetDirection(dir: Integer);
+begin
+  FIMPImage.directions := dir;
+end;
 
 function TIMPImageFile.GetImageCount(): Integer;
 begin
@@ -387,7 +449,13 @@ end;
 
 procedure TIMPImageFile.SetFrame(index: Integer; data: PByte; len, xOffset, yOffset: Integer);
 begin
-  if (index < 0) or (index >= FIMPImage.frameCount) then
+  SetFrameData(index, data, len);
+  SetFrameOffset(index, xOffset, yOffset);
+end;
+
+procedure TIMPImageFile.SetFrameData(index: Integer; data: PByte; len: Integer);
+begin
+   if (index < 0) or (index >= FIMPImage.frameCount) then
     exit;
   if (len < 0) then
     len := 0;
@@ -397,6 +465,10 @@ begin
   begin
     copymemory(@FIMPImage.frame[index].data[0], data, len);
   end;
+end;
+
+procedure TIMPImageFile.SetFrameOffset(index: Integer; xOffset, yOffset: Integer);
+begin
   FIMPImage.frame[index].xOffset := xOffset;
   FIMPImage.frame[index].yOffset := yOffset;
 end;

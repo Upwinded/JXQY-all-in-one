@@ -18,7 +18,8 @@ uses
   PakFile in 'PakFile.pas',
   lzoobj in 'lzoobj.pas',
   PicFile in 'PicFile.pas',
-  ImageForm in 'ImageForm.pas' {ImageEditor};
+  ImageForm in 'ImageForm.pas' {ImageEditor},
+  ImageEdit in 'ImageEdit.pas' {ImageEditForm};
 
 {$R App.RES}
 

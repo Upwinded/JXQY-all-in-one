@@ -3,13 +3,13 @@ object FlashForm: TFlashForm
   Top = 0
   BorderStyle = bsNone
   Caption = 'FlashForm'
-  ClientHeight = 384
-  ClientWidth = 512
+  ClientHeight = 502
+  ClientWidth = 670
   Color = clBtnFace
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -11
+  Font.Height = -14
   Font.Name = 'Tahoma'
   Font.Style = []
   OldCreateOrder = False
@@ -17,8 +17,8 @@ object FlashForm: TFlashForm
   OnClick = FormClick
   OnClose = FormClose
   OnCreate = FormCreate
-  PixelsPerInch = 96
-  TextHeight = 13
+  PixelsPerInch = 120
+  TextHeight = 17
   object Timer1: TTimer
     Enabled = False
     Interval = 10

@@ -18,9 +18,9 @@ var
 
 var
   CRePack: boolean = false;
-  CRePackH: integer = 0;
+  CRePackH: Cardinal = 0;
   CImageEditor: Boolean = false;
-  CImageEditorH: Integer = 0;
+  CImageEditorH: Cardinal = 0;
   TILE_WIDTH: integer = 64;
   TILE_HEIGHT: integer = 32;
 

@@ -13,7 +13,10 @@
     <Transaction>2017/12/08 09:17:33.808.dfm,E:\proj\shf\Editor\about.dfm=</Transaction>
     <Transaction>2018/03/01 08:57:07.081.pas,E:\proj\shf\Editor\Unit1.pas=E:\proj\shf\Editor\ImageForm.pas</Transaction>
     <Transaction>2018/03/01 08:57:07.081.dfm,E:\proj\shf\Editor\Unit1.dfm=E:\proj\shf\Editor\ImageForm.dfm</Transaction>
-  </Transactions>  <ProjectSortOrder AutoSort="0" SortType="0">
+    <Transaction>2018/04/04 13:16:10.386.pas,C:\Editor\Unit1.pas=C:\Editor\ImageEdit.pas</Transaction>
+    <Transaction>2018/04/04 13:16:10.386.dfm,C:\Editor\Unit1.dfm=C:\Editor\ImageEdit.dfm</Transaction>
+  </Transactions>
+	<ProjectSortOrder AutoSort="0" SortType="0">
     <File Path="about.pas"/>
     <File Path="about.dfm"/>
     <File Path="Head.pas"/>
@@ -30,5 +33,7 @@
     <File Path="PicFile.pas"/>
     <File Path="RePack.pas"/>
     <File Path="RePack.dfm"/>
+    <File Path="ImageEdit.pas"/>
+    <File Path="ImageEdit.dfm"/>
   </ProjectSortOrder>
 </BorlandProject>

@@ -203,9 +203,6 @@ object RepackForm: TRepackForm
       TitleCaptions.Strings = (
         #25991#20214#21517#31216
         #25991#20214#25171#21253#21517#31216#25110'ID')
-      ColWidths = (
-        314
-        289)
     end
   end
   object OpenDialog1: TOpenDialog
