@@ -8,7 +8,7 @@ Weather::Weather()
 	snowflake = engine->createSnowflake();
 	raindrop = engine->createRaindrop();
 	lightningMask = engine->createMask(0xFF, 0xFF, 0xFF, 0xFF);
-	fadeMask = engine->createMask(0, 0, 0, 255);
+	fadeMask = engine->createMask(0, 0, 0, 0xFF);
 	engine->setImageAlpha(fadeMask, 0);
 	createLumMask();
 }
@@ -136,17 +136,13 @@ void Weather::drawElementLum()
 						}
 					}
 				}
-			}
-				
-			
+			}		
 			if (drawLumMask)
 			{
 				Point pos = gm->map.getTilePosition({ j, i }, cenTile, cenScreen, offset);
 				engine->drawImage(lumMask, pos.x - LUM_MASK_WIDTH / 2 + (int)eOffset.x, pos.y - LUM_MASK_HEIGHT / 2 - TILE_HEIGHT / 2 + (int)eOffset.y);
-			}
-			
+			}		
 		}
-		
 	}
 }
 
@@ -160,7 +156,6 @@ void Weather::fadeInEx()
 	fadding = true;
 	isFadeIn = true;
 	isSleeping = false;
-	//initTime();
 	fadeBeginTime = getTime();
 }
 
@@ -173,7 +168,6 @@ void Weather::fadeIn()
 	fadding = true;
 	isFadeIn = true;
 	isSleeping = false;
-	//initTime();
 	fadeBeginTime = getTime();
 	run();
 }
@@ -187,7 +181,6 @@ void Weather::fadeOut()
 	fadding = true;
 	isFadeIn = false;
 	isSleeping = false;
-	//initTime();
 	fadeBeginTime = getTime();
 	run();
 }
@@ -197,7 +190,6 @@ void Weather::sleep(unsigned int t)
 	fadding = true;
 	isFadeIn = false;
 	isSleeping = true;
-	//initTime();
 	fadeBeginTime = getTime();
 	sleepLastTime = t;
 	run();
@@ -262,7 +254,6 @@ int Weather::getDropNum()
 void Weather::resetDrops()
 {
 	int dropNum = getDropNum();	
-
 	for (int i = 0; i < (int)drops.size(); i++)
 	{	
 		if (drops[i].type == wtNone && i < dropNum)
@@ -270,7 +261,6 @@ void Weather::resetDrops()
 			resetDrop(&drops[i], true);
 		}		
 	}
-
 }
 
 void Weather::resetDrop(WeatherDrop * drop, bool newdrop)

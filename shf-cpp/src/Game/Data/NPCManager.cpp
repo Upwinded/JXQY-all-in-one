@@ -236,6 +236,7 @@ void NPCManager::npcAutoAction()
 		{
 			if (distance <= friendUpdateList[i]->attackRadius)
 			{
+				friendUpdateList[i]->destGE = e;
 				friendUpdateList[i]->beginAttack(e->position);
 			}
 			else
@@ -283,6 +284,7 @@ void NPCManager::npcAutoAction()
 		{
 			if (distance <= enemyUpdateList[i]->attackRadius)
 			{
+				enemyUpdateList[i]->destGE = e;
 				enemyUpdateList[i]->beginAttack(e->position);
 			}
 			else
@@ -330,6 +332,7 @@ void NPCManager::npcAutoAction()
 		{
 			if (distance <= neutralUpdateList[i]->attackRadius)
 			{
+				neutralUpdateList[i]->destGE = e;
 				neutralUpdateList[i]->beginAttack(e->position);
 			}
 			else

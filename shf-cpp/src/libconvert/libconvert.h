@@ -6,6 +6,19 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <codecvt>
+#include <locale>
+#include <algorithm>
+#include <memory.h>
+#include <string.h>
+
+//#define _USE_LIBICONV
+
+#ifdef _USE_LIBICONV
+extern "C"
+{
+#include <iconv.h>
+}
+#endif // _USE_LIBICONV
 
 namespace convert
 {
@@ -39,6 +52,11 @@ std::string unicodeToUTF8(const std::wstring& unicodeStr);
 std::wstring UTF8ToUnicode(const std::string& UTF8Str);
 std::string GBKToUTF8(const std::string& str);
 std::string UTF8ToGBK(const std::string& str);
+
+#ifdef _USE_LIBICONV
+static std::string conv(const std::string& src, const char* from, const char* to);
+static std::string conv(const std::string& src, const std::string& from, const std::string& to);
+#endif // _USE_LIBICONV
 
 void deleteAll(const std::string & path);
 void copyTo(const std::string & spath, const std::string & dpath);

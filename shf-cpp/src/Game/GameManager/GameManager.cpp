@@ -2123,6 +2123,7 @@ bool GameManager::onHandleEvent(AEvent * e)
 			if (npcManager.clickIndex >= 0)
 			{
 				act.dest = npcManager.npcList[npcManager.clickIndex]->position;
+				act.destGE = npcManager.npcList[npcManager.clickIndex];
 			}
 			else
 			{
@@ -2139,6 +2140,7 @@ bool GameManager::onHandleEvent(AEvent * e)
 			if (npcManager.clickIndex >= 0)
 			{
 				act.dest = npcManager.npcList[npcManager.clickIndex]->position;
+				act.destGE = npcManager.npcList[npcManager.clickIndex];
 			}
 			else
 			{
@@ -2155,6 +2157,7 @@ bool GameManager::onHandleEvent(AEvent * e)
 			if (npcManager.clickIndex >= 0)
 			{
 				act.dest = npcManager.npcList[npcManager.clickIndex]->position;
+				act.destGE = npcManager.npcList[npcManager.clickIndex];
 			}
 			else
 			{
@@ -2171,6 +2174,7 @@ bool GameManager::onHandleEvent(AEvent * e)
 			if (npcManager.clickIndex >= 0)
 			{
 				act.dest = npcManager.npcList[npcManager.clickIndex]->position;
+				act.destGE = npcManager.npcList[npcManager.clickIndex];
 			}
 			else
 			{
@@ -2187,6 +2191,7 @@ bool GameManager::onHandleEvent(AEvent * e)
 			if (npcManager.clickIndex >= 0)
 			{
 				act.dest = npcManager.npcList[npcManager.clickIndex]->position;
+				act.destGE = npcManager.npcList[npcManager.clickIndex];
 			}
 			else
 			{

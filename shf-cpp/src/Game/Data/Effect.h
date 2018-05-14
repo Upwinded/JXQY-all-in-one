@@ -8,8 +8,7 @@ enum EffectKind
 	ekExploding = 1,
 	ekHiding = 2,
 	ekSuperMode = 3,
-	ekFlyEnd = 4, //介于飞行与爆炸的中间状态，用于一些飞行时无法碰撞的技能，设置一个独立检测碰撞的状态
-	ekThrowing = 5,
+	ekThrowing = 4,
 };
 
 enum LauncherKind
@@ -36,6 +35,7 @@ public:
 
 	Magic magic;
 	GameElement * user = nullptr;
+	GameElement * target = nullptr;
 	std::string fileName = "";
 	int doing = ekExploding;
 	int level = 0;

@@ -527,7 +527,7 @@ void Player::updateAction(unsigned int frameTime)
 			attackDone = true;
 			if (magicIndex >= 0)
 			{
-				useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level);
+				useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level, destGE);
 			}			
 
 		}
@@ -540,18 +540,18 @@ void Player::updateAction(unsigned int frameTime)
 				{
 					if (magicIndex >= 0)
 					{
-						useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level);
+						useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level, destGE);
 					}
 				}
 				else
 				{
 					if (nowAction == acAttack2 || nowAction == acSpecialAttack)
 					{
-						doSpecialAttack(magicDest);
+						doSpecialAttack(magicDest, destGE);
 					}
 					else
 					{
-						doAttack(magicDest);
+						doAttack(magicDest, destGE);
 					}
 				}
 			}		
@@ -729,7 +729,7 @@ void Player::onUpdate()
 		else if (nextAction->action == acRun || nextAction->action == acARun)
 		{
 			nextDest = nextAction->type;
-			destGE = (NPC *)nextAction->destGE;
+			destGE = nextAction->destGE;
 			beginRun(nextAction->dest);
 		}
 		else if (nextAction->action == acJump || nextAction->action == acAJump)
@@ -741,13 +741,13 @@ void Player::onUpdate()
 		else if (nextAction->action == acAttack || nextAction->action == acAttack1 || nextAction->action == acAttack2 || nextAction->action == acSpecialAttack)
 		{
 			nextDest = ndNone;
-			destGE = NULL;
+			destGE = nextAction->destGE;
 			beginAttack(nextAction->dest);
 		}
 		else if (nextAction->action == acMagic)
 		{
 			nextDest = ndNone;
-			destGE = NULL;
+			destGE = nextAction->destGE;
 			if (nextAction->type >= 0 && nextAction->type < MAGIC_TOOLBAR_COUNT)
 			{
 				if (gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic == NULL || gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level < 1 || gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level > MAGIC_MAX_LEVEL)
@@ -1602,11 +1602,11 @@ void Player::loadLevel(const std::string& fileName)
 
 }
 
-void Player::doSpecialAttack(Point dest)
+void Player::doSpecialAttack(Point dest, GameElement * target)
 {
 	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic == NULL || gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->specialMagic == NULL)
 	{
-		doAttack(dest);
+		doAttack(dest, target);
 		return;
 	}
 	int launcher = 0;
@@ -1629,7 +1629,7 @@ void Player::doSpecialAttack(Point dest)
 			launcher = lkNeutral;
 		}
 	}
-	gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->specialMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher);
+	gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->specialMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher, target);
 }
 
 void Player::drawAlpha(Point cenTile, Point cenScreen, PointEx coffset)

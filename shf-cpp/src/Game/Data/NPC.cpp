@@ -1106,7 +1106,7 @@ void NPC::reloadAction()
 	reloadAction(ajump);
 }
 
-void NPC::doAttack(Point dest)
+void NPC::doAttack(Point dest, GameElement * target)
 {
 	int launcher = 0;
 	if (kind == nkPlayer)
@@ -1132,11 +1132,11 @@ void NPC::doAttack(Point dest)
 	{
 		if (npcMagic != NULL)
 		{
-			npcMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher);
+			npcMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher, target);
 		}
 		else if (npcMagic2 != NULL)
 		{
-			npcMagic2->addEffect(this, position, dest, attackLevel, attack, evade, launcher);
+			npcMagic2->addEffect(this, position, dest, attackLevel, attack, evade, launcher, target);
 		}
 	}
 	else 
@@ -1144,17 +1144,17 @@ void NPC::doAttack(Point dest)
 		int idx = rand() % 2;
 		if (idx)
 		{
-			npcMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher);
+			npcMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher, target);
 		}
 		else
 		{
-			npcMagic2->addEffect(this, position, dest, attackLevel, attack, evade, launcher);
+			npcMagic2->addEffect(this, position, dest, attackLevel, attack, evade, launcher, target);
 		}
 	}
 
 }
 
-void NPC::useMagic(Magic * m, Point dest, int level)
+void NPC::useMagic(Magic * m, Point dest, int level, GameElement * target)
 {
 	if (m == NULL)
 	{
@@ -1188,7 +1188,7 @@ void NPC::useMagic(Magic * m, Point dest, int level)
 			launcher = lkNeutral;
 		}
 	}
-	m->addEffect(this, position, dest, level, m->level[level].effect, evade, launcher);
+	m->addEffect(this, position, dest, level, m->level[level].effect, evade, launcher, target);
 }
 
 void NPC::addBody()
@@ -1757,6 +1757,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 
 	//std::string section = "Init";
 	getFrameTime();
+	destGE = nullptr;
 	npcName = ini->Get(section, "Name", "");
 	kind = ini->GetInteger(section, "Kind", nkNormal);
 	npcIni = ini->Get(section, "NPCIni", "");
@@ -2197,7 +2198,7 @@ void NPC::updateAction(unsigned int frameTime)
 	{
 		if (getUpdateTime() - actionBeginTime >= actionLastTime)
 		{
-			doAttack(attackDest);
+			doAttack(attackDest, destGE);
 			beginStand();
 		}
 	}

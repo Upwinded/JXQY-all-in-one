@@ -5,10 +5,10 @@
 #include "File.h"
 #include <iostream>
 #include <fstream>
-#include <time.h>
 
 File::File()
 {
+
 }
 
 File::~File()
@@ -99,23 +99,4 @@ char* File::getIdxContent(std::string fileName_idx, std::string fileName_grp, st
     auto Rgrp = new char[total_length];
     File::readFile(fileName_grp, Rgrp, total_length);
     return Rgrp;
-}
-
-std::string File::getFileTime(std::string fileName)
-{
-    struct stat s;
-    struct tm* filedate = NULL;
-    time_t tm_t = 0;
-
-    int sss = stat(fileName.c_str(), &s);
-    if (sss == 0)
-    {
-        tm_t = s.st_mtime;
-        filedate = localtime(&tm_t);
-        char buf[128] = { 0 };
-        strftime(buf, 64, "%Y-%m-%d  %H:%M:%S", filedate);
-        printf("%s:%s\n", fileName.c_str(), buf);
-        return buf;
-    }
-    return "--------------------";  //20
 }

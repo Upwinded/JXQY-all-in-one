@@ -110,18 +110,13 @@ public:
 	void freeImage(_image image);
 	int getImageSize(_image image, int * w, int * h);
 
-
-	//保存字符串到图片子程序
-	_image beginDrawTalk(int w, int h);
-	_image endDrawTalk();
-	void drawSolidUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
-
 	//绘制缩略图子程序
 	_image createBMP16(int w, int h, char * data, int size);
 	_image beginSaveScreen();
 	_image endSaveScreen();
 	int saveImageToBMP16(_image image, int w, int h, char ** s);
 
+	//天气类图像
 	_image createRaindrop();
 	_image createSnowflake();
 	
@@ -132,6 +127,11 @@ public:
 	void drawText(const std::string& text, int x, int y, int size, unsigned int color);
 	_image createUnicodeText(const std::wstring& text, int size, unsigned int color);
 	void drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
+
+	//保存字符串到图片子程序
+	_image beginDrawTalk(int w, int h);
+	_image endDrawTalk();
+	void drawSolidUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
 
 	//用于绘制屏幕遮盖，一般可用于夜晚、黄昏以及雷电等特殊情景的天色绘制
 	void setScreenMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
@@ -232,8 +232,6 @@ public:
 	void stopTalk();
 	void pauseTalk();
 	void resumeTalk();
-
-private:
 	
 public:
 	//根据文件名新建视频数据

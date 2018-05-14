@@ -211,6 +211,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
       <SubSystem>NotSet</SubSystem>
+      <MinimumRequiredVersion>
+      </MinimumRequiredVersion>
     </Link>
     <ResourceCompile>
       <SuppressStartupBanner>false</SuppressStartupBanner>
@@ -236,6 +238,8 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
       <SubSystem>NotSet</SubSystem>
+      <MinimumRequiredVersion>
+      </MinimumRequiredVersion>
     </Link>
     <ResourceCompile>
       <SuppressStartupBanner>false</SuppressStartupBanner>

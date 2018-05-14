@@ -8,8 +8,7 @@
 
 
 #include "libconvert.h"
-#include <algorithm>
-#include "stdio.h"
+
 #ifdef _WIN32
 #include "io.h"
 #else
@@ -325,19 +324,71 @@ std::string convert::upperCase(const std::string & str)
 #define GBKName "zh_CN.GBK"
 #endif // _MSC_VER
 
+#ifdef _USE_LIBICONV
+
+#define CONV_BUFFER_SIZE 2048
+
+std::string convert::conv(const std::string& src, const char* from, const char* to)
+{
+	//const char *from_charset, const char *to_charset, const char *inbuf, size_t inlen, char *outbuf;
+	size_t inlen = (int)src.length() < CONV_BUFFER_SIZE ? (int)src.length() : CONV_BUFFER_SIZE;
+	size_t outlen = CONV_BUFFER_SIZE;
+
+	char in[CONV_BUFFER_SIZE] = { '\0' };
+	char out[CONV_BUFFER_SIZE] = { '\0' };
+
+	char* pin = in, *pout = out;
+	memcpy(in, src.c_str(), inlen);
+	iconv_t cd;
+	cd = iconv_open(to, from);
+	if (cd == nullptr) { return ""; }
+	if (iconv(cd, &pin, &inlen, &pout, &outlen) == -1)
+	{
+		out[0] = '\0';
+	}
+	iconv_close(cd);
+	return out;
+	return src;
+}
+
+std::string convert::conv(const std::string& src, const std::string& from, const std::string& to)
+{
+	return conv(src, from.c_str(), to.c_str());
+}
+#endif // _USE_LIBICONV
 
 std::string convert::unicodeToGBK(const std::wstring& unicodeStr)
 {
+#ifdef _USE_LIBICONV
+	int len = unicodeStr.length() * sizeof(wchar_t);
+	auto c = new char[len + 1];
+	c[len] = '\0';
+	memcpy(c, unicodeStr.c_str(), len);
+	std::string s = c;	
+	return conv(s, "utf-16", "cp936");
+#else
 	std::wstring_convert<std::codecvt_byname<wchar_t, char, mbstate_t>> cvt(new std::codecvt_byname<wchar_t, char, mbstate_t>(GBKName));
 	std::string str = cvt.to_bytes(unicodeStr);
 	return str;
+#endif // _USE_LIBICONV
+
 }
 
 std::wstring convert::GBKToUnicode(const std::string& str)
 {
+#ifdef _USE_LIBICONV
+	auto s = conv(str, "utf-16", "cp936");
+	int len = s.length() / sizeof(wchar_t);
+	auto c = new wchar_t[len + 1];
+	c[len] = '\0';
+	memcpy(c, str.c_str(), len * sizeof(wchar_t));
+	std::wstring ret = c;
+	return ret;
+#else
 	std::wstring_convert<std::codecvt_byname<wchar_t, char, mbstate_t>> cvt(new std::codecvt_byname<wchar_t, char, mbstate_t>(GBKName));
 	std::wstring wstr = cvt.from_bytes(str);
 	return wstr; 
+#endif // _USE_LIBICONV
 }
 
 std::string convert::unicodeToUTF8(const std::wstring& unicodeStr)

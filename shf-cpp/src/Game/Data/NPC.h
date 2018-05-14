@@ -130,6 +130,7 @@ public:
 	unsigned int getUpdateTime();
 	unsigned int updateTime = 0;
 
+	GameElement * destGE = nullptr;
 
 	bool attackDone = false;
 	bool haveDest = false;
@@ -259,8 +260,8 @@ public:
 	virtual void directHurt(Effect * e);
 	void addBody();
 
-	virtual void doAttack(Point dest);
-	virtual void useMagic(Magic * m, Point dest, int level);
+	virtual void doAttack(Point dest, GameElement * target);
+	virtual void useMagic(Magic * m, Point dest, int level, GameElement * target);
 
 	bool frozen = false;
 	unsigned int frozenLastTime = 0;

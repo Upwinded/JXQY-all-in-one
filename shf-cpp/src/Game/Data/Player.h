@@ -52,8 +52,8 @@ enum NextDest
 {
 	ndNone = 0, 
 	ndTalk = 1,
-	ndAttack = 2,
-	ndObj = 3,
+	ndObj = 2,
+	ndAttack = 3,
 };
 
 
@@ -96,8 +96,7 @@ public:
 	void addNextAction(NextAction * act);
 
 	int nextDest = ndNone;
-	GameElement * destGE = NULL;
-
+	//GameElement * destGE = NULL; //在NPC中已定义
 	Effect * shieldEffect = NULL;
 
 	int magicIndex = 0;
@@ -138,7 +137,7 @@ public:
 	void limitAttribute();
 
 	void loadLevel(const std::string& fileName);
-	virtual void doSpecialAttack(Point dest);
+	virtual void doSpecialAttack(Point dest, GameElement * target);
 
 	virtual void drawAlpha(Point cenTile, Point cenScreen, PointEx coffset);
 	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset);

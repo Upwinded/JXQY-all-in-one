@@ -120,7 +120,7 @@ void Magic::initFromIni(const std::string & fileName, bool loadSpecialMagic)
 	}
 }
 
-void Magic::addEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target)
 {
 	if (lvl < 1)
 	{
@@ -136,70 +136,70 @@ void Magic::addEffect(GameElement * user, Point from, Point to, int lvl, int dam
 	case mmkPoint:
 	{
 		{
-			addPointEffect(user, from, to, lvl, damage, evade, launcher);
+			return addPointEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;	
 	}
 	case mmkFly:
 	{
 		{
-			addFlyEffect(user, from, to, lvl, damage, evade, launcher);
+			return addFlyEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkFlyContinuous:
 	{	
 		{
-			addContinuousFlyEffect(user, from, to, lvl, damage, evade, launcher);
+			return addContinuousFlyEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkCircle:
 	{
 		{
-			addCircleEffect(user, from, to, lvl, damage, evade, launcher);
+			return addCircleEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkHeartCircle:
 	{
 		{
-			addHeartCircleEffect(user, from, to, lvl, damage, evade, launcher);
+			return addHeartCircleEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkHelixCircle:
 	{
 		{
-			addHelixCircleEffect(user, from, to, lvl, damage, evade, launcher);
+			return addHelixCircleEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkSector:
 	{
 		{
-			addSectorEffect(user, from, to, lvl, damage, evade, launcher, false);
+			return addSectorEffect(user, from, to, lvl, damage, evade, launcher, false);
 		}
 		break;
 	}
 	case mmkRandSector:
 	{
 		{
-			addSectorEffect(user, from, to, lvl, damage, evade, launcher, true);
+			return addSectorEffect(user, from, to, lvl, damage, evade, launcher, true);
 		}
 		break;
 	}
 	case mmkLine:
 	{
 		{
-			addLineEffect(user, from, to, lvl, damage, evade, launcher);
+			return addLineEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkMoveLine:
 	{
 		{
-			addMoveLineEffect(user, from, to, lvl, damage, evade, launcher);
+			return addMoveLineEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
@@ -210,17 +210,17 @@ void Magic::addEffect(GameElement * user, Point from, Point to, int lvl, int dam
 			{
 			case mrSquare:
 			{
-				addSquareEffect(user, from, to, lvl, damage, evade, launcher);
+				return addSquareEffect(user, from, to, lvl, damage, evade, launcher);
 				break;
 			}
 			case mrWave:
 			{
-				addWaveEffect(user, from, to, lvl, damage, evade, launcher);
+				return addWaveEffect(user, from, to, lvl, damage, evade, launcher);
 				break;
 			}
 			case mrCross:
 			{
-				addCrossEffect(user, from, to, lvl, damage, evade, launcher);
+				return addCrossEffect(user, from, to, lvl, damage, evade, launcher);
 				break;
 			}		
 			default:
@@ -232,24 +232,40 @@ void Magic::addEffect(GameElement * user, Point from, Point to, int lvl, int dam
 	case mmkSelf:
 	{
 		{
-			addSelfEffect(user, from, to, lvl, damage, evade, launcher, level[lvl].specialKind);
+			return addSelfEffect(user, from, to, lvl, damage, evade, launcher, level[lvl].specialKind);
 		}
 		break;
 	}
 	case mmkFullScreen:
 	{
 		{
-			addFullScreenEffect(user, from, to, lvl, damage, evade, launcher);
+			return addFullScreenEffect(user, from, to, lvl, damage, evade, launcher);
+		}
+		break;
+	}
+	case mmkFollow:
+	{
+		{
+			return addFollowEffect(user, from, to, lvl, damage, evade, launcher, target);
+		}
+		break;
+	}
+	case mmkThrow:
+	{
+		{
+			return addThrowEffect(user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	default:
 		break;
 	}
+	return {};
 }
 
-void Magic::addPointEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addPointEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	Effect * e = new Effect;
 	e->level = lvl;
 	e->user = user;
@@ -283,10 +299,13 @@ void Magic::addPointEffect(GameElement * user, Point from, Point to, int lvl, in
 	e->calDest();
 	gm->effectManager.addEffect(e);
 	e->beginTime = e->getTime();
+	ret.push_back(e);
+	return ret;
 }
 
-void Magic::addFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	Effect * e = new Effect;
 	e->level = lvl;
 	e->user = user;
@@ -335,10 +354,13 @@ void Magic::addFlyEffect(GameElement * user, Point from, Point to, int lvl, int 
 	e->calDest();
 	gm->effectManager.addEffect(e);
 	e->beginTime = e->getTime();
+	ret.push_back(e);
+	return ret;
 }
 
-void Magic::addContinuousFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addContinuousFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	if (from.x == to.x && from.y == to.y)
 	{
 		to = Map::getSubPoint(to, 0);
@@ -394,12 +416,15 @@ void Magic::addContinuousFlyEffect(GameElement * user, Point from, Point to, int
 		e->calDest();
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
+		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	double angle = -pi;
 	gm->effectManager.setPaused(true);
 	for (size_t i = 0; i < CIRCLE_COUNT; i++)
@@ -439,12 +464,15 @@ void Magic::addCircleEffect(GameElement * user, Point from, Point to, int lvl, i
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
 		angle += CIRCLE_ANGLE_SPACE;
+		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addHeartCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	double angle = -pi;
 	gm->effectManager.setPaused(true);
 	for (size_t i = 0; i < CIRCLE_COUNT; i++)
@@ -514,12 +542,15 @@ void Magic::addHeartCircleEffect(GameElement * user, Point from, Point to, int l
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
 		angle += CIRCLE_ANGLE_SPACE;
+		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addHelixCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	int startDir = calDirection(from, to, CIRCLE_COUNT);
 	startDir -= CIRCLE_COUNT / 4;
@@ -572,12 +603,15 @@ void Magic::addHelixCircleEffect(GameElement * user, Point from, Point to, int l
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
 		angle += CIRCLE_ANGLE_SPACE;
+		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime)
+std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	if (from.x == to.x && from.y == to.y)
 	{
@@ -631,6 +665,7 @@ void Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, i
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 12;
+			ret.push_back(e);
 		}
 	}
 	else if (lvl < 7)
@@ -670,6 +705,7 @@ void Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, i
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 16;
+			ret.push_back(e);
 		}
 	}
 	else if (lvl < MAGIC_MAX_LEVEL)
@@ -710,6 +746,7 @@ void Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, i
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 15;
+			ret.push_back(e);
 		}
 	}
 	else
@@ -748,13 +785,16 @@ void Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, i
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 16;
+			ret.push_back(e);
 		}
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	{
 		Point tempTo = to;
@@ -818,13 +858,16 @@ void Magic::addLineEffect(GameElement * user, Point from, Point to, int lvl, int
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			pos = Map::getSubPoint(pos, dir);
+			ret.push_back(e);
 		}
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addMoveLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addMoveLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	{
 		Point tempTo = to;
@@ -886,13 +929,16 @@ void Magic::addMoveLineEffect(GameElement * user, Point from, Point to, int lvl,
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			pos = Map::getSubPoint(pos, dir);
+			ret.push_back(e);
 		}
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	int mrange = (lvl - 1) / 3 + 1;
 	Point pos = to;
@@ -934,14 +980,17 @@ void Magic::addSquareEffect(GameElement * user, Point from, Point to, int lvl, i
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			newPos = Map::getSubPoint(newPos, 5);
+			ret.push_back(e);
 		}
 		pos = Map::getSubPoint(pos, 3);
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addWaveEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addWaveEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	int hrange = 3 + ((lvl - 1) / 3) * 2;
 	int wrange = 2;
@@ -1004,14 +1053,17 @@ void Magic::addWaveEffect(GameElement * user, Point from, Point to, int lvl, int
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
 			newPos = Map::getSubPoint(newPos, dir);
+			ret.push_back(e);
 		}
 		pos = Map::getSubPoint(pos, srcDir);
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addCrossEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addCrossEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	int mrange = 3 + ((lvl - 1) / 3) * 2;
 	Point pos[4] = { from, from, from, from };
@@ -1048,13 +1100,16 @@ void Magic::addCrossEffect(GameElement * user, Point from, Point to, int lvl, in
 			e->calDest();
 			gm->effectManager.addEffect(e);
 			e->beginTime = e->getTime();
+			ret.push_back(e);
 		}
 	}
 	gm->effectManager.setPaused(false);
+	return ret;
 }
 
-void Magic::addSelfEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind)
+std::vector<void *> Magic::addSelfEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind)
 {
+	std::vector<void *> ret = {};
 	Effect * e = new Effect;
 	e->user = user;
 	e->level = lvl;
@@ -1081,6 +1136,7 @@ void Magic::addSelfEffect(GameElement * user, Point from, Point to, int lvl, int
 	e->calDest();
 	gm->effectManager.addEffect(e);
 	e->beginTime = e->getTime();
+	ret.push_back(e);
 	switch (specialKind)
 	{
 	case mskAddLife:
@@ -1103,9 +1159,10 @@ void Magic::addSelfEffect(GameElement * user, Point from, Point to, int lvl, int
 	default:
 		break;
 	}
+	return ret;
 }
 
-void Magic::addFullScreenEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addFullScreenEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
 	Effect * e = new Effect;
 	e->user = user;
@@ -1138,6 +1195,7 @@ void Magic::addFullScreenEffect(GameElement * user, Point from, Point to, int lv
 	gm->effectManager.resumeAllEffect();
 	auto damageList = gm->npcManager.findNPC(lkEnemy, user->position, 20);
 	Effect * oriE = e;
+	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
 	for (size_t i = 0; i < damageList.size(); i++)
 	{
@@ -1162,9 +1220,31 @@ void Magic::addFullScreenEffect(GameElement * user, Point from, Point to, int lv
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
 		e->playSound(ekExploding);
+		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
 	delete oriE;
+	return ret;
+}
+
+std::vector<void *> Magic::addFollowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target)
+{
+	auto ret = addFlyEffect(user, from, to, lvl, damage, evade, launcher);
+	for (size_t i = 0; i < ret.size(); i++)
+	{
+		((Effect *)ret[i])->target = target;
+	}
+	return ret;
+}
+
+std::vector<void *> Magic::addThrowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+{
+	auto ret = addFlyEffect(user, from, to, lvl, damage, evade, launcher);
+	for (size_t i = 0; i < ret.size(); i++)
+	{
+		((Effect *)ret[i])->doing = ekThrowing;
+	}
+	return ret;
 }
 
 double Magic::calAngle(Point from, Point to)

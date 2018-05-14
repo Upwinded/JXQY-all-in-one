@@ -70,11 +70,11 @@
     <Filter Include="Game\Config">
       <UniqueIdentifier>{de590541-c8b1-4038-ba01-b6a7126c4002}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Game\Script\Lua">
-      <UniqueIdentifier>{28ee957c-e2a4-45d0-ad22-2bc83c43025f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Game\GameManager">
       <UniqueIdentifier>{c7429a16-50cc-4b94-b36d-093954e07aa1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Script\lua">
+      <UniqueIdentifier>{fadf6410-1b41-495c-b7d2-f1625c0a8b91}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -184,105 +184,6 @@
     </ClCompile>
     <ClCompile Include="src\Game\Script\Script.cpp">
       <Filter>Game\Script</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lapi.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lauxlib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lbaselib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lbitlib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lcode.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lcorolib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lctype.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ldblib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ldebug.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ldo.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ldump.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lfunc.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lgc.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\linit.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\liolib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\llex.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lmathlib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lmem.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\loadlib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lobject.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lopcodes.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\loslib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lparser.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lstate.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lstring.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lstrlib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ltable.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ltablib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\ltm.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lundump.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lutf8lib.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lvm.c">
-      <Filter>Game\Script\Lua</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Script\lua\lzio.c">
-      <Filter>Game\Script\Lua</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Data\Global.cpp">
       <Filter>Game\Data</Filter>
@@ -431,6 +332,105 @@
     <ClCompile Include="src\Game\GameManager\GameController.cpp">
       <Filter>Game\GameManager</Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lapi.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lauxlib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lbaselib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lbitlib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lcode.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lcorolib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lctype.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ldblib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ldebug.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ldo.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ldump.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lfunc.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lgc.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\linit.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\liolib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\llex.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lmathlib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lmem.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\loadlib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lobject.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lopcodes.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\loslib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lparser.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lstate.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lstring.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lstrlib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ltable.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ltablib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\ltm.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lundump.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lutf8lib.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lvm.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Script\lua\lzio.c">
+      <Filter>Game\Script\lua</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Engine\Engine.h">
@@ -543,84 +543,6 @@
     </ClInclude>
     <ClInclude Include="src\Game\Script\Script.h">
       <Filter>Game\Script</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lapi.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lauxlib.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lcode.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lctype.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\ldebug.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\ldo.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lfunc.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lgc.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\llex.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\llimits.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lmem.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lobject.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lopcodes.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lparser.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lprefix.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lstate.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lstring.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\ltable.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\ltm.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lua.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lua.hpp">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\luaconf.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lualib.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lundump.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lvm.h">
-      <Filter>Game\Script\Lua</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Script\lua\lzio.h">
-      <Filter>Game\Script\Lua</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Data\Global.h">
       <Filter>Game\Data</Filter>
@@ -778,6 +700,84 @@
     <ClInclude Include="src\Game\GameManager\GameController.h">
       <Filter>Game\GameManager</Filter>
     </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lapi.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lauxlib.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lcode.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lctype.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\ldebug.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\ldo.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lfunc.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lgc.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\llex.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\llimits.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lmem.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lobject.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lopcodes.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lparser.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lprefix.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lstate.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lstring.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\ltable.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\ltm.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lua.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lua.hpp">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\luaconf.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lualib.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lundump.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lvm.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Script\lua\lzio.h">
+      <Filter>Game\Script\lua</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Resource Include="shf.res">
@@ -786,7 +786,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="src\Game\Script\lua\Makefile">
-      <Filter>Game\Script\Lua</Filter>
+      <Filter>Game\Script\lua</Filter>
     </None>
   </ItemGroup>
 </Project>
