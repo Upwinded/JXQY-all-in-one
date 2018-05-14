@@ -125,7 +125,7 @@ public:
 	virtual void beginMagic(Point dest);
 	virtual void beginJump(Point dest);
 	virtual void beginRun(Point dest);
-	virtual void beginAttack(Point dest);
+	virtual void beginAttack(Point dest, GameElement * target = nullptr);
 	virtual void beginHurt(Point dest);
 	bool canHurt();
 	void checkTrap();
@@ -137,7 +137,7 @@ public:
 	void limitAttribute();
 
 	void loadLevel(const std::string& fileName);
-	virtual void doSpecialAttack(Point dest, GameElement * target);
+	virtual void doSpecialAttack(Point dest, GameElement * target = nullptr);
 
 	virtual void drawAlpha(Point cenTile, Point cenScreen, PointEx coffset);
 	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset);

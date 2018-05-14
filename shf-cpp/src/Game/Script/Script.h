@@ -20,6 +20,12 @@ private:
 
 	void registerFunc();
 
+	std::string name = "script";
+
+	lua_State * luaState = NULL;
+
+	void loadLib();
+
 	static int lua_printf(lua_State * l);
 
 	static int lua_GetVar(lua_State * l);
@@ -153,10 +159,5 @@ private:
 	static int lua_ShowRandomSnow(lua_State * l);
 	static int lua_ShowRain(lua_State * l);
 
-	std::string name = "script";	
-
-	lua_State * luaState = NULL;
-
-	void loadLib();
 };
 

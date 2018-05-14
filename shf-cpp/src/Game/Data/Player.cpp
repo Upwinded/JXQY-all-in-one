@@ -333,7 +333,7 @@ void Player::updateAction(unsigned int frameTime)
 						beginStand();
 						if (nd == ndAttack)
 						{
-							beginAttack(tempNPC->position);
+							beginAttack(tempNPC->position, tempNPC);
 						}
 						else
 						{
@@ -527,9 +527,8 @@ void Player::updateAction(unsigned int frameTime)
 			attackDone = true;
 			if (magicIndex >= 0)
 			{
-				useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level, destGE);
+				useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level, attackTarget);
 			}			
-
 		}
 		if (getUpdateTime() - actionBeginTime >= actionLastTime)
 		{
@@ -540,18 +539,18 @@ void Player::updateAction(unsigned int frameTime)
 				{
 					if (magicIndex >= 0)
 					{
-						useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level, destGE);
+						useMagic(gm->magicManager.magicList[MAGIC_COUNT + magicIndex].magic, magicDest, gm->magicManager.magicList[MAGIC_COUNT + magicIndex].level, attackTarget);
 					}
 				}
 				else
 				{
 					if (nowAction == acAttack2 || nowAction == acSpecialAttack)
 					{
-						doSpecialAttack(magicDest, destGE);
+						doSpecialAttack(magicDest, attackTarget);
 					}
 					else
 					{
-						doAttack(magicDest, destGE);
+						doAttack(magicDest, attackTarget);
 					}
 				}
 			}		
@@ -742,7 +741,8 @@ void Player::onUpdate()
 		{
 			nextDest = ndNone;
 			destGE = nextAction->destGE;
-			beginAttack(nextAction->dest);
+			beginAttack(nextAction->dest, destGE);
+			destGE = nullptr;
 		}
 		else if (nextAction->action == acMagic)
 		{
@@ -1031,7 +1031,7 @@ void Player::changeWalk(Point dest)
 			beginStand();
 			if (nd == ndAttack)
 			{
-				beginAttack(tempNPC->position);
+				beginAttack(tempNPC->position, tempNPC);
 			}
 			else
 			{
@@ -1099,7 +1099,7 @@ void Player::changeRun(Point dest)
 			beginStand();
 			if (nd == ndAttack)
 			{
-				beginAttack(tempNPC->position);
+				beginAttack(tempNPC->position, tempNPC);
 			}
 			else
 			{
@@ -1202,6 +1202,7 @@ void Player::talkTo(NPC * npc)
 
 void Player::beginStand()
 {
+	destGE = nullptr;
 	deleteStep();
 	stepList.resize(0);
 	offset = { 0, 0 };
@@ -1253,7 +1254,7 @@ void Player::beginWalk(Point dest)
 			beginStand();
 			if (nd == ndAttack)
 			{
-				beginAttack(tempNPC->position);
+				beginAttack(tempNPC->position, tempNPC);
 			}
 			else
 			{
@@ -1390,7 +1391,7 @@ void Player::beginRun(Point dest)
 			beginStand();
 			if (nd == ndAttack)
 			{
-				beginAttack(tempNPC->position);
+				beginAttack(tempNPC->position, tempNPC);
 			}
 			else
 			{
@@ -1444,14 +1445,13 @@ void Player::beginRun(Point dest)
 	}
 }
 
-void Player::beginAttack(Point dest)
+void Player::beginAttack(Point dest, GameElement * target)
 {
-
 	if (!canFight || !canDoAction(acAttack) || frozen)
 	{
 		return;
 	}
-
+	attackTarget = target;
 	if (thew < ATTACK_THEW_COST)
 	{
 		gm->showMessage("ÌåÁ¦²»×ã£¡");
@@ -1502,7 +1502,6 @@ void Player::beginAttack(Point dest)
 			res.specialAttack.shadow = gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->actionImage;
 			nowAction = acSpecialAttack;
 			actionLastTime = getActionTime(acSpecialAttack);
-			printf("action last time %d\n", actionLastTime);
 			playSound(acAttack2);
 		}
 		else
@@ -1520,6 +1519,7 @@ void Player::beginHurt(Point dest)
 	{
 		return;
 	}
+	destGE = nullptr;
 	deleteStep();
 	stepList.resize(0);
 	offset = { 0, 0 };

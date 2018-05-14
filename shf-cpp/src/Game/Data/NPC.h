@@ -131,6 +131,7 @@ public:
 	unsigned int updateTime = 0;
 
 	GameElement * destGE = nullptr;
+	GameElement * attackTarget = nullptr;
 
 	bool attackDone = false;
 	bool haveDest = false;
@@ -222,7 +223,7 @@ public:
 	virtual void npcGoto(Point dest);
 	virtual void npcGotoEx(Point dest);
 	virtual void npcGotoDir(int dir, int distance);
-	virtual void npcAttack(Point dest);
+	virtual void npcAttack(Point dest, GameElement * target = nullptr);
 	virtual void doSpecialAction(const std::string & fileName);
 	virtual void setLevel(int lvl);
 
@@ -235,11 +236,11 @@ public:
 	virtual void checkDie();
 	virtual void beginDieScript();
 	virtual void beginDie();
-	virtual void beginAttack(Point dest);
+	virtual void beginAttack(Point dest, GameElement * target = nullptr);
 	virtual void beginSpecial();
 
 	virtual void beginSit();
-	virtual void beginMagic(Point dest);
+	virtual void beginMagic(Point dest, GameElement * target = nullptr);
 	virtual void beginJump(Point dest);
 	virtual void beginRun(Point dest);
 

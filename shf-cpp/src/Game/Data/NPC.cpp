@@ -24,12 +24,14 @@ unsigned int NPC::eventRun()
 
 void NPC::npcJumpTo(Point dest)
 {
+	destGE = nullptr;
 	beginJump(dest);
 	eventRun();
 }
 
 void NPC::npcRunTo(Point dest)
 {
+	destGE = nullptr;
 	if (position.x == dest.x && position.y == dest.y)
 	{
 		return;
@@ -49,6 +51,7 @@ void NPC::npcRunTo(Point dest)
 
 void NPC::npcGoto(Point dest)
 {
+	destGE = nullptr;
 	haveDest = false;
 	if (position.x == dest.x && position.y == dest.y)
 	{
@@ -70,6 +73,7 @@ void NPC::npcGoto(Point dest)
 
 void NPC::npcGotoEx(Point dest)
 {
+	destGE = nullptr;
 	haveDest = true;
 	gotoExDest = dest;
 	beginWalk(dest);
@@ -77,6 +81,7 @@ void NPC::npcGotoEx(Point dest)
 
 void NPC::npcGotoDir(int dir, int distance)
 {
+	destGE = nullptr;
 	Point pos = position;
 	for (int i = 0; i < distance; i++)
 	{
@@ -85,9 +90,9 @@ void NPC::npcGotoDir(int dir, int distance)
 	npcGoto(pos);
 }
 
-void NPC::npcAttack(Point dest)
+void NPC::npcAttack(Point dest, GameElement * target)
 {
-	beginAttack(dest);
+	beginAttack(dest, target);
 	eventRun();
 }
 
@@ -1216,6 +1221,7 @@ void NPC::deleteStep()
 
 void NPC::beginStand()
 {
+	destGE = nullptr;
 	deleteStep();
 	stepList.resize(0);
 	offset = { 0, 0 };
@@ -1291,6 +1297,7 @@ void NPC::beginHurt()
 	{
 		return;
 	}
+	destGE = nullptr;
 	deleteStep();
 	stepList.resize(0);
 	offset = { 0, 0 };
@@ -1342,12 +1349,13 @@ void NPC::beginDie()
 	actionBeginTime = getUpdateTime();
 }
 
-void NPC::beginAttack(Point dest)
+void NPC::beginAttack(Point dest, GameElement * target)
 {
 	if (!canDoAction(acAttack))
 	{
 		return;
 	}
+	attackTarget = target;
 	int attackCount = 1;
 	if (canDoAction(acAttack1))
 	{
@@ -1420,12 +1428,13 @@ void NPC::beginSit()
 	playSound(acSit);
 }
 
-void NPC::beginMagic(Point dest)
+void NPC::beginMagic(Point dest, GameElement * target)
 {
 	if (!canDoAction(acMagic))
 	{
 		return;
 	}
+	attackTarget = target;
 	deleteStep();
 	stepList.resize(0);
 	offset = { 0, 0 };
@@ -1758,6 +1767,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	//std::string section = "Init";
 	getFrameTime();
 	destGE = nullptr;
+	attackTarget = nullptr;
 	npcName = ini->Get(section, "Name", "");
 	kind = ini->GetInteger(section, "Kind", nkNormal);
 	npcIni = ini->Get(section, "NPCIni", "");
@@ -2016,7 +2026,7 @@ void NPC::updateAction(unsigned int frameTime)
 					}
 					else
 					{
-						beginAttack(fnpc->position);
+						beginAttack(fnpc->position, fnpc);
 					}
 				}
 				else
@@ -2106,7 +2116,7 @@ void NPC::updateAction(unsigned int frameTime)
 							}
 							else
 							{
-								beginAttack(fnpc->position);
+								beginAttack(fnpc->position, fnpc);
 								return;
 							}
 						}
@@ -2198,7 +2208,7 @@ void NPC::updateAction(unsigned int frameTime)
 	{
 		if (getUpdateTime() - actionBeginTime >= actionLastTime)
 		{
-			doAttack(attackDest, destGE);
+			doAttack(attackDest, attackTarget);
 			beginStand();
 		}
 	}
