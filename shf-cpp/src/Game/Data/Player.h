@@ -122,7 +122,7 @@ public:
 	virtual void talkTo(NPC * npc);
 	virtual void beginStand();
 	virtual void beginWalk(Point dest);
-	virtual void beginMagic(Point dest);
+	virtual void beginMagic(Point dest, GameElement * target = nullptr);
 	virtual void beginJump(Point dest);
 	virtual void beginRun(Point dest);
 	virtual void beginAttack(Point dest, GameElement * target = nullptr);

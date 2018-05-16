@@ -717,7 +717,7 @@ void Player::onUpdate()
 	updateAction(ft);
 
 	//站立时处理接下来的人物动作
-	if (nextAction != NULL && (nowAction == acStand || nowAction == acStand1 || nowAction == acAStand))
+	if (nextAction != NULL && isStanding())
 	{
 		if (nextAction->action == acWalk || nextAction->action == acAWalk)
 		{
@@ -754,7 +754,7 @@ void Player::onUpdate()
 				{
 					magicIndex = -1;
 					magicDest = nextAction->dest;
-					beginMagic(nextAction->dest);
+					beginMagic(nextAction->dest, nextAction->destGE);
 				}
 				else if (mana < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].manaCost)
 				{
@@ -773,7 +773,7 @@ void Player::onUpdate()
 					mana -= gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].manaCost;
 					thew -= gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].thewCost;
 					life -= gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].lifeCost;
-					beginMagic(nextAction->dest);
+					beginMagic(nextAction->dest, nextAction->destGE);
 					magicIndex = nextAction->type;
 					magicDest = nextAction->dest;
 				}			
@@ -1303,12 +1303,13 @@ void Player::beginWalk(Point dest)
 	
 }
 
-void Player::beginMagic(Point dest)
+void Player::beginMagic(Point dest, GameElement * target)
 {
 	if (!canFight || !canDoAction(acMagic) || frozen)
 	{
 		return;
 	}
+	attackTarget = target;
 	attackDone = false;
 	deleteStep();
 	stepList.resize(0);
