@@ -35,8 +35,6 @@ libpng <http://www.libpng.org/pub/png/libpng.html>
 
 SDL_ttf <https://www.libsdl.org/projects/SDL_ttf/>
 
-freetype <https://www.freetype.org/>
-
 FMOD <https://www.fmod.com/>
 
 FFmpeg <https://www.ffmpeg.org/>
