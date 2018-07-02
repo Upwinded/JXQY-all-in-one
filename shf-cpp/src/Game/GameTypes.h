@@ -3,6 +3,9 @@
 #include <deque>
 #include "./../Image/IMP.h"
 
+#define TILE_WIDTH 64
+#define TILE_HEIGHT 32
+
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
 
@@ -86,6 +89,10 @@
 #define PLAYER_MAGIC_DELAY 300
 //每帧时间（原武功效果持续时间为帧数，在将其转为毫秒时使用该宏）
 #define EFFECT_FRAME_TIME (1000.0/60.0)
+//每两帧之间最大的间隔时间
+#define MAX_FRAME_TIME 40
+//游戏运行速度参数
+#define SPEED_TIME 0.004
 //NPC闲逛间隔时间（毫秒）
 #define NPC_WALK_INTERVAL 5000
 //NPC闲逛间隔基础上增加随机额外间隔时间范围（毫秒）
@@ -95,7 +102,7 @@
 //不进行寻路的NPC在攻击找人时的最大移动歩数，歩数走完时才会再次改变目的移动
 #define NPC_STEP_MAX_COUNT 5
 //NPC跟随检测范围，超出此范围进行寻找
-#define FOLLOW_RADIUS 1
+#define NPC_FOLLOW_RADIUS 1
 
 #ifdef pi
 #undef pi
@@ -105,16 +112,22 @@
 //武功类延迟时间
 
 //连续型飞行技能每个effect的施放间隔
-#define CONTINUOUS_INTERVAL 20
+#define MAGIC_CONTINUOUS_INTERVAL 20
 //圆形技能的effect个数
-#define CIRCLE_COUNT 32
+#define MAGIC_CIRCLE_COUNT 32
 //圆形技能的相隔角度
-#define CIRCLE_ANGLE_SPACE (2 * pi / CIRCLE_COUNT)
+#define MAGIC_CIRCLE_ANGLE_SPACE (2 * pi / MAGIC_CIRCLE_COUNT)
 //心形技能施放延迟等参数
-#define HEART_DELAY 10
-#define HEART_DECAY 0.1
+#define MAGIC_HEART_DELAY 10
+#define MAGIC_HEART_DECAY 0.1
 //螺旋技能每个effect的施放间隔
-#define CIRCLE_HELIX_INTERVAL 10
+#define MAGIC_CIRCLE_HELIX_INTERVAL 10
+//跟随技能更新目标间隔(ms)
+#define MAGIC_FOLLOW_DELAY 0
+//跟随技能找寻目标范围
+#define MAGIC_FOLLOW_RADIUS 10
+//投掷技能曲线最高点系数（根据目标距离远近计算投掷最大高度）
+#define MAGIC_THROW_HEIGHT 7.0
 
 enum TileObstacle
 {
@@ -248,6 +261,3 @@ struct MapMpc
 {
 	Mpc mpc[MAP_MPC_COUNT];
 };
-
-#define TILE_WIDTH 64
-#define TILE_HEIGHT 32

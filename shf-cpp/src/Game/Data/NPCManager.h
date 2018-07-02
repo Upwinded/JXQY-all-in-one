@@ -19,11 +19,14 @@ public:
 	int clickIndex = 0;
 
 	void standAll();
+	int findNPCIndex(NPC * npc);
+	bool findNPC(NPC * npc);
 
 	std::vector<NPC *> findNPC(const std::string & npcName);
-	bool findNPC(NPC * npc);
 	std::vector<NPC *> findNPC(int launcherKind);
 	std::vector<NPC *> findNPC(int launcherKind, Point pos, int radius);
+	NPC * findNearestNPC(int launcherKind, Point pos, int radius);
+	NPC * findNearestViewNPC(int launcherKind, Point pos, int radius);
 
 	//更新所有npc的自动AI动作
 	void npcAutoAction();

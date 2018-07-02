@@ -30,6 +30,36 @@ void NPCManager::standAll()
 	}
 }
 
+int NPCManager::findNPCIndex(NPC * npc)
+{
+	if (npc == NULL)
+	{
+		return -1;
+	}
+	if (npc == &gm->player)
+	{
+		return 0;
+	}
+	for (size_t i = 0; i < npcList.size(); i++)
+	{
+		if (npcList[i] == npc)
+		{
+			return i + 1;
+		}
+	}
+	return -1;
+}
+
+bool NPCManager::findNPC(NPC * npc)
+{
+	return (findNPCIndex(npc) >= 0);
+}
+
+std::vector<NPC*> NPCManager::findNPC(int launcherKind)
+{
+	return findNPC(launcherKind, { 0, 0 }, 0);
+}
+
 std::vector<NPC *> NPCManager::findNPC(const std::string & npcName)
 {
 	std::vector<NPC *> result;
@@ -46,31 +76,6 @@ std::vector<NPC *> NPCManager::findNPC(const std::string & npcName)
 		}
 	}
 	return result;
-}
-
-bool NPCManager::findNPC(NPC * npc)
-{
-	if (npc == NULL)
-	{
-		return false;
-	}
-	if (npc == &gm->player)
-	{
-		return true;
-	}
-	for (size_t i = 0; i < npcList.size(); i++)
-	{
-		if (npcList[i] == npc)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-std::vector<NPC*> NPCManager::findNPC(int launcherKind)
-{
-	return findNPC(launcherKind, { 0, 0 }, 0);
 }
 
 std::vector<NPC*> NPCManager::findNPC(int launcherKind, Point pos, int radius)
@@ -116,6 +121,54 @@ std::vector<NPC*> NPCManager::findNPC(int launcherKind, Point pos, int radius)
 		}
 	}
 	return result;
+}
+
+NPC * NPCManager::findNearestNPC(int launcherKind, Point pos, int radius)
+{
+	auto tempNPCList = findNPC(launcherKind, pos, radius);
+	int temp = -1;
+	int distance = radius + 1;
+	for (int i = 0; i < (int)tempNPCList.size(); i++)
+	{
+		int tempDistance = Map::calDistance(pos, tempNPCList[i]->position);
+		if (tempDistance < distance)
+		{
+			temp = i;
+			distance = tempDistance;
+		}
+	}
+	if (temp < 0)
+	{
+		return nullptr;
+	}
+	else
+	{
+		return tempNPCList[temp];
+	}	
+}
+
+NPC * NPCManager::findNearestViewNPC(int launcherKind, Point pos, int radius)
+{
+	auto tempNPCList = findNPC(launcherKind, pos, radius);
+	int temp = -1;
+	int distance = radius + 1;
+	for (int i = 0; i < (int)tempNPCList.size(); i++)
+	{
+		int tempDistance = Map::calDistance(pos, tempNPCList[i]->position);
+		if (tempDistance < distance && gm->map.canView(pos, tempNPCList[i]->position))
+		{
+			temp = i;
+			distance = tempDistance;
+		}
+	}
+	if (temp < 0)
+	{
+		return nullptr;
+	}
+	else
+	{
+		return tempNPCList[temp];
+	}
 }
 
 void NPCManager::npcAutoAction()

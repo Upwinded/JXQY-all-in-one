@@ -243,6 +243,13 @@ Point Map::getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx off
 	return pos;
 }
 
+//将坐标位置当作以1为单位的正菱形
+double Map::getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset)
+{
+	auto pos = getTilePosition(to, from);
+	return hypot(((double)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH, ((double)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
+}
+
 void Map::loadMapMpc()
 {
 
@@ -479,38 +486,7 @@ std::deque<Point> Map::getPassPath(Point from, Point to, Point flyDirection, Poi
 		return result;
 	}
 
-	double angle;
-	if (flyDirection.x == 0)
-	{
-		if (flyDirection.y > 0)
-		{
-			angle = pi * 3 / 2;
-		}
-		else
-		{
-			angle = pi / 2;
-		}
-	}
-	else if (flyDirection.y == 0)
-	{
-		if (flyDirection.x > 0)
-		{
-			angle = 0;
-		}
-		else
-		{
-			angle = pi;
-		}
-	}
-	else
-	{
-		//angle = atan2((double)-flyDirection.y * TILE_HEIGHT / TILE_WIDTH, (double)flyDirection.x);
-		angle = atan2((double)-flyDirection.y, (double)flyDirection.x);
-		if (angle < 0)
-		{
-			angle += 2 * pi;
-		}
-	}
+	double angle = calFlyDirection(flyDirection);
 
 	Point nowStep = from;
 	int leftStep = calDistance(from, to);
@@ -530,6 +506,33 @@ std::deque<Point> Map::getPassPath(Point from, Point to, Point flyDirection, Poi
 			}
 		}
 		nowStep = stepList[stepList.size() - 1];
+	}
+	return result;
+}
+
+std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, PointEx toOffset, Point flyDirection)
+{
+	std::deque<Point> result;
+	result.resize(0);
+	if (flyDirection.x == 0 && flyDirection.y == 0)
+	{
+		return result;
+	}
+	if (from.x == to.x && from.y == to.y)
+	{
+		return result;
+	}
+	double angle = calFlyDirection(flyDirection);
+	int leftStep = calDistance(from, to) * 2;
+	Point nowStep = from;
+	PointEx nowOffset = fromOffset;
+	result.push_back(nowStep);
+	while ((nowStep.x != to.x || nowStep.y != to.y) && (leftStep-- > 0))
+	{
+		auto nextStep = getLineSubStepEx(nowStep, nowOffset, angle);
+		nowStep = nextStep.point;
+		nowOffset = nextStep.pointEx;
+		result.push_back(nowStep);
 	}
 	return result;
 }
@@ -1654,6 +1657,135 @@ bool Map::isInMap(Point pos)
 	return true;
 }
 
+double Map::calFlyDirection(Point flyDirection)
+{
+	double angle;
+	if (flyDirection.x == 0)
+	{
+		if (flyDirection.y > 0)
+		{
+			angle = pi * 3 / 2;
+		}
+		else
+		{
+			angle = pi / 2;
+		}
+	}
+	else if (flyDirection.y == 0)
+	{
+		if (flyDirection.x > 0)
+		{
+			angle = 0;
+		}
+		else
+		{
+			angle = pi;
+		}
+	}
+	else
+	{
+		//angle = atan2((double)-flyDirection.y * TILE_HEIGHT / TILE_WIDTH, (double)flyDirection.x);
+		angle = atan2((double)-flyDirection.y, (double)flyDirection.x);
+		if (angle < 0)
+		{
+			angle += 2 * pi;
+		}
+	}
+	return angle;
+}
+
+LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, double angle)
+{
+	LinePathPoint result;
+	result.point = from;
+	result.pointEx = fromOffset;
+	result.pointEx.x /= (TILE_WIDTH / 2);
+	result.pointEx.y /= (TILE_HEIGHT / 2);
+	int dir = 0;
+	if (angle <= pi / 4 || angle > pi * 7 / 4)
+	{		
+		auto p = atan2(result.pointEx.y, 1.0 - result.pointEx.x);
+		if (angle > pi)
+		{
+			angle -= 2 * pi;
+		}
+		if (p > angle)
+		{
+			result.point = getSubPoint(from, 7);
+			dir = 7;
+		}
+		else
+		{
+			result.point = getSubPoint(from, 5);
+			dir = 5;
+		}
+		if (angle < 0)
+		{
+			angle += 2 * pi;
+		}
+	}
+	else if (angle <= pi * 3 / 4)
+	{
+		auto p = atan2(1.0 + result.pointEx.y, - result.pointEx.x);
+		if (p < 0)
+		{
+			p += 2 * pi;
+		}
+		if (p > angle)
+		{
+			result.point = getSubPoint(from, 5);
+			dir = 5;
+		}
+		else
+		{
+			result.point = getSubPoint(from, 3);
+			dir = 3;
+		}
+	}
+	else if (angle <= pi * 5 / 4)
+	{
+		auto p = atan2(result.pointEx.y, -1.0 - result.pointEx.x);
+		if (p < 0)
+		{
+			p += 2 * pi;
+		}
+		if (p > angle)
+		{
+			result.point = getSubPoint(from, 3);
+			dir = 3;
+		}
+		else
+		{
+			result.point = getSubPoint(from, 1);
+			dir = 1;
+		}
+	}
+	else
+	{
+		auto p = atan2(-1.0 + result.pointEx.y, - result.pointEx.x);
+		if (p < 0)
+		{
+			p += 2 * pi;
+		}
+		if (p > angle)
+		{
+			result.point = getSubPoint(from, 1);
+			dir = 1;
+		}
+		else
+		{
+			result.point = getSubPoint(from, 7);
+			dir = 7;
+		}
+	}
+	auto newpos = getTilePosition(result.point, from);
+	result.pointEx.x -= double(newpos.x) / (TILE_WIDTH / 2);
+	result.pointEx.y -= double(newpos.y) / (TILE_HEIGHT / 2);
+	result.pointEx.x *= (TILE_WIDTH / 2);
+	result.pointEx.y *= (TILE_HEIGHT / 2);
+	return result;
+}
+
 std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
 {
 	std::vector<Point> result;
@@ -1970,7 +2102,6 @@ std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int 
 				{
 					canGo = true;
 				}
-
 			}
 			else if (i == 2)
 			{

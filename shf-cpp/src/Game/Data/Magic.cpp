@@ -395,7 +395,7 @@ std::vector<void *> Magic::addContinuousFlyEffect(GameElement * user, Point from
 		e->evade = evade;
 
 		e->launcherKind = launcher;
-		e->waitTime += i * CONTINUOUS_INTERVAL;
+		e->waitTime += i * MAGIC_CONTINUOUS_INTERVAL;
 		if (level[lvl].lifeFrame <= 0)
 		{
 			e->lifeTime = e->getFlyingImageTime();
@@ -427,7 +427,7 @@ std::vector<void *> Magic::addCircleEffect(GameElement * user, Point from, Point
 	std::vector<void *> ret = {};
 	double angle = -pi;
 	gm->effectManager.setPaused(true);
-	for (size_t i = 0; i < CIRCLE_COUNT; i++)
+	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
 		Effect * e = new Effect;
 		e->level = lvl;
@@ -463,7 +463,7 @@ std::vector<void *> Magic::addCircleEffect(GameElement * user, Point from, Point
 		e->calDest();
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
-		angle += CIRCLE_ANGLE_SPACE;
+		angle += MAGIC_CIRCLE_ANGLE_SPACE;
 		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
@@ -475,7 +475,7 @@ std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, 
 	std::vector<void *> ret = {};
 	double angle = -pi;
 	gm->effectManager.setPaused(true);
-	for (size_t i = 0; i < CIRCLE_COUNT; i++)
+	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
 		Effect * e = new Effect;
 		e->level = lvl;
@@ -500,29 +500,29 @@ std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, 
 			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 
-		if (i < CIRCLE_COUNT / 4)
+		if (i < MAGIC_CIRCLE_COUNT / 4)
 		{
 			int count = i;
-			e->waitTime += (CIRCLE_COUNT / 4 - count) * HEART_DELAY;
-			e->speed = int(floor(e->speed * (1.0 - count * HEART_DECAY) + 0.5));
+			e->waitTime += (MAGIC_CIRCLE_COUNT / 4 - count) * MAGIC_HEART_DELAY;
+			e->speed = int(floor(e->speed * (1.0 - count * MAGIC_HEART_DECAY) + 0.5));
 		}
-		else if (i < CIRCLE_COUNT / 2)
+		else if (i < MAGIC_CIRCLE_COUNT / 2)
 		{
-			int count = i - CIRCLE_COUNT / 4;
-			e->waitTime += count * HEART_DELAY;
-			e->speed = int(floor(e->speed * (1.0 - (CIRCLE_COUNT / 4 - count) * HEART_DECAY) + 0.5));
+			int count = i - MAGIC_CIRCLE_COUNT / 4;
+			e->waitTime += count * MAGIC_HEART_DELAY;
+			e->speed = int(floor(e->speed * (1.0 - (MAGIC_CIRCLE_COUNT / 4 - count) * MAGIC_HEART_DECAY) + 0.5));
 		}
-		else if (i < 3 * CIRCLE_COUNT / 4)
+		else if (i < 3 * MAGIC_CIRCLE_COUNT / 4)
 		{
-			int count = i - CIRCLE_COUNT / 2;
-			e->waitTime += count * HEART_DELAY + HEART_DELAY * CIRCLE_COUNT / 4;
-			e->speed = int(floor(e->speed * (1.0 + count * HEART_DECAY) + 0.5));
+			int count = i - MAGIC_CIRCLE_COUNT / 2;
+			e->waitTime += count * MAGIC_HEART_DELAY + MAGIC_HEART_DELAY * MAGIC_CIRCLE_COUNT / 4;
+			e->speed = int(floor(e->speed * (1.0 + count * MAGIC_HEART_DECAY) + 0.5));
 		}
 		else
 		{
-			int count = i - 3 * CIRCLE_COUNT / 4;
-			e->waitTime += (CIRCLE_COUNT / 4 - count) * HEART_DELAY + HEART_DELAY * CIRCLE_COUNT / 4;
-			e->speed = int(floor(e->speed * (1.0 + (CIRCLE_COUNT / 4 - count) * HEART_DECAY) + 0.5));
+			int count = i - 3 * MAGIC_CIRCLE_COUNT / 4;
+			e->waitTime += (MAGIC_CIRCLE_COUNT / 4 - count) * MAGIC_HEART_DELAY + MAGIC_HEART_DELAY * MAGIC_CIRCLE_COUNT / 4;
+			e->speed = int(floor(e->speed * (1.0 + (MAGIC_CIRCLE_COUNT / 4 - count) * MAGIC_HEART_DECAY) + 0.5));
 		}
 
 		if (e->speed <= 0)
@@ -541,7 +541,7 @@ std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, 
 		e->calDest();
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
-		angle += CIRCLE_ANGLE_SPACE;
+		angle += MAGIC_CIRCLE_ANGLE_SPACE;
 		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
@@ -552,15 +552,15 @@ std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, 
 {
 	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
-	int startDir = calDirection(from, to, CIRCLE_COUNT);
-	startDir -= CIRCLE_COUNT / 4;
+	int startDir = calDirection(from, to, MAGIC_CIRCLE_COUNT);
+	startDir -= MAGIC_CIRCLE_COUNT / 4;
 	if (startDir < 0)
 	{
-		startDir += CIRCLE_COUNT;
+		startDir += MAGIC_CIRCLE_COUNT;
 	}
-	startDir = CIRCLE_COUNT - startDir;
+	startDir = MAGIC_CIRCLE_COUNT - startDir;
 	double angle = -pi;
-	for (int i = 0; i < CIRCLE_COUNT; i++)
+	for (int i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
 		Effect * e = new Effect;
 		e->level = lvl;
@@ -587,9 +587,9 @@ std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, 
 		int count = i - startDir;
 		if (count < 0)
 		{
-			count += CIRCLE_COUNT;
+			count += MAGIC_CIRCLE_COUNT;
 		}
-		e->waitTime += count * CIRCLE_HELIX_INTERVAL;
+		e->waitTime += count * MAGIC_CIRCLE_HELIX_INTERVAL;
 
 		if (e->waitTime > 0)
 		{
@@ -602,7 +602,7 @@ std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, 
 		e->calDest();
 		gm->effectManager.addEffect(e);
 		e->beginTime = e->getTime();
-		angle += CIRCLE_ANGLE_SPACE;
+		angle += MAGIC_CIRCLE_ANGLE_SPACE;
 		ret.push_back(e);
 	}
 	gm->effectManager.setPaused(false);
@@ -936,20 +936,24 @@ std::vector<void *> Magic::addMoveLineEffect(GameElement * user, Point from, Poi
 	return ret;
 }
 
-std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int range)
 {
 	std::vector<void *> ret = {};
 	gm->effectManager.setPaused(true);
-	int mrange = (lvl - 1) / 3 + 1;
+	int mrange = 3 + ((lvl - 1) / 3) * 2;
+	if (range >= 0)
+	{
+		mrange = range;
+	}	
 	Point pos = to;
-	for (int i = 0; i < mrange; i++)
+	for (int i = 0; i < (int)(mrange / 2); i++)
 	{
 		pos = Map::getSubPoint(pos, 0);
 	}
-	for (int i = 0; i < mrange * 2 + 1; i++)
+	for (int i = 0; i < mrange; i++)
 	{
 		Point newPos = pos;
-		for (int j = 0; j < mrange * 2 + 1; j++)
+		for (int j = 0; j < mrange; j++)
 		{
 			Effect * e = new Effect;
 			e->user = user;
@@ -966,7 +970,7 @@ std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point
 			e->lifeTime = e->getFlyingTime();
 			if (e->lifeTime == 0)
 			{
-				e->lifeTime = (unsigned int)(EFFECT_FRAME_TIME * 3);
+				e->lifeTime = (unsigned int)(MAX_FRAME_TIME * 2);
 			}
 			if (e->waitTime > 0)
 			{
@@ -1233,6 +1237,7 @@ std::vector<void *> Magic::addFollowEffect(GameElement * user, Point from, Point
 	for (size_t i = 0; i < ret.size(); i++)
 	{
 		((Effect *)ret[i])->target = target;
+		((Effect *)ret[i])->dest = to;
 	}
 	return ret;
 }
@@ -1242,7 +1247,28 @@ std::vector<void *> Magic::addThrowEffect(GameElement * user, Point from, Point 
 	auto ret = addFlyEffect(user, from, to, lvl, damage, evade, launcher);
 	for (size_t i = 0; i < ret.size(); i++)
 	{
-		((Effect *)ret[i])->doing = ekThrowing;
+		if (((Effect *)ret[i])->doing == ekFlying)
+		{
+			((Effect *)ret[i])->doing = ekThrowing;
+		}
+		((Effect *)ret[i])->dest = to;
+	}
+	return ret;
+}
+
+std::vector<void*> Magic::addThrowExplodeEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+{
+	auto ret = addSquareEffect(user, from, to, lvl, damage, evade, launcher, (int)((lvl - 1) / 3 + 1));
+	for (size_t i = 0; i < ret.size(); i++)
+	{
+		auto e = (Effect *)ret[i];
+		e->waitTime = 0;
+		e->doing = ekFlying;
+		e->lifeTime = e->getFlyingTime();
+		if (e->lifeTime == 0)
+		{
+			e->lifeTime = (unsigned int)(MAX_FRAME_TIME * 2);
+		}
 	}
 	return ret;
 }
@@ -1274,11 +1300,6 @@ int Magic::calDirection(Point from, Point to, int maxDir)
 
 int Magic::calDirection(double angle, int maxDir)
 {
-#ifdef pi
-#undef pi
-#endif // pi
-#define pi 3.1415926
-
 	if (angle < 0)
 	{
 		angle += 2 * pi;

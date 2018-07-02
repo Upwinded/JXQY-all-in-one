@@ -77,13 +77,14 @@ public:
 	std::vector<void *> addSectorEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime);
 	std::vector<void *> addLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	std::vector<void *> addMoveLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	std::vector<void *> addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int range = -1);
 	std::vector<void *> addWaveEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	std::vector<void *> addCrossEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	std::vector<void *> addSelfEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind);
 	std::vector<void *> addFullScreenEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	std::vector<void *> addFollowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target);
 	std::vector<void *> addThrowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	std::vector<void *> addThrowExplodeEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 
 	double calAngle(Point from, Point to);
 	int calDirection(Point from, Point to);

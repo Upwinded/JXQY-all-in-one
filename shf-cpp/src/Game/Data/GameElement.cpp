@@ -28,6 +28,26 @@ void GameElement::playSoundFile(const std::string & fileName, float x, float y)
 	}
 }
 
+void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff)
+{
+	Point newpos = Map::getElementPosition({ (int)off.x , (int)off.y }, pos, { 0, 0 }, { 0, 0 });
+	if (newpos.x != pos.x || newpos.y != pos.y)
+	{
+		Point newtilepos = Map::getTilePosition(newpos, pos, { 0, 0 }, { 0, 0 });
+		off.x -= newtilepos.x;
+		off.y -= newtilepos.y;
+		pos = newpos;
+	}
+	if (newPos != nullptr)
+	{
+		*newPos = newpos;
+	}
+	if (newOff != nullptr)
+	{
+		*newOff = off;
+	}
+}
+
 void GameElement::updateEffectPosition(unsigned int ftime, double flySpeed)
 {
 	if (flySpeed == 0)
@@ -40,7 +60,7 @@ void GameElement::updateEffectPosition(unsigned int ftime, double flySpeed)
 		return;
 	}
 
-	double distance = flySpeed * (double)speedTime * (double)ftime / 2;
+	double distance = flySpeed * (double)SPEED_TIME * (double)ftime / 2;
 	offset.x += distance / l * (double)flyingDirection.x * (double)TILE_WIDTH;
 	offset.y += distance / l * (double)flyingDirection.y * (double)TILE_HEIGHT;
 	Point newpos = Map::getElementPosition({ (int)offset.x , (int)offset.y }, position, { 0, 0 }, { 0, 0 });
@@ -65,7 +85,7 @@ void GameElement::updateFlyingPosition(unsigned int ftime, double flySpeed)
 		return;
 	}
 
-	double distance = flySpeed * (double)speedTime * (double)ftime;
+	double distance = flySpeed * (double)SPEED_TIME * (double)ftime;
 	offset.x += distance / l * (double)flyingDirection.x * (double)TILE_WIDTH;
 	offset.y += distance / l * (double)flyingDirection.y * (double)TILE_WIDTH;
 	Point newpos = Map::getElementPosition({ (int)offset.x , (int)offset.y }, position, { 0, 0 }, { 0, 0 });
@@ -86,9 +106,9 @@ void GameElement::updatePosition(unsigned int ftime)
 unsigned int GameElement::getFrameTime()
 {
 	unsigned int frameTime = getTime() - LastTime;
-	if (frameTime > maxFrameTime)
+	if (frameTime > MAX_FRAME_TIME)
 	{
-		frameTime = maxFrameTime;
+		frameTime = MAX_FRAME_TIME;
 	}
 	frameTime = (int)(((double)frameTime) * timeSlow + 0.5);
 	engine->setTime(&timer, LastTime + frameTime);

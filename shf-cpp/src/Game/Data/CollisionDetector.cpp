@@ -17,19 +17,24 @@ void CollisionDetector::detectCollision()
 	}
 	for (size_t i = 0; i < gm->effectManager.effectList.size(); i++)
 	{
-		if (gm->effectManager.effectList[i] != NULL && gm->effectManager.effectList[i]->doing == ekFlying)
+		if (gm->effectManager.effectList[i] != NULL && gm->effectManager.effectList[i]->doing == ekFlying ||
+			gm->effectManager.effectList[i] != NULL && gm->effectManager.effectList[i]->doing == ekThrowing)
 		{
 			bool collided = false;
 			for (size_t j = 0; j < gm->effectManager.effectList[i]->passPath.size(); j++)
 			{
-				for (int k = 0; k < (int)collisionList.size(); k++)
+				if (gm->effectManager.effectList[i] != NULL && gm->effectManager.effectList[i]->doing != ekThrowing)
 				{
-					if (gm->npcManager.findNPC(collisionList[k]) && detectCollisionPass(collisionList[k], gm->effectManager.effectList[i], j))
+					for (int k = 0; k < (int)collisionList.size(); k++)
 					{
-						collided = true;
-						break;
+						if (gm->npcManager.findNPC(collisionList[k]) && detectCollisionPass(collisionList[k], gm->effectManager.effectList[i], j))
+						{
+							collided = true;
+							break;
+						}
 					}
 				}
+				
 				if (!collided)
 				{
 					if (!gm->map.canFly(gm->effectManager.effectList[i]->passPath[j]))
@@ -43,12 +48,15 @@ void CollisionDetector::detectCollision()
 
 			if (!collided)
 			{
-				for (int j = 0; j < (int)collisionList.size(); j++)
+				if (gm->effectManager.effectList[i] != NULL && gm->effectManager.effectList[i]->doing != ekThrowing)
 				{
-					if (gm->npcManager.findNPC(collisionList[j]) && detectCollision(collisionList[j], gm->effectManager.effectList[i]))
+					for (int j = 0; j < (int)collisionList.size(); j++)
 					{
-						collided = true;
-						break;
+						if (gm->npcManager.findNPC(collisionList[j]) && detectCollision(collisionList[j], gm->effectManager.effectList[i]))
+						{
+							collided = true;
+							break;
+						}
 					}
 				}
 

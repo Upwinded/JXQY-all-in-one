@@ -3,9 +3,6 @@
 #include "../GameTypes.h"
 #include "math.h"
 
-#define maxFrameTime 40
-#define speedTime 0.004
-
 class GameElement:
 	public Element
 {
@@ -32,7 +29,7 @@ public:
 	Point flyingDirection = { 0, 0 };
 
 	void playSoundFile(const std::string & fileName, float x = 0.0f, float y = 0.0f);
-
+	void getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff);
 	void updateEffectPosition(unsigned int ftime, double flySpeed);
 	void updateFlyingPosition(unsigned int ftime, double flySpeed);
 	void updatePosition(unsigned int ftime);

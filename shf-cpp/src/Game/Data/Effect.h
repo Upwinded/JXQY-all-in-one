@@ -46,12 +46,16 @@ public:
 	int damage = 0;
 	int evade = 0;
 	Point src = { 0, 0 };
+	PointEx srcOffset = { 0, 0 };
 	Point dest = { 0, 0 };
+	PointEx destOffset = { 0, 0 };
+	double width = 0.5;
 
 	std::deque<Point> passPath = {};
 
 	void beginExplode();
 	void beginFly();
+	void beginDrop();
 	void initFromMagic(Magic * m);
 	virtual void initFromIni(INIReader * ini, const std::string & section);
 	virtual void saveToIni(INIReader * ini, const std::string & section);
@@ -69,15 +73,16 @@ public:
 	unsigned int getSuperImageTime();
 	void calTime();
 	void calDest();
-
+	std::deque<Point> getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset);
+	void changeFollowTarget(GameElement * newTarget);
 	unsigned char getLum();
+
+	int getMoveKind();
 private:
 	void initParam();
 
 	virtual void freeResource();
 	virtual void onUpdate();
-
-	
 
 };
 

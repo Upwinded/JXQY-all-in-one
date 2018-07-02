@@ -1360,7 +1360,7 @@ void Player::beginJump(Point dest)
 	flyingDirection = Map::getTilePosition(step, position, { 0, 0 }, { 0, 0 });
 	flyingDirection.x;
 	flyingDirection.y;
-	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / speedTime;
+	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / SPEED_TIME;
 	jumpState = 0;
 }
 

@@ -29,6 +29,14 @@
 2bytes : 0x00 0x1F"
 */
 
+
+
+struct LinePathPoint
+{
+	Point point = { 0, 0 };
+	PointEx pointEx = { 0, 0 };
+};
+
 struct PathTile
 {
 	int index = -1;
@@ -61,6 +69,7 @@ public:
 	static Point getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx offset);
 	static Point getTilePosition(Point tile, Point cenTile, Point cenScreen = { 0, 0 }, PointEx offset = { 0, 0 });
 	static Point getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx offset);
+	static double getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset);
 
 	void loadMapMpc();
 	std::deque<Point> getPath(Point from, Point to);
@@ -72,6 +81,8 @@ public:
 	std::deque<Point> getStep(Point from, Point to);
 	//得到起止之间的所有点
 	std::deque<Point> getPassPath(Point from, Point to, Point flyDirection, Point dest);
+	//得到起止之间的所有点(带偏移)
+	std::deque<Point> getPassPathEx(Point from, PointEx fromOffset, Point to, PointEx toOffset, Point flyDirection);
 
 	Point getJumpPath(Point from, Point to);
 	bool canView(Point from, Point to);
@@ -115,6 +126,9 @@ public:
 
 	bool isInMap(Point pos);
 private:
+	double calFlyDirection(Point flyDirection);
+
+	LinePathPoint getLineSubStepEx(Point from, PointEx fromOffset, double angle);
 	std::vector<Point> getLineSubStep(Point from, Point to, double angle);
 	std::vector<Point> getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex);
 	bool isInMap(PathMap * pathMap, Point pos);

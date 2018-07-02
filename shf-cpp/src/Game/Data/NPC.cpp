@@ -371,7 +371,7 @@ unsigned int NPC::calStepLastTime()
 	{
 		speed = runSpeed;
 	}
-	stepLastTime = (unsigned int)(0.5 / ((double)speed) / (double)speedTime);
+	stepLastTime = (unsigned int)(0.5 / ((double)speed) / (double)SPEED_TIME);
 	if (direction % 2 != 0)
 	{
 		stepLastTime = (unsigned int)(1.414 / 2 * stepLastTime + 0.5);
@@ -1009,7 +1009,7 @@ void NPC::beginJump(Point dest)
 	flyingDirection = Map::getTilePosition(step, position, { 0, 0 }, { 0, 0 });
 	flyingDirection.x;
 	flyingDirection.y;
-	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / speedTime;
+	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / SPEED_TIME;
 	jumpState = 0;
 	
 }
@@ -1655,17 +1655,17 @@ bool NPC::isFollowAttack(NPC * npc)
 
 void NPC::beginFollowWalk(Point dest)
 {
-	beginRadiusWalk(dest, FOLLOW_RADIUS);
+	beginRadiusWalk(dest, NPC_FOLLOW_RADIUS);
 }
 
 void NPC::beginFollowAttack(Point dest)
 {
-	beginRadiusWalk(dest, FOLLOW_RADIUS);
+	beginRadiusWalk(dest, NPC_FOLLOW_RADIUS);
 }
 
 void NPC::changeFollowWalk(Point dest)
 {
-	changeRadiusWalk(dest, FOLLOW_RADIUS);
+	changeRadiusWalk(dest, NPC_FOLLOW_RADIUS);
 }
 
 void NPC::changeFollowAttack(Point dest)
@@ -2031,7 +2031,7 @@ void NPC::updateAction(unsigned int frameTime)
 				}
 				else
 				{
-					if (gm->map.calDistance(position, fnpc->position) > FOLLOW_RADIUS)
+					if (gm->map.calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
 					{
 						beginFollowWalk(fnpc->position);
 					}
@@ -2124,7 +2124,7 @@ void NPC::updateAction(unsigned int frameTime)
 						{
 							offset = { 0, 0 };
 							stepList.resize(0);
-							if (gm->map.calDistance(position, fnpc->position) > FOLLOW_RADIUS)
+							if (gm->map.calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
 							{
 								changeFollowWalk(fnpc->position);						
 							}
