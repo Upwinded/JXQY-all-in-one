@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Console|Win32">
@@ -367,6 +367,7 @@
     <ClCompile Include="src\Game\Menu\PracticeMenu.cpp" />
     <ClCompile Include="src\Game\Menu\YesNo.cpp" />
     <ClCompile Include="src\Game\Scene\MainScene.cpp" />
+    <ClCompile Include="src\Game\Scene\Nurturance.cpp" />
     <ClCompile Include="src\Game\Scene\Title.cpp" />
     <ClCompile Include="src\Game\Scene\TitleTeam.cpp" />
     <ClCompile Include="src\Game\Scene\VideoPlayer.cpp" />
@@ -482,6 +483,7 @@
     <ClInclude Include="src\Game\Menu\PracticeMenu.h" />
     <ClInclude Include="src\Game\Menu\YesNo.h" />
     <ClInclude Include="src\Game\Scene\MainScene.h" />
+    <ClInclude Include="src\Game\Scene\Nurturance.h" />
     <ClInclude Include="src\Game\Scene\Title.h" />
     <ClInclude Include="src\Game\Scene\TitleTeam.h" />
     <ClInclude Include="src\Game\Scene\VideoPlayer.h" />

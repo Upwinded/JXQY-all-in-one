@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <deque>
-#include "./../Image/IMP.h"
+#include "../../Image/IMP.h"
 
 #define TILE_WIDTH 64
 #define TILE_HEIGHT 32

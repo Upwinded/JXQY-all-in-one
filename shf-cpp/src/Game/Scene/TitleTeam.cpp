@@ -52,14 +52,14 @@ void TitleTeam::onDraw()
 		color = 0xFFFFFF + (alpha << 24);
 	}
 	
-	engine->drawUnicodeText(L"剑侠情缘贰", w - 370, 90, 55, color);
-	engine->drawUnicodeText(L"引擎重制：", w - 410, 200, 30, color);
-	engine->drawUnicodeText(L"Upwinded", w - 300, 270, 26, color);
-	engine->drawUnicodeText(L"特别感谢：", w - 410, 340, 30, color);
-	engine->drawUnicodeText(L"偶像(Weyl、BT、scarsty、SB500)", w - 410, 425, 26, color);
-	engine->drawUnicodeText(L"小试刀剑", w - 290, 480, 26, color);
-	engine->drawUnicodeText(L"大武侠论坛(dawuxia.net)", w - 385, 535, 26, color);
-	engine->drawUnicodeText(L"剑侠情缘贴吧", w - 320, 590, 26, color);
+	engine->drawUnicodeText(L"剑侠情缘贰", w - 370, 50, 55, color);
+	engine->drawUnicodeText(L"引擎重制：", w - 410, 110, 30, color);
+	engine->drawUnicodeText(L"Upwinded", w - 300, 150, 26, color);
+	engine->drawUnicodeText(L"特别感谢：", w - 410, 200, 30, color);
+	engine->drawUnicodeText(L"偶像(Weyl、BT、scarsty、SB500)", w - 410, 250, 26, color);
+	engine->drawUnicodeText(L"小试刀剑", w - 290, 300, 26, color);
+	engine->drawUnicodeText(L"大武侠论坛(dawuxia.net)", w - 385, 350, 26, color);
+	engine->drawUnicodeText(L"剑侠情缘贴吧", w - 320, 400, 26, color);
 }
 
 void TitleTeam::onExit()
