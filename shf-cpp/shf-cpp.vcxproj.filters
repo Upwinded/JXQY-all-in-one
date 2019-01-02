@@ -134,9 +134,6 @@
     <ClCompile Include="src\Component\Button.cpp">
       <Filter>Component</Filter>
     </ClCompile>
-    <ClCompile Include="src\Component\VideoContainer.cpp">
-      <Filter>Component</Filter>
-    </ClCompile>
     <ClCompile Include="src\Engine\minilzo\minilzo.c">
       <Filter>Engine\miniLZO</Filter>
     </ClCompile>
@@ -171,9 +168,6 @@
       <Filter>Component</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\Title.cpp">
-      <Filter>Game\Scene</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\Scene\VideoPlayer.cpp">
       <Filter>Game\Scene</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\TitleTeam.cpp">
@@ -431,6 +425,15 @@
     <ClCompile Include="src\Game\Script\lua\lzio.c">
       <Filter>Game\Script\lua</Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\Scene\Nurturance.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Scene\VideoPage.cpp">
+      <Filter>Game\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Component\VideoPlayer.cpp">
+      <Filter>Component</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Engine\Engine.h">
@@ -470,9 +473,6 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="src\Component\Button.h">
-      <Filter>Component</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Component\VideoContainer.h">
       <Filter>Component</Filter>
     </ClInclude>
     <ClInclude Include="src\Component\Component.h">
@@ -530,9 +530,6 @@
       <Filter>Component</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\Title.h">
-      <Filter>Game\Scene</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\Scene\VideoPlayer.h">
       <Filter>Game\Scene</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\TitleTeam.h">
@@ -777,6 +774,15 @@
     </ClInclude>
     <ClInclude Include="src\Game\Script\lua\lzio.h">
       <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Scene\Nurturance.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Scene\VideoPage.h">
+      <Filter>Game\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Component\VideoPlayer.h">
+      <Filter>Component</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

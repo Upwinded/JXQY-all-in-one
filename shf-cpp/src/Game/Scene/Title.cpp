@@ -1,5 +1,5 @@
 #include "Title.h"
-#include "VideoPlayer.h"
+#include "VideoPage.h"
 #include "TitleTeam.h"
 #include "../Script/Script.h"
 #include "MainScene.h"
@@ -170,10 +170,10 @@ void Title::onExit()
 
 void Title::onRun()
 {
-	VideoPlayer * vp = new VideoPlayer("video\\logo.avi");
+	VideoPage * vp = new VideoPage("video\\logo.avi");
 	vp->run();
 	delete vp;
-	vp = new VideoPlayer("video\\title.avi");
+	vp = new VideoPage("video\\title.avi");
 	vp->run();
 	delete vp;
 	playTitleBGM();
