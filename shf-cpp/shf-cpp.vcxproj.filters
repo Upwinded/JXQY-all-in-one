@@ -431,6 +431,9 @@
     <ClCompile Include="src\Game\Script\lua\lzio.c">
       <Filter>Game\Script\lua</Filter>
     </ClCompile>
+    <ClCompile Include="src\Game\Scene\Nurturance.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Engine\Engine.h">
@@ -777,6 +780,9 @@
     </ClInclude>
     <ClInclude Include="src\Game\Script\lua\lzio.h">
       <Filter>Game\Script\lua</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Scene\Nurturance.h">
+      <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

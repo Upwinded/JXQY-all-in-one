@@ -490,13 +490,28 @@ std::vector<std::string> convert::getAllFile(const std::string & path, const std
 	{
 		if (f.attrib != _A_SUBDIR && (lowerCase(extractFileExt(f.name)) == fext || fext == ".*"))
 		{
-			s.resize(s.size() + 1);
-			s[s.size() - 1] = f.name;
+			s.push_back(f.name);
 		}
 		ret = _findnext(handle, &f);
 	}
 	_findclose(handle);
 #else
+	DIR *dp;
+	struct dirent *entry;
+	if ((dp = opendir(path)) == NULL)
+	{
+		return s;
+	}
+	while ((entry = readdir(dp)) != NULL)
+	{
+		if ((strcmp(".", entry->d_name) == 0 || strcmp("..", entry->d_name) == 0) && (lowerCase(extractFileExt(f.name)) == fext || fext == ".*"))
+		{
+			continue;
+		}
+		s.push_back(entry->d_name);
+	}
+
+/*
 	struct ffblk _ffblk;
 	int ret = _findfirst("*.*", &_ffblk, 2);
 	while (!ret)
@@ -508,6 +523,7 @@ std::vector<std::string> convert::getAllFile(const std::string & path, const std
 		}	
 		ret = _findnext("*.*", &_ffblk, 2);
 	}
+*/
 #endif // _WIN32
 	return s;
 }
