@@ -1,13 +1,13 @@
 #pragma once
 #include "../../Component/Component.h"
-#include "VideoPlayer.h"
+#include "VideoPage.h"
 class TitleTeam :
 	public Element
 {
 public:
 	TitleTeam();
 	~TitleTeam();
-	VideoPlayer * vp = NULL;
+	VideoPage * vp = NULL;
 
 	virtual void freeResource();
 

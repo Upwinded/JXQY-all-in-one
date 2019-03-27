@@ -1,31 +1,31 @@
-#include "VideoContainer.h"
+#include "VideoPlayer.h"
 
-VideoContainer::VideoContainer()
+VideoPlayer::VideoPlayer()
 {
-	elementType = etVideoContainer;
+	elementType = etVideoPlayer;
 	priority = epVideo;
 	result = erNone;
 	rect = { 0, 0, 0, 0 };
-	name = "VideoContainer";
+	name = "VideoPlayer";
 	coverMouse = true;
 }
 
-VideoContainer::~VideoContainer()
+VideoPlayer::~VideoPlayer()
 {
 	freeResource();
 }
 
-VideoContainer::VideoContainer(const std::string & fileName)
+VideoPlayer::VideoPlayer(const std::string & fileName)
 {
-	elementType = etVideoContainer;
+	elementType = etVideoPlayer;
 	priority = epVideo;
 	result = erNone;
 	rect = { 0, 0, 0, 0 };
-	name = "VideoContainer";
+	name = "VideoPlayer";
 	videoFileName = fileName;
 }
 
-void VideoContainer::reopenVideo(const std::string& fileName, int vloop)
+void VideoPlayer::reopenVideo(const std::string& fileName, int vloop)
 {
 	if (v != NULL)
 	{
@@ -39,7 +39,7 @@ void VideoContainer::reopenVideo(const std::string& fileName, int vloop)
 	engine->runVideo(v);
 }
 
-void VideoContainer::freeResource()
+void VideoPlayer::freeResource()
 {
 	if (v != NULL)
 	{
@@ -48,7 +48,7 @@ void VideoContainer::freeResource()
 	}
 }
 
-bool VideoContainer::onHandleEvent(AEvent * e)
+bool VideoPlayer::onHandleEvent(AEvent * e)
 {
 	if (e->eventType == KEYUP)
 	{
@@ -61,7 +61,7 @@ bool VideoContainer::onHandleEvent(AEvent * e)
 	return false;
 }
 
-bool VideoContainer::onInitial()
+bool VideoPlayer::onInitial()
 {
 	if (v != NULL)
 	{
@@ -73,16 +73,16 @@ bool VideoContainer::onInitial()
 	return true;
 }
 
-void VideoContainer::onExit()
+void VideoPlayer::onExit()
 {
 }
 
-void VideoContainer::onRun()
+void VideoPlayer::onRun()
 {
 	engine->runVideo(v);
 }
 
-void VideoContainer::onUpdate()
+void VideoPlayer::onUpdate()
 {
 	engine->updateVideo(v);
 	if (engine->getVideoStopped(v))
@@ -103,7 +103,7 @@ void VideoContainer::onUpdate()
 	}
 }
 
-void VideoContainer::onDraw()
+void VideoPlayer::onDraw()
 {
 	if (dragging && dragItem == this)
 	{
@@ -137,7 +137,7 @@ void VideoContainer::onDraw()
 	}
 }
 
-void VideoContainer::onDrawDrag()
+void VideoPlayer::onDrawDrag()
 {
 	Rect r = rect;
 	int x, y;
@@ -159,7 +159,7 @@ void VideoContainer::onDrawDrag()
 	}
 }
 
-void VideoContainer::onClick()
+void VideoPlayer::onClick()
 {
 	result |= erClick;
 	if (canCallBack)
@@ -172,7 +172,7 @@ void VideoContainer::onClick()
 	}
 }
 
-void VideoContainer::onDragEnd(Element * dst)
+void VideoPlayer::onDragEnd(Element * dst)
 {
 	coverMouse = true;
 	int x, y;
@@ -183,7 +183,7 @@ void VideoContainer::onDragEnd(Element * dst)
 	rect.y = y;
 }
 
-void VideoContainer::onDrag(int * param1, int * param2)
+void VideoPlayer::onDrag(int * param1, int * param2)
 {
 	coverMouse = false;
 }

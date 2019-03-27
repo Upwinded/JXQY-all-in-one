@@ -112,6 +112,7 @@ protected:
 	bool running = false;
 public:
 	unsigned int run();
+	unsigned int stop(int ret = erNone);
 	unsigned int result = erNone;	//某些情况下的返回值
 	Rect rect = { 0, 0, 0, 0 };		//元素占据的范围，用于鼠标进出检测等
 

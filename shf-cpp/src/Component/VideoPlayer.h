@@ -1,13 +1,13 @@
 #pragma once
 #include "..\Element\Element.h"
 
-class VideoContainer :
+class VideoPlayer :
 	public Element
 {
 public:
-	VideoContainer();
-	~VideoContainer();
-	VideoContainer(const std::string & fileName);
+	VideoPlayer();
+	~VideoPlayer();
+	VideoPlayer(const std::string & fileName);
 
 	_video v = NULL;
 

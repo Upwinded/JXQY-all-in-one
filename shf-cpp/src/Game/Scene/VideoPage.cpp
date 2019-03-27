@@ -1,6 +1,6 @@
-#include "VideoPlayer.h"
+#include "VideoPage.h"
 
-VideoPlayer::VideoPlayer()
+VideoPage::VideoPage()
 {
 	int w = 0 , h = 0;
 	engine->getWindowSize(&w, &h);
@@ -9,7 +9,7 @@ VideoPlayer::VideoPlayer()
 	drawFullScreen = true;
 }
 
-VideoPlayer::VideoPlayer(const std::string & fileName)
+VideoPage::VideoPage(const std::string & fileName)
 {
 	int w = 0, h = 0;
 	engine->getWindowSize(&w, &h);
@@ -20,7 +20,7 @@ VideoPlayer::VideoPlayer(const std::string & fileName)
 }
 
 
-VideoPlayer::~VideoPlayer()
+VideoPage::~VideoPage()
 {
 	freeResource();
 }

@@ -632,6 +632,13 @@ unsigned int Element::run()
 	return result;
 }
 
+unsigned int Element::stop(int ret)
+{
+	running = false;
+	result = ret;
+	return ret;
+}
+
 void Element::freeAll()
 {
 	for (size_t i = 0; i < children.size(); i++)

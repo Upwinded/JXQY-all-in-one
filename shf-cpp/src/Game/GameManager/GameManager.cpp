@@ -735,7 +735,7 @@ void GameManager::playMovie(const std::string & fileName)
 	}
 	stopMusic();
 	printf("Play Movie %s\n", fileName.c_str());
-	video = new VideoContainer(VIDEO_FOLDER + fileName);
+	video = new VideoPlayer(VIDEO_FOLDER + fileName);
 	video->drawFullScreen = true;
 	video->run();
 	delete video;
@@ -1849,7 +1849,12 @@ void GameManager::showRain(int brain)
 
 void GameManager::onUpdate()
 {
-
+	if (eventList.size() > 0)
+	{
+		NPC * deathNPC = eventList[0].deathNPC;
+		eventList.erase(eventList.begin());
+		runNPCDeathScript(deathNPC);
+	}
 }
 
 void GameManager::onDraw()

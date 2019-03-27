@@ -30,7 +30,7 @@ bool TitleTeam::onInitial()
 	freeResource();
 	int w = 0, h = 0;
 	engine->getWindowSize(&w, &h);
-	vp = new VideoPlayer("video\\team.avi");
+	vp = new VideoPage("video\\team.avi");
 	vp->rect.w = w - 440;
 	vp->rect.x = 0;
 	vp->rect.y = 0;

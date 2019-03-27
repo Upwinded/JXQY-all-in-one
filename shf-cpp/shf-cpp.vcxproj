@@ -314,7 +314,7 @@
     <ClCompile Include="src\Component\Scrollbar.cpp" />
     <ClCompile Include="src\Component\TalkLabel.cpp" />
     <ClCompile Include="src\Component\TransImage.cpp" />
-    <ClCompile Include="src\Component\VideoContainer.cpp" />
+    <ClCompile Include="src\Component\VideoPlayer.cpp" />
     <ClCompile Include="src\Element\Element.cpp" />
     <ClCompile Include="src\Engine\Engine.cpp" />
     <ClCompile Include="src\Engine\EngineBase.cpp" />
@@ -370,7 +370,7 @@
     <ClCompile Include="src\Game\Scene\Nurturance.cpp" />
     <ClCompile Include="src\Game\Scene\Title.cpp" />
     <ClCompile Include="src\Game\Scene\TitleTeam.cpp" />
-    <ClCompile Include="src\Game\Scene\VideoPlayer.cpp" />
+    <ClCompile Include="src\Game\Scene\VideoPage.cpp" />
     <ClCompile Include="src\Game\Script\lua\lapi.c" />
     <ClCompile Include="src\Game\Script\lua\lauxlib.c" />
     <ClCompile Include="src\Game\Script\lua\lbaselib.c" />
@@ -425,7 +425,7 @@
     <ClInclude Include="src\Component\Scrollbar.h" />
     <ClInclude Include="src\Component\TalkLabel.h" />
     <ClInclude Include="src\Component\TransImage.h" />
-    <ClInclude Include="src\Component\VideoContainer.h" />
+    <ClInclude Include="src\Component\VideoPlayer.h" />
     <ClInclude Include="src\Element\Element.h" />
     <ClInclude Include="src\Engine\Engine.h" />
     <ClInclude Include="src\Engine\EngineBase.h" />
@@ -486,7 +486,7 @@
     <ClInclude Include="src\Game\Scene\Nurturance.h" />
     <ClInclude Include="src\Game\Scene\Title.h" />
     <ClInclude Include="src\Game\Scene\TitleTeam.h" />
-    <ClInclude Include="src\Game\Scene\VideoPlayer.h" />
+    <ClInclude Include="src\Game\Scene\VideoPage.h" />
     <ClInclude Include="src\Game\Script\lua\lapi.h" />
     <ClInclude Include="src\Game\Script\lua\lauxlib.h" />
     <ClInclude Include="src\Game\Script\lua\lcode.h" />

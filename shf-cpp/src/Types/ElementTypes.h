@@ -35,7 +35,7 @@ enum ElementType
 	etStateMenu,
 	etDocMenu,
 	etMap = 0x11000,
-	etVideoContainer = 0x12000,
+	etVideoPlayer = 0x12000,
 	etImageContainer,
 	etButton = 0x100000,	
 	etScrollbar,

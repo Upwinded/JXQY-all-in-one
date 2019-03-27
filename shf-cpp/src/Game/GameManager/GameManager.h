@@ -57,7 +57,7 @@ public:
 	void clearMenu();
 	bool menuDisplayed();
 
-	VideoContainer * video = NULL;
+	VideoPlayer * video = NULL;
 
 	MsgBox * messageBox = NULL;
 	StateMenu * stateMenu = NULL;

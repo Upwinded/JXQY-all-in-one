@@ -670,6 +670,12 @@ void Player::onUpdate()
 		{
 			gm->runNPCDeathScript(this);
 		}
+		else
+		{		
+			EventInfo eventInfo;
+			eventInfo.deathNPC = this;
+			gm->eventList.push_back(eventInfo);
+		}
 	}
 	if (shieldLife > 0)
 	{

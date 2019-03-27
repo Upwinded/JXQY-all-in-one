@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Button.h"
-#include "VideoContainer.h"
+#include "VideoPlayer.h"
 #include "DragButton.h"
 #include "ImageContainer.h"
 #include "Scrollbar.h"

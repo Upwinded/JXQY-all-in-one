@@ -806,7 +806,7 @@ void NPCManager::onUpdate()
 	{
 		if (findNPC(deathScriptList[i]))
 		{
-			gm->runNPCDeathScript(deathScriptList[i]);
+			gm->runNPCDeathScript(deathScriptList[i]);		
 		}	
 	}
 
