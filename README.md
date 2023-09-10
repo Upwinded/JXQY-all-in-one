@@ -39,6 +39,7 @@ windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android
 cd linux
 
 在ubuntu下可使用 install-dependents.sh 安装依赖库，其它系统请自行解决这部分
+
 ./install-dependents.sh
 
 ./build.sh
@@ -48,6 +49,7 @@ cd linux
 ios的ffmpeg库中，livavcodec.framework 有文件超过100mb，没法直接上传到github，请先进入3rd/ffmpeg/ios文件夹并解压libavcodec.framework.zip文件
 
 进入 macos_ios/jxqy 文件夹
+
 使用 xcode 打开 jxqy.xcodeproj 工程，选择不同Target进行编译即可。
  
 # 感谢
