@@ -1,0 +1,131 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'upwinded.jxqy.allinone'
+    compileSdk 33
+
+    defaultConfig {
+        applicationId "upwinded.jxqy.allinone"
+        minSdk 28
+        targetSdk 33
+        versionCode 1
+        versionName "1.0"
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64' //, 'armeabi-v7a', 'x86'
+        }
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17'
+            }
+        }
+    }
+    sourceSets {
+        main {
+            assets {
+                srcDirs = ['../../assets']
+                exclude '../../assets/save/game/*'
+                exclude '../../assets/save/rpg1/*'
+                exclude '../../assets/save/rpg2/*'
+                exclude '../../assets/save/rpg3/*'
+                exclude '../../assets/save/rpg4/*'
+                exclude '../../assets/save/rpg5/*'
+                exclude '../../assets/save/rpg6/*'
+                exclude '../../assets/save/rpg7/*'
+                exclude '../../assets/save/rpg8/*'
+                exclude '../../assets/save/rpg9/*'
+                exclude '../../assets/save/shot/*'
+                exclude '../../assets/config/*.ini'
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'
+        }
+    }
+    buildFeatures {
+        viewBinding true
+    }
+
+    applicationVariants.all { variant ->
+//        if (variant.buildType.name != 'debug') {
+//            variant.packageApplicationProvider.get().outputDirectory = rootProject.file("../bin/android")
+//        }
+        def outputAPKName = "jxqy_all_in_one_${variant.name}.apk"
+        def outputApkPath = variant.getPackageApplicationProvider().get().outputDirectory.getAsFile().get().getPath()
+        variant.outputs.all {
+            outputFileName = outputAPKName
+        }
+        variant.outputs.all {
+            variant.assembleProvider.get().doLast {
+                //cp位置
+                copy {
+                    //apk files
+                    from outputApkPath
+                    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+                    include '**/*.apk'
+
+                    into '../../bin/android'
+                }
+//                delete outputFile
+            }
+        }
+        variant.mergeAssets.doLast {
+            delete(fileTree(dir: variant.mergeAssets.outputDir, includes: ['save/game/*.npc', 'save/game/*.obj','save/game/*.ini','save/game/*.txt',
+                                                                           'save/rpg1/*.npc', 'save/rpg1/*.obj','save/rpg1/*.ini','save/rpg1/*.txt',
+                                                                           'save/rpg2/*.npc', 'save/rpg2/*.obj','save/rpg2/*.ini','save/rpg2/*.txt',
+                                                                           'save/rpg3/*.npc', 'save/rpg3/*.obj','save/rpg3/*.ini','save/rpg3/*.txt',
+                                                                           'save/rpg4/*.npc', 'save/rpg4/*.obj','save/rpg4/*.ini','save/rpg4/*.txt',
+                                                                           'save/rpg5/*.npc', 'save/rpg5/*.obj','save/rpg5/*.ini','save/rpg5/*.txt',
+                                                                           'save/rpg6/*.npc', 'save/rpg6/*.obj','save/rpg6/*.ini','save/rpg6/*.txt',
+                                                                           'save/rpg7/*.npc', 'save/rpg7/*.obj','save/rpg7/*.ini','save/rpg7/*.txt',
+                                                                           'save/shot/*.bmp', 'config/*.ini']))
+
+        }
+
+    }
+
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation 'androidx.appcompat:appcompat:1.4.1'
+    implementation 'com.google.android.material:material:1.5.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.3'
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.3'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
+    implementation files('../../3rd/fmod/android/lib/fmod.jar')
+}
+
+clean {
+    println("VSApp:clean APK")
+    //clean 成功
+    doLast {
+        def tree = fileTree(new File(project.rootDir, '../bin/android'))
+        tree.include '*.apk'
+        long now = System.currentTimeMillis()
+        //println now
+        tree.each {
+            //println (it.lastModified())
+            println("VSApp:clean del: " + it.name)
+            it.delete()
+
+        }
+    }
+}

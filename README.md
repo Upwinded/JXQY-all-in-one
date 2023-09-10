@@ -1,25 +1,56 @@
-# SHF
-Sword Heroes' Fate
+# JXQY-all-in-one（old:SHF）
 
-# 说明
+剑侠情缘-all-in-one（old:Sword Heroes' Fate）
 
-引擎使用C++编写，工程使用VS2017创建。
+## 为什么改了名字？
+因为一直有一个比较遥远的目标，就是把剑侠情缘三部曲都实现，并且移植到多个平台。目前剑侠情缘2能在多平台运行。
 
-编辑器和启动器使用Delphi编写，可以使用Delphi2010以上的版本编译。
+# release说明
 
-完整游戏下载：https://pan.baidu.com/s/1WB8mQ4X6ocCgCjEpCpdkDg
+作者编译的版本支持如下平台：
 
-目录结构说明：
+windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android 9以上
 
-（1）shf-cpp文件夹：游戏引擎代码。
+下载地址：
 
-（2）Starter文件夹：游戏启动器代码。
+链接：https://pan.baidu.com/s/140vPCnQYC2DrRZKpjlb51w?pwd=juyh 
+提取码：juyh 
 
-（3）Editor文件夹：游戏编辑器代码。
+注意：ubuntu版本，如果20.04，可直接运行run_with_built-in_lib.sh开始游戏；20.04以上版本，请先运行install-runtime.sh安装运行时库，然后执行run.sh
+
+# repository说明与编译
+
+因为多平台的依赖库找起来比较麻烦，所以我也上传进了这个repository里面，全部放在3rd文件夹下。
+
+## 资源文件
+
+剑侠情缘2的资源文件可以从 https://github.com/Upwinded/jxqy2-assets 获取，把这些文件全部放入Assets文件夹。
+
+## windows
+
+使用vs2022打开 win文件夹下面的 jxqy-all-in-one.sln 文件，进行编译即可。
+
+## android
+
+使用android studio打开android文件夹，进行编译即可。
+
+## linux
+
+cd linux
+
+在ubuntu下可使用 install-dependents.sh 安装依赖库，其它系统请自行解决这部分
+./install-dependents.sh
+
+./build.sh
+
+## macOS && iOS
+
+进入 macos_ios/jxqy 文件夹
+使用 xcode 打开 jxqy.xcodeproj 工程，选择不同Target进行编译即可。
  
 # 感谢
  
-剑侠情缘2这个游戏是我玩的第一个武侠游戏，能够重制这款游戏一直是我埋在心里的梦想。大概3、4年前我曾经尝试使用delphi和lazarus分别做过一些，但由于水平有限同时时间也不允许，引擎只实现了显示地图，之后就搁置了。今年10月，偶像（weyl，scarsty，bt，sb500）发布了金群的C++复刻版，他在发布时说过：这个引擎有没有人使用不那么重要，重要的是完成了自己一直的梦想。这句话一下子点燃了我重拾梦想、再次开始制作剑侠情缘引擎的想法。我的编程启蒙老师是偶像，当初拿着他的pascal版代码研究学习，一字一句的研读和练习，受益良多，而此次的剑侠情缘重制，我又参考了他的C++复刻版，只能用感激涕零来表达对他的感谢！
+剑侠情缘2这个游戏是我玩的第一个武侠游戏，能够重制这款游戏一直是我埋在心里的梦想。大概3、4年前我曾经尝试使用delphi和lazarus分别做过一些，但由于水平有限同时时间也不允许，引擎只实现了显示地图，之后就搁置了。2017年10月，偶像（weyl，scarsty，bt，sb500）发布了金群的C++复刻版，他在发布时说过：这个引擎有没有人使用不那么重要，重要的是完成了自己一直的梦想。这句话一下子点燃了我重拾梦想、再次开始制作剑侠情缘引擎的想法。我的编程启蒙老师是偶像，当初拿着他的pascal版代码研究学习，一字一句的研读和练习，受益良多，而此次的剑侠情缘重制，我又参考了他的C++复刻版，只能用感激涕零来表达对他的感谢！
 
 剑侠情缘游戏的大部分资料参考了月影传说高清版作者小试刀剑发布的资料以及剑侠情缘贴吧里面的资料，感谢小试刀剑以及各位剑侠情缘贴吧吧友的分享。
 
@@ -34,6 +65,8 @@ SDL_image <https://www.libsdl.org/projects/SDL_image/>
 libpng <http://www.libpng.org/pub/png/libpng.html>
 
 SDL_ttf <https://www.libsdl.org/projects/SDL_ttf/>
+
+freetype <https://github.com/freetype/freetype>
 
 FMOD <https://www.fmod.com/>
 
@@ -82,9 +115,6 @@ The distribution of a modified version of the software is subject to the followi
 The license does not require source code to be made available if distributing binary code.
 
 # 游戏说明
-## 完整游戏下载地址
-
-https://pan.baidu.com/s/1WB8mQ4X6ocCgCjEpCpdkDg
  
 ## 作弊模式
 
