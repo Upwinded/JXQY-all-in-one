@@ -45,6 +45,8 @@ cd linux
 
 ## macOS && iOS
 
+ios的ffmpeg库中，livavcodec.framework 有文件超过100mb，没法直接上传到github，请先进入3rd/ffmpeg/ios文件夹并解压libavcodec.framework.zip文件
+
 进入 macos_ios/jxqy 文件夹
 使用 xcode 打开 jxqy.xcodeproj 工程，选择不同Target进行编译即可。
  
