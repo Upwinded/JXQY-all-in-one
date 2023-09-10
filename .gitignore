@@ -1,6 +1,6 @@
 ################################### Project Files ###################################
 assets/
-!assets/Assets-Folder.md
+!assets/AssetsFolder.md
 cmake_install.cmake
 output-metadata.json
 
