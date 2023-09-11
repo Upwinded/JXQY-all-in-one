@@ -108,7 +108,7 @@ void Item::onEvent()
 		if (!showHint)
 		{
 			showHint = true;
-			result = erShowHint;
+			result |= erShowHint;
 		}
 		
 	}
@@ -117,7 +117,7 @@ void Item::onEvent()
 		if (showHint)
 		{
 			showHint = false;
-			result = erHideHint;
+			result |= erHideHint;
 		}
 	}
 }
@@ -167,7 +167,7 @@ bool Item::onHandleEvent(AEvent * e)
 	{
 		if (e->eventData == MBC_MOUSE_RIGHT)
 		{
-			result = erMouseRDown;
+			result |= erMouseRDown;
 			return true;
 		}
 	}

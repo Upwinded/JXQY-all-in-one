@@ -10,20 +10,17 @@
 #endif
 #include "../libconvert/libconvert.h"
 
-class File
+namespace File
 {
-private:
-    File();
-    virtual ~File();
-public:
-    static bool fileExist(const std::string& fileName);
-    static bool readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int& len);
-    //static void readFile(const std::string& fileName, void* s, int len);
-    static void writeFile(const std::string& fileName, const void* s, int len);
-    static void writeFile(const std::string& fileName, const std::unique_ptr<char[]>& s, int len);
-    static void copy(const std::string & src, const std::string & dst);
 
-    static std::string getAssetsName(const std::string& fileName);
+    bool fileExist(const std::string& fileName);
+    bool readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int& len);
+    //void readFile(const std::string& fileName, void* s, int len);
+    void writeFile(const std::string& fileName, const void* s, int len);
+    void writeFile(const std::string& fileName, const std::unique_ptr<char[]>& s, int len);
+    void copy(const std::string & src, const std::string & dst);
+
+    std::string getAssetsName(const std::string& fileName);
 
 //    template <class T> static void readDataToVector(char* data, int length, std::vector<T>& v)
 //    {

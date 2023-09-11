@@ -9,15 +9,6 @@
 #define APP_NAME "jxqy"
 #define ORG_NAME "com.upwinded.jxqy"
 
-File::File()
-{
-
-}
-
-File::~File()
-{
-}
-
 bool File::fileExist(const std::string& fileName)
 {
     std::string  newFileName = AssetsPath + fileName;

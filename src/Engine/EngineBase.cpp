@@ -1807,10 +1807,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	dm.w = wWidth;
 	dm.h = wHeight;
 
-#ifdef _MOBILE
-    dm.w = screenWidth;
-    dm.h = screenHeight;
-#else
+#ifndef _MOBILE
 
 	if (fullScreen)
 	{

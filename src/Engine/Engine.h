@@ -1,4 +1,4 @@
-/*
+﻿/*
 	Engine模块是位于EngineBase模块上层的引擎，供游戏实际调用。
 	EngineBase封装了SDL、FMOD、FFMPEG等模块，实现了引擎大部分的底层功能。
 	Engine模块是对EngineBase的再封装，提供了最主要的常用接口和一些EngineBase

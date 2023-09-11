@@ -110,8 +110,6 @@ void convert::_splitpath(const char *path, char *drive, char *dir, char *fname, 
         if (dir) { dir[0] = '\0'; }
     }
 }
-
-
 #endif
 
 
