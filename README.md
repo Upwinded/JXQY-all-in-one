@@ -20,11 +20,10 @@ windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android
 
 # repository说明与编译
 
-因为多平台的依赖库找起来比较麻烦，所以我也上传到了这里：
+因为多平台的依赖库找起来比较麻烦，所以我把我使用的库上传到了这里：
 
-链接：https://pan.baidu.com/s/1nzAXgdjgs3Xa_A8IwUhGpQ?pwd=9pv6 
-
-提取码：9pv6 
+链接：https://pan.baidu.com/s/1NqzXZMnX0xsk0jhXNIHk_Q?pwd=60r2 
+提取码：60r2 
 
 不再放在repository里面
 
