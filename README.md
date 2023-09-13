@@ -20,17 +20,21 @@ windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android
 
 # repository说明与编译
 
-因为多平台的依赖库找起来比较麻烦，所以我把我使用的库上传到了这里：
+## 依赖和运行时库
 
+因为多平台的依赖库找起来比较麻烦，所以我把我使用的库上传到了这里，不再放在repository里面：
 链接：https://pan.baidu.com/s/1NqzXZMnX0xsk0jhXNIHk_Q?pwd=60r2 
 提取码：60r2 
 
-不再放在repository里面
+请把解压出的3rd文件夹里面的内容 放入repo的3rd文件夹。
 
+bin文件夹包含windows下的运行时库，以及linux下FMOD的运行时库，可按需合并到repo的bin文件夹。
 
 ## 资源文件
 
 剑侠情缘2的资源文件可以从 https://github.com/Upwinded/jxqy2-assets 获取，把这些文件全部放入Assets文件夹。
+
+android,iOS,macOS会自动打包assets文件夹里面的内容（如果自己修改assets内容，存档请只保留rpg0文件夹下的内容）
 
 ## windows
 
@@ -45,14 +49,11 @@ windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android
 cd linux
 
 在ubuntu下可使用 install-dependents.sh 安装依赖库，其它系统请自行解决这部分
-
 ./install-dependents.sh
 
 ./build.sh
 
 ## macOS && iOS
-
-ios的ffmpeg库中，livavcodec.framework 有文件超过100mb，没法直接上传到github，请先进入3rd/ffmpeg/ios文件夹并解压libavcodec.framework.zip文件
 
 进入 macos_ios/jxqy 文件夹
 
