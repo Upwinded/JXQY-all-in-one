@@ -138,7 +138,7 @@ public:
 
 	//人物对话
 	void talk(const std::string & part);
-	void say(const std::string & str);
+	void say(const std::string & str, int index = -1);
 
 	//工具函数
 	void fadeIn();
@@ -202,8 +202,8 @@ public:
 	void npcSpecialAction(const std::string & name, const std::string & fileName);
 
 	//主角函数
-	void loadPlayer(const std::string & fileName = "");
-	void savePlayer(const std::string & fileName = "");
+	void loadPlayer(int index);
+	void savePlayer(int index);
 	void setPlayerPosition(int x, int y);
 	void setPlayerDir(int dir);
 	void setPlayerScn();
@@ -247,8 +247,8 @@ public:
 	void fullThew();
 	void fullMana();
 	void updateState();
-	void saveGoods(const std::string & fileName = "");
-	void loadGoods(const std::string & fileName = "");
+	void saveGoods(int index);
+	void loadGoods(int index);
 	void clearGoods();
 	void getGoodsNum(const std::string & name);
 	void getMoneyNum();

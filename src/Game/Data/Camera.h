@@ -21,6 +21,7 @@ public:
 	GameElement * followNPC = nullptr;
 	bool followPlayer = true;
 	void flyTo(int dir, int distance);
+	void flyToEx(int dir, int distance);
 
 	void setFlyTo(int dir, int distance);
 	void setFollowPlayer();

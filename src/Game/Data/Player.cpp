@@ -525,7 +525,12 @@ void Player::updateAction(UTime frameTime)
 	}
 	else if (nowAction == acAttack || nowAction == acAttack1 || nowAction == acAttack2 || nowAction == acSpecialAttack || nowAction == acMagic)
 	{
-		if (!attackDone && nowAction == acMagic && getUpdateTime() - actionBeginTime >= PLAYER_MAGIC_DELAY)
+		int tempActionLastTime = actionLastTime;
+		if (gm->global.gameType == GAME_JXQY2)
+		{
+			tempActionLastTime = PLAYER_MAGIC_DELAY;
+		}
+		if (!attackDone && nowAction == acMagic && getUpdateTime() - actionBeginTime >= tempActionLastTime) //PLAYER_MAGIC_DELAY)
 		{
 			attackDone = true;
 			if (magicIndex >= 0)
@@ -1762,18 +1767,17 @@ void Player::beginDie()
 	}
 }
 
-void Player::load(const std::string & fileName)
+void Player::load(int index)
 {
 	freeResource();
 	std::string fName = SAVE_CURRENT_FOLDER;
-	if (fileName == "")
-	{
-		fName += PLAYER_INI;
-	}
-	else
-	{
-		fName += fileName;
-	}
+    fName += PLAYER_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += PLAYER_INI_EXT;
+
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(fName, s);
 
@@ -1799,9 +1803,9 @@ void Player::load(const std::string & fileName)
 	
 }
 
-void Player::save(const std::string & fileName)
+void Player::save(int index)
 {
-	INIReader * ini = new INIReader;
+	INIReader ini;
 	std::string section = "Init";
 
 	Point tempPos = position;
@@ -1810,28 +1814,26 @@ void Player::save(const std::string & fileName)
 		position = stepList[0];
 	}
 
-	saveToIni(ini, section);
+	saveToIni(&ini, section);
 
 	position = tempPos;
 
-	ini->SetInteger(section, "Magic", magic);
-	ini->SetInteger(section, "Money", money);
-	ini->SetBoolean(section, "CanRun", canRun);
-	ini->SetBoolean(section, "CanJump", canJump);
-	ini->SetBoolean(section, "CanFight", canFight);
-	ini->SetInteger(section, "Fight", fight);
-	ini->Set(section, "LevelIni", levelIni);
+	ini.SetInteger(section, "Magic", magic);
+	ini.SetInteger(section, "Money", money);
+	ini.SetBoolean(section, "CanRun", canRun);
+	ini.SetBoolean(section, "CanJump", canJump);
+	ini.SetBoolean(section, "CanFight", canFight);
+	ini.SetInteger(section, "Fight", fight);
+	ini.Set(section, "LevelIni", levelIni);
 
 	std::string fName = SAVE_CURRENT_FOLDER;
-	if (fileName == "")
-	{
-		fName += PLAYER_INI;
-	}
-	else
-	{
-		fName += fileName;
-	}
-	ini->saveToFile(fName);
-	delete ini;
-	ini = nullptr;
+    fName += PLAYER_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += PLAYER_INI_EXT;
+	ini.saveToFile(fName);
+    
+    SaveFileManager::AppendFile(fName);
 }

@@ -9,12 +9,13 @@ public:
 	PartnerManager();
 	virtual ~PartnerManager();
 
-	//读取npc时临时保存所有partner
+	// 从npc列表读取所有partner
+    // 读取npc时临时保存所有partner
 	virtual void loadPartner();
 	virtual void addPartner();
 
-	virtual void load();
-	virtual void save();
+	virtual void load(int index);
+	virtual void save(int index);
 	void freeResource();
 
 private:

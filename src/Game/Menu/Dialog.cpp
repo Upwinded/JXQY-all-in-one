@@ -21,6 +21,30 @@ void Dialog::init()
 	head2 = addImageContainer("ini\\ui\\dialog\\head2.ini");
 	setChildRectReferToParent();
 
+	readHeadFiles();
+}
+
+void Dialog::readHeadFiles()
+{
+	std::unique_ptr<char[]> s;
+	int len = 0;
+	std::string fileName = HEAD_FILE_NAME;
+	len = PakFile::readFile(fileName, s);
+	if (s == nullptr || len == 0)
+	{
+		printf("no ini file: %s\n", fileName.c_str());
+		return;
+	}
+	ini = std::make_shared<INIReader>(s);
+}
+
+std::string Dialog::getHeadName(int index)
+{
+	if (ini != nullptr)
+	{
+		return ini->Get("PORTRAIT", convert::formatString("%d", index), "");
+	}
+	return "";
 }
 
 void Dialog::setTalkStr(const std::string & str)
@@ -100,6 +124,7 @@ void Dialog::setHead2(const std::string & fileName)
 
 void Dialog::freeResource()
 {
+	ini = nullptr;
 	if (impImage != nullptr)
 	{
 		IMP::clearIMPImage(impImage);

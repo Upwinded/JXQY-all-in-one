@@ -1,4 +1,4 @@
-#include "EngineBase.h"
+﻿#include "EngineBase.h"
 #include <map>
 #include <iostream>
 #include <thread>
@@ -2391,7 +2391,6 @@ int EngineBase::openVideoFile(_video video)
 	return result;
 
 }
-
 
 int EngineBase::read_packet(void *opaque, uint8_t *buf, int buf_size)
 {

@@ -41,10 +41,8 @@ private:
 	static int lua_GetVar(lua_State * l);
 	static int lua_Assign(lua_State * l);
 	static int lua_Add(lua_State * l);
-
 	static int lua_Talk(lua_State * l);
 	static int lua_Say(lua_State * l);
-
 	static int lua_FadeIn(lua_State * l);
 	static int lua_FadeOut(lua_State * l);
 	static int lua_SetFadeLum(lua_State * l);
@@ -57,14 +55,12 @@ private:
 	static int lua_Sleep(lua_State * l);
 	static int lua_PlayMovie(lua_State * l);
 	static int lua_StopMovie(lua_State * l);
-
 	static int lua_LoadMap(lua_State * l);
 	static int lua_LoadGame(lua_State * l);
 	static int lua_SetMapPos(lua_State * l);
 	static int lua_SetMapTrap(lua_State * l);
 	static int lua_SaveMapTrap(lua_State * l);
 	static int lua_SetMapTime(lua_State * l);
-
 	static int lua_LoadObj(lua_State * l);
 	static int lua_SaveObj(lua_State * l);
 	static int lua_AddObj(lua_State * l);
@@ -75,7 +71,6 @@ private:
 	static int lua_ClearBody(lua_State * l);
 	static int lua_OpenBox(lua_State * l);
 	static int lua_CloseBox(lua_State * l);
-
 	static int lua_LoadNpc(lua_State * l);
 	static int lua_SaveNpc(lua_State * l);
 	static int lua_AddNpc(lua_State * l);
@@ -100,7 +95,6 @@ private:
 	static int lua_SetNpcActionType(lua_State * l);
 	static int lua_SetNpcActionFile(lua_State * l);
 	static int lua_NpcSpecialAction(lua_State * l);
-
 	static int lua_LoadPlayer(lua_State * l);
 	static int lua_SavePlayer(lua_State * l);
 	static int lua_SetPlayerPos(lua_State * l);

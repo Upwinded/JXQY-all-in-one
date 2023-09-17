@@ -483,6 +483,7 @@ bool GameController::onHandleEvent(AEvent* e)
 				act.type = 0;
 				break;
 			} 
+			_last_magic_index = act.type;
 			gm->player->addNextAction(&act);
 			return true;
 		}
@@ -526,6 +527,26 @@ bool GameController::onHandleEvent(AEvent* e)
 			act.dest = pos;
 			gm->player->addNextAction(&act);
 			return true;
+		}
+		else if (e->eventData == MBC_MOUSE_RIGHT)
+		{
+			if (_last_magic_index >= 0)
+			{
+				NextAction act;
+				act.action = acMagic;
+				if (gm->npcManager.clickIndex >= 0)
+				{
+					act.dest = gm->npcManager.npcList[gm->npcManager.clickIndex]->position;
+					act.destGE = gm->npcManager.npcList[gm->npcManager.clickIndex];
+				}
+				else
+				{
+					act.dest = gm->getMousePoint();
+				}
+				act.type = _last_magic_index;
+				gm->player->addNextAction(&act);
+				return true;
+			}
 		}
 	}
 	else if (dragging == TOUCH_UNTOUCHEDID && e->eventType == ET_MOUSEDOWN && gm->npcManager.clickIndex >= 0)

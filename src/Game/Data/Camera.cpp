@@ -20,10 +20,22 @@ void Camera::flyTo(int dir, int distance)
 		setFlyTo(dir, distance);
 		run();
 	}
-	if (position.x == gm->player->position.x && position.y == gm->player->position.y)
+	//if (position.x == gm->player->position.x && position.y == gm->player->position.y)
+	//{
+	//	setFollowPlayer();
+	//}
+}
+
+void Camera::flyToEx(int dir, int distance)
+{
+	if (distance > 0)
 	{
-		setFollowPlayer();
+		setFlyTo(dir, distance);
 	}
+	//if (position.x == gm->player->position.x && position.y == gm->player->position.y)
+	//{
+	//	setFollowPlayer();
+	//}
 }
 
 void Camera::setFlyTo(int dir, int distance)
@@ -274,6 +286,13 @@ void Camera::onUpdate()
 			distanceFlied = { 0.0, 0.0 };
 		}
 		updatePosition();
+		if (not flying)
+		{
+			if (position.x == gm->player->position.x && position.y == gm->player->position.y)
+			{
+				setFollowPlayer();
+			}
+		}
 	}
 	auto differencePoint = gm->map.getTilePosition(position, lastPosition);
 	differencePosition.y = ((double)differencePoint.y) - lastOffset.y + offset.y;

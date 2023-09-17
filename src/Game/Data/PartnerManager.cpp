@@ -1,4 +1,4 @@
-#include "PartnerManager.h"
+﻿#include "PartnerManager.h"
 #include "../GameManager/GameManager.h"
 
 
@@ -35,12 +35,17 @@ void PartnerManager::addPartner()
 	partnerList.resize(0);
 }
 
-void PartnerManager::load()
+void PartnerManager::load(int index)
 {
 	freeResource();
-	std::string fileName = SAVE_CURRENT_FOLDER;
-	fileName += PARTNER_INI;
-	INIReader ini(fileName);
+    std::string fName = SAVE_CURRENT_FOLDER;
+    fName += PARTNER_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += PARTNER_INI_EXT;
+	INIReader ini(fName);
 	std::string section = "Head";
 	int count = ini.GetInteger(section, "Count", 0);
 	if (count <= 0)
@@ -61,11 +66,16 @@ void PartnerManager::load()
 	partnerList.resize(0);
 }
 
-void PartnerManager::save()
+void PartnerManager::save(int index)
 {
 	freeResource();
-	std::string fileName = SAVE_CURRENT_FOLDER;
-	fileName += PARTNER_INI;
+	std::string fName = SAVE_CURRENT_FOLDER;
+    fName += PARTNER_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += PARTNER_INI_EXT;
 	for (size_t i = 0; i < gm->npcManager.npcList.size(); i++)
 	{
 		if (gm->npcManager.npcList[i] != nullptr && gm->npcManager.npcList[i]->kind == nkPartner)
@@ -83,7 +93,9 @@ void PartnerManager::save()
 		partnerList[i]->saveToIni(&ini, section);
 	}
 	partnerList.resize(0);
-	ini.saveToFile(fileName);
+	ini.saveToFile(fName);
+    
+    SaveFileManager::AppendFile(fName);
 }
 
 void PartnerManager::freeResource()

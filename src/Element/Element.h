@@ -168,6 +168,8 @@ protected:
 	virtual void onDrawDrag(int x, int y) {};
 	//所需画的东西写在这里
 	virtual void onDraw() {};
+	//所有子元素都画完后调用
+	virtual void onDrawEnd() {};
 	//初始化时调用的事件
 	virtual bool onInitial() { return true; };
 	//在开始run并且初始化之后触发的事件

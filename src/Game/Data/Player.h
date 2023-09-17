@@ -160,8 +160,8 @@ public:
 
 	virtual void checkDie();
 	virtual void beginDie();
-	virtual void load(const std::string & fileName = "");
-	virtual void save(const std::string & fileName = "");
+	virtual void load(int index);
+	virtual void save(int index);
 
 };
 

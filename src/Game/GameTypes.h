@@ -26,8 +26,12 @@
 
 #define SHOT_BMP "rpg%d.bmp"
 #define GLOBAL_INI "game.ini"
-#define PLAYER_INI "player.ini"
-#define PARTNER_INI "partner.ini"
+//#define PLAYER_INI "player.ini"
+#define PLAYER_INI_NAME "player"
+#define PLAYER_INI_EXT ".ini"
+//#define PARTNER_INI_NAME "partner.ini"
+#define PARTNER_INI_NAME "partner"
+#define PARTNER_INI_EXT ".ini"
 #define MEMO_INI "memo.txt"
 #define TRAPS_INI "traps.ini"
 #define MAP_FOLDER "map\\"
@@ -41,6 +45,7 @@
 #define LEVEL_FOLDER "ini\\level\\"
 
 #define HEAD_FOLDER "mpc\\portrait\\"
+#define HEAD_FILE_NAME "ini\\ui\\dialog\\headfile.ini"
 
 #define NPC_INI_FOLDER "ini\\npc\\"
 #define NPC_RES_INI_FOLDER "ini\\npcres\\"
@@ -70,8 +75,10 @@
 #define GOODS_TOOLBAR_COUNT 3
 #define GOODS_BODY_COUNT 7
 #define GOODS_RES_FOLDER "mpc\\goods\\"
-#define GOODS_INI "goods.ini"
-#define GOODS_INI_FOLDER "ini\\goods\\"
+//#define GOODS_INI "goods.ini"
+#define GOODS_INI_NAME "goods"
+#define GOODS_INI_EXT ".ini"
+#define INI_GOODS_FOLDER "ini\\goods\\"
 
 #define BUYSELL_GOODS_COUNT 81
 #define BUYSELL_FOLDER "ini\\buy\\"
@@ -82,7 +89,9 @@
 #define MAGIC_TOOLBAR_COUNT 5
 #define MAGIC_PRACTISE_COUNT 1
 #define MAGIC_RES_FOLDER "mpc\\magic\\"
-#define MAGIC_INI "magic.ini"
+//#define MAGIC_INI "magic.ini"
+#define MAGIC_INI_NAME "magic"
+#define MAGIC_INI_EXT ".ini"
 #define INI_MAGIC_FOLDER "ini\\magic\\"
 #define MAGIC_MAX_LEVEL 10
 

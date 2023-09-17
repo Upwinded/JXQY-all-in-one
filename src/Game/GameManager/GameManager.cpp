@@ -185,16 +185,18 @@ bool GameManager::loadGame(int index)
 
 	effectManager.freeResource();
 
-	magicManager.load();
-	goodsManager.load();
+	
 
 	varList.load();
 	memo.load();
 	//traps.load();
+    
+    player->load(global.data.characterIndex);
+    magicManager.load(global.data.characterIndex);
+    goodsManager.load(global.data.characterIndex);
 
-	player->load();
 	npcManager.clearAllNPC();
-	partnerManager.load();
+	partnerManager.load(global.data.characterIndex);
 	npcManager.load(global.data.npcName);
 	objectManager.load(global.data.objName);
 
@@ -235,10 +237,16 @@ void GameManager::saveGame(int index)
 	varList.save();
 	memo.save();
 	traps.save();
-	player->save();
-	partnerManager.save();
-	magicManager.save();
-	goodsManager.save();
+    
+    player->save(global.data.characterIndex);
+
+    
+	partnerManager.save(global.data.characterIndex);
+    
+	magicManager.save(global.data.characterIndex);
+	goodsManager.save(global.data.characterIndex);
+    
+    
 	npcManager.save(global.data.npcName);
 	objectManager.save(global.data.objName);
 	effectManager.save();
@@ -1163,14 +1171,14 @@ void GameManager::npcSpecialAction(const std::string & name, const std::string &
 	}
 }
 
-void GameManager::loadPlayer(const std::string & fileName)
+void GameManager::loadPlayer(int index)
 {
-	player->load(fileName);
+	player->load(index);
 }
 
-void GameManager::savePlayer(const std::string & fileName)
+void GameManager::savePlayer(int index)
 {
-	player->save(fileName);
+	player->save(index);
 }
 
 void GameManager::setPlayerPosition(int x, int y)
@@ -1430,14 +1438,14 @@ void GameManager::updateState()
 	menu.stateMenu->updateLabel();
 }
 
-void GameManager::saveGoods(const std::string & fileName)
+void GameManager::saveGoods(int index)
 {
-	goodsManager.save(fileName);
+	goodsManager.save(index);
 }
 
-void GameManager::loadGoods(const std::string & fileName)
+void GameManager::loadGoods(int index)
 {
-	goodsManager.load(fileName);
+	goodsManager.load(index);
 }
 
 void GameManager::clearGoods()
@@ -1681,15 +1689,21 @@ void GameManager::talk(const std::string & part)
 	delete ini;
 }
 
-void GameManager::say(const std::string & str)
+void GameManager::say(const std::string & str, int index)
 {
 	Dialog dialog;
 	addChild(&dialog);
-	dialog.setHead1("");
+	if (index >= 0)
+	{
+		dialog.setHead1(dialog.getHeadName(index));
+	}
+	else
+	{
+		dialog.setHead1("");
+	}
 	dialog.setTalkStr(str);
 	dialog.run();
 	removeChild(&dialog);
-
 }
 
 void GameManager::fadeIn()

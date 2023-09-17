@@ -26,25 +26,23 @@ void GoodsManager::freeResource()
 	}
 }
 
-void GoodsManager::load(const std::string & fileName)
+void GoodsManager::load(int index)
 {
 	freeResource();
-	std::string iniName = SAVE_CURRENT_FOLDER;
-	if (fileName.empty())
-	{
-		iniName += GOODS_INI;
-	}
-	else
-	{
-		iniName += fileName;
-	}
-	INIReader * ini = new INIReader(iniName);
+	std::string fName = SAVE_CURRENT_FOLDER;
+    fName += GOODS_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += GOODS_INI_EXT;
+	INIReader ini(fName);
 
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
 		std::string section = convert::formatString("%d", i + 1);
-		goodsList[i].iniFile = ini->Get(section, "IniFile", "");
-		goodsList[i].number = ini->GetInteger(section, "Number", 0);
+		goodsList[i].iniFile = ini.Get(section, "IniFile", "");
+		goodsList[i].number = ini.GetInteger(section, "Number", 0);
 		if (goodsList[i].iniFile.empty())
 		{
 			goodsList[i].number = 0;
@@ -63,15 +61,13 @@ void GoodsManager::load(const std::string & fileName)
 			}
 		}
 	}
-
-	delete ini;
 }
 
-void GoodsManager::save(const std::string & fileName)
+void GoodsManager::save(int index)
 {
-	INIReader * ini = new INIReader;
+	INIReader ini;
 	std::string section = "Head";
-	ini->SetInteger(section, "Count", 0);
+	ini.SetInteger(section, "Count", 0);
 	int count = 0;
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
@@ -79,23 +75,22 @@ void GoodsManager::save(const std::string & fileName)
 		{
 			count++;
 			section = convert::formatString("%d", i + 1);
-			ini->Set(section, "IniFile", goodsList[i].iniFile);
-			ini->SetInteger(section, "Number", goodsList[i].number);
+			ini.Set(section, "IniFile", goodsList[i].iniFile);
+			ini.SetInteger(section, "Number", goodsList[i].number);
 		}
 	}
 	section = "Head";
-	ini->SetInteger(section, "Count", count);
-	std::string iniName = SAVE_CURRENT_FOLDER;
-	if (fileName.empty())
-	{
-		iniName += GOODS_INI;
-	}
-	else
-	{
-		iniName += fileName;
-	}
-	ini->saveToFile(iniName);
-	delete ini;
+	ini.SetInteger(section, "Count", count);
+    std::string fName = SAVE_CURRENT_FOLDER;
+    fName += GOODS_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += GOODS_INI_EXT;
+	ini.saveToFile(fName);
+    
+    SaveFileManager::AppendFile(fName);
 }
 
 GoodsInfo * GoodsManager::findGoods(const std::string & itemName)
@@ -253,10 +248,9 @@ bool GoodsManager::buyItem(const std::string & itemName, int num)
 	{
 		return false;
 	}
-	Goods * goods = new Goods;
-	goods->initFromIni(itemName);
-	int cst = goods->cost * num;
-	delete goods;
+	Goods goods;
+	goods.initFromIni(itemName);
+	int cst = goods.cost * num;
 	if (gm->player->money < cst)
 	{
 		gm->showMessage(convert::GBKToUTF8_InWinOnly("金钱不足！"));

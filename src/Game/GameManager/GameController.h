@@ -25,6 +25,8 @@ public:
 	void setFastSelectBtn(int index, bool sVisible, std::string str = "");
 
 #endif // _MOBILE
+private:
+	int _last_magic_index = -1;
 
 };
 

@@ -148,37 +148,37 @@ _shared_image NPC::getActionImage(int * offsetx, int * offsety)
 		return IMP::loadImageForDirection(res.run.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
 		break;
 	case acJump:
-		return IMP::loadImageForDirection(res.jump.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.jump.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAttack:
-		return IMP::loadImageForDirection(res.attack.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.attack.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAttack1:
-		return IMP::loadImageForDirection(res.attack1.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.attack1.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAttack2:
-		return IMP::loadImageForDirection(res.attack2.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.attack2.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acSpecialAttack:
-		return IMP::loadImageForDirection(res.specialAttack.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.specialAttack.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acMagic:
-		return IMP::loadImageForDirection(res.magic.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.magic.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acHurt:
-		return IMP::loadImageForDirection(res.hurt.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.hurt.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acDeath:
-		return IMP::loadImageForDirection(res.death.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.death.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acSit:
 		return IMP::loadImageForLastFrame(res.sit.image, direction, offsetx, offsety);
 		break;
 	case acSitting:
-		return IMP::loadImageForDirection(res.sit.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.sit.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acSpecial:
-		return IMP::loadImageForDirection(res.special.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.special.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;	
 	case acAStand:
 		return IMP::loadImageForDirection(res.astand.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
@@ -190,7 +190,7 @@ _shared_image NPC::getActionImage(int * offsetx, int * offsety)
 		return IMP::loadImageForDirection(res.arun.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
 		break;
 	case acAJump:
-		return IMP::loadImageForDirection(res.ajump.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.ajump.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	default:
 		return nullptr;
@@ -215,37 +215,37 @@ _shared_image NPC::getActionShadow(int * offsetx, int * offsety)
 		return IMP::loadImageForDirection(res.run.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
 		break;
 	case acJump:
-		return IMP::loadImageForDirection(res.jump.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.jump.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAttack:
-		return IMP::loadImageForDirection(res.attack.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.attack.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAttack1:
-		return IMP::loadImageForDirection(res.attack1.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.attack1.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAttack2:
-		return IMP::loadImageForDirection(res.attack2.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.attack2.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acSpecialAttack:
-		return IMP::loadImageForDirection(res.specialAttack.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.specialAttack.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acMagic:
-		return IMP::loadImageForDirection(res.magic.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.magic.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acHurt:
-		return IMP::loadImageForDirection(res.hurt.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.hurt.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acDeath:
-		return IMP::loadImageForDirection(res.death.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.death.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;		
 	case acSit:
 		return IMP::loadImageForLastFrame(res.sit.shadow, direction, offsetx, offsety);
 		break;
 	case acSitting:
-		return IMP::loadImageForDirection(res.sit.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.sit.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acSpecial:
-		return IMP::loadImageForDirection(res.special.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.special.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	case acAStand:
 		return IMP::loadImageForDirection(res.astand.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
@@ -257,7 +257,7 @@ _shared_image NPC::getActionShadow(int * offsetx, int * offsety)
 		return IMP::loadImageForDirection(res.arun.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
 		break;
 	case acAJump:
-		return IMP::loadImageForDirection(res.ajump.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
+		return IMP::loadImageForDirection(res.ajump.shadow, direction, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 		break;
 	default:
 		return nullptr;

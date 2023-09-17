@@ -660,11 +660,11 @@ int Script::lua_LoadPlayer(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->loadPlayer(lua_tostring(l, 1));
+		gm->loadPlayer(lua_tointeger(l, 1));
 	}
 	else
 	{
-		gm->loadPlayer();
+		gm->loadPlayer(-1);
 	}
 	return 0;
 }
@@ -674,11 +674,11 @@ int Script::lua_SavePlayer(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->savePlayer(lua_tostring(l, 1));
+		gm->savePlayer(lua_tointeger(l, 1));
 	}
 	else
 	{
-		gm->savePlayer();
+		gm->savePlayer(-1);
 	}
 	return 0;
 }
@@ -1058,11 +1058,11 @@ int Script::lua_SaveGoods(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->saveGoods(lua_tostring(l, 1));
+		gm->saveGoods(lua_tointeger(l, 1));
 	}
 	else
 	{
-		gm->saveGoods();
+		gm->saveGoods(-1);
 	}
 	return 0;
 }
@@ -1072,8 +1072,12 @@ int Script::lua_LoadGoods(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->loadGoods(lua_tostring(l, 1));
+		gm->loadGoods(lua_tointeger(l, 1));
 	}
+    else
+    {
+        gm->loadGoods(-1);
+    }
 	return 0;
 }
 
@@ -1281,7 +1285,11 @@ int Script::lua_Talk(lua_State * l)
 int Script::lua_Say(lua_State * l)
 {
 	int argc = lua_gettop(l);
-	if (argc >= 1)
+	if (argc >= 2)
+	{
+		gm->say(lua_tostring(l, 1), (int)lua_tointeger(l, 2));
+	}
+	else if (argc >= 1)
 	{
 		gm->say(lua_tostring(l, 1));
 	}

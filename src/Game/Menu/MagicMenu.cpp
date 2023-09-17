@@ -73,6 +73,10 @@ void MagicMenu::onEvent()
 #ifdef _MOBILE
 		if (ret & erClick || ret & erMouseRDown)
 		{
+#else
+		if (ret & erMouseRDown)
+		{
+#endif
 			if (gm->magicManager.magicListExists(item[i]->dragIndex))
 			{
 				if (gm->menu.practiceMenu != nullptr && gm->menu.practiceMenu->visible == true)
@@ -95,10 +99,7 @@ void MagicMenu::onEvent()
 					}
 				}
 			}
-#else
-		if (ret & erMouseRDown)
-		{
-#endif
+
 			gm->menu.toolTip->visible = false;
 			item[i]->resetHint();
 		}

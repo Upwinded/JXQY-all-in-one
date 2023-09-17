@@ -9,6 +9,8 @@ public:
 	Dialog();
 	virtual ~Dialog();
 
+	std::shared_ptr<INIReader> ini = nullptr;
+
 	ImageContainer * head1 = nullptr;
 	ImageContainer * head2 = nullptr;
 	TalkLabel * label = nullptr;
@@ -24,7 +26,11 @@ public:
 	void setHead1(const std::string & fileName);
 	void setHead2(const std::string & fileName);
 
+	std::string getHeadName(int index);
+
 private:
+	void readHeadFiles();
+
 	void freeResource();
 	virtual void onEvent();
 	virtual bool onHandleEvent(AEvent * e);

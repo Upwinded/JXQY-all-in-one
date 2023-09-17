@@ -25,8 +25,8 @@ public:
 
 	MagicInfo * findMagic(const std::string & iniName);
 
-	void load();
-	void save();
+	void load(int index);
+	void save(int index);
 
 	void freeResource();
 	void addPracticeExp(int addexp);

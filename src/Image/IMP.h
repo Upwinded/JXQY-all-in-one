@@ -77,9 +77,9 @@ public:
 	static void clearIMPImage(_shared_imp impImage);
 
 	static _shared_image loadImage(_shared_imp impImage, int index, int * xOffset = nullptr, int * yOffset = nullptr);
-	static _shared_image loadImageForTime(_shared_imp impImage, UTime time, int * xOffset = nullptr, int * yOffset = nullptr);
-	static _shared_image loadImageForDirection(_shared_imp impImage, int direction, UTime time, int * xOffset = nullptr, int * yOffset = nullptr);
-	static _shared_image loadImageForLastFrame(_shared_imp impImage, int direction, int * xOffset = nullptr, int * yOffset = nullptr);
+	static _shared_image loadImageForTime(_shared_imp impImage, UTime time, int * xOffset = nullptr, int * yOffset = nullptr, bool once = false, bool reverse = false);
+	static _shared_image loadImageForDirection(_shared_imp impImage, int direction, UTime time, int * xOffset = nullptr, int * yOffset = nullptr, bool once = false, bool reverse = false);
+	static _shared_image loadImageForLastFrame(_shared_imp impImage, int direction, int * xOffset = nullptr, int * yOffset = nullptr, bool reverse = false);
 
 private:
 	static bool cmpIMGHead(_shared_imp img);

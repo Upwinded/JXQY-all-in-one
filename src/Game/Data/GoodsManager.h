@@ -17,8 +17,8 @@ public:
 
 	void freeResource();
 
-	void load(const std::string & fileName = "");
-	void save(const std::string & fileName = "");
+	void load(int index);
+	void save(int index);
 	GoodsInfo * findGoods(const std::string & itemName);
 	void clearItem();
 	int getItemNum(const std::string & itemName);

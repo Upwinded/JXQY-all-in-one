@@ -445,7 +445,7 @@ _shared_image IMP::loadImage(_shared_imp impImage, int index, int * xOffset, int
 	return nullptr;
 }
 
-_shared_image IMP::loadImageForTime(_shared_imp impImage, UTime time, int * xOffset, int * yOffset)
+_shared_image IMP::loadImageForTime(_shared_imp impImage, UTime time, int * xOffset, int * yOffset, bool once, bool reverse)
 {
 	if (impImage == nullptr)
 	{
@@ -453,13 +453,12 @@ _shared_image IMP::loadImageForTime(_shared_imp impImage, UTime time, int * xOff
 	}
 	int directions = impImage->directions;
 	impImage->directions = 1;
-	_shared_image image = loadImageForDirection(impImage, 0, time, xOffset, yOffset);
+	_shared_image image = loadImageForDirection(impImage, 0, time, xOffset, yOffset, once, reverse);
 	impImage->directions = directions;
 	return image;
-
 }
 
-_shared_image IMP::loadImageForDirection(_shared_imp impImage, int direction, UTime time, int * xOffset, int * yOffset)
+_shared_image IMP::loadImageForDirection(_shared_imp impImage, int direction, UTime time, int * xOffset, int * yOffset, bool once, bool reverse)
 {
 	if (impImage == nullptr)
 	{
@@ -491,7 +490,25 @@ _shared_image IMP::loadImageForDirection(_shared_imp impImage, int direction, UT
 	{
 		framePerDirection = 1;
 	}
-	int index = (impImage->interval > 0) ? ((time / impImage->interval) % framePerDirection) : (0);
+    if (impImage->interval < 0)
+    {
+        impImage->interval = 0;
+    }
+    int index = 0;
+
+    bool end = (impImage->interval > 0) ? time / impImage->interval > framePerDirection : false;
+    if (end && once) {
+        index = reverse ? 0 : framePerDirection - 1;
+    }
+    else
+    {
+        index = (impImage->interval > 0) ? ((time / impImage->interval) % framePerDirection) : (0);
+        if (reverse)
+        {
+            index = framePerDirection - 1 - index;
+        }
+    }
+
 	index += framePerDirection * direction;
 	if (index < impImage->frame.size() && index >= 0)
 	{
@@ -500,7 +517,7 @@ _shared_image IMP::loadImageForDirection(_shared_imp impImage, int direction, UT
 	return nullptr;
 }
 
-_shared_image IMP::loadImageForLastFrame(_shared_imp impImage, int direction, int * xOffset, int * yOffset)
+_shared_image IMP::loadImageForLastFrame(_shared_imp impImage, int direction, int * xOffset, int * yOffset, bool reverse)
 {
 	if (impImage == nullptr)
 	{
@@ -528,7 +545,16 @@ _shared_image IMP::loadImageForLastFrame(_shared_imp impImage, int direction, in
 		direction = 0;
 	}
 	int fpd = impImage->frame.size() / impImage->directions;
-	int index = fpd * (direction + 1) - 1;
+    int index = 0;
+    if (reverse)
+    {
+        index = fpd * direction;
+    }
+    else
+    {
+        index = fpd * (direction + 1) - 1;
+
+    }
 	if (index < impImage->frame.size() && index >= 0)
 	{
 		return loadImage(impImage, index, xOffset, yOffset);

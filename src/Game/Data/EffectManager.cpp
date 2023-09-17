@@ -1,5 +1,5 @@
 #include "EffectManager.h"
-
+#include "../GameManager/GameManager.h"
 
 
 EffectManager::EffectManager()
@@ -133,6 +133,8 @@ void EffectManager::save()
 	std::string iniName = SAVE_CURRENT_FOLDER;
 	iniName += EFFECT_INI;
 	ini.saveToFile(iniName);
+    
+    SaveFileManager::AppendFile(iniName);
 }
 
 void EffectManager::disableAllEffect()

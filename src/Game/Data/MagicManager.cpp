@@ -24,35 +24,37 @@ MagicInfo * MagicManager::findMagic(const std::string & iniName)
 	return nullptr;
 }
 
-void MagicManager::load()
+void MagicManager::load(int index)
 {
 	freeResource();
-	std::string iniName = SAVE_CURRENT_FOLDER;
-	iniName += MAGIC_INI;
-	INIReader * ini = new INIReader(iniName);
+    std::string fName = SAVE_CURRENT_FOLDER;
+    fName += MAGIC_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += MAGIC_INI_EXT;
+	INIReader ini(fName);
 
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
 		std::string section = convert::formatString("%d", i + 1);
-		magicList[i].iniFile = ini->Get(section, "IniFile", "");
-		magicList[i].level = ini->GetInteger(section, "Level", 0);
-		magicList[i].exp = ini->GetInteger(section, "Exp", 0);
+		magicList[i].iniFile = ini.Get(section, "IniFile", "");
+		magicList[i].level = ini.GetInteger(section, "Level", 0);
+		magicList[i].exp = ini.GetInteger(section, "Exp", 0);
 		if (magicList[i].iniFile != "")
 		{
 			magicList[i].magic = new Magic;
 			magicList[i].magic->initFromIni(magicList[i].iniFile);
 		}	
 	}
-
-	delete ini;
-	
 }
 
-void MagicManager::save()
+void MagicManager::save(int index)
 {
-	INIReader * ini = new INIReader;
+	INIReader ini;
 	std::string section = "Head";
-	ini->SetInteger(section, "Count", 0);
+	ini.SetInteger(section, "Count", 0);
 	int count = 0;
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
@@ -60,17 +62,23 @@ void MagicManager::save()
 		{
 			count++;
 			section = convert::formatString("%d", i + 1);
-			ini->Set(section, "IniFile", magicList[i].iniFile);
-			ini->SetInteger(section, "Level", magicList[i].level);
-			ini->SetInteger(section, "Exp", magicList[i].exp);
+			ini.Set(section, "IniFile", magicList[i].iniFile);
+			ini.SetInteger(section, "Level", magicList[i].level);
+			ini.SetInteger(section, "Exp", magicList[i].exp);
 		}
 	}
 	section = "Head";
-	ini->SetInteger(section, "Count", count);
-	std::string iniName = SAVE_CURRENT_FOLDER;
-	iniName += MAGIC_INI;
-	ini->saveToFile(iniName);
-	delete ini;
+	ini.SetInteger(section, "Count", count);
+    std::string fName = SAVE_CURRENT_FOLDER;
+    fName += MAGIC_INI_NAME;
+    if (index >= 0)
+    {
+        fName += convert::formatString("%d", index);
+    }
+    fName += MAGIC_INI_EXT;
+	ini.saveToFile(fName);
+    
+    SaveFileManager::AppendFile(fName);
 }
 
 void MagicManager::freeResource()

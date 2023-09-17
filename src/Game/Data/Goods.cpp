@@ -54,7 +54,7 @@ void Goods::reset()
 void Goods::initFromIni(const std::string & fileName)
 {
 	reset();
-	std::string iniName = GOODS_INI_FOLDER;
+	std::string iniName = INI_GOODS_FOLDER;
 	iniName += fileName;
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(iniName, s);

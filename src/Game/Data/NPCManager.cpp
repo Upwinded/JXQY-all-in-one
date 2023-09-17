@@ -807,14 +807,12 @@ void NPCManager::load(const std::string & fileName)
 	freeResource();
 
 	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
-	auto ini = new INIReader(iniName);
+	INIReader ini(iniName);
 
 	std::string section = "Head";
-	int count = ini->GetInteger(section, "Count", 0);
+	int count = ini.GetInteger(section, "Count", 0);
 	if (count <= 0)
 	{
-		delete ini;
-		ini = nullptr;
 		gm->partnerManager.addPartner();
 		gm->player->reloadAction();
 		for (size_t i = 0; i < npcList.size(); i++)
@@ -827,12 +825,11 @@ void NPCManager::load(const std::string & fileName)
 	{
 		section = convert::formatString("NPC%03d", i);
 		auto npc = new NPC;
-		npc->initFromIni(ini, section);
+		npc->initFromIni(&ini, section);
 		addChild(npc);
 		npcList.push_back(npc);
 	}
-	delete ini;
-	ini = nullptr;
+
 	gm->partnerManager.addPartner();
 	gm->player->reloadAction();
 	for (size_t i = 0; i < npcList.size(); i++)
@@ -848,25 +845,24 @@ void NPCManager::save(const std::string & fileName)
 		return;
 	}
 	
-	auto ini = new INIReader();
+	INIReader ini;
 
 	std::string section = "Head";
-	ini->Set(section, "Map", GameManager::getInstance()->global.data.mapName);
-	ini->SetInteger(section, "Count", npcList.size());
+	ini.Set(section, "Map", GameManager::getInstance()->global.data.mapName);
+	ini.SetInteger(section, "Count", npcList.size());
 	int npcCount = 0;
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
 		if (npcList[i] != nullptr && npcList[i]->kind != nkPartner && npcList[i]->kind != nkPlayer)
 		{
 			section = convert::formatString("NPC%03d", npcCount++);
-			npcList[i]->saveToIni(ini, section);
+			npcList[i]->saveToIni(&ini, section);
 		}
 		
 	}
 	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
-	ini->saveToFile(iniName);
-	delete ini;
-	ini = nullptr;
+	ini.saveToFile(iniName);
+
 	SaveFileManager::AppendFile(fileName);
 }
 

@@ -1,4 +1,4 @@
-#include "Element.h"
+﻿#include "Element.h"
 
 Element * Element::currentDragItem = nullptr;
 int Element::dragParam[2] = { 0, 0 };
@@ -330,7 +330,9 @@ void Element::drawSelf()
 			{
 				children[i]->drawSelf();
 			}
-		}	
+		}
+
+		onDrawEnd();
 	}
 }
 
