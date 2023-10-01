@@ -26,7 +26,7 @@ void Scrollbar::positionChanged(int tempPosition)
 		{
 			if (parent != nullptr)
 			{
-				parent->onChildCallBack(this);
+				parent->onChildCallBack(getMySharedPtr());
 				result = erNone;
 			}
 		}
@@ -38,31 +38,18 @@ void Scrollbar::freeResource()
 	if (slideBtn != nullptr)
 	{
 		slideBtn->freeResource();
-		delete slideBtn;
 		slideBtn = nullptr;
 	}
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	removeAllChild();
 	result = erNone;
 }
 
-void Scrollbar::initFromIni(const std::string & fileName)
+void Scrollbar::initFromIniWithName(INIReader & ini, const std::string& fileName)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
 
 	style = (ScrollbarStyle)ini.GetInteger("Init", "Style", int(style));
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
@@ -77,12 +64,23 @@ void Scrollbar::initFromIni(const std::string & fileName)
 	slideEnd = ini.GetInteger("Init", "SlideEnd", slideEnd);
 	max = ini.GetInteger("Init", "Max", max);
 	std::string impName = ini.Get("Init", "Image", "");
-	impImage = IMP::createIMPImage(impName);
+	impImage = loadRes(impName);
 	std::string slideBtnIni = ini.Get("Init", "SlideBtn", "");
 	slideBtnIni = convert::extractFilePath(fileName) + slideBtnIni;
-	slideBtn = new DragButton;
+	slideBtn = std::make_shared<DragButton>();
 	addChild(slideBtn);
-	slideBtn->initFromIni(slideBtnIni);
+
+	std::unique_ptr<char[]> s;
+	int len = 0;
+	len = PakFile::readFile(slideBtnIni, s);
+	if (s == nullptr || len == 0)
+	{
+		GameLog::write("no ini file: %s\n", slideBtnIni.c_str());
+		return;
+	}
+	INIReader sbIni(s);
+
+	slideBtn->initFromIni(sbIni);
 }
 
 void Scrollbar::limitPos(int * p, int minp, int maxp)

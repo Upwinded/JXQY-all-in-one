@@ -1,13 +1,10 @@
-#ifndef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
-#endif 
-
 #include "File.h"
 #include <iostream>
 #include <fstream>
 
 #define APP_NAME "jxqy"
 #define ORG_NAME "com.upwinded.jxqy"
+#include "log.h"
 
 bool File::fileExist(const std::string& fileName)
 {
@@ -88,11 +85,11 @@ bool File::readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int
 #endif
     if (!fp)
     {
-        fprintf(stderr, "Can not open file(rb) %s\n", newFileName.c_str());
+        GameLog::write("Can not open file(rb) %s\n", newFileName.c_str());
         return false;
     }
     SDL_RWseek(fp, 0, SEEK_END);
-    int length = SDL_RWtell(fp);
+    int length = (int)SDL_RWtell(fp);
     len = length;
     SDL_RWseek(fp, 0, SEEK_SET);
     s = std::make_unique<char[]>(length + 1);
@@ -122,7 +119,7 @@ bool File::readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int
 //#endif
 //    if (!fp)
 //    {
-//        fprintf(stderr, "Can not open file %s\n", newFileName.c_str());
+//        GameLog::write(stderr, "Can not open file %s\n", newFileName.c_str());
 //        return;
 //    }
 //    SDL_RWseek(fp, 0, 0);
@@ -163,7 +160,7 @@ void File::writeFile(const std::string& fileName, const void* s, int len)
 #endif
     if (!fp)
     {
-        fprintf(stderr, "Can not open file(wb) %s\n", fileName.c_str());
+        GameLog::write("Can not open file(wb) %s\n", fileName.c_str());
         return;
     }
     SDL_RWseek(fp, 0, 0);
@@ -174,6 +171,52 @@ void File::writeFile(const std::string& fileName, const void* s, int len)
 void File::writeFile(const std::string& fileName, const std::unique_ptr<char[]>& s, int len)
 {
     writeFile(fileName, s.get(), len);
+}
+
+void File::appendFile(const std::string& fileName, const void* s, int len)
+{
+    if (s == nullptr)
+    {
+        return;
+    }
+    std::string  newFileName = AssetsPath + fileName;
+
+    convert::replaceAllString(newFileName, "\\", "/");
+    auto fp = SDL_RWFromFile(newFileName.c_str(), "wb+");
+#ifdef __ANDROID__
+    if (!fp)
+    {
+        std::string path = SDL_AndroidGetInternalStoragePath();
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
+        convert::replaceAllString(newFileName, "/", "_");
+        newFileName = path + newFileName;
+        fp = SDL_RWFromFile(newFileName.c_str(), "wb+");
+    }
+#elif defined( __APPLE__)
+    if (fp == nullptr)
+    {
+        std::string path = SDL_GetPrefPath(ORG_NAME, APP_NAME);
+        //std::string path = "~/Library/Containers/${BundleId}";
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
+        convert::replaceAllString(newFileName, "/", "_");
+        newFileName = path + newFileName;
+        fp = SDL_RWFromFile(newFileName.c_str(), "wb+");
+
+    }
+#endif
+    if (!fp)
+    {
+        fprintf(stderr, "Can not open file(wb+) %s\n", fileName.c_str());
+        return;
+    }
+    SDL_RWseek(fp, 0, 2);
+    SDL_RWwrite(fp, s, len, 1);
+    SDL_RWclose(fp);
+}
+
+void File::appendFile(const std::string& fileName, const std::unique_ptr<char[]>& s, int len)
+{
+    appendFile(fileName, s.get(), len);
 }
 
 void File::copy(const std::string& src, const std::string& dst)

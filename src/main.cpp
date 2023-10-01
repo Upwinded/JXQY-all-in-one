@@ -11,12 +11,6 @@
 #include "Game/Game.h"
 
 
-#ifdef _WIN32
-#ifndef _DEBUG
-#pragma comment(linker, "/subsystem:\"windows\" /entry:\"mainCRTStartup\"")
-#endif // _CONSOLE_MODE
-#endif // _WIN32
-
 #if defined( __ANDROID__ )
 #include <jni.h>
 int SDL_main(int argc, char* argv[])
@@ -26,10 +20,22 @@ int main(int argc, char* argv[])
     return SDL_UIKitRunApp(argc, argv, SDL_main);
 }
 int SDL_main(int argc, char* argv[])
+#elif defined(_WIN32) && !defined(_DEBUG)
+int SDL_main(int argc, char* argv[])
 #else
 int main(int argc, char* argv[])
 #endif
 {
+	std::string log_on = "-lf";
+	for (int i = 0; i < argc; i++)
+	{
+		std::string par = argv[i];
+		if (par.compare(log_on) == 0)
+		{
+			GameLog::use_log_file = true;
+			GameLog::write("Use Log File");
+		}
+	}
 	Game game;
     auto ret = game.run();
 #ifdef __IPHONEOS__

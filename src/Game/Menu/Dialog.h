@@ -11,9 +11,9 @@ public:
 
 	std::shared_ptr<INIReader> ini = nullptr;
 
-	ImageContainer * head1 = nullptr;
-	ImageContainer * head2 = nullptr;
-	TalkLabel * label = nullptr;
+	std::shared_ptr<ImageContainer> head1 = nullptr;
+	std::shared_ptr<ImageContainer> head2 = nullptr;
+	std::shared_ptr<TalkLabel> label = nullptr;
 
 	int talkStrLen = 60;
 	int talkIndex = 0;
@@ -33,7 +33,7 @@ private:
 
 	void freeResource();
 	virtual void onEvent();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 
 };
 

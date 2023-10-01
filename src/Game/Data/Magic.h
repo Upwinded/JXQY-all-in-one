@@ -58,6 +58,8 @@ struct MagicLevel
 	int attackRadius = 0;
 };
 
+class Effect;
+
 class Magic
 {
 public:
@@ -65,34 +67,34 @@ public:
 	virtual ~Magic();
 
 	void reset();
-	void initFromIni(const std::string & fileName);
+	void initFromIni(const std::string& fileName);
 	void initFromIni(const std::string & fileName, bool loadSpecialMagic);
-	std::vector<void *> addEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target);
-	std::vector<void *> addPointEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addContinuousFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addHeartCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addHelixCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addSectorEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime);
-	std::vector<void *> addLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addMoveLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int range = -1);
-	std::vector<void *> addWaveEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addCrossEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addSelfEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind);
-	std::vector<void *> addFullScreenEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addFollowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target);
-	std::vector<void *> addThrowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
-	std::vector<void *> addThrowExplodeEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, std::shared_ptr<GameElement> target);
+	static std::vector<std::shared_ptr<Effect>> addPointEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addFlyEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addContinuousFlyEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addHeartCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addHelixCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addSectorEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime);
+	static std::vector<std::shared_ptr<Effect>> addLineEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addMoveLineEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addSquareEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, int range = -1);
+	static std::vector<std::shared_ptr<Effect>> addWaveEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addCrossEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addSelfEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind);
+	static std::vector<std::shared_ptr<Effect>> addFullScreenEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addFollowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, std::shared_ptr<GameElement> target);
+	static std::vector<std::shared_ptr<Effect>> addThrowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addThrowExplodeEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 
-	double calAngle(Point from, Point to);
-	int calDirection(Point from, Point to);
-	int calDirection(double angle);
-	int calDirection(Point from, Point to, int maxDir);
-	int calDirection(double angle, int maxDir);
+	static double calAngle(Point from, Point to);
+	static int calDirection(Point from, Point to);
+	static int calDirection(double angle);
+	static int calDirection(Point from, Point to, int maxDir);
+	static int calDirection(double angle, int maxDir);
 
-	void copy(Magic * magic);
+	void copy(Magic& magic);
 	void freeResource();
 	void createRes();
 
@@ -132,11 +134,11 @@ public:
 	std::string superModeImage = "";
 
 
-	Magic * specialMagic = nullptr;
+	std::shared_ptr<Magic> specialMagic = nullptr;
 
 	MagicLevel level[MAGIC_MAX_LEVEL + 1];
 
-	double limitAngle(double angle);
-	int getDir(double angle, int maxDir);
+	static double limitAngle(double angle);
+	static int getDir(double angle, int maxDir);
 };
 

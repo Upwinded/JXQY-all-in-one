@@ -406,6 +406,12 @@
     <ClCompile Include="..\..\3rd\minilzo\minilzo.c">
       <Filter>3rd\minilzo</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\File\log.cpp">
+      <Filter>Src\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Component\BaseComponent.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\Component\BaseComponent.h">
@@ -773,6 +779,9 @@
     </ClInclude>
     <ClInclude Include="..\..\3rd\minilzo\minilzo.h">
       <Filter>3rd\minilzo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\File\log.h">
+      <Filter>Src\File</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

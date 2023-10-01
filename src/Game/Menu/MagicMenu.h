@@ -9,12 +9,12 @@ public:
 	MagicMenu();
 	virtual ~MagicMenu();
 
-	ImageContainer * title = nullptr;
-	ImageContainer * image = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
+	std::shared_ptr<ImageContainer> image = nullptr;
 
-	Scrollbar * scrollbar = nullptr;
+	std::shared_ptr<Scrollbar> scrollbar = nullptr;
 
-	Item * item[MENU_ITEM_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	std::shared_ptr<Item> item[MENU_ITEM_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	void updateMagic();
 	void updateMagic(int index);

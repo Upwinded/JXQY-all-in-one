@@ -14,8 +14,8 @@ public:
 	int lineSize = 30;
 
 	//std::vector<std::wstring> wstr;
-	std::vector<Label *> mstr;
-	virtual void initFromIni(const std::string& fileName);
+	std::vector<std::shared_ptr<Label>> mstr;
+	virtual void initFromIni(INIReader & ini);
 protected:
 	void freeResource();
 

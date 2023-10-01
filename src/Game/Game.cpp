@@ -12,10 +12,10 @@ Game::~Game()
 
 int Game::run()
 {	
-	printf("Game Run!\n");
-	printf("Init Game Engine\n");
+	GameLog::write("Game Run!\n");
+	GameLog::write("Init Game Engine\n");
 	int w = DEFAULT_WINDOW_WIDTH, h = DEFAULT_WINDOW_HEIGHT;
-#ifdef _MOBILE
+#ifdef __MOBILE__
 	w = 1200;
 	h = 600;
 	Config::setDefaultWindowSize(w, h);
@@ -31,27 +31,28 @@ int Game::run()
 	{
 		return -1;
 	}
-	printf("Init Game Font\n");
-	//设置字体，s的空间交给引擎处理，无需delete
+	GameLog::write("Init Game Font\n");
+
+	//设置字体
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(gameFont, s);
 	if (s != nullptr && len > 0)
 	{
 		Engine::getInstance()->setFontFromMem(s, len);
 	}
-	printf("Init Cursor\n");
+	GameLog::write("Init Cursor\n");
 	//设置鼠标样式
-	auto cursorImage = IMP::createIMPImage("mpc\\ui\\common\\mouse.mpc");
+	auto cursorImage = IMP::createIMPImage("mpc\\ui\\common\\mouse.mpc", false);
 	Engine::getInstance()->setMouseFromImpImage(cursorImage);
-	IMP::clearIMPImage(cursorImage);
-	//delete cursorImage;
 
-	printf("Begin Game Title\n");
-	Title * title = new Title;
+	GameLog::write("Begin Game Title\n");
+	PElement title = std::make_shared<Title>();
+	Element::setAsTop(title);
 	int ret = title->run();
-	delete title;
-	//printf("Release Engine!\n");
+	Element::removeFromTop(title);
+
+	//GameLog::write("Release Engine!\n");
 	//Engine::getInstance()->destroyEngine();
-	printf("Game End!\n");
+	GameLog::write("Game End!\n");
 	return ret;
 }

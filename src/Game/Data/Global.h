@@ -38,6 +38,7 @@ struct GlobalData
 
 	bool NPCAI = true;
 	bool canInput = true;
+
 };
 
 #define GAME_JXQY2 0
@@ -51,6 +52,7 @@ public:
 	virtual ~Global();
 
 	int gameType = GAME_JXQY2;
+	bool useWav = false;
 
 	GlobalData data;
 

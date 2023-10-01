@@ -30,7 +30,7 @@ public:
 	int direction = 0;
 	Point flyingDirection = { 0, 0 };
 
-	void playSoundFile(const std::string & fileName, float x = 0.0f, float y = 0.0f, float volume = -1.0f);
+	_channel playSoundFile(const std::string & fileName, float x = 0.0f, float y = 0.0f, float volume = -1.0f);
 	void getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff);
 	void updateEffectPosition(UTime ftime, double flySpeed);
 	void updateJumpingPosition(UTime ftime, double flySpeed);
@@ -42,12 +42,12 @@ public:
 	//得到的是当前元素的像素位置,实际在中心点下方距离(TILE_HEIGHT/2)处
 	//因所有元素位置都下移了，所以检测碰撞时，可以直接使用
 	Point getPosition(Point cenTile, PointEx cenOffset);
-	Point getPosition(GameElement * camera);
+	Point getPosition(std::shared_ptr<GameElement> camera);
 
-	bool checkCollide(GameElement * ge1, GameElement * ge2);
-	bool checkCollide(GameElement * ge);
+	bool checkCollide(std::shared_ptr<GameElement> ge1, std::shared_ptr<GameElement> ge2);
+	bool checkCollide(std::shared_ptr<GameElement> ge);
 
-	virtual void onCollide(GameElement * ge) {};
+	virtual void onCollide(std::shared_ptr<GameElement> ge) {};
 
 	virtual void draw() {};
 

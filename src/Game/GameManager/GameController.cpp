@@ -17,64 +17,105 @@ GameController::~GameController()
 
 #define freeComponent(component); \
 	removeChild(component); \
-	if (component != nullptr)\
+	if (component.get() != nullptr)\
 	{\
-		delete component; \
 		component = nullptr; \
 	}
 void GameController::freeResource()
 {
 
-#ifdef _MOBILE
+#ifdef __MOBILE__
 	freeComponent(joystickPanel);
 	freeComponent(skillPanel);
-#endif // _MOBILE
+#endif // __MOBILE__
 }
 
 void GameController::init()
 {
 	freeResource();
-#ifdef _MOBILE
-	joystickPanel = new JoystickPanel;
-	addChild(joystickPanel);
-	skillPanel = new SkillsPanel;
-	addChild(skillPanel);
-#endif // _MOBILE
 
-#ifdef _MOBILE
-	if (gm->menu.bottomMenu != nullptr)
+#ifdef __MOBILE__
+
+	joystickPanel = std::make_shared<JoystickPanel>();
+	addChild(joystickPanel);
+	skillPanel = std::make_shared<SkillsPanel>();
+	addChild(skillPanel);
+
+#endif // __MOBILE__
+
+#ifdef __MOBILE__
+
+	if (gm->menu->bottomMenu != nullptr)
 	{
-		skillPanel->skillBtn1->drawItem = gm->menu.bottomMenu->magicItem[0];
-		skillPanel->skillBtn2->drawItem = gm->menu.bottomMenu->magicItem[1];
-		skillPanel->skillBtn3->drawItem = gm->menu.bottomMenu->magicItem[2];
-		skillPanel->skillBtn4->drawItem = gm->menu.bottomMenu->magicItem[3];
-		skillPanel->skillBtn5->drawItem = gm->menu.bottomMenu->magicItem[4];
+		skillPanel->skillBtn[0]->drawItem = gm->menu->bottomMenu->magicItem[0];
+		skillPanel->skillBtn[1]->drawItem = gm->menu->bottomMenu->magicItem[1];
+		skillPanel->skillBtn[2]->drawItem = gm->menu->bottomMenu->magicItem[2];
+		skillPanel->skillBtn[3]->drawItem = gm->menu->bottomMenu->magicItem[3];
+		skillPanel->skillBtn[4]->drawItem = gm->menu->bottomMenu->magicItem[4];
 	}
-#endif // _MOBILE
+
+#endif // __MOBILE__
 }
 
-void GameController::onChildCallBack(Element* child)
+void GameController::onChildCallBack(PElement child)
 {
 	if (child == nullptr || !gm->global.data.canInput) { return; }
-#ifdef _MOBILE
+#ifdef __MOBILE__
 	auto ret = child->getResult();
 	if (child == skillPanel)
 	{
 		if (ret & erDragEnd)
 		{
 			auto dragPos = skillPanel->getDragEndPosition();
-			Point pos = gm->getMousePoint(dragPos.x, dragPos.y);
 
-			NextAction act;
+			switch (skillPanel->getClickIndex()) {
+				case SKILL_PANEL_JUMP: {
+					Point pos = gm->getMousePoint(dragPos.x, dragPos.y);
+					NextAction act;
+					act.action = acJump;
+					act.dest = pos;
+					gm->player->addNextAction(act);
+					break;
+				}
+				case SKILL_PANEL_SKILL1:
+				case SKILL_PANEL_SKILL2:
+				case SKILL_PANEL_SKILL3:
+				case SKILL_PANEL_SKILL4:
+				case SKILL_PANEL_SKILL5:
+				{
+					if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
+					{
+						auto angle = atan2(-dragPos.x, dragPos.y);
+						double distance = 400;
+						auto pos = getPlayerRelativePosition(angle, distance, MapXRatio);
 
-			act.action = acJump;
-			act.dest = pos;
-			gm->player->addNextAction(&act);
+						NextAction act;
+						act.action = acMagic;
+						act.destGE = nullptr;
+						act.dest = pos;
+						act.type = skillPanel->getClickIndex();
+						gm->player->addNextAction(act);
+					}
+					break;
+				}
+			}
 		}
-		if (ret & erMouseLDown)
+		else if (ret & erClick)
 		{
 			switch (skillPanel->getClickIndex())
 			{
+				case SKILL_PANEL_JUMP:
+				{
+                    int dir = gm->player->direction;
+                    auto angle = dir * pi / 4;
+                    double distance = 400;
+                    auto pos = getPlayerRelativePosition(angle, distance, TILE_WIDTH / TILE_HEIGHT);
+					NextAction act;
+					act.action = acJump;
+					act.dest = pos;
+					gm->player->addNextAction(act);
+					break;
+				}
 				case SKILL_PANEL_SIT:
 				{
 					if (gm->player->isSitting())
@@ -100,14 +141,14 @@ void GameController::onChildCallBack(Element* child)
 						{
 							act.action = acWalk;
 						}
-						NPC* tempNPC = nullptr;
-						if (gm->npcManager.clickIndex >= 0)
+						std::shared_ptr<NPC> tempNPC = nullptr;
+						if (gm->npcManager->clickIndex >= 0)
 						{
-							tempNPC = gm->npcManager.npcList[gm->npcManager.clickIndex];
+							tempNPC = gm->npcManager->npcList[gm->npcManager->clickIndex];
 						}
 						else
 						{
-							tempNPC = gm->npcManager.findNearestViewNPC(lkEnemy, gm->player->position, 15);
+							tempNPC = gm->npcManager->findNearestViewNPC(lkEnemy, gm->player->position, 15);
 						}
 						act.type = ndAttack;
 						if (tempNPC != nullptr)
@@ -117,30 +158,30 @@ void GameController::onChildCallBack(Element* child)
 						}
 						else
 						{
-							act.dest = gm->map.getSubPoint(gm->player->position, gm->player->direction);
+							act.dest = gm->map->getSubPoint(gm->player->position, gm->player->direction);
 						}
-						gm->player->addNextAction(&act);
+						gm->player->addNextAction(act);
 					}
 					break;
 				}
-				case SKILL_PANEL_SKIIL1:
-				case SKILL_PANEL_SKIIL2:
-				case SKILL_PANEL_SKIIL3:
-				case SKILL_PANEL_SKIIL4:
-				case SKILL_PANEL_SKIIL5:
+                case SKILL_PANEL_SKILL1:
+                case SKILL_PANEL_SKILL2:
+                case SKILL_PANEL_SKILL3:
+                case SKILL_PANEL_SKILL4:
+                case SKILL_PANEL_SKILL5:
 				{
 					if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
 					{
 						NextAction act;
 						act.action = acMagic;
-						NPC* tempNPC = nullptr;
-						if (gm->npcManager.clickIndex >= 0)
+						std::shared_ptr<NPC> tempNPC = nullptr;
+						if (gm->npcManager->clickIndex >= 0)
 						{
-							tempNPC = gm->npcManager.npcList[gm->npcManager.clickIndex];
+							tempNPC = gm->npcManager->npcList[gm->npcManager->clickIndex];
 						}
 						else
 						{
-							tempNPC = gm->npcManager.findNearestViewNPC(lkEnemy, gm->player->position, 15);
+							tempNPC = gm->npcManager->findNearestViewNPC(lkEnemy, gm->player->position, 15);
 						}
 						if (tempNPC != nullptr)
 						{
@@ -149,21 +190,17 @@ void GameController::onChildCallBack(Element* child)
 						}
 						else
 						{
-							act.dest = gm->map.getSubPoint(gm->player->position, gm->player->direction);
+							act.dest = gm->map->getSubPoint(gm->player->position, gm->player->direction);
 						}
 						act.type = skillPanel->getClickIndex();
-						gm->player->addNextAction(&act);
+						gm->player->addNextAction(act);
 					}
 					break;
 				}
-#ifndef _MSC_VER
-				case SKILL_PANEL_FAST_SELECT ... SKILL_PANEL_FAST_SELECT + FASTBTN_COUNT - 1:
-#else
 				case SKILL_PANEL_FAST_SELECT:
 				case SKILL_PANEL_FAST_SELECT + 1:
 				case SKILL_PANEL_FAST_SELECT + 2:
 				case SKILL_PANEL_FAST_SELECT + 3:
-#endif
 				{
 					NextAction act;
 					if (gm->player->canRun && (gm->player->thew > (int)round((double)gm->player->info.thewMax * MIN_THEW_RATE_TO_RUN) || gm->player->thew > MIN_THEW_LIMIT_TO_RUN))
@@ -180,8 +217,8 @@ void GameController::onChildCallBack(Element* child)
 						if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
 						{
 							act.type = gm->fastSelectingList[index].type;
-							if (((act.type == ndTalk) && (gm->npcManager.findNPC((NPC*)gm->fastSelectingList[index].destGE)))
-								|| ((act.type == ndObj) && (gm->objectManager.findObj((Object*)gm->fastSelectingList[index].destGE))))
+							if (((act.type == ndTalk) && (gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(gm->fastSelectingList[index].destGE))))
+								|| ((act.type == ndObj) && (gm->objectManager->findObj(std::dynamic_pointer_cast<Object>(gm->fastSelectingList[index].destGE)))))
 							{
 								act.dest = gm->fastSelectingList[index].destGE->position;
 								act.destGE = gm->fastSelectingList[index].destGE;
@@ -190,7 +227,7 @@ void GameController::onChildCallBack(Element* child)
 							{
 								act.destGE = nullptr;
 							}
-							gm->player->addNextAction(&act);
+							gm->player->addNextAction(act);
 						}
 					}
 					break;
@@ -214,7 +251,7 @@ void GameController::onEvent()
 			MouseAlreadyDown = false;
 		}
 	}
-#ifndef _MOBILE
+#ifndef __MOBILE__
 	if (dragging == TOUCH_UNTOUCHEDID && MouseAlreadyDown && engine->getMousePressed(MBC_MOUSE_LEFT) && touchingID != TOUCH_UNTOUCHEDID && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
 	{
 		if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
@@ -226,24 +263,24 @@ void GameController::onEvent()
 			cenScreen.y = (int)h / 2;
 			int x, y;
 			engine->getMousePosition(x, y);
-			Point pos = gm->map.getMousePosition({ x, y }, gm->camera.position, cenScreen, gm->camera.offset);
+			Point pos = gm->map->getMousePosition({ x, y }, gm->camera->position, cenScreen, gm->camera->offset);
 			if (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT))
 			{
 				NextAction act;
 				act.action = acRun;
 				act.dest = pos;
-				gm->player->addNextAction(&act);
+				gm->player->addNextAction(act);
 			}
 			else
 			{
 				NextAction act;
 				act.action = acWalk;
 				act.dest = pos;
-				gm->player->addNextAction(&act);
+				gm->player->addNextAction(act);
 			}
 		}
 	}
-	else if (dragging == TOUCH_UNTOUCHEDID && engine->getMousePressed(MBC_MOUSE_LEFT) && gm->npcManager.clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
+	else if (dragging == TOUCH_UNTOUCHEDID && engine->getMousePressed(MBC_MOUSE_LEFT) && gm->npcManager->clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
 	{
 		if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
 		{
@@ -256,7 +293,7 @@ void GameController::onEvent()
 			{
 				act.action = acWalk;
 			}
-			NPC* tempNPC = gm->npcManager.npcList[gm->npcManager.clickIndex];
+			std::shared_ptr<NPC> tempNPC = gm->npcManager->npcList[gm->npcManager->clickIndex];
 			if (tempNPC != nullptr)
 			{
 				act.destGE = tempNPC;
@@ -269,12 +306,12 @@ void GameController::onEvent()
 					act.type = ndTalk;
 				}
 				act.dest = tempNPC->position;
-				gm->player->addNextAction(&act);
+				gm->player->addNextAction(act);
 			}
 			
 		}
 	}
-	else if (dragging == TOUCH_UNTOUCHEDID && engine->getMousePressed(MBC_MOUSE_LEFT) && gm->objectManager.clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
+	else if (dragging == TOUCH_UNTOUCHEDID && engine->getMousePressed(MBC_MOUSE_LEFT) && gm->objectManager->clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
 	{
 		NextAction act;
 
@@ -286,13 +323,13 @@ void GameController::onEvent()
 		{
 			act.action = acWalk;
 		}
-		Object* tempObject = gm->objectManager.objectList[gm->objectManager.clickIndex];
+		std::shared_ptr<Object> tempObject = gm->objectManager->objectList[gm->objectManager->clickIndex];
 		if (tempObject != nullptr)
 		{
 			act.destGE = tempObject;
 			act.type = ndObj;
 			act.dest = tempObject->position;
-			gm->player->addNextAction(&act);
+			gm->player->addNextAction(act);
 		}
 	}
 
@@ -350,14 +387,14 @@ void GameController::onEvent()
 		KeyStep = false;
 	}
 
-	if (KeyStep && gm->map.canWalk(dest))
+	if (KeyStep && gm->map->canWalk(dest))
 	{
 		act.dest = dest;
-		gm->player->addNextAction(&act);
+		gm->player->addNextAction(act);
 	}
 #endif
     
-#ifdef _MOBILE
+#ifdef __MOBILE__
     NextAction act;
 	bool joystickAction = true;
 	if (joystickPanel->joystick->isRunning())
@@ -382,31 +419,32 @@ void GameController::onEvent()
 	if (joystickAction)
 	{
 		auto dirList = joystickPanel->joystick->getDirectionList();
-
+		bool steping = false;
 		for (size_t i = 0; i < dirList.size(); i++)
 		{
-			auto step = gm->map.getSubPoint(gm->player->position, dirList[i]);
+			auto step = gm->map->getSubPoint(gm->player->position, dirList[i]);
 			if (gm->player->position == step)
 			{
 				break;
 			}
-			if (!gm->map.isInMap(step))
+			if (!gm->map->isInMap(step))
 			{
 				continue;
 			}
 			bool breakOut = false;
-			for (size_t j = 0; j < gm->map.dataMap.tile[step.y][step.x].stepIndex.size(); j++)
+			for (size_t j = 0; j < gm->map->dataMap.tile[step.y][step.x].stepIndex.size(); j++)
 			{
-				if (gm->map.dataMap.tile[step.y][step.x].stepIndex[j] == gm->player->npcIndex)
+				if (gm->map->dataMap.tile[step.y][step.x].stepIndex[j] == gm->player->npcIndex)
 				{
 					breakOut = true;
 					break;
 				}
 			}
-			if (!breakOut && gm->map.canWalk(step))
+			if (!breakOut && gm->map->canWalk(step))
 			{
 				act.dest = step;
-				gm->player->addNextAction(&act);
+				steping = true;
+				gm->player->addNextAction(act);
 				break;
 			}
 			if (breakOut)
@@ -414,8 +452,72 @@ void GameController::onEvent()
 				break;
 			}
 		}
+		if (!steping)
+		{
+			if (dirList.size() > 0 && gm->player->isStanding())
+			{
+				gm->player->direction = *dirList.begin();
+			}
+
+		}
 	}
 
+
+	if (!gm->inEvent)
+	{
+		gm->fastSelectingList.resize(0);
+		int radius = 2;
+		auto tempObjList = gm->objectManager->findRadiusScriptViewObj(gm->player->position, radius);
+		for (int i = 0; i < tempObjList.size(); ++i)
+		{
+			NextAction action;
+			action.type = ndObj;
+			action.destGE = tempObjList[i];
+			action.dest = action.destGE->position;
+			action.distance = gm->map->calDistance(gm->player->position, action.destGE->position);
+			gm->fastSelectingList.push_back(action);
+		}
+		auto tempNPCList = gm->npcManager->findRadiusScriptViewNPC(gm->player->position, radius);
+		for (int i = 0; i < tempNPCList.size(); ++i)
+		{
+			NextAction action;
+			action.type = ndTalk;
+			action.destGE = tempNPCList[i];
+			action.dest = action.destGE->position;
+			action.distance = gm->map->calDistance(gm->player->position, action.destGE->position);
+
+			gm->fastSelectingList.push_back(action);
+		}
+
+		std::sort(gm->fastSelectingList.begin(), gm->fastSelectingList.end(), gm->actionCmp);
+		if (gm->fastSelectingList.size() > FASTBTN_COUNT)
+		{
+			gm->fastSelectingList.resize(FASTBTN_COUNT);
+		}
+		for (int i = 0; i < gm->fastSelectingList.size(); ++i)
+		{
+			if (gm->fastSelectingList[i].type == ndTalk)
+			{
+				setFastSelectBtn(i, true, std::dynamic_pointer_cast<NPC>(gm->fastSelectingList[i].destGE)->npcName);
+			}
+			else
+			{
+				setFastSelectBtn(i, true, std::dynamic_pointer_cast<Object>(gm->fastSelectingList[i].destGE)->objName);
+			}
+		}
+
+		for (int i = gm->fastSelectingList.size(); i < FASTBTN_COUNT; ++i)
+		{
+			setFastSelectBtn(i, false);
+		}
+	}
+	else
+	{
+		for (int i = 0; i < FASTBTN_COUNT; ++i)
+		{
+			setFastSelectBtn(i, false);
+		}
+	}
 #endif
 }
 
@@ -424,16 +526,16 @@ void GameController::onUpdate()
 	visible = !gm->inEvent;
 }
 
-bool GameController::onHandleEvent(AEvent* e)
+bool GameController::onHandleEvent(AEvent & e)
 {
 	if (!gm->global.data.canInput)
 	{
 		return false;
 	}
 
-	if (e->eventType == ET_KEYDOWN)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_V)
+		if (e.eventData == KEY_V)
 		{
 			if (gm->player->isSitting())
 			{
@@ -445,24 +547,24 @@ bool GameController::onHandleEvent(AEvent* e)
 			}
 			return true;
 		}
-		else if (e->eventData == KEY_A || 
-				e->eventData == KEY_S || 
-				e->eventData == KEY_D ||
-				e->eventData == KEY_F ||
-				e->eventData == KEY_G)
+		else if (e.eventData == KEY_A || 
+				e.eventData == KEY_S || 
+				e.eventData == KEY_D ||
+				e.eventData == KEY_F ||
+				e.eventData == KEY_G)
 		{
 			NextAction act;
 			act.action = acMagic;
-			if (gm->npcManager.clickIndex >= 0)
+			if (gm->npcManager->clickIndex >= 0)
 			{
-				act.dest = gm->npcManager.npcList[gm->npcManager.clickIndex]->position;
-				act.destGE = gm->npcManager.npcList[gm->npcManager.clickIndex];
+				act.dest = gm->npcManager->npcList[gm->npcManager->clickIndex]->position;
+				act.destGE = gm->npcManager->npcList[gm->npcManager->clickIndex];
 			}
 			else
 			{
 				act.dest = gm->getMousePoint();
 			}
-			switch (e->eventData)
+			switch (e.eventData)
 			{
 			case KEY_A:
 				act.type = 0;
@@ -484,13 +586,13 @@ bool GameController::onHandleEvent(AEvent* e)
 				break;
 			} 
 			_last_magic_index = act.type;
-			gm->player->addNextAction(&act);
+			gm->player->addNextAction(act);
 			return true;
 		}
-		else if (e->eventData == KEY_Z || e->eventData == KEY_X || e->eventData == KEY_C)
+		else if (e.eventData == KEY_Z || e.eventData == KEY_X || e.eventData == KEY_C)
 		{
 			int itemIndex = GOODS_COUNT;
-			switch (e->eventData)
+			switch (e.eventData)
 			{
 			case KEY_Z: itemIndex += 0; break;
 			case KEY_X: itemIndex += 1; break;
@@ -502,9 +604,9 @@ bool GameController::onHandleEvent(AEvent* e)
 			return true;
 		}
 	}
-	else if (dragging == TOUCH_UNTOUCHEDID && e->eventType == ET_MOUSEDOWN && touchingID != TOUCH_UNTOUCHEDID)
+	else if (dragging == TOUCH_UNTOUCHEDID && e.eventType == ET_MOUSEDOWN && touchingID != TOUCH_UNTOUCHEDID)
 	{
-		if (e->eventData == MBC_MOUSE_LEFT)
+		if (e.eventData == MBC_MOUSE_LEFT)
 		{
 			MouseAlreadyDown = true;
 			Point pos = gm->getMousePoint();
@@ -525,31 +627,31 @@ bool GameController::onHandleEvent(AEvent* e)
 			}
 
 			act.dest = pos;
-			gm->player->addNextAction(&act);
+			gm->player->addNextAction(act);
 			return true;
 		}
-		else if (e->eventData == MBC_MOUSE_RIGHT)
+		else if (e.eventData == MBC_MOUSE_RIGHT)
 		{
 			if (_last_magic_index >= 0)
 			{
 				NextAction act;
 				act.action = acMagic;
-				if (gm->npcManager.clickIndex >= 0)
+				if (gm->npcManager->clickIndex >= 0)
 				{
-					act.dest = gm->npcManager.npcList[gm->npcManager.clickIndex]->position;
-					act.destGE = gm->npcManager.npcList[gm->npcManager.clickIndex];
+					act.dest = gm->npcManager->npcList[gm->npcManager->clickIndex]->position;
+					act.destGE = gm->npcManager->npcList[gm->npcManager->clickIndex];
 				}
 				else
 				{
 					act.dest = gm->getMousePoint();
 				}
 				act.type = _last_magic_index;
-				gm->player->addNextAction(&act);
+				gm->player->addNextAction(act);
 				return true;
 			}
 		}
 	}
-	else if (dragging == TOUCH_UNTOUCHEDID && e->eventType == ET_MOUSEDOWN && gm->npcManager.clickIndex >= 0)
+	else if (dragging == TOUCH_UNTOUCHEDID && e.eventType == ET_MOUSEDOWN && gm->npcManager->clickIndex >= 0)
 	{
 		NextAction act;
 		if (engine->getKeyPress(KEY_LALT) || engine->getKeyPress(KEY_RALT))
@@ -566,8 +668,8 @@ bool GameController::onHandleEvent(AEvent* e)
 		}
 		if (act.action != acJump)
 		{
-			act.destGE = gm->npcManager.npcList[gm->npcManager.clickIndex];
-			if (gm->npcManager.npcList[gm->npcManager.clickIndex]->kind == nkBattle && gm->npcManager.npcList[gm->npcManager.clickIndex]->relation == nrHostile)
+			act.destGE = gm->npcManager->npcList[gm->npcManager->clickIndex];
+			if (gm->npcManager->npcList[gm->npcManager->clickIndex]->kind == nkBattle && gm->npcManager->npcList[gm->npcManager->clickIndex]->relation == nrHostile)
 			{
 				act.type = ndAttack;
 			}
@@ -576,10 +678,10 @@ bool GameController::onHandleEvent(AEvent* e)
 				act.type = ndTalk;
 			}
 		}
-		act.dest = gm->npcManager.npcList[gm->npcManager.clickIndex]->position;
-		gm->player->addNextAction(&act);
+		act.dest = gm->npcManager->npcList[gm->npcManager->clickIndex]->position;
+		gm->player->addNextAction(act);
 	}
-	else if (dragging == TOUCH_UNTOUCHEDID && e->eventType == ET_MOUSEDOWN && gm->objectManager.clickIndex >= 0)
+	else if (dragging == TOUCH_UNTOUCHEDID && e.eventType == ET_MOUSEDOWN && gm->objectManager->clickIndex >= 0)
 	{
 		NextAction act;
 		if (engine->getKeyPress(KEY_LALT) || engine->getKeyPress(KEY_RALT))
@@ -596,16 +698,16 @@ bool GameController::onHandleEvent(AEvent* e)
 		}
 		if (act.action != acJump)
 		{
-			act.destGE = gm->objectManager.objectList[gm->objectManager.clickIndex];
+			act.destGE = gm->objectManager->objectList[gm->objectManager->clickIndex];
 			act.type = ndObj;
 		}
-		act.dest = gm->objectManager.objectList[gm->objectManager.clickIndex]->position;
-		gm->player->addNextAction(&act);
+		act.dest = gm->objectManager->objectList[gm->objectManager->clickIndex]->position;
+		gm->player->addNextAction(act);
 	}
 	return false;
 }
 
-#ifdef _MOBILE
+#ifdef __MOBILE__
 void GameController::setFastSelectBtn(int index, bool sVisible, std::string str)
 {
 	skillPanel->fastBtn[index]->visible = sVisible;
@@ -614,5 +716,18 @@ void GameController::setFastSelectBtn(int index, bool sVisible, std::string str)
 		skillPanel->fastBtn[index]->setUTF8Str(str);
 	}
 }
-#endif // _MOBILE
+#endif // __MOBILE__
+
+Point GameController::getPlayerRelativePosition(double angle, double distance, double xFactor)
+{
+	Point relativePos;
+	relativePos.x = (int)round(-sin(angle) * distance * xFactor);
+	relativePos.y = (int)round(cos(angle) * distance);
+	auto playerPos = gm->player->getPosition(gm->camera->position, gm->camera->offset);
+	playerPos.y -= TILE_HEIGHT / 2;
+	relativePos = relativePos + playerPos;
+	relativePos = gm->getMousePoint(relativePos.x, relativePos.y);
+	return relativePos;
+}
+
 

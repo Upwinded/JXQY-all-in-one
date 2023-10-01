@@ -59,11 +59,11 @@ void Memo::add(const std::string & str)
 	{
 		memo.insert(memo.begin() + i, strs[i]);
 	}
-	gm->menu.memoMenu->reRange((int)memo.size() > 0 ? (int)memo.size() - 1 : 0);
+	gm->menu->memoMenu->reRange((int)memo.size() > 0 ? (int)memo.size() - 1 : 0);
 }
 
 void Memo::clear()
 {
 	memo.clear();
-	gm->menu.memoMenu->reset();
+	gm->menu->memoMenu->reset();
 }

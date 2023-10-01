@@ -16,12 +16,9 @@ PracticeMenu::~PracticeMenu()
 
 void PracticeMenu::updateMagic()
 {
-	if (magic->impImage != nullptr)
-	{
-		IMP::clearIMPImage(magic->impImage);
-		//delete magic->impImage;
-		magic->impImage = nullptr;
-	}
+
+	magic->impImage = nullptr;
+
 	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != "")
 	{
 		name->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->name);
@@ -65,34 +62,33 @@ void PracticeMenu::updateLevel()
 
 void PracticeMenu::onEvent()
 {
-	
 	unsigned int ret = magic->getResult();
 	if (ret & erShowHint)
 	{
 		if (gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].iniFile != "" && gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic != nullptr)
 		{
-			gm->menu.toolTip->visible = true;
-			gm->menu.toolTip->changeParent(this);
-			gm->menu.toolTip->setMagic(gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic, gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].level);
+			gm->menu->toolTip->visible = true;
+			addChild(gm->menu->toolTip);
+			gm->menu->toolTip->setMagic(gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic, gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].level);
 		}
 		else
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 		}
 
 	}
 	if (ret & erHideHint)
 	{
-		gm->menu.toolTip->visible = false;
+		gm->menu->toolTip->visible = false;
 	}
 	if (ret & erMouseRDown)
 	{
-		gm->menu.toolTip->visible = false;
+		gm->menu->toolTip->visible = false;
 		magic->resetHint();
 	}
 	if (ret & erDropped)
 	{
-		gm->menu.toolTip->visible = false;
+		gm->menu->toolTip->visible = false;
 		magic->resetHint();
 		if (magic->dropType == dtMagic)
 		{
@@ -103,11 +99,11 @@ void PracticeMenu::onEvent()
 			}
 			if (magic->dropIndex < MAGIC_COUNT)
 			{
-				gm->menu.magicMenu->updateMagic();
+				gm->menu->magicMenu->updateMagic();
 			}
 			else if (magic->dropIndex < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT)
 			{
-				gm->menu.bottomMenu->updateMagicItem();
+				gm->menu->bottomMenu->updateMagicItem();
 			}
 		}
 	}
@@ -116,17 +112,17 @@ void PracticeMenu::onEvent()
 void PracticeMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\equip\\window.ini");
-	title = addImageContainer("ini\\ui\\xiulian\\title.ini");
-	image = addImageContainer("ini\\ui\\xiulian\\image.ini");
+	initFromIniFileName(u8"ini\\ui\\equip\\window.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\xiulian\\title.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\xiulian\\image.ini");
 
-	name = addLabel("ini\\ui\\xiulian\\name.ini");
-	intro = addLabel("ini\\ui\\xiulian\\intro.ini");
+	name = addComponent<Label>(u8"ini\\ui\\xiulian\\name.ini");
+	intro = addComponent<Label>(u8"ini\\ui\\xiulian\\intro.ini");
 	intro->autoNextLine = true;
-	level = addLabel("ini\\ui\\xiulian\\level.ini");
-	exp = addLabel("ini\\ui\\xiulian\\exp.ini");
+	level = addComponent<Label>(u8"ini\\ui\\xiulian\\level.ini");
+	exp = addComponent<Label>(u8"ini\\ui\\xiulian\\exp.ini");
 
-	magic = addItem("ini\\ui\\xiulian\\magic.ini");
+	magic = addComponent<Item>(u8"ini\\ui\\xiulian\\magic.ini");
 	magic->dragIndex = MAGIC_TOOLBAR_COUNT + MAGIC_COUNT;
 	magic->dragType = dtMagic;
 	magic->canShowHint = true;
@@ -135,12 +131,9 @@ void PracticeMenu::init()
 
 void PracticeMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	freeCom(image);
 	freeCom(title);
 	freeCom(level);

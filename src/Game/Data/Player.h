@@ -36,7 +36,7 @@ struct NextAction
 	int action = acStand;
 	Point dest = { 0, 0 };
 	int type = 0;
-	GameElement * destGE = nullptr;
+	std::shared_ptr<GameElement> destGE = nullptr;
 	int distance = 0;
 };
 
@@ -97,19 +97,19 @@ public:
 
 	virtual void updateAction(UTime frameTime);
 	virtual void onUpdate();
-	NextAction * nextAction = nullptr;
+	std::shared_ptr<NextAction> nextAction = nullptr;
 	void freeResource();
 
-	virtual void hurt(Effect * e);
+	virtual void hurt(std::shared_ptr<Effect> e);
 	virtual void hurtLife(int damage);
 	virtual void addExp(int aExp);
 	virtual void levelUp();
 
-	void addNextAction(NextAction * act);
+	void addNextAction(NextAction& act);
 
 	int nextDest = ndNone;
-	//GameElement * destGE = nullptr; //在NPC中已定义
-	Effect * shieldEffect = nullptr;
+	//std::shared_ptr<GameElement> destGE = nullptr; //在NPC中已定义
+	std::shared_ptr<Effect> shieldEffect = nullptr;
 
 	int magicIndex = 0;
 	Point magicDest = { 0, 0 };
@@ -130,14 +130,14 @@ public:
 
 	virtual void standUp();
 
-	virtual void runObj(Object * obj);
-	virtual void talkTo(NPC * npc);
+	virtual void runObj(std::shared_ptr<Object> obj);
+	virtual void talkTo(std::shared_ptr<NPC> npc);
 	virtual void beginStand();
 	virtual void beginWalk(Point dest);
-	virtual void beginMagic(Point dest, GameElement * target = nullptr);
+	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	virtual void beginJump(Point dest);
 	virtual void beginRun(Point dest);
-	virtual void beginAttack(Point dest, GameElement * target = nullptr);
+	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	virtual void beginHurt(Point dest);
 	bool canHurt();
 	void checkTrap();
@@ -151,7 +151,7 @@ public:
 //	virtual bool mouseInRect(int x, int y) { return false; }
 
 	void loadLevel(const std::string& fileName);
-	virtual void doSpecialAttack(Point dest, GameElement * target = nullptr);
+	virtual void doSpecialAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 
 	virtual void drawAlpha(Point cenTile, Point cenScreen, PointEx coffset);
 	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset);

@@ -27,7 +27,7 @@ void TextButton::setStrColor(unsigned int color)
 void TextButton::setStr(const std::string& s)
 {
 	auto temps = s;
-	if (convert::GetUtf8LetterNumber(s.c_str()) > (size_t)rect.w / label.fontSize)
+	if (convert::GetUtf8LetterCount(s.c_str()) > (int)rect.w / label.fontSize)
 	{
 		//substr(0, rect.w / label.fontSize);
 		auto temp_list = convert::splitString(s, convert_max(rect.w / label.fontSize, 1));
@@ -44,10 +44,9 @@ void TextButton::setUTF8Str(const std::string& s)
 	setStr(s);
 }
 
-void TextButton::initFromIni(const std::string& fileName)
+void TextButton::initFromIni(INIReader & ini)
 {
-	Button::initFromIni(fileName);
-	INIReader ini(fileName);
+	Button::initFromIni(ini);
 	label.fontSize = ini.GetInteger("Init", "Font", label.fontSize);
 	label.color = ini.GetColor("Init", "Color", label.color);
 }
@@ -58,7 +57,7 @@ void TextButton::onDraw()
 	label.rect = rect;
     label.rect.y += (rect.h - label.fontSize) / 2;
 	auto str = label.getStr();
-	label.rect.x += (rect.w - (convert::GetUtf8LetterNumber(str.c_str()) * label.fontSize)) / 2;
+	label.rect.x += (rect.w - (convert::GetUtf8LetterCount(str.c_str()) * label.fontSize)) / 2;
 	label.onDraw();
 }
 
@@ -67,7 +66,17 @@ void TextButton::onMouseLeftDown(int x, int y)
     if (parent != nullptr && parent->canCallBack)
     {
         result = erMouseLDown;
-        parent->onChildCallBack(this);
+        parent->onChildCallBack(getMySharedPtr());
         result = erNone;
     }
+}
+
+void TextButton::onClick()
+{
+	if (parent != nullptr && parent->canCallBack)
+	{
+		result = erClick;
+		parent->onChildCallBack(getMySharedPtr());
+		result = erNone;
+	}
 }

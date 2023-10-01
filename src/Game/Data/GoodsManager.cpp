@@ -4,6 +4,7 @@
 
 GoodsManager::GoodsManager()
 {
+
 }
 
 
@@ -20,7 +21,6 @@ void GoodsManager::freeResource()
 		goodsList[i].number = 0;
 		if (goodsList[i].goods != nullptr)
 		{
-			delete goodsList[i].goods;
 			goodsList[i].goods = nullptr;
 		}
 	}
@@ -56,7 +56,7 @@ void GoodsManager::load(int index)
 			}
 			else
 			{
-				goodsList[i].goods = new Goods;
+				goodsList[i].goods = std::make_shared<Goods>();
 				goodsList[i].goods->initFromIni(goodsList[i].iniFile);
 			}
 		}
@@ -81,14 +81,13 @@ void GoodsManager::save(int index)
 	}
 	section = "Head";
 	ini.SetInteger(section, "Count", count);
-    std::string fName = SAVE_CURRENT_FOLDER;
-    fName += GOODS_INI_NAME;
+    std::string fName = GOODS_INI_NAME;
     if (index >= 0)
     {
         fName += convert::formatString("%d", index);
     }
     fName += GOODS_INI_EXT;
-	ini.saveToFile(fName);
+	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
     
     SaveFileManager::AppendFile(fName);
 }
@@ -113,7 +112,6 @@ void GoodsManager::clearItem()
 		goodsList[i].number = 0;
 		if (goodsList[i].goods != nullptr)
 		{
-			delete goodsList[i].goods;
 			goodsList[i].goods = nullptr;
 		}
 	}
@@ -177,7 +175,6 @@ void GoodsManager::sellItem(const std::string & itemName)
 			if (goodsList[i].number <= 0)
 			{
 				goodsList[i].iniFile = "";
-				delete goodsList[i].goods;
 				goodsList[i].goods = nullptr;
 				goodsList[i].number = 0;
 			}
@@ -199,7 +196,7 @@ bool GoodsManager::addItem(const std::string & itemName, int num)
 		{
 			goodsList[i].number += num;
 			updateMenu(i);
-			gm->showMessage(convert::formatString(convert::GBKToUTF8_InWinOnly("得到%s!").c_str(), goodsList[i].goods->name.c_str()));
+			gm->showMessage(convert::formatString(u8"得到%s!", goodsList[i].goods->name.c_str()));
 			return true;
 		}
 	}
@@ -209,10 +206,10 @@ bool GoodsManager::addItem(const std::string & itemName, int num)
 		{
 			goodsList[i].iniFile = itemName;
 			goodsList[i].number = num;
-			goodsList[i].goods = new Goods;
+			goodsList[i].goods = std::make_shared<Goods>();
 			goodsList[i].goods->initFromIni(itemName);
 			updateMenu(i);
-			gm->showMessage(convert::formatString(convert::GBKToUTF8_InWinOnly("得到%s!").c_str(), goodsList[i].goods->name.c_str()));
+			gm->showMessage(convert::formatString(u8"得到%s!", goodsList[i].goods->name.c_str()));
 			return true;
 		}
 	}
@@ -233,7 +230,6 @@ void GoodsManager::deleteItem(const std::string & itemName)
 			goodsList[i].iniFile = "";
 			if (goodsList[i].goods != nullptr)
 			{
-				delete goodsList[i].goods;
 				goodsList[i].goods = nullptr;
 			}
 			updateMenu(i);
@@ -253,7 +249,7 @@ bool GoodsManager::buyItem(const std::string & itemName, int num)
 	int cst = goods.cost * num;
 	if (gm->player->money < cst)
 	{
-		gm->showMessage(convert::GBKToUTF8_InWinOnly("金钱不足！"));
+		gm->showMessage(u8"金钱不足！");
 		return false;
 	}
 	if (addItem(itemName, num))
@@ -261,7 +257,7 @@ bool GoodsManager::buyItem(const std::string & itemName, int num)
 		gm->player->money -= cst;
 		return true;
 	}
-	gm->showMessage(convert::GBKToUTF8_InWinOnly("物品栏位置已满！"));
+	gm->showMessage(u8"物品栏位置已满！");
 	return false;
 }
 
@@ -273,7 +269,6 @@ void GoodsManager::useItem(int itemIndex)
 		goodsList[itemIndex].number = 0;
 		if (goodsList[itemIndex].goods != nullptr)
 		{
-			delete goodsList[itemIndex].goods;
 			goodsList[itemIndex].goods = nullptr;
 		}
 		return;
@@ -296,34 +291,33 @@ void GoodsManager::useItem(int itemIndex)
 			goodsList[itemIndex].number = 0;
 			if (goodsList[itemIndex].goods != nullptr)
 			{
-				delete goodsList[itemIndex].goods;
 				goodsList[itemIndex].goods = nullptr;
 			}
 		}
 		if (itemIndex < GOODS_COUNT)
 		{
-			gm->menu.goodsMenu->updateGoods();
+			gm->menu->goodsMenu->updateGoods();
 		}
 		else if (itemIndex < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
 		{
-			gm->menu.bottomMenu->updateGoodsItem();
+			gm->menu->bottomMenu->updateGoodsItem();
 		}
 	}
 	else if (goodsList[itemIndex].goods->kind == gkEquipment)
 	{
-		int partIndex = gm->menu.equipMenu->getPartIndex(goodsList[itemIndex].goods->part);
+		int partIndex = gm->menu->equipMenu->getPartIndex(goodsList[itemIndex].goods->part);
 		if (partIndex >= 0)
 		{
 			exchange(itemIndex, GOODS_COUNT + GOODS_TOOLBAR_COUNT + partIndex);
-			gm->menu.equipMenu->updateGoods();
+			gm->menu->equipMenu->updateGoods();
 			gm->player->limitAttribute();
 			if (itemIndex < GOODS_COUNT)
 			{
-				gm->menu.goodsMenu->updateGoods();
+				gm->menu->goodsMenu->updateGoods();
 			}
 			else if (itemIndex < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
 			{
-				gm->menu.bottomMenu->updateGoodsItem();
+				gm->menu->bottomMenu->updateGoodsItem();
 			}
 		}
 	}
@@ -333,23 +327,23 @@ void GoodsManager::updateMenu(int idx)
 {
 	if (idx < GOODS_COUNT)
 	{
-		gm->menu.goodsMenu->updateGoods();
+		gm->menu->goodsMenu->updateGoods();
 	}
 	else if (idx < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
 	{
-		gm->menu.bottomMenu->updateGoodsItem();
+		gm->menu->bottomMenu->updateGoodsItem();
 	}
 	else
 	{
-		gm->menu.equipMenu->updateGoods();
+		gm->menu->equipMenu->updateGoods();
 	}
 }
 
 void GoodsManager::updateMenu()
 {
-	gm->menu.goodsMenu->updateGoods();
-	gm->menu.bottomMenu->updateGoodsItem();
-	gm->menu.equipMenu->updateGoods();
+	gm->menu->goodsMenu->updateGoods();
+	gm->menu->bottomMenu->updateGoodsItem();
+	gm->menu->equipMenu->updateGoods();
 }
 
 bool GoodsManager::goodsListExists(int index)

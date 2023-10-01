@@ -159,18 +159,12 @@ void Joystick::freeResource()
 	RoundButton::freeResource();
 }
 
-void Joystick::initFromIni(const std::string& fileName)
+void Joystick::initFromIni(INIReader & ini)
 {
 	freeResource();
 	std::unique_ptr<char[]> s;
 	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
+
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
 	rect.w = ini.GetInteger("Init", "Width", rect.w);
@@ -186,10 +180,8 @@ void Joystick::initFromIni(const std::string& fileName)
 	}
 	else
 	{
-		printf("%s image file error\n", impName.c_str());
+		GameLog::write("%s image file error\n", impName.c_str());
 	}
-
-	IMP::clearIMPImage(impImage);
-	//delete impImage;
+	
 	impImage = nullptr;
 }

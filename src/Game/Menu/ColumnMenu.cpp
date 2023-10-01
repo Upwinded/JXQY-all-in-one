@@ -39,22 +39,19 @@ void ColumnMenu::onUpdate()
 void ColumnMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\column\\window.ini");
-	columnLife = addColumnImage("ini\\ui\\column\\collife.ini");
-	columnThew = addColumnImage("ini\\ui\\column\\colthew.ini");
-	columnMana = addColumnImage("ini\\ui\\column\\colmana.ini");
-	image = addTransImage("ini\\ui\\column\\column.ini");
+	initFromIniFileName("ini\\ui\\column\\window.ini");
+	columnLife = addComponent<ColumnImage>("ini\\ui\\column\\collife.ini");
+	columnThew = addComponent<ColumnImage>("ini\\ui\\column\\colthew.ini");
+	columnMana = addComponent<ColumnImage>("ini\\ui\\column\\colmana.ini");
+	image = addComponent<TransImage>("ini\\ui\\column\\column.ini");
 	setChildRectReferToParent();
 }
 
 void ColumnMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	freeCom(image);
 	freeCom(columnLife);
 	freeCom(columnThew);

@@ -17,9 +17,9 @@ Config::~Config()
 void Config::load()
 {
 	std::string fileName = CONFIG_INI;
-	printf("load config \n");
+	GameLog::write("load config \n");
 	INIReader ini(fileName);
-	printf("load config file done \n");
+	GameLog::write("load config file done \n");
 	fullScreen = ini.GetBoolean("game", "fullScreen", fullScreen);
 	playerAlpha = ini.GetBoolean("game", "playeralpha", playerAlpha);
 	canChangeDisplayMode = ini.GetBoolean("game", "canchangedisplaymode", canChangeDisplayMode);

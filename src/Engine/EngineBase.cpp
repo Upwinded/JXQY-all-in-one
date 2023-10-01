@@ -17,24 +17,26 @@ std::vector<_video> EngineBase::videoList;
 #endif // SHF_USE_VIDEO
 #endif // SHF_USE_AUDIO
 
+std::mutex EngineBase::_mutex;
 AppEventHandler EngineBase::_externalEventHandler = NULL;
-SDL_Renderer* EngineBase::renderer = nullptr;
-SDL_Texture* EngineBase::tempRenderTarget = nullptr;
-bool EngineBase::isBackGround = false;
-Time EngineBase::time;
+std::atomic<SDL_Renderer*> EngineBase::renderer = nullptr;
+std::atomic<SDL_Texture*>  EngineBase::tempRenderTarget = nullptr;
+std::atomic<bool> EngineBase::isBackGround = false;
+Timer EngineBase::timer;
 
-Time::Time()
+
+Timer::Timer()
 {
 	reInit();
 }
 
-Time::Time(Time* parent)
+Timer::Timer(Timer* parent)
 {
 	setParent(parent);
 	reInit();
 }
 
-Time::~Time()
+Timer::~Timer()
 {
 	if (_parent != nullptr)
 	{
@@ -47,7 +49,7 @@ Time::~Time()
 	_children.clear();
 }
 
-void Time::setParent(Time* parent)
+void Timer::setParent(Timer* parent)
 {
 	auto now = get();
 	if (_parent != nullptr)
@@ -63,7 +65,7 @@ void Time::setParent(Time* parent)
 	//_paused = false;
 }
 
-UTime Time::get()
+UTime Timer::get()
 {
 	if (_paused)
 	{
@@ -85,17 +87,17 @@ UTime Time::get()
 	}
 }
 
-void Time::set(UTime t)
+void Timer::set(UTime t)
 {
 	_beginTime += get() - t;
 }
 
-bool Time::getPaused()
+bool Timer::getPaused()
 {
 	return _paused;
 }
 
-void Time::setPaused(bool paused)
+void Timer::setPaused(bool paused)
 {
 	if (paused == _paused)
 	{
@@ -113,29 +115,29 @@ void Time::setPaused(bool paused)
 	}
 }
 
-void Time::reInit()
+void Timer::reInit()
 {
 	_beginTime += get();
 }
 
-void Time::addChild(Time* time)
+void Timer::addChild(Timer* timer)
 {
-	if (time != nullptr)
+	if (timer != nullptr)
 	{
-		time->_parent = this;
-		_children.push_back(time);
+		timer->_parent = this;
+		_children.push_back(timer);
 	}
 }
 
-void Time::removeChild(Time* time)
+void Timer::removeChild(Timer* timer)
 {
-	if (time != nullptr && time->_parent == this)
+	if (timer != nullptr && timer->_parent == this)
 	{
-		time->_parent = nullptr;
+		timer->_parent = nullptr;
 		size_t i = 0;
 		while (i < _children.size())
 		{
-			if (_children[i] == time)
+			if (_children[i] == timer)
 			{
 				_children.erase(_children.begin() + i);
 			}
@@ -162,16 +164,6 @@ EngineBase::~EngineBase()
 
 void EngineBase::clearCursor()
 {
-	//for (size_t i = 0; i < cursorImage.image.size(); i++)
-	//{
-	//	if (cursorImage.image[i].frame != nullptr)
-	//	{
-	//		SDL_FreeCursor(cursorImage.image[i].frame.get());
-	//		cursorImage.image[i].frame = nullptr;
-	//		freeImage(cursorImage.image[i].softwareFrame);
-	//		cursorImage.image[i].softwareFrame = nullptr;
-	//	}
-	//}
 	cursorImage.image.resize(0);
 	cursorImage.interval = 0;
 }
@@ -197,7 +189,7 @@ void EngineBase::drawCursor()
 	{
 		return;
 	}
-	if (frameIndex >= 0 && frameIndex < cursorImage.image.size())
+	if (frameIndex >= 0 && frameIndex < (int)cursorImage.image.size())
 	{
 		if (hardwareCursor)
 		{
@@ -319,14 +311,14 @@ bool EngineBase::pointInImage(_shared_image image, int x, int y)
 
 void EngineBase::initTime()
 {
-	time.setParent(nullptr);
-	time.reInit();
+	timer.setParent(nullptr);
+	timer.reInit();
 }
 
 
 UTime EngineBase::getTime()
 {
-	return time.get();
+	return timer.get();
 	/*if (time.paused)
 	{
 		return time.pauseBeginTime - time.beginTime;
@@ -355,7 +347,7 @@ UTime EngineBase::getTime()
 //	}
 //}
 //
-//unsigned int EngineBase::initTime(Time * t)
+//unsigned int EngineBase::initTime(Timer * t)
 //{
 //	unsigned int now = 0;
 //	t->beginTime = getTime();
@@ -363,7 +355,7 @@ UTime EngineBase::getTime()
 //	return t->beginTime;
 //}
 //
-//unsigned int EngineBase::getTime(Time * t)
+//unsigned int EngineBase::getTime(Timer * t)
 //{
 //	if (t->paused)
 //	{
@@ -375,7 +367,7 @@ UTime EngineBase::getTime()
 //	}
 //}
 //
-//void EngineBase::setTime(Time * t, unsigned int time)
+//void EngineBase::setTime(Timer * t, unsigned int time)
 //{
 //	unsigned int tm = getTime(t);
 //	if (tm > time)
@@ -388,7 +380,7 @@ UTime EngineBase::getTime()
 //	}
 //}
 //
-//void EngineBase::setTimePaused(Time * t, bool paused)
+//void EngineBase::setTimePaused(Timer * t, bool paused)
 //{
 //	if (paused == t->paused)
 //	{
@@ -439,7 +431,7 @@ _shared_image EngineBase::createNewImageFromImage(_shared_image image)
 	SDL_RenderCopy(renderer, from, nullptr, nullptr);
 	SDL_SetTextureBlendMode(from, bm);	
 
-	auto to = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, w, h));
+	auto to = make_safe_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, w, h));
 	auto pixels = std::make_unique<char[]>(w * h * 4);
 	int pitch = w * 4;
 	SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, pixels.get(), pitch);
@@ -458,7 +450,7 @@ _shared_image EngineBase::loadImageFromMem(std::unique_ptr<char[]>& data, int si
 	}
     auto img = IMG_LoadTexture_RW(renderer, SDL_RWFromMem(data.get(), size), 1);
     //auto img = IMG_LoadTextureTyped_RW(renderer, SDL_RWFromMem(data.get(), size), 1, "ßPNG");
-	_shared_image ret = make_shared_image(img);
+	_shared_image ret = make_safe_shared_image(img);
 	return ret;
 }
 
@@ -468,12 +460,12 @@ _shared_image EngineBase::loadImageFromFile(const std::string & fileName)
 	int size;
 	if (!File::readFile(fileName, data, size))
 	{
-		printf("Image File Readed Error\n");
+		GameLog::write("Image File Readed Error\n");
 		return nullptr;
 	}
 	if (data == nullptr || size <= 0)
 	{
-		printf("Image File Readed Error\n");
+		GameLog::write("Image File Readed Error\n");
 		return nullptr;
 	}
 	auto result = loadImageFromMem(data, size);
@@ -537,14 +529,14 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 	int pitch = 4 * w;
 	if (st == nullptr)
 	{
-		printf("allocing memory error\n");
+		GameLog::write("allocing memory error\n");
 		SetRenderTarget(renderer, tt);
 		//freeImage(ts);
 		return -1;
 	}
 	if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, st.get(), pitch) != 0)
 	{
-		printf("reading pixels error\n");
+		GameLog::write("reading pixels error\n");
 		SetRenderTarget(renderer, tt);
 		//freeImage(ts);
 		/*delete[] st;*/
@@ -667,6 +659,44 @@ void EngineBase::drawImage(_shared_image image, Rect * src, Rect * dst)
 	SDL_RenderCopy(renderer, image.get(), ps, pd);
 }
 
+void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center)
+{
+	if (image == nullptr)
+	{
+		return;
+	}
+	SDL_Rect s;
+	SDL_Rect d;
+	SDL_Rect* ps = nullptr;
+	SDL_Rect* pd = nullptr;
+	if (src != nullptr)
+	{
+		s.x = src->x;
+		s.y = src->y;
+		s.w = src->w;
+		s.h = src->h;
+		ps = &s;
+	}
+	if (dst != nullptr)
+	{
+		d.x = dst->x;
+		d.y = dst->y;
+		d.w = dst->w;
+		d.h = dst->h;
+		pd = &d;
+	}
+	SDL_Point p;
+	SDL_Point* pp = nullptr;
+	if (center != nullptr)
+	{
+		p.x = center->x;
+		p.y = center->y;
+		pp = &p;
+	}
+
+	SDL_RenderCopyEx(renderer, image.get(), ps, pd, angle, pp, SDL_FLIP_NONE);
+}
+
 //void EngineBase::freeImage(Image_t* image)
 //{
 //	if (image != nullptr)
@@ -676,7 +706,7 @@ void EngineBase::drawImage(_shared_image image, Rect * src, Rect * dst)
 //	}
 //}
 
-_shared_image EngineBase::createMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+_shared_image EngineBase::createMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a, bool safe)
 {
 	SDL_Texture * tt = SDL_GetRenderTarget(renderer);
 	auto t = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, 1, 1));
@@ -684,7 +714,16 @@ _shared_image EngineBase::createMask(unsigned char r, unsigned char g, unsigned 
 	{
 		return nullptr;
 	}
-	auto t2 = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, 1, 1));
+	_shared_image t2 = nullptr;
+	if (safe)
+	{
+		t2 = make_safe_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, 1, 1));
+	}
+	else
+	{
+		t2 = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, 1, 1));
+	}
+	
 	if (t2.get() == nullptr)
 	{
 		return nullptr;
@@ -726,7 +765,7 @@ _shared_image EngineBase::createLumMask()
 	}
 	memcpy(s->pixels, c, LUM_MASK_HEIGHT * LUM_MASK_WIDTH * 4);
 	delete[] c;
-	auto t = make_shared_image(SDL_CreateTextureFromSurface(renderer, s));
+	auto t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, s));
 	SDL_FreeSurface(s);
 	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_ADD);
 	return t;
@@ -797,11 +836,11 @@ _shared_image EngineBase::loadSaveShotFromPixels(int w, int h, std::unique_ptr<c
 {
 	if (w <= 0 || h <= 0 || data == nullptr || size <= 0 || w * h * SaveBMPPixelBytes > size)
 	{
-		printf("save shot null\n");
+		GameLog::write("save shot null\n");
 		return nullptr;
 	}
 	auto pitch = w * SaveBMPPixelBytes;
-	auto result = make_shared_image(SDL_CreateTexture(renderer, SaveBMPFormat, SDL_TEXTUREACCESS_STATIC, w, h));
+	auto result = make_safe_shared_image(SDL_CreateTexture(renderer, SaveBMPFormat, SDL_TEXTUREACCESS_STATIC, w, h));
 	SDL_UpdateTexture(result.get(), nullptr, data.get(), pitch);
 	SDL_SetTextureBlendMode(result.get(), SDL_BLENDMODE_BLEND);
 	return result;
@@ -908,7 +947,7 @@ _shared_image EngineBase::createRaindrop()
 		}
 	}
 	//SDL_UnlockSurface(s);
-	auto t = make_shared_image(SDL_CreateTextureFromSurface(renderer, s));
+	auto t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, s));
 	SDL_FreeSurface(s);
 	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_BLEND);
 	return t;
@@ -930,7 +969,7 @@ _shared_image EngineBase::createSnowflake()
 	memcpy(((char *)s->pixels) + 20, &col, 4);
 	memcpy(((char *)s->pixels) + 28, &col, 4);
 	//SDL_UnlockSurface(s);
-	auto t = make_shared_image(SDL_CreateTextureFromSurface(renderer, s));
+	auto t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, s));
 	SDL_FreeSurface(s);
 	setImageAlpha(t, 0xB0);
 	return t;
@@ -945,14 +984,14 @@ void EngineBase::loadLogo()
 	//}
 	std::string logoFileName = "config\\logo.png";
 #ifdef USE_LOGO_RESOURCE
-	HRSRC hRsrc = FindResource(nullptr, TEXT("PngImage_1"), RT_RCDATA);
+	HRSRC hRsrc = FindResource(nullptr, TEXT("PNGIMAGE"), RT_RCDATA);
 	if (hRsrc == nullptr)
 	{
 		logo = loadImageFromFile(logoFileName);
-		printf("Logo Loaded From File\n");
+		GameLog::write("Logo Loaded From File\n");
 		return;
 	}
-	printf("Logo Loaded From Resource\n");
+	GameLog::write("Logo Loaded From Resource\n");
 
 	unsigned int size = SizeofResource(nullptr, hRsrc);
 	if (size == 0)
@@ -995,17 +1034,28 @@ void EngineBase::fadeInLogo()
 		g = (clLogoBG & 0xFF00) >> 8;
 		b = clLogoBG & 0xFF;
 		setScreenMask(r, g, b, 255);
-		Time t(&time);
+		Timer t(&timer);
 		t.reInit();
-		while (t.get() < 1000)
+		auto now = t.get();
+		while (now < 1000)
 		{
 			frameBegin();
 			drawScreenMask();
-			unsigned char a = (unsigned char)(((double)t.get()) / (double)1000 * (double)255);
+			unsigned char a = (unsigned char)(((double)now) / (double)1000 * (double)255);
 			setImageAlpha(logo, a);
 			drawImage(logo, (width - w) / 2, (height - h) / 2);
 			frameEnd();
+			now = t.get();
 		}
+
+
+		frameBegin();
+		drawScreenMask();
+		setImageAlpha(logo, (unsigned char)255);
+		drawImage(logo, (width - w) / 2, (height - h) / 2);
+		frameEnd();
+
+
 		frameBegin();
 		drawScreenMask();
 		setImageAlpha(logo, 255);
@@ -1024,17 +1074,20 @@ void EngineBase::fadeOutLogo()
 	int w, h;
 	if (getImageSize(logo, w, h) == 0)
 	{
-		Time t(&time);
+		Timer t(&timer);
 		t.reInit();
-;		while (t.get() < 1000)
+		auto now = t.get()
+;		while (now < 1000)
 		{
 			frameBegin();
 			drawScreenMask();
-			unsigned char a = (unsigned char)(((double)1000 - (double)t.get()) / (double)1000 * (double)255);
+			unsigned char a = (unsigned char)((1000 - now) / (double)1000 * (double)255);
 			setImageAlpha(logo, a);
 			drawImage(logo, (width - w) / 2, (height - h) / 2);
 			frameEnd();
+			now = t.get();
 		}
+
 		frameBegin();
 		drawScreenMask();
 		frameEnd();
@@ -1215,24 +1268,24 @@ void EngineBase::handleEvent()
 {
 	clearEventList();
 	SDL_Event e;
-	time.setPaused(true);
+	timer.setPaused(true);
 	while (SDL_PollEvent(&e))
 	{
 		switch (e.type)
 		{
 			case SDL_QUIT:
 			{
-				eventList.event.push_back(AEvent(ET_QUIT , 0, 0, 0));
+				eventList.event.push(AEvent(ET_QUIT , 0, 0, 0));
 				break;
 			}
 			case SDL_KEYDOWN: case SDL_KEYUP:
 			{	
-				eventList.event.push_back(AEvent((EventType)e.type , e.key.keysym.scancode, 0, 0));
+				eventList.event.push(AEvent((EventType)e.type , e.key.keysym.scancode, 0, 0));
 				break;
 			}
 			case SDL_MOUSEMOTION:
 			{
-#ifndef _MOBILE
+#ifndef __MOBILE__
 				int tempX = -1, tempY = -1;
 				calculateCursor(e.motion.x, e.motion.y, &tempX, &tempY);
 
@@ -1240,14 +1293,14 @@ void EngineBase::handleEvent()
 				{
 					mouseX = tempX;
 					mouseY = tempY;
-					eventList.event.push_back(AEvent(EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
+					eventList.event.push(AEvent(EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
 				}
-#endif // (!defined _MOBILE)
+#endif // (!defined __MOBILE__)
 				break;
 			}
 			case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
 			{
-#ifndef _MOBILE
+#ifndef __MOBILE__
 				//鼠标点击时增加一个鼠标移动事件
 				int tempX = -1, tempY = -1;
 				calculateCursor(e.motion.x, e.motion.y, &tempX, &tempY);
@@ -1255,10 +1308,10 @@ void EngineBase::handleEvent()
 				{
 					mouseX = tempX;
 					mouseY = tempY;
-					eventList.event.push_back(AEvent((EventType)EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
+					eventList.event.push(AEvent((EventType)EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
 				}
-				eventList.event.push_back(AEvent((EventType)e.type, e.button.button, tempX, tempY));
-#endif // (!defined _MOBILE)
+				eventList.event.push(AEvent((EventType)e.type, e.button.button, tempX, tempY));
+#endif // (!defined __MOBILE__)
 				break;
 			}
 			case SDL_FINGERDOWN: case SDL_FINGERUP: 
@@ -1271,9 +1324,9 @@ void EngineBase::handleEvent()
 				calculateCursor((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
-					eventList.event.push_back(AEvent(ET_FINGERMOTION, (int)e.tfinger.fingerId, tempX, tempY));
+					eventList.event.push(AEvent(ET_FINGERMOTION, (int)e.tfinger.fingerId, tempX, tempY));
 				}
-				eventList.event.push_back(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
+				eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
 				break;
 			}
 			case SDL_FINGERMOTION:
@@ -1286,7 +1339,7 @@ void EngineBase::handleEvent()
 				calculateCursor((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
-					eventList.event.push_back(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
+					eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
 				}
 				break;
 			}
@@ -1296,7 +1349,19 @@ void EngineBase::handleEvent()
 			}			
 		}
 	}
-	time.setPaused(false);
+#ifndef __MOBILE__
+	int tempX = -1, tempY = -1, mX, mY;
+	SDL_GetMouseState(&mX, &mY);
+	calculateCursor(mX, mY, &tempX, &tempY);
+	if (tempX >= 0 && tempY >= 0)
+	{
+		mouseX = tempX;
+		mouseY = tempY;
+		eventList.event.push(AEvent(EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
+	}
+#endif // !__MOBILE__
+
+	timer.setPaused(false);
 }
 
 void EngineBase::copyEvent(AEvent& s, AEvent& d)
@@ -1309,7 +1374,7 @@ void EngineBase::copyEvent(AEvent& s, AEvent& d)
 
 void EngineBase::clearEventList()
 {
-	eventList.event.resize(0);
+	while (!eventList.event.empty()) { eventList.event.pop(); }
 }
 
 int EngineBase::getEventCount()
@@ -1323,30 +1388,14 @@ int EngineBase::getEvent(AEvent& event)
 	{
 		return 0;
 	}
-	copyEvent(eventList.event[0], event);
-	eventList.event.erase(eventList.event.begin());
+	copyEvent(eventList.event.front(), event);
+	eventList.event.pop();
 	return (int)eventList.event.size() + 1;
 }
 
 void EngineBase::pushEvent(AEvent& event)
 {
-	eventList.event.push_back(event);
-}
-
-//需要自己释放
-int EngineBase::readEventList(EventList& eList)
-{
-	if (!eventList.event.size())
-	{
-		return 0;
-	}
-
-	eList.event.resize(eventList.event.size());
-	for (size_t i = 0; i < eList.event.size(); i++)
-	{
-		copyEvent((eventList.event[i]), (eList.event[i]));
-	}
-	return eList.event.size();
+	eventList.event.push(event);
 }
 
 bool EngineBase::getKeyPress(KeyCode key)
@@ -1395,11 +1444,11 @@ void EngineBase::setFontName(const std::string & fontName)
 	fontData = SDL_RWFromFile(fontName.c_str(), "r+");
 	if (!fontData)
 	{
-		printf("there is no fontData\n");
+		GameLog::write("there is no fontData\n");
 	}
 }
 
-void EngineBase::drawSolidText(const std::string& text, int x, int y, int size, unsigned int color)
+void EngineBase::drawTalk(const std::string& text, int x, int y, int size, unsigned int color)
 {
 	_shared_image t = createText(text, size, color);
 	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_NONE);
@@ -1468,7 +1517,7 @@ _shared_image EngineBase::createUnicodeText(const std::wstring& text, int size, 
 
 }
 
-_shared_image EngineBase::createText(const std::string& text, int size, unsigned int color)
+_shared_image EngineBase::createText(const std::string& text, int size, unsigned int color, bool safe)
 {
 	TTF_Font * _font = nullptr;
 	if (!fontData)
@@ -1492,7 +1541,16 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	c.a = (color & 0xFF000000) >> 24;
 
 	auto text_s = TTF_RenderUTF8_Blended(_font, text.c_str(), c);
-	auto text_t = make_shared_image(SDL_CreateTextureFromSurface(renderer, text_s));
+	_shared_image text_t;
+	if (safe)
+	{
+		text_t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, text_s));
+	}
+	else
+	{
+		text_t = make_shared_image(SDL_CreateTextureFromSurface(renderer, text_s));
+	}
+
 	setImageAlpha(text_t, c.a);
 
 	SDL_FreeSurface(text_s);
@@ -1537,9 +1595,11 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
 		/* Prepare your app to go into the background.  Stop loops, etc.
 			This gets called when the user hits the home button, or gets a call.
 		*/
+		//_mutex.lock();
 		isBackGround = true;
 		tempRenderTarget = SDL_GetRenderTarget(renderer);
 		SDL_SetRenderTarget(renderer, nullptr);
+		//_mutex.unlock();
 		return 0;
 	case SDL_APP_DIDENTERBACKGROUND:
 		/* This will get called if the user accepted whatever sent your app to the background.
@@ -1552,9 +1612,11 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
 		/* This call happens when your app is coming back to the foreground.
 			Restore all your state here.
 		*/
-		isBackGround = false;
+		//_mutex.lock();
 		SDL_SetRenderTarget(renderer, tempRenderTarget);
 		tempRenderTarget = nullptr;
+		isBackGround = false;
+		//_mutex.unlock();
 		return 0;
 	case SDL_APP_DIDENTERFOREGROUND:
 		/* Restart your loops here.
@@ -1586,7 +1648,7 @@ InitErrorType EngineBase::initEngineBase(const std::string & windowCaption, int 
 	height = wHeight;
 	if (initSDL(windowCaption, wWidth, wHeight, isFullScreen) != 0)
 	{
-		printf("Init SDL Error!\n");
+		GameLog::write("Init SDL Error!\n");
 		return sdlError;
 	}
 	
@@ -1596,7 +1658,7 @@ InitErrorType EngineBase::initEngineBase(const std::string & windowCaption, int 
 #ifdef SHF_USE_AUDIO
 	if (initSoundSystem() != 0)
 	{
-		printf("Init Sound Error!\n");
+		GameLog::write("Init Sound Error!\n");
 		return soundError;
 	}
 #endif
@@ -1604,14 +1666,14 @@ InitErrorType EngineBase::initEngineBase(const std::string & windowCaption, int 
 #ifdef SHF_USE_VIDEO
 	if (initVideo() != 0)
 	{
-		printf("Init Video Error!\n");
+		GameLog::write("Init Video Error!\n");
 		return videoError;
 	}
 #endif
 
 	if (lzo_init() != LZO_E_OK)
 	{
-		printf("Init miniLZO Error!\n");
+		GameLog::write("Init miniLZO Error!\n");
 		return LZOError;
 	}
 	SDL_StopTextInput();
@@ -1664,7 +1726,7 @@ bool EngineBase::setFullScreen(bool full)
 	}
 	if (fullScreen)
 	{
-#ifndef _MOBILE
+#ifndef __MOBILE__
 		if (canChangeDisplayMode)
 		{
 
@@ -1682,7 +1744,7 @@ bool EngineBase::setFullScreen(bool full)
 			SDL_GetDisplayMode(0, 0, &dm);
 			SDL_SetWindowSize(window, dm.w, dm.h);
 			SDL_SetWindowFullscreen(window, flags);
-#ifndef _MOBILE
+#ifndef __MOBILE__
 		}
 #endif
 	}
@@ -1776,11 +1838,11 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 {
 	if (SDL_Init(SDL_INIT_EVERYTHING ^ SDL_INIT_AUDIO))
 	{
-		printf("SDL error: %s \n", SDL_GetError());
+		GameLog::write("SDL error: %s \n", SDL_GetError());
 		return sdlError;
 	}
 
-#ifdef _MOBILE
+#ifdef __MOBILE__
 	int screenWidth = wWidth;
 	int screenHeight = wHeight;
 	getScreenInfo(screenWidth, screenHeight);
@@ -1794,7 +1856,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	}
 	width = wWidth;
 	height = wHeight;
-    printf("window real size: %d * %d\n", width, height);
+    GameLog::write("window real size: %d * %d\n", width, height);
 #endif
 
 	SDL_ShowCursor(0);
@@ -1807,7 +1869,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	dm.w = wWidth;
 	dm.h = wHeight;
 
-#ifndef _MOBILE
+#ifndef __MOBILE__
 
 	if (fullScreen)
 	{
@@ -1819,9 +1881,9 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 		{
 #endif
             SDL_GetCurrentDisplayMode(0, &dm);
-            printf("current display mode: %d * %d \n", dm.w, dm.h);
+            GameLog::write("current display mode: %d * %d \n", dm.w, dm.h);
             flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-#ifndef _MOBILE
+#ifndef __MOBILE__
 		}
 	}
 	else
@@ -1832,10 +1894,10 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	window = SDL_CreateWindow(windowCaption.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, dm.w, dm.h, flags);
 	if (window == nullptr)
 	{
-		printf("SDL Create Window Error : %s\n", SDL_GetError());
+		GameLog::write("SDL Create Window Error : %s\n", SDL_GetError());
 		return sdlError;
 	}
-#ifndef _MOBILE
+#ifndef __MOBILE__
 	if (fullScreen)
 	{
 		SDL_SetWindowSize(window, dm.w, dm.h);
@@ -1889,7 +1951,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 
 void EngineBase::destroySDL()
 {
-	printf("Begin destroy SDL\n");
+	GameLog::write("Begin destroy SDL\n");
 	destroyCursor();
 	if (fontBuffer != nullptr)
 	{
@@ -1910,7 +1972,7 @@ void EngineBase::destroySDL()
 	//	SDL_DestroyTexture(realScreen);
 	//	realScreen = nullptr;
 	//}
-    printf("Begin destroy SDL Renderer \n");
+    GameLog::write("Begin destroy SDL Renderer \n");
     SDL_SetRenderTarget(renderer, nullptr);
     if (renderer)
     {
@@ -1918,7 +1980,7 @@ void EngineBase::destroySDL()
         renderer = nullptr;
     }
     
-    printf("Begin destroy SDL Window \n");
+    GameLog::write("Begin destroy SDL Window \n");
     if (window)
     {
         SDL_DestroyWindow(window);
@@ -1927,7 +1989,7 @@ void EngineBase::destroySDL()
     
     
 	SDL_Quit();
-	printf("Destroy SDL done!\n");
+	GameLog::write("Destroy SDL done!\n");
 }
 
 void EngineBase::destroyCursor()
@@ -1969,7 +2031,7 @@ int EngineBase::initSoundSystem()
 
 void EngineBase::destroySoundSystem()
 {
-	printf("Begin destroy sound system\n");
+	GameLog::write("Begin destroy sound system\n");
 	//soundMutex.lock();
 	for (size_t i = 0; i < soundList.sound.size(); i++)
 	{
@@ -1988,7 +2050,7 @@ void EngineBase::destroySoundSystem()
 		FMOD_System_Release(soundSystem);
 		soundSystem = nullptr;
 	}
-	printf("Destroy sound system done!\n");
+	GameLog::write("Destroy sound system done!\n");
 }
 
 void EngineBase::updateSoundSystem()
@@ -2010,7 +2072,7 @@ FMOD_RESULT F_CALLBACK EngineBase::autoReleaseSound(FMOD_CHANNELCONTROL * chanCo
 		}
 		int index = -1;
 
-		MutexLocker mutexLocker(&Engine::getInstance()->soundMutex);
+		std::lock_guard<std::mutex> locker(Engine::getInstance()->soundMutex);
 
 		if (soundList.sound.size() == 0)
 		{
@@ -2068,7 +2130,7 @@ _music EngineBase::createMusic(const std::unique_ptr<char[]>& data, int size, bo
 
 	if (FMOD_System_CreateSound(soundSystem, data.get(), mode, &exinfo, &sound) != 0)
 	{
-		//printf("Create Sound Error!\n");
+		//GameLog::write("Create Sound Error!\n");
 		return nullptr;
 	}
 	if (priority != 128)
@@ -2081,7 +2143,7 @@ _music EngineBase::createMusic(const std::unique_ptr<char[]>& data, int size, bo
 	{
 		if (FMOD_Sound_Set3DMinMaxDistance(sound, 0.5f, 5000.0f) != 0)
 		{
-			printf("Set3DMinMaxDistance Error!\n");
+			GameLog::write("Set3DMinMaxDistance Error!\n");
 		}
 	}
 
@@ -2130,7 +2192,7 @@ _music EngineBase::createVideoRAW(FMOD_SYSTEM * system, char * data, int size, b
 	int ret = FMOD_System_CreateSound(tempSystem, data, mode, &exinfo, &sound);
 	if (ret != 0)
 	{
-		//printf("Create Sound Error! %d\n", ret);
+		//GameLog::write("Create Sound Error! %d\n", ret);
 		return nullptr;
 	}
 	if (priority != 128)
@@ -2143,7 +2205,7 @@ _music EngineBase::createVideoRAW(FMOD_SYSTEM * system, char * data, int size, b
 	{
 		if (FMOD_Sound_Set3DMinMaxDistance(sound, 0.5f, 5000.0f) != 0)
 		{
-			printf("Set3DMinMaxDistance Error!\n");
+			GameLog::write("Set3DMinMaxDistance Error!\n");
 		}
 	}
 	return (_music)sound;
@@ -2156,7 +2218,7 @@ void EngineBase::freeMusic(_music music)
 #ifdef SHF_USE_AUDIO
 	if (music == nullptr)
 	{
-		printf("music to release is nullptr \n");
+		GameLog::write("music to release is nullptr \n");
 		return;
 	}
 	FMOD_Sound_Release(music);
@@ -2173,7 +2235,7 @@ _channel EngineBase::playMusic(_music music, float volume)
 	FMOD_CHANNEL* fmod_channel_;
 	if (FMOD_System_PlaySound(soundSystem, music, nullptr, true, &fmod_channel_) != 0)
 	{
-		printf("Play Sound Error!\n");
+		GameLog::write("Play Sound Error!\n");
 	}
 	_channel channel = fmod_channel_;
 	setMusicVolume(channel, volume);
@@ -2229,7 +2291,7 @@ void EngineBase::setMusicPosition(_channel channel, float x, float y)
 #ifdef SHF_USE_AUDIO
 	FMOD_VECTOR vector;
 	vector.x = x;
-	vector.y = 0;
+	vector.y = -1.0f;
 	vector.z = y;
 	FMOD_VECTOR vel = { 0.0f, 0.0f, 0.0f };
 	FMOD_Channel_Set3DAttributes(channel, &vector, &vel);
@@ -2246,10 +2308,10 @@ void EngineBase::setMusicVolume(_channel channel, float volume)
 bool EngineBase::getMusicPlaying(_channel channel)
 {
 #ifdef SHF_USE_AUDIO
-	bool playing = false;
-	if (FMOD_Channel_IsPlaying(channel, (FMOD_BOOL*)&playing) == 0)
+	FMOD_BOOL playing = false;
+	if (FMOD_Channel_IsPlaying(channel, &playing) == 0)
 	{
-		return playing;
+		return playing != 0;
 	}
 #endif
 	return false;
@@ -2258,7 +2320,7 @@ bool EngineBase::getMusicPlaying(_channel channel)
 bool EngineBase::soundAutoRelease(_music music, _channel channel)
 {
 #ifdef SHF_USE_AUDIO
-	MutexLocker mutexLocker(&soundMutex);
+	std::lock_guard<std::mutex> locker(soundMutex);
 	for (size_t i = 0; i < soundList.sound.size(); i++)
 	{
 		if (soundList.sound[i].c == channel || soundList.sound[i].m == music)
@@ -2279,7 +2341,7 @@ void EngineBase::checkSoundRelease()
 {
 #ifdef SHF_USE_AUDIO
 
-	MutexLocker mutexLocker(&soundMutex);
+	std::lock_guard<std::mutex> locker(soundMutex);
 	for (size_t i = soundList.sound.size(); i > 0; --i)
 	{
 		FMOD_BOOL playing = 0;
@@ -2318,9 +2380,9 @@ int EngineBase::initVideo()
 
 void EngineBase::destroyVideo()
 {
-	printf("Begin destroy video\n");
+	GameLog::write("Begin destroy video\n");
 	clearVideoList();
-	printf("Destroy video done!\n");
+	GameLog::write("Destroy video done!\n");
 }
 #endif
 
@@ -2400,7 +2462,7 @@ int EngineBase::read_packet(void *opaque, uint8_t *buf, int buf_size)
     int newSize = buf_size;
     if (length - nowPos < buf_size)
     {
-        newSize = length - nowPos;
+        newSize = (int)(length - nowPos);
     }
     auto sz = SDL_RWread(fp, buf, 1, newSize);
 	if (sz == 0)
@@ -2483,7 +2545,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 	{
 		char buf[1024];
 		av_strerror(ret, buf, 1024);
-		printf("video %s open error: %s\n", File::getAssetsName(newFileName).c_str(), buf);
+		GameLog::write("video %s open error: %s\n", File::getAssetsName(newFileName).c_str(), buf);
 	}
 	if (ret == 0)
 	{
@@ -2586,13 +2648,13 @@ void EngineBase::setVideoTimePaused(_video video, bool paused)
 	}
 }
 
-double EngineBase::setVideoTime(_video video, double time)
+double EngineBase::setVideoTime(_video video, double timer)
 {
 	if (video == nullptr || video->cg == nullptr)
 	{
 		return 0.0;
 	}
-	video->time.beginTime += getVideoTime(video) - time;
+	video->time.beginTime += getVideoTime(video) - timer;
 	return getVideoTime(video);
 }
 
@@ -2695,9 +2757,9 @@ void EngineBase::decodeNextAudio(_video video)
 						_music m = createVideoRAW(tempSystem, video->buffer, data_length_, false, false, FMOD_SOUND_FORMAT_PCM16, video->audioStream.codecCtx->ch_layout.nb_channels, video->audioStream.codecCtx->sample_rate, 1);
 #endif // (defined USE_FFMPEG4)
 
-						video->soundTime.resize(video->soundTime.size() + 1);
-						//video->soundTime[video->soundTime.size() - 1] = ((double)pts * video->audioStream.timeBasePacket);
-						video->soundTime[video->soundTime.size() - 1] = video->soundDelay + video->audioStream.startTime;
+						VideoSound videoSound;
+						//videoSound.t = ((double)pts * video->audioStream.timeBasePacket);
+						videoSound.t = video->soundDelay + video->audioStream.startTime;
 
 #if (defined USE_FFMPEG4)
 						double addTime = ((double)data_length_) / 2.0 / (((double)video->audioStream.codecCtx->sample_rate) / 1000.0) / ((double)video->audioStream.codecCtx->channel_layout);
@@ -2706,23 +2768,22 @@ void EngineBase::decodeNextAudio(_video video)
 #endif // (defined USE_FFMPEG4)		
 
 						video->soundDelay += addTime;
-						video->videoSounds.push_back(m);
-						video->videoSoundChannels.resize(video->videoSoundChannels.size() + 1);
+						videoSound.m = m;
 						FMOD_CHANNEL * c;
 						if (FMOD_System_PlaySound(tempSystem, m, video->cg, true, &c) == 0)
 						{
-							video->videoSoundChannels[video->videoSoundChannels.size() - 1] = c;
+							videoSound.c = c;
 							setMusicVolume(c, video->videoVolume);
 							FMOD_Channel_SetCallback(c, audioCallback);
 							if (video->running)
 							{
-								if ((video->soundTime[video->soundTime.size() - 1] - getVideoTime(video)) < 0)
+								if ((videoSound.t - getVideoTime(video)) < 0)
 								{
-									setVideoTime(video, (video->soundTime[video->soundTime.size() - 1]));
+									setVideoTime(video, (videoSound.t));
 								}
 								unsigned long long clock_start = 0;
 								FMOD_Channel_GetDSPClock(c, 0, &clock_start);
-								clock_start += (unsigned long long)((video->soundTime[video->soundTime.size() - 1] - getVideoTime(video)) * video->soundRate + 0.5);
+								clock_start += (unsigned long long)((videoSound.t - getVideoTime(video)) * video->soundRate + 0.5);
 								FMOD_Channel_SetDelay(c, clock_start, 0, true);
 								if (!video->time.paused)
 								{
@@ -2732,8 +2793,9 @@ void EngineBase::decodeNextAudio(_video video)
 						}
 						else
 						{
-							video->videoSoundChannels[video->videoSoundChannels.size() - 1] = nullptr;
+							videoSound.c = nullptr;
 						}
+						video->videoSounds.push_back(videoSound);
 					}
 				}
 			}			
@@ -2836,7 +2898,7 @@ void EngineBase::decodeNextVideo(_video video)
 						}
 						else
 						{
-							printf("Mixed negative and positive line sizes are not supported.\n");
+							GameLog::write("Mixed negative and positive line sizes are not supported.\n");
 						}
 //						sws_scale(video->swsContext, (const uint8_t * const*)f->data, f->linesize, 0, video->videoStream.codecCtx->height, (uint8_t * const*)video->sFrame->data, video->sFrame->linesize);
 //						SDL_UpdateYUVTexture(tex, nullptr, video->sFrame->data[0], video->sFrame->linesize[0], video->sFrame->data[1], video->sFrame->linesize[1], video->sFrame->data[2], video->sFrame->linesize[2]);
@@ -2851,10 +2913,11 @@ void EngineBase::decodeNextVideo(_video video)
 							SDL_UpdateTexture(tex.get(), nullptr, f->data[0], f->linesize[0]);
 						}
 						break;
-					}				
-					video->videoTime.push_back((double)((dts > 0 ? dts : pts)) * video->videoStream.timeBasePacket + video->videoStream.startTime);
-					video->image.push_back(tex);
-					//printf("frame %d, time %f\n", video->image.size(), (double)(dts > 0 ? dts : pts) * video->videoStream.timeBasePacket + video->videoStream.startTime);
+					}
+					VideoImage videoImage;
+					videoImage.t = (double)((dts > 0 ? dts : pts)) * video->videoStream.timeBasePacket + video->videoStream.startTime;
+					videoImage.image = tex;
+					video->videoImage.push_back(videoImage);
 				}
 			}
 				
@@ -2935,24 +2998,18 @@ void EngineBase::clearVideo(_video video)
 	{
 		return;
 	}
-	for (size_t i = 0; i < video->videoSoundChannels.size(); i++)
-	{
-		stopMusic(video->videoSoundChannels[i]);
-	}
-	video->videoSoundChannels.resize(0);
+
 	for (size_t i = 0; i < video->videoSounds.size(); i++)
 	{
-		freeMusic(video->videoSounds[i]);
+		stopMusic(video->videoSounds[i].c);
+		freeMusic(video->videoSounds[i].m);
 	}
-	video->videoSounds.resize(0);
-	video->soundTime.resize(0);
-
-	//for (size_t i = 0; i < video->image.size(); i++)
+	video->videoSounds.clear();
+	//for (size_t i = 0; i < video->videoImage.size(); i++)
 	//{
-	//	freeImage(video->image[i]);
+	//	freeImage(video->videoImage[i]);
 	//}
-	video->image.resize(0);
-	video->videoTime.resize(0);
+	video->videoImage.clear();
 }
 
 void EngineBase::rearrangeVideoFrame(_video video)
@@ -2961,15 +3018,15 @@ void EngineBase::rearrangeVideoFrame(_video video)
 	{
 		return;
 	}
-	for (int i = 0; i < (int)video->image.size(); i++)
+	for (int i = 0; i < (int)video->videoImage.size(); i++)
 	{
-		for (int j = 0; j < int(video->image.size()) - i - 1; j--)
+		for (int j = 0; j < int(video->videoImage.size()) - i - 1; j--)
 		{
-			if (video->videoTime[j] > video->videoTime[j + 1])
+			if (video->videoImage[j].t > video->videoImage[j + 1].t)
 			{
-				double t = video->videoTime[j];
-				video->videoTime[j] = video->videoTime[j + 1];
-				video->videoTime[j + 1] = t;
+				double t = video->videoImage[j].t;
+				video->videoImage[j].t = video->videoImage[j + 1].t;
+				video->videoImage[j + 1].t = t;
 			}
 		}
 	}
@@ -3075,12 +3132,12 @@ FMOD_RESULT F_CALLBACK EngineBase::audioCallback(FMOD_CHANNELCONTROL * chanContr
 		int index2 = 0;
 		for (size_t i = 0; i < videoList.size(); i++)
 		{
-			if (videoList[i]->videoSoundChannels.size() > 0)
+			if (videoList[i]->videoSounds.size() > 0)
 			{
 				bool find = false;
-				for (size_t j = 0; j < videoList[i]->videoSoundChannels.size(); j++)
+				for (size_t j = 0; j < videoList[i]->videoSounds.size(); j++)
 				{
-					if (videoList[i]->videoSoundChannels[j] == channel)
+					if (videoList[i]->videoSounds[j].c == channel)
 					{
 						find = true;
 						index2 = j;
@@ -3095,24 +3152,13 @@ FMOD_RESULT F_CALLBACK EngineBase::audioCallback(FMOD_CHANNELCONTROL * chanContr
 			}
 		}
 		if (index >= 0)
-		{		
-			// TODO: 优化代码
+		{
 			for (int i = 0; i <= index2; i++)
 			{
-				//freeMusic(videoList[index]->videoSounds[i].get());
-				videoList[index]->videoSounds[i] = nullptr;
+				//freeMusic(videoList[index]->videoSounds[i]);
+				videoList[index]->videoSounds[i].stopped = true;
 			}
-			for (int i = 0; i < ((int)videoList[index]->videoSounds.size()) - index2 - 1; i++)
-			{
-				videoList[index]->videoSounds[i] = videoList[index]->videoSounds[i + index2 + 1];
-				videoList[index]->videoSoundChannels[i] = videoList[index]->videoSoundChannels[i + index2 + 1];
-				videoList[index]->soundTime[i] = videoList[index]->soundTime[i + index2 + 1];
-			}
-			videoList[index]->videoSounds.resize(videoList[index]->videoSounds.size() - index2 - 1);
-			videoList[index]->videoSoundChannels.resize(videoList[index]->videoSoundChannels.size() - index2 - 1);
-			videoList[index]->soundTime.resize(videoList[index]->soundTime.size() - index2 - 1);
 		}
-
 	}
 	return FMOD_OK;
 }
@@ -3141,7 +3187,7 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 	swr_ctx = swr_alloc();
 	if (!swr_ctx)
 	{
-		printf("swr_alloc error \n");
+		GameLog::write("swr_alloc error \n");
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
@@ -3199,7 +3245,7 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 	src_nb_samples = frame->nb_samples;
 	if (src_nb_samples <= 0)
 	{
-		printf("src_nb_samples error \n");
+		GameLog::write("src_nb_samples error \n");
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
@@ -3219,14 +3265,14 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 
 	if ((ret = swr_init(swr_ctx)) < 0)
 	{
-		printf("Failed to initialize the resampling context\n");
+		GameLog::write("Failed to initialize the resampling context\n");
 		return -1;
 	}
 
 	max_dst_nb_samples = dst_nb_samples = (int)av_rescale_rnd(src_nb_samples, out_sample_rate, codecCtx->sample_rate, AV_ROUND_UP);
 	if (max_dst_nb_samples <= 0)
 	{
-		printf("av_rescale_rnd error \n");
+		GameLog::write("av_rescale_rnd error \n");
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
@@ -3237,14 +3283,14 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 	ret = av_samples_alloc_array_and_samples(&dst_data, &dst_linesize, dst_nb_channels, dst_nb_samples, (AVSampleFormat)out_sample_format, 0);
 	if (ret < 0)
 	{
-		printf("av_samples_alloc_array_and_samples error \n");
+		GameLog::write("av_samples_alloc_array_and_samples error \n");
 		return -1;
 	}
 
 	dst_nb_samples = (int)av_rescale_rnd(swr_get_delay(swr_ctx, codecCtx->sample_rate) + src_nb_samples, out_sample_rate, codecCtx->sample_rate, AV_ROUND_UP);
 	if (dst_nb_samples <= 0)
 	{
-		printf("av_rescale_rnd error \n");
+		GameLog::write("av_rescale_rnd error \n");
 		return -1;
 	}
 	if (dst_nb_samples > max_dst_nb_samples)
@@ -3259,20 +3305,20 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 		ret = swr_convert(swr_ctx, dst_data, dst_nb_samples, (const uint8_t**)frame->data, frame->nb_samples);
 		if (ret < 0)
 		{
-			printf("swr_convert error \n");
+			GameLog::write("swr_convert error \n");
 			return -1;
 		}
 
 		resampled_data_size = av_samples_get_buffer_size(&dst_linesize, dst_nb_channels, ret, (AVSampleFormat)out_sample_format, 1);
 		if (resampled_data_size < 0)
 		{
-			printf("av_samples_get_buffer_size error \n");
+			GameLog::write("av_samples_get_buffer_size error \n");
 			return -1;
 		}
 	}
 	else
 	{
-		printf("swr_ctx null error \n");
+		GameLog::write("swr_ctx null error \n");
 		return -1;
 	}
 
@@ -3345,19 +3391,16 @@ void EngineBase::deleteVideoFromList(int index)
 _video EngineBase::loadVideo(const std::string& fileName)
 {
 #ifdef SHF_USE_VIDEO
-	printf("Open video %s\n", fileName.c_str());
+	GameLog::write("Open video %s\n", fileName.c_str());
 	if (!File::fileExist(fileName))
 	{
-		printf("Video:%s not exists\n", fileName.c_str());
+		GameLog::write("Video:%s not exists\n", fileName.c_str());
 		return nullptr;
 	}
 
 	auto video = new Video_t;
-	video->image.resize(0);
-	video->videoTime.resize(0);
-	video->soundTime.resize(0);
+	video->videoImage.resize(0);
 	video->videoSounds.resize(0);
-	video->videoSoundChannels.resize(0);
 	video->videoStream.formatCtx = avformat_alloc_context();
 	video->audioStream.formatCtx = avformat_alloc_context();
 	video->videoStream.frame = av_frame_alloc();
@@ -3375,7 +3418,7 @@ _video EngineBase::loadVideo(const std::string& fileName)
 	video->videoVolume = 1;
 	if (openVideoFile(video) < 0)
 	{
-		printf("Open video:%s error\n", fileName.c_str());
+		GameLog::write("Open video:%s error\n", fileName.c_str());
 		return nullptr;
 	}
 
@@ -3445,12 +3488,19 @@ void EngineBase::freeVideo(Video_t* video)
 		FMOD_ChannelGroup_Release(video->cg);
 		video->cg = nullptr;
 	}
+	for (size_t i = 0; i < video->videoSounds.size(); i++)
+	{
+		stopMusic(video->videoSounds[i].c);
+		freeMusic(video->videoSounds[i].m);
+	}
+
 	if (video->soundSystem != nullptr)
 	{
+		FMOD_System_Close(video->soundSystem);
 		FMOD_System_Release(video->soundSystem);
 		video->soundSystem = nullptr;
 	}
-
+	delete video;
 #endif
 }
 
@@ -3471,13 +3521,13 @@ void EngineBase::runVideo(_video video)
 	{
 		if (video->videoSounds.size() > 0)
 		{
-			for (size_t i = 0; i < video->videoSoundChannels.size(); i++)
+			for (size_t i = 0; i < video->videoSounds.size(); i++)
 			{
 				unsigned long long clock_start = 0;
-				FMOD_Channel_GetDSPClock(video->videoSoundChannels[i], 0, &clock_start);
-				clock_start += (unsigned long long)((video->soundTime[i]) * video->soundRate + 0.5);
-				FMOD_Channel_SetDelay(video->videoSoundChannels[i], clock_start, 0, true);
-				resumeMusic(video->videoSoundChannels[i]);
+				FMOD_Channel_GetDSPClock(video->videoSounds[i].c, 0, &clock_start);
+				clock_start += (unsigned long long)((video->videoSounds[i].t) * video->soundRate + 0.5);
+				FMOD_Channel_SetDelay(video->videoSounds[i].c, clock_start, 0, true);
+				resumeMusic(video->videoSounds[i].c);
 			}
 		}	
 	}
@@ -3513,6 +3563,21 @@ bool EngineBase::updateVideo(_video video)
 			resetVideo(video);
 		}
 	}
+	auto iter = video->videoSounds.begin();
+	while (iter != video->videoSounds.end())
+	{
+		if (iter->stopped)
+		{
+			stopMusic(iter->c);
+			freeMusic(iter->m);
+			iter = video->videoSounds.erase(iter);
+		}
+		else
+		{
+			iter++;
+		}
+	}
+
 #endif
 	return true;
 }
@@ -3548,12 +3613,12 @@ void EngineBase::tryDecodeVideo(_video video)
 	{		
 		if (video->videoStream.exists)
 		{			
-			while ((!video->audioStream.decodeEnd) && ((video->videoSounds.size() < (unsigned int)2) || (video->soundTime.size() > 0 && (video->soundTime[video->soundTime.size() - 1] < video_time + 100))))
+			while ((!video->audioStream.decodeEnd) && ((video->videoSounds.size() < (unsigned int)2) || (video->videoSounds.size() > 0 && (video->videoSounds[video->videoSounds.size() - 1].t < video_time + 100))))
 			{
 				decodeNextAudio(video);
 				checkVideoDecodeEnd(video);
 			}
-			while ((!video->videoStream.decodeEnd) && ((video->image.size() < (unsigned int)2) || (video->videoTime.size() > 0 && (video->videoTime[video->videoTime.size() - 1] < video_time + 100))))
+			while ((!video->videoStream.decodeEnd) && ((video->videoImage.size() < (unsigned int)2) || (video->videoImage.size() > 0 && (video->videoImage[video->videoImage.size() - 1].t < video_time + 100))))
 			{
 				decodeNextVideo(video);
 				checkVideoDecodeEnd(video);
@@ -3561,7 +3626,7 @@ void EngineBase::tryDecodeVideo(_video video)
 		}
 		else
 		{
-			while ((!video->audioStream.decodeEnd) && ((video->videoSounds.size() < (unsigned int)2) || (video->soundTime.size() > 0 && (video->soundTime[video->soundTime.size() - 1] < video_time + 100))))
+			while ((!video->audioStream.decodeEnd) && ((video->videoSounds.size() < (unsigned int)2) || (video->videoSounds.size() > 0 && (video->videoSounds[video->videoSounds.size() - 1].t < video_time + 100))))
 			{
 				decodeNextAudio(video);
 				checkVideoDecodeEnd(video);
@@ -3570,7 +3635,7 @@ void EngineBase::tryDecodeVideo(_video video)
 	}
 	else if (video->videoStream.exists)
 	{
-		while ((!video->videoStream.decodeEnd) && ((video->image.size() < (unsigned int)2) || (video->videoTime.size() > 0 && (video->videoTime[video->videoTime.size() - 1] < video_time + 100))))
+		while ((!video->videoStream.decodeEnd) && ((video->videoImage.size() < (unsigned int)2) || (video->videoImage.size() > 0 && (video->videoImage[video->videoImage.size() - 1].t < video_time + 100))))
 		{
 			decodeNextVideo(video);
 			checkVideoDecodeEnd(video);
@@ -3597,46 +3662,34 @@ void EngineBase::drawVideoFrame(_video video)
 	}
 	//rearrangeVideoFrame(v);
 	double t = getVideoTime(video);
-	if (video->image.size() == 0)
+	if (video->videoImage.size() == 0)
 	{
 		_shared_image image = createMask(0, 0, 0, 255);
 		drawImage(image, rect);
 		//freeImage(image);
 	}
-	else if (video->image.size() == 1)
+	else if (video->videoImage.size() == 1)
 	{
-		drawImage(video->image[0], rect);
+		drawImage(video->videoImage[0].image, rect);
 	}
-	else if (video->image.size() > 1)
+	else if (video->videoImage.size() > 1)
 	{
 		int index = 0;
-		for (size_t i = 0; i < video->image.size(); i++)
+		for (size_t i = 0; i < video->videoImage.size(); i++)
 		{
-			if ((int)t >= video->videoTime[i])
+			if ((int)t >= video->videoImage[i].t)
 			{
 				index = i;
 			}
 		}
 
-		drawImage(video->image[index], rect);
+		drawImage(video->videoImage[index].image, rect);
 
 		// TODO: 优化代码
-		for (int i = 0; i < index; i++)
+		if (index > 0)
 		{
-			//freeImage(video->image[i]);
-			video->image[0] = nullptr;
-			video->image.erase(video->image.begin());
-			video->videoTime.erase(video->videoTime.begin());
-		}
-
-		/*for (int i = 0; i < ((int)video->image.size()) - index; i++)
-		{
-			video->image[i] = video->image[i + index];
-			video->videoTime[i] = video->videoTime[i + index];
-		}*/
-
-		//video->image.resize(video->image.size() - index);
-		//video->videoTime.resize(video->videoTime.size() - index);		
+			video->videoImage.erase(video->videoImage.begin(), video->videoImage.begin() + index - 1);
+		}	
 	}
 #endif
 }
@@ -3666,9 +3719,9 @@ void EngineBase::pauseVideo(_video video)
 	}
 	if (video->audioStream.exists)
 	{
-		for (size_t i = 0; i < video->videoSoundChannels.size(); i++)
+		for (size_t i = 0; i < video->videoSounds.size(); i++)
 		{
-			pauseMusic(video->videoSoundChannels[i]);
+			pauseMusic(video->videoSounds[i].c);
 		}	
 	}
 	setVideoTimePaused(video, true);
@@ -3686,16 +3739,16 @@ void EngineBase::resumeVideo(_video video)
 	setVideoTimePaused(video, false);
 	if (video->audioStream.exists)
 	{		
-		for (size_t i = 0; i < video->videoSoundChannels.size(); i++)
+		for (size_t i = 0; i < video->videoSounds.size(); i++)
 		{
-			if (video->soundTime[i] > getVideoTime(video))
+			if (video->videoSounds[i].t > getVideoTime(video))
 			{
 				unsigned long long clock_start = 0;
-				FMOD_Channel_GetDSPClock(video->videoSoundChannels[i], 0, &clock_start);
-				clock_start += (unsigned long long)((video->soundTime[i] - getVideoTime(video)) * video->soundRate);
-				FMOD_Channel_SetDelay(video->videoSoundChannels[i], clock_start, 0, true);
+				FMOD_Channel_GetDSPClock(video->videoSounds[i].c, 0, &clock_start);
+				clock_start += (unsigned long long)((video->videoSounds[i].t - getVideoTime(video)) * video->soundRate);
+				FMOD_Channel_SetDelay(video->videoSounds[i].c, clock_start, 0, true);
 			}
-			resumeMusic(video->videoSoundChannels[i]);
+			resumeMusic(video->videoSounds[i].c);
 		}
 	}
 #endif

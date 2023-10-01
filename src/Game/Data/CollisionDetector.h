@@ -5,7 +5,7 @@
 namespace CollisionDetector
 {
 	void detectCollision();
-	bool detectCollision(NPC * npc, Effect * effect);
-	bool detectCollisionPass(NPC * npc, Effect * effect, int idx);
+	bool detectCollision(std::shared_ptr<NPC> npc, std::shared_ptr<Effect> effect);
+	bool detectCollisionPass(std::shared_ptr<NPC> npc, std::shared_ptr<Effect> effect, Point pos);
 };
 

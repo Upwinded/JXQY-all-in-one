@@ -48,7 +48,7 @@ void Magic::reset()
 	}
 }
 
-void Magic::initFromIni(const std::string & fileName)
+void Magic::initFromIni(const std::string& fileName)
 {
 	initFromIni(fileName, true);
 }
@@ -112,13 +112,13 @@ void Magic::initFromIni(const std::string & fileName, bool loadSpecialMagic)
 
 		if (loadSpecialMagic && attackFile != "")
 		{
-			specialMagic = new Magic;
+			specialMagic = std::make_shared<Magic>();
 			specialMagic->initFromIni(attackFile, false);
 		}
 	}
 }
 
-std::vector<void *> Magic::addEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target)
+std::vector<std::shared_ptr<Effect>> Magic::addEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, std::shared_ptr<GameElement> target)
 {
 	if (lvl < 1)
 	{
@@ -129,96 +129,96 @@ std::vector<void *> Magic::addEffect(GameElement * user, Point from, Point to, i
 		lvl = MAGIC_MAX_LEVEL;
 	}
 
-	switch (level[lvl].moveKind)
+	switch (srcMagic->level[lvl].moveKind)
 	{
 	case mmkPoint:
 	{
 		{
-			return addPointEffect(user, from, to, lvl, damage, evade, launcher);
+			return addPointEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;	
 	}
 	case mmkFly:
 	{
 		{
-			return addFlyEffect(user, from, to, lvl, damage, evade, launcher);
+			return addFlyEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkFlyContinuous:
 	{	
 		{
-			return addContinuousFlyEffect(user, from, to, lvl, damage, evade, launcher);
+			return addContinuousFlyEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkCircle:
 	{
 		{
-			return addCircleEffect(user, from, to, lvl, damage, evade, launcher);
+			return addCircleEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkHeartCircle:
 	{
 		{
-			return addHeartCircleEffect(user, from, to, lvl, damage, evade, launcher);
+			return addHeartCircleEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkHelixCircle:
 	{
 		{
-			return addHelixCircleEffect(user, from, to, lvl, damage, evade, launcher);
+			return addHelixCircleEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkSector:
 	{
 		{
-			return addSectorEffect(user, from, to, lvl, damage, evade, launcher, false);
+			return addSectorEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, false);
 		}
 		break;
 	}
 	case mmkRandSector:
 	{
 		{
-			return addSectorEffect(user, from, to, lvl, damage, evade, launcher, true);
+			return addSectorEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, true);
 		}
 		break;
 	}
 	case mmkLine:
 	{
 		{
-			return addLineEffect(user, from, to, lvl, damage, evade, launcher);
+			return addLineEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkMoveLine:
 	{
 		{
-			return addMoveLineEffect(user, from, to, lvl, damage, evade, launcher);
+			return addMoveLineEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkRegion:
 	{
 		{
-			switch (level[lvl].region)
+			switch (srcMagic->level[lvl].region)
 			{
 			case mrSquare:
 			{
-				return addSquareEffect(user, from, to, lvl, damage, evade, launcher);
+				return addSquareEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 				break;
 			}
 			case mrWave:
 			{
-				return addWaveEffect(user, from, to, lvl, damage, evade, launcher);
+				return addWaveEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 				break;
 			}
 			case mrCross:
 			{
-				return addCrossEffect(user, from, to, lvl, damage, evade, launcher);
+				return addCrossEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 				break;
 			}		
 			default:
@@ -230,28 +230,28 @@ std::vector<void *> Magic::addEffect(GameElement * user, Point from, Point to, i
 	case mmkSelf:
 	{
 		{
-			return addSelfEffect(user, from, to, lvl, damage, evade, launcher, level[lvl].specialKind);
+			return addSelfEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, srcMagic->level[lvl].specialKind);
 		}
 		break;
 	}
 	case mmkFullScreen:
 	{
 		{
-			return addFullScreenEffect(user, from, to, lvl, damage, evade, launcher);
+			return addFullScreenEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
 	case mmkFollow:
 	{
 		{
-			return addFollowEffect(user, from, to, lvl, damage, evade, launcher, target);
+			return addFollowEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, target);
 		}
 		break;
 	}
 	case mmkThrow:
 	{
 		{
-			return addThrowEffect(user, from, to, lvl, damage, evade, launcher);
+			return addThrowEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 		}
 		break;
 	}
@@ -261,33 +261,33 @@ std::vector<void *> Magic::addEffect(GameElement * user, Point from, Point to, i
 	return {};
 }
 
-std::vector<void *> Magic::addPointEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addPointEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	Effect * e = new Effect;
+	std::vector<std::shared_ptr<Effect>> ret;
+	std::shared_ptr<Effect> e = std::make_shared<Effect>();
 	e->level = lvl;
 	e->user = user;
-	e->initFromMagic(this);
+	e->initFromMagic(srcMagic);
 	e->flyingDirection = { 0, 0 };
 	e->position = to;
 	e->src = e->position;
     int dir = 0;
-    if (flyImage != nullptr)
+    if (srcMagic->flyImage != nullptr)
     {
-        dir = calDirection(from, to, flyImage->directions);
+        dir = calDirection(from, to, srcMagic->flyImage->directions);
     }
     else
     {
         dir = calDirection(from, to);
     }
 	e->direction = dir;
-	if (level[lvl].lifeFrame <= 0)
+	if (srcMagic->level[lvl].lifeFrame <= 0)
 	{
 		e->lifeTime = e->getFlyingImageTime();
 	}
 	else
 	{
-		e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+		e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 	}
 	e->launcherKind = launcher;
 	e->damage = damage;
@@ -301,34 +301,34 @@ std::vector<void *> Magic::addPointEffect(GameElement * user, Point from, Point 
 	{
 		e->doing = ekFlying;
 	}
-	e->flyingDirection.y *= MapXRatio;
+	e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 	e->calDest();
-	gm->effectManager.addEffect(e);
+	gm->effectManager->addEffect(e);
 	e->beginTime = e->getTime();
 	ret.push_back(e);
 	return ret;
 }
 
-std::vector<void *> Magic::addFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addFlyEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	Effect * e = new Effect;
+	std::vector<std::shared_ptr<Effect>> ret;
+	std::shared_ptr<Effect> e = std::make_shared<Effect>();
 	e->level = lvl;
 	e->user = user;
-	e->initFromMagic(this);
+	e->initFromMagic(srcMagic);
 
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		to = Map::getSubPoint(to, 0);
 	}
 	int dir = calDirection(from, to);
 	Point src = from;
 	from = Map::getSubPoint(from, NPC::calDirection(from, to));
-	if (from.x != to.x || from.y != to.y)
+	if (from != to)
 	{
-        if (flyImage != nullptr)
+        if (srcMagic->flyImage != nullptr)
         {
-            dir = calDirection(from, to, flyImage->directions);
+            dir = calDirection(from, to, srcMagic->flyImage->directions);
         }
 		else
         {
@@ -338,9 +338,9 @@ std::vector<void *> Magic::addFlyEffect(GameElement * user, Point from, Point to
 	}
 	else
 	{
-        if (flyImage != nullptr)
+        if (srcMagic->flyImage != nullptr)
         {
-            dir = calDirection(src, to, flyImage->directions);
+            dir = calDirection(src, to, srcMagic->flyImage->directions);
         }
         else
         {
@@ -348,13 +348,13 @@ std::vector<void *> Magic::addFlyEffect(GameElement * user, Point from, Point to
         }
 		e->flyingDirection = Map::getTilePosition(to, src);
 	}
-	if (level[lvl].lifeFrame <= 0)
+	if (srcMagic->level[lvl].lifeFrame <= 0)
 	{
 		e->lifeTime = e->getFlyingImageTime();
 	}
 	else
 	{
-		e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+		e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 	}
 	e->direction = dir;
 	e->position = from;
@@ -371,41 +371,41 @@ std::vector<void *> Magic::addFlyEffect(GameElement * user, Point from, Point to
 	{
 		e->doing = ekFlying;
 	}
-	e->flyingDirection.y *= MapXRatio;
+	e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 	e->calDest();
-	gm->effectManager.addEffect(e);
+	gm->effectManager->addEffect(e);
 	e->beginTime = e->getTime();
 	ret.push_back(e);
 	return ret;
 }
 
-std::vector<void *> Magic::addContinuousFlyEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addContinuousFlyEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	if (from.x == to.x && from.y == to.y)
+	std::vector<std::shared_ptr<Effect>> ret;
+	if (from == to)
 	{
 		to = Map::getSubPoint(to, 0);
 	}
 	int dir = calDirection(from, to);
 	Point src = from;
 	from = Map::getSubPoint(from, NPC::calDirection(from, to));
-	if (from.x != to.x || from.y != to.y)
+	if (from != to)
 	{
 		dir = calDirection(from, to);
 	}
-	gm->effectManager.setPaused(true);
+	gm->effectManager->setPaused(true);
 	for (int i = 0; i < lvl; i++)
 	{
-		Effect * e = new Effect;
+		std::shared_ptr<Effect> e = std::make_shared<Effect>();
 		e->level = lvl;
 		e->user = user;
-		e->initFromMagic(this);
+		e->initFromMagic(srcMagic);
 
-        if (from.x != to.x || from.y != to.y)
+        if (from != to)
         {
-            if (flyImage != nullptr)
+            if (srcMagic->flyImage != nullptr)
             {
-                dir = calDirection(from, to, flyImage->directions);
+                dir = calDirection(from, to, srcMagic->flyImage->directions);
             }
             else
             {
@@ -415,9 +415,9 @@ std::vector<void *> Magic::addContinuousFlyEffect(GameElement * user, Point from
         }
         else
         {
-            if (flyImage != nullptr)
+            if (srcMagic->flyImage != nullptr)
             {
-                dir = calDirection(src, to, flyImage->directions);
+                dir = calDirection(src, to, srcMagic->flyImage->directions);
             }
             else
             {
@@ -433,13 +433,13 @@ std::vector<void *> Magic::addContinuousFlyEffect(GameElement * user, Point from
 
 		e->launcherKind = launcher;
 		e->waitTime += i * MAGIC_CONTINUOUS_INTERVAL;
-		if (level[lvl].lifeFrame <= 0)
+		if (srcMagic->level[lvl].lifeFrame <= 0)
 		{
 			e->lifeTime = e->getFlyingImageTime();
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 		if (e->waitTime > 0)
 		{
@@ -449,30 +449,30 @@ std::vector<void *> Magic::addContinuousFlyEffect(GameElement * user, Point from
 		{
 			e->doing = ekFlying;
 		}
-		e->flyingDirection.y *= MapXRatio;
+		e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 		e->calDest();
-		gm->effectManager.addEffect(e);
+		gm->effectManager->addEffect(e);
 		e->beginTime = e->getTime();
 		ret.push_back(e);
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
+	std::vector<std::shared_ptr<Effect>> ret;
 	double angle = -pi;
-	gm->effectManager.setPaused(true);
+	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
-		Effect * e = new Effect;
+		std::shared_ptr<Effect> e = std::make_shared<Effect>();
 		e->level = lvl;
 		e->user = user;
-		e->initFromMagic(this);
-        if (flyImage != nullptr)
+		e->initFromMagic(srcMagic);
+        if (srcMagic->flyImage != nullptr)
         {
-            e->direction = calDirection(-angle - pi / 2, flyImage->directions);
+            e->direction = calDirection(-angle - pi / 2, srcMagic->flyImage->directions);
         }
         else
         {
@@ -486,13 +486,13 @@ std::vector<void *> Magic::addCircleEffect(GameElement * user, Point from, Point
 		e->damage = damage;
 		e->evade = evade;
 
-		if (level[lvl].lifeFrame <= 0)
+		if (srcMagic->level[lvl].lifeFrame <= 0)
 		{
 			e->lifeTime = e->getFlyingImageTime();
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 
 		if (e->waitTime > 0)
@@ -504,30 +504,30 @@ std::vector<void *> Magic::addCircleEffect(GameElement * user, Point from, Point
 			e->doing = ekFlying;
 		}
 		e->calDest();
-		gm->effectManager.addEffect(e);
+		gm->effectManager->addEffect(e);
 		e->beginTime = e->getTime();
 		angle += MAGIC_CIRCLE_ANGLE_SPACE;
 		ret.push_back(e);
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
+	std::vector<std::shared_ptr<Effect>> ret;
 	double angle = -pi;
-	gm->effectManager.setPaused(true);
+	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
-		Effect * e = new Effect;
+		std::shared_ptr<Effect> e = std::make_shared<Effect>();
 		e->level = lvl;
 		e->user = user;
-		e->initFromMagic(this);
+		e->initFromMagic(srcMagic);
 
-        if (flyImage != nullptr)
+        if (srcMagic->flyImage != nullptr)
         {
-            e->direction = calDirection(-angle - pi / 2, flyImage->directions);
+            e->direction = calDirection(-angle - pi / 2, srcMagic->flyImage->directions);
         }
         else
         {
@@ -541,13 +541,13 @@ std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, 
 		e->damage = damage;
 		e->evade = evade;
 
-		if (level[lvl].lifeFrame <= 0)
+		if (srcMagic->level[lvl].lifeFrame <= 0)
 		{
 			e->lifeTime = e->getFlyingImageTime();
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 
 		if (i < MAGIC_CIRCLE_COUNT / 4)
@@ -589,19 +589,19 @@ std::vector<void *> Magic::addHeartCircleEffect(GameElement * user, Point from, 
 			e->doing = ekFlying;
 		}
 		e->calDest();
-		gm->effectManager.addEffect(e);
+		gm->effectManager->addEffect(e);
 		e->beginTime = e->getTime();
 		angle += MAGIC_CIRCLE_ANGLE_SPACE;
 		ret.push_back(e);
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	int startDir = calDirection(from, to, MAGIC_CIRCLE_COUNT);
 	startDir -= MAGIC_CIRCLE_COUNT / 4;
 	if (startDir < 0)
@@ -612,14 +612,14 @@ std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, 
 	double angle = -pi;
 	for (int i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
-		Effect * e = new Effect;
+		std::shared_ptr<Effect> e = std::make_shared<Effect>();
 		e->level = lvl;
 		e->user = user;
-		e->initFromMagic(this);
+		e->initFromMagic(srcMagic);
 
-        if (flyImage != nullptr)
+        if (srcMagic->flyImage != nullptr)
         {
-            e->direction = calDirection(-angle - pi / 2, flyImage->directions);
+            e->direction = calDirection(-angle - pi / 2, srcMagic->flyImage->directions);
         }
         else
         {
@@ -633,13 +633,13 @@ std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, 
 		e->damage = damage;
 		e->evade = evade;
 
-		if (level[lvl].lifeFrame <= 0)
+		if (srcMagic->level[lvl].lifeFrame <= 0)
 		{
 			e->lifeTime = e->getFlyingImageTime();
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 		int count = i - startDir;
 		if (count < 0)
@@ -657,39 +657,41 @@ std::vector<void *> Magic::addHelixCircleEffect(GameElement * user, Point from, 
 			e->doing = ekFlying;
 		}
 		e->calDest();
-		gm->effectManager.addEffect(e);
+		gm->effectManager->addEffect(e);
 		e->beginTime = e->getTime();
 		angle += MAGIC_CIRCLE_ANGLE_SPACE;
 		ret.push_back(e);
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime)
+std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, bool randTime)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
-	if (from.x == to.x && from.y == to.y)
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
+	if (from == to)
 	{
 		to = Map::getSubPoint(to, 0);
 	}
 	int dir = NPC::calDirection(from, to);
 	Point src = from;
 	//from = Map::getSubPoint(from, NPC::calDirection(from, to));
-	double angle = dir * pi / 4;
+	auto tempPos = Map::getTilePosition(to, from);
+	tempPos.y = (int)round(MapXRatio * tempPos.y);
+	double angle = atan2(-tempPos.x, tempPos.y); //dir * pi / 4;
 	if (lvl < 4)
 	{
 		angle -= pi / 12;
 		for (size_t i = 0; i < 3; i++)
 		{
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->level = lvl;
 			e->user = user;
-			e->initFromMagic(this);
-            if (flyImage != nullptr)
+			e->initFromMagic(srcMagic);
+            if (srcMagic->flyImage != nullptr)
             {
-                e->direction = calDirection(limitAngle(angle), flyImage->directions);
+                e->direction = calDirection(limitAngle(angle), srcMagic->flyImage->directions);
             }
             else
             {
@@ -708,13 +710,13 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 			{
 				e->waitTime += rand() % 200;
 			}
-			if (level[lvl].lifeFrame <= 0)
+			if (srcMagic->level[lvl].lifeFrame <= 0)
 			{
 				e->lifeTime = e->getFlyingImageTime();
 			}
 			else
 			{
-				e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+				e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 			}
 			if (e->waitTime > 0)
 			{
@@ -726,9 +728,11 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 12;
+
 			ret.push_back(e);
 		}
 	}
@@ -737,13 +741,13 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 		angle -= pi / 10;
 		for (size_t i = 0; i < 5; i++)
 		{
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->level = lvl;
 			e->user = user;
-			e->initFromMagic(this);
-            if (flyImage != nullptr)
+			e->initFromMagic(srcMagic);
+            if (srcMagic->flyImage != nullptr)
             {
-                e->direction = calDirection(limitAngle(angle), flyImage->directions);
+                e->direction = calDirection(limitAngle(angle), srcMagic->flyImage->directions);
             }
             else
             {
@@ -773,7 +777,7 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 20;
 			ret.push_back(e);
@@ -785,14 +789,14 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 		for (size_t i = 0; i < 7; i++)
 		{
 
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->level = lvl;
 			e->user = user;
-			e->initFromMagic(this);
+			e->initFromMagic(srcMagic);
 
-            if (flyImage != nullptr)
+            if (srcMagic->flyImage != nullptr)
             {
-                e->direction = calDirection(limitAngle(angle), flyImage->directions);
+                e->direction = calDirection(limitAngle(angle), srcMagic->flyImage->directions);
             }
             else
             {
@@ -822,7 +826,7 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 15;
 			ret.push_back(e);
@@ -833,13 +837,13 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 		angle -= pi / 4;
 		for (size_t i = 0; i < 9; i++)
 		{
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->level = lvl;
 			e->user = user;
-			e->initFromMagic(this);
-            if (flyImage != nullptr)
+			e->initFromMagic(srcMagic);
+            if (srcMagic->flyImage != nullptr)
             {
-                e->direction = calDirection(limitAngle(angle), flyImage->directions);
+                e->direction = calDirection(limitAngle(angle), srcMagic->flyImage->directions);
             }
             else
             {
@@ -868,23 +872,23 @@ std::vector<void *> Magic::addSectorEffect(GameElement * user, Point from, Point
 
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			angle += pi / 16;
 			ret.push_back(e);
 		}
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addLineEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	{
 		Point tempTo = to;
-		if (from.x == to.x && from.y == to.y)
+		if (from == to)
 		{
 			tempTo = Map::getSubPoint(to, 0);
 		}
@@ -907,19 +911,19 @@ std::vector<void *> Magic::addLineEffect(GameElement * user, Point from, Point t
 		}
 		for (int i = 0; i < lvl * 2 + 1; i++)
 		{
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->level = lvl;
 			e->user = user;
-			e->initFromMagic(this);
+			e->initFromMagic(srcMagic);
 			e->direction = magicDir;
 			e->flyingDirection = { 0, 0 };
-			if (level[lvl].lifeFrame <= 0)
+			if (srcMagic->level[lvl].lifeFrame <= 0)
 			{
 				e->lifeTime = e->getFlyingImageTime();
 			}
 			else
 			{
-				e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+				e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 			}
 			e->position = pos;
 			e->src = e->position;
@@ -941,23 +945,23 @@ std::vector<void *> Magic::addLineEffect(GameElement * user, Point from, Point t
 
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			pos = Map::getSubPoint(pos, dir);
 			ret.push_back(e);
 		}
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addMoveLineEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addMoveLineEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	{
 		Point tempTo = to;
-		if (from.x == to.x && from.y == to.y)
+		if (from == to)
 		{
 			tempTo = Map::getSubPoint(to, 0);
 		}
@@ -982,13 +986,13 @@ std::vector<void *> Magic::addMoveLineEffect(GameElement * user, Point from, Poi
 		for (int i = 0; i < lvl * 2 + 1; i++)
 		{
 
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->level = lvl;
 			e->user = user;
-			e->initFromMagic(this);
+			e->initFromMagic(srcMagic);
 			e->direction = magicDir;
 			e->flyingDirection = Map::getTilePosition(Map::getSubPoint({ 0, 0 }, srcDir), { 0, 0 });
-			e->flyingDirection.y *= MapXRatio;
+			e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 			e->position = pos;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -998,13 +1002,13 @@ std::vector<void *> Magic::addMoveLineEffect(GameElement * user, Point from, Poi
 			{
 				e->noLum = true;
 			}
-			if (level[lvl].lifeFrame <= 0)
+			if (srcMagic->level[lvl].lifeFrame <= 0)
 			{
 				e->lifeTime = e->getFlyingImageTime();
 			}
 			else
 			{
-				e->lifeTime = (unsigned int)((double)level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+				e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 			}
 			if (e->waitTime > 0)
 			{
@@ -1016,20 +1020,20 @@ std::vector<void *> Magic::addMoveLineEffect(GameElement * user, Point from, Poi
 
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			pos = Map::getSubPoint(pos, dir);
 			ret.push_back(e);
 		}
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int range)
+std::vector<std::shared_ptr<Effect>> Magic::addSquareEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, int range)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	int mrange = 3 + ((lvl - 1) / 3) * 2;
 	if (range >= 0)
 	{
@@ -1045,10 +1049,10 @@ std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point
 		Point newPos = pos;
 		for (int j = 0; j < mrange; j++)
 		{
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->user = user;
 			e->level = lvl;
-			e->initFromMagic(this);
+			e->initFromMagic(srcMagic);
 			e->direction = 0;
 			e->flyingDirection = { 0, 0 };
 			e->position = newPos;
@@ -1074,25 +1078,25 @@ std::vector<void *> Magic::addSquareEffect(GameElement * user, Point from, Point
 				e->doing = ekFlying;
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			newPos = Map::getSubPoint(newPos, 5);
 			ret.push_back(e);
 		}
 		pos = Map::getSubPoint(pos, 3);
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addWaveEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addWaveEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	int hrange = 3 + ((lvl - 1) / 3) * 2;
 	int wrange = 2;
 	Point tempTo = to;
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		tempTo = Map::getSubPoint(to, 0);
 	}
@@ -1120,10 +1124,10 @@ std::vector<void *> Magic::addWaveEffect(GameElement * user, Point from, Point t
 		Point newPos = pos;
 		for (int j = 0; j < wrange * 2 + 1; j++)
 		{
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->user = user;
 			e->level = lvl;
-			e->initFromMagic(this);
+			e->initFromMagic(srcMagic);
 			e->direction = 0;
 			e->flyingDirection = { 0, 0 };
 			e->position = newPos;
@@ -1150,21 +1154,21 @@ std::vector<void *> Magic::addWaveEffect(GameElement * user, Point from, Point t
 				e->doing = ekFlying;
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			newPos = Map::getSubPoint(newPos, dir);
 			ret.push_back(e);
 		}
 		pos = Map::getSubPoint(pos, srcDir);
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addCrossEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addCrossEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	int mrange = 3 + ((lvl - 1) / 3) * 2;
 	Point pos[4] = { from, from, from, from };
 	for (int i = 0; i < mrange; i++)
@@ -1172,10 +1176,10 @@ std::vector<void *> Magic::addCrossEffect(GameElement * user, Point from, Point 
 		for (int j = 0; j < 4; j++)
 		{
 			pos[j] = Map::getSubPoint(pos[j], j * 2 + 1);
-			Effect * e = new Effect;
+			std::shared_ptr<Effect> e = std::make_shared<Effect>();
 			e->user = user;
 			e->level = lvl;
-			e->initFromMagic(this);
+			e->initFromMagic(srcMagic);
 			e->direction = 0;
 			e->flyingDirection = { 0, 0 };
 			e->position = pos[j];
@@ -1198,22 +1202,22 @@ std::vector<void *> Magic::addCrossEffect(GameElement * user, Point from, Point 
 				e->doing = ekFlying;
 			}
 			e->calDest();
-			gm->effectManager.addEffect(e);
+			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
 			ret.push_back(e);
 		}
 	}
-	gm->effectManager.setPaused(false);
+	gm->effectManager->setPaused(false);
 	return ret;
 }
 
-std::vector<void *> Magic::addSelfEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind)
+std::vector<std::shared_ptr<Effect>> Magic::addSelfEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind)
 {
-	std::vector<void *> ret;
-	Effect * e = new Effect;
+	std::vector<std::shared_ptr<Effect>> ret;
+	std::shared_ptr<Effect> e = std::make_shared<Effect>();
 	e->user = user;
 	e->level = lvl;
-	e->initFromMagic(this);
+	e->initFromMagic(srcMagic);
 	e->flyingDirection = { 0, 0 };
 	e->position = user->position;
 	e->src = e->position;
@@ -1234,16 +1238,16 @@ std::vector<void *> Magic::addSelfEffect(GameElement * user, Point from, Point t
 		e->lifeTime = e->getExplodingTime();
 	}
 	e->calDest();
-	gm->effectManager.addEffect(e);
+	gm->effectManager->addEffect(e);
 	e->beginTime = e->getTime();
-	ret.push_back(e);
+	//ret.push_back(e);
 	switch (specialKind)
 	{
 	case mskAddLife:
-		((NPC *)user)->addLife(damage);
+		(std::dynamic_pointer_cast<NPC>(user))->addLife(damage);
 		break;
 	case mskAddThew:
-		((NPC *)user)->addThew(damage);
+		(std::dynamic_pointer_cast<NPC>(user))->addThew(damage);
 		break;
 	case mskAddShield:
 		if (user != gm->player)
@@ -1253,7 +1257,7 @@ std::vector<void *> Magic::addSelfEffect(GameElement * user, Point from, Point t
 		gm->player->shieldBeginTime = gm->player->getTime();
 		gm->player->shieldLastTime = e->lifeTime;
 		gm->player->shieldLife = damage;
-		gm->effectManager.deleteEffect(gm->player->shieldEffect);
+		gm->effectManager->deleteEffect(gm->player->shieldEffect);
 		gm->player->shieldEffect = e;
 		break;
 	default:
@@ -1262,12 +1266,12 @@ std::vector<void *> Magic::addSelfEffect(GameElement * user, Point from, Point t
 	return ret;
 }
 
-std::vector<void *> Magic::addFullScreenEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	Effect * e = new Effect;
+	std::shared_ptr<Effect> e = std::make_shared<Effect>();
 	e->user = user;
 	e->level = lvl;
-	e->initFromMagic(this);
+	e->initFromMagic(srcMagic);
 	e->flyingDirection = { 0, 0 };
 	e->position = gm->player->position;
 	e->src = e->position;
@@ -1280,29 +1284,29 @@ std::vector<void *> Magic::addFullScreenEffect(GameElement * user, Point from, P
 	e->evade = evade;
 	e->lifeTime = e->getSuperImageTime();
 	e->calDest();
-	gm->npcManager.setPaused(true);
+	gm->npcManager->setPaused(true);
 	gm->player->setPaused(true);
-	gm->objectManager.setPaused(true);
-	gm->effectManager.pauseAllEffect();
-	gm->effectManager.addEffect(e);
+	gm->objectManager->setPaused(true);
+	gm->effectManager->pauseAllEffect();
+	gm->effectManager->addEffect(e);
 	e->beginTime = e->getTime();
 	e->doing = ekSuperMode;
 	e->run();
-	gm->npcManager.setPaused(false);
+	gm->npcManager->setPaused(false);
 	gm->player->setPaused(false);
-	gm->objectManager.setPaused(false);
-	gm->effectManager.resumeAllEffect();
-	auto damageList = gm->npcManager.findNPC(lkEnemy, user->position, 20);
-	Effect * oriE = e;
-	std::vector<void *> ret;
-	gm->effectManager.setPaused(true);
+	gm->objectManager->setPaused(false);
+	gm->effectManager->resumeAllEffect();
+	auto damageList = gm->npcManager->findNPC(lkEnemy, user->position, 20);
+	std::shared_ptr<Effect> oriE = e;
+	std::vector<std::shared_ptr<Effect>> ret;
+	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < damageList.size(); i++)
 	{
 		damageList[i]->directHurt(oriE);
-		e = new Effect;
+		e = std::make_shared<Effect>();
 		e->user = user;
 		e->level = lvl;
-		e->initFromMagic(this);
+		e->initFromMagic(srcMagic);
 		e->flyingDirection = { 0, 0 };
 		e->position = damageList[i]->position;
 		e->src = e->position;
@@ -1316,47 +1320,47 @@ std::vector<void *> Magic::addFullScreenEffect(GameElement * user, Point from, P
 		e->lifeTime = e->getExplodingTime();
 		e->calDest();
 		e->doing = ekExploding;
-		gm->effectManager.addEffect(e);
+		gm->effectManager->addEffect(e);
 		e->beginTime = e->getTime();
 		e->playSound(ekExploding);
 		ret.push_back(e);
 	}
-	gm->effectManager.setPaused(false);
-	delete oriE;
+	gm->effectManager->setPaused(false);
+	gm->effectManager->deleteEffect(oriE);
 	return ret;
 }
 
-std::vector<void *> Magic::addFollowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher, GameElement * target)
+std::vector<std::shared_ptr<Effect>> Magic::addFollowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, std::shared_ptr<GameElement> target)
 {
-	auto ret = addFlyEffect(user, from, to, lvl, damage, evade, launcher);
+	auto ret = addFlyEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 	for (size_t i = 0; i < ret.size(); i++)
 	{
-		((Effect *)ret[i])->target = target;
-		((Effect *)ret[i])->dest = to;
+		(ret[i])->target = target;
+		(ret[i])->dest = to;
 	}
 	return ret;
 }
 
-std::vector<void *> Magic::addThrowEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addThrowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	auto ret = addFlyEffect(user, from, to, lvl, damage, evade, launcher);
+	auto ret = addFlyEffect(srcMagic, user, from, to, lvl, damage, evade, launcher);
 	for (size_t i = 0; i < ret.size(); i++)
 	{
-		if (((Effect *)ret[i])->doing == ekFlying)
+		if ((ret[i])->doing == ekFlying)
 		{
-			((Effect *)ret[i])->doing = ekThrowing;
+			(ret[i])->doing = ekThrowing;
 		}
-		((Effect *)ret[i])->dest = to;
+		(ret[i])->dest = to;
 	}
 	return ret;
 }
 
-std::vector<void*> Magic::addThrowExplodeEffect(GameElement * user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addThrowExplodeEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
-	auto ret = addSquareEffect(user, from, to, lvl, damage, evade, launcher, (int)((lvl - 1) / 3 + 1));
+	auto ret = addSquareEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, (int)((lvl - 1) / 3 + 1));
 	for (size_t i = 0; i < ret.size(); i++)
 	{
-		auto e = (Effect *)ret[i];
+		auto e = ret[i];
 		e->waitTime = 0;
 		e->doing = ekFlying;
 		e->lifeTime = e->getFlyingTime();
@@ -1412,14 +1416,9 @@ int Magic::calDirection(double angle, int maxDir)
 	return result;
 }
 
-void Magic::copy(Magic * magic)
+void Magic::copy(Magic & magic)
 {
-	if (magic == nullptr)
-	{
-		return;
-	}
-
-#define copyData(a); a = magic->a;
+#define copyData(a); a = magic.a;
 
 	copyData(iniName);
 	copyData(name);
@@ -1460,50 +1459,18 @@ void Magic::copy(Magic * magic)
 
 void Magic::freeResource()
 {
-	if (actionImage != nullptr)
-	{
-		IMP::clearIMPImage(actionImage);
-		//delete actionImage;
-		actionImage = nullptr;
-	}
-	if (actionShadow != nullptr)
-	{
-		IMP::clearIMPImage(actionShadow);
-		//delete actionShadow;
-		actionShadow = nullptr;
-	}
-	if (specialMagic != nullptr)
-	{
-		delete specialMagic;
-		specialMagic = nullptr;
-	}
-	if (imageSelfCreated)
-	{
-		if (flyImage != nullptr)
-		{
-			IMP::clearIMPImage(flyImage);
-			//delete flyImage;
-			flyImage = nullptr;
-		}
-		if (explodeImage != nullptr)
-		{
-			IMP::clearIMPImage(explodeImage);
-			//delete explodeImage;
-			explodeImage = nullptr;
-		}
-		if (superImage != nullptr)
-		{
-			IMP::clearIMPImage(superImage);
-			//delete superImage;
-			superImage = nullptr;
-		}
-	}
-	else
-	{
-		flyImage = nullptr;
-		explodeImage = nullptr;
-		superImage = nullptr;
-	}
+	actionImage = nullptr;
+
+	actionShadow = nullptr;
+
+	specialMagic = nullptr;
+
+	flyImage = nullptr;
+		
+	explodeImage = nullptr;
+		
+	superImage = nullptr;
+	
 }
 
 void Magic::createRes()

@@ -18,10 +18,10 @@ public:
 	int itemCount = 0;
 	std::string soundName = "";
 	std::vector<std::string> itemName;
-	std::vector<Button *> itemButton;
+	std::vector<std::shared_ptr<Button>> itemButton;
 	int index = -1;
 
-	virtual void initFromIni(const std::string & fileName);
+	virtual void initFromIni(INIReader & ini);
 	void freeResource();
 private:
 	virtual void onEvent();

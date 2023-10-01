@@ -5,12 +5,21 @@ class BaseComponent :
 	public Element
 {
 public:
-	BaseComponent() { result = erNone; priority = epComponent;  }
-	virtual ~BaseComponent() { freeResource(); }
+	BaseComponent();
+	virtual ~BaseComponent();
 
 	virtual void freeResource() {}
 
-	virtual void initFromIni(const std::string& fileName) {}
+	void initFromIniFileName(const std::string& fileName);
+
+	virtual void initFromIni(INIReader& ini) {}
+	virtual void initFromIniWithName(INIReader& ini, const std::string& fileName);
+
+	_shared_imp loadRes(const std::string& impName);
+
+	void tryCleanRes();
+private:
+	static std::map<std::string, _shared_imp> res;
 
 };
 

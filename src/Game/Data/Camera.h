@@ -18,7 +18,7 @@ private:
 	PointEx flyStartOffset = { 0.0, 0.0 };
 
 public:
-	GameElement * followNPC = nullptr;
+	std::shared_ptr<GameElement> followNPC = nullptr;
 	bool followPlayer = true;
 	void flyTo(int dir, int distance);
 	void flyToEx(int dir, int distance);

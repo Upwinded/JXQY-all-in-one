@@ -9,7 +9,7 @@ public:
 
 	bool checked = false;
 
-	virtual void initFromIni(const std::string & fileName);
+	virtual void initFromIni(INIReader & ini);
 
 private:
 	virtual void onDraw();

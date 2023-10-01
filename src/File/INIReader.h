@@ -14,6 +14,7 @@
 #include <stdarg.h>
 #include "File.h"
 #include <map>
+#include "../Types/Types.h"
 
 struct iniKey
 {
@@ -55,7 +56,7 @@ public:
 	//(Added by Upwinded.)
 	void Set(const std::string& section, const std::string& name, const std::string& value);
 	//(Added by Upwinded.)
-	void SetTime64(const std::string& section, const std::string& name, Uint64 value);
+	void SetTime(const std::string& section, const std::string& name, UTime value);
 	//(Added by Upwinded.)
 	void SetInteger(const std::string& section, const std::string& name, long value);
 	//(Added by Upwinded.)
@@ -73,7 +74,7 @@ public:
     // Get a string value from INI file, returning default_value if not found.
     std::string Get(const std::string& section, const std::string& name, const std::string& default_value) const;
 	
-	Uint64 GetTime64(const std::string& section, const std::string& name, Uint64 default_value) const;
+	UTime GetTime(const std::string& section, const std::string& name, UTime default_value) const;
 
     // Get an integer (long) value from INI file, returning default_value if
     // not found or not a valid integer (decimal "1234", "-1234", or hex "0x4d2").
@@ -90,49 +91,16 @@ public:
     bool GetBoolean(const std::string& section, const std::string& name, bool default_value) const;
 
 
+
 private:
+
     int _error = 0;
     //std::map<std::string, std::map<std::string, std::string>> _values;
 	IniMap map;
 
-	static unsigned int hashString(const std::string & name)
-	{
-		unsigned int result = 0;
-		if (name.length() > 0)
-		{
-			char * ch = new char[name.length() + 1];
-			memcpy(ch, name.c_str(), name.length());
-			ch[name.length()] = 0;
-			unsigned int cnt = 0;
-			int i = 0;
-			while (ch[i] != 0)
-			{
-				if (ch[i] == '/')
-				{
-					ch[i] = '\\';
-				}
-				if ((ch[i] >= 'A') && (ch[i] <= 'Z'))
-				{
-					ch[i] = 0x20 + ch[i];
-				}
-				unsigned int u = ch[i];
-				result = (u * (cnt + 1) + result) % 0x8000000B;
-				result = (((result ^ 0xFFFFFFFF) + 1) << 4) - result;
-				cnt++;
-				i++;
-			}
-			result ^= 0x12345678;
-			delete[] ch;
-		}
-		return result;
-	}
-
     static std::string MakeKey(const std::string& section, const std::string& name);
     static int ValueHandler(void* user, const char* section, const char* name,
                             const char* value);
-
-	std::string formatString(const char* format, ...);
-
 };
 
 #endif  // __INIREADER_H__

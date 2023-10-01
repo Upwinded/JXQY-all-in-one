@@ -9,15 +9,15 @@ public:
 	GoodsMenu();
 	virtual ~GoodsMenu();
 
-	ImageContainer * title = nullptr;
-	ImageContainer * image = nullptr;
-	ImageContainer * gold = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
+	std::shared_ptr<ImageContainer> image = nullptr;
+	std::shared_ptr<ImageContainer> gold = nullptr;
 
-	Scrollbar * scrollbar = nullptr;
+	std::shared_ptr<Scrollbar> scrollbar = nullptr;
 
-	Label * money = nullptr;
+	std::shared_ptr<Label> money = nullptr;
 
-	Item * item[MENU_ITEM_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	std::shared_ptr<Item> item[MENU_ITEM_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	void updateMoney();
 	void updateGoods();

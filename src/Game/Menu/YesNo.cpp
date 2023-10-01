@@ -17,22 +17,18 @@ YesNo::~YesNo()
 void YesNo::init(const std::string & s)
 {
 	freeResource();
-	initFromIni("ini\\ui\\yesno\\window.ini");
-	yes = addButton("ini\\ui\\yesno\\btnYes.ini");
-	no = addButton("ini\\ui\\yesno\\btnNo.ini");
-	label = addLabel("ini\\ui\\yesno\\label.ini");
+	initFromIniFileName("ini\\ui\\yesno\\window.ini");
+	yes = addComponent<Button>("ini\\ui\\yesno\\btnYes.ini");
+	no = addComponent<Button>("ini\\ui\\yesno\\btnNo.ini");
+	label = addComponent<Label>("ini\\ui\\yesno\\label.ini");
 	label->setStr(s);
 	setChildRectReferToParent();
 }
 
 void YesNo::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
+
 	freeCom(yes);
 	freeCom(no);
 	freeCom(label);
@@ -52,11 +48,11 @@ void YesNo::onEvent()
 	}
 }
 
-bool YesNo::onHandleEvent(AEvent * e)
+bool YesNo::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_KEYDOWN)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			running = false;
 			result = erExit;

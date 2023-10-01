@@ -17,7 +17,7 @@ void Traps::load()
 	freeResource();
 	std::string fileName = TRAPS_INI;
 	fileName = SAVE_CURRENT_FOLDER + fileName;
-	ini = new INIReader(fileName);
+	ini = std::make_shared<INIReader>(fileName);
 }
 
 void Traps::save()
@@ -35,7 +35,6 @@ void Traps::freeResource()
 {
 	if (ini != nullptr)
 	{
-		delete ini;
 		ini = nullptr;
 	}
 }
@@ -56,7 +55,7 @@ void Traps::set(const std::string & mapName, int index, const std::string & valu
 	{
 		std::string fileName = TRAPS_INI;
 		fileName = SAVE_CURRENT_FOLDER + fileName;
-		ini = new INIReader(fileName);
+		ini = std::make_shared<INIReader>(fileName);
 	}
 	std::string name = convert::formatString("%d", index);
 	ini->Set(mapName, name, value);

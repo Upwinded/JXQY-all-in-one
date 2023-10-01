@@ -4,6 +4,10 @@
 #include "../File/File.h"
 #include "../Engine/Engine.h"
 #include "../File/PakFile.h"
+
+
+#define Directly_Load false
+
 #define frameNullLen 1
 
 struct IMPFrame
@@ -53,10 +57,10 @@ struct IMPFile
 class IMP
 {
 private:
-	static bool loadIMPImage(_shared_imp impImage, const std::string& fileName);
-	static bool loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size);
-	static bool loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName);
-	static bool loadIMPImageFromPak(_shared_imp impImage, const std::string& fileName, const std::string& pakName = "", bool firstReadPak = false);
+	static bool loadIMPImage(_shared_imp impImage, const std::string& fileName, bool directlyLoad = Directly_Load);
+	static bool loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
+	static bool loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName, bool directlyLoad = Directly_Load);
+	static bool loadIMPImageFromPak(_shared_imp impImage, const std::string& fileName, const std::string& pakName = "", bool directlyLoad = Directly_Load, bool firstReadPak = false);
 
 public:
 
@@ -64,17 +68,16 @@ public:
 
 	static void copyIMPImage(_shared_imp dst, _shared_imp src);
 	
-	static _shared_imp createIMPImage(const std::string& fileName);
-	static _shared_imp createIMPImage(unsigned int fileID);
-	static _shared_imp createIMPImageFromMem(std::unique_ptr<char[]>& data, int size);
-	static _shared_imp createIMPImageFromFile(const std::string& fileName);
-	static _shared_imp createIMPImageFromPak(const std::string& fileName, const std::string & pakName = "", bool firstReadPak = false);
+	static _shared_imp createIMPImage(const std::string& fileName, bool directlyLoad = Directly_Load);
+	static _shared_imp createIMPImage(unsigned int fileID, bool directlyLoad = Directly_Load);
+	static _shared_imp createIMPImageFromMem(std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
+	static _shared_imp createIMPImageFromFile(const std::string& fileName, bool directlyLoad = Directly_Load);
+	static _shared_imp createIMPImageFromPak(const std::string& fileName, bool directlyLoad = Directly_Load, const std::string & pakName = "", bool firstReadPak = false);
+	static _shared_imp createIMPImageFromPNG(std::string pngName, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromImage(_shared_image img);
-	static _shared_imp createIMPImageFromPNG(std::string pngName);
+
 
 	static _shared_imp createIMPImageFromFrame(_shared_imp impImage, int index);
-
-	static void clearIMPImage(_shared_imp impImage);
 
 	static _shared_image loadImage(_shared_imp impImage, int index, int * xOffset = nullptr, int * yOffset = nullptr);
 	static _shared_image loadImageForTime(_shared_imp impImage, UTime time, int * xOffset = nullptr, int * yOffset = nullptr, bool once = false, bool reverse = false);
@@ -83,5 +86,6 @@ public:
 
 private:
 	static bool cmpIMGHead(_shared_imp img);
+	static void clearIMPImage(_shared_imp impImage);
 
 };

@@ -15,7 +15,7 @@
 
 struct EventInfo
 {
-	NPC * npc = nullptr;
+	std::shared_ptr<NPC> npc = nullptr;
 	std::string scriptMapName = "";
 	std::string scriptName = "";
 };
@@ -61,7 +61,7 @@ public:
 
 	void freeResource();
 
-#ifdef _MOBILE
+#ifdef __MOBILE__
 	static bool actionCmp(NextAction a, NextAction b)
 	{
 		return a.distance < b.distance;
@@ -69,32 +69,37 @@ public:
 
 	std::vector<NextAction> fastSelectingList;
 
-#endif // _MOBILE
+#endif // __MOBILE__
 
 	// Children
-	MenuController menu;
-	GameController controller;
+	std::shared_ptr<MenuController> menu = std::make_shared<MenuController>();
+	std::shared_ptr<GameController> controller = std::make_shared<GameController>();
+	
+	std::shared_ptr<Weather> weather = std::make_shared<Weather>();
 
+	std::shared_ptr<Camera> camera = std::make_shared<Camera>();
 
-	VideoPlayer * video = nullptr;
+	std::shared_ptr<Map> map = std::make_shared<Map>();
+
+	std::shared_ptr<NPCManager> npcManager = std::make_shared<NPCManager>();
+	std::shared_ptr<ObjectManager> objectManager = std::make_shared<ObjectManager>();
+	std::shared_ptr<EffectManager> effectManager = std::make_shared<EffectManager>();
+
+	std::shared_ptr<VideoPlayer> video = nullptr;
+
 	Global global;
-	Map map;
 	Memo memo;
-	Traps traps;	
-	Camera camera;
-	Player * player = nullptr;
+	Traps traps;
+	
+	std::shared_ptr<Player> player = std::make_shared<Player>();
 
-	NPCManager npcManager;
-	ObjectManager objectManager;
-	EffectManager effectManager;
+
 	GoodsManager goodsManager;
 	MagicManager magicManager;
 	PartnerManager partnerManager;
 
 	VariableList varList;
 	Script script;
-
-	Weather weather;
 
 	Point getMousePoint();
 	Point getMousePoint(int x, int y);
@@ -110,14 +115,14 @@ public:
 	void clearSelected();
 
 	bool inEvent = false;
-	Object * scriptObj = nullptr;
-	void runObjScript(Object * obj);
-	NPC * scriptNPC = nullptr;
-	void runNPCScript(NPC * npc);
-	void runNPCDeathScript(NPC * npc, const std::string & scriptName, const std::string & scriptMapName);
+	std::shared_ptr<Object> scriptObj = nullptr;
+	void runObjScript(std::shared_ptr<Object> obj);
+	std::shared_ptr<NPC> scriptNPC = nullptr;
+	void runNPCScript(std::shared_ptr<NPC> npc);
+	void runNPCDeathScript(std::shared_ptr<NPC> npc, const std::string & scriptName, const std::string & scriptMapName);
 	void runEventList();
-	Goods * scriptGoods = nullptr;
-	void runGoodsScript(Goods * goods);
+	std::shared_ptr<Goods> scriptGoods = nullptr;
+	void runGoodsScript(std::shared_ptr<Goods> goods);
 	std::string scriptMapName = "";
 	int scriptTrapIndex = 0;
 	void runTrapScript(int idx);
@@ -273,6 +278,9 @@ public:
 	void showRain(int brain);
 
 private:
+	void loadingDisplayThread(std::vector<_shared_image> loadingImage);
+	bool loadingDisplaying = false;
+private:
 
 	virtual void onUpdate();
 	virtual void onDraw();
@@ -280,7 +288,7 @@ private:
 	virtual void onRun();
 	virtual void onExit();
 	virtual void onEvent();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 
 };
 

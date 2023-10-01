@@ -2,7 +2,7 @@
 
 MainScene::MainScene(int idx)
 {
-	game = new GameManager;
+	game = std::make_shared<GameManager>();
 	addChild(game);
 	gameIndex = idx;
 }
@@ -10,14 +10,17 @@ MainScene::MainScene(int idx)
 MainScene::~MainScene()
 {
 	removeAllChild();
-	delete game;
 	game = nullptr;
 }
 
 bool MainScene::onInitial()
 {
+	if (game == nullptr)
+	{
+		return true;
+	}
 	game->gameIndex = gameIndex;
-	//game->loadGameWithThread(gameIndex);
+
 	return true; 
 }
 

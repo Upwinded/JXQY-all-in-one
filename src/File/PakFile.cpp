@@ -87,7 +87,7 @@ int PakFile::findFileInPak(unsigned int fileID, const std::string & pakName)
 	if (fp)
 	{
 		SDL_RWseek(fp, 0, 2);
-		int size = SDL_RWtell(fp);
+		int size = (int)SDL_RWtell(fp);
 		SDL_RWseek(fp, 0, 0);
 		if (size >= sizeof(PakHead))
 		{
@@ -315,7 +315,7 @@ bool PakFile::readPak(const std::string & pakName, int index, std::unique_ptr<ch
 		if (fp)
 		{
 			SDL_RWseek(fp, 0, 2);
-			int size = SDL_RWtell(fp);
+			int size = (int)SDL_RWtell(fp);
 			SDL_RWseek(fp, 0, 0);
 			PakHead pakHead;
 			SDL_RWread(fp, &pakHead, sizeof(PakHead), 1);

@@ -156,7 +156,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
         else if (*prev_name && *start && start > line) {
             /* Non-blank line with leading whitespace, treat as continuation
                of previous name's value (as per Python configparser). */
-            if (!HANDLER(user, section, prev_name, start) && !error)
+            if (!HANDLER(srcMagic, user, section, prev_name, start) && !error)
                 error = lineno;
         }
 #endif

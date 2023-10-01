@@ -37,24 +37,16 @@ void Button::playSound(int index)
 	
 }
 
-void Button::onClick()
+void Button::draw()
 {
-	result |= erClick;
-	if (canCallBack)
-	{
-		if (parent != nullptr)
-		{
-			parent->onChildCallBack(this);
-			result = erNone;
-		}
-	}
+	draw(rect.x, rect.y);
 }
 
-void Button::onDraw()
+void Button::draw(int x, int y)
 {
 	int xOffset, yOffset;
 	_shared_image img = nullptr;
-	if (touchInRectID != TOUCH_UNTOUCHEDID || (dragging != TOUCH_UNTOUCHEDID && currentDragItem == this))
+	if (touchingDownID != TOUCH_UNTOUCHEDID || (dragging != TOUCH_UNTOUCHEDID && currentDragItem == getMySharedPtr()))
 	{
 		img = IMP::loadImageForTime(image[2], getTime(), &xOffset, &yOffset);
 		if (img == nullptr)
@@ -92,13 +84,35 @@ void Button::onDraw()
 	}
 	if (stretch)
 	{
+		Rect tempRect;
+		tempRect.x = x;
+		tempRect.y = y;
+		tempRect.w = rect.w;
+		tempRect.h = rect.h;
 		engine->drawImage(img, nullptr, &rect);
 	}
 	else
 	{
-		engine->drawImage(img, rect.x, rect.y);
+		engine->drawImage(img, x, y);
 	}
-	
+}
+
+void Button::onClick()
+{
+	result |= erClick;
+	if (canCallBack)
+	{
+		if (parent != nullptr)
+		{
+			parent->onChildCallBack(getMySharedPtr());
+			result = erNone;
+		}
+	}
+}
+
+void Button::onDraw()
+{
+	draw();
 }
 
 void Button::onExit()
@@ -134,12 +148,7 @@ void Button::freeImage()
 {
 	for (size_t i = 0; i < 3; i++)
 	{
-		if (image[i] != nullptr)
-		{
-			IMP::clearIMPImage(image[i]);
-			//delete image[i];
-			image[i] = nullptr;
-		}
+		image[i] = nullptr;
 	}
 }
 
@@ -167,18 +176,9 @@ void Button::freeResource()
 	result = erNone;
 }
 
-void Button::initFromIni(const std::string & fileName)
+void Button::initFromIni(INIReader & ini)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
 	kind = ini.Get("Init", "Kind", kind);
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
@@ -216,11 +216,9 @@ void Button::initFromIni(const std::string & fileName)
 	}
 	else
 	{
-		printf("%s image file error\n", impName.c_str());
+		GameLog::write("%s image file error\n", impName.c_str());
 	}
-	
-	IMP::clearIMPImage(impImage);
-	//delete impImage;
+
 	impImage = nullptr;
 }
 

@@ -9,12 +9,12 @@ VideoPlayer::VideoPlayer()
 	name = "VideoPlayer";
 	coverMouse = true;
 	canCallBack = true;
-#ifdef _MOBILE
-	skipLabel.rect = {30, 20, 70, 35};
-	skipLabel.fontSize = 30;
-	skipLabel.setStr(convert::GBKToUTF8_InWinOnly("跳过"));
-	skipLabel.coverMouse = true;
-	addChild(&skipLabel);
+#ifdef __MOBILE__
+	skipLabel->rect = {30, 20, 70, 35};
+	skipLabel->fontSize = 30;
+	skipLabel->setStr(u8"跳过");
+	skipLabel->coverMouse = true;
+	addChild(skipLabel);
 #endif
 }
 
@@ -51,7 +51,7 @@ void VideoPlayer::freeResource()
 	}
 }
 
-void VideoPlayer::onChildCallBack(Element * child)
+void VideoPlayer::onChildCallBack(PElement child)
 {
 	if (child != nullptr)
 	{
@@ -62,17 +62,17 @@ void VideoPlayer::onChildCallBack(Element * child)
             result |= erVideoStopped;
             if (parent != nullptr && parent->canCallBack)
             {
-                parent->onChildCallBack(this);
+                parent->onChildCallBack(getMySharedPtr());
             }
 		}
 	}
 }
 
-bool VideoPlayer::onHandleEvent(AEvent * e)
+bool VideoPlayer::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_KEYUP)
+	if (e.eventType == ET_KEYUP)
 	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			engine->stopVideo(v);
 			running = false;
@@ -112,7 +112,7 @@ void VideoPlayer::onUpdate()
 		{
 			if (parent != nullptr)
 			{
-				parent->onChildCallBack(this);
+				parent->onChildCallBack(getMySharedPtr());
 				result = erNone;
 			}		
 		}
@@ -125,7 +125,7 @@ void VideoPlayer::onUpdate()
 
 void VideoPlayer::onDraw()
 {
-	if (dragging && currentDragItem == this)
+	if (dragging && currentDragItem.get() == this)
 	{
 		return;
 	}
@@ -182,13 +182,13 @@ void VideoPlayer::onClick()
 	{
 		if (parent != nullptr)
 		{
-			parent->onChildCallBack(this);
+			parent->onChildCallBack(getMySharedPtr());
 			result = erNone;
 		}
 	}
 }
 
-void VideoPlayer::onDragEnd(Element * dst, int x, int y)
+void VideoPlayer::onDragEnd(PElement dst, int x, int y)
 {
 	coverMouse = true;
 	rect.x = x;

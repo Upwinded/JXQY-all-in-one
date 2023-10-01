@@ -9,9 +9,9 @@ public:
 	EquipMenu();
 	virtual ~EquipMenu();
 
-	ImageContainer * image = nullptr;
-	ImageContainer * title = nullptr;
-	Item * item[GOODS_BODY_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	std::shared_ptr<ImageContainer> image = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
+	std::shared_ptr<Item> item[GOODS_BODY_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	void updateGoods();
 	void updateGoods(int index);

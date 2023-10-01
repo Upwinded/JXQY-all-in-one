@@ -12,10 +12,6 @@ Object::Object()
 Object::~Object()
 {
 	freeResource();
-	if (parent != nullptr)
-	{
-		gm->objectManager.removeObj(this);
-	}
 }
 
 void Object::openBox()
@@ -116,10 +112,10 @@ _shared_image Object::getActionImage(int * offsetx, int * offsety)
 			return IMP::loadImageForDirection(res.image, direction, getUpdateTime() - actionBeginTime, offsetx, offsety);
 			break;
 		case oaOpening:
-			return IMP::loadImageForTime(res.image, getUpdateTime() - actionBeginTime, offsetx, offsety);
+			return IMP::loadImageForTime(res.image, getUpdateTime() - actionBeginTime, offsetx, offsety, true);
 			break;
 		case oaClosing:
-			return IMP::loadImageForTime(res.image, actionLastTime - (getUpdateTime() - actionBeginTime), offsetx, offsety);
+			return IMP::loadImageForTime(res.image, getUpdateTime() - actionBeginTime, offsetx, offsety, true, true);
 			break;
 		default:
 			return nullptr;
@@ -228,8 +224,8 @@ void Object::initRes(const std::string & fileName)
 	res.imageFile = ini.Get(section, "Image", "");
 	res.shadowFile = ini.Get(section, "Shade", "");
 	res.soundFile = ini.Get(section, "Sound", "");
-	res.image = gm->objectManager.loadObjectImage(res.imageFile);
-	res.shadow = gm->objectManager.loadObjectImage(res.shadowFile);
+	res.image = gm->objectManager->loadObjectImage(res.imageFile);
+	res.shadow = gm->objectManager->loadObjectImage(res.shadowFile);
 }
 
 void Object::saveToIni(INIReader * ini, const std::string & section)
@@ -253,7 +249,8 @@ void Object::saveToIni(INIReader * ini, const std::string & section)
 	ini->SetInteger(section, "Lum", lum);
 	ini->SetInteger(section, "Damage", damage);
 	ini->SetInteger(section, "Frame", frame);
-	ini->SetInteger(section, "State", state);
+	ini->SetInteger(section, "State", nowAction);
+	ini->SetTime(section, "ActionTime", getUpdateTime() - actionBeginTime);
 }
 
 void Object::initFromIni(INIReader * ini, const std::string & section)
@@ -278,7 +275,8 @@ void Object::initFromIni(INIReader * ini, const std::string & section)
 	lum = ini->GetInteger(section, "Lum", olNone);
 	damage = ini->GetInteger(section, "Damage", 0);
 	frame = ini->GetInteger(section, "Frame", 0);
-	state = ini->GetInteger(section, "State", 0);
+	state = ini->GetInteger(section, "State", oaStay);
+	actionBeginTime = getUpdateTime() - ini->GetTime(section, "ActionTime", 0);
 
 	initRes(objectFile);
 	initSound(wavFile);
@@ -354,13 +352,13 @@ void Object::onUpdate()
 	xscal = cenScreen.x / TILE_WIDTH + 3;
 	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
 	int tileHeightScal = 10;
-	Point cenTile = gm->camera.position;
+	Point cenTile = gm->camera->position;
 
 	if (position.x >= cenTile.x - xscal && position.x < cenTile.x + xscal && position.y >= cenTile.y - yscal && position.y < cenTile.y + yscal + tileHeightScal)
 	{
 		PointEx posoffset;
-		posoffset.x = (gm->camera.offset.x - offset.x);
-		posoffset.y = (gm->camera.offset.y - offset.y);
+		posoffset.x = (gm->camera->offset.x - offset.x);
+		posoffset.y = (gm->camera->offset.y - offset.y);
 		Point pos = Map::getTilePosition(position, cenTile, cenScreen, posoffset);
 		if (scriptFile != "")
 		{
@@ -411,13 +409,14 @@ void Object::onUpdate()
 			damageTime += damageInterval;
 			if (!gm->inEvent && !(gm->player->isJumping() && gm->player->jumpState == jsJumping))
 			{
-				if (gm->player->position.x == position.x && gm->player->position.y == position.y)
+				if (gm->player->position == position)
 				{
 					gm->player->hurtLife(damage);
 				}
 			}
 		}
 	}
+
 	if (nowAction == oaOpening || nowAction == oaClosing)
 	{
 		if (getUpdateTime() - actionBeginTime > actionLastTime)
@@ -444,7 +443,7 @@ void Object::onUpdate()
 
 void Object::onMouseLeftDown(int x, int y)
 {
-#ifdef _MOBILE
+#ifdef __MOBILE__
 	auto player = gm->player;
 	NextAction act;
     if (player->canRun && (player->thew > (int)round((double)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
@@ -455,10 +454,10 @@ void Object::onMouseLeftDown(int x, int y)
 	{
 		act.action = acWalk;
 	}
-	act.destGE = this;
+	act.destGE = std::dynamic_pointer_cast<Object>(getMySharedPtr());
 	act.type = ndObj;
 	act.dest = position;
-	player->addNextAction(&act);
+	player->addNextAction(act);
 #endif
 }
 
@@ -466,7 +465,6 @@ void Object::onEvent()
 {
 	if (touchingID != TOUCH_UNTOUCHEDID)
 	{
-        printf("%s selectiong \n", name.c_str());
 		selecting = true;
 	}
 	else

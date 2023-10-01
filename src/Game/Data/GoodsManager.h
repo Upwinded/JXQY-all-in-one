@@ -6,7 +6,7 @@ struct GoodsInfo
 {
 	std::string iniFile = "";
 	int number = 0;
-	Goods * goods = nullptr;
+	std::shared_ptr<Goods> goods = nullptr;
 };
 
 class GoodsManager

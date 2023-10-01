@@ -11,7 +11,7 @@ DragButton::~DragButton()
 	freeResource();
 }
 
-void DragButton::onDragEnd(Element * dst, int x, int y)
+void DragButton::onDragEnd(PElement dst, int x, int y)
 {
 	rect.x = x;
 	rect.y = y;
@@ -21,7 +21,7 @@ void DragButton::onDragEnd(Element * dst, int x, int y)
 	{
 		if (parent != nullptr)
 		{
-			parent->onChildCallBack(this);
+			parent->onChildCallBack(getMySharedPtr());
 			result = erNone;
 		}
 	}

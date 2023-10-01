@@ -18,24 +18,20 @@ System::~System()
 void System::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\system\\window.ini");
-	title = addImageContainer("ini\\ui\\system\\title.ini");
-	returnBtn = addButton("ini\\ui\\system\\return.ini");
-	saveloadBtn = addButton("ini\\ui\\system\\saveload.ini");
-	optionBtn = addButton("ini\\ui\\system\\option.ini");
-	quitBtn = addButton("ini\\ui\\system\\quit.ini");
+	initFromIniFileName("ini\\ui\\system\\window.ini");
+	title = addComponent<ImageContainer>("ini\\ui\\system\\title.ini");
+	returnBtn = addComponent<Button>("ini\\ui\\system\\return.ini");
+	saveloadBtn = addComponent<Button>("ini\\ui\\system\\saveload.ini");
+	optionBtn = addComponent<Button>("ini\\ui\\system\\option.ini");
+	quitBtn = addComponent<Button>("ini\\ui\\system\\quit.ini");
 
 	setChildRectReferToParent();
 }
 
 void System::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
+
 	freeCom(title);
 	freeCom(returnBtn);
 	freeCom(saveloadBtn);
@@ -47,7 +43,7 @@ void System::onEvent()
 {
 	if (saveloadBtn != nullptr && saveloadBtn->getResult(erClick))
 	{
-		SaveLoad * sl = new SaveLoad(true, true);
+		auto sl = std::make_shared<SaveLoad>(true, true);
 		addChild(sl);
 		sl->priority = 0;
 		unsigned int ret = sl->run();
@@ -57,10 +53,11 @@ void System::onEvent()
 			result = erLoad;
 			running = false;
 			visible = false;
-//			GameManager::getInstance()->loadGameWithThread(index + 1);
-			GameManager::getInstance()->weather.fadeOut();
-			GameManager::getInstance()->loadGame(index + 1);
-			GameManager::getInstance()->weather.fadeInEx();
+
+			GameManager::getInstance()->weather->fadeOut();
+			GameManager::getInstance()->loadGameWithThread(index + 1);
+			//GameManager::getInstance()->loadGame(index + 1);
+			GameManager::getInstance()->weather->fadeInEx();
 		}
 		else if ((ret & erSave) != 0)
 		{
@@ -70,16 +67,15 @@ void System::onEvent()
 			saveScreen();
 		}
 		removeChild(sl);
-		delete sl;
+		sl = nullptr;
 	}
 	if (optionBtn != nullptr && optionBtn->getResult(erClick))
 	{
-		Option * option = new Option;
+		auto option = std::make_shared<Option>();
 		option->priority = epMax;
 		addChild(option);
 		option->run();
 		removeChild(option);
-		delete option;
 		option = nullptr;
 	}
 	if (returnBtn != nullptr && returnBtn->getResult(erClick))
@@ -92,20 +88,19 @@ void System::onEvent()
 		running = false;
 		result = erExit;
 	}
-
 }
 
-bool System::onHandleEvent(AEvent * e)
+bool System::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_QUIT)
+	if (e.eventType == ET_QUIT)
 	{
 		running = false;
 		result = erExit;
 		return true;
 	}
-	else if (e->eventType == ET_KEYDOWN)
+	else if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			running = false;
 			result = erOK;
@@ -121,8 +116,8 @@ void System::saveScreen()
 	int w = 260;
 	int h = 200;
 	engine->beginSaveScreen();
-	gm->map.drawMap();
-	gm->weather.draw();
+	gm->map->drawMap();
+	gm->weather->draw();
 	auto snap = engine->endSaveScreen();
 	std::unique_ptr<char[]> data;
 	int len = engine->saveImageToPixels(snap, w, h, data);

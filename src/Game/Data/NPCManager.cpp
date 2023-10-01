@@ -14,12 +14,11 @@ NPCManager::~NPCManager()
 	freeResource();
     if (player != nullptr)
     {
-        delete player;
         player = nullptr;
     }
 }
 
-void NPCManager::setPlayer(NPC * nowPlayer)
+void NPCManager::setPlayer(std::shared_ptr<NPC> nowPlayer)
 {
     player = nowPlayer;
 }
@@ -39,13 +38,13 @@ void NPCManager::standAll()
 	}
 }
 
-int NPCManager::findNPCIndex(NPC * npc)
+int NPCManager::findNPCIndex(std::shared_ptr<NPC> npc)
 {
 	if (npc == nullptr)
 	{
 		return -1;
 	}
-	if (npc == gm->player)
+	if (npc.get() == gm->player.get())
 	{
 		return 0;
 	}
@@ -59,12 +58,12 @@ int NPCManager::findNPCIndex(NPC * npc)
 	return -1;
 }
 
-bool NPCManager::findNPC(NPC * npc)
+bool NPCManager::findNPC(std::shared_ptr<NPC> npc)
 {
 	return (findNPCIndex(npc) >= 0);
 }
 
-NPC* NPCManager::findPlayerNPC()
+std::shared_ptr<NPC> NPCManager::findPlayerNPC()
 {
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
@@ -76,14 +75,14 @@ NPC* NPCManager::findPlayerNPC()
 	return nullptr;
 }
 
-std::vector<NPC*> NPCManager::findNPC(int launcherKind)
+std::vector<std::shared_ptr<NPC>> NPCManager::findNPC(int launcherKind)
 {
 	return findNPC(launcherKind, { 0, 0 }, 0);
 }
 
-std::vector<NPC *> NPCManager::findNPC(const std::string & npcName)
+std::vector<std::shared_ptr<NPC>> NPCManager::findNPC(const std::string & npcName)
 {
-	std::vector<NPC *> result;
+	std::vector<std::shared_ptr<NPC>> result;
 	result.resize(0);
 	if (npcName == gm->player->npcName)
 	{
@@ -99,9 +98,9 @@ std::vector<NPC *> NPCManager::findNPC(const std::string & npcName)
 	return result;
 }
 
-std::vector<NPC*> NPCManager::findNPC(int launcherKind, Point pos, int radius)
+std::vector<std::shared_ptr<NPC>> NPCManager::findNPC(int launcherKind, Point pos, int radius)
 {
-	std::vector<NPC*> result;
+	std::vector<std::shared_ptr<NPC>> result;
 	if (launcherKind == lkSelf)
 	{
 		result.push_back(gm->player);
@@ -111,7 +110,7 @@ std::vector<NPC*> NPCManager::findNPC(int launcherKind, Point pos, int radius)
 	{
 		if (npcList[i]->kind == nkBattle)
 		{
-			NPC * tempNPC = nullptr;
+			std::shared_ptr<NPC> tempNPC = nullptr;
 			if (launcherKind == lkFriend && npcList[i]->relation == nrFriendly)
 			{
 				tempNPC = npcList[i];
@@ -128,7 +127,7 @@ std::vector<NPC*> NPCManager::findNPC(int launcherKind, Point pos, int radius)
 			{
 				if (radius > 0)
 				{
-					int distance = gm->map.calDistance(tempNPC->position, pos);
+					int distance = gm->map->calDistance(tempNPC->position, pos);
 					if (distance <= radius)
 					{
 						result.push_back(tempNPC);
@@ -143,9 +142,9 @@ std::vector<NPC*> NPCManager::findNPC(int launcherKind, Point pos, int radius)
 	}
 	return result;
 }
-std::vector<NPC *> NPCManager::findNPC(Point pos, int radius)
+std::vector<std::shared_ptr<NPC>> NPCManager::findNPC(Point pos, int radius)
 {
-    std::vector<NPC*> result;
+    std::vector<std::shared_ptr<NPC>> result;
     for (size_t i = 0; i < npcList.size(); i++)
     {
         auto tempNPC = npcList[i];
@@ -153,7 +152,7 @@ std::vector<NPC *> NPCManager::findNPC(Point pos, int radius)
         {
             if (radius > 0)
             {
-                int distance = gm->map.calDistance(tempNPC->position, pos);
+                int distance = gm->map->calDistance(tempNPC->position, pos);
                 if (distance <= radius)
                 {
                     result.push_back(tempNPC);
@@ -168,7 +167,7 @@ std::vector<NPC *> NPCManager::findNPC(Point pos, int radius)
     return result;
 }
 
-NPC * NPCManager::findNearestNPC(int launcherKind, Point pos, int radius)
+std::shared_ptr<NPC> NPCManager::findNearestNPC(int launcherKind, Point pos, int radius)
 {
 	auto tempNPCList = findNPC(launcherKind, pos, radius);
 	int temp = -1;
@@ -192,7 +191,7 @@ NPC * NPCManager::findNearestNPC(int launcherKind, Point pos, int radius)
 	}	
 }
 
-NPC * NPCManager::findNearestViewNPC(int launcherKind, Point pos, int radius)
+std::shared_ptr<NPC> NPCManager::findNearestViewNPC(int launcherKind, Point pos, int radius)
 {
 	auto tempNPCList = findNPC(launcherKind, pos, radius);
 	int temp = -1;
@@ -200,7 +199,7 @@ NPC * NPCManager::findNearestViewNPC(int launcherKind, Point pos, int radius)
 	for (int i = 0; i < (int)tempNPCList.size(); i++)
 	{
 		int tempDistance = Map::calDistance(pos, tempNPCList[i]->position);
-		if (tempDistance < distance && gm->map.canView(pos, tempNPCList[i]->position))
+		if (tempDistance < distance && gm->map->canView(pos, tempNPCList[i]->position))
 		{
             temp = i;
             distance = tempDistance;
@@ -216,18 +215,18 @@ NPC * NPCManager::findNearestViewNPC(int launcherKind, Point pos, int radius)
 	}
 }
 
-NPC * NPCManager::findNearestScriptViewNPC(Point pos, int radius)
+std::shared_ptr<NPC> NPCManager::findNearestScriptViewNPC(Point pos, int radius)
 {
     int temp = -1;
     int distance = radius + 1;
-    for (int i = 0; i < npcList.size(); ++i)
+    for (size_t i = 0; i < npcList.size(); ++i)
     {
         if (npcList[i] == nullptr) { continue; }
         if (npcList[i]->relation == nrFriendly || npcList[i]->relation == nrNeutral)
         {
             int tempDistance = Map::calDistance(pos, npcList[i]->position);
             bool dialogRadiusLarger = (npcList[i]->dialogRadius >= tempDistance);
-            if (npcList[i]->scriptFile != "" && (gm->map.canView(pos, npcList[i]->position) || dialogRadiusLarger))
+            if (npcList[i]->scriptFile != "" && (gm->map->canView(pos, npcList[i]->position) || dialogRadiusLarger))
             {
                 if (tempDistance < distance || (dialogRadiusLarger && temp < 0))
                 {
@@ -247,23 +246,45 @@ NPC * NPCManager::findNearestScriptViewNPC(Point pos, int radius)
     }
 }
 
-std::vector<NPC *> NPCManager::findRadiusScriptViewNPC(Point pos, int radius)
+std::vector<std::shared_ptr<NPC>> NPCManager::findRadiusScriptViewNPC(Point pos, int radius)
 {
-	std::vector<NPC *> ret;
-	for (int i = 0; i < npcList.size(); ++i)
+	std::vector<std::shared_ptr<NPC>> ret;
+	for (size_t i = 0; i < npcList.size(); ++i)
 	{
 		if (npcList[i] == nullptr) { continue; }
 		if (npcList[i]->relation == nrFriendly || npcList[i]->relation == nrNeutral)
 		{
 			int tempDistance = Map::calDistance(pos, npcList[i]->position);
 			bool dialogRadiusLarger = (npcList[i]->dialogRadius >= tempDistance);
-			if (npcList[i]->scriptFile != "" && ((gm->map.canView(pos, npcList[i]->position) && tempDistance <= radius) || dialogRadiusLarger))
+			if (npcList[i]->scriptFile != "" && ((gm->map->canView(pos, npcList[i]->position) && tempDistance <= radius) || dialogRadiusLarger))
 			{
 				ret.push_back(npcList[i]);
 			}
 		}
 	}
 	return ret;
+}
+
+void NPCManager::deleteNPCFromOtherPlace(std::shared_ptr<NPC> npc)
+{
+	if (gm->camera->followNPC.get() == npc.get())
+	{
+		gm->camera->followNPC = nullptr;
+	}
+	removeChild(npc);
+
+	auto iter = actionImageList.begin();
+	while (iter != actionImageList.end())
+	{
+		if (iter->second.use_count() <= 1)
+		{
+			iter = actionImageList.erase(iter);
+		}
+		else
+		{
+			iter++;
+		}
+	}
 }
 
 void NPCManager::npcAutoAction()
@@ -274,15 +295,15 @@ void NPCManager::npcAutoAction()
 	}
 	//根据人物的属性建立7个列表
 	//常规列表，放置需要更新走动的常规NPC
-	std::vector<NPC *> normalList;
+	std::vector<std::shared_ptr<NPC>> normalList;
 	//以下3个列表放置所有战斗类NPC，根据关系分类
-	std::vector<NPC *> friendList;
-	std::vector<NPC *> enemyList;
-	std::vector<NPC *> neutralList;
+	std::vector<std::shared_ptr<NPC>> friendList;
+	std::vector<std::shared_ptr<NPC>> enemyList;
+	std::vector<std::shared_ptr<NPC>> neutralList;
 	//以下3个列表放置所有需要更新动作的NPC，根据关系分类
-	std::vector<NPC *> friendUpdateList;
-	std::vector<NPC *> enemyUpdateList;
-	std::vector<NPC *> neutralUpdateList;
+	std::vector<std::shared_ptr<NPC>> friendUpdateList;
+	std::vector<std::shared_ptr<NPC>> enemyUpdateList;
+	std::vector<std::shared_ptr<NPC>> neutralUpdateList;
 
 	//友军列表添加玩家
 	if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
@@ -344,7 +365,7 @@ void NPCManager::npcAutoAction()
 			stepY += normalList[i]->position.y;
 			int tvr = normalList[i]->visionRadius;
 			normalList[i]->visionRadius = NPC_WALK_STEP * 2;
-			if (normalList[i]->canView({ stepX, stepY }) && gm->map.canWalk({ stepX, stepY }))
+			if (normalList[i]->canView({ stepX, stepY }) && gm->map->canWalk({ stepX, stepY }))
 			{
 				normalList[i]->beginWalk({ stepX, stepY });
 				normalList[i]->walkTime = normalList[i]->getTime() + std::abs(rand()) % NPC_WALK_INTERVAL_RANGE;
@@ -354,13 +375,13 @@ void NPCManager::npcAutoAction()
 	}
 	for (size_t i = 0; i < friendUpdateList.size(); i++)
 	{
-		NPC * e = nullptr;
+		std::shared_ptr<NPC> e = nullptr;
 		int distance = -1;
 		for (size_t j = 0; j < enemyList.size(); j++)
 		{
 			if (friendUpdateList[i]->canView(enemyList[j]->position))
 			{
-				int temp = gm->map.calDistance(friendUpdateList[i]->position, enemyList[j]->position);
+				int temp = gm->map->calDistance(friendUpdateList[i]->position, enemyList[j]->position);
 				if (distance == -1 || temp < distance)
 				{
 					distance = temp;
@@ -372,7 +393,7 @@ void NPCManager::npcAutoAction()
 		{
 			if (friendUpdateList[i]->canView(neutralList[j]->position))
 			{
-				int temp = gm->map.calDistance(friendUpdateList[i]->position, neutralList[j]->position);
+				int temp = gm->map->calDistance(friendUpdateList[i]->position, neutralList[j]->position);
 				if (distance == -1 || temp < distance)
 				{
 					distance = temp;
@@ -402,13 +423,13 @@ void NPCManager::npcAutoAction()
 	}
 	for (size_t i = 0; i < enemyUpdateList.size(); i++)
 	{
-		NPC * e = nullptr;
+		std::shared_ptr<NPC> e = nullptr;
 		int distance = -1;
 		for (size_t j = 0; j < friendList.size(); j++)
 		{
 			if (enemyUpdateList[i]->canView(friendList[j]->position))
 			{
-				int temp = gm->map.calDistance(enemyUpdateList[i]->position, friendList[j]->position);
+				int temp = gm->map->calDistance(enemyUpdateList[i]->position, friendList[j]->position);
 				if (distance == -1 || temp < distance)
 				{
 					distance = temp;
@@ -420,7 +441,7 @@ void NPCManager::npcAutoAction()
 		{
 			if (enemyUpdateList[i]->canView(neutralList[j]->position))
 			{
-				int temp = gm->map.calDistance(enemyUpdateList[i]->position, neutralList[j]->position);
+				int temp = gm->map->calDistance(enemyUpdateList[i]->position, neutralList[j]->position);
 				if (distance == -1 || temp < distance)
 				{
 					distance = temp;
@@ -450,13 +471,13 @@ void NPCManager::npcAutoAction()
 	}
 	for (size_t i = 0; i < neutralUpdateList.size(); i++)
 	{
-		NPC * e = nullptr;
+		std::shared_ptr<NPC> e = nullptr;
 		int distance = -1;
 		for (size_t j = 0; j < enemyList.size(); j++)
 		{
 			if (neutralUpdateList[i]->canView(enemyList[j]->position))
 			{
-				int temp = gm->map.calDistance(neutralUpdateList[i]->position, enemyList[j]->position);
+				int temp = gm->map->calDistance(neutralUpdateList[i]->position, enemyList[j]->position);
 				if (distance == -1 || temp < distance)
 				{
 					distance = temp;
@@ -468,7 +489,7 @@ void NPCManager::npcAutoAction()
 		{
 			if (neutralUpdateList[i]->canView(friendList[j]->position))
 			{
-				int temp = gm->map.calDistance(neutralUpdateList[i]->position, friendList[j]->position);
+				int temp = gm->map->calDistance(neutralUpdateList[i]->position, friendList[j]->position);
 				if (distance == -1 || temp < distance)
 				{
 					distance = temp;
@@ -541,7 +562,7 @@ void NPCManager::draw(Point tile, Point cenTile, Point cenScreen, PointEx offset
 {
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
-		if (npcList[i] != nullptr && npcList[i]->position.x == tile.x && npcList[i]->position.y == tile.y)
+		if (npcList[i] != nullptr && npcList[i]->position == tile)
 		{
 			
 			Point pos = Map::getTilePosition(tile, cenTile, cenScreen, offset);
@@ -588,7 +609,7 @@ void NPCManager::setPartnerPos(int x, int y, int dir)
 			{
 				dir -= 8;
 			}
-			npcList[i]->position = gm->map.getSubPoint({ x, y }, dir);
+			npcList[i]->position = gm->map->getSubPoint({ x, y }, dir);
 
 		}
 	}
@@ -599,7 +620,7 @@ void NPCManager::clearNPC()
 	gm->partnerManager.loadPartner();
 	freeResource();
 	gm->partnerManager.addPartner();
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 	clearActionImageList();
 	gm->player->reloadAction();
 	for (size_t i = 0; i < npcList.size(); i++)
@@ -611,7 +632,7 @@ void NPCManager::clearNPC()
 void NPCManager::clearAllNPC()
 {
 	freeResource();
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 	gm->player->reloadAction();
 }
 
@@ -625,10 +646,11 @@ void NPCManager::clearSelected()
 		}
 	}
 }
-void NPCManager::removeNPC(NPC * npc)
+
+void NPCManager::removeNPCOnlyFromList(std::shared_ptr<NPC> npc)
 {
 	if (npc == nullptr) { return; }
-	for (int i = 0; i < npcList.size(); ++i) {
+	for (size_t i = 0; i < npcList.size(); ++i) {
 		if (npcList[i] == npc)
 		{
 			npcList.erase(npcList.begin() + i);
@@ -645,7 +667,7 @@ void NPCManager::deleteNPC(std::vector<int> idx)
 	{
 		return;
 	}
-	std::vector<NPC*> newList, deleteList;
+	std::vector<std::shared_ptr<NPC>> newList;
 	newList.resize(0);
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
@@ -662,39 +684,37 @@ void NPCManager::deleteNPC(std::vector<int> idx)
 		{
 			if (npcList[i] != nullptr)
 			{
-				deleteList.push_back(npcList[i]);
-			}		
+				deleteNPCFromOtherPlace(npcList[i]);
+				npcList[i] = nullptr;
+			}
 		}
 		else
 		{
 			newList.push_back(npcList[i]);
 		}
 	}
-	for (size_t i = 0; i < deleteList.size(); i++)
-	{
-		delete deleteList[i];
-	}
 	npcList = newList;
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 }
 
 void NPCManager::deleteNPC(int idx)
 {
-	if (idx >= 0 && idx < npcList.size())
+	if (idx >= 0 && idx < (int)npcList.size())
 	{
 		auto npc = npcList[idx];
 		npcList.erase(npcList.begin() + idx);
 		if (npc != nullptr)
 		{
-			delete npc;
+			deleteNPCFromOtherPlace(npc);
+			npc = nullptr;
 		}
 	}
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 }
 
 void NPCManager::deleteNPC(std::string nName)
 {
-	std::vector<NPC *> newList, deleteList;
+	std::vector<std::shared_ptr<NPC>> newList;
 	newList.resize(0);
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
@@ -702,7 +722,8 @@ void NPCManager::deleteNPC(std::string nName)
 		{
 			if (npcList[i] != nullptr)
 			{
-				deleteList.push_back(npcList[i]);
+				deleteNPCFromOtherPlace(npcList[i]);
+				npcList[i] = nullptr;
 			}		
 		}
 		else
@@ -710,17 +731,13 @@ void NPCManager::deleteNPC(std::string nName)
 			newList.push_back(npcList[i]);
 		}
 	}
-	for (size_t i = 0; i < deleteList.size(); i++)
-	{
-		delete deleteList[i];
-	}
 	npcList = newList;
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 }
 
 void NPCManager::addNPC(std::string iniName, int x, int y, int dir)
 {
-	auto npc = new NPC;
+	auto npc = std::make_shared<NPC>();
 	npcList.push_back(npc);
 	npc->npcIndex = npcList.size();
 	std::string iniN = NPC_INI_FOLDER + iniName;
@@ -735,10 +752,10 @@ void NPCManager::addNPC(std::string iniName, int x, int y, int dir)
 	npc->position.y = y;
 	npc->direction = dir;
 	addChild(npc);
-	gm->map.addNPCToDataMap(npc->position, npcList.size());
+	gm->map->addNPCToDataMap(npc->position, npcList.size());
 }
 
-void NPCManager::addNPC(NPC * npc)
+void NPCManager::addNPC(std::shared_ptr<NPC> npc)
 {
 	if (npc == nullptr)
 	{
@@ -748,36 +765,32 @@ void NPCManager::addNPC(NPC * npc)
 	npc->beginStand();
 	npcList.push_back(npc);
 	npc->npcIndex = npcList.size();
-	gm->map.addNPCToDataMap(npc->position, npcList.size());
+	gm->map->addNPCToDataMap(npc->position, npcList.size());
 }
 
 void NPCManager::freeResource()
 {
-	removeAllChild();
-	auto deleteList = npcList;
-	for (size_t i = 0; i < deleteList.size(); i++)
+	for (size_t i = 0; i < npcList.size(); i++)
 	{
-		if (deleteList[i] != nullptr)
+		if (npcList[i] != nullptr)
 		{
-			delete deleteList[i];
+			deleteNPCFromOtherPlace(npcList[i]);
+			npcList[i] = nullptr;
 		}
 	}
+	removeAllChild();
 	npcList.resize(0);
 	clearActionImageList();
 }
 
 void NPCManager::clearActionImageList()
 {
-	for (size_t i = 0; i < actionImageList.size(); i++)
+	for (auto iter = actionImageList.begin(); iter != actionImageList.end(); iter++)
 	{
-		if (actionImageList[i].image != nullptr)
-		{
-			IMP::clearIMPImage(actionImageList[i].image);
-			//delete actionImageList[i].image;
-			actionImageList[i].image = nullptr;
-		}
+		iter->second = nullptr;
 	}
-	actionImageList.resize(0);
+
+	actionImageList.clear();
 }
 
 _shared_imp NPCManager::loadActionImage(const std::string & imageName)
@@ -786,19 +799,16 @@ _shared_imp NPCManager::loadActionImage(const std::string & imageName)
 	{
 		return nullptr;
 	}
-	for (size_t i = 0; i < actionImageList.size(); i++)
+	auto img = actionImageList.find(imageName);
+	if (img != actionImageList.end())
 	{
-		if (actionImageList[i].name == imageName)
-		{
-			return actionImageList[i].image;
-		}
+		return img->second;
 	}
-	ActionImage actImg;
-	actImg.name = imageName;
+
 	std::string tempName = NPC_RES_FOLDER + imageName;
-	actImg.image = IMP::createIMPImage(tempName);
-	actionImageList.push_back(actImg);
-	return actImg.image;
+	_shared_imp actImg = IMP::createIMPImage(tempName);
+	actionImageList[imageName] = actImg;
+	return actImg;
 }
 
 void NPCManager::load(const std::string & fileName)
@@ -824,7 +834,7 @@ void NPCManager::load(const std::string & fileName)
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("NPC%03d", i);
-		auto npc = new NPC;
+		auto npc = std::make_shared<NPC>();
 		npc->initFromIni(&ini, section);
 		addChild(npc);
 		npcList.push_back(npc);
@@ -860,8 +870,7 @@ void NPCManager::save(const std::string & fileName)
 		}
 		
 	}
-	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
-	ini.saveToFile(iniName);
+	ini.saveToFile(SaveFileManager::CurrentPath() + fileName);
 
 	SaveFileManager::AppendFile(fileName);
 }

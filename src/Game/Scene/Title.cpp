@@ -27,26 +27,23 @@ void Title::playTitleBGM()
 
 void Title::init()
 {
-	initFromIni(R"(ini\ui\title\window.ini)");
-	initBtn = addButton(R"(ini\ui\title\initbtn.ini)");
-	exitBtn = addButton(R"(ini\ui\title\exitbtn.ini)");
-	loadBtn = addButton(R"(ini\ui\title\loadbtn.ini)");
-	teamBtn = addButton(R"(ini\ui\title\teambtn.ini)");
+	initFromIniFileName(u8"ini\\ui\\title\\window.ini");
+	initBtn = addComponent<Button>(u8"ini\\ui\\title\\initbtn.ini");
+	exitBtn = addComponent<Button>(u8"ini\\ui\\title\\exitbtn.ini");
+	loadBtn = addComponent<Button>(u8"ini\\ui\\title\\loadbtn.ini");
+	teamBtn = addComponent<Button>(u8"ini\\ui\\title\\teambtn.ini");
 	initBtn->stretch = true;
 	exitBtn->stretch = true;
 	loadBtn->stretch = true;
 	teamBtn->stretch = true;
-	weather = new Weather;
+	weather = std::make_shared<Weather>();
 	weather->priority = epMax;
 	addChild(weather);
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(R"(mpc\ui\title\title.png)", s);
+	int len = PakFile::readFile(u8"mpc\\ui\\title\\title.png", s);
 	if (len > 0)
 	{ 
 		impImage = make_shared_imp();
@@ -59,22 +56,14 @@ void Title::init()
 
 void Title::freeResource()
 {
-	delete initBtn;
 	initBtn = nullptr;
-	delete exitBtn;
 	exitBtn = nullptr;
-	delete loadBtn;
 	loadBtn = nullptr;
-	delete teamBtn;
 	teamBtn = nullptr;
-	delete weather;
 	weather = nullptr;
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	result = erNone;
 	removeAllChild();
 }
@@ -110,9 +99,9 @@ void Title::onEvent()
 	{
         weather->fadeOut();
 		engine->stopBGM();
-		auto tt = new TitleTeam;
+		auto tt = std::make_shared<TitleTeam>();
 		tt->run();
-		delete tt;
+		tryCleanRes();
 		playTitleBGM();
         weather->fadeInEx();
 	}
@@ -121,20 +110,23 @@ void Title::onEvent()
 		weather->fadeOut();
 		engine->stopBGM();
 		//重新开始
-		auto ms = new MainScene(0);
+		auto ms = std::make_shared<MainScene>(0);
 		auto ret = ms->run();
-		delete ms;
 		if (ret & erExit)
 		{
 			running = false;
 		}
-		playTitleBGM();
-		weather->fadeInEx();
+		else
+		{
+			tryCleanRes();
+			playTitleBGM();
+			weather->fadeInEx();
+		}
 	}
 	if (loadBtn != nullptr && loadBtn->getResult(erClick))
 	{
 		//读取进度
-		auto sl = new SaveLoad(false, true);
+		auto sl = std::make_shared<SaveLoad>(false, true);
 		addChild(sl);
 		sl->priority = 0;
 		unsigned int ret = sl->run();
@@ -142,18 +134,18 @@ void Title::onEvent()
 		{
 			weather->fadeOut();
 			engine->stopBGM();
-			auto ms = new MainScene(sl->index + 1);
+			auto ms = std::make_shared<MainScene>(sl->index + 1);
 			ret = ms->run();
-			delete ms;
 			if (ret & erExit)
 			{
 				running = false;
 			}
+			tryCleanRes();
 			playTitleBGM();
 			weather->fadeInEx();
 		}
 		removeChild(sl);
-		delete sl;	
+		sl = nullptr;
 	}
 }
 
@@ -170,24 +162,18 @@ void Title::onExit()
 
 void Title::onRun()
 {
-	auto vp = new VideoPage("video\\logo.avi");
+	auto vp = std::make_shared<VideoPage>("video\\logo.avi");
 	vp->run();
-	delete vp;
-	vp = new VideoPage("video\\title.avi");
+	vp = std::make_shared<VideoPage>("video\\title.avi");
 	vp->run();
-	delete vp;
 	playTitleBGM();
 }
 
-bool Title::onHandleEvent(AEvent * e)
+bool Title::onHandleEvent(AEvent & e)
 {
-	if (e == nullptr)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		return false;
-	}
-	if (e->eventType == ET_KEYDOWN)
-	{
-		if (e->eventData == KEY_F)
+		if (e.eventData == KEY_F)
 		{	
 			if (engine->getKeyPress(KEY_LCTRL) || engine->getKeyPress(KEY_RCTRL))
 			{ 
@@ -195,7 +181,7 @@ bool Title::onHandleEvent(AEvent * e)
 				return true;
 			}
 		}
-		if (e->eventData == KEY_M)
+		if (e.eventData == KEY_M)
 		{
 			if (engine->getKeyPress(KEY_LCTRL) || engine->getKeyPress(KEY_RCTRL))
 			{
@@ -204,7 +190,7 @@ bool Title::onHandleEvent(AEvent * e)
 			}
 		}
 	}
-	else if (e->eventType == ET_QUIT)
+	else if (e.eventType == ET_QUIT)
 	{
 		running = false;
 		return true;

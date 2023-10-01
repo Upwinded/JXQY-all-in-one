@@ -32,6 +32,7 @@ void Label::setStr(const std::string & s)
 		strImage.resize(0);
 
 		int length = rect.w / fontSize;
+
 		if (autoNextLine)
 		{
 			auto newstrs = convert::splitString(str, "<enter>");//length);
@@ -43,7 +44,7 @@ void Label::setStr(const std::string & s)
 					auto strs2 = convert::splitString(newstrs[i], length);
 					for (size_t j = 0; j < strs2.size(); j++)
 					{
-						engine->drawSolidText(strs2[j], 0, count * fontSize, fontSize, color);
+						engine->drawTalk(strs2[j], 0, count * fontSize, fontSize, color);
 						count++;
 					}
 				}
@@ -65,18 +66,13 @@ void Label::onMouseLeftDown(int x, int y)
 	if (parent != nullptr && parent->canCallBack)
 	{
 		result |= erMouseLDown;
-		parent->onChildCallBack(this);
+		parent->onChildCallBack(getMySharedPtr());
 	}
 }
 
 void Label::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
 	for (size_t i = 0; i < strImage.size(); i++)
 	{
 		if (strImage[i] != nullptr)

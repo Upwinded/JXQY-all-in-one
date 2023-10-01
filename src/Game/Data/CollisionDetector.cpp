@@ -1,33 +1,34 @@
 #include "CollisionDetector.h"
 #include "../GameManager/GameManager.h"
 
+
 void CollisionDetector::detectCollision()
 {
-	std::vector<NPC *> collisionList;
+	std::vector<std::shared_ptr<NPC>> collisionList;
 	if (gm->player->nowAction != acHide && gm->player->nowAction != acDeath)
 	{
 		collisionList.push_back(gm->player);
 	}
-	for (size_t i = 0; i < gm->npcManager.npcList.size(); i++)
+	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
 	{
-		if (gm->npcManager.npcList[i] != nullptr && gm->npcManager.npcList[i]->kind == nkBattle)
+		if (gm->npcManager->npcList[i].get() != nullptr && gm->npcManager->npcList[i]->kind == nkBattle)
 		{
-			collisionList.push_back(gm->npcManager.npcList[i]);
+			collisionList.push_back(gm->npcManager->npcList[i]);
 		}
 	}
-	for (size_t i = 0; i < gm->effectManager.effectList.size(); i++)
+	for (size_t i = 0; i < gm->effectManager->effectList.size(); i++)
 	{
-		if (gm->effectManager.effectList[i] != nullptr && gm->effectManager.effectList[i]->doing == ekFlying ||
-			gm->effectManager.effectList[i] != nullptr && gm->effectManager.effectList[i]->doing == ekThrowing)
+		if (gm->effectManager->effectList[i].get() != nullptr && gm->effectManager->effectList[i]->doing == ekFlying ||
+			gm->effectManager->effectList[i].get() != nullptr && gm->effectManager->effectList[i]->doing == ekThrowing)
 		{
 			bool collided = false;
-			for (size_t j = 0; j < gm->effectManager.effectList[i]->passPath.size(); j++)
+			for (size_t j = 0; j < gm->effectManager->effectList[i]->passPath.size(); j++)
 			{
-				if (gm->effectManager.effectList[i] != nullptr && gm->effectManager.effectList[i]->doing != ekThrowing)
+				if (gm->effectManager->effectList[i].get() != nullptr && gm->effectManager->effectList[i]->doing != ekThrowing)
 				{
 					for (int k = 0; k < (int)collisionList.size(); k++)
 					{
-						if (gm->npcManager.findNPC(collisionList[k]) && detectCollisionPass(collisionList[k], gm->effectManager.effectList[i], j))
+						if (gm->npcManager->findNPC(collisionList[k]) && detectCollisionPass(collisionList[k], gm->effectManager->effectList[i], gm->effectManager->effectList[i]->passPath[j]))
 						{
 							collided = true;
 							break;
@@ -37,22 +38,22 @@ void CollisionDetector::detectCollision()
 				
 				if (!collided)
 				{
-					if (!gm->map.canFly(gm->effectManager.effectList[i]->passPath[j]))
+					if (!gm->map->canFly(gm->effectManager->effectList[i]->passPath[j]))
 					{
-						gm->effectManager.effectList[i]->position = gm->effectManager.effectList[i]->passPath[j];
-						gm->effectManager.effectList[i]->beginExplode();
+						gm->effectManager->effectList[i]->beginExplode(gm->effectManager->effectList[i]->passPath[j]);
 						collided = true;
+						break;
 					}
 				}
 			}
 
 			if (!collided)
 			{
-				if (gm->effectManager.effectList[i] != nullptr && gm->effectManager.effectList[i]->doing != ekThrowing)
+				if (gm->effectManager->effectList[i].get() != nullptr && gm->effectManager->effectList[i]->doing != ekThrowing)
 				{
 					for (int j = 0; j < (int)collisionList.size(); j++)
 					{
-						if (gm->npcManager.findNPC(collisionList[j]) && detectCollision(collisionList[j], gm->effectManager.effectList[i]))
+						if (gm->npcManager->findNPC(collisionList[j]) && detectCollision(collisionList[j], gm->effectManager->effectList[i]))
 						{
 							collided = true;
 							break;
@@ -62,9 +63,9 @@ void CollisionDetector::detectCollision()
 
 				if (!collided)
 				{
-					if (!gm->map.canFly(gm->effectManager.effectList[i]->position))
+					if (!gm->map->canFly(gm->effectManager->effectList[i]->position))
 					{
-						gm->effectManager.effectList[i]->beginExplode();
+						gm->effectManager->effectList[i]->beginExplode(gm->effectManager->effectList[i]->position);
 					}
 				}
 			}					
@@ -72,7 +73,7 @@ void CollisionDetector::detectCollision()
 	}
 }
 
-bool CollisionDetector::detectCollision(NPC * npc, Effect * effect)
+bool CollisionDetector::detectCollision(std::shared_ptr<NPC> npc, std::shared_ptr<Effect> effect)
 {
 	if (npc == gm->player)
 	{
@@ -80,7 +81,7 @@ bool CollisionDetector::detectCollision(NPC * npc, Effect * effect)
 		{
 			if (effect->checkCollide(npc))
 			{
-				effect->beginExplode();
+				effect->beginExplode(npc->position);
 				npc->hurt(effect);
 				return true;
 			}
@@ -96,7 +97,7 @@ bool CollisionDetector::detectCollision(NPC * npc, Effect * effect)
 			{
 				if (effect->checkCollide(npc))
 				{
-					effect->beginExplode();			
+					effect->beginExplode(npc->position);			
 					npc->hurt(effect);
 					
 					return true;
@@ -110,7 +111,7 @@ bool CollisionDetector::detectCollision(NPC * npc, Effect * effect)
 			{
 				if (effect->checkCollide(npc))
 				{
-					effect->beginExplode();
+					effect->beginExplode(npc->position);
 
 					npc->hurt(effect);
 					return true;
@@ -130,17 +131,15 @@ bool CollisionDetector::detectCollision(NPC * npc, Effect * effect)
 	return false;
 }
 
-bool CollisionDetector::detectCollisionPass(NPC * npc, Effect * effect, int idx)
+bool CollisionDetector::detectCollisionPass(std::shared_ptr<NPC> npc, std::shared_ptr<Effect> effect, Point pos)
 {
 	if (npc == gm->player)
 	{
 		if (effect->launcherKind == lkEnemy)
 		{
-			if (npc->position.x == effect->passPath[idx].x && npc->position.y == effect->passPath[idx].y)
+			if (npc->position == pos)
 			{
-				effect->position = effect->passPath[idx];
-				effect->offset = { 0, 0 };
-				effect->beginExplode();
+				effect->beginExplode(npc->position);
 				npc->hurt(effect);
 				return true;
 			}
@@ -154,11 +153,9 @@ bool CollisionDetector::detectCollisionPass(NPC * npc, Effect * effect, int idx)
 		{
 			if (effect->launcherKind == lkEnemy)
 			{
-				if (npc->position.x == effect->passPath[idx].x && npc->position.y == effect->passPath[idx].y)
+				if (npc->position == pos)
 				{
-					effect->position = effect->passPath[idx];
-					effect->offset = { 0, 0 };
-					effect->beginExplode();
+					effect->beginExplode(npc->position);
 					npc->hurt(effect);
 
 					return true;
@@ -170,11 +167,9 @@ bool CollisionDetector::detectCollisionPass(NPC * npc, Effect * effect, int idx)
 		{
 			if (effect->launcherKind == lkSelf || effect->launcherKind == lkFriend)
 			{
-				if (npc->position.x == effect->passPath[idx].x && npc->position.y == effect->passPath[idx].y)
+				if (npc->position == pos)
 				{
-					effect->position = effect->passPath[idx];
-					effect->offset = { 0, 0 };
-					effect->beginExplode();
+					effect->beginExplode(npc->position);
 					npc->hurt(effect);
 					return true;
 				}

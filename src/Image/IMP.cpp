@@ -41,13 +41,13 @@ unsigned int IMP::getIMPImageActionTime(_shared_imp impImage)
 	return impImage->interval * framePerDirection;
 }
 
-bool IMP::loadIMPImage(_shared_imp impImage, const std::string & fileName)
+bool IMP::loadIMPImage(_shared_imp impImage, const std::string & fileName, bool directlyLoad)
 {
 	std::unique_ptr<char[]> data;
 	int size = PakFile::readFile(fileName, data);
 	if (size > 0)
 	{
-		if (loadIMPImageFromMem(impImage, data, size))
+		if (loadIMPImageFromMem(impImage, data, size, directlyLoad))
 		{
 			return true;
 		}
@@ -55,7 +55,7 @@ bool IMP::loadIMPImage(_shared_imp impImage, const std::string & fileName)
 	return false;
 }
 
-bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size)
+bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size, bool directlyLoad)
 {
 	int imageHeadLen = imgHeadLen + 4 * 3 + 4 * imageNullLen;
 	if (impImage == nullptr || data == nullptr || size < imageHeadLen)
@@ -91,7 +91,7 @@ bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& dat
 	size -= imageHeadLen;
 	
 	impImage->frame.resize(frameCount);
-	for (int i = 0; i < impImage->frame.size(); i++)
+	for (size_t i = 0; i < impImage->frame.size(); i++)
 	{
 		if (size >= 4 * 3 + 4 * frameNullLen)
 		{
@@ -101,7 +101,7 @@ bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& dat
 			data_ptr += 4;
 			memcpy(&impImage->frame[i].yOffset, data_ptr, 4);
 			data_ptr += 4;
-			for (int j = 0; j < frameNullLen; j++)
+			for (size_t j = 0; j < frameNullLen; j++)
 			{
 				memcpy(&impImage->frame[i].frameNull[j], data_ptr, 4);
 				data_ptr += 4;
@@ -125,6 +125,12 @@ bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& dat
 					memcpy(&impImage->frame[i].data[0], data_ptr, impImage->frame[i].dataLen);
 					size -= impImage->frame[i].dataLen;
 					data_ptr += impImage->frame[i].dataLen;
+					if (directlyLoad)
+					{
+						impImage->frame[i].image = Engine::getInstance()->loadImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen);
+						impImage->frame[i].data = nullptr;
+						impImage->frame[i].dataLen = 0;
+					}
 				}
 			}
 			else
@@ -146,7 +152,7 @@ bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& dat
 	return true;
 }
 
-bool IMP::loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName)
+bool IMP::loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName, bool directlyLoad)
 {
 	if (impImage == nullptr)
 	{
@@ -160,7 +166,7 @@ bool IMP::loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName
 
 		if (File::readFile(fileName, data, size))
 		{
-			bool result = loadIMPImageFromMem(impImage, data, size);
+			bool result = loadIMPImageFromMem(impImage, data, size, directlyLoad);
 			return result;
 		}
 		return false;
@@ -168,13 +174,13 @@ bool IMP::loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName
 	return false;
 }
 
-bool IMP::loadIMPImageFromPak(_shared_imp impImage, const std::string & fileName, const std::string & pakName, bool firstReadPak)
+bool IMP::loadIMPImageFromPak(_shared_imp impImage, const std::string & fileName, const std::string & pakName, bool directlyLoad, bool firstReadPak)
 {
 	std::unique_ptr<char[]> data;
 	int size;
 	if (PakFile::readFile(fileName, data, size, pakName, firstReadPak) > 0)
 	{
-		if (loadIMPImageFromMem(impImage, data, size))
+		if (loadIMPImageFromMem(impImage, data, size, directlyLoad))
 		{
 			return true;
 		}
@@ -197,7 +203,7 @@ void IMP::copyIMPImage(_shared_imp dst, _shared_imp src)
 			dst->imageNull[i] = src->imageNull[i];
 		}
 		dst->frame.resize(dst->frame.size());
-		for (int i = 0; i < dst->frame.size(); i++)
+		for (size_t i = 0; i < dst->frame.size(); i++)
 		{
 			dst->frame[i].dataLen = src->frame[i].dataLen;
 			dst->frame[i].xOffset = src->frame[i].xOffset;
@@ -229,7 +235,7 @@ void IMP::copyIMPImage(_shared_imp dst, _shared_imp src)
 	}
 }
 
-_shared_imp IMP::createIMPImageFromFile(const std::string& fileName)
+_shared_imp IMP::createIMPImageFromFile(const std::string& fileName, bool directlyLoad)
 {
 	if (File::fileExist(fileName))
 	{
@@ -237,17 +243,17 @@ _shared_imp IMP::createIMPImageFromFile(const std::string& fileName)
 		int size;
 		if (File::readFile(fileName, data, size))
 		{
-			auto result = createIMPImageFromMem(data, size);
+			auto result = createIMPImageFromMem(data, size, directlyLoad);
 			return result;
 		}
 	}
 	return nullptr;
 }
 
-_shared_imp IMP::createIMPImage(const std::string & fileName)
+_shared_imp IMP::createIMPImage(const std::string & fileName, bool directlyLoad)
 {
 	auto impImage = make_shared_imp();
-	if (loadIMPImage(impImage, fileName))
+	if (loadIMPImage(impImage, fileName, directlyLoad))
 	{
 		return impImage;
 	}
@@ -257,22 +263,22 @@ _shared_imp IMP::createIMPImage(const std::string & fileName)
 	}
 }
 
-_shared_imp IMP::createIMPImage(unsigned int fileID)
+_shared_imp IMP::createIMPImage(unsigned int fileID, bool directlyLoad)
 {
 	std::unique_ptr<char[]> s;
 	int len = 0;
 	len = PakFile::readFile(fileID, s);
 	if (s != nullptr && len > 0)
 	{
-		return IMP::createIMPImageFromMem(s, len);
+		return IMP::createIMPImageFromMem(s, len, directlyLoad);
 	}
 	return nullptr;
 }
 
-_shared_imp IMP::createIMPImageFromPak(const std::string & fileName, const std::string & pakName, bool firstReadPak)
+_shared_imp IMP::createIMPImageFromPak(const std::string & fileName, bool directlyLoad, const std::string & pakName, bool firstReadPak)
 {
 	auto impImage = make_shared_imp();
-	if (loadIMPImageFromPak(impImage, fileName, pakName, firstReadPak))
+	if (loadIMPImageFromPak(impImage, fileName, pakName, directlyLoad, firstReadPak))
 	{
 		return impImage;
 	}
@@ -282,10 +288,10 @@ _shared_imp IMP::createIMPImageFromPak(const std::string & fileName, const std::
 	}
 }
 
-_shared_imp IMP::createIMPImageFromMem(std::unique_ptr<char[]>& data, int size)
+_shared_imp IMP::createIMPImageFromMem(std::unique_ptr<char[]>& data, int size, bool directlyLoad)
 {
 	auto impImage = make_shared_imp();
-	if (loadIMPImageFromMem(impImage, data, size))
+	if (loadIMPImageFromMem(impImage, data, size, directlyLoad))
 	{
 		return impImage;
 	}
@@ -313,7 +319,7 @@ _shared_imp IMP::createIMPImageFromImage(_shared_image img)
 	return impImage;
 }
 
-_shared_imp IMP::createIMPImageFromPNG(std::string pngName)
+_shared_imp IMP::createIMPImageFromPNG(std::string pngName, bool directlyLoad)
 {
 	std::unique_ptr<char[]> s;
 	auto len = PakFile::readFile(pngName, s);
@@ -330,6 +336,12 @@ _shared_imp IMP::createIMPImageFromPNG(std::string pngName)
 	impImage->frame[0].image = nullptr;
 	impImage->frame[0].xOffset = 0;
 	impImage->frame[0].yOffset = 0;
+	if (directlyLoad)
+	{
+		impImage->frame[0].image = Engine::getInstance()->loadImageFromMem(impImage->frame[0].data, impImage->frame[0].dataLen);
+		impImage->frame[0].dataLen = 0;
+		impImage->frame[0].data = nullptr;
+	}
 
 	return impImage;
 }
@@ -340,7 +352,7 @@ _shared_imp IMP::createIMPImageFromFrame(_shared_imp impImage, int index)
 	{
 		return nullptr;
 	}
-	if (index < 0 || index >= impImage->frame.size())
+	if (index < 0 || index >= (int)impImage->frame.size())
 	{
 		return nullptr;
 	}
@@ -496,7 +508,7 @@ _shared_image IMP::loadImageForDirection(_shared_imp impImage, int direction, UT
     }
     int index = 0;
 
-    bool end = (impImage->interval > 0) ? time / impImage->interval > framePerDirection : false;
+    bool end = (impImage->interval > 0) ? time / impImage->interval >= framePerDirection : false;
     if (end && once) {
         index = reverse ? 0 : framePerDirection - 1;
     }

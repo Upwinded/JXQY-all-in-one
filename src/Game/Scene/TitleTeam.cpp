@@ -20,7 +20,6 @@ void TitleTeam::freeResource()
 	if (vp != nullptr)
 	{
 		vp->freeResource();
-		delete vp;
 		vp = nullptr;
 	}
 	removeAllChild();
@@ -31,7 +30,7 @@ bool TitleTeam::onInitial()
 	freeResource();
 	int w = 0, h = 0;
 	engine->getWindowSize(w, h);
-	vp = new VideoPage("video\\team.avi");
+	vp = std::make_shared<VideoPage>("video\\team.avi");
 	vp->rect.w = w - 440;
 	vp->rect.x = 0;
 	vp->rect.y = 0;
@@ -53,18 +52,18 @@ void TitleTeam::onDraw()
 		color = 0xFFFFFF + (alpha << 24);
 	}
 
-	engine->drawText(convert::GBKToUTF8_InWinOnly("剑侠情缘All_in_One"), w - 410, 50, 45, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("引擎重制："), w - 410, 110, 30, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("Upwinded"), w - 300, 150, 26, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("特别感谢："), w - 410, 200, 30, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("偶像(Weyl、BT、scarsty、SB500)"), w - 410, 250, 26, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("小试刀剑"), w - 290, 300, 26, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("大武侠论坛(dawuxia.net)"), w - 385, 350, 26, color);
-	engine->drawText(convert::GBKToUTF8_InWinOnly("剑侠情缘贴吧"), w - 320, 400, 26, color);
+	engine->drawText(u8"剑侠情缘All_in_One", w - 410, 50, 45, color);
+	engine->drawText(u8"引擎重制：", w - 410, 110, 30, color);
+	engine->drawText(u8"Upwinded", w - 300, 150, 26, color);
+	engine->drawText(u8"特别感谢：", w - 410, 200, 30, color);
+	engine->drawText(u8"偶像(Weyl、BT、scarsty、SB500)", w - 410, 250, 26, color);
+	engine->drawText(u8"小试刀剑", w - 290, 300, 26, color);
+	engine->drawText(u8"大武侠论坛(dawuxia.net)", w - 385, 350, 26, color);
+	engine->drawText(u8"剑侠情缘贴吧", w - 320, 400, 26, color);
 
 }
 
-void TitleTeam::onChildCallBack(Element * child)
+void TitleTeam::onChildCallBack(PElement child)
 {
 	if (child != nullptr)
 	{
@@ -80,15 +79,11 @@ void TitleTeam::onExit()
 	freeResource();
 }
 
-bool TitleTeam::onHandleEvent(AEvent * e)
+bool TitleTeam::onHandleEvent(AEvent & e)
 {
-	if (e == nullptr)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		return false;
-	}
-	if (e->eventType == ET_KEYDOWN)
-	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			running = false;
 		}

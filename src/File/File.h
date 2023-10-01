@@ -3,12 +3,21 @@
 #include <string>
 #include <vector>
 #include "../Types/Types.h"
+extern "C"
+{
 #ifdef __APPLE__
 #include "SDL2/SDL.h"
 #else
 #include "SDL.h"
 #endif
+}
 #include "../libconvert/libconvert.h"
+
+#if (defined USE_TIME64)
+typedef Uint64 UTime;
+#else
+typedef Uint32 UTime;
+#endif
 
 namespace File
 {
@@ -18,6 +27,9 @@ namespace File
     //void readFile(const std::string& fileName, void* s, int len);
     void writeFile(const std::string& fileName, const void* s, int len);
     void writeFile(const std::string& fileName, const std::unique_ptr<char[]>& s, int len);
+    void appendFile(const std::string& fileName, const void* s, int len);
+    void appendFile(const std::string& fileName, const std::unique_ptr<char[]>& s, int len);
+
     void copy(const std::string & src, const std::string & dst);
 
     std::string getAssetsName(const std::string& fileName);

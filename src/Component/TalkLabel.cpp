@@ -22,12 +22,9 @@ TalkLabel::~TalkLabel()
 
 void TalkLabel::setTalkStr(TalkString& tString)
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	if (!engine->beginDrawTalk(rect.w, rect.h))
 	{
 		impImage = nullptr;
@@ -37,7 +34,7 @@ void TalkLabel::setTalkStr(TalkString& tString)
 	int y = 0;
 	for (size_t i = 0; i < tString.talkChar.size(); i++)
 	{
-		engine->drawSolidText(tString.talkChar[i].s, x * fontSize, y * fontSize, fontSize, tString.talkChar[i].color);
+		engine->drawTalk(tString.talkChar[i].s, x * fontSize, y * fontSize, fontSize, tString.talkChar[i].color);
 		x++;
 		if (x >= length)
 		{

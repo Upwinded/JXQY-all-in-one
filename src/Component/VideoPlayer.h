@@ -20,16 +20,16 @@ public:
 
 	void freeResource();
 
-#ifdef _MOBILE
-	Label skipLabel;
+#ifdef __MOBILE__
+	std::shared_ptr<Label> skipLabel = std::make_shared<Label>();
 #endif
 
 public:
-	virtual void onChildCallBack(Element * child);
+	virtual void onChildCallBack(PElement child);
 
 protected:
 
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 
 	virtual bool onInitial();
 	virtual void onExit();
@@ -38,7 +38,7 @@ protected:
 	virtual void onDraw();
 	virtual void onDrawDrag(int x, int y);
 	virtual void onClick();
-	virtual void onDragEnd(Element * dst, int x, int y);
+	virtual void onDragEnd(PElement dst, int x, int y);
 	virtual void onDragBegin(int * param1, int * param2);
 };
 

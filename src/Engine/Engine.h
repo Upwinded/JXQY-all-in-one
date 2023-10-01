@@ -42,8 +42,6 @@ private:
 	static int engineAppEventHandler(SDL_Event* event);
 public:
 
-	std::shared_ptr<std::mutex> mutex = std::make_shared<std::mutex>();
-
 	//初始化引擎
 	int init(std::string & windowCaption, int windowWidth, int windowHeight, bool isFullScreen);
 	//释放引擎
@@ -95,6 +93,7 @@ public:
 	_shared_image createNewImageFromImage(_shared_image image);
 	void drawImage(_shared_image image, int x, int y);
 	void drawImage(_shared_image image, Rect* src, Rect* dst);
+	void drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center);
 	void drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha);
 	void drawImageWithAlpha(_shared_image image, Rect *src, Rect * dst, unsigned char alpha);
 	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
@@ -119,14 +118,16 @@ public:
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
 	_shared_image createText(const std::string& text, int size, unsigned int color);
 	void drawText(const std::string& text, int x, int y, int size, unsigned int color);
-	_shared_image createUnicodeText(const std::wstring& text, int size, unsigned int color);
-	void drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
 
 	//保存字符串到图片子程序
 	bool beginDrawTalk(int w, int h);
 	_shared_image endDrawTalk();
-	void drawSolidText(const std::string& text, int x, int y, int size, unsigned int color);
+	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
 	void drawSolidUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
+private:
+	bool _talk_drawing = false;
+
+public:
 
 	//用于绘制屏幕遮盖，一般可用于夜晚、黄昏以及雷电等特殊情景的天色绘制
 	void setScreenMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
@@ -161,7 +162,6 @@ public:
 	int getEventCount();
 	int getEvent(AEvent& event);
 	void pushEvent(AEvent& event);
-	int readEventList(EventList& eList);
 	bool getKeyPress(KeyCode key);
 
 	bool getMousePressed(MouseButtonCode button);

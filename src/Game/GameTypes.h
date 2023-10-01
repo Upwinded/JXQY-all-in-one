@@ -99,7 +99,7 @@
 #define EFFECT_RES_FOLDER "mpc\\effect\\"
 
 //声音距离参数，数值越大衰减越大
-#define SOUND_FACTOR 3.0f
+#define SOUND_FACTOR 0.5f
 //声音最远距离
 #define SOUND_FAREST 10000.0f
 //NPC或OBJECT背景声音的播放间隔
@@ -226,7 +226,7 @@ struct MapHead
 
 struct MpcInfo
 {
-	char* name = nullptr;
+	std::unique_ptr<char[]> name = nullptr;
 	int index = 0;
 	int dynamic = 0;
 	int obstacle = 0;

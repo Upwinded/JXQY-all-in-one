@@ -68,7 +68,7 @@ void Player::updateLevel()
 		fullLife();
 		fullThew();
 		fullMana();
-		gm->menu.stateMenu->updateLabel();
+		gm->menu->stateMenu->updateLabel();
 	}
 }
 
@@ -94,25 +94,25 @@ void Player::setLevel(int lvl)
 	fullLife();
 	fullThew();
 	fullMana();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::fullLife()
 {
 	life = info.lifeMax;
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::fullThew()
 {
 	thew = info.thewMax;
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::fullMana()
 {
 	mana = info.manaMax;
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addLifeMax(int value)
@@ -120,7 +120,7 @@ void Player::addLifeMax(int value)
 	lifeMax += value;
 	calInfo();
 	fullLife();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addThewMax(int value)
@@ -128,7 +128,7 @@ void Player::addThewMax(int value)
 	thewMax += value;
 	calInfo();
 	fullThew();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addManaMax(int value)
@@ -136,7 +136,7 @@ void Player::addManaMax(int value)
 	manaMax += value;
 	calInfo();
 	fullMana();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addLife(int value)
@@ -147,7 +147,7 @@ void Player::addLife(int value)
     }
 	life += value;
 	limitAttribute();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 	if (life <= 0)
 	{
 		beginDie();
@@ -158,41 +158,41 @@ void Player::addThew(int value)
 {
 	thew += value;
 	limitAttribute();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addMana(int value)
 {
 	mana += value;
 	limitAttribute();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addAttack(int value)
 {
 	attack += value;
 	calInfo();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addDefend(int value)
 {
 	defend += value;
 	calInfo();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addEvade(int value)
 {
 	evade += value;
 	calInfo();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 void Player::addMoney(int value)
 {
 	money += value;
-	gm->menu.goodsMenu->updateMoney();
+	gm->menu->goodsMenu->updateMoney();
 }
 
 void Player::updateAction(UTime frameTime)
@@ -222,9 +222,9 @@ void Player::updateAction(UTime frameTime)
 		}
 		if (haveDest)
 		{
-			if (position.x != gotoExDest.x || position.y != gotoExDest.y)
+			if (position != gotoExDest)
 			{
-				if (gm->map.canWalk(gotoExDest))
+				if (gm->map->canWalk(gotoExDest))
 				{
 					beginWalk(gotoExDest);
 				}
@@ -296,13 +296,9 @@ void Player::updateAction(UTime frameTime)
 			if (stepState == ssIn)
 			{
 				stepList.erase(stepList.begin());
-				if (gm->map.haveTraps(position) && !gm->inEvent)
+				if (gm->map->haveTraps(position) && !gm->inEvent)
 				{
-					if (nextAction != nullptr)
-					{
-						delete nextAction;
-						nextAction = nullptr;
-					}
+					nextAction = nullptr;
 					if (isRunning())
 					{
 						recoveryTime = getUpdateTime();
@@ -311,12 +307,12 @@ void Player::updateAction(UTime frameTime)
 					actionBeginTime = stepBeginTime + stepLastTime;
 					beginStand();
 					offset = { 0, 0 };
-					gm->runTrapScript(gm->map.getTrapIndex(position));
+					gm->runTrapScript(gm->map->getTrapIndex(position));
 				}
 				else if (nextAction == nullptr && nextDest != ndNone
-				 && ((nextDest == ndAttack && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= attackRadius)
-					 || (nextDest == ndTalk && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= ((NPC *)destGE)->dialogRadius)
-					 || (nextDest == ndObj && gm->objectManager.findObj((Object *)destGE) && Map::calDistance(position, ((Object *)destGE)->position) <= 1)))
+				 && ((nextDest == ndAttack && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE)->position)) <= attackRadius)
+					 || (nextDest == ndTalk && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE)->position)) <= (std::dynamic_pointer_cast<NPC>(destGE))->dialogRadius)
+					 || (nextDest == ndObj && gm->objectManager->findObj(std::dynamic_pointer_cast<Object>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<Object>(destGE))->position) <= 1)))
 				{
 
 					int nd = nextDest;
@@ -324,14 +320,14 @@ void Player::updateAction(UTime frameTime)
 
 					if (nd == ndObj)
 					{
-						Object * tempObj = (Object *)destGE;
+						std::shared_ptr<Object> tempObj = std::dynamic_pointer_cast<Object>(destGE);
 						destGE = nullptr;
 						beginStand();
 						runObj(tempObj);
 					}
 					else
 					{
-						NPC * tempNPC = (NPC *)destGE;
+						std::shared_ptr<NPC> tempNPC = std::dynamic_pointer_cast<NPC>(destGE);
 						destGE = nullptr;
 						beginStand();
 						if (nd == ndAttack)
@@ -344,14 +340,14 @@ void Player::updateAction(UTime frameTime)
 						}
 					}			
 				}
-				else if (nextAction == nullptr && stepList.size() > 0 && gm->map.canWalk(stepList[0]))
+				else if (nextAction == nullptr && stepList.size() > 0 && gm->map->canWalk(stepList[0]))
 				{
 					if (isRunning() && thew < RUN_THEW_COST && !gm->inEvent)
 					{					
 						recoveryTime = getUpdateTime();
 						stepList.resize(0);
 						beginStand();
-						gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+						gm->showMessage(u8"体力不足！");
 					}
 					else
 					{
@@ -363,10 +359,10 @@ void Player::updateAction(UTime frameTime)
 
 							limitDir(&dir1);
 							limitDir(&dir2);
-							if (gm->map.canPass(gm->map.getSubPoint(position, dir1)) && gm->map.canPass(gm->map.getSubPoint(position, dir2)))
+							if (gm->map->canPass(gm->map->getSubPoint(position, dir1)) && gm->map->canPass(gm->map->getSubPoint(position, dir2)))
 							{
 								stepState = ssOut;
-								gm->map.addStepToDataMap(stepList[0], npcIndex);
+								gm->map->addStepToDataMap(stepList[0], npcIndex);
 								direction = calDirection(stepList[0]);
 								stepBeginTime += stepLastTime;
 								calStepLastTime();
@@ -389,7 +385,7 @@ void Player::updateAction(UTime frameTime)
 								thew -= RUN_THEW_COST;
 							}
 							stepState = ssOut;
-							gm->map.addStepToDataMap(stepList[0], npcIndex);
+							gm->map->addStepToDataMap(stepList[0], npcIndex);
 							direction = calDirection(stepList[0]);
 							stepBeginTime += stepLastTime;
 							calStepLastTime();
@@ -405,7 +401,7 @@ void Player::updateAction(UTime frameTime)
 						Point dest = nextAction->dest;
 						nextDest = nextAction->type;
 						destGE = nextAction->destGE;
-						delete nextAction;
+
 						nextAction = nullptr;
 						stepList.resize(0);
 						if (isRunning())
@@ -420,7 +416,7 @@ void Player::updateAction(UTime frameTime)
 						Point dest = nextAction->dest;
 						nextDest = nextAction->type;
 						destGE = nextAction->destGE;
-						delete nextAction;
+
 						nextAction = nullptr;
 						stepList.resize(0);
 						changeRun(dest);
@@ -438,10 +434,10 @@ void Player::updateAction(UTime frameTime)
 			}
 			else if (stepState == ssOut)
 			{
-				gm->map.deleteNPCFromDataMap(position, npcIndex);
-				gm->map.deleteStepFromDataMap(stepList[0], npcIndex);
+				gm->map->deleteNPCFromDataMap(position, npcIndex);
+				gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
 				position = stepList[0];
-				gm->map.addNPCToDataMap(position, npcIndex);
+				gm->map->addNPCToDataMap(position, npcIndex);
 				stepState = ssIn;
 				stepBeginTime += stepLastTime;
 				calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
@@ -472,23 +468,20 @@ void Player::updateAction(UTime frameTime)
 			if (jumpState != jsDown)
 			{
 				jumpState = jsDown;
-				gm->map.deleteNPCFromDataMap(position, npcIndex);
-				gm->map.deleteStepFromDataMap(stepList[0], npcIndex);
+				gm->map->deleteNPCFromDataMap(position, npcIndex);
+				gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
 				position = stepList[0];
 				offset = { 0.0, 0.0 };
 				stepList.resize(0);
-				gm->map.addNPCToDataMap(position, npcIndex);
+				gm->map->addNPCToDataMap(position, npcIndex);
 			}
 			recoveryTime = getUpdateTime();
 			beginStand();
-			if (gm->map.haveTraps(position))
+			if (gm->map->haveTraps(position))
 			{
-				if (nextAction != nullptr)
-				{
-					delete nextAction;
-					nextAction = nullptr;
-				}
-				gm->runTrapScript(gm->map.getTrapIndex(position));
+				nextAction = nullptr;
+
+				gm->runTrapScript(gm->map->getTrapIndex(position));
 			}
 		}
 		else if (getUpdateTime() - actionBeginTime > 2 * actionLastTime / 3)
@@ -496,17 +489,17 @@ void Player::updateAction(UTime frameTime)
 			if (jumpState != jsDown)
 			{
 				jumpState = jsDown;
-				gm->map.deleteNPCFromDataMap(position, npcIndex);
-				gm->map.deleteStepFromDataMap(stepList[0], npcIndex);
+				gm->map->deleteNPCFromDataMap(position, npcIndex);
+				gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
 				position = stepList[0];
 				offset = { 0.0, 0.0 };				
 				stepList.resize(0);
-				gm->map.addNPCToDataMap(position, npcIndex);
+				gm->map->addNPCToDataMap(position, npcIndex);
 			}
 		}
 		else if (getUpdateTime() - actionBeginTime > actionLastTime / 3)
 		{
-			gm->map.deleteNPCFromDataMap(position, npcIndex);
+			gm->map->deleteNPCFromDataMap(position, npcIndex);
 			if (jumpState != jsJumping)
 			{			
 				updateJumpingPosition(getUpdateTime() - actionBeginTime - actionLastTime / 3, jumpSpeed);
@@ -516,7 +509,7 @@ void Player::updateAction(UTime frameTime)
 			{
 				updateJumpingPosition(frameTime, jumpSpeed);
 			}	
-			gm->map.addNPCToDataMap(position, npcIndex);
+			gm->map->addNPCToDataMap(position, npcIndex);
 		}
 		else
 		{
@@ -525,12 +518,12 @@ void Player::updateAction(UTime frameTime)
 	}
 	else if (nowAction == acAttack || nowAction == acAttack1 || nowAction == acAttack2 || nowAction == acSpecialAttack || nowAction == acMagic)
 	{
-		int tempActionLastTime = actionLastTime;
+		auto tempActionLastTime = actionLastTime;
 		if (gm->global.gameType == GAME_JXQY2)
 		{
 			tempActionLastTime = PLAYER_MAGIC_DELAY;
 		}
-		if (!attackDone && nowAction == acMagic && getUpdateTime() - actionBeginTime >= tempActionLastTime) //PLAYER_MAGIC_DELAY)
+		if (!attackDone && nowAction == acMagic && getUpdateTime() - actionBeginTime >= tempActionLastTime)
 		{
 			attackDone = true;
 			if (magicIndex >= 0)
@@ -585,7 +578,7 @@ void Player::updateAction(UTime frameTime)
 			}
 			else if (thew < SIT_THEW_COST)
 			{
-				gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+				gm->showMessage(u8"体力不足！");
 				beginStand();
 			}
 			else
@@ -611,7 +604,7 @@ void Player::updateAction(UTime frameTime)
 			}
 			else if (thew < SIT_THEW_COST)
 			{
-				gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+				gm->showMessage(u8"体力不足！");
 				beginStand();
 			}
 			else
@@ -672,29 +665,28 @@ void Player::onUpdate()
 {
 	auto ft = getFrameTime();
 	updateTime = getTime();
-	//printf("player nowAction:%d \n", nowAction);
+	//GameLog::write("player nowAction:%d \n", nowAction);
 	if (getResult() & erRunDeathScript)
 	{
 		if (!gm->inEvent)
 		{
-			gm->runNPCDeathScript(this, deathScript, gm->mapName);
+			gm->runNPCDeathScript(std::dynamic_pointer_cast<NPC>(getMySharedPtr()), deathScript, gm->mapName);
 		}
-		//防止bug，事件中屏蔽主角死亡
-		/*else
+		else
 		{		
 			EventInfo eventInfo;
-			eventInfo.npc = this;
+			eventInfo.npc = std::dynamic_pointer_cast<NPC>(getMySharedPtr());
             eventInfo.scriptName = deathScript;
             eventInfo.scriptMapName = gm->mapName;
 			gm->eventList.push_back(eventInfo);
-		}*/
+		}
 	}
 	if (shieldLife > 0)
 	{
 		if (getTime() - shieldBeginTime >= shieldLastTime)
 		{
 			shieldLife = 0;
-			gm->effectManager.deleteEffect(shieldEffect);
+			gm->effectManager->deleteEffect(shieldEffect);
 			shieldEffect = nullptr;
 		}
 		else
@@ -706,7 +698,7 @@ void Player::onUpdate()
 	else if (shieldEffect != nullptr)
 	{
 		shieldLife = 0;
-		gm->effectManager.deleteEffect(shieldEffect);
+		gm->effectManager->deleteEffect(shieldEffect);
 		shieldEffect = nullptr;
 	}
 
@@ -781,15 +773,15 @@ void Player::onUpdate()
                     }
                     else if (mana < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].manaCost)
                     {
-                        gm->showMessage(convert::GBKToUTF8_InWinOnly("内力不足！"));
+                        gm->showMessage(u8"内力不足！");
                     }
                     else if (thew < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].thewCost)
                     {
-                        gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+                        gm->showMessage(u8"体力不足！");
                     }
                     else if (life < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].lifeCost)
                     {
-                        gm->showMessage(convert::GBKToUTF8_InWinOnly("生命不足！"));
+                        gm->showMessage(u8"生命不足！");
                     }
                     else
                     {
@@ -827,7 +819,7 @@ void Player::onUpdate()
 			destGE = nullptr;
 			beginSpecial();
 		}
-		delete nextAction;
+
 		nextAction = nullptr;
 	}
 
@@ -843,23 +835,26 @@ void Player::freeResource()
 	offset = { 0, 0 };
 	npcMagic = nullptr;
 	npcMagic2 = nullptr;
+	if (gm != nullptr)
+	{
+		gm->magicManager.tryCleanAttackMagic();
+	}
 	followNPC = "";
 	freeNPCRes();
 	stepList.resize(0);
+
 	shieldLastTime = 0;
 	shieldBeginTime = 0;
 	shieldLife = 0;
 	shieldEffect = nullptr;
-	if (nextAction != nullptr)
-	{
-		delete nextAction;
-		nextAction = nullptr;
-	}
+
+	nextAction = nullptr;
+
 	fight = 0;
 	recoveryTime = getUpdateTime();
 }
 
-void Player::hurt(Effect * e)
+void Player::hurt(std::shared_ptr<Effect> e)
 {
 	if (nowAction == acDeath || nowAction == acHide || e == nullptr)
 	{
@@ -910,7 +905,7 @@ void Player::hurt(Effect * e)
 		else
 		{
 			int d = calDirection(atan2(e->flyingDirection.x, -e->flyingDirection.y));
-			Point fd = gm->map.getSubPoint(position, d);
+			Point fd = gm->map->getSubPoint(position, d);
 			if (rand() % 100 > evd)
 			{
 				if (!frozen && e->magic.level[e->level].moveKind == 2 && e->magic.level[e->level].specialKind == 1)
@@ -967,7 +962,7 @@ void Player::addExp(int aExp)
 void Player::levelUp()
 {
 	int imgIdx = rand() % 5;
-	Effect * e = new Effect;
+	std::shared_ptr<Effect> e = std::make_shared<Effect>();
 	e->level = 1;
 	e->magic.level[e->level].moveKind = mmkSelf;
 	e->magic.level[e->level].specialKind = -1;
@@ -998,34 +993,27 @@ void Player::levelUp()
 	e->flyingDirection = { 0, 0 };
 	e->position = gm->player->position;
 	e->offset = gm->player->offset;
-	gm->effectManager.addEffect(e);
+	gm->effectManager->addEffect(e);
 	e->beginTime = e->getTime();
-	gm->showMessage(convert::formatString(convert::GBKToUTF8_InWinOnly("%s的等级得到提升！").c_str(), npcName.c_str()));
+	gm->showMessage(convert::formatString(u8"%s的等级得到提升！", npcName.c_str()));
 }
 
-void Player::addNextAction(NextAction * act)
+void Player::addNextAction(NextAction& act)
 {
-	if (act == nullptr)
+
+	if (act.action == acRun || act.action == acWalk || act.action == acARun || act.action == acAWalk)
 	{
-		return;
-	}
-	if (act->action == acRun || act->action == acWalk || act->action == acARun || act->action == acAWalk)
-	{
-		if (act->type == ndNone && !gm->map.canWalk(act->dest))
+		if (act.type == ndNone && !gm->map->canWalk(act.dest))
 		{
 			return;
 		}
 	}
-	if (nextAction != nullptr)
-	{
-		delete nextAction;
-		nextAction = nullptr;
-	}
-	nextAction = new NextAction;
-	nextAction->action = act->action;
-	nextAction->dest = act->dest;
-	nextAction->type = act->type;
-	nextAction->destGE = act->destGE;
+
+	nextAction = nextAction = std::make_shared<NextAction>();
+	nextAction->action = act.action;
+	nextAction->dest = act.dest;
+	nextAction->type = act.type;
+	nextAction->destGE = act.destGE;
 }
 
 
@@ -1036,23 +1024,23 @@ void Player::changeWalk(Point dest)
 		return;
 	}
 	if (nextDest != ndNone && destGE != nullptr
-		&& ((nextDest == ndAttack && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= attackRadius)
-			|| (nextDest == ndTalk && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= ((NPC *)destGE)->dialogRadius)
-			|| (nextDest == ndObj && gm->objectManager.findObj((Object *)destGE) && Map::calDistance(position, ((Object *)destGE)->position) <= 1))) 
+		&& ((nextDest == ndAttack && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= attackRadius)
+			|| (nextDest == ndTalk && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= (std::dynamic_pointer_cast<NPC>(destGE))->dialogRadius)
+			|| (nextDest == ndObj && gm->objectManager->findObj(std::dynamic_pointer_cast<Object>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<Object>(destGE))->position) <= 1))) 
 	{
 		int nd = nextDest;
 		nextDest = ndNone;
 
 		if (nd == ndObj)
 		{
-			Object * tempObj = (Object *)destGE;
+			std::shared_ptr<Object> tempObj = std::dynamic_pointer_cast<Object>(destGE);
 			destGE = nullptr;
 			beginStand();
 			runObj(tempObj);
 		}
 		else
 		{
-			NPC * tempNPC = (NPC *)destGE;
+			std::shared_ptr<NPC> tempNPC = std::dynamic_pointer_cast<NPC>(destGE);
 			destGE = nullptr;
 			beginStand();
 			if (nd == ndAttack)
@@ -1067,7 +1055,7 @@ void Player::changeWalk(Point dest)
 	}
 	else
 	{
-		auto tempList = gm->map.getPath(position, dest);
+		auto tempList = gm->map->getPath(position, dest);
 		if (tempList.size() > 0)
 		{
 			stepList = tempList;
@@ -1076,7 +1064,7 @@ void Player::changeWalk(Point dest)
 			stepBeginTime += stepLastTime;
 			nowAction = acWalk;
 			calStepLastTime();
-			gm->map.addStepToDataMap(stepList[0], npcIndex);
+			gm->map->addStepToDataMap(stepList[0], npcIndex);
 			if (fight > 0 && canDoAction(acAWalk))
 			{
 				nowAction = acAWalk;
@@ -1104,23 +1092,23 @@ void Player::changeRun(Point dest)
 		return;
 	}
 	if (nextDest != ndNone && destGE != nullptr
-		&& ((nextDest == ndAttack && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= attackRadius)
-			|| (nextDest == ndTalk && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= ((NPC *)destGE)->dialogRadius)
-			|| (nextDest == ndObj && gm->objectManager.findObj((Object *)destGE) && Map::calDistance(position, ((Object *)destGE)->position) <= 1))) 
+		&& ((nextDest == ndAttack && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= attackRadius)
+			|| (nextDest == ndTalk && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= (std::dynamic_pointer_cast<NPC>(destGE))->dialogRadius)
+			|| (nextDest == ndObj && gm->objectManager->findObj(std::dynamic_pointer_cast<Object>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<Object>(destGE))->position) <= 1))) 
 	{
 		int nd = nextDest;
 		nextDest = ndNone;
 
 		if (nd == ndObj)
 		{
-			Object * tempObj = (Object *)destGE;
+			std::shared_ptr<Object> tempObj = std::dynamic_pointer_cast<Object>(destGE);
 			destGE = nullptr;
 			beginStand();
 			runObj(tempObj);
 		}
 		else
 		{
-			NPC * tempNPC = (NPC *)destGE;
+			std::shared_ptr<NPC> tempNPC = std::dynamic_pointer_cast<NPC>(destGE);
 			destGE = nullptr;
 			beginStand();
 			if (nd == ndAttack)
@@ -1135,14 +1123,14 @@ void Player::changeRun(Point dest)
 	}
 	else
 	{
-		auto tempList = gm->map.getPath(position, dest);
+		auto tempList = gm->map->getPath(position, dest);
 		if (tempList.size() > 0)
 		{
 			if (!gm->inEvent)
 			{
 				if (thew < RUN_THEW_COST)
 				{
-					gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+					gm->showMessage(u8"体力不足！");
 					if (isRunning())
 					{
 						recoveryTime = getUpdateTime();
@@ -1158,7 +1146,7 @@ void Player::changeRun(Point dest)
 			stepBeginTime += stepLastTime;
 			nowAction = acRun;
 			calStepLastTime();
-			gm->map.addStepToDataMap(stepList[0], npcIndex);
+			gm->map->addStepToDataMap(stepList[0], npcIndex);
 			if (fight > 0 && canDoAction(acARun))
 			{
 				nowAction = acARun;
@@ -1186,7 +1174,7 @@ void Player::standUp()
 	beginStand();
 }
 
-void Player::runObj(Object * obj)
+void Player::runObj(std::shared_ptr<Object> obj)
 {
 	if (obj == nullptr)
 	{
@@ -1201,7 +1189,7 @@ void Player::runObj(Object * obj)
 	}
 }
 
-void Player::talkTo(NPC * npc)
+void Player::talkTo(std::shared_ptr<NPC> npc)
 {
 	if (npc == nullptr)
 	{
@@ -1220,7 +1208,7 @@ void Player::talkTo(NPC * npc)
 	{
 		gm->runNPCScript(npc);
 	}
-	if (gm->npcManager.findNPC(npc) && npc->action == naNone && npc->isStanding())
+	if (gm->npcManager->findNPC(npc) && npc->action == naNone && npc->isStanding())
 	{
 		npc->direction = tempDir;
 	}
@@ -1259,23 +1247,23 @@ void Player::beginWalk(Point dest)
 		return;
 	}
 	if (nextDest != ndNone && destGE != nullptr
-		&& ((nextDest == ndAttack && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= attackRadius)
-			|| (nextDest == ndTalk && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= ((NPC *)destGE)->dialogRadius)
-			|| (nextDest == ndObj && gm->objectManager.findObj((Object *)destGE) && Map::calDistance(position, ((Object *)destGE)->position) <= 1))) 
+		&& ((nextDest == ndAttack && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= attackRadius)
+			|| (nextDest == ndTalk && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= (std::dynamic_pointer_cast<NPC>(destGE))->dialogRadius)
+			|| (nextDest == ndObj && gm->objectManager->findObj(std::dynamic_pointer_cast<Object>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<Object>(destGE))->position) <= 1))) 
 	{
 		int nd = nextDest;
 		nextDest = ndNone;
 
 		if (nd == ndObj)
 		{
-			Object * tempObj = (Object *)destGE;
+			std::shared_ptr<Object> tempObj = std::dynamic_pointer_cast<Object>(destGE);
 			destGE = nullptr;
 			beginStand();
 			runObj(tempObj);
 		}
 		else
 		{
-			NPC * tempNPC = (NPC *)destGE;
+			std::shared_ptr<NPC> tempNPC = std::dynamic_pointer_cast<NPC>(destGE);
 			destGE = nullptr;
 			beginStand();
 			if (nd == ndAttack)
@@ -1290,10 +1278,10 @@ void Player::beginWalk(Point dest)
 	}
 	else
 	{
-		auto tempList = gm->map.getPath(position, dest);
+		auto tempList = gm->map->getPath(position, dest);
 		if (tempList.size() > 0)
 		{
-			if (!gm->map.canWalk(tempList[0]))
+			if (!gm->map->canWalk(tempList[0]))
 			{
 				tempList.resize(0);
 				beginStand();
@@ -1310,7 +1298,7 @@ void Player::beginWalk(Point dest)
 			calStepLastTime();
 			stepBeginTime = getUpdateTime();
 			actionBeginTime = getUpdateTime();
-			gm->map.addStepToDataMap(stepList[0], npcIndex);
+			gm->map->addStepToDataMap(stepList[0], npcIndex);
 			if (fight > 0 && canDoAction(acAWalk))
 			{
 				nowAction = acAWalk;
@@ -1329,7 +1317,7 @@ void Player::beginWalk(Point dest)
 	
 }
 
-void Player::beginMagic(Point dest, GameElement * target)
+void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 {
 	if (!canFight || !canDoAction(acMagic) || frozen)
 	{
@@ -1359,17 +1347,17 @@ void Player::beginJump(Point dest)
 	{
 		if (thew < JUMP_THEW_COST)
 		{
-			gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+			gm->showMessage(u8"体力不足！");
 			return;
 		}
 		thew -= JUMP_THEW_COST;
 	}	
-	Point step = gm->map.getJumpPath(position, dest);
+	Point step = gm->map->getJumpPath(position, dest);
 	stepList.resize(1);
 	stepList[0] = step;
 	direction = calDirection(stepList[0]);
 	actionBeginTime = getUpdateTime();
-	gm->map.addStepToDataMap(stepList[0], npcIndex);
+	gm->map->addStepToDataMap(stepList[0], npcIndex);
 	if (fight > 0 && canDoAction(acAJump))
 	{
 		nowAction = acAJump;
@@ -1395,23 +1383,23 @@ void Player::beginRun(Point dest)
 		return;
 	}
 	if (nextDest != ndNone && destGE != nullptr
-		&& ((nextDest == ndAttack && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= attackRadius)
-			|| (nextDest == ndTalk && gm->npcManager.findNPC((NPC *)destGE) && Map::calDistance(position, ((NPC *)destGE)->position) <= ((NPC *)destGE)->dialogRadius)
-			|| (nextDest == ndObj && gm->objectManager.findObj((Object *)destGE) && Map::calDistance(position, ((Object *)destGE)->position) <= 1))) 
+		&& ((nextDest == ndAttack && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= attackRadius)
+			|| (nextDest == ndTalk && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<NPC>(destGE))->position) <= (std::dynamic_pointer_cast<NPC>(destGE))->dialogRadius)
+			|| (nextDest == ndObj && gm->objectManager->findObj(std::dynamic_pointer_cast<Object>(destGE)) && Map::calDistance(position, (std::dynamic_pointer_cast<Object>(destGE))->position) <= 1))) 
 	{
 		int nd = nextDest;
 		nextDest = ndNone;
 
 		if (nd == ndObj)
 		{
-			Object * tempObj = (Object *)destGE;
+			std::shared_ptr<Object> tempObj = std::dynamic_pointer_cast<Object>(destGE);
 			destGE = nullptr;
 			beginStand();
 			runObj(tempObj);
 		}
 		else
 		{
-			NPC * tempNPC = (NPC *)destGE;
+			std::shared_ptr<NPC> tempNPC = std::dynamic_pointer_cast<NPC>(destGE);
 			destGE = nullptr;
 			beginStand();
 			if (nd == ndAttack)
@@ -1430,15 +1418,15 @@ void Player::beginRun(Point dest)
 		{
 			if (thew < RUN_THEW_COST)
 			{
-				gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+				gm->showMessage(u8"体力不足！");
 				return;
 			}
 			thew -= RUN_THEW_COST;
 		}	
-		auto tempList = gm->map.getPath(position, dest);
+		auto tempList = gm->map->getPath(position, dest);
 		if (tempList.size() > 0)
 		{
-			if (!gm->map.canWalk(tempList[0]))
+			if (!gm->map->canWalk(tempList[0]))
 			{
 				tempList.resize(0);
 				beginStand();
@@ -1452,7 +1440,7 @@ void Player::beginRun(Point dest)
 			calStepLastTime();
 			stepBeginTime = getUpdateTime();
 			actionBeginTime = getUpdateTime();
-			gm->map.addStepToDataMap(stepList[0], npcIndex);
+			gm->map->addStepToDataMap(stepList[0], npcIndex);
 			if (fight > 0 && canDoAction(acARun))
 			{
 				nowAction = acARun;
@@ -1470,7 +1458,7 @@ void Player::beginRun(Point dest)
 	}
 }
 
-void Player::beginAttack(Point dest, GameElement * target)
+void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 {
 	if (!canFight || !canDoAction(acAttack) || frozen)
 	{
@@ -1479,7 +1467,7 @@ void Player::beginAttack(Point dest, GameElement * target)
 	attackTarget = target;
 	if (thew < ATTACK_THEW_COST)
 	{
-		gm->showMessage(convert::GBKToUTF8_InWinOnly("体力不足！"));
+		gm->showMessage(u8"体力不足！");
 		return;
 	}
 	thew -= ATTACK_THEW_COST;
@@ -1559,11 +1547,11 @@ void Player::beginHurt(Point dest)
 
 bool Player::canHurt()
 {
-	if (isJumping() && (jumpState == jsJumping || (jumpState == jsDown && gm->map.haveTraps(position))))
+	if (isJumping() && (jumpState == jsJumping || (jumpState == jsDown && gm->map->haveTraps(position))))
 	{
 		return false;
 	}
-	else if ((isWalking() || isRunning()) && stepState == ssIn && gm->map.haveTraps(position))
+	else if ((isWalking() || isRunning()) && stepState == ssIn && gm->map->haveTraps(position))
 	{
 		return false;
 	}
@@ -1572,9 +1560,9 @@ bool Player::canHurt()
 
 void Player::checkTrap()
 {
-	if (gm->map.haveTraps(position))
+	if (gm->map->haveTraps(position))
 	{
-		gm->runTrapScript(gm->map.getTrapIndex(position));
+		gm->runTrapScript(gm->map->getTrapIndex(position));
 	}
 }
 
@@ -1625,7 +1613,7 @@ void Player::loadLevel(const std::string& fileName)
 
 }
 
-void Player::doSpecialAttack(Point dest, GameElement * target)
+void Player::doSpecialAttack(Point dest, std::shared_ptr<GameElement> target)
 {
 	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic == nullptr || gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->specialMagic == nullptr)
 	{
@@ -1652,7 +1640,7 @@ void Player::doSpecialAttack(Point dest, GameElement * target)
 			launcher = lkNeutral;
 		}
 	}
-	gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->specialMagic->addEffect(this, position, dest, attackLevel, attack, evade, launcher, target);
+	Magic::addEffect(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->specialMagic, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, attackLevel, attack, evade, launcher, target);
 }
 
 void Player::drawAlpha(Point cenTile, Point cenScreen, PointEx coffset)
@@ -1826,14 +1814,13 @@ void Player::save(int index)
 	ini.SetInteger(section, "Fight", fight);
 	ini.Set(section, "LevelIni", levelIni);
 
-	std::string fName = SAVE_CURRENT_FOLDER;
-    fName += PLAYER_INI_NAME;
+	std::string fName = PLAYER_INI_NAME;
     if (index >= 0)
     {
         fName += convert::formatString("%d", index);
     }
     fName += PLAYER_INI_EXT;
-	ini.saveToFile(fName);
+	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
     
     SaveFileManager::AppendFile(fName);
 }

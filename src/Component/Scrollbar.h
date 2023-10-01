@@ -21,7 +21,7 @@ public:
 
 	void positionChanged(int tempPosition);
 
-	DragButton * slideBtn = nullptr;
+	std::shared_ptr<DragButton> slideBtn = nullptr;
 
 	Rect slideRect = { 0, 0, 0, 0 };
 	Rect lastRect = { 0, 0, 0, 0 };
@@ -30,7 +30,7 @@ public:
 
 	void freeResource();
 
-	virtual void initFromIni(const std::string & fileName);
+	virtual void initFromIniWithName(INIReader & ini, const std::string & fileName);
 	void limitPos(int * p, int minp, int maxp);
 
 	void setSlideBtnRect();

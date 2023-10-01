@@ -1,8 +1,7 @@
-#include "GameManager.h"
+﻿#include "GameManager.h"
 #include <thread>
 
 GameManager * GameManager::this_ = nullptr;
-
 
 
 GameManager::GameManager()
@@ -15,20 +14,21 @@ GameManager::GameManager()
 	rectFullScreen = true;
 	priority = epMap;
 	result = erNone;
-    player = new Player();
-	npcManager.setPlayer(player);
 
-	addChild(&controller);
-	addChild(&menu);
-	addChild(&weather);
+	npcManager->setPlayer(player);
 
-	controller.addChild(&camera);
+	addChild(controller);
+	addChild(menu);
+	addChild(weather);
 
-	controller.addChild(player);
-	controller.addChild(&map);
-	controller.addChild(&npcManager);
-	controller.addChild(&objectManager);
-	controller.addChild(&effectManager);
+	controller->addChild(camera);
+
+	controller->addChild(player);
+
+	controller->addChild(map);
+	controller->addChild(npcManager);
+	controller->addChild(objectManager);
+	controller->addChild(effectManager);
 }
 
 GameManager::~GameManager()
@@ -40,53 +40,41 @@ GameManager::~GameManager()
 
 void GameManager::initMenuWithThread()
 {
+	inThread = true;
 	loadThreadOver = false;
+	loadingDisplaying = true;
+	std::string str = u8"创建UI中";
+	std::vector<_shared_image> loadingImage;
+	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + ".", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "..", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "...", 50, 0xFFFFFFFF));
+
 	std::thread t(&GameManager::initMenuThread, this);
+	//std::thread t(&GameManager::loadingDisplayThread, this, loadingImage);
+	//t.detach();
 
-	t.detach();
-	auto beginTime = engine->getTime();
+	loadingDisplayThread(loadingImage);
+	t.join();
+	inThread = false;
 
-	loadMutex.lock();
-	while (!loadThreadOver)
-	{
-		loadMutex.unlock();
-		engine->frameBegin();
-		int w, h;
-		engine->getWindowSize(w, h);
-		std::wstring ws = L"Loading";
-		auto t = (engine->getTime() - beginTime) % 1200 / 300;
-		if (t == 1)
-		{
-			ws += L".";
-		}
-		else if (t == 2)
-		{
-			ws += L"..";
-		}
-		else if (t == 3)
-		{
-			ws += L"...";
-		}
-		engine->drawUnicodeText(ws, w - 220, h - 70, 50, 0xFFFFFFFF);
-		engine->frameEnd();
-		loadMutex.lock();
-	}
-	loadMutex.unlock();
+	controller->init();
 }
 
 void GameManager::initMenuThread()
 {
 	this_->initMenu();
-	loadMutex.lock();
+    std::lock_guard<std::mutex> locker(this_->loadMutex);
 	this_->loadThreadOver = true;
-	loadMutex.unlock();
 }
 
 void GameManager::initMenu()
 {
-	menu.init();
-
-	controller.init();
+	menu->init();
+	if (!inThread)
+	{
+		controller->init();
+	}
 }
 
 GameManager * GameManager::getInstance()
@@ -98,46 +86,34 @@ void GameManager::loadGameWithThread(int index)
 {
 	inThread = true;
 	loadThreadOver = false;
+	loadingDisplaying = true;
+
+	std::string str = u8"读取游戏中";
+	std::vector<_shared_image> loadingImage;
+	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + ".", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "..", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "...", 50, 0xFFFFFFFF));
+
 	std::thread t(&GameManager::loadGameThread, this, index);
-	
-	t.detach();
-	auto beginTime = engine->getTime();
-	
-	loadMutex.lock();
-	while (!loadThreadOver)
-	{
-		loadMutex.unlock();
-		engine->frameBegin();
-		int w, h;
-		engine->getWindowSize(w, h);
-		std::wstring ws = L"Loading";
-		auto t = (engine->getTime() - beginTime) % 1200 / 300;
-		if (t == 1)
-		{
-			ws += L".";
-		}
-		else if (t == 2)
-		{
-			ws += L"..";
-		}
-		else if (t == 3)
-		{
-			ws += L"...";
-		}
-		engine->drawUnicodeText(ws, w - 220, h - 70, 50, 0xFFFFFFFF);
-		engine->frameEnd();
-		loadMutex.lock();
-	}
-	loadMutex.unlock();
+	//t.detach();
+
+	loadingDisplayThread(loadingImage);
+	t.join();
+
 	inThread = false;
-	menu.update();
+
+	weather->setLum(global.data.mainLum);
+	weather->setTime(global.data.mapTime);
+	menu->update();
+
 }
 
 void GameManager::setMapPos(int x, int y)
 {
-	camera.followPlayer = false;
-	camera.position = { x + 5, y + 15};
-	camera.offset = { 0, 0 };
+	camera->followPlayer = false;
+	camera->position = { x + 5, y + 15};
+	camera->offset = { 0, 0 };
 }
 
 void GameManager::setMapTrap(int idx, const std::string & trapFile)
@@ -153,13 +129,13 @@ void GameManager::saveMapTrap()
 void GameManager::setMapTime(unsigned char t)
 {
 	global.data.mapTime = t;
-	weather.setTime(t);
+	weather->setTime(t);
 }
 
 void GameManager::loadGameThread(int index)
 {
 	this_->loadGame(index);
-	MutexLocker mutexLocker(&loadMutex);
+	std::lock_guard<std::mutex> locker(this_->loadMutex);
 	this_->loadThreadOver = true;
 }
 
@@ -183,49 +159,58 @@ bool GameManager::loadGame(int index)
 	global.data.npcName = tempNpcName;
 	global.data.objName = tempObjName;
 
-	effectManager.freeResource();
-
-	
+	effectManager->freeResource();
 
 	varList.load();
 	memo.load();
 	//traps.load();
-    
+
     player->load(global.data.characterIndex);
+
     magicManager.load(global.data.characterIndex);
+
     goodsManager.load(global.data.characterIndex);
 
-	npcManager.clearAllNPC();
-	partnerManager.load(global.data.characterIndex);
-	npcManager.load(global.data.npcName);
-	objectManager.load(global.data.objName);
+	npcManager->clearAllNPC();
 
-	effectManager.load();
-	if (map.data != nullptr)
+	partnerManager.load(global.data.characterIndex);
+
+	npcManager->load(global.data.npcName);
+
+	objectManager->load(global.data.objName);
+
+	effectManager->load();
+
+	if (map->data != nullptr)
 	{
-		map.createDataMap();
+		map->createDataMap();
 	}
-	
-	weather.reset();
+
+	weather->reset();
+
 	clearMenu();
+
+	weather->setFadeLum(global.data.fadeLum);
+	
+	timer.setPaused(false);
+	playMusic(global.data.bgmName);
 
 	if (global.data.snowShow)
 	{
-		weather.setWeather(wtSnow);
+		weather->setWeather(wtSnow);
 	}
 	else if (global.data.rainShow)
 	{
-		weather.setWeather(wtLightning);
+		weather->setWeather(wtLightning);
 	}
-	weather.setFadeLum(global.data.fadeLum);
-	weather.setLum(global.data.mainLum);
-	weather.setTime(global.data.mapTime);
-	timer.setPaused(false);
-	playMusic(global.data.bgmName);
+
 	if (!inThread)
 	{
-		menu.update();
+		weather->setLum(global.data.mainLum);
+		weather->setTime(global.data.mapTime);
+		menu->update();
 	}
+
 	setPlayerScn();
 
 	return true;
@@ -239,17 +224,14 @@ void GameManager::saveGame(int index)
 	traps.save();
     
     player->save(global.data.characterIndex);
-
-    
 	partnerManager.save(global.data.characterIndex);
     
 	magicManager.save(global.data.characterIndex);
 	goodsManager.save(global.data.characterIndex);
-    
-    
-	npcManager.save(global.data.npcName);
-	objectManager.save(global.data.objName);
-	effectManager.save();
+     
+	npcManager->save(global.data.npcName);
+	objectManager->save(global.data.objName);
+	effectManager->save();
 	if (index > 0)
 	{
 		SaveFileManager::CopySaveFileTo(index);
@@ -258,45 +240,46 @@ void GameManager::saveGame(int index)
 
 void GameManager::clearMenu()
 {
-	menu.clearMenu();
+	menu->clearMenu();
 }
 
 bool GameManager::menuDisplayed()
 {
-	return menu.menuDisplayed();
+	return menu->menuDisplayed();
 }
 
 #define freeMenu(component); \
-	menu.removeChild(component); \
-	if (component != nullptr)\
+	menu->removeChild(component); \
+	if (component.get() != nullptr)\
 	{\
-		delete component; \
 		component = nullptr; \
 	}
 
 #define freeBtmMenu(component); \
 	btmWnd.removeChild(component); \
-	if (component != nullptr)\
+	if (component.get() != nullptr)\
 	{\
-		delete component; \
 		component = nullptr; \
 	}
-
+#define safeFreeResource(a) \
+	if (a.get() != nullptr) \
+	{\
+		a->freeResource();\
+	}
 void GameManager::freeResource()
 {
-	controller.freeResource();
-	menu.freeResource();
-
-	effectManager.freeResource();
+	camera->followNPC = nullptr;
+	safeFreeResource(controller);
+	safeFreeResource(menu);
+	safeFreeResource(effectManager);
 	partnerManager.freeResource();
-	npcManager.freeResource();
+	safeFreeResource(npcManager);
+	safeFreeResource(objectManager);
+	safeFreeResource(player);
 	magicManager.freeResource();
-	objectManager.freeResource();
-	player->freeResource();
-	weather.freeResource();
-	map.freeResource();
+	safeFreeResource(weather);
+	safeFreeResource(map);
 }
-
 
 Point GameManager::getMousePoint(int x, int y)
 {
@@ -305,13 +288,8 @@ Point GameManager::getMousePoint(int x, int y)
 	Point cenScreen;
 	cenScreen.x = (int)w / 2;
 	cenScreen.y = (int)h / 2;
-	int xscal, yscal;
-	xscal = cenScreen.x / TILE_WIDTH + 2;
-	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
-	int tileHeightScal = 10;
 
-	Point cenTile = camera.position;
-	Point pos = map.getMousePosition({ x, y }, camera.position, cenScreen, camera.offset);
+	Point pos = map->getMousePosition({ x, y }, camera->position, cenScreen, camera->offset);
 	return pos;
 }
 
@@ -326,25 +304,22 @@ Point GameManager::getMousePoint()
 void GameManager::loadMapThread(const std::string & fileName)
 {
 	this_->loadMap(fileName);
-	loadMutex.lock();
+	std::lock_guard<std::mutex> locker(this_->loadMutex);
 	this_->loadThreadOver = true;
-	loadMutex.unlock();
 }
 
 void GameManager::loadNPCThread(const std::string & fileName)
 {
 	this_->loadNPC(fileName);
-	loadMutex.lock();
+	std::lock_guard<std::mutex> locker(this_->loadMutex);
 	this_->loadThreadOver = true;
-	loadMutex.unlock();
 }
 
 void GameManager::loadObjectThread(const std::string & fileName)
 {
 	this_->loadObject(fileName);
-	loadMutex.lock();
+	std::lock_guard<std::mutex> locker(this_->loadMutex);
 	this_->loadThreadOver = true;
-	loadMutex.unlock();
 }
 
 void GameManager::runScript(const std::string & fileName, const std::string & mapName)
@@ -356,28 +331,28 @@ void GameManager::runScript(const std::string & fileName, const std::string & ma
 	int len = PakFile::readFile(SCRIPT_MAP_FOLDER + mapName + "\\" + fileName, s);
 	if (len <= 0 || s == nullptr)
 	{
-		printf("script: %s not found\n", (SCRIPT_MAP_FOLDER + mapName + "\\" + fileName).c_str());
+		GameLog::write("script: %s not found\n", (SCRIPT_MAP_FOLDER + mapName + "\\" + fileName).c_str());
 		s = nullptr;
 		int len = PakFile::readFile(SCRIPT_GOODS_FOLDER + fileName, s);
 		if (len <= 0 || s == nullptr)
 		{
-			printf("script: %s not found\n", (SCRIPT_GOODS_FOLDER + fileName).c_str());
+			GameLog::write("script: %s not found\n", (SCRIPT_GOODS_FOLDER + fileName).c_str());
 			s = nullptr;
 			int len = PakFile::readFile(SCRIPT_COMMON_FOLDER + fileName, s);
 			if (len <= 0 || s == nullptr)
 			{
-				printf("script: %s not found\n", (SCRIPT_COMMON_FOLDER + fileName).c_str());
+				GameLog::write("script: %s not found\n", (SCRIPT_COMMON_FOLDER + fileName).c_str());
 				return;
 			}
-			printf("run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
+			GameLog::write("run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
 			script.runScript(s, len);
 			return;
 		}
-		printf("run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
+		GameLog::write("run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
 		script.runScript(s, len);
 		return;
 	}
-	printf("run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER , mapName.c_str(), newName.c_str());
+	GameLog::write("run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER , mapName.c_str(), newName.c_str());
 	script.runScript(s, len);
 	return;
 }
@@ -389,20 +364,29 @@ void GameManager::runScript(const std::string & fileName)
 
 void GameManager::moveScreen(int direction, int distance)
 {
-	camera.flyTo(direction, distance);
+	camera->flyTo(direction, distance);
 }
 
 void GameManager::loadMap(const std::string & fileName)
 {
 	global.data.mapName = fileName;
-	mapName = convert::GBKToUTF8_InWinOnly(convert::extractFileName(convert::UTF8ToGBK_InWinOnly(fileName)));
-	map.load(MAP_FOLDER + fileName);
-	camera.followPlayer = true;
-	npcManager.clearNPC();
-	objectManager.clearObj();
+	mapName = convert::extractFileName(fileName);
+
+	map->load(MAP_FOLDER + fileName);
+
+	camera->followPlayer = true;
+
+	camera->followNPC = nullptr;
+
+	effectManager->clearEffect();
+
+	npcManager->clearNPC();
+
+	objectManager->clearObj();
+
 	global.data.npcName = "";
 	global.data.objName = "";
-	map.createDataMap();
+	map->createDataMap();
 	traps.load();
 	enableFight();
 	player->beginStand();
@@ -412,56 +396,45 @@ void GameManager::loadMapWithThread(const std::string & fileName)
 {
 	loadThreadOver = false;
 
+	std::string str = u8"读取地图中";
+	std::vector<_shared_image> loadingImage;
+	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + ".", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "..", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "...", 50, 0xFFFFFFFF));
+
 	std::thread t(&GameManager::loadMapThread, this, fileName);
 
-	t.detach();
-	auto beginTime = engine->getTime();
+	//t.detach();
 
-	loadMutex.lock();
-	while (!loadThreadOver)
-	{
-		loadMutex.unlock();
-		engine->frameBegin();
-		int w, h;
-		engine->getWindowSize(w, h);
-		std::wstring ws = L"Loading Map";
-		auto t = (engine->getTime() - beginTime) % 1200 / 300;
-		if (t == 1)
-		{
-			ws += L".";
-		}
-		else if (t == 2)
-		{
-			ws += L"..";
-		}
-		else if (t == 3)
-		{
-			ws += L"...";
-		}
-		engine->drawUnicodeText(ws, w - 300, h - 70, 50, 0xFFFFFFFF);
-		engine->frameEnd();
-		loadMutex.lock();
-	}
-	loadMutex.unlock();
-
+	loadingDisplayThread(loadingImage);
+	t.join();
 }
 
 void GameManager::playMusic(const std::string & fileName)
 {
 	global.data.bgmName = fileName;
-	if (strcmp(fileName.c_str(), bgmName.c_str()) == 0)
+	if (!global.useWav)
 	{
-		
+		auto ext = convert::extractFileExt(fileName);
+		if (ext.empty() || strcmp(ext.c_str(), ".wav") == 0)
+		{
+			global.data.bgmName = convert::extractFileName(fileName) + ".mp3";
+		}
+	}
+	GameLog::write("play bgm %s\n", global.data.bgmName.c_str());
+	if (strcmp(global.data.bgmName.c_str(), bgmName.c_str()) == 0)
+	{
 		return;
 	}
 	engine->stopBGM();
-	bgmName = fileName;
-	if (fileName == "")
+	bgmName = global.data.bgmName;
+	if (bgmName == "")
 	{
 		return;
 	}
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(MUSIC_FOLDER + fileName, s);
+	int len = PakFile::readFile(MUSIC_FOLDER + bgmName, s);
 	if (s != nullptr && len > 0)
 	{
 		engine->loadBGM(s, len);
@@ -499,8 +472,8 @@ void GameManager::returnToDesktop()
 
 void GameManager::clearSelected()
 {
-	npcManager.clearSelected();
-	objectManager.clearSelected();
+	npcManager->clearSelected();
+	objectManager->clearSelected();
 }
 
 void GameManager::returnToTitle()
@@ -519,9 +492,9 @@ void GameManager::disableInput()
 	global.data.canInput = false;
 }
 
-void GameManager::runObjScript(Object * obj)
+void GameManager::runObjScript(std::shared_ptr<Object> obj)
 {
-	delete player->nextAction;
+
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
 	player->destGE = nullptr;
@@ -533,20 +506,20 @@ void GameManager::runObjScript(Object * obj)
 	{
 		scriptObj = obj;
 		inEvent = true;
-		effectManager.disableAllEffect();
+		effectManager->disableAllEffect();
 		scriptType = stObject;
 		runScript(obj->scriptFile);
 		scriptType = stNone;
 		inEvent = false;
 	}
 	scriptObj = nullptr;
-	camera.followPlayer = true;
+	camera->followPlayer = true;
 	runEventList();
 }
 
-void GameManager::runNPCScript(NPC * npc)
+void GameManager::runNPCScript(std::shared_ptr<NPC> npc)
 {
-	delete player->nextAction;
+
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
 	player->destGE = nullptr;
@@ -554,32 +527,32 @@ void GameManager::runNPCScript(NPC * npc)
 	{
 		return;
 	}
-	if (npc != nullptr && npcManager.findNPC(npc))
+	if (npc != nullptr && npcManager->findNPC(npc))
 	{
 		scriptNPC = npc;
 		inEvent = true;
-		effectManager.disableAllEffect();
+		effectManager->disableAllEffect();
 		scriptType = stNPC;
 		runScript(npc->scriptFile);
 		scriptType = stNone;
 		inEvent = false;
 	}
 	scriptNPC = nullptr;
-	camera.followPlayer = true;
+	camera->followPlayer = true;
 	runEventList();
 }
 
-void GameManager::runNPCDeathScript(NPC * npc, const std::string & scriptName, const std::string & scriptMapName)
+void GameManager::runNPCDeathScript(std::shared_ptr<NPC> npc, const std::string & scriptName, const std::string & scriptMapName)
 {
-	if (!npcManager.findNPC(npc))
-	{
-		return;
-	}
+	//if (!npcManager->findNPC(npc))
+	//{
+	//	return;
+	//}
 	if (scriptName == "")
 	{
 		return;
 	}
-	delete player->nextAction;
+
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
 	player->destGE = nullptr;
@@ -597,7 +570,7 @@ void GameManager::runNPCDeathScript(NPC * npc, const std::string & scriptName, c
 	}
 	if (npc != nullptr)
 	{
-		if (npcManager.findNPC(npc))
+		if (npcManager->findNPC(npc))
 		{
 			scriptNPC = npc;
 		}
@@ -606,14 +579,14 @@ void GameManager::runNPCDeathScript(NPC * npc, const std::string & scriptName, c
 			scriptNPC = nullptr;
 		}
 		inEvent = true;
-		//effectManager.disableAllEffect();
+		//effectManager->disableAllEffect();
 		scriptType = stNPCDeath;
 		runScript(scriptName, scriptMapName);
 		scriptType = stNone;
 		inEvent = false;
 	}
 	scriptNPC = nullptr;
-	camera.followPlayer = true;
+	camera->followPlayer = true;
 	runEventList();
 }
 
@@ -621,7 +594,7 @@ void GameManager::runEventList()
 {
 	if (eventList.size() > 0)
 	{
-		NPC* deathNPC = eventList[0].npc;
+		auto deathNPC = eventList[0].npc;
 		std::string tempScriptName = eventList[0].scriptName;
 		std::string tempScriptMapName = eventList[0].scriptMapName;
 		eventList.erase(eventList.begin());
@@ -629,9 +602,8 @@ void GameManager::runEventList()
 	}
 }
 
-void GameManager::runGoodsScript(Goods * goods)
+void GameManager::runGoodsScript(std::shared_ptr<Goods> goods)
 {
-	delete player->nextAction;
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
 	player->destGE = nullptr;
@@ -647,20 +619,19 @@ void GameManager::runGoodsScript(Goods * goods)
 	{
 		scriptGoods = goods;
 		inEvent = true;
-		effectManager.disableAllEffect();
+		effectManager->disableAllEffect();
 		scriptType = stGoods;
 		runScript(goods->script);
 		scriptType = stNone;
 		inEvent = false;
 	}
 	scriptGoods = nullptr;
-	camera.followPlayer = true;
+	camera->followPlayer = true;
 	runEventList();
 }
 
 void GameManager::runTrapScript(int idx)
 {
-	delete player->nextAction;
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
 	player->destGE = nullptr;
@@ -682,7 +653,7 @@ void GameManager::runTrapScript(int idx)
 	if (sname != "")
 	{
 		inEvent = true;
-		effectManager.disableAllEffect();
+		effectManager->disableAllEffect();
 		traps.set(mapName, idx, "");
 		std::string tempMapName = mapName;
 		scriptType = stTraps;
@@ -692,7 +663,7 @@ void GameManager::runTrapScript(int idx)
 	}
 	scriptMapName = "";
 	scriptTrapIndex = 0;
-	camera.followPlayer = true;
+	camera->followPlayer = true;
 	runEventList();
 }
 
@@ -700,15 +671,14 @@ void GameManager::playMovie(const std::string & fileName)
 {
 	if (video != nullptr)
 	{
-		delete video;
 		video = nullptr;
 	}
 	stopMusic();
-	printf("Play Movie %s\n", fileName.c_str());
-	video = new VideoPlayer(VIDEO_FOLDER + fileName);
+	GameLog::write("Play Movie %s\n", fileName.c_str());
+	video = std::make_shared<VideoPlayer>(VIDEO_FOLDER + fileName);
 	video->drawFullScreen = true;
 	video->run();
-	delete video;
+
 	video = nullptr;
 	playMusic(global.data.bgmName);
 }
@@ -720,77 +690,58 @@ void GameManager::stopMovie()
 
 void GameManager::loadNPC(const std::string & fileName)
 {
-	//npcManager.save(global.data.npcName);
+	//npcManager->save(global.data.npcName);
 	global.data.npcName = fileName;
-	npcManager.load(global.data.npcName);
-	map.createDataMap();
+	npcManager->load(global.data.npcName);
+	map->createDataMap();
 }
 
 void GameManager::loadNPCWithThread(const std::string & fileName)
 {
 	loadThreadOver = false;
 
+	std::string str = u8"读取资源中";
+	std::vector<_shared_image> loadingImage;
+	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + ".", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "..", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "...", 50, 0xFFFFFFFF));
+
 	std::thread t(&GameManager::loadNPCThread, this, fileName);
 
-	t.detach();
-	auto beginTime = engine->getTime();
-
-	loadMutex.lock();
-	while (!loadThreadOver)
-	{
-		loadMutex.unlock();
-		engine->frameBegin();
-		int w, h;
-		engine->getWindowSize(w, h);
-		std::wstring ws = L"Loading Resources";
-		auto t = (engine->getTime() - beginTime) % 1200 / 300;
-		if (t == 1)
-		{
-			ws += L".";
-		}
-		else if (t == 2)
-		{
-			ws += L"..";
-		}
-		else if (t == 3)
-		{
-			ws += L"...";
-		}
-		engine->drawUnicodeText(ws, w - 300, h - 70, 50, 0xFFFFFFFF);
-		engine->frameEnd();
-		loadMutex.lock();
-	}
-	loadMutex.unlock();
+	//t.detach();
+	loadingDisplayThread(loadingImage);
+	t.join();
 }
 
 void GameManager::saveNPC(const std::string & fileName)
 {
 	if (fileName == "")
 	{
-		npcManager.save(global.data.npcName);
+		npcManager->save(global.data.npcName);
 	}
 	else
 	{
 		global.data.npcName = fileName;
-		npcManager.save(fileName);
+		npcManager->save(fileName);
 	}
 }
 
 void GameManager::addNPC(const std::string & iniName, int x, int y, int dir)
 {
-	npcManager.addNPC(iniName, x, y, dir);
+	npcManager->addNPC(iniName, x, y, dir);
 }
 
 void GameManager::deleteNPC(const std::string & name)
 {
-	npcManager.deleteNPC(name);
+	npcManager->deleteNPC(name);
 }
 
 void GameManager::setNPCRes(const std::string & name, const std::string & resName)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->npcIni = resName;
@@ -799,7 +750,7 @@ void GameManager::setNPCRes(const std::string & name, const std::string & resNam
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->npcIni = resName;
@@ -812,7 +763,7 @@ void GameManager::setNPCScript(const std::string & name, const std::string & scr
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->scriptFile = scriptName;
@@ -820,7 +771,7 @@ void GameManager::setNPCScript(const std::string & name, const std::string & scr
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->scriptFile = scriptName;
@@ -832,7 +783,7 @@ void GameManager::setNPCDeathScript(const std::string & name, const std::string 
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->deathScript = scriptName;
@@ -840,7 +791,7 @@ void GameManager::setNPCDeathScript(const std::string & name, const std::string 
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->deathScript = scriptName;
@@ -852,7 +803,7 @@ void GameManager::goTo(const std::string & name, int x, int y)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->goTo({ x, y });
@@ -860,7 +811,7 @@ void GameManager::goTo(const std::string & name, int x, int y)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->goTo({ x, y });
@@ -872,7 +823,7 @@ void GameManager::goToEx(const std::string & name, int x, int y)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->goToEx({ x, y });
@@ -880,7 +831,7 @@ void GameManager::goToEx(const std::string & name, int x, int y)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->goToEx({ x, y });
@@ -892,7 +843,7 @@ void GameManager::goToDir(const std::string & name, int dir, int distance)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->goToDir(dir, distance);
@@ -900,7 +851,7 @@ void GameManager::goToDir(const std::string & name, int dir, int distance)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->goToDir(dir, distance);
@@ -910,7 +861,7 @@ void GameManager::goToDir(const std::string & name, int dir, int distance)
 
 void GameManager::followNPC(const std::string & follower, const std::string & leader)
 {
-	auto npc = npcManager.findNPC(follower);
+	auto npc = npcManager->findNPC(follower);
 	for (size_t i = 0; i < npc.size(); i++)
 	{
 		npc[i]->followNPC = leader;
@@ -919,7 +870,7 @@ void GameManager::followNPC(const std::string & follower, const std::string & le
 
 void GameManager::followPlayer(const std::string & follower)
 {
-	auto npc = npcManager.findNPC(follower);
+	auto npc = npcManager->findNPC(follower);
 	for (size_t i = 0; i < npc.size(); i++)
 	{
 		npc[i]->followNPC = gm->player->name;
@@ -934,14 +885,14 @@ void GameManager::enableNPCAI()
 void GameManager::disableNPCAI()
 {
 	global.data.NPCAI = false;
-	//npcManager.standAll();
+	//npcManager->standAll();
 }
 
 void GameManager::attackTo(const std::string & name, int x, int y)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->beginAttack({ x, y });
@@ -950,7 +901,7 @@ void GameManager::attackTo(const std::string & name, int x, int y)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->beginAttack({ x, y });
@@ -964,7 +915,7 @@ void GameManager::setNPCPosition(const std::string & name, int x, int y)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->haveDest = false;
@@ -975,7 +926,7 @@ void GameManager::setNPCPosition(const std::string & name, int x, int y)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->beginStand();
@@ -984,14 +935,14 @@ void GameManager::setNPCPosition(const std::string & name, int x, int y)
 			npc[i]->offset = { 0, 0 };
 		}
 	}
-	map.createDataMap();
+	map->createDataMap();
 }
 
 void GameManager::setNPCDir(const std::string & name, int dir)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr && npc->isStanding())
 		{
 			npc->beginStand();
@@ -1001,7 +952,7 @@ void GameManager::setNPCDir(const std::string & name, int dir)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			if (npc[i]->isStanding())
@@ -1017,7 +968,7 @@ void GameManager::setNPCKind(const std::string & name, int kind)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->kind = kind;
@@ -1025,7 +976,7 @@ void GameManager::setNPCKind(const std::string & name, int kind)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->kind = kind;
@@ -1037,7 +988,7 @@ void GameManager::setNPCLevel(const std::string & name, int level)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->level = level;
@@ -1046,7 +997,7 @@ void GameManager::setNPCLevel(const std::string & name, int level)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->level = level;
@@ -1059,7 +1010,7 @@ void GameManager::setNPCAction(const std::string & name, int action)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			if (action == acStand)
@@ -1074,7 +1025,7 @@ void GameManager::setNPCAction(const std::string & name, int action)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			if (action == acStand)
@@ -1093,7 +1044,7 @@ void GameManager::setNPCRelation(const std::string & name, int relation)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->relation = relation;
@@ -1102,7 +1053,7 @@ void GameManager::setNPCRelation(const std::string & name, int relation)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->relation = relation;
@@ -1115,7 +1066,7 @@ void GameManager::setNPCActionType(const std::string & name, int actionType)
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->action = actionType;
@@ -1123,7 +1074,7 @@ void GameManager::setNPCActionType(const std::string & name, int actionType)
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->action = actionType;
@@ -1135,7 +1086,7 @@ void GameManager::setNPCActionFile(const std::string & name, int action, const s
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->loadActionFile(fileName, action);
@@ -1143,7 +1094,7 @@ void GameManager::setNPCActionFile(const std::string & name, int action, const s
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->loadActionFile(fileName, action);
@@ -1155,7 +1106,7 @@ void GameManager::npcSpecialAction(const std::string & name, const std::string &
 {
 	if (name == "")
 	{
-		NPC * npc = scriptNPC;
+		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
 		{
 			npc->doSpecialAction(fileName);
@@ -1163,7 +1114,7 @@ void GameManager::npcSpecialAction(const std::string & name, const std::string &
 	}
 	else
 	{
-		auto npc = npcManager.findNPC(name);
+		auto npc = npcManager->findNPC(name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			npc[i]->doSpecialAction(fileName);
@@ -1187,8 +1138,8 @@ void GameManager::setPlayerPosition(int x, int y)
 	player->position = { x, y };
 	player->offset = { 0, 0 };
 	player->haveDest = false;
-	gm->npcManager.setPartnerPos(x, y, player->direction);
-	map.createDataMap();
+	gm->npcManager->setPartnerPos(x, y, player->direction);
+	map->createDataMap();
 }
 
 void GameManager::setPlayerDir(int dir)
@@ -1198,15 +1149,15 @@ void GameManager::setPlayerDir(int dir)
 
 void GameManager::setPlayerScn()
 {
-	camera.followPlayer = true;
-	auto npc = npcManager.findPlayerNPC();
+	camera->followPlayer = true;
+	auto npc = npcManager->findPlayerNPC();
 	if (npc != nullptr)
 	{
-		camera.followNPC = npc;
+		camera->followNPC = npc;
 	}
 	else
 	{
-		camera.followNPC = player;
+		camera->followNPC = player;
 	}
 }
 
@@ -1349,11 +1300,11 @@ void GameManager::addMoney(int value)
 	player->addMoney(value);
 	if (value > 0)
 	{
-		showMessage(convert::formatString("获得%d两银子！", value));
+		showMessage(convert::formatString(u8"获得%d两银子！", value));
 	}
 	else
 	{
-		showMessage(convert::formatString("失去%d两银子！", -value));
+		showMessage(convert::formatString(u8"失去%d两银子！", -value));
 	}
 }
 
@@ -1434,8 +1385,8 @@ void GameManager::fullMana()
 
 void GameManager::updateState()
 {
-	menu.equipMenu->updateGoods();
-	menu.stateMenu->updateLabel();
+	menu->equipMenu->updateGoods();
+	menu->stateMenu->updateLabel();
 }
 
 void GameManager::saveGoods(int index)
@@ -1466,71 +1417,53 @@ void GameManager::getMoneyNum()
 void GameManager::setMoneyNum(int value)
 {
 	player->money = value;
-	menu.goodsMenu->updateMoney();
+	menu->goodsMenu->updateMoney();
 }
 
 void GameManager::loadObject(const std::string & fileName)
 {
-	//objectManager.save(global.data.objName);
+	//objectManager->save(global.data.objName);
 	global.data.objName = fileName;
-	objectManager.load(global.data.objName);
-	map.createDataMap();
+	objectManager->load(global.data.objName);
+	map->createDataMap();
 }
 
 void GameManager::loadObjectWithThread(const std::string & fileName)
 {
 	loadThreadOver = false;
 
+	std::string str = u8"读取资源中";
+	std::vector<_shared_image> loadingImage;
+	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + ".", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "..", 50, 0xFFFFFFFF));
+	loadingImage.push_back(engine->createText(str + "...", 50, 0xFFFFFFFF));
+
 	std::thread t(&GameManager::loadObjectThread, this, fileName);
 
-	t.detach();
-	auto beginTime = engine->getTime();
+	//t.detach();
 
-	loadMutex.lock();
-	while (!loadThreadOver)
-	{
-		loadMutex.unlock();
-		engine->frameBegin();
-		int w, h;
-		engine->getWindowSize(w, h);
-		std::wstring ws = L"Loading Resources";
-		auto t = (engine->getTime() - beginTime) % 1200 / 300;
-		if (t == 1)
-		{
-			ws += L".";
-		}
-		else if (t == 2)
-		{
-			ws += L"..";
-		}
-		else if (t == 3)
-		{
-			ws += L"...";
-		}
-		engine->drawUnicodeText(ws, w - 300, h - 70, 50, 0xFFFFFFFF);
-		engine->frameEnd();
-		loadMutex.lock();
-	}
-	loadMutex.unlock();
+	loadingDisplayThread(loadingImage);
+	t.join();
 }
 
 void GameManager::saveObject(const std::string & fileName)
 {
 	if (fileName == "")
 	{
-		objectManager.save(global.data.objName);
+		objectManager->save(global.data.objName);
 	}
 	else
 	{
 		global.data.objName = fileName;
-		objectManager.save(fileName);
+		objectManager->save(fileName);
 	}
 	
 }
 
 void GameManager::addObject(const std::string & iniName, int x, int y, int dir)
 {
-	objectManager.addObject(iniName, x, y, dir);
+	objectManager->addObject(iniName, x, y, dir);
 }
 
 void GameManager::deleteObject(const std::string & name)
@@ -1547,37 +1480,37 @@ void GameManager::deleteObject(const std::string & name)
 			return;
 		}
 	}
-	objectManager.deleteObject(objName);
+	objectManager->deleteObject(objName);
 }
 
 void GameManager::setObjectPosition(const std::string & name, int x, int y)
 {
-	Object * obj = nullptr;
+	std::shared_ptr<Object> obj = nullptr;
 	if (name == "")
 	{
 		obj = scriptObj;
 	}
 	else
 	{
-		obj = objectManager.findObj(name);
+		obj = objectManager->findObj(name);
 	}
 	if (obj != nullptr)
 	{
 		obj->position = { x, y };
-		map.createDataMap();
+		map->createDataMap();
 	}
 }
 
 void GameManager::setObjectKind(const std::string & name, int kind)
 {
-	Object * obj = nullptr;
+	std::shared_ptr<Object> obj = nullptr;
 	if (name == "")
 	{
 		obj = scriptObj;
 	}
 	else
 	{
-		obj = objectManager.findObj(name);
+		obj = objectManager->findObj(name);
 	}
 	if (obj != nullptr)
 	{
@@ -1587,14 +1520,14 @@ void GameManager::setObjectKind(const std::string & name, int kind)
 
 void GameManager::setObjectScript(const std::string & name, const std::string & scriptFile)
 {
-	Object * obj = nullptr;
+	std::shared_ptr<Object> obj = nullptr;
 	if (name == "")
 	{
 		obj = scriptObj;
 	}
 	else
 	{
-		obj = objectManager.findObj(name);
+		obj = objectManager->findObj(name);
 	}
 	if (obj != nullptr)
 	{
@@ -1628,7 +1561,7 @@ void GameManager::talk(const std::string & part)
 	{
 		return;
 	}
-	INIReader * ini = new INIReader(s);
+	INIReader ini(s);
 	std::vector<std::string> talkStr;
 	talkStr.resize(0);
 
@@ -1637,7 +1570,7 @@ void GameManager::talk(const std::string & part)
 	{
 		std::string name = convert::formatString("%d", talkIndex + 1);
 		
-		std::string str = ini->Get(part, name, "");
+		std::string str = ini.Get(part, name, "");
 		if (str == "")
 		{
 			break;
@@ -1648,11 +1581,11 @@ void GameManager::talk(const std::string & part)
 	
 	if (talkIndex <= 0)
 	{
-		delete ini;
 		return;
 	}
-	Dialog * dialog = new Dialog;
-	addChild(dialog);
+	//std::shared_ptr<Dialog> dialog = std::make_shared<Dialog>();
+	//addChild(dialog);
+	auto dialog = menu->dialog;
 	std::string head1 = "";
 	std::string head2 = "";
 
@@ -1660,7 +1593,7 @@ void GameManager::talk(const std::string & part)
 	for (int i = 0; i < talkIndex; i++)
 	{
 		std::string tstr = convert::formatString("%s%d", headStr.c_str(), i + 1);
-		std::string thstr = ini->Get(part, tstr, "NoHeadChange");
+		std::string thstr = ini.Get(part, tstr, "NoHeadChange");
 		if (thstr != "NoHeadChange")
 		{
 			if (i % 2 == 1)
@@ -1682,60 +1615,63 @@ void GameManager::talk(const std::string & part)
 		}
 		dialog->setTalkStr(talkStr[i]);
 		std::string s = talkStr[i];
+		dialog->visible = true;
 		dialog->run();
+		dialog->visible = false;
 	}
-	removeChild(dialog);
-	delete dialog;
-	delete ini;
+	//removeChild(dialog);
 }
 
 void GameManager::say(const std::string & str, int index)
 {
-	Dialog dialog;
-	addChild(&dialog);
+	//auto dialog = std::make_shared<Dialog>();
+	//addChild(dialog);
+	auto dialog = menu->dialog;
 	if (index >= 0)
 	{
-		dialog.setHead1(dialog.getHeadName(index));
+		dialog->setHead1(dialog->getHeadName(index));
 	}
 	else
 	{
-		dialog.setHead1("");
+		dialog->setHead1("");
 	}
-	dialog.setTalkStr(str);
-	dialog.run();
-	removeChild(&dialog);
+	dialog->setTalkStr(str);
+	dialog->visible = true;
+	dialog->run();
+	dialog->visible = false;
+	//removeChild(dialog);
 }
 
 void GameManager::fadeIn()
 {
-	weather.fadeIn();
+	weather->fadeIn();
 }
 
 void GameManager::fadeOut()
 {
-	weather.fadeOut();
+	weather->fadeOut();
 }
 
 void GameManager::setFadeLum(int lum)
 {
 	global.data.fadeLum = lum;
-	weather.setFadeLum(lum);
+	weather->setFadeLum(lum);
 }
 
 void GameManager::setMainLum(int lum)
 {
 	global.data.mainLum = lum;
-	weather.setLum(lum);
+	weather->setLum(lum);
 }
 
 void GameManager::sleep(unsigned int time)
 {
-	weather.sleep(time);
+	weather->sleep(time);
 }
 
 void GameManager::showMessage(const std::string & str)
 {
-	menu.showMessage(str);
+	menu->showMessage(str);
 }
 
 void GameManager::addToMemo(const std::string & str)
@@ -1750,20 +1686,19 @@ void GameManager::clearMemo()
 
 void GameManager::buyGoods(const std::string & fileName)
 {
-	BuySellMenu * bsMenu = new BuySellMenu;
+	std::shared_ptr<BuySellMenu> bsMenu = std::make_shared<BuySellMenu>();
 	addChild(bsMenu);
 	bsMenu->buy(fileName);
 	removeChild(bsMenu);
-	delete bsMenu;
 }
 
 void GameManager::sellGoods(const std::string & fileName)
 {
-	BuySellMenu * bsMenu = new BuySellMenu;
+	std::shared_ptr<BuySellMenu> bsMenu = std::make_shared<BuySellMenu>();
 	addChild(bsMenu);
 	bsMenu->sell(fileName);
 	removeChild(bsMenu);
-	delete bsMenu;
+
 }
 
 void GameManager::hideInterface()
@@ -1773,12 +1708,12 @@ void GameManager::hideInterface()
 
 void GameManager::hideBottomWnd()
 {
-	menu.hideBottomWnd();
+	menu->hideBottomWnd();
 }
 
 void GameManager::showBottomWnd()
 {
-	menu.showBottomWnd();
+	menu->showBottomWnd();
 }
 
 void GameManager::hideMouseCursor()
@@ -1797,13 +1732,13 @@ void GameManager::showSnow(int bsnow)
 	{
 		global.data.snowShow = true;
 		global.data.rainShow = false;
-		weather.setWeather(wtSnow);
+		weather->setWeather(wtSnow);
 	}
 	else
 	{
 		global.data.snowShow = false;
 		global.data.rainShow = false;
-		weather.setWeather(wtNone);
+		weather->setWeather(wtNone);
 	}
 }
 
@@ -1818,86 +1753,66 @@ void GameManager::showRain(int brain)
 	{
 		global.data.rainShow = true;
 		global.data.snowShow = false;
-		weather.setWeather(wtLightning);
+		weather->setWeather(wtLightning);
 	}
 	else
 	{
 		global.data.rainShow = false;
 		global.data.snowShow = false;
-		weather.setWeather(wtNone);
+		weather->setWeather(wtNone);
 	}
+}
+
+void GameManager::loadingDisplayThread(std::vector<_shared_image> loadingImage)
+{
+	int w, h;
+	engine->getWindowSize(w, h);
+
+	auto beginTime = engine->getTime();
+
+	size_t imgIndex = 0;
+
+	loadMutex.lock();
+	while (!loadThreadOver)
+	{
+		loadMutex.unlock();
+
+		engine->frameBegin();
+
+		if (engine->getTime() - beginTime > 100)
+		{
+			beginTime = engine->getTime();
+			imgIndex++;
+			if (imgIndex >= loadingImage.size())
+			{
+				imgIndex = 0;
+			}
+		}
+		engine->delay(10);
+
+		engine->drawImage(loadingImage[imgIndex], w - 320, h - 70);
+		engine->frameEnd();
+
+		loadMutex.lock();
+	}
+	loadingDisplaying = false;
+	loadMutex.unlock();
 }
 
 void GameManager::onUpdate()
 {
 	runEventList();
-#ifdef _MOBILE
-    if (!inEvent)
-    {
-		fastSelectingList.resize(0);
-        int radius = 2;
-		auto tempObjList = objectManager.findRadiusScriptViewObj(player->position, radius);
-        for (int i = 0; i < tempObjList.size(); ++i)
-		{
-			NextAction action;
-			action.type = ndObj;
-			action.destGE = tempObjList[i];
-			action.dest = action.destGE->position;
-            action.distance = map.calDistance(player->position, action.destGE->position);
-			fastSelectingList.push_back(action);
-		}
-        auto tempNPCList = npcManager.findRadiusScriptViewNPC(player->position, radius);
-        for (int i = 0; i < tempNPCList.size(); ++i)
-        {
-            NextAction action;
-            action.type = ndTalk;
-            action.destGE = tempNPCList[i];
-            action.dest = action.destGE->position;
-            action.distance = map.calDistance(player->position, action.destGE->position);
-
-            fastSelectingList.push_back(action);
-        }
-
-        std::sort(fastSelectingList.begin(), fastSelectingList.end(), actionCmp);
-        if (fastSelectingList.size() > FASTBTN_COUNT)
-        {
-            fastSelectingList.resize(FASTBTN_COUNT);
-        }
-        for (int i = 0; i < fastSelectingList.size(); ++i)
-        {
-            if (fastSelectingList[i].type == ndTalk)
-            {
-				controller.setFastSelectBtn(i, true, ((NPC*)fastSelectingList[i].destGE)->npcName);
-            }
-            else
-            {
-				controller.setFastSelectBtn(i, true, ((Object *)fastSelectingList[i].destGE)->objName);
-            }
-        }
-
-		for (int i = fastSelectingList.size(); i < FASTBTN_COUNT; ++i)
-		{
-			controller.setFastSelectBtn(i, false);
-		}
-    }
-    else
-    {
-        for (int i = 0; i < FASTBTN_COUNT; ++i)
-        {
-			controller.setFastSelectBtn(i, false);
-        }
-    }
-#endif
 }
 
 void GameManager::onDraw()
 {
-	map.drawMap();
+	map->drawMap();
 }
 
 bool GameManager::onInitial()
 {
-	initMenu();
+	initMenuWithThread();
+	//initMenu();
 	if (gameIndex == 0)
 	{
 		inEvent = true;
@@ -1906,9 +1821,8 @@ bool GameManager::onInitial()
 	}
 	else
 	{
-//		loadGameWithThread(gameIndex);
-        loadGame(gameIndex);
-		weather.fadeInEx();
+		loadGameWithThread(gameIndex);
+		weather->fadeInEx();
 	}	
 	return true;
 }
@@ -1932,33 +1846,19 @@ void GameManager::onEvent()
 	}
 }
 
-bool GameManager::onHandleEvent(AEvent * e)
+bool GameManager::onHandleEvent(AEvent & e)
 {
-	//printf("global input : %d \n", global.data.canInput);
 	if (!global.data.canInput)
 	{
 		return false;
 	}
-//	if (e->eventType == ET_FINGERDOWN && e->eventData == touchInRectID)
-//	{
-//		Point pos = getMousePoint(e->eventX, e->eventY);
-//		//player->position = pos;
-//
-//		NextAction act;
-//
-//		act.action = acJump;
-//		act.dest = pos;
-//		player->addNextAction(&act);
-//		return true;
-//	}
-//	else
-	if (e->eventType == ET_KEYDOWN)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_F12 && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		if (e.eventData == KEY_F12 && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
 		{
 			cheatMode = !cheatMode;
 		}
-		else if (e->eventData == KEY_Q && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_Q && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
 		{
 			if (cheatMode)
 			{
@@ -1967,21 +1867,26 @@ bool GameManager::onHandleEvent(AEvent * e)
 				fullThew();
 			}
 		}
-		else if (e->eventData == KEY_W && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_W && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
 		{
 			if (cheatMode)
 			{
-				magicManager.addPracticeExp(100000);
+				if (magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level < 10)
+				{
+					magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level += 1;
+					menu->practiceMenu->updateExp();
+					menu->practiceMenu->updateLevel();
+				}
 			}
 		}
-		else if (e->eventData == KEY_E && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_E && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
 		{
 			if (cheatMode)
 			{
-				player->addExp(10000);
+				player->addExp(player->levelUpExp - player->exp);
 			}
 		}
-		else if (e->eventData == KEY_R && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_R && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
 		{
 			if (cheatMode)
 			{
@@ -1994,7 +1899,7 @@ bool GameManager::onHandleEvent(AEvent * e)
 
 void GameManager::clearBody()
 {
-	objectManager.clearBody();
+	objectManager->clearBody();
 }
 
 void GameManager::openBox()

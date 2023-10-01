@@ -14,15 +14,15 @@ PartnerManager::~PartnerManager()
 void PartnerManager::loadPartner()
 {
 	freeResource();
-	for (size_t i = 0; i < gm->npcManager.npcList.size(); i++)
+	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
 	{
-		if (gm->npcManager.npcList[i] != nullptr && gm->npcManager.npcList[i]->kind == nkPartner)
+		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->kind == nkPartner)
 		{
-			partnerList.push_back(gm->npcManager.npcList[i]);
+			partnerList.push_back(gm->npcManager->npcList[i]);
 		}
 	}
-	for (int i = 0; i < partnerList.size(); ++i) {
-		gm->npcManager.removeNPC(partnerList[i]);
+	for (size_t i = 0; i < partnerList.size(); ++i) {
+		gm->npcManager->removeNPCOnlyFromList(partnerList[i]);
 	}
 }
 
@@ -30,7 +30,7 @@ void PartnerManager::addPartner()
 {
 	for (size_t i = 0; i < partnerList.size(); i++)
 	{
-		gm->npcManager.addNPC(partnerList[i]);
+		gm->npcManager->addNPC(partnerList[i]);
 	}
 	partnerList.resize(0);
 }
@@ -57,10 +57,10 @@ void PartnerManager::load(int index)
 		partnerList.resize(count);
 		for (size_t i = 0; i < partnerList.size(); i++)
 		{
-			partnerList[i] = new NPC;
+			partnerList[i] = std::make_shared<NPC>();
 			section = convert::formatString("%d", i + 1);
 			partnerList[i]->initFromIni(&ini, section);
-			gm->npcManager.addNPC(partnerList[i]);
+			gm->npcManager->addNPC(partnerList[i]);
 		}
 	}
 	partnerList.resize(0);
@@ -69,18 +69,17 @@ void PartnerManager::load(int index)
 void PartnerManager::save(int index)
 {
 	freeResource();
-	std::string fName = SAVE_CURRENT_FOLDER;
-    fName += PARTNER_INI_NAME;
+	std::string fName = PARTNER_INI_NAME;
     if (index >= 0)
     {
         fName += convert::formatString("%d", index);
     }
     fName += PARTNER_INI_EXT;
-	for (size_t i = 0; i < gm->npcManager.npcList.size(); i++)
+	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
 	{
-		if (gm->npcManager.npcList[i] != nullptr && gm->npcManager.npcList[i]->kind == nkPartner)
+		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->kind == nkPartner)
 		{
-			partnerList.push_back(gm->npcManager.npcList[i]);
+			partnerList.push_back(gm->npcManager->npcList[i]);
 		}
 	}
 
@@ -93,7 +92,7 @@ void PartnerManager::save(int index)
 		partnerList[i]->saveToIni(&ini, section);
 	}
 	partnerList.resize(0);
-	ini.saveToFile(fName);
+	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
     
     SaveFileManager::AppendFile(fName);
 }

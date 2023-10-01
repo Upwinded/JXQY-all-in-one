@@ -8,18 +8,22 @@
 #include "../File/INIReader.h"
 #include "../Types/Types.h"
 
+class Element;
+
+using PElement = std::shared_ptr<Element>;
+
 class Element
 {
 public:
 	Element();
-protected:
 	virtual ~Element();
 public:
-	void addChild(Element * child);
-	void removeChild(Element * child);
+	static void setAsTop(PElement child);
+	static void removeFromTop(PElement child);
+	void addChild(PElement child);
+	void removeChild(PElement child);
 	void removeAllChild();
-	void changeParent(Element * p);
-	void setChildActivated(Element * child, bool activated);
+	void setChildActivated(PElement child, bool activated);
 	//按照自身x,y位置设置子元素的区域
 	void setChildRectReferToParent(int setLevel = -1);
 	unsigned int getResult();
@@ -27,12 +31,18 @@ public:
 	int index = -1;
 	int type = -1;
 	bool canCallBack = false;
+private:
+	static PElement _topParent;
+	static bool _top_initialed;
 
 protected:
+	PElement getMySharedPtr();
+	PElement getChildSharedPtr(Element* element);
+
 	Engine* engine = nullptr;
 
-	static std::vector<Element *> runningElement;
-	Time timer;						//计时器
+	static std::vector<PElement> runningElement;
+	Timer timer;						//计时器
 public:
 
 	unsigned char priority = 128;	//优先级，0最大，255最小，默认128
@@ -42,7 +52,7 @@ public:
 	std::string name = "Element";
 
 	Element * parent = nullptr;
-	std::vector<Element *> children;
+	std::vector<PElement> children;
 
 	UTime LastFrameTime = 0;
 
@@ -83,13 +93,13 @@ protected:
 	int mouseLDownY = 0;
 public:
 	EventTouchID touchingID = TOUCH_UNTOUCHEDID;	//鼠标进入状态变量
-	EventTouchID touchInRectID = TOUCH_UNTOUCHEDID;	//鼠标在区域中左键按下
+	EventTouchID touchingDownID = TOUCH_UNTOUCHEDID;	//鼠标在区域中左键按下
 protected:
 	bool nextFrame = false;
 
 	static EventTouchID dragging;
 	static int dragParam[2];
-	static Element* currentDragItem;
+	static PElement currentDragItem;
 	static Point dragTouchPosition;
 	static Point dragDownPosition;
 	int dragRange = 1;	//鼠标拖拽移动判定的像素范围
@@ -100,7 +110,7 @@ protected:
 	virtual bool mouseInRect(int x, int y);
 private:
 	//先交给每个child处理事件,再处理自身事件
-	bool handleEvent(AEvent * e);
+	bool handleEvent(AEvent& e);
 	void handleEvents();
 	bool checkAllTouchDown(EventTouchID id, int x, int y);
 	bool checkTouchDown(EventTouchID id, int x, int y);
@@ -129,6 +139,7 @@ private:
 protected:
 	void quit();
 	bool running = false;
+
 public:
 	unsigned int run();
 	unsigned int stop(int ret = erNone);
@@ -138,10 +149,13 @@ public:
 	void freeAll();
 	virtual void freeResource() { result = erNone; };
 	virtual void initFromIni(std::string fileName) {};
+
+	bool isDragging();
+
 protected:
 	virtual void onEvent() {};
 	//处理事件，已处理返回true，未处理返回false，未处理的事件将继续交给其它元素进行处理
-	virtual bool onHandleEvent(AEvent * e) { return false; };
+	virtual bool onHandleEvent(AEvent & e) { return false; };
 	//鼠标进入触发的事件
 	virtual void onMouseMoveIn(int x, int y) {};
 	//鼠标移出触发的事件
@@ -155,7 +169,7 @@ protected:
 	//鼠标点击事件
 	virtual void onClick() {};
 	//拖拽放置事件
-	virtual void onDrop(Element * src, int param1, int param2) {};
+	virtual void onDrop(PElement src, int param1, int param2) {};
 	//设置控件继承区域触发事件
 	virtual void onSetChildRect() {};
 	//拖拽事件
@@ -163,7 +177,7 @@ protected:
 	//正在拖拽，拖拽时每帧都会调用
 	virtual void onDragging(int x, int y) {};
 	//拖拽结束时调用，可在此函数中取消拖拽状态，避免放置事件触发
-	virtual void onDragEnd(Element * dst, int x, int y) {};
+	virtual void onDragEnd(PElement dst, int x, int y) {};
 	//画拖拽的画面
 	virtual void onDrawDrag(int x, int y) {};
 	//所需画的东西写在这里
@@ -186,5 +200,5 @@ protected:
 
 public:
 	//供子元素回调
-	virtual void onChildCallBack(Element * child) {};
+	virtual void onChildCallBack(PElement child) {};
 };

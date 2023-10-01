@@ -4,9 +4,6 @@
 // Go to the project home page for more info:
 //
 // https://github.com/benhoyt/inih
-#ifndef _CRT_SECURE_NO_WARNINGS
-#define _CRT_SECURE_NO_WARNINGS
-#endif 
 
 #include <algorithm>
 #include <cctype>
@@ -124,21 +121,21 @@ void INIReader::Set(const std::string& section, const std::string& name,
 
 }
 
-void INIReader::SetTime64(const std::string& section, const std::string& name, Uint64 value)
+void INIReader::SetTime(const std::string& section, const std::string& name, UTime value)
 {
-	std::string v = formatString("%d", value);
+	std::string v = std::to_string(value);
 	Set(section, name, v);
 }
 
 void INIReader::SetInteger(const std::string & section, const std::string & name, long value)
 {
-	std::string v = formatString("%d", value);
+	std::string v = std::to_string(value);
 	Set(section, name, v);
 }
 
 void INIReader::SetReal(const std::string & section, const std::string & name, double value)
 {
-	std::string v = formatString("%lf", value);
+	std::string v = std::to_string(value);
 	Set(section, name, v);
 }
 
@@ -151,7 +148,7 @@ void INIReader::SetBoolean(const std::string & section, const std::string & name
 unsigned int INIReader::GetColor(const std::string & section, const std::string & name, unsigned int value)
 {
 	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
-	std::string col = convert::formatString("%d", colorData[0]) + "," + convert::formatString("%d", colorData[1]) + "," + convert::formatString("%d", colorData[2]);
+	std::string col = std::to_string(colorData[0]) + "," + std::to_string(colorData[1]) + "," + std::to_string(colorData[2]);
 	col = Get(section, name, col);
 	std::vector<std::string> c = convert::splitString(col, ",");
 	for (size_t i = 0; i < (c.size() > 3 ? 3 : c.size()); i++)
@@ -159,50 +156,58 @@ unsigned int INIReader::GetColor(const std::string & section, const std::string 
 		//char* end = nullptr;
 		//long n = strtol(c[i].c_str(), &end, 0);
 		//colorData[i] = (unsigned char)(end > c[i].c_str() ? n : colorData[i]);
-		colorData[i] = (unsigned char)atoi(c[i].c_str());
+		if (!c[i].empty())
+		{
+			try
+			{
+				colorData[i] = (unsigned char)std::stoul(c[i]);
+			}
+			catch (const std::exception&)
+			{
+
+			}
+		}
 	}
 	return 0xFF000000 | ((colorData[0] << 16) + (colorData[1] << 8) + colorData[2]);
 }
 
-Uint64 INIReader::GetTime64(const std::string& section, const std::string& name, Uint64 default_value) const
+UTime INIReader::GetTime(const std::string& section, const std::string& name, UTime default_value) const
 {
 	string valstr = Get(section, name, "");
-	const char* value = valstr.c_str();
-	if (value == nullptr)
+	try
+	{
+		return (UTime)std::stoll(valstr, nullptr, 0);
+	}
+	catch (const std::exception&)
 	{
 		return default_value;
 	}
-	char* end;
-	// This parses "1234" (decimal) and also "0x4D2" (hex)
-	auto n = strtoll(value, &end, 0);
-	return end > value ? n : default_value;
 }
 
 long INIReader::GetInteger(const string& section, const string& name, long default_value) const
 {
     string valstr = Get(section, name, "");
-    const char* value = valstr.c_str();
-	if (value == nullptr)
+	try
+	{
+		return std::stol(valstr, nullptr, 0);
+	}
+	catch (const std::exception&)
 	{
 		return default_value;
 	}
-    char* end;
-    // This parses "1234" (decimal) and also "0x4D2" (hex)
-    long n = strtol(value, &end, 0);
-    return end > value ? n : default_value;
 }
 
 double INIReader::GetReal(const string& section, const string& name, double default_value) const
 {
     string valstr = Get(section, name, "");
-    const char* value = valstr.c_str();
-	if (value == nullptr)
+	try
+	{
+		return std::stod(valstr);
+	}
+	catch (const std::exception&)
 	{
 		return default_value;
 	}
-    char* end;
-    double n = strtod(value, &end);
-    return end > value ? n : default_value;
 }
 
 bool INIReader::GetBoolean(const string& section, const string& name, bool default_value) const
@@ -241,7 +246,7 @@ void INIReader::saveToFile(const std::string & fileName)
 	/*auto fp = SDL_RWFromFile(fileName.c_str(), "wb");
 	if (!fp)
 	{
-		fprintf(stderr, "Can not open file %s\n", fileName.c_str());
+		GameLog::write(stderr, "Can not open file %s\n", fileName.c_str());
 		return;
 	}
 	SDL_RWseek(fp, 0, 0);
@@ -269,16 +274,3 @@ int INIReader::ValueHandler(void* user, const char* section, const char* name,
     return 1;
 }
 
-#ifdef _MSC_VER
-#define vsprintf vsprintf_s
-#endif
-
-std::string INIReader::formatString(const char * format, ...)
-{
-	char s[1000];
-	va_list arg_ptr;
-	va_start(arg_ptr, format);
-	vsprintf(s, format, arg_ptr);
-	va_end(arg_ptr);
-	return s;
-}

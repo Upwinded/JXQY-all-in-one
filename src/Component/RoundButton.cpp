@@ -1,27 +1,17 @@
 
 #include "RoundButton.h"
 
-RoundButton::RoundButton(int range): RoundButton()
-{
-	setRange(range);
-}
-
 void RoundButton::freeResource()
 {
 	for (size_t i = 0; i < _textImageCount; i++)
 	{
-		if (_textImage[i] != nullptr)
-		{
-			//engine->freeImage(_textImage[i]);
-			_textImage[i] = nullptr;
-		}
+		_textImage[i] = nullptr;
 	}
 	Button::freeResource();
 }
 
 void RoundButton::setText(const std::string& text)
 {
-	freeResource();
 	_text = text;
 	for (size_t i = 0; i < _textImageCount; i++)
 	{
@@ -50,65 +40,15 @@ bool RoundButton::mouseInRect(int x, int y)
 	return false;
 }
 
-void RoundButton::initFromIni(const std::string& fileName)
+void RoundButton::initFromIni(INIReader & ini)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
 
-	kind = ini.Get("Init", "Kind", kind);
-	rect.x = ini.GetInteger("Init", "Left", rect.x);
-	rect.y = ini.GetInteger("Init", "Top", rect.y);
-	rect.w = ini.GetInteger("Init", "Width", rect.w);
-	rect.h = ini.GetInteger("Init", "Height", rect.h);
+	Button::initFromIni(ini);
+
 	roundRange = ini.GetInteger("Init", "Range", roundRange);
 	_text = ini.Get("Init", "text", _text);
 	setText(_text);
-	std::string impName = ini.Get("Init", "Image", "");
-	auto impImage = IMP::createIMPImage(impName);
-	if (impImage != nullptr)
-	{
-		if (convert::lowerCase(kind) == "trackbtn")
-		{
-			int frame = 0;
-			frame = ini.GetInteger("Init", "Up", 0);
-			image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger("Init", "Track", 1);
-			image[1] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger("Init", "Down", 1);
-			image[2] = IMP::createIMPImageFromFrame(impImage, frame);
-
-			std::string soundName = ini.Get("Init", "Sound", "");
-			loadSound(soundName, 1);
-			loadSound(soundName, 0);
-		}
-		else
-		{
-			int frame = 0;
-			frame = ini.GetInteger("Init", "Up", 0);
-			image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger("Init", "Down", 1);
-			image[2] = IMP::createIMPImageFromFrame(impImage, frame);
-
-			std::string soundName = ini.Get("Init", "Sound", "");
-			loadSound(soundName, 1);
-		}
-	}
-	else
-	{
-		printf("%s image file error\n", impName.c_str());
-	}
-
-	IMP::clearIMPImage(impImage);
-	//delete impImage;
-	impImage = nullptr;
 }
 
 void RoundButton::onMouseLeftDown(int x, int y)
@@ -116,7 +56,17 @@ void RoundButton::onMouseLeftDown(int x, int y)
 	if (parent != nullptr && parent->canCallBack)
 	{
 		result = erMouseLDown;
-		parent->onChildCallBack(this);
+		parent->onChildCallBack(getMySharedPtr());
+		result = erNone;
+	}
+}
+
+void RoundButton::onClick()
+{
+	if (parent != nullptr && parent->canCallBack)
+	{
+		result = erClick;
+		parent->onChildCallBack(getMySharedPtr());
 		result = erNone;
 	}
 }
@@ -135,7 +85,7 @@ void RoundButton::onDraw()
 	}
 	if (!needDrawStr) { return; }
 	_shared_image img = nullptr;
-	if (touchInRectID != TOUCH_UNTOUCHEDID || (dragging != TOUCH_UNTOUCHEDID && currentDragItem == this))
+	if (touchingDownID != TOUCH_UNTOUCHEDID || (dragging != TOUCH_UNTOUCHEDID && currentDragItem.get() == this))
 	{
 		img = _textImage[1];
 	}

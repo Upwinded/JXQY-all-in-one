@@ -72,8 +72,6 @@ public:
 	int damage = 0;
 	int frame = 0;
 
-	int state = 0;
-
 	UTime damageTime = 0;
 	UTime damageInterval = 0;
 	UTime randSoundTime = 0;

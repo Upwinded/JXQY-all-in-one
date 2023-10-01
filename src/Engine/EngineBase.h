@@ -5,41 +5,35 @@ SDL、FMOD、FFMPEG等底层都封装在这里。
 #pragma once
 
 #include <string>
+#include <deque>
+#include <string>
+#include <vector>
+#include <functional>
+#include <algorithm>
+#include <mutex>
+#include <atomic>
 
 #if defined(__IPHONEOS__)
-#ifndef _MOBILE
-#define _MOBILE
-#endif // !_MOBILE
+#ifndef __MOBILE__
+#define __MOBILE__
+#endif // !__MOBILE__
 #endif // defined(__IPHONEOS__)
 
-
 #ifdef __ANDROID__
-#ifndef _MOBILE
-#define _MOBILE
-#endif // !_MOBILE
+#ifndef __MOBILE__
+#define __MOBILE__
+#endif // !__MOBILE__
 #endif // __ANDROID__
 
 #ifdef _WIN32
-#ifndef _MOBILE
-//#define _MOBILE
-#endif // !_MOBILE
-#endif // _WIN32
-
-
-#ifdef _WIN32
 #ifdef _MSC_VER
-#include "windows.h" 
-#define SDL_MAIN_HANDLED
-#define USE_LOGO_RESOURCE
+// 是否从资源文件读取LOGO
+//#define USE_LOGO_RESOURCE
+#ifdef USE_LOGO_RESOURCE
+#include "windows.h"
+#endif
 #endif // _MSC_VER
-//#define SHF_USE_VIDEO
-//#define SHF_USE_AUDIO
 #endif // _WIN32
-
-//#ifdef __ANDROID__
-//#define SHF_USE_AUDIO
-//#define SHF_USE_VIDEO
-//#endif
 
 #ifndef SHF_USE_AUDIO
 #define SHF_USE_AUDIO
@@ -84,23 +78,10 @@ extern "C"
 #include "../File/File.h"
 #include "../libconvert/libconvert.h"
 #include "../Types/Types.h"
-
-
-#include <string>
-#include <vector>
-#include <functional>
-#include <algorithm>
-#include <mutex>
-
+#include "../File/log.h"
 
 #ifdef main
 #undef main
-#endif
-
-#if (defined USE_TIME64)
-typedef Uint64 UTime;
-#else
-typedef Uint32 UTime;
 #endif
 
 struct Rect
@@ -126,6 +107,8 @@ typedef std::shared_ptr<Cursor_t> _shared_cursor;
 typedef SDL_Texture Image_t;
 typedef std::shared_ptr<Image_t> _shared_image;
 #define make_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){SDL_DestroyTexture(b);})
+
+#define make_safe_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){std::lock_guard<std::mutex> locker(EngineBase::_mutex); SDL_DestroyTexture(b);})
 
 typedef SDL_Surface Surface_t;
 typedef std::shared_ptr<Surface_t> _shared_surface;
@@ -193,6 +176,20 @@ struct TimeEx
 
 #ifdef SHF_USE_VIDEO
 
+struct VideoSound
+{
+	_channel c = nullptr;
+	_music m = nullptr;
+	double t = 0.0;
+	bool stopped = false;
+};
+
+struct VideoImage
+{
+	_shared_image image = nullptr;
+	double t = 0.0;
+};
+
 struct MediaContent
 {
 	int time;
@@ -238,20 +235,17 @@ struct VideoStruct
 	FMOD_CHANNELGROUP * cg = nullptr;
 
 	float videoVolume = 1;
-	std::vector<_music> videoSounds;
-	std::vector<_channel> videoSoundChannels;
-	std::vector<double> soundTime;
+	std::deque<VideoSound> videoSounds;
 	double soundDelay = 0;
 	double soundRate = 48.0;
 	FMOD_SYSTEM * soundSystem = nullptr;
 	void * b = nullptr;
 	
 	int pixelFormat = 0;
-	std::vector<_shared_image> image;
+	std::deque<VideoImage> videoImage;
 	AVFrame * sFrame = nullptr;
 	SwsContext * swsContext = nullptr;
 
-	std::vector<double> videoTime;
 	SDL_Rect rect;
 	bool fullScreen = true;
 	int loop = 0;
@@ -273,32 +267,13 @@ typedef int Video_t;
 //typedef std::shared_ptr<Video_t> _video;
 typedef Video_t* _video;
 
-class MutexLocker
+class Timer
 {
 public:
-	MutexLocker(std::mutex* mutex)
-	{
-		_mutex = mutex; 
-		//printf("mutex try to lock!\n");
-		_mutex->lock();
-		//printf("mutex locked!\n");
-	}
-	virtual ~MutexLocker() 
-	{ 
-		_mutex->unlock(); 
-		//printf("mutex unlocked!\n"); 
-	}
-private:
-	std::mutex* _mutex;
-};
-
-class Time
-{
-public:
-	Time();
-	Time(Time* parent);
-	virtual ~Time();
-	void setParent(Time* parent);
+	Timer();
+	Timer(Timer* parent);
+	virtual ~Timer();
+	void setParent(Timer* parent);
 	UTime get();
 	void set(UTime t);
 	bool getPaused();
@@ -306,15 +281,15 @@ public:
 	void reInit();
 
 private:
-	void addChild(Time* time);
-	void removeChild(Time* time);
+	void addChild(Timer* time);
+	void removeChild(Timer* time);
 
 private:
 	UTime _beginTime = 0;
 	bool _paused = false;
 	UTime _pauseBeginTime = 0;
-	Time* _parent = nullptr;
-	std::vector<Time*> _children;
+	Timer* _parent = nullptr;
+	std::vector<Timer*> _children;
 };
 
 typedef int (* AppEventHandler)(SDL_Event* e);
@@ -326,6 +301,7 @@ protected:
 public:
 	virtual ~EngineBase();
 
+	static std::mutex _mutex;
 	//初始化类函数
 private:
 	_shared_image logo = nullptr;
@@ -344,11 +320,13 @@ private:
 	_shared_image realScreen;
 
 protected:
+
+
     std::mutex soundMutex;
-	static SDL_Renderer* renderer;
-	static SDL_Texture* tempRenderTarget;
+	static std::atomic<SDL_Renderer*> renderer;
+	static std::atomic<SDL_Texture*> tempRenderTarget;
 	static AppEventHandler _externalEventHandler;
-	static bool isBackGround;
+	static std::atomic<bool> isBackGround;
 
 	int SetRenderTarget(SDL_Renderer* r, SDL_Texture* t);
 
@@ -383,7 +361,7 @@ protected:
 
 	//时间差需小于49天 -_-|||
 private:
-	static Time time;
+	static Timer timer;
 	int FPS = 0;
 	int FPSTime = 0;
 	int FPSCounter = 0;
@@ -413,6 +391,7 @@ protected:
 
 protected:
 //图片相关的函数
+
 	void drawImage(_shared_image image, SDL_Rect * src, SDL_Rect * dst);
 	void drawImage(_shared_image image, SDL_Rect * rect);
 	bool pointInImage(_shared_image image, int x, int y);
@@ -426,7 +405,8 @@ protected:
 	_shared_surface loadSurfaceFromMem(std::unique_ptr<char[]>& data, int size);
 	void drawImage(_shared_image image, int x, int y);
 	void drawImage(_shared_image image, Rect * rect);
-	void drawImage(_shared_image image, Rect *src, Rect * dst);
+	void drawImage(_shared_image image, Rect * src, Rect * dst);
+	void drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center);
 	//void freeImage(Image_t* image);
 	void setImageAlpha(_shared_image image, unsigned char a);
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
@@ -440,7 +420,7 @@ protected:
 	//将对话字符串保存为Texture，用于提升绘图速度
 	bool beginDrawTalk(int w, int h);
 	_shared_image endDrawTalk();
-	void drawSolidText(const std::string& text, int x, int y, int size, unsigned int color);
+	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
 	void drawSolidUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
 
 	//从纹理像素数据生成BMP16格式截图
@@ -465,7 +445,7 @@ protected:
 #define LUM_MASK_WIDTH 800
 #define LUM_MASK_HEIGHT 400
 #define LUM_MASK_MAX_ALPHA 80
-	_shared_image createMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
+	_shared_image createMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a, bool safe = false);
 	_shared_image createLumMask();
 	//绘制遮罩
 	void drawMask(_shared_image mask);
@@ -498,7 +478,6 @@ protected:
 	int getEventCount();
 	int getEvent(AEvent& event);
 	void pushEvent(AEvent& event);
-	int readEventList(EventList& eList);
 	bool getKeyPress(KeyCode key);
 	bool getMousePress(MouseButtonCode button);
 	void getMouse(int& x, int& y);
@@ -515,7 +494,7 @@ protected:
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
 	_shared_image createUnicodeText(const std::wstring& text, int size, unsigned int color);
 	void drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
-	_shared_image createText(const std::string& text, int size, unsigned int color);
+	_shared_image createText(const std::string& text, int size, unsigned int color, bool safe = false);
 	void drawText(const std::string& text,int x, int y, int size, unsigned int color);
 	void setFontName(const std::string& fontName);
 	

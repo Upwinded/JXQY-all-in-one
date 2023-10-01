@@ -9,7 +9,7 @@ public:
 	MenuController();
 	virtual ~MenuController();
 
-	virtual bool onHandleEvent(AEvent* e);
+	virtual bool onHandleEvent(AEvent & e);
 
 	void init();
 	void freeResource();
@@ -21,18 +21,20 @@ public:
 	void hideBottomWnd();
 	void showBottomWnd();
 
-	Panel upMenu;
+	std::shared_ptr<Panel> upMenu = nullptr;
 
-	MsgBox* messageBox = nullptr;
-	StateMenu* stateMenu = nullptr;
-	ToolTip* toolTip = nullptr;
-	MemoMenu* memoMenu = nullptr;
-	EquipMenu* equipMenu = nullptr;
-	PracticeMenu* practiceMenu = nullptr;
-	GoodsMenu* goodsMenu = nullptr;
-	MagicMenu* magicMenu = nullptr;
+	std::shared_ptr<MsgBox> messageBox = nullptr;
+	std::shared_ptr<StateMenu> stateMenu = nullptr;
+	std::shared_ptr<ToolTip> toolTip = nullptr;
+	std::shared_ptr<MemoMenu> memoMenu = nullptr;
+	std::shared_ptr<EquipMenu> equipMenu = nullptr;
+	std::shared_ptr<PracticeMenu> practiceMenu = nullptr;
+	std::shared_ptr<GoodsMenu> goodsMenu = nullptr;
+	std::shared_ptr<MagicMenu> magicMenu = nullptr;
 
-	BottomMenu* bottomMenu = nullptr;
+	std::shared_ptr<BottomMenu> bottomMenu = nullptr;
+
+	std::shared_ptr<Dialog> dialog = nullptr;
 
 };
 

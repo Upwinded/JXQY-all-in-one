@@ -9,10 +9,6 @@ Effect::Effect()
 Effect::~Effect()
 {
 	freeResource();
-	if (parent != nullptr)
-	{
-		gm->effectManager.removeEffect(this);
-	}
 }
 
 void Effect::eventRun()
@@ -69,49 +65,26 @@ UTime Effect::getSuperImageTime()
 	return IMP::getIMPImageActionTime(magic.superImage);
 }
 
-void Effect::beginExplode()
+void Effect::beginExplode(Point pos)
 {
 	doing = ekExploding;
-	if (flyingDirection.x == 0 && flyingDirection.y == 0)
+	if (flyingDirection.is_zero() || pos == src)
 	{
-		offset = { 0, 0 };
+		offset = srcOffset;
+		position = pos;
 	}
 	else
 	{
-		double angle = atan2(-flyingDirection.y, flyingDirection.x);
-
-		if (angle >= pi * 7 / 8 || angle < - pi * 7 / 8 )
+		offset = getCollideOffset(pos);
+		auto l1 = hypot(offset.x, offset.y);
+		if (l1 < TILE_HEIGHT)
 		{
-			offset = { TILE_WIDTH / 2, 0 };
+			auto l2 = hypot(flyingDirection.x * MapXRatio,flyingDirection.y);
+			offset.x -= flyingDirection.x * (TILE_HEIGHT - l1) / l2 * MapXRatio;
+			offset.y -= flyingDirection.y * (TILE_HEIGHT - l1) / l2;
 		}
-		else if (angle < pi * 7 / 8 && angle >= pi * 5 / 8)
-		{
-			offset = { TILE_WIDTH / 4, TILE_HEIGHT / 4 };
-		}
-		else if (angle < pi * 5 / 8 && angle >= pi * 3 / 8)
-		{
-			offset = { 0, TILE_HEIGHT / 2 };
-		}
-		else if (angle < pi * 3 / 8 && angle >= pi / 8)
-		{
-			offset = { -TILE_WIDTH / 4, TILE_HEIGHT / 4 };
-		}
-		else if (angle < pi / 8 && angle >= -pi / 8)
-		{
-			offset = { -TILE_WIDTH / 2, 0 };
-		}
-		else if (angle < -pi / 8 && angle >= -pi * 3 / 8)
-		{
-			offset = { -TILE_WIDTH / 4, -TILE_HEIGHT / 4 };
-		}
-		else if (angle < -pi * 3 / 8 && angle >= -pi * 5 / 8)
-		{
-			offset = { 0, -TILE_HEIGHT / 2 };
-		}
-		else
-		{
-			offset = { TILE_WIDTH / 4, -TILE_HEIGHT / 4 };
-		}
+		position = pos;
+		updatePosition();
 	}
 	if (magic.level[level].moveKind != mmkPoint)
 	{
@@ -149,7 +122,9 @@ void Effect::beginDrop()
 	doing = ekHiding;
 	lifeTime = 0;
 	result = erLifeExhaust;
-	magic.addThrowExplodeEffect(user, dest, dest, level, damage, evade, launcherKind);
+	auto tempMagic = std::make_shared<Magic>();
+	tempMagic->copy(magic);
+	Magic::addThrowExplodeEffect(tempMagic, user, dest, dest, level, damage, evade, launcherKind);
 	playSound(ekExploding);
 }
 
@@ -169,6 +144,29 @@ UTime Effect::getFlyingTime()
 	}
 }
 
+void Effect::updateSound()
+{
+	if (channel == nullptr)
+	{
+		return;
+	}
+	if (!engine->getMusicPlaying(channel))
+	{
+		channel = nullptr;
+		return;
+	}
+	if (gm == nullptr || gm->camera == nullptr)
+	{
+		return;
+	}
+
+	PointEx soundOffset = gm->camera->offset - offset;
+	Point pos = Map::getTilePosition(position, gm->camera->position, { 0, 0 }, soundOffset);
+	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
+	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
+	engine->setMusicPosition(channel, x, y);
+}
+
 void Effect::initParam()
 {
 	fileName = magic.iniName;
@@ -185,7 +183,7 @@ void Effect::calTime()
 void Effect::calDest()
 {
 	dest = src;
-	if (flyingDirection.x == 0 && flyingDirection.y == 0)
+	if (flyingDirection.is_zero())
 	{
 		return;
 	}
@@ -204,19 +202,24 @@ void Effect::calDest()
 
 auto Effect::getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {	
-	std::deque<Point> tempPath[3], result;
-	tempPath[0] = gm->map.getPassPathEx(from, fromOffset, to, toOffset, flyingDirection);
+	std::deque<Point> result, tempPath[3];
+	std::vector<double> resultDistance;
+	PointEx distanceOffset[3];
+	distanceOffset[0] = { 0, 0 };
+	tempPath[0] = gm->map->getPassPathEx(from, fromOffset, to, toOffset, flyingDirection);
 	double l = hypot(flyingDirection.x, flyingDirection.y);
-	int tempX = convert_max((int)(((double)flyingDirection.x) / l * width * TILE_WIDTH * MapXRatio / 2) - 1, 1);
-	int tempY = convert_max((int)(((double)flyingDirection.y) / l * width * TILE_WIDTH / 2) - 1, 1);
+	int tempX = convert_max((int)round(((double)flyingDirection.x) / l * width * TILE_WIDTH / 2) - 1, 1);
+	int tempY = convert_max((int)round((((double)flyingDirection.y) / l * width * TILE_WIDTH / 2) - 1), 1);
 	Point tempFrom, tempTo;
 	PointEx tempFromOffset, tempToOffset;
 	getNewPosition(from, { fromOffset.x + tempY , fromOffset.y - tempX }, &tempFrom, &tempFromOffset);
 	getNewPosition(to, { toOffset.x + tempY , toOffset.y - tempX }, &tempTo, &tempToOffset);
-	tempPath[1] = gm->map.getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
+	distanceOffset[1] = { (double)tempY, (double)- tempX};
+	tempPath[1] = gm->map->getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
 	getNewPosition(from, { fromOffset.x - tempY , fromOffset.y + tempX }, &tempFrom, &tempFromOffset);
 	getNewPosition(to, { toOffset.x - tempY , toOffset.y + tempX }, &tempTo, &tempToOffset);
-	tempPath[2] = gm->map.getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
+	distanceOffset[1] = { (double)-tempY, (double)tempX };
+	tempPath[2] = gm->map->getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
 	auto maxStep = convert_max(convert_max(tempPath[0].size(), tempPath[1].size()), tempPath[2].size());
 	for (size_t i = 0; i < maxStep; i++)
 	{
@@ -224,19 +227,44 @@ auto Effect::getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOff
 		{
 			if (tempPath[j].size() > i)
 			{
-				result.push_back(tempPath[j][i]);
+				auto toOffset = getCollideOffset(tempPath[j][i]);
+				auto l = Map::getTileDistance(src, srcOffset + distanceOffset[j], tempPath[j][i], toOffset);
+				bool found = false;
+				for (size_t k = 0; k < result.size(); k++)
+				{
+					if (result[k] == tempPath[j][i])
+					{
+						found = true;
+						break;
+					}
+					else
+					{
+						if (l < resultDistance[k])
+						{
+							found = true;
+							result.insert(result.begin() + k, tempPath[j][i]);
+							resultDistance.insert(resultDistance.begin() + k, l);
+							break;
+						}
+					}
+				}
+				if (!found)
+				{
+					result.push_back(tempPath[j][i]);
+					resultDistance.push_back(l);
+				}
 			}
 		}
 	}
 	return result;
 }
 
-void Effect::changeFollowTarget(GameElement * newTarget)
+void Effect::changeFollowTarget(std::shared_ptr<GameElement> newTarget)
 {
 	target = newTarget;
 	src = position;
 	srcOffset = offset;
-	dest = ((NPC *)newTarget)->position;
+	dest = (std::dynamic_pointer_cast<NPC>(newTarget))->position;
 	destOffset = { 0, 0 };
 	flyingDirection = Map::getTilePosition(dest, src);
 	flyingDirection.x -= (int)srcOffset.x;
@@ -276,7 +304,7 @@ int Effect::getMoveKind()
 	return magic.level[level].moveKind;
 }
 
-void Effect::initFromMagic(Magic * m)
+void Effect::initFromMagic(std::shared_ptr<Magic> m)
 {
 	if (m == nullptr)
 	{
@@ -285,7 +313,7 @@ void Effect::initFromMagic(Magic * m)
 	}
 	else
 	{
-		magic.copy(m);
+		magic.copy(*m.get());
 	}
 	initParam();
 	calTime();
@@ -325,6 +353,7 @@ void Effect::initFromIni(INIReader * ini, const std::string & section)
 	launcherKind = ini->GetInteger(section, "Launcher", lkSelf);
 	direction = ini->GetInteger(section, "Direction", 0);
 	level = ini->GetInteger(section, "Level", 0);
+
 	magic.initFromIni(fileName);
 	initParam();
 }
@@ -353,9 +382,9 @@ void Effect::saveToIni(INIReader * ini, const std::string & section)
 	ini->SetReal(section, "OffsetY", offset.y);
 	
 	auto tempBeginTime = getTime() - beginTime;
-	ini->SetTime64(section, "BeginTime", tempBeginTime);
-	ini->SetTime64(section, "LifeTime", lifeTime);
-	ini->SetTime64(section, "WaitTime", waitTime);
+	ini->SetTime(section, "BeginTime", tempBeginTime);
+	ini->SetTime(section, "LifeTime", lifeTime);
+	ini->SetTime(section, "WaitTime", waitTime);
 	ini->SetInteger(section, "Damage", damage);
 	ini->SetInteger(section, "Evade", evade);
 	ini->SetInteger(section, "Launcher", launcherKind);
@@ -365,19 +394,55 @@ void Effect::saveToIni(INIReader * ini, const std::string & section)
 
 void Effect::playSound(int act)
 {
-	PointEx soundOffset;
-	soundOffset.x = gm->camera.offset.x - offset.x;
-	soundOffset.y = gm->camera.offset.y - offset.y;
-	Point pos = Map::getTilePosition(position, gm->camera.position, { 0, 0 }, soundOffset);
+	PointEx soundOffset = gm->camera->offset - offset;
+	Point pos = Map::getTilePosition(position, gm->camera->position, { 0, 0 }, soundOffset);
 	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
 	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
+	float soundFactor = 1.0f;
 	switch (act)
 	{
 	case ekFlying:
-		playSoundFile(magic.flyingSound, x, y, engine->getSoundVolume() * 0.5f);
+		// 多重飞行技能释放时，声音叠加过大，此处降低音量处理
+		if (magic.level[level].moveKind == mmkHeartCircle || magic.level[level].moveKind == mmkCircle 
+			|| magic.level[level].moveKind == mmkHelixCircle)
+		{
+			soundFactor = 0.05f;
+		}
+		else if (magic.level[level].moveKind == mmkSector || magic.level[level].moveKind == mmkRandSector ||
+			(magic.level[level].moveKind == mmkRegion && magic.level[level].region == mrWave))
+		{
+			if (level < 4)
+			{
+				soundFactor = 0.35f;
+			}
+			else if (level < 7)
+			{
+				soundFactor = 0.2f;
+			}
+			else
+			{
+				soundFactor = 0.1f;
+			}
+		}
+		else if (magic.level[level].moveKind == mmkRegion)
+		{
+			if (level < 4)
+			{
+				soundFactor = 0.15f;
+			}
+			else if (level < 7)
+			{
+				soundFactor = 0.1f;
+			}
+			else
+			{
+				soundFactor = 0.05f;
+			}
+		}
+		channel = playSoundFile(magic.flyingSound, x, y, engine->getSoundVolume() * soundFactor);
 		break;
 	case ekExploding:
-		playSoundFile(magic.vanishSound, x, y, engine->getSoundVolume() * 0.5f);
+		channel = playSoundFile(magic.vanishSound, x, y, engine->getSoundVolume() * soundFactor);
 		break;
 	case ekHiding:
 		break;
@@ -490,9 +555,9 @@ void Effect::onUpdate()
 		updateEffectPosition(ft, (double)magic.level[level].speed);
 		Point to = position;
 		PointEx toOffset = offset;
-		//passPath = gm->map.getPassPath(from, to, flyingDirection, dest);
+		//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
 		passPath = getPassPath(from, fromOffset, to, toOffset);
-		if ((position.x == dest.x && position.y == dest.y) || Map::getTileDistance(src, srcOffset, position, offset) >= Map::getTileDistance(src, srcOffset, dest, destOffset))
+		if ((position == dest) || Map::getTileDistance(src, srcOffset, position, offset) >= Map::getTileDistance(src, srcOffset, dest, destOffset))
 		{
 			beginDrop();
 		}
@@ -515,7 +580,7 @@ void Effect::onUpdate()
 			updateEffectPosition(ft, (double)magic.level[level].speed);
 			Point to = position;
 			PointEx toOffset = offset;
-			//passPath = gm->map.getPassPath(from, to, flyingDirection, dest);
+			//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
 			passPath = getPassPath(from, fromOffset, to, toOffset);
 			if (getUpdateTime() - beginTime >= lifeTime)
 			{
@@ -525,7 +590,7 @@ void Effect::onUpdate()
 				}
 				else if (magic.level[level].moveKind == mmkRegion)
 				{
-					beginExplode();
+					beginExplode(position);
 					result = erExplode;
 					if (lifeTime == 0)
 					{
@@ -543,9 +608,9 @@ void Effect::onUpdate()
 			{
 				if (magic.level[level].moveKind == mmkFollow && getUpdateTime() - beginTime > MAGIC_FOLLOW_DELAY)
 				{
-					if (gm->npcManager.findNPC((NPC *)target))
+					if (gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(target)))
 					{
-						if (dest.x != ((NPC *)target)->position.x || dest.y != ((NPC *)target)->position.y)
+						if (dest != (std::dynamic_pointer_cast<NPC>(target))->position)
 						{
 							changeFollowTarget(target);
 						}
@@ -557,7 +622,7 @@ void Effect::onUpdate()
 						{
 							tempLK = lkEnemy;
 						}
-						auto tempNPC = gm->npcManager.findNearestViewNPC(tempLK, position, MAGIC_FOLLOW_RADIUS);
+						auto tempNPC = gm->npcManager->findNearestViewNPC(tempLK, position, MAGIC_FOLLOW_RADIUS);
 						if (tempNPC != nullptr)
 						{
 							changeFollowTarget(tempNPC);
@@ -574,7 +639,7 @@ void Effect::onUpdate()
 			}
 			else
 			{
-				beginExplode();
+				beginExplode(position);
 				result = erExplode;
 				if (lifeTime == 0)
 				{
@@ -593,7 +658,7 @@ void Effect::onUpdate()
 		}
 		if (magic.level[level].moveKind == mmkSelf)
 		{
-			if (gm->npcManager.findNPC((NPC *)user))
+			if (gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(user)))
 			{
 				position = user->position;
 				offset = user->offset;
@@ -628,13 +693,13 @@ void Effect::onUpdate()
 				updateEffectPosition(getUpdateTime() - beginTime, (double)flySpeed);
 				Point to = position;
 				PointEx toOffset = offset;
-				//passPath = gm->map.getPassPath(from, to, flyingDirection, dest);
+				//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
 				passPath = getPassPath(from, fromOffset, to, toOffset);
 				if (getUpdateTime() - beginTime >= lifeTime)
 				{
 					if (magic.level[level].moveKind == mmkRegion)
 					{
-						beginExplode();
+						beginExplode(position);
 						result = erExplode;
 						if (lifeTime == 0)
 						{
@@ -651,7 +716,7 @@ void Effect::onUpdate()
 			}
 			else
 			{
-				beginExplode();
+				beginExplode(position);
 				if (magic.level[level].moveKind == mmkSelf)
 				{
 					position = gm->player->position;
@@ -660,5 +725,34 @@ void Effect::onUpdate()
 			}
 		}
 	}
-
+	updateSound();
 }
+
+PointEx Effect::getCollideOffset(Point pos)
+{
+	PointEx result;
+	auto p0 = Map::getTilePosition(src, pos, { 0, 0 }, srcOffset);
+	if (flyingDirection.x == 0)
+	{
+		result.x = (int)round(p0.x);
+		result.y = 0;
+	}
+	else if (flyingDirection.y == 0)
+	{
+		result.y = (int)round(p0.y);
+		result.x = 0;
+	}
+	else
+	{
+		double k0 = ((double)flyingDirection.y) / ((double)flyingDirection.x * MapXRatio);
+		Point p1;
+		p1.x = (int)round(((k0 * p0.x) - p0.y) / (k0 + 1 / k0));
+		p1.y = (int)round(-p1.x / k0);
+		//p1.x = (int)round(p1.x / MapXRatio);
+		result.x = p1.x;
+		result.y = p1.y;
+	}
+
+	return result;
+}
+

@@ -44,7 +44,7 @@ void MagicManager::load(int index)
 		magicList[i].exp = ini.GetInteger(section, "Exp", 0);
 		if (magicList[i].iniFile != "")
 		{
-			magicList[i].magic = new Magic;
+			magicList[i].magic = std::make_shared<Magic>();
 			magicList[i].magic->initFromIni(magicList[i].iniFile);
 		}	
 	}
@@ -69,14 +69,13 @@ void MagicManager::save(int index)
 	}
 	section = "Head";
 	ini.SetInteger(section, "Count", count);
-    std::string fName = SAVE_CURRENT_FOLDER;
-    fName += MAGIC_INI_NAME;
+    std::string fName = MAGIC_INI_NAME;
     if (index >= 0)
     {
         fName += convert::formatString("%d", index);
     }
     fName += MAGIC_INI_EXT;
-	ini.saveToFile(fName);
+	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
     
     SaveFileManager::AppendFile(fName);
 }
@@ -90,19 +89,10 @@ void MagicManager::freeResource()
 		magicList[i].exp = 0;
 		if (magicList[i].magic != nullptr)
 		{
-			delete magicList[i].magic;
 			magicList[i].magic = nullptr;
 		}		
 	}
-	for (size_t i = 0; i < attackMagicList.size(); i++)
-	{
-		if (attackMagicList[i].magic != nullptr)
-		{
-			delete attackMagicList[i].magic;
-			attackMagicList[i].magic = nullptr;
-		}
-	}
-	attackMagicList.resize(0);
+	attackMagicList.clear();
 }
 
 void MagicManager::addPracticeExp(int addexp)
@@ -110,7 +100,7 @@ void MagicManager::addPracticeExp(int addexp)
 	if (magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr)
 	{
 		magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp += addexp;
-		gm->menu.practiceMenu->updateExp();
+		gm->menu->practiceMenu->updateExp();
 		bool lup = false;
 		while (magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level < MAGIC_MAX_LEVEL && magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp >= magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp)
 		{
@@ -119,14 +109,14 @@ void MagicManager::addPracticeExp(int addexp)
 		}
 		if (lup)
 		{
-			gm->menu.practiceMenu->updateExp();
-			gm->menu.practiceMenu->updateLevel();
-			gm->showMessage(convert::formatString(convert::GBKToUTF8_InWinOnly("%s的等级提升了！").c_str(), magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->name.c_str(), magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
+			gm->menu->practiceMenu->updateExp();
+			gm->menu->practiceMenu->updateLevel();
+			gm->showMessage(convert::formatString(u8"%s的等级提升了！", magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->name.c_str(), magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
 		}
 	}
 }
 
-void MagicManager::addUseExp(Effect * e, int addexp)
+void MagicManager::addUseExp(std::shared_ptr<Effect> e, int addexp)
 {
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
@@ -141,9 +131,9 @@ void MagicManager::addUseExp(Effect * e, int addexp)
 			}
 			if (lup)
 			{
-				gm->menu.practiceMenu->updateExp();
-				gm->menu.practiceMenu->updateLevel();
-				gm->showMessage(convert::formatString(convert::GBKToUTF8_InWinOnly("%s的等级提升了！").c_str(), magicList[i].magic->name.c_str(), magicList[i].level));
+				gm->menu->practiceMenu->updateExp();
+				gm->menu->practiceMenu->updateLevel();
+				gm->showMessage(convert::formatString(u8"%s的等级提升了！", magicList[i].magic->name.c_str(), magicList[i].level));
 			}
 			break;
 		}
@@ -179,10 +169,10 @@ void MagicManager::addMagic(const std::string & magicName)
 				magicList[i].iniFile = magicName;
 				magicList[i].level = 1;
 				magicList[i].exp = 0;
-				magicList[i].magic = new Magic;
+				magicList[i].magic = std::make_shared<Magic>();
 				magicList[i].magic->initFromIni(magicName);
 				updateMenu(i);
-				gm->showMessage(convert::formatString(convert::GBKToUTF8_InWinOnly("学会了%s!").c_str(), magicList[i].magic->name.c_str()));
+				gm->showMessage(convert::formatString(u8"学会了%s！", magicList[i].magic->name.c_str()));
 				return;
 			}
 		}
@@ -203,7 +193,6 @@ void MagicManager::deleteMagic(const std::string & magicName)
 		m->exp = 0;
 		if (m->magic != nullptr)
 		{
-			delete m->magic;
 			m->magic = nullptr;
 		}
 		updateMenu();
@@ -214,23 +203,23 @@ void MagicManager::updateMenu(int idx)
 {
 	if (idx < MAGIC_COUNT)
 	{
-		gm->menu.magicMenu->updateMagic();
+		gm->menu->magicMenu->updateMagic();
 	}
 	else if (idx < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT)
 	{
-		gm->menu.bottomMenu->updateMagicItem();
+		gm->menu->bottomMenu->updateMagicItem();
 	}
 	else
 	{
-		gm->menu.practiceMenu->updateMagic();
+		gm->menu->practiceMenu->updateMagic();
 	}
 }
 
 void MagicManager::updateMenu()
 {
-	gm->menu.magicMenu->updateMagic();
-	gm->menu.bottomMenu->updateMagicItem();
-	gm->menu.practiceMenu->updateMagic();
+	gm->menu->magicMenu->updateMagic();
+	gm->menu->bottomMenu->updateMagicItem();
+	gm->menu->practiceMenu->updateMagic();
 }
 
 void MagicManager::exchange(int index1, int index2)
@@ -252,31 +241,37 @@ bool MagicManager::magicListExists(int index)
 	return false;
 }
 
-Magic * MagicManager::loadAttackMagic(const std::string & name)
+std::shared_ptr<Magic> MagicManager::loadAttackMagic(const std::string & name)
 {	
 	if (name == "")
 	{
-		return nullptr;
+		return std::shared_ptr<Magic>(nullptr);
 	}
-	int found = -1;
-	for (size_t i = 0; i < attackMagicList.size(); i++)
+
+	auto m = attackMagicList.find(name);
+	if (m != attackMagicList.end())
 	{
-		if (attackMagicList[i].name == name)
+		return m->second;
+	}
+
+	std::shared_ptr<Magic> am = std::make_shared<Magic>();
+	am->initFromIni(name);
+	attackMagicList[name] = am;
+	return am;
+}
+
+void MagicManager::tryCleanAttackMagic()
+{
+	auto iter = attackMagicList.begin();
+	while (iter != attackMagicList.end())
+	{
+		if (iter->second.use_count() <= 1)
 		{
-			found = (int)i;
+			iter = attackMagicList.erase(iter);
 		}
-	}
-	if (found >= 0)
-	{
-		return attackMagicList[found].magic;
-	}
-	else
-	{
-		AttackMagic am;
-		am.magic = new Magic;
-		am.name = name;
-		am.magic->initFromIni(name);
-		attackMagicList.push_back(am);
-		return am.magic;
+		else
+		{
+			iter++;
+		}
 	}
 }

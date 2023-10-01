@@ -20,10 +20,6 @@ void Camera::flyTo(int dir, int distance)
 		setFlyTo(dir, distance);
 		run();
 	}
-	//if (position.x == gm->player->position.x && position.y == gm->player->position.y)
-	//{
-	//	setFollowPlayer();
-	//}
 }
 
 void Camera::flyToEx(int dir, int distance)
@@ -32,10 +28,6 @@ void Camera::flyToEx(int dir, int distance)
 	{
 		setFlyTo(dir, distance);
 	}
-	//if (position.x == gm->player->position.x && position.y == gm->player->position.y)
-	//{
-	//	setFollowPlayer();
-	//}
 }
 
 void Camera::setFlyTo(int dir, int distance)
@@ -51,7 +43,7 @@ void Camera::setFlyTo(int dir, int distance)
 	}
 	dir = dir % 8;
 	flyDirection = dir;
-	printf("dir:%d\n", flyDirection);
+	GameLog::write("dir:%d\n", flyDirection);
 	switch (flyDirection)
 	{
 	case 0:
@@ -95,7 +87,7 @@ void Camera::setFollowPlayer()
 
 void Camera::reArrangeNPC()
 {
-	if (gm->map.data == nullptr)
+	if (gm->map->data == nullptr)
 	{
 		return;
 	}
@@ -115,13 +107,13 @@ void Camera::reArrangeNPC()
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
 		{
-			if ( i >= 0 && i < gm->map.data->head.height && j >= 0 && j < gm->map.data->head.width)
+			if ( i >= 0 && i < gm->map->data->head.height && j >= 0 && j < gm->map->data->head.width)
 			{
-				for (size_t k = 0; k < gm->map.dataMap.tile[i][j].npcIndex.size(); k++)
+				for (size_t k = 0; k < gm->map->dataMap.tile[i][j].npcIndex.size(); k++)
 				{
-					if (gm->map.dataMap.tile[i][j].npcIndex[k] > 0)
+					if (gm->map->dataMap.tile[i][j].npcIndex[k] > 0)
 					{
-						npcIndex.push_back(gm->map.dataMap.tile[i][j].npcIndex[k] - 1);
+						npcIndex.push_back(gm->map->dataMap.tile[i][j].npcIndex[k] - 1);
 					}					
 				}
 			}
@@ -129,8 +121,8 @@ void Camera::reArrangeNPC()
 	}
 	for (size_t i = 0; i < npcIndex.size(); i++)
 	{
-		gm->npcManager.removeChild(gm->npcManager.npcList[npcIndex[i]]);
-		gm->npcManager.addChild(gm->npcManager.npcList[npcIndex[i]]);
+		gm->npcManager->removeChild(gm->npcManager->npcList[npcIndex[i]]);
+		gm->npcManager->addChild(gm->npcManager->npcList[npcIndex[i]]);
 	}
 }
 
@@ -141,10 +133,10 @@ void Camera::onUpdate()
 	auto lastOffset = offset;
 	if (followPlayer)
 	{
-		NPC * npcPlayer = gm->player;
-		if (followNPC != nullptr && gm->npcManager.findNPC((NPC *)followNPC))
+		std::shared_ptr<NPC> npcPlayer = gm->player;
+		if (followNPC != nullptr && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(followNPC)))
 		{
-			npcPlayer = (NPC *)followNPC;
+			npcPlayer = std::dynamic_pointer_cast<NPC>(followNPC);
 		}
 		else
 		{
@@ -154,10 +146,10 @@ void Camera::onUpdate()
 		position = npcPlayer->position;
 		offset = npcPlayer->offset;	
 	
-		if (gm->map.data != nullptr)
+		if (gm->map->data != nullptr)
 		{
-			int mapw = gm->map.data->head.width;
-			int maph = gm->map.data->head.height;
+			int mapw = gm->map->data->head.width;
+			int maph = gm->map->data->head.height;
 			int w, h;
 			engine->getWindowSize(w, h);
 
@@ -288,13 +280,13 @@ void Camera::onUpdate()
 		updatePosition();
 		if (not flying)
 		{
-			if (position.x == gm->player->position.x && position.y == gm->player->position.y)
+			if (position == gm->player->position)
 			{
 				setFollowPlayer();
 			}
 		}
 	}
-	auto differencePoint = gm->map.getTilePosition(position, lastPosition);
+	auto differencePoint = gm->map->getTilePosition(position, lastPosition);
 	differencePosition.y = ((double)differencePoint.y) - lastOffset.y + offset.y;
 	differencePosition.x = ((double)differencePoint.x) - lastOffset.x + offset.x;
 }

@@ -14,24 +14,24 @@ void Option::init()
 {
 	freeResource();
 
-	initFromIni("ini\\ui\\option\\window.ini");
-	rtnBtn = addButton("ini\\ui\\option\\btreturn.ini");
+	initFromIniFileName("ini\\ui\\option\\window.ini");
+	rtnBtn = addComponent<Button>("ini\\ui\\option\\btreturn.ini");
 
-	music = addScrollbar("ini\\ui\\option\\sbmusic.ini");
-	sound = addScrollbar("ini\\ui\\option\\sbsound.ini");
-	speed = addScrollbar("ini\\ui\\option\\sbspeed.ini");
+	music = addComponent<Scrollbar>("ini\\ui\\option\\sbmusic.ini");
+	sound = addComponent<Scrollbar>("ini\\ui\\option\\sbsound.ini");
+	speed = addComponent<Scrollbar>("ini\\ui\\option\\sbspeed.ini");
 
-	musicCB = addCheckBox("ini\\ui\\option\\cbmusic.ini");
-	soundCB = addCheckBox("ini\\ui\\option\\cbsound.ini");
-	speedCB = addCheckBox("ini\\ui\\option\\cbspeed.ini");
+	musicCB = addComponent<CheckBox>("ini\\ui\\option\\cbmusic.ini");
+	soundCB = addComponent<CheckBox>("ini\\ui\\option\\cbsound.ini");
+	speedCB = addComponent<CheckBox>("ini\\ui\\option\\cbspeed.ini");
 
-	player = addCheckBox("ini\\ui\\option\\cbplayer.ini");
-	shadow = addCheckBox("ini\\ui\\option\\cbshadow.ini");
-	dyLoad = addCheckBox("ini\\ui\\option\\cbdyload.ini");
+	player = addComponent<CheckBox>("ini\\ui\\option\\cbplayer.ini");
+	shadow = addComponent<CheckBox>("ini\\ui\\option\\cbshadow.ini");
+	dyLoad = addComponent<CheckBox>("ini\\ui\\option\\cbdyload.ini");
 
-	playerBg = addImageContainer("ini\\ui\\option\\lbplayer.ini");
-	shadowBg = addImageContainer("ini\\ui\\option\\lbshadow.ini");
-	dyLoadBg = addImageContainer("ini\\ui\\option\\lbdyload.ini");
+	playerBg = addComponent<ImageContainer>("ini\\ui\\option\\lbplayer.ini");
+	shadowBg = addComponent<ImageContainer>("ini\\ui\\option\\lbshadow.ini");
+	dyLoadBg = addComponent<ImageContainer>("ini\\ui\\option\\lbdyload.ini");
 
 
 	setChildRectReferToParent();
@@ -84,12 +84,8 @@ void Option::init()
 
 void Option::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
 
 	freeCom(rtnBtn);
 	freeCom(music);
@@ -173,11 +169,11 @@ void Option::onEvent()
 	}
 }
 
-bool Option::onHandleEvent(AEvent * e)
+bool Option::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_KEYDOWN)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			running = false;
 			result = erOK;

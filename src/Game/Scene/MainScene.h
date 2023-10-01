@@ -11,7 +11,7 @@ public:
 	MainScene(int index);
 	virtual ~MainScene();
 
-	GameManager * game = nullptr;
+	std::shared_ptr<GameManager> game = nullptr;
 
 private:
 	int gameIndex = -1;

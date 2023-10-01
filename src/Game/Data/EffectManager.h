@@ -10,13 +10,12 @@ public:
 	EffectManager();
 	virtual ~EffectManager();
 
-	std::vector<Effect *> effectList;
+	std::vector<std::shared_ptr<Effect>> effectList;
 
 	void pauseAllEffect();
 	void resumeAllEffect();
-	void addEffect(Effect * effect);
-	void deleteEffect(Effect * effect);
-	void removeEffect(Effect * effect);
+	void addEffect(std::shared_ptr<Effect> effect);
+	void deleteEffect(std::shared_ptr<Effect> effect);
 	void clearEffect();
 
 	void load();

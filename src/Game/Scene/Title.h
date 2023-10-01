@@ -10,11 +10,11 @@ public:
 	Title();
 	virtual ~Title();
 
-	Button * initBtn = nullptr;
-	Button * exitBtn = nullptr;
-	Button * loadBtn = nullptr;
-	Button * teamBtn = nullptr;
-	Weather * weather = nullptr;
+	std::shared_ptr<Button> initBtn = nullptr;
+	std::shared_ptr<Button> exitBtn = nullptr;
+	std::shared_ptr<Button> loadBtn = nullptr;
+	std::shared_ptr<Button> teamBtn = nullptr;
+	std::shared_ptr<Weather> weather = nullptr;
 
 	void playTitleBGM();
 	void init();
@@ -25,6 +25,6 @@ private:
 	virtual bool onInitial();
 	virtual void onExit();
 	virtual void onRun();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 };
 

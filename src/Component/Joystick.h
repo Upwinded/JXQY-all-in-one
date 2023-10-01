@@ -11,7 +11,6 @@ class Joystick :
 {
 public:
 	Joystick():RoundButton() {}
-	Joystick(int range):RoundButton(range) {}
 	virtual ~Joystick() { freeResource(); }
 protected:
 	Point touchPosition = { OutRange, OutRange };
@@ -38,6 +37,6 @@ public:
 
 	void freeResource();
 public:
-	virtual void initFromIni(const std::string& fileName);
+	virtual void initFromIni(INIReader & ini);
 };
 

@@ -32,19 +32,13 @@ void EquipMenu::updateGoods(int index)
 	{
 		return;
 	}
-	if (item[index]->impImage != nullptr)
-	{
-		IMP::clearIMPImage(item[index]->impImage);
-		//delete item[index]->impImage;
-		item[index]->impImage = nullptr;
-	}	
+	item[index]->impImage = nullptr;	
 	if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile == "" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number <= 0)
 	{
 		item[index]->setStr("");
 		gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile = "";
 		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods != nullptr)
 		{
-			delete gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods;
 			gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods = nullptr;
 		}
 		gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number = 0;
@@ -55,7 +49,7 @@ void EquipMenu::updateGoods(int index)
 		item[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number));
 	}
 	gm->player->calInfo();
-	gm->menu.stateMenu->updateLabel();
+	gm->menu->stateMenu->updateLabel();
 }
 
 int EquipMenu::getPartIndex(const std::string & part)
@@ -100,20 +94,20 @@ void EquipMenu::onEvent()
 		{
 			if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile != "" && gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number > 0)
 			{
-				gm->menu.toolTip->visible = true;
-				gm->menu.toolTip->changeParent(this);
-				gm->menu.toolTip->setGoods(gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods);
+				gm->menu->toolTip->visible = true;
+				addChild(gm->menu->toolTip);
+				gm->menu->toolTip->setGoods(gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods);
 			}
 			else
 			{
-				gm->menu.toolTip->visible = false;
+				gm->menu->toolTip->visible = false;
 			}
 		}
 		if (ret & erHideHint)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 		}
-#ifdef _MOBILE
+#ifdef __MOBILE__
 		if ((ret & erClick) && (ret & erMouseRDown) && false)
 		{
 			for (int j = 0; j < GOODS_COUNT; ++j)
@@ -122,24 +116,24 @@ void EquipMenu::onEvent()
 				{
 					gm->goodsManager.exchange(j, item[i]->dragIndex);
 					updateGoods(i);
-					gm->menu.goodsMenu->updateGoods();
+					gm->menu->goodsMenu->updateGoods();
 					break;
 				}
 			}
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
 		}
 #else
 		if (ret & erMouseRDown)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
 		}
 #endif
 
 		if (ret & erDropped)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
 			if (item[i]->dropType == dtGoods)
 			{
@@ -153,12 +147,12 @@ void EquipMenu::onEvent()
 					if (item[i]->dropIndex < GOODS_COUNT)
 					{
 						updateGoods(i);
-						gm->menu.goodsMenu->updateGoods();
+						gm->menu->goodsMenu->updateGoods();
 ;					}
 					else if (item[i]->dropIndex < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
 					{
 						updateGoods(i);
-						gm->menu.bottomMenu->updateGoodsItem();
+						gm->menu->bottomMenu->updateGoodsItem();
 					}
 					else
 					{
@@ -173,13 +167,13 @@ void EquipMenu::onEvent()
 void EquipMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\equip\\window.ini");
-	title = addImageContainer("ini\\ui\\equip\\title.ini");
-	image = addImageContainer("ini\\ui\\equip\\image.ini");
+	initFromIniFileName("ini\\ui\\equip\\window.ini");
+	title = addComponent<ImageContainer>("ini\\ui\\equip\\title.ini");
+	image = addComponent<ImageContainer>("ini\\ui\\equip\\image.ini");
 	for (size_t i = 0; i < GOODS_BODY_COUNT; i++)
 	{
 		std::string iniName = convert::formatString("ini\\ui\\equip\\item%d.ini", i + 1);
-		item[i] = addItem(iniName);
+		item[i] = addComponent<Item>(iniName);
 		item[i]->dragType = dtGoods;
 		item[i]->dragIndex = GOODS_TOOLBAR_COUNT + GOODS_COUNT + i;
 		item[i]->canShowHint = true;
@@ -189,12 +183,8 @@ void EquipMenu::init()
 
 void EquipMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
+
 	freeCom(image);
 	freeCom(title);
 	for (size_t i = 0; i < GOODS_BODY_COUNT; i++)

@@ -15,19 +15,19 @@ SaveLoad::~SaveLoad()
 void SaveLoad::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\saveload\\window.ini");
+	initFromIniFileName("ini\\ui\\saveload\\window.ini");
 	if (save)
 	{
-		saveBtn = addButton("ini\\ui\\saveload\\savebtn.ini");
+		saveBtn = addComponent<Button>("ini\\ui\\saveload\\savebtn.ini");
 	}
 	if (load)
 	{
-		loadBtn = addButton("ini\\ui\\saveload\\loadbtn.ini");
+		loadBtn = addComponent<Button>("ini\\ui\\saveload\\loadbtn.ini");
 	}
-	exitBtn = addButton("ini\\ui\\saveload\\exitbtn.ini");
-	snap = addImageContainer("ini\\ui\\saveload\\snapbmp.ini");
+	exitBtn = addComponent<Button>("ini\\ui\\saveload\\exitbtn.ini");
+	snap = addComponent<ImageContainer>("ini\\ui\\saveload\\snapbmp.ini");
 	snap->stretch = true;
-	listBox = addListBox("ini\\ui\\saveload\\listbox.ini");
+	listBox = addComponent<ListBox>("ini\\ui\\saveload\\listbox.ini");
 
 	setChildRectReferToParent();
 }
@@ -43,12 +43,9 @@ void SaveLoad::onEvent()
 	if (index != listBox->index)
 	{
 		index = listBox->index;
-		if (snap->impImage != nullptr)
-		{
-			IMP::clearIMPImage(snap->impImage);
-			//delete snap->impImage;
-			snap->impImage = nullptr;
-		}
+
+		snap->impImage = nullptr;
+
 		std::string imageName = SHOT_FOLDER + convert::formatString(SHOT_BMP, index + 1);
 
 		std::unique_ptr<char[]> c_ptr;
@@ -131,12 +128,7 @@ void SaveLoad::onEvent()
 
 void SaveLoad::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
 	freeCom(snap);
 	freeCom(saveBtn);
 	freeCom(exitBtn);
@@ -144,11 +136,11 @@ void SaveLoad::freeResource()
 	freeCom(listBox);
 }
 
-bool SaveLoad::onHandleEvent(AEvent * e)
+bool SaveLoad::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_KEYDOWN)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			running = false;
 			result = erOK;

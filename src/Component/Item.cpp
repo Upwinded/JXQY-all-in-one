@@ -15,18 +15,10 @@ Item::~Item()
 	freeResource();
 }
 
-void Item::initFromIni(const std::string & fileName)
+void Item::initFromIni(INIReader & ini)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
+
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
 	rect.w = ini.GetInteger("Init", "Width", rect.w);
@@ -34,7 +26,7 @@ void Item::initFromIni(const std::string & fileName)
 	name = ini.Get("Init", "Name", name);
 	fontSize = ini.GetInteger("Init", "Font", fontSize);
 	std::string impName = ini.Get("Init", "Image", "");
-	impImage = IMP::createIMPImage(impName);
+	impImage = loadRes(impName);
 	color = ini.GetColor("Init", "Color", color);
 }
 
@@ -59,13 +51,9 @@ void Item::resetHint()
 }
 
 void Item::freeResoure()
-{
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+{		
+	impImage = nullptr;
+
 	if (strImage != nullptr)
 	{
 		//engine->freeImage(strImage);
@@ -87,9 +75,9 @@ void Item::drawItemStr()
 	}	
 }
 
-void Item::onDrop(Element * src, int param1, int param2)
+void Item::onDrop(PElement src, int param1, int param2)
 {
-	if (src != nullptr && src != this)
+	if (src.get() != nullptr && src.get() != this)
 	{
 		result |= erDropped;
 		dropType = src->dragType;
@@ -129,7 +117,7 @@ void Item::onMouseMoveIn(int x, int y)
 
 void Item::onDraw()
 {
-	if (dragging > TOUCH_UNTOUCHEDID && currentDragItem == this)
+	if (dragging > TOUCH_UNTOUCHEDID && currentDragItem.get() == this)
 	{
 		return;
 	}
@@ -161,11 +149,11 @@ void Item::onDrawDrag(int x, int y)
 	}
 }
 
-bool Item::onHandleEvent(AEvent * e)
+bool Item::onHandleEvent(AEvent & e)
 {
-	if (touchingID != TOUCH_UNTOUCHEDID && e->eventType == ET_MOUSEDOWN)
+	if (touchingID != TOUCH_UNTOUCHEDID && e.eventType == ET_MOUSEDOWN)
 	{
-		if (e->eventData == MBC_MOUSE_RIGHT)
+		if (e.eventData == MBC_MOUSE_RIGHT)
 		{
 			result |= erMouseRDown;
 			return true;

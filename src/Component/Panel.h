@@ -13,16 +13,16 @@
 #include "Joystick.h"
 #include "RoundButton.h"
 #include "TextButton.h"
+#include "DragRoundButton.h"
+#include "DragButton.h"
+#include "FadeMask.h"
+#include "VideoPlayer.h"
 
-#define addComponent(T,c,n) c=new T;\
-                            c->initFromIni(n);\
-                            addChild(c);
 
 #define freeCom(component); \
 	removeChild(component);\
-	if (component != nullptr)\
+	if (component.get() != nullptr)\
 	{\
-		delete component;\
 		component = nullptr;\
 	}
 
@@ -38,30 +38,39 @@ public:
 	int alignY = 0;
 	void setAlign();
 public:
-	virtual void initFromIni(const std::string& fileName);
+	//virtual void initFromIni(const std::string& fileName) { BaseComponent::initFromIni(fileName); }
+	virtual void initFromIni(INIReader & ini);
 protected:
 
-	Button * addButton(const std::string& fileName);
-	Scrollbar * addScrollbar(const std::string& fileName);
-	ImageContainer * addImageContainer(const std::string& fileName);
-	Item * addItem(const std::string& fileName);
-	ListBox * addListBox(const std::string & fileName);
-	CheckBox * addCheckBox(const std::string & fileName);
-	Label * addLabel(const std::string & fileName);
-	TalkLabel * addTalkLabel(const std::string & fileName);
-	MemoText * addMemo(const std::string & fileName);
-	ColumnImage * addColumnImage(const std::string & fileName);
-	TransImage * addTransImage(const std::string & fileName);
-	Joystick* addJoystick(const std::string& fileName);
-	RoundButton* addRoundButton(const std::string& fileName);
-	TextButton* addTextButton(const std::string& fileName);
+	template <typename T>
+	auto addComponent(const std::string& fileName)
+	{
+		std::unique_ptr<char[]> s;
+		int len = 0;
+		len = PakFile::readFile(fileName, s);
+		if (s == nullptr || len == 0)
+		{
+			GameLog::write("no ini file: %s\n", fileName.c_str());
+			return std::shared_ptr<T>(nullptr);
+		}
+		INIReader ini(s);
+		auto component = std::make_shared<T>();
 
-
+		if (std::is_same<T, Scrollbar>::value)
+		{
+			component->initFromIniWithName(ini, fileName);
+		}
+		else
+		{
+			component->initFromIni(ini);
+		}
+		this->addChild(component);
+		return component;
+	}
 
 	void freeResource();
 
-
-	void resetRect(Element * e, int x, int y);
+	void resetRect(PElement e, int x, int y);
 	void resetRect();
 
 };

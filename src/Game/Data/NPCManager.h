@@ -1,14 +1,8 @@
-#pragma once
+﻿#pragma once
 #include "NPC.h"
 #include <vector>
 #include <deque>
 #include "../GameManager/SaveFileManager.h"
-
-struct ActionImage
-{
-	std::string name = "";
-	_shared_imp image = nullptr;
-};
 
 class NPCManager:
 	public Element
@@ -17,26 +11,28 @@ public:
 	NPCManager();
 	virtual ~NPCManager();
 private:
-    NPC * player = nullptr;
+    std::shared_ptr<NPC> player = nullptr;
 public:
-    void setPlayer(NPC * nowPlayer);
+    void setPlayer(std::shared_ptr<NPC> nowPlayer);
 	int clickIndex = 0;
 
 	void standAll();
-	int findNPCIndex(NPC * npc);
-	bool findNPC(NPC * npc);
-	NPC* findPlayerNPC();
+	int findNPCIndex(std::shared_ptr<NPC> npc);
+	bool findNPC(std::shared_ptr<NPC> npc);
+	std::shared_ptr<NPC> findPlayerNPC();
 
-	std::vector<NPC *> findNPC(const std::string & npcName);
-	std::vector<NPC *> findNPC(int launcherKind);
-	std::vector<NPC *> findNPC(Point pos, int radius);
-	std::vector<NPC *> findNPC(int launcherKind, Point pos, int radius);
-	NPC * findNearestNPC(int launcherKind, Point pos, int radius);
-	NPC * findNearestViewNPC(int launcherKind, Point pos, int radius);
-	NPC * findNearestScriptViewNPC(Point pos, int radius);
-	std::vector<NPC *> findRadiusScriptViewNPC(Point pos, int radius);
+	std::vector<std::shared_ptr<NPC>> findNPC(const std::string & npcName);
+	std::vector<std::shared_ptr<NPC>> findNPC(int launcherKind);
+	std::vector<std::shared_ptr<NPC>> findNPC(Point pos, int radius);
+	std::vector<std::shared_ptr<NPC>> findNPC(int launcherKind, Point pos, int radius);
+	std::shared_ptr<NPC> findNearestNPC(int launcherKind, Point pos, int radius);
+	std::shared_ptr<NPC> findNearestViewNPC(int launcherKind, Point pos, int radius);
+	std::shared_ptr<NPC> findNearestScriptViewNPC(Point pos, int radius);
+	std::vector<std::shared_ptr<NPC>> findRadiusScriptViewNPC(Point pos, int radius);
 
-	//更新所有npc的自动AI动作
+
+
+	// 更新所有npc的自动AI动作
 	void npcAutoAction();
 
 	bool drawNPCSelectedAlpha(Point cenTile, Point cenScreen, PointEx offset);
@@ -44,7 +40,7 @@ public:
 	void drawNPC(int index, Point cenTile, Point cenScreen, PointEx offset);
 
 	void draw(Point tile, Point cenTile, Point cenScreen, PointEx offset);
-	std::vector<NPC *> npcList;
+	std::vector<std::shared_ptr<NPC>> npcList;
 	void setPartnerPos(int x, int y, int dir);
 	//清理不含partner的NPC
 	void clearNPC();
@@ -56,17 +52,20 @@ public:
 	void deleteNPC(std::vector<int> idx);
 	void deleteNPC(int idx);
 	void deleteNPC(std::string nName);
+	void deleteNPCFromOtherPlace(std::shared_ptr<NPC> npc);
 
-	void removeNPC(NPC * npc);
+	// 只从列表中移除
+	void removeNPCOnlyFromList(std::shared_ptr<NPC> npc);
+
 	void addNPC(std::string iniName, int x, int y, int dir);
-	void addNPC(NPC * npc);
+	void addNPC(std::shared_ptr<NPC> npc);
 
 	void freeResource();
 
 	void clearActionImageList();
 
 	_shared_imp loadActionImage(const std::string & imageName);
-	std::vector<ActionImage> actionImageList;
+	std::map<std::string, _shared_imp> actionImageList;
 
 	virtual void load(const std::string & fileName);
 	virtual void save(const std::string & fileName);

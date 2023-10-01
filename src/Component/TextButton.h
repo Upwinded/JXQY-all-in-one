@@ -16,10 +16,11 @@ public:
 	void setStrColor(unsigned int color);
 	virtual void setStr(const std::string& s);
     virtual void setUTF8Str(const std::string& s);
-	virtual void initFromIni(const std::string & fileName);
+	virtual void initFromIni(INIReader & ini);
 
 	virtual void onDraw();
     virtual void onMouseLeftDown(int x, int y);
+	virtual void onClick();
 
 };
 

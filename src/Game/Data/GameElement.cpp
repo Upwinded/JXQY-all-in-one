@@ -12,11 +12,11 @@ GameElement::~GameElement()
 	freeResource();
 }
 
-void GameElement::playSoundFile(const std::string & fileName, float x, float y, float volume)
+_channel GameElement::playSoundFile(const std::string & fileName, float x, float y, float volume)
 {
 	if (fileName == "")
 	{
-		return;
+		return nullptr;
 	}
 	std::string soundName = SOUND_FOLDER + fileName;
 	std::unique_ptr<char[]> s;
@@ -25,19 +25,20 @@ void GameElement::playSoundFile(const std::string & fileName, float x, float y, 
 	{
 		if (volume == -1.0f)
 		{
-			engine->playSound(s, len, x, y);
+			return engine->playSound(s, len, x, y);
 		}
 		else
 		{
-			engine->playSound(s, len, x, y, volume);
+			return engine->playSound(s, len, x, y, volume);
 		}
 	}
+	return nullptr;
 }
 
 void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff)
 {
 	Point newpos = Map::getElementPosition({ (int)off.x , (int)off.y }, pos, { 0, 0 }, { 0, 0 });
-	if (newpos.x != pos.x || newpos.y != pos.y)
+	if (newpos != pos)
 	{
 		Point newtilepos = Map::getTilePosition(newpos, pos, { 0, 0 }, { 0, 0 });
 		off.x -= newtilepos.x;
@@ -126,7 +127,7 @@ Point GameElement::getPosition(Point cenTile, PointEx cenOffset)
 	return pos;
 }
 
-Point GameElement::getPosition(GameElement * camera)
+Point GameElement::getPosition(std::shared_ptr<GameElement> camera)
 {
 	if (camera == nullptr)
 	{
@@ -138,13 +139,13 @@ Point GameElement::getPosition(GameElement * camera)
 	return Map::getTilePosition(position, camera->position, { 0, 0 }, coffset);
 }
 
-bool GameElement::checkCollide(GameElement * ge1, GameElement * ge2)
+bool GameElement::checkCollide(std::shared_ptr<GameElement> ge1, std::shared_ptr<GameElement> ge2)
 {
 	if (ge1 == nullptr || ge2 == nullptr)
 	{
 		return false;
 	}
-	if (ge1->position.x != ge2->position.x || ge1->position.y != ge2->position.y)
+	if (ge1->position != ge2->position)
 	{
 		return false;
 	}
@@ -168,8 +169,8 @@ bool GameElement::checkCollide(GameElement * ge1, GameElement * ge2)
 	*/
 }
 
-bool GameElement::checkCollide(GameElement * ge)
+bool GameElement::checkCollide(std::shared_ptr<GameElement> ge)
 {
-	return checkCollide(this, ge);
+	return checkCollide(std::dynamic_pointer_cast<GameElement>(getMySharedPtr()), ge);
 }
 

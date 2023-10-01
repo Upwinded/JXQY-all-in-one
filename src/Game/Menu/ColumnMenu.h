@@ -8,10 +8,10 @@ public:
 	ColumnMenu();
 	virtual ~ColumnMenu();
 
-	TransImage * image = nullptr;
-	ColumnImage * columnLife = nullptr;
-	ColumnImage * columnThew = nullptr;
-	ColumnImage * columnMana = nullptr;
+	std::shared_ptr<TransImage> image = nullptr;
+	std::shared_ptr<ColumnImage> columnLife = nullptr;
+	std::shared_ptr<ColumnImage> columnThew = nullptr;
+	std::shared_ptr<ColumnImage> columnMana = nullptr;
 
 	void updateState();
 

@@ -9,17 +9,17 @@ public:
 	virtual ~JoystickPanel();
 private:
 public:
-	Joystick * joystick = nullptr;
+	std::shared_ptr<Joystick> joystick = nullptr;
 public:
 	std::vector<int> getDirectionList();
 	bool isRunning();
 	bool isWalking();
 private:
 	Point dragEndPosition = { 0, 0 };
-	//DragRoundButton* leftJumpBtn = nullptr;
+	//std::shared_ptr<DragRoundButton> leftJumpBtn = nullptr;
 public:
 	Point getDragEndPosition() { return dragEndPosition; }
-	virtual void onChildCallBack(Element* child);
+	virtual void onChildCallBack(PElement child);
 protected:
 	virtual void onUpdate();
 	virtual void init();

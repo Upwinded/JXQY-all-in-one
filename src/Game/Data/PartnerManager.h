@@ -19,7 +19,7 @@ public:
 	void freeResource();
 
 private:
-	std::vector<NPC *> partnerList;
+	std::vector<std::shared_ptr<NPC>> partnerList;
 
 };
 

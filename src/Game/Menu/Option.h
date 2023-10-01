@@ -11,20 +11,20 @@ public:
 
 	Config * config = nullptr;
 
-	Button * rtnBtn = nullptr;
-	Scrollbar * music = nullptr;
-	Scrollbar * sound = nullptr;
-	Scrollbar * speed = nullptr;
-	CheckBox * player = nullptr;
-	CheckBox * dyLoad = nullptr;
-	CheckBox * shadow = nullptr;
-	ImageContainer * playerBg = nullptr;
-	ImageContainer * dyLoadBg = nullptr;
-	ImageContainer * shadowBg = nullptr;
+	std::shared_ptr<Button> rtnBtn = nullptr;
+	std::shared_ptr<Scrollbar> music = nullptr;
+	std::shared_ptr<Scrollbar> sound = nullptr;
+	std::shared_ptr<Scrollbar> speed = nullptr;
+	std::shared_ptr<CheckBox> player = nullptr;
+	std::shared_ptr<CheckBox> dyLoad = nullptr;
+	std::shared_ptr<CheckBox> shadow = nullptr;
+	std::shared_ptr<ImageContainer> playerBg = nullptr;
+	std::shared_ptr<ImageContainer> dyLoadBg = nullptr;
+	std::shared_ptr<ImageContainer> shadowBg = nullptr;
 
-	CheckBox * musicCB = nullptr;
-	CheckBox * soundCB = nullptr;
-	CheckBox * speedCB = nullptr;
+	std::shared_ptr<CheckBox> musicCB = nullptr;
+	std::shared_ptr<CheckBox> soundCB = nullptr;
+	std::shared_ptr<CheckBox> speedCB = nullptr;
 
 private:
 	void init();
@@ -35,6 +35,6 @@ private:
 
 	virtual void onEvent();
 
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 };
 

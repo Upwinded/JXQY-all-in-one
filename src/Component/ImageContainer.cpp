@@ -15,27 +15,13 @@ ImageContainer::~ImageContainer()
 
 void ImageContainer::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
 	removeAllChild();
 }
 
-void ImageContainer::initFromIni(const std::string & fileName)
+void ImageContainer::initFromIni(INIReader & ini)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
 
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
@@ -43,7 +29,7 @@ void ImageContainer::initFromIni(const std::string & fileName)
 	rect.h = ini.GetInteger("Init", "Height", rect.h);
 	name = ini.Get("Init", "Name", name);
 	std::string impName = ini.Get("Init", "Image", "");
-	impImage = IMP::createIMPImage(impName);
+	impImage = loadRes(impName);
 }
 
 void ImageContainer::onDraw()

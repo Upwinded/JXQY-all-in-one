@@ -15,7 +15,7 @@ void VariableList::load()
 	freeResource();
 	std::string fileName = SAVE_CURRENT_FOLDER;
 	fileName += VARIABLE_INI;
-	ini = new INIReader(fileName);
+	ini = std::make_shared<INIReader>(fileName);
 }
 
 void VariableList::save()
@@ -103,7 +103,6 @@ void VariableList::freeResource()
 {
 	if (ini != nullptr)
 	{
-		delete ini;
 		ini = nullptr;
 	}
 }

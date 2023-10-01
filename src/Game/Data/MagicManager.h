@@ -5,16 +5,10 @@
 
 struct MagicInfo
 {
-	Magic * magic = nullptr;
+	std::shared_ptr<Magic> magic = nullptr;
 	std::string iniFile = "";
 	int level = 0;
 	int exp = 0;
-};
-
-struct AttackMagic
-{
-	std::string name = "";
-	Magic * magic = nullptr;
 };
 
 class MagicManager
@@ -23,14 +17,14 @@ public:
 	MagicManager();
 	virtual ~MagicManager();
 
-	MagicInfo * findMagic(const std::string & iniName);
+	MagicInfo* findMagic(const std::string & iniName);
 
 	void load(int index);
 	void save(int index);
 
 	void freeResource();
 	void addPracticeExp(int addexp);
-	void addUseExp(Effect * e, int addexp);
+	void addUseExp(std::shared_ptr<Effect> e, int addexp);
 	void addMagicExp(const std::string & magicName, int addexp);
 	void addMagic(const std::string & magicName);
 	void deleteMagic(const std::string & magicName);
@@ -43,7 +37,11 @@ public:
 	MagicInfo magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT];
 	bool magicListExists(int index);
 
-	Magic * loadAttackMagic(const std::string & name);
-	std::vector<AttackMagic> attackMagicList;
+	// npc 用到的武功列表
+	std::shared_ptr<Magic> loadAttackMagic(const std::string & name);
+	void tryCleanAttackMagic();
+private:
+	std::map<std::string, std::shared_ptr<Magic>> attackMagicList;
+
 };
 

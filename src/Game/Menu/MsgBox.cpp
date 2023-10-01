@@ -18,7 +18,7 @@ void MsgBox::showMessage(const std::string & str)
 {
 	if (label == nullptr)
 	{
-		label = addLabel("ini\\ui\\message\\label.ini");
+		label = addComponent<Label>("ini\\ui\\message\\label.ini");
 		label->coverMouse = false;
 		setChildRectReferToParent();
 	}
@@ -40,8 +40,8 @@ void MsgBox::onUpdate()
 void MsgBox::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\message\\window.ini");
-	label = addLabel("ini\\ui\\message\\label.ini");
+	initFromIniFileName("ini\\ui\\message\\window.ini");
+	label = addComponent<Label>("ini\\ui\\message\\label.ini");
 	label->coverMouse = false;
 	label->autoNextLine = true;
 	setChildRectReferToParent();
@@ -49,12 +49,8 @@ void MsgBox::init()
 
 void MsgBox::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
 
 	freeCom(label);
 }

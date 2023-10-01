@@ -5,9 +5,7 @@
 MenuController::MenuController()
 {
 	priority = epMenu;
-	addChild(&upMenu);
 }
-
 
 MenuController::~MenuController()
 {
@@ -15,9 +13,9 @@ MenuController::~MenuController()
 	freeResource();
 }
 
-bool MenuController::onHandleEvent(AEvent* e)
+bool MenuController::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_QUIT || (e->eventType == ET_KEYDOWN && e->eventData == KEY_ESCAPE))
+	if (e.eventType == ET_QUIT || (e.eventType == ET_KEYDOWN && e.eventData == KEY_ESCAPE))
 	{
 		if (menuDisplayed())
 		{
@@ -26,7 +24,7 @@ bool MenuController::onHandleEvent(AEvent* e)
 		else
 		{
 			bottomMenu->optionBtn->checked = true;
-			gm->controller.setPaused(true);
+			gm->controller->setPaused(true);
 			if (currentDragItem != nullptr)
 			{
 				currentDragItem->dragEnd();
@@ -35,28 +33,28 @@ bool MenuController::onHandleEvent(AEvent* e)
 			{
 				dragging = TOUCH_UNTOUCHEDID;
 			}
-			bool vis = gm->menu.visible;
-			gm->menu.visible = false;
-			gm->menu.toolTip->changeParent(nullptr);
+			bool vis = gm->menu->visible;
+			gm->menu->visible = false;
+			removeChild(gm->menu->toolTip);
 			std::shared_ptr<System> system = std::make_shared<System>();
-			gm->addChild(system.get());
+			gm->addChild(system);
 			unsigned int ret = system->run();
-			gm->removeChild(system.get());
+			gm->removeChild(system);
 			system = nullptr;
 			if ((ret & erExit) != 0)
 			{
 				gm->result = erExit;
 				gm->setRunning(false);
 			}
-			gm->controller.setPaused(false);
-			gm->menu.visible = vis;
+			gm->controller->setPaused(false);
+			gm->menu->visible = vis;
 			bottomMenu->optionBtn->checked = false;
 		}
 		return true;
 	}
-	else if (e->eventType == ET_KEYDOWN)
+	else if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_F1)
+		if (e.eventData == KEY_F1)
 		{
 			stateMenu->visible = !stateMenu->visible;
 			stateMenu->updateLabel();
@@ -67,7 +65,7 @@ bool MenuController::onHandleEvent(AEvent* e)
 			bottomMenu->equipBtn->checked = false;
 			return true;
 		}
-		else if (e->eventData == KEY_F2)
+		else if (e.eventData == KEY_F2)
 		{
 			equipMenu->visible = !equipMenu->visible;
 			practiceMenu->visible = false;
@@ -77,7 +75,7 @@ bool MenuController::onHandleEvent(AEvent* e)
 			bottomMenu->stateBtn->checked = false;
 			return true;
 		}
-		else if (e->eventData == KEY_F3)
+		else if (e.eventData == KEY_F3)
 		{
 			practiceMenu->visible = !practiceMenu->visible;
 			equipMenu->visible = false;
@@ -87,7 +85,7 @@ bool MenuController::onHandleEvent(AEvent* e)
 			bottomMenu->stateBtn->checked = false;
 			return true;
 		}
-		else if (e->eventData == KEY_F5)
+		else if (e.eventData == KEY_F5)
 		{
 			goodsMenu->visible = !goodsMenu->visible;
 			magicMenu->visible = false;
@@ -97,7 +95,7 @@ bool MenuController::onHandleEvent(AEvent* e)
 			bottomMenu->magicBtn->checked = false;
 			return true;
 		}
-		else if (e->eventData == KEY_F6)
+		else if (e.eventData == KEY_F6)
 		{
 			magicMenu->visible = !magicMenu->visible;
 			memoMenu->visible = false;
@@ -107,7 +105,7 @@ bool MenuController::onHandleEvent(AEvent* e)
 			bottomMenu->notesBtn->checked = false;
 			return true;
 		}
-		else if (e->eventData == KEY_F7)
+		else if (e.eventData == KEY_F7)
 		{
 			memoMenu->visible = !memoMenu->visible;
 			magicMenu->visible = false;
@@ -123,10 +121,16 @@ bool MenuController::onHandleEvent(AEvent* e)
 
 void MenuController::init()
 {
-#define AddUpMenuChild(A, a); a = new A; upMenu.addChild(a);
-#define AddMenuChild(A, a); a = new A; addChild(a);
-
+//#define AddUpMenuChild(A, a); a = new A; upMenu.addChild(a);
+//#define AddMenuChild(A, a); a = new A; addChild(a);
+#define AddUpMenuChild(A, a); a = std::make_shared<A>(); upMenu->addChild(a); 
+#define AddMenuChild(A, a);  a = std::make_shared<A>(); addChild(a); 
+	
 	freeResource();
+
+	upMenu = std::make_shared<Panel>();
+	addChild(upMenu);
+
 	AddUpMenuChild(MsgBox, messageBox);
 	AddUpMenuChild(StateMenu, stateMenu);
 	AddUpMenuChild(ToolTip, toolTip);
@@ -136,26 +140,30 @@ void MenuController::init()
 	AddUpMenuChild(GoodsMenu, goodsMenu);
 	AddUpMenuChild(MagicMenu, magicMenu);
 	AddMenuChild(BottomMenu, bottomMenu);
+	AddMenuChild(Dialog, dialog);
+	dialog->visible = false;
 }
 
 #define freeMenu(component); \
 	removeChild(component); \
-	if (component != nullptr)\
+	if (component.get() != nullptr)\
 	{\
-		delete component; \
 		component = nullptr; \
 	}
 
 #define freeMenuofUp(component); \
-	upMenu.removeChild(component); \
-	if (component != nullptr)\
+	if (upMenu.get() != nullptr)\
 	{\
-		delete component; \
+		upMenu->removeChild(component); \
+	}\
+	if (component.get() != nullptr)\
+	{\
 		component = nullptr; \
 	}
 
 void MenuController::freeResource()
 {
+
 	freeMenuofUp(messageBox);
 	freeMenuofUp(stateMenu);
 	freeMenuofUp(toolTip);
@@ -165,7 +173,9 @@ void MenuController::freeResource()
 	freeMenuofUp(goodsMenu);
 	freeMenuofUp(magicMenu);
 
+	freeMenu(upMenu);
 	freeMenu(bottomMenu);
+	freeMenu(dialog);
 
 }
 

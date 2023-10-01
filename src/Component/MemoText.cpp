@@ -10,7 +10,7 @@ MemoText::MemoText()
 	mstr.resize(MEMO_LINE);
 	for (size_t i = 0; i < MEMO_LINE; i++)
 	{
-		mstr[i] = new Label;
+		mstr[i] = std::make_shared<Label>();
 		addChild(mstr[i]);
 	}
 }
@@ -20,25 +20,15 @@ MemoText::~MemoText()
 	freeResource();
 }
 
-void MemoText::initFromIni(const std::string & fileName)
+void MemoText::initFromIni(INIReader & ini)
 {
 	freeResource();
 	mstr.resize(MEMO_LINE);
 	for (size_t i = 0; i < MEMO_LINE; i++)
 	{
-		mstr[i] = new Label;
+		mstr[i] = std::make_shared<Label>();
 		addChild(mstr[i]);
 	}
-
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
 
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
@@ -62,7 +52,6 @@ void MemoText::freeResource()
 {
 	for (size_t i = 0; i < MEMO_LINE; i++)
 	{
-		delete mstr[i];
 		mstr[i] = nullptr;
 	}
 	mstr.resize(0);

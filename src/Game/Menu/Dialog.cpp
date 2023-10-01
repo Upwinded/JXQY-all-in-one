@@ -15,10 +15,10 @@ Dialog::~Dialog()
 void Dialog::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\dialog\\window.ini");
-	label = addTalkLabel("ini\\ui\\dialog\\label.ini");
-	head1 = addImageContainer("ini\\ui\\dialog\\head1.ini");
-	head2 = addImageContainer("ini\\ui\\dialog\\head2.ini");
+	initFromIniFileName("ini\\ui\\dialog\\window.ini");
+	label = addComponent<TalkLabel>("ini\\ui\\dialog\\label.ini");
+	head1 = addComponent<ImageContainer>("ini\\ui\\dialog\\head1.ini");
+	head2 = addComponent<ImageContainer>("ini\\ui\\dialog\\head2.ini");
 	setChildRectReferToParent();
 
 	readHeadFiles();
@@ -32,7 +32,7 @@ void Dialog::readHeadFiles()
 	len = PakFile::readFile(fileName, s);
 	if (s == nullptr || len == 0)
 	{
-		printf("no ini file: %s\n", fileName.c_str());
+		GameLog::write("no ini file: %s\n", fileName.c_str());
 		return;
 	}
 	ini = std::make_shared<INIReader>(s);
@@ -87,18 +87,11 @@ void Dialog::setTalkStr(const std::string & str)
 
 void Dialog::setHead1(const std::string & fileName)
 {
-	if (head1->impImage != nullptr)
-	{
-		IMP::clearIMPImage(head1->impImage);
-		//delete head1->impImage;
-		head1->impImage = nullptr;
-	}
-	if (head2->impImage != nullptr)
-	{
-		IMP::clearIMPImage(head2->impImage);
-		//delete head2->impImage;
-		head2->impImage = nullptr;
-	}
+
+	head1->impImage = nullptr;
+
+	head2->impImage = nullptr;
+
 	std::string headName = HEAD_FOLDER + fileName;
 	head1->impImage = IMP::createIMPImage(headName);
 
@@ -106,18 +99,8 @@ void Dialog::setHead1(const std::string & fileName)
 
 void Dialog::setHead2(const std::string & fileName)
 {
-	if (head1->impImage != nullptr)
-	{
-		IMP::clearIMPImage(head1->impImage);
-		//delete head1->impImage;
-		head1->impImage = nullptr;
-	}
-	if (head2->impImage != nullptr)
-	{
-		IMP::clearIMPImage(head2->impImage);
-		//delete head2->impImage;
-		head2->impImage = nullptr;
-	}
+	head1->impImage = nullptr;
+	head2->impImage = nullptr;
 	std::string headName = HEAD_FOLDER + fileName;
 	head2->impImage = IMP::createIMPImage(headName);
 }
@@ -125,11 +108,9 @@ void Dialog::setHead2(const std::string & fileName)
 void Dialog::freeResource()
 {
 	ini = nullptr;
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	freeCom(label);
 	freeCom(head1);
 	freeCom(head2);
@@ -146,9 +127,13 @@ void Dialog::onEvent()
 	}
 }
 
-bool Dialog::onHandleEvent(AEvent * e)
+bool Dialog::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_MOUSEDOWN || e->eventType == ET_KEYDOWN || e->eventType == ET_FINGERDOWN)
+	if (!running)
+	{
+		return false;
+	}
+	if (e.eventType == ET_MOUSEDOWN || e.eventType == ET_KEYDOWN || e.eventType == ET_FINGERDOWN)
 	{
 		index++;
 		if (index >= (int)talkStrList.size())

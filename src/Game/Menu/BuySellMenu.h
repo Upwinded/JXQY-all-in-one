@@ -18,13 +18,13 @@ public:
 	int bsKind = bsBuy;
 	static BuySellMenu * getInstance();
 
-	ImageContainer * title = nullptr;
-	ImageContainer * image = nullptr;
-	Button * closeBtn = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
+	std::shared_ptr<ImageContainer> image = nullptr;
+	std::shared_ptr<Button> closeBtn = nullptr;
 
-	Scrollbar * scrollbar = nullptr;
+	std::shared_ptr<Scrollbar> scrollbar = nullptr;
 
-	Item * item[MENU_ITEM_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+	std::shared_ptr<Item> item[MENU_ITEM_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 	GoodsInfo goodsList[BUYSELL_GOODS_COUNT];
 
@@ -41,7 +41,7 @@ private:
 
 	int position = -1;
 	virtual void onEvent();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 	virtual void init();
 	void freeResource();
 };

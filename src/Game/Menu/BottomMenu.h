@@ -18,18 +18,18 @@ public:
 	void updateMagicItem();
 	void updateMagicItem(int index);
 
-	ColumnMenu columnMenu;
+	std::shared_ptr<ColumnMenu> columnMenu = nullptr;
 
-	CheckBox * equipBtn = nullptr;
-	CheckBox * goodsBtn = nullptr;
-	CheckBox * magicBtn = nullptr;
-	CheckBox * notesBtn = nullptr;
-	CheckBox * optionBtn = nullptr;
-	CheckBox * stateBtn = nullptr;
-	CheckBox * xiulianBtn = nullptr;
+	std::shared_ptr<CheckBox> equipBtn = nullptr;
+	std::shared_ptr<CheckBox> goodsBtn = nullptr;
+	std::shared_ptr<CheckBox> magicBtn = nullptr;
+	std::shared_ptr<CheckBox> notesBtn = nullptr;
+	std::shared_ptr<CheckBox> optionBtn = nullptr;
+	std::shared_ptr<CheckBox> stateBtn = nullptr;
+	std::shared_ptr<CheckBox> xiulianBtn = nullptr;
 
-	Item * goodsItem[GOODS_TOOLBAR_COUNT] = { nullptr, nullptr, nullptr };
-	Item * magicItem[MAGIC_TOOLBAR_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr };
+	std::shared_ptr<Item> goodsItem[GOODS_TOOLBAR_COUNT] = { nullptr, nullptr, nullptr };
+	std::shared_ptr<Item> magicItem[MAGIC_TOOLBAR_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 private:
 	virtual void init();

@@ -8,7 +8,6 @@ class RoundButton :
 {
 public:
 	RoundButton() { stretch = true; }
-	RoundButton(int range);
 	virtual ~RoundButton() { freeResource(); }
 protected:
 	int roundRange = 50;
@@ -25,9 +24,10 @@ public:
 protected:
 	virtual bool mouseInRect(int x, int y);
 	virtual void onDraw();
+	virtual void onClick();
 public:
-	virtual void initFromIni(const std::string& fileName);
+	virtual void initFromIni(INIReader & ini);
 	virtual void onMouseLeftDown(int x, int y);
-	Item * drawItem = nullptr;
+	std::shared_ptr<Item> drawItem = nullptr;
 };
 

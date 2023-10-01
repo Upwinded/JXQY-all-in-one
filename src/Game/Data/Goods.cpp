@@ -51,7 +51,7 @@ void Goods::reset()
 	evade = 0;
 }
 
-void Goods::initFromIni(const std::string & fileName)
+void Goods::initFromIni(const std::string& fileName)
 {
 	reset();
 	std::string iniName = INI_GOODS_FOLDER;

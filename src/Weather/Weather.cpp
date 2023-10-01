@@ -103,26 +103,26 @@ void Weather::drawElementLum()
 	xscal = cenScreen.x / TILE_WIDTH + 2;
 	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
 	int tileHeightScal = 10;
-	Point cenTile = gm->camera.position;
-	PointEx offset = gm->camera.offset;
+	Point cenTile = gm->camera->position;
+	PointEx offset = gm->camera->offset;
 
-	EffectMap emap = gm->effectManager.createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
+	EffectMap emap = gm->effectManager->createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
 		{		
-			if (gm->map.data == nullptr || j < 0 || j >= gm->map.data->head.width || i < 0 || i >= gm->map.data->head.height)
+			if (gm->map->data == nullptr || j < 0 || j >= gm->map->data->head.width || i < 0 || i >= gm->map->data->head.height)
 			{
 				continue;
 			}
 			bool drawLumMask = false;
 			PointEx eOffset = { 0, 0 };
-			for (size_t k = 0; k < gm->map.dataMap.tile[i][j].objIndex.size(); k++)
+			for (size_t k = 0; k < gm->map->dataMap.tile[i][j].objIndex.size(); k++)
 			{
-				if (gm->objectManager.objectList[gm->map.dataMap.tile[i][j].objIndex[k]]->lum > (int)gm->global.data.mainLum)
+				if (gm->objectManager->objectList[gm->map->dataMap.tile[i][j].objIndex[k]]->lum > (int)gm->global.data.mainLum)
 				{
 					drawLumMask = true;
-					eOffset = gm->objectManager.objectList[gm->map.dataMap.tile[i][j].objIndex[k]]->offset;
+					eOffset = gm->objectManager->objectList[gm->map->dataMap.tile[i][j].objIndex[k]]->offset;
 					break;
 				}
 			}	
@@ -130,12 +130,12 @@ void Weather::drawElementLum()
 			{
 				for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 				{
-					if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->getLum() >(int)gm->global.data.mainLum)
+						if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->getLum() >(int)gm->global.data.mainLum)
 						{
 							drawLumMask = true;
-							eOffset = gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset;
+							eOffset = gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset;
 							break;
 						}
 					}
@@ -143,7 +143,7 @@ void Weather::drawElementLum()
 			}		
 			if (drawLumMask)
 			{
-				Point pos = gm->map.getTilePosition({ j, i }, cenTile, cenScreen, offset);
+				Point pos = gm->map->getTilePosition({ j, i }, cenTile, cenScreen, offset);
 				engine->drawImage(lumMask, pos.x - LUM_MASK_WIDTH / 2 + (int)eOffset.x, pos.y - LUM_MASK_HEIGHT / 2 - TILE_HEIGHT / 2 + (int)eOffset.y);
 			}		
 		}
@@ -450,8 +450,8 @@ void Weather::updateWeather()
 	{
 		if (drops[i].type == wtSnow)
 		{
-			drops[i].y = (((double)t) * drops[i].speed) + drops[i].y - gm->camera.differencePosition.y;
-			drops[i].x += ((double)(rand() % 4 - 2)) - gm->camera.differencePosition.x;
+			drops[i].y = (((double)t) * drops[i].speed) + drops[i].y - gm->camera->differencePosition.y;
+			drops[i].x += ((double)(rand() % 4 - 2)) - gm->camera->differencePosition.x;
 			int w, h;
 			engine->getWindowSize(w, h);
             if (drops[i].x < -DROP_OFF_SCREEN_RANGE)

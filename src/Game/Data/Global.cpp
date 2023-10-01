@@ -21,6 +21,8 @@ void Global::load()
 
 	gameType = ini.GetInteger("Game", "Type", gameType);
 
+	useWav = ini.GetBoolean("Game", "UseWav", false);
+
 	data.mapName = ini.Get("State", "Map", "");
 	data.npcName = ini.Get("State", "Npc", "");
 	data.objName = ini.Get("State", "Obj", "");
@@ -50,6 +52,7 @@ void Global::save()
 	INIReader ini(fileName);
 
 	ini.SetInteger("Game", "Type", gameType);
+	ini.SetBoolean("Game", "UseWav", useWav);
 
 	ini.Set("State", "Map", data.mapName);
 	ini.Set("State", "Npc", data.npcName);

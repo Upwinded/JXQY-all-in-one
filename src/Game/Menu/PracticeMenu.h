@@ -8,15 +8,15 @@ public:
 	PracticeMenu();
 	virtual ~PracticeMenu();
 
-	ImageContainer * image = nullptr;
-	ImageContainer * title = nullptr;
+	std::shared_ptr<ImageContainer> image = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
 
-	Label * name = nullptr;
-	Label * intro = nullptr;
-	Label * level = nullptr;
-	Label * exp = nullptr;
+	std::shared_ptr<Label> name = nullptr;
+	std::shared_ptr<Label> intro = nullptr;
+	std::shared_ptr<Label> level = nullptr;
+	std::shared_ptr<Label> exp = nullptr;
 
-	Item * magic = nullptr;
+	std::shared_ptr<Item> magic = nullptr;
 
 	void updateMagic();
 	void updateExp();

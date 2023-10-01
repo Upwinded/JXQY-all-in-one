@@ -13,18 +13,10 @@ ListBox::~ListBox()
 	freeResource();
 }
 
-void ListBox::initFromIni(const std::string & fileName)
+void ListBox::initFromIni(INIReader & ini)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
+
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
 	rect.w = ini.GetInteger("Init", "Width", rect.w);
@@ -47,7 +39,7 @@ void ListBox::initFromIni(const std::string & fileName)
 		
 		for (size_t i = 0; i < itemName.size(); i++)
 		{
-			itemButton[i] = new Button;
+			itemButton[i] = std::make_shared<Button>();
 			itemName[i] = ini.Get("Items", convert::formatString("%d", i + 1), "");
 			
 			itemButton[i]->loadSound(soundName, 1);
@@ -66,7 +58,6 @@ void ListBox::freeResource()
 	{
 		if (itemButton[i] != nullptr)
 		{
-			delete itemButton[i];
 			itemButton[i] = nullptr;
 		}	
 	}
@@ -85,13 +76,9 @@ void ListBox::onEvent()
 			{
 				if (index >= 0)
 				{
-					IMP::clearIMPImage(itemButton[index]->image[0]);
-					//delete itemButton[index]->image[0];
 					itemButton[index]->image[0] = IMP::createIMPImageFromImage(engine->createText(itemName[index], itemSize, color));
 				}
 				index = i;
-				IMP::clearIMPImage(itemButton[index]->image[0]);
-				//delete itemButton[index]->image[0];
 				itemButton[index]->image[0] = IMP::createIMPImageFromImage(engine->createText(itemName[index], itemSize, selColor));
 			}			 
 		}

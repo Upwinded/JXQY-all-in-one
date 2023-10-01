@@ -29,18 +29,18 @@ void StateMenu::updateLabel()
 void StateMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\state\\window.ini");
-	image = addImageContainer("ini\\ui\\state\\image.ini");
-	title = addImageContainer("ini\\ui\\state\\title.ini");
-	labLevel = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab等级.ini"));
-	labExp = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab经验.ini"));
-	labExpUp = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab升级.ini"));
-	labAttack = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab攻击.ini"));
-	labDefend = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab防御.ini"));
-	labEvade = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab闪避.ini"));
-	labLife = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab生命.ini"));
-	labThew = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab体力.ini"));
-	labMana = addLabel(convert::GBKToUTF8_InWinOnly("ini\\ui\\state\\lab内力.ini"));
+	initFromIniFileName(u8"ini\\ui\\state\\window.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\state\\image.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\state\\title.ini");
+	labLevel = addComponent<Label>(u8"ini\\ui\\state\\lab等级.ini");
+	labExp = addComponent<Label>(u8"ini\\ui\\state\\lab经验.ini");
+	labExpUp = addComponent<Label>(u8"ini\\ui\\state\\lab升级.ini");
+	labAttack = addComponent<Label>(u8"ini\\ui\\state\\lab攻击.ini");
+	labDefend = addComponent<Label>(u8"ini\\ui\\state\\lab防御.ini");
+	labEvade = addComponent<Label>(u8"ini\\ui\\state\\lab闪避.ini");
+	labLife = addComponent<Label>(u8"ini\\ui\\state\\lab生命.ini");
+	labThew = addComponent<Label>(u8"ini\\ui\\state\\lab体力.ini");
+	labMana = addComponent<Label>(u8"ini\\ui\\state\\lab内力.ini");
 	setChildRectReferToParent();
 }
 
@@ -51,12 +51,8 @@ void StateMenu::onEvent()
 
 void StateMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
+
 	freeCom(image);
 	freeCom(title);
 	freeCom(labAttack);

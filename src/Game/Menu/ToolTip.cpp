@@ -13,19 +13,16 @@ ToolTip::~ToolTip()
 	freeResource();
 }
 
-void ToolTip::setGoods(Goods * goods)
+void ToolTip::setGoods(std::shared_ptr<Goods> goods)
 {
 	if (goods == nullptr)
 	{
 		return;
 	}
 	std::string imageName = GOODS_RES_FOLDER + goods->image;
-	if (image->impImage != nullptr)
-	{
-		IMP::clearIMPImage(image->impImage);
-		//delete image->impImage;
-		image->impImage = nullptr;
-	}
+
+	image->impImage = nullptr;
+
 	image->impImage = IMP::createIMPImage(imageName);
 	name->setStr(goods->name);
 	std::string costStr = "Price:";
@@ -36,19 +33,16 @@ void ToolTip::setGoods(Goods * goods)
 	intro2->setStr(introStr);
 }
 
-void ToolTip::setMagic(Magic * magic, int level)
+void ToolTip::setMagic(std::shared_ptr<Magic> magic, int level)
 {
 	if (magic == nullptr)
 	{
 		return;
 	}
 	std::string imageName = MAGIC_RES_FOLDER + magic->image;
-	if (image->impImage != nullptr)
-	{
-		IMP::clearIMPImage(image->impImage);
-		//delete image->impImage;
-		image->impImage = nullptr;
-	}
+
+	image->impImage = nullptr;
+
 	image->impImage = IMP::createIMPImage(imageName);
 	name->setStr(magic->name);
 	std::string costStr = "Level:";
@@ -62,26 +56,23 @@ void ToolTip::setMagic(Magic * magic, int level)
 void ToolTip::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\tooltip\\window.ini");
-	image = addImageContainer("ini\\ui\\tooltip\\image.ini");
+	initFromIniFileName("ini\\ui\\tooltip\\window.ini");
+	image = addComponent<ImageContainer>("ini\\ui\\tooltip\\image.ini");
 	image->stretch = true;
-	intro1 = addLabel("ini\\ui\\tooltip\\intro1.ini");
-	intro2 = addLabel("ini\\ui\\tooltip\\intro2.ini");
+	intro1 = addComponent<Label>("ini\\ui\\tooltip\\intro1.ini");
+	intro2 = addComponent<Label>("ini\\ui\\tooltip\\intro2.ini");
 	intro2->rect.y = intro1->rect.y;
 	intro2->autoNextLine = true;
-	name = addLabel("ini\\ui\\tooltip\\name.ini");
-	cost = addLabel("ini\\ui\\tooltip\\cost.ini");
+	name = addComponent<Label>("ini\\ui\\tooltip\\name.ini");
+	cost = addComponent<Label>("ini\\ui\\tooltip\\cost.ini");
 	setChildRectReferToParent();
 }
 
 void ToolTip::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	freeCom(name);
 	freeCom(cost);
 	freeCom(intro1);

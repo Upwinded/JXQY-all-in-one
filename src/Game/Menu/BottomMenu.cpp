@@ -6,7 +6,8 @@ BottomMenu::BottomMenu()
 {
 	init();
 	visible = true;
-	addChild(&columnMenu);
+	columnMenu = std::make_shared<ColumnMenu>();
+	addChild(columnMenu);
 }
 
 BottomMenu::~BottomMenu()
@@ -29,12 +30,9 @@ void BottomMenu::updateGoodsItem(int index)
 	{
 		if (goodsItem[index] != nullptr)
 		{
-			if (goodsItem[index]->impImage != nullptr)
-			{
-				IMP::clearIMPImage(goodsItem[index]->impImage);
-				//delete goodsItem[index]->impImage;
-				goodsItem[index]->impImage = nullptr;
-			}
+
+			goodsItem[index]->impImage = nullptr;
+
 			updateGoodsNumber(index);
 			if (GameManager::getInstance()->goodsManager.goodsList[GOODS_COUNT + index].goods != nullptr)
 			{
@@ -72,7 +70,6 @@ void BottomMenu::updateGoodsNumber(int index)
 				goodsItem[index]->setStr("");
 				if (gm->goodsManager.goodsList[GOODS_COUNT + index].goods != nullptr)
 				{
-					delete gm->goodsManager.goodsList[GOODS_COUNT + index].goods;
 					gm->goodsManager.goodsList[GOODS_COUNT + index].goods = nullptr;
 				}
 				gm->goodsManager.goodsList[GOODS_COUNT + index].iniFile = "";
@@ -96,12 +93,9 @@ void BottomMenu::updateMagicItem(int index)
 	{
 		if (magicItem[index] != nullptr)
 		{
-			if (magicItem[index]->impImage != nullptr)
-			{
-				IMP::clearIMPImage(magicItem[index]->impImage);
-				//delete magicItem[index]->impImage;
-				magicItem[index]->impImage = nullptr;
-			}
+
+			magicItem[index]->impImage = nullptr;
+
 			if (gm->magicManager.magicList[MAGIC_COUNT + index].magic != nullptr)
 			{
 				magicItem[index]->impImage = GameManager::getInstance()->magicManager.magicList[MAGIC_COUNT + index].magic->createMagicIcon();
@@ -118,19 +112,19 @@ void BottomMenu::updateMagicItem(int index)
 void BottomMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\bottom\\window.ini");
-	equipBtn = addCheckBox("ini\\ui\\bottom\\btnequip.ini");
-	goodsBtn = addCheckBox("ini\\ui\\bottom\\btngoods.ini");
-	magicBtn = addCheckBox("ini\\ui\\bottom\\btnmagic.ini");
-	notesBtn = addCheckBox("ini\\ui\\bottom\\btnnotes.ini");
-	optionBtn = addCheckBox("ini\\ui\\bottom\\btnoption.ini");
-	stateBtn = addCheckBox("ini\\ui\\bottom\\btnstate.ini");
-	xiulianBtn = addCheckBox("ini\\ui\\bottom\\btnxiulian.ini");
+	initFromIniFileName("ini\\ui\\bottom\\window.ini");
+	equipBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnequip.ini");
+	goodsBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btngoods.ini");
+	magicBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnmagic.ini");
+	notesBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnnotes.ini");
+	optionBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnoption.ini");
+	stateBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnstate.ini");
+	xiulianBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnxiulian.ini");
 
 	for (size_t i = 0; i < GOODS_TOOLBAR_COUNT; i++)
 	{
 		std::string itemName = convert::formatString("ini\\ui\\bottom\\item%d.ini", i + 1);
-		goodsItem[i] = addItem(itemName);
+		goodsItem[i] = addComponent<Item>(itemName);
 		goodsItem[i]->dragType = dtGoods;
 		goodsItem[i]->dragIndex = GOODS_COUNT + i;
 		goodsItem[i]->canShowHint = true;
@@ -139,7 +133,7 @@ void BottomMenu::init()
 	for (size_t i = 0; i <  MAGIC_TOOLBAR_COUNT; i++)
 	{
 		std::string itemName = convert::formatString("ini\\ui\\bottom\\item%d.ini", i + 1 + GOODS_TOOLBAR_COUNT);
-		magicItem[i] = addItem(itemName);
+		magicItem[i] = addComponent<Item>(itemName);
 		magicItem[i]->dragType = dtMagic;
 		magicItem[i]->dragIndex = MAGIC_COUNT + i;
 		magicItem[i]->canShowHint = true;
@@ -157,33 +151,33 @@ void BottomMenu::onEvent()
 		{
 			if (gm->goodsManager.goodsList[GOODS_COUNT + i].iniFile != "" && gm->goodsManager.goodsList[GOODS_COUNT + i].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + i].number > 0)
 			{
-				gm->menu.toolTip->visible = true;
-				gm->menu.toolTip->changeParent(this);
-				gm->menu.toolTip->setGoods(gm->goodsManager.goodsList[GOODS_COUNT + i].goods);
+				gm->menu->toolTip->visible = true;
+				addChild(gm->menu->toolTip);
+				gm->menu->toolTip->setGoods(gm->goodsManager.goodsList[GOODS_COUNT + i].goods);
 			}
 			else
 			{
-				gm->menu.toolTip->visible = false;
+				gm->menu->toolTip->visible = false;
 			}
 			
 		}
 		if (ret & erHideHint)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 		}
-#ifdef _MOBILE
+#ifdef __MOBILE__
 		if (ret & erMouseRDown || ret & erClick)
 #else
 		if (ret & erMouseRDown)
 #endif
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			goodsItem[i]->resetHint();
 			gm->goodsManager.useItem(goodsItem[i]->dragIndex);
 		}
 		if (ret & erDropped)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			goodsItem[i]->resetHint();
 			
 			if (goodsItem[i]->dropType == dtGoods)
@@ -193,7 +187,7 @@ void BottomMenu::onEvent()
 					if (goodsItem[i]->dropIndex < GOODS_COUNT)
 					{						
 						gm->goodsManager.exchange(i + GOODS_COUNT, goodsItem[i]->dropIndex);
-						gm->menu.goodsMenu->updateGoods();
+						gm->menu->goodsMenu->updateGoods();
 						updateGoodsItem(i);
 					}
 					else if (goodsItem[i]->dropIndex < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
@@ -206,7 +200,7 @@ void BottomMenu::onEvent()
 						if (gm->goodsManager.goodsList[i + GOODS_COUNT].goods == nullptr || (gm->goodsManager.goodsList[i + GOODS_COUNT].goods->part == gm->goodsManager.goodsList[goodsItem[i]->dropIndex].goods->part))
 						{
 							gm->goodsManager.exchange(i + GOODS_COUNT, goodsItem[i]->dropIndex);
-							gm->menu.equipMenu->updateGoods(goodsItem[i]->dropIndex - GOODS_COUNT - GOODS_TOOLBAR_COUNT);
+							gm->menu->equipMenu->updateGoods(goodsItem[i]->dropIndex - GOODS_COUNT - GOODS_TOOLBAR_COUNT);
 							updateGoodsItem(i);
 						}
 					}
@@ -221,28 +215,28 @@ void BottomMenu::onEvent()
 		{
 			if (gm->magicManager.magicListExists(MAGIC_COUNT + i))
 			{
-				gm->menu.toolTip->visible = true;
-				gm->menu.toolTip->changeParent(this);
-				gm->menu.toolTip->setMagic(gm->magicManager.magicList[MAGIC_COUNT + i].magic, gm->magicManager.magicList[MAGIC_COUNT + i].level);
+				gm->menu->toolTip->visible = true;
+				addChild(gm->menu->toolTip);
+				gm->menu->toolTip->setMagic(gm->magicManager.magicList[MAGIC_COUNT + i].magic, gm->magicManager.magicList[MAGIC_COUNT + i].level);
 			}
 			else
 			{
-				gm->menu.toolTip->visible = false;
+				gm->menu->toolTip->visible = false;
 			}
 			
 		}
 		if (ret & erHideHint)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 		}
 		if (ret & erMouseRDown)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			magicItem[i]->resetHint();
 		}
 		if (ret & erDropped)
 		{	
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			magicItem[i]->resetHint();
 			if (magicItem[i]->dropType == dtMagic)
 			{
@@ -255,11 +249,11 @@ void BottomMenu::onEvent()
 					}
 					if (magicItem[i]->dropIndex < MAGIC_COUNT)
 					{
-						gm->menu.magicMenu->updateMagic();
+						gm->menu->magicMenu->updateMagic();
 					}
 					else if (magicItem[i]->dropIndex == MAGIC_COUNT + MAGIC_TOOLBAR_COUNT)
 					{
-						gm->menu.practiceMenu->updateMagic();
+						gm->menu->practiceMenu->updateMagic();
 					}
 				}
 			}	
@@ -269,7 +263,7 @@ void BottomMenu::onEvent()
 	if (optionBtn->getResult(erClick))
 	{
 		optionBtn->checked = true;
-		gm->controller.setPaused(true);
+		gm->controller->setPaused(true);
 		if (currentDragItem != nullptr)
 		{
 			currentDragItem->dragEnd();
@@ -278,21 +272,21 @@ void BottomMenu::onEvent()
 		{
 			dragging = TOUCH_UNTOUCHEDID;
 		}
-		bool vis = gm->menu.visible;
-		gm->menu.visible = false;
-		gm->menu.toolTip->changeParent(nullptr);
+		bool vis = gm->menu->visible;
+		gm->menu->visible = false;
+		removeChild(gm->menu->toolTip);
 		std::shared_ptr<System> system = std::make_shared<System>();
-		gm->addChild(system.get());
+		gm->addChild(system);
 		unsigned int ret = system->run();
-		gm->removeChild(system.get());
+		gm->removeChild(system);
 		system = nullptr;
 		if ((ret & erExit) != 0)
 		{
 			gm->result = erExit;
 			gm->setRunning(false);
 		}
-		gm->controller.setPaused(false);
-		gm->menu.visible = vis;
+		gm->controller->setPaused(false);
+		gm->menu->visible = vis;
 		optionBtn->checked = false;
 
 		/*std::shared_ptr<Option> option = std::make_shared<Option>();
@@ -307,102 +301,99 @@ void BottomMenu::onEvent()
 	{
 		if (equipBtn->checked)
 		{
-			gm->menu.equipMenu->visible = true;
-			gm->menu.stateMenu->visible = false;
-			gm->menu.practiceMenu->visible = false;
+			gm->menu->equipMenu->visible = true;
+			gm->menu->stateMenu->visible = false;
+			gm->menu->practiceMenu->visible = false;
 			stateBtn->checked = false;
 			xiulianBtn->checked = false;
 		}
 		else
 		{
-			gm->menu.equipMenu->visible = false;
+			gm->menu->equipMenu->visible = false;
 		}
 	}
 	if (stateBtn->getResult(erClick))
 	{
 		if (stateBtn->checked)
 		{
-			gm->menu.stateMenu->visible = true;
-			gm->menu.equipMenu->visible = false;
-			gm->menu.practiceMenu->visible = false;
+			gm->menu->stateMenu->visible = true;
+			gm->menu->equipMenu->visible = false;
+			gm->menu->practiceMenu->visible = false;
 			equipBtn->checked = false;
 			xiulianBtn->checked = false;
 		}
 		else
 		{
-			gm->menu.stateMenu->visible = false;
+			gm->menu->stateMenu->visible = false;
 		}
 	}
 	if (xiulianBtn->getResult(erClick))
 	{
 		if (xiulianBtn->checked)
 		{
-			gm->menu.practiceMenu->visible = true;
-			gm->menu.equipMenu->visible = false;
-			gm->menu.stateMenu->visible = false;
+			gm->menu->practiceMenu->visible = true;
+			gm->menu->equipMenu->visible = false;
+			gm->menu->stateMenu->visible = false;
 			equipBtn->checked = false;
 			stateBtn->checked = false;
 		}
 		else
 		{
-			gm->menu.practiceMenu->visible = false;
+			gm->menu->practiceMenu->visible = false;
 		}
 	}
 	if (goodsBtn->getResult(erClick))
 	{
 		if (goodsBtn->checked)
 		{
-			gm->menu.goodsMenu->visible = true;
-			gm->menu.magicMenu->visible = false;
-			gm->menu.memoMenu->visible = false;
+			gm->menu->goodsMenu->visible = true;
+			gm->menu->magicMenu->visible = false;
+			gm->menu->memoMenu->visible = false;
 			magicBtn->checked = false;
 			notesBtn->checked = false;
 		}
 		else
 		{
-			gm->menu.goodsMenu->visible = false;
+			gm->menu->goodsMenu->visible = false;
 		}
 	}
 	if (magicBtn->getResult(erClick))
 	{
 		if (magicBtn->checked)
 		{
-			gm->menu.magicMenu->visible = true;
-			gm->menu.goodsMenu->visible = false;
-			gm->menu.memoMenu->visible = false;
+			gm->menu->magicMenu->visible = true;
+			gm->menu->goodsMenu->visible = false;
+			gm->menu->memoMenu->visible = false;
 			goodsBtn->checked = false;
 			notesBtn->checked = false;
 		}
 		else
 		{
-			gm->menu.magicMenu->visible = false;
+			gm->menu->magicMenu->visible = false;
 		}
 	}
 	if (notesBtn->getResult(erClick))
 	{
 		if (notesBtn->checked)
 		{
-			gm->menu.memoMenu->visible = true;
-			gm->menu.goodsMenu->visible = false;
-			gm->menu.magicMenu->visible = false;
+			gm->menu->memoMenu->visible = true;
+			gm->menu->goodsMenu->visible = false;
+			gm->menu->magicMenu->visible = false;
 			goodsBtn->checked = false;
 			magicBtn->checked = false;
 		}
 		else
 		{
-			gm->menu.memoMenu->visible = false;
+			gm->menu->memoMenu->visible = false;
 		}
 	}
 }
 
 void BottomMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	freeCom(equipBtn);
 	freeCom(goodsBtn);
 	freeCom(magicBtn);

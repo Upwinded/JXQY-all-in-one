@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <memory>
+#include <queue>
 
 
 enum EventType
@@ -138,5 +139,5 @@ struct AEvent
 
 struct EventList
 {
-	std::vector<AEvent> event;
+	std::queue<AEvent> event;
 };

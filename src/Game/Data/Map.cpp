@@ -20,7 +20,7 @@ bool Map::load(const std::string & fileName)
 {
 	freeMpc();
 	freeData();
-	printf("load map file %s\n", fileName.c_str());
+	GameLog::write("load map file %s\n", fileName.c_str());
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(fileName, s);
 	if (s != nullptr && len > 0)
@@ -28,7 +28,7 @@ bool Map::load(const std::string & fileName)
 		bool ret = load(s, len);
 		return ret;
 	}
-	printf("map file %s doesn't exist!\n", fileName.c_str());
+	GameLog::write("map file %s doesn't exist!\n", fileName.c_str());
 	return false;
 }
 
@@ -39,7 +39,9 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 	memcpy(_dst, d, _len);\
 	d += _len;\
 	size -= _len;
+
 	freeData();
+
 	int size = len;
 	//check length of head
 	if (size >= MAP_HEAD_LEN)
@@ -59,7 +61,6 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 
 	if (!compareMapHead(data.get()))
 	{
-		//delete data;
 		data = nullptr;
 		return false;
 	}
@@ -87,7 +88,6 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 	
 	if ((data->head.nameLen <= 0) || (data->head.infoLen != data->head.nameLen + 32) || (size < MAP_MPC_COUNT * data->head.infoLen + (int)sizeof(MapTile) * data->head.width * data->head.height))
 	{
-		//delete data;
 		data = nullptr;
 		return false;
 	}
@@ -95,8 +95,8 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 	//read mpc info
 	for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 	{
-		data->mpc.mpc[i].name = new char[data->head.nameLen];
-		mapReadData(data->mpc.mpc[i].name, data->head.nameLen);
+		data->mpc.mpc[i].name = std::unique_ptr<char[]>(new char[data->head.nameLen]);
+		mapReadData(data->mpc.mpc[i].name.get(), data->head.nameLen);
 		mapReadData(&data->mpc.mpc[i].index, 4);
 		mapReadData(&data->mpc.mpc[i].dynamic, 4);
 		mapReadData(&data->mpc.mpc[i].obstacle, 4);
@@ -137,18 +137,18 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 	return true;
 }
 
-Point Map::getElementPosition(Point pos, Point cenTile, Point cenScreen, PointEx offset)
+Point Map::getElementPosition(Point pos, Point cenTile, Point cenScreen, PointEx cenTileOffset)
 {
 	pos.y -= TILE_HEIGHT / 2;
-	return getMousePosition(pos, cenTile, cenScreen, offset);
+	return getMousePosition(pos, cenTile, cenScreen, cenTileOffset);
 }
 
-Point Map::getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx offset)
+Point Map::getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx cenTileOffset)
 {
 	Point point;
 	int line = std::abs(cenTile.y % 2);
-	cenScreen.x -= (int)round(offset.x);
-	cenScreen.y -= (int)round(offset.y);
+	cenScreen.x -= (int)round(cenTileOffset.x);
+	cenScreen.y -= (int)round(cenTileOffset.y);
 	float x = (float)(mouse.x - cenScreen.x);
 	float y = (float)(mouse.y - cenScreen.y);
 	float lx = y / TILE_HEIGHT - x / TILE_WIDTH;
@@ -206,12 +206,12 @@ Point Map::getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx
 	return point;
 }
 
-Point Map::getTilePosition(Point tile, Point cenTile, Point cenScreen, PointEx offset)
+Point Map::getTilePosition(Point tile, Point cenTile, Point cenScreen, PointEx cenTileOffset)
 {
 	Point point;
 	int line = std::abs(cenTile.y % 2);
-	cenScreen.x -= (int)round(offset.x);
-	cenScreen.y -= (int)round(offset.y);
+	cenScreen.x -= (int)round(cenTileOffset.x);
+	cenScreen.y -= (int)round(cenTileOffset.y);
 	int line2 = std::abs(tile.y % 2);
 	int x = tile.x - cenTile.x;
 	int y = tile.y - cenTile.y;
@@ -242,17 +242,18 @@ Point Map::getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx off
 	return pos;
 }
 
-//将坐标位置当作以1为单位的正菱形
+//获得距离，从斜45度矫正为平视地图比例的菱形
 double Map::getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {
 	auto pos = getTilePosition(to, from);
-	return hypot(((double)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH, ((double)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
+	return hypot(((double)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH  * MapXRatio, ((double)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
 }
 
 void Map::loadMapMpc()
 {
 	freeMpc();
 
+	engine->delay(1);
 	if (data != nullptr)
 	{
 		mapMpc = std::make_shared<MapMpc>();
@@ -268,8 +269,9 @@ void Map::loadMapMpc()
 			{
 				mpcName += "\\";
 			}
-			mpcName += data->mpc.mpc[i].name;
+			mpcName += data->mpc.mpc[i].name.get();
 			mapMpc->mpc[i].img = IMP::createIMPImage(mpcName);
+
 		}
 
 	}
@@ -280,7 +282,7 @@ std::deque<Point> Map::getPath(Point from, Point to)
 {
 	std::deque<Point> path;
 	path.resize(0);
-	if (to.x == from.x && to.y == from.y)
+	if (to == from)
 	{
 		return path;
 	}
@@ -356,7 +358,7 @@ std::deque<Point> Map::getPath(Point from, Point to)
 		while (true)
 		{
 			step = pathMap.map[step.y][step.x].from;
-			if (step.x == from.x && step.y == from.y)
+			if (step == from)
 			{
 				break;
 			}
@@ -397,7 +399,7 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 	while (0 < stepCount--)
 	{
 		stepIdx++;
-		if (pos.x == to.x && pos.y == to.y)
+		if (pos == to)
 		{
 			return result;
 		}
@@ -423,20 +425,20 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 			default:
 				break;
 			}
-			std::vector<Point> tempSteps = gm->map.getSubPointEx(pos, NPC::calDirection(pos, to) + d);
+			std::vector<Point> tempSteps = gm->map->getSubPointEx(pos, NPC::calDirection(pos, to) + d);
 			if (tempSteps.size() > 0)
 			{
 				bool canContinue = true;
 				for (size_t j = 0; j < tempSteps.size() - 1; j++)
 				{
-					if (!gm->map.canPass(tempSteps[j]))
+					if (!gm->map->canPass(tempSteps[j]))
 					{
 						canContinue = false;
 					}
 				}
 				if (canContinue && tempSteps.size() > 0)
 				{
-					if (!gm->map.canWalk(tempSteps[tempSteps.size() - 1]))
+					if (!gm->map->canWalk(tempSteps[tempSteps.size() - 1]))
 					{
 						canContinue = false;
 					}
@@ -456,13 +458,13 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 std::deque<Point> Map::getStep(Point from, Point to)
 {
 	std::deque<Point> result;
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		return result;
 	}
 	int dir = NPC::calDirection(from, to);
-	Point pos = gm->map.getSubPoint(from, dir);
-	if (gm->map.canWalk(pos))
+	Point pos = gm->map->getSubPoint(from, dir);
+	if (gm->map->canWalk(pos))
 	{
 		result.push_back(pos);
 	}
@@ -475,11 +477,11 @@ std::deque<Point> Map::getPassPath(Point from, Point to, Point flyDirection, Poi
 	result.resize(0);
 	result.push_back(from);
 
-	if (flyDirection.x == 0 && flyDirection.y == 0)
+	if (flyDirection.is_zero())
 	{
 		return result;
 	}
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		return result;
 	}
@@ -494,7 +496,7 @@ std::deque<Point> Map::getPassPath(Point from, Point to, Point flyDirection, Poi
 		std::vector<Point> stepList = getLineSubStep(nowStep, dest, angle);
 		for (size_t i = 0; i < stepList.size(); i++)
 		{
-			if (stepList[i].x != to.x || stepList[i].y != to.y)
+			if (stepList[i] != to)
 			{
 				result.push_back(stepList[i]);
 			}
@@ -512,11 +514,11 @@ std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, P
 {
 	std::deque<Point> result;
 	result.resize(0);
-	if (flyDirection.x == 0 && flyDirection.y == 0)
+	if (flyDirection.is_zero())
 	{
 		return result;
 	}
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		return result;
 	}
@@ -525,7 +527,7 @@ std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, P
 	Point nowStep = from;
 	PointEx nowOffset = fromOffset;
 	result.push_back(nowStep);
-	while ((nowStep.x != to.x || nowStep.y != to.y) && (leftStep-- > 0))
+	while ((nowStep != to) && (leftStep-- > 0))
 	{
 		auto nextStep = getLineSubStepEx(nowStep, nowOffset, angle);
 		nowStep = nextStep.point;
@@ -537,7 +539,7 @@ std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, P
 
 Point Map::getJumpPath(Point from, Point to)
 {
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		return from;
 	}
@@ -604,7 +606,7 @@ Point Map::getJumpPath(Point from, Point to)
 					break;
 				}
 			}
-			if (stepList[stepList.size() - 1].x == to.x && stepList[stepList.size() - 1].y == to.y)
+			if (stepList[stepList.size() - 1] == to)
 			{
 				break;
 			}	
@@ -619,7 +621,7 @@ Point Map::getJumpPath(Point from, Point to)
 
 bool Map::canView(Point from, Point to)
 {
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		return true;
 	}
@@ -675,7 +677,7 @@ bool Map::canView(Point from, Point to)
 		{
 			return false;
 		}
-		if (stepList[stepList.size() - 1].x == to.x && stepList[stepList.size() - 1].y == to.y)
+		if (stepList[stepList.size() - 1] == to)
 		{
 			return true;
 		}
@@ -708,7 +710,7 @@ bool Map::canWalk(Point pos)
 			{
 				for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
 				{
-					int objKind = gm->objectManager.objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+					int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
 					if (objKind == okBox || objKind == okDoor || objKind == okOrnament)
 					{
 						return false;
@@ -735,7 +737,7 @@ bool Map::canJump(Point pos)
 			{
 				for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
 				{
-					int objKind = gm->objectManager.objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+					int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
 					if (objKind == okDoor)
 					{
 						return false;
@@ -792,7 +794,7 @@ bool Map::canFly(Point pos)
 		{
 			for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
 			{
-				int objKind = gm->objectManager.objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+				int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
 				if (objKind == okDoor || objKind == okOrnament)
 				{
 					return false;
@@ -820,7 +822,7 @@ bool Map::canViewTile(Point pos)
 		{
 			for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
 			{
-				int objKind = gm->objectManager.objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+				int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
 				if (objKind == okDoor)
 				{
 					return false;
@@ -851,7 +853,7 @@ bool Map::canPass(Point pos)
 			{
 				for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
 				{
-					int objKind = gm->objectManager.objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+					int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
 					if (objKind == okBox || objKind == okDoor || objKind == okOrnament)
 					{
 						return false;
@@ -1016,8 +1018,8 @@ void Map::drawMap()
 	xscal = cenScreen.x / TILE_WIDTH + 2;
 	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
 	int tileHeightScal = 15;
-	Point cenTile = gm->camera.position;
-	PointEx offset = gm->camera.offset;
+	Point cenTile = gm->camera->position;
+	PointEx offset = gm->camera->offset;
 
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
@@ -1032,7 +1034,7 @@ void Map::drawMap()
 		}
 	}
 
-	EffectMap emap = gm->effectManager.createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
+	EffectMap emap = gm->effectManager->createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
 	
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
@@ -1044,11 +1046,11 @@ void Map::drawMap()
 			}
 			for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 			{
-				if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					if ((double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
+					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
 					{
-						gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 					}
 				}
 			}
@@ -1058,7 +1060,7 @@ void Map::drawMap()
 
 			for (size_t k = 0; k < dataMap.tile[i][j].objIndex.size(); k++)
 			{
-				gm->objectManager.drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
+				gm->objectManager->drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
 			}
 			for (size_t k = 0; k < dataMap.tile[i][j].npcIndex.size(); k++)
 			{
@@ -1071,17 +1073,17 @@ void Map::drawMap()
 				}
 				else
 				{
-					gm->npcManager.drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
+					gm->npcManager->drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
 				}
 			}
 
 			for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 			{
-				if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					if ((double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
+					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
 					{
-						gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 					}
 				}
 			}
@@ -1107,11 +1109,11 @@ void Map::drawMap()
 				}
 				for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 				{
-					if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if ((double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
+						if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
 						{
-							gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
 
 					}
@@ -1135,11 +1137,11 @@ void Map::drawMap()
 				}
 				for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 				{
-					if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if (-(double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
+						if (-(double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
 						{
-							gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
 					}
 				}
@@ -1164,7 +1166,7 @@ void Map::drawMap()
 
 				for (size_t k = 0; k < dataMap.tile[i][j].objIndex.size(); k++)
 				{
-					gm->objectManager.drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
+					gm->objectManager->drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
 				}
 				for (size_t k = 0; k < dataMap.tile[i][j].npcIndex.size(); k++)
 				{
@@ -1177,7 +1179,7 @@ void Map::drawMap()
 					}
 					else
 					{
-						gm->npcManager.drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
+						gm->npcManager->drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
 					}
 				}
 			}
@@ -1203,7 +1205,7 @@ void Map::drawMap()
 
 				for (size_t k = 0; k < dataMap.tile[i][j].objIndex.size(); k++)
 				{
-					gm->objectManager.drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
+					gm->objectManager->drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
 				}
 				for (size_t k = 0; k < dataMap.tile[i][j].npcIndex.size(); k++)
 				{
@@ -1216,7 +1218,7 @@ void Map::drawMap()
 					}
 					else
 					{
-						gm->npcManager.drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
+						gm->npcManager->drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
 					}
 				}	
 			}
@@ -1237,11 +1239,11 @@ void Map::drawMap()
 				}
 				for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 				{
-					if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if ((double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
+						if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
 						{
-							gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
 						
 					}
@@ -1265,11 +1267,11 @@ void Map::drawMap()
 				}
 				for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 				{
-					if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if (-(double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
+						if (-(double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
 						{
-							gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
 					}
 				}
@@ -1283,7 +1285,7 @@ void Map::drawMap()
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
 		{
-			//npcManager.draw(tile, cenTile, cenScreen, offset);
+			//npcManager->draw(tile, cenTile, cenScreen, offset);
 			if (data == nullptr || j < 0 || j >= data->head.width || i < 0 || i >= data->head.height)
 			{
 				continue;
@@ -1292,7 +1294,7 @@ void Map::drawMap()
 
 			for (size_t k = 0; k < dataMap.tile[i][j].objIndex.size(); k++)
 			{
-				gm->objectManager.drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
+				gm->objectManager->drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
 			}
 			for (size_t k = 0; k < dataMap.tile[i][j].npcIndex.size(); k++)
 			{
@@ -1305,14 +1307,14 @@ void Map::drawMap()
 				}
 				else
 				{
-					gm->npcManager.drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
+					gm->npcManager->drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
 				}
 			}
 			for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 			{
-				if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+					gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 				}
 			}
 		}
@@ -1320,9 +1322,9 @@ void Map::drawMap()
 		{
 			for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
 			{
-				if (gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					gm->effectManager.effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+					gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 				}
 			}
 		}
@@ -1335,9 +1337,9 @@ void Map::drawMap()
 		{
 			for (int k = 0; k < (int)emap.tile[i][j].index.size(); k++)
 			{
-				if (gm->effectManager.effectList[emap.tile[i][j].index[k]] != nullptr)
+				if (gm->effectManager->effectList[emap.tile[i][j].index[k]] != nullptr)
 				{
-					gm->effectManager.effectList[emap.tile[i][j].index[k]]->draw(cenTile, cenScreen, offset);
+					gm->effectManager->effectList[emap.tile[i][j].index[k]]->draw(cenTile, cenScreen, offset);
 				}
 			}
 		}
@@ -1358,9 +1360,9 @@ void Map::drawMap()
 	}
 	
 
-	if (!gm->objectManager.drawOBJSelectedAlpha(cenTile, cenScreen, offset))
+	if (!gm->objectManager->drawOBJSelectedAlpha(cenTile, cenScreen, offset))
 	{
-		gm->npcManager.drawNPCSelectedAlpha(cenTile, cenScreen, offset);
+		gm->npcManager->drawNPCSelectedAlpha(cenTile, cenScreen, offset);
 	}
 	if (gm->player->isJumping() && gm->player->jumpState == jsJumping)
 	{
@@ -1416,26 +1418,26 @@ void Map::createDataMap()
 			}
 		}
 	}
-	for (size_t i = 0; i < gm->npcManager.npcList.size(); i++)
+	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
 	{
-		if (gm->npcManager.npcList[i] != nullptr && gm->npcManager.npcList[i]->position.x >= 0 && gm->npcManager.npcList[i]->position.x < w && gm->npcManager.npcList[i]->position.y >= 0 && gm->npcManager.npcList[i]->position.y < h)
+		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->position.x >= 0 && gm->npcManager->npcList[i]->position.x < w && gm->npcManager->npcList[i]->position.y >= 0 && gm->npcManager->npcList[i]->position.y < h)
 		{
-			gm->npcManager.npcList[i]->npcIndex = i + 1;
-			dataMap.tile[gm->npcManager.npcList[i]->position.y][gm->npcManager.npcList[i]->position.x].npcIndex.push_back(i + 1);
+			gm->npcManager->npcList[i]->npcIndex = i + 1;
+			dataMap.tile[gm->npcManager->npcList[i]->position.y][gm->npcManager->npcList[i]->position.x].npcIndex.push_back(i + 1);
 		}
-		if (gm->npcManager.npcList[i] != nullptr && (gm->npcManager.npcList[i]->isWalking() || gm->npcManager.npcList[i]->isRunning()))
+		if (gm->npcManager->npcList[i] != nullptr && (gm->npcManager->npcList[i]->isWalking() || gm->npcManager->npcList[i]->isRunning()))
 		{
-			if (gm->npcManager.npcList[i]->stepState == ssOut && gm->npcManager.npcList[i]->stepList.size() > 0)
+			if (gm->npcManager->npcList[i]->stepState == ssOut && gm->npcManager->npcList[i]->stepList.size() > 0)
 			{
-				addStepToDataMap(gm->npcManager.npcList[i]->stepList[0], i + 1);
+				addStepToDataMap(gm->npcManager->npcList[i]->stepList[0], i + 1);
 			}
 		}
 	}
-	for (size_t i = 0; i < gm->objectManager.objectList.size(); i++)
+	for (size_t i = 0; i < gm->objectManager->objectList.size(); i++)
 	{
-		if (gm->objectManager.objectList[i] != nullptr && gm->objectManager.objectList[i]->position.x >= 0 && gm->objectManager.objectList[i]->position.x < w && gm->objectManager.objectList[i]->position.y >= 0 && gm->objectManager.objectList[i]->position.y < h)
+		if (gm->objectManager->objectList[i] != nullptr && gm->objectManager->objectList[i]->position.x >= 0 && gm->objectManager->objectList[i]->position.x < w && gm->objectManager->objectList[i]->position.y >= 0 && gm->objectManager->objectList[i]->position.y < h)
 		{
-			dataMap.tile[gm->objectManager.objectList[i]->position.y][gm->objectManager.objectList[i]->position.x].objIndex.push_back(i);
+			dataMap.tile[gm->objectManager->objectList[i]->position.y][gm->objectManager->objectList[i]->position.x].objIndex.push_back(i);
 		}
 	}
 }
@@ -1585,14 +1587,8 @@ void Map::freeMpc()
 	{
 		for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 		{
-			if (mapMpc->mpc[i].img != nullptr)
-			{
-				IMP::clearIMPImage(mapMpc->mpc[i].img);
-				//delete mapMpc->mpc[i].img;
-				mapMpc->mpc[i].img = nullptr;
-			}
+			mapMpc->mpc[i].img = nullptr;
 		}
-		//delete mapMpc;
 		mapMpc = nullptr;
 	}
 }
@@ -1604,13 +1600,11 @@ void Map::freeData()
 		data->tile.resize(0);
 		for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 		{
-			if (data->mpc.mpc[i].name != nullptr)
+			if (data->mpc.mpc[i].name.get() != nullptr)
 			{
-				delete[] data->mpc.mpc[i].name;
-				data->mpc.mpc[i].name = nullptr;
+				data->mpc.mpc[i].name = std::unique_ptr<char[]>(nullptr);
 			}
 		}
-		//delete data;
 		data = nullptr;
 	}
 }
@@ -1697,7 +1691,7 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, double angle
 	LinePathPoint result;
 	result.point = from;
 	result.pointEx = fromOffset;
-	result.pointEx.x /= (TILE_WIDTH / 2);
+	result.pointEx.x /= (TILE_WIDTH / 2 / MapXRatio);
 	result.pointEx.y /= (TILE_HEIGHT / 2);
 	int dir = 0;
 	if (angle <= pi / 4 || angle > pi * 7 / 4)
@@ -1788,7 +1782,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
 {
 	std::vector<Point> result;
 	result.resize(0);
-	if (from.x == to.x && from.y == to.y)
+	if (from == to)
 	{
 		result.push_back(from);
 		return result;
@@ -2035,19 +2029,8 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
 	return result;
 }
 
-std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex)
+bool Map::getSlantPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Point from, Point to, int stepIndex)
 {
-	std::vector<Point> subStep;
-	subStep.resize(0);
-	if (pathMap->map[to.y][to.x].index >= 0)
-	{
-		return subStep;
-	}
-	if (!isInMap(pathMap, from))
-	{
-		return subStep;
-	}
-	int line = std::abs(from.y) % 2;
 	Point pos;
 	for (int i = line - 1; i < line + 1; i++)
 	{
@@ -2055,26 +2038,48 @@ std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int 
 		{
 			pos.x = from.x + i;
 			pos.y = from.y + j;
-			if (pos.x == to.x && pos.y == to.y)
+			if (pos == to)
 			{
 				pathMap->map[pos.y][pos.x].from = from;
 				pathMap->map[pos.y][pos.x].index = stepIndex;
 				subStep.push_back(pos);
-				return subStep;
+				return true;
 			}
-			else if (isInMap(pathMap, pos) && canWalk(pos) && pathMap->map[pos.y][pos.x].index < 0)
+			else if (isInMap(pathMap, pos) && canWalk(pos))
 			{
-				pathMap->map[pos.y][pos.x].from = from;
-				pathMap->map[pos.y][pos.x].index = stepIndex;
-				subStep.push_back(pos);
+				if (pathMap->map[pos.y][pos.x].index < 0)
+				{
+					pathMap->map[pos.y][pos.x].from = from;
+					pathMap->map[pos.y][pos.x].index = stepIndex;
+					auto tileCost = getTileDistance(pos, { 0, 0 }, from, { 0, 0 });
+					pathMap->map[pos.y][pos.x].cost = tileCost + pathMap->map[from.y][from.x].cost;
+					subStep.push_back(pos);
+				}
+				else if (pathMap->map[pos.y][pos.x].index == stepIndex)
+				{
+					auto tileCost = getTileDistance(pos, { 0, 0 }, from, { 0, 0 });
+					auto totalCost = tileCost + pathMap->map[from.y][from.x].cost;
+					if (pathMap->map[pos.y][pos.x].cost > totalCost)
+					{
+						pathMap->map[pos.y][pos.x].from = from;
+						//pathMap->map[pos.y][pos.x].index = stepIndex;
+						pathMap->map[pos.y][pos.x].cost = totalCost;
+					}
+				}
 			}
 		}
 	}
+	return false;
+}
+
+bool Map::getVHPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Point from, Point to, int stepIndex)
+{
+	Point pos;
 	for (int i = 0; i < 4; i++)
 	{
 		pos.x = (i - 1) % 2 + from.x;
 		pos.y = ((i - 2) % 2) * 2 + from.y;
-		if ((isInMap(pathMap, pos) && canWalk(pos) && pathMap->map[pos.y][pos.x].index < 0) || (pos.x == to.x && pos.y == to.y))
+		if ((isInMap(pathMap, pos) && canWalk(pos) && (pathMap->map[pos.y][pos.x].index < 0 || pathMap->map[pos.y][pos.x].index == stepIndex)) || (pos == to))
 		{
 			bool canGo = false;
 			if (i == 0)
@@ -2129,25 +2134,73 @@ std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int 
 			}
 			if (canGo)
 			{
-				if (pos.x == to.x && pos.y == to.y)
+				if (pos == to)
 				{
 					pathMap->map[pos.y][pos.x].from = from;
 					pathMap->map[pos.y][pos.x].index = stepIndex;
 					subStep.push_back(pos);
-					return subStep;
+					return true;
 				}
 				else
 				{
-					pathMap->map[pos.y][pos.x].from = from;
-					pathMap->map[pos.y][pos.x].index = stepIndex;
-					subStep.push_back(pos);
+					if (pathMap->map[pos.y][pos.x].index < 0)
+					{
+						pathMap->map[pos.y][pos.x].from = from;
+						pathMap->map[pos.y][pos.x].index = stepIndex;
+						auto tileCost = getTileDistance(pos, { 0, 0 }, from, { 0, 0 });
+						pathMap->map[pos.y][pos.x].cost = tileCost + pathMap->map[from.y][from.x].cost;
+						subStep.push_back(pos);
+					}
+					else if (pathMap->map[pos.y][pos.x].index == stepIndex)
+					{
+						auto tileCost = getTileDistance(pos, { 0, 0 }, from, { 0, 0 });
+						auto totalCost = tileCost + pathMap->map[from.y][from.x].cost;
+						if (pathMap->map[pos.y][pos.x].cost > totalCost)
+						{
+							pathMap->map[pos.y][pos.x].from = from;
+							//pathMap->map[pos.y][pos.x].index = stepIndex;
+							pathMap->map[pos.y][pos.x].cost = totalCost;
+						}
+					}
 				}
-
 			}
 		}
-			
-			
 	}
+	return false;
+}
+
+std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex)
+{
+	std::vector<Point> subStep;
+	subStep.resize(0);
+	if (pathMap->map[to.y][to.x].index >= 0)
+	{
+		return subStep;
+	}
+	if (!isInMap(pathMap, from))
+	{
+		return subStep;
+	}
+	int line = std::abs(from.y) % 2;
+
+	auto dir = NPC::calDirection(from, to);
+	if (dir % 2 == 0)
+	{
+		if (getVHPath(subStep, line, pathMap, from, to, stepIndex))
+		{
+			return subStep;
+		}
+		getSlantPath(subStep, line, pathMap, from, to, stepIndex);
+	}
+	else
+	{
+		if (getSlantPath(subStep, line, pathMap, from, to, stepIndex))
+		{
+			return subStep;
+		}
+		getVHPath(subStep, line, pathMap, from, to, stepIndex);
+	}
+	
 	return subStep;
 	
 }

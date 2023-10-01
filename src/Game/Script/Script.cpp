@@ -198,11 +198,11 @@ int Script::lua_printf(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		printf("lua_printf: %s\n", lua_tostring(l, 1));
+		GameLog::write("lua_printf: %s\n", lua_tostring(l, 1));
 	}
 	else
 	{
-		printf("lua_printf: null str\n");
+		GameLog::write("lua_printf: null str\n");
 	}
 	return 0;
 }
@@ -213,7 +213,7 @@ int Script::lua_RunScript(lua_State * l)
 	if (argc >= 1)
 	{
 		std::string n = lua_tostring(l, 1);
-		printf("lua_RunScript: %s\n", n.c_str());
+		GameLog::write("lua_RunScript: %s\n", n.c_str());
 		gm->runScript(n);
 	}
 	return 0;
@@ -260,8 +260,8 @@ int Script::lua_LoadMap(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-//		gm->loadMapWithThread(lua_tostring(l, 1));
-		gm->loadMap(lua_tostring(l, 1));
+		gm->loadMapWithThread(lua_tostring(l, 1));
+		//gm->loadMap(lua_tostring(l, 1));
 	}
 	return 0;
 }
@@ -271,8 +271,8 @@ int Script::lua_LoadGame(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-//		gm->loadGameWithThread((int)lua_tointeger(l, 1));
-		gm->loadGame((int)lua_tointeger(l, 1));
+		gm->loadGameWithThread((int)lua_tointeger(l, 1));
+		//gm->loadGame((int)lua_tointeger(l, 1));
 	}
 	return 0;
 }
@@ -318,8 +318,8 @@ int Script::lua_LoadObj(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-//		gm->loadObjectWithThread(lua_tostring(l, 1));
-		gm->loadObject(lua_tostring(l, 1));
+		gm->loadObjectWithThread(lua_tostring(l, 1));
+		//gm->loadObject(lua_tostring(l, 1));
 	}
 	return 0;
 }
@@ -415,8 +415,8 @@ int Script::lua_LoadNpc(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-//		gm->loadNPCWithThread(lua_tostring(l, 1));
-		gm->loadNPC(lua_tostring(l, 1));
+		gm->loadNPCWithThread(lua_tostring(l, 1));
+		//gm->loadNPC(lua_tostring(l, 1));
 	}
 	return 0;
 }
@@ -660,7 +660,7 @@ int Script::lua_LoadPlayer(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->loadPlayer(lua_tointeger(l, 1));
+		gm->loadPlayer((int)lua_tointeger(l, 1));
 	}
 	else
 	{
@@ -674,7 +674,7 @@ int Script::lua_SavePlayer(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->savePlayer(lua_tointeger(l, 1));
+		gm->savePlayer((int)lua_tointeger(l, 1));
 	}
 	else
 	{
@@ -1058,7 +1058,7 @@ int Script::lua_SaveGoods(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->saveGoods(lua_tointeger(l, 1));
+		gm->saveGoods((int)lua_tointeger(l, 1));
 	}
 	else
 	{
@@ -1072,7 +1072,7 @@ int Script::lua_LoadGoods(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		gm->loadGoods(lua_tointeger(l, 1));
+		gm->loadGoods((int)lua_tointeger(l, 1));
 	}
     else
     {

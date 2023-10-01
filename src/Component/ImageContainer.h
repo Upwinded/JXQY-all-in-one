@@ -12,7 +12,7 @@ public:
 
 	bool stretch = false;
 
-	virtual void initFromIni(const std::string& fileName);
+	virtual void initFromIni(INIReader & ini);
 
 protected:
 	void freeResource();

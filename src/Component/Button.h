@@ -32,10 +32,12 @@ public:
 	void freeSound();
 	void freeResource();
 
-	virtual void initFromIni(const std::string & fileName);
+	virtual void initFromIni(INIReader & ini);
 
 protected:
 	void playSound(int index);
+	void draw();
+	void draw(int x, int y);
 
 	virtual void onClick();
 	virtual void onExit();

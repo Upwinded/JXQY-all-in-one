@@ -34,8 +34,8 @@ public:
 	UTime updateTime = 0;
 
 	Magic magic;
-	GameElement * user = nullptr;
-	GameElement * target = nullptr;
+	std::shared_ptr<GameElement> user = nullptr;
+	std::shared_ptr<GameElement> target = nullptr;
 	std::string fileName = "";
 	int doing = ekExploding;
 	int level = 0;
@@ -53,10 +53,10 @@ public:
 
 	std::deque<Point> passPath;
 
-	void beginExplode();
+	void beginExplode(Point pos);
 	void beginFly();
 	void beginDrop();
-	void initFromMagic(Magic * m);
+	void initFromMagic(std::shared_ptr<Magic> m);
 	virtual void initFromIni(INIReader * ini, const std::string & section);
 	virtual void saveToIni(INIReader * ini, const std::string & section);
 	virtual void playSound(int act);
@@ -74,15 +74,18 @@ public:
 	void calTime();
 	void calDest();
 	auto getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset);
-	void changeFollowTarget(GameElement * newTarget);
+	void changeFollowTarget(std::shared_ptr<GameElement> newTarget);
 	unsigned char getLum();
 	bool noLum = false;
 	int getMoveKind();
 private:
+	_channel channel = nullptr;
+	void updateSound();
 	void initParam();
 
 	void freeResource();
 	virtual void onUpdate();
 
+	PointEx getCollideOffset(Point pos);
 };
 

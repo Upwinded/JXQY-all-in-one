@@ -45,7 +45,7 @@ enum NPCActionType
 	naGo = 2
 };
 
-struct NPCAction
+struct NPCActionRes
 {
 	std::string imageFile = "";
 	std::string shadowFile = "";
@@ -100,24 +100,24 @@ enum StepState
 
 struct NPCRes
 {
-	NPCAction stand;
-	NPCAction stand1;
-	NPCAction walk;
-	NPCAction run;
-	NPCAction jump;
-	NPCAction attack;
-	NPCAction attack1;
-	NPCAction attack2;
-	NPCAction magic;
-	NPCAction hurt;
-	NPCAction death;
-	NPCAction sit;
-	NPCAction special;
-	NPCAction specialAttack;
-	NPCAction astand;
-	NPCAction awalk;
-	NPCAction arun;
-	NPCAction ajump;
+	NPCActionRes stand;
+	NPCActionRes stand1;
+	NPCActionRes walk;
+	NPCActionRes run;
+	NPCActionRes jump;
+	NPCActionRes attack;
+	NPCActionRes attack1;
+	NPCActionRes attack2;
+	NPCActionRes magic;
+	NPCActionRes hurt;
+	NPCActionRes death;
+	NPCActionRes sit;
+	NPCActionRes special;
+	NPCActionRes specialAttack;
+	NPCActionRes astand;
+	NPCActionRes awalk;
+	NPCActionRes arun;
+	NPCActionRes ajump;
 };
 
 class NPC :
@@ -130,8 +130,8 @@ public:
 	UTime getUpdateTime();
 	UTime updateTime = 0;
 
-	GameElement * destGE = nullptr;
-	GameElement * attackTarget = nullptr;
+	std::shared_ptr<GameElement> destGE = nullptr;
+	std::shared_ptr<GameElement> attackTarget = nullptr;
 
 	bool attackDone = false;
 	bool haveDest = false;
@@ -149,8 +149,8 @@ public:
 	static int calDirection(double angle);
 	static int calDirection(Point src, Point dest);
 	UTime walkTime = 0;
-	Magic * npcMagic = nullptr;
-	Magic * npcMagic2 = nullptr;
+	std::shared_ptr<Magic> npcMagic = nullptr;
+	std::shared_ptr<Magic> npcMagic2 = nullptr;
 	bool magicUsed = true;
 
 	std::string npcName = "";
@@ -213,7 +213,7 @@ public:
 	bool isDying();
 	bool isHurting();
 	bool isDoingSpecialAction();
-	bool canDoAction(NPCAction * act);
+	bool canDoAction(NPCActionRes * act);
 	bool canDoAction(int act);
 	bool canView(Point dest);
 
@@ -230,7 +230,7 @@ public:
 	virtual void goTo(Point dest);
 	virtual void goToEx(Point dest);
 	virtual void goToDir(int dir, int distance);
-	virtual void attackTo(Point dest, GameElement * target = nullptr);
+	virtual void attackTo(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	virtual void doSpecialAction(const std::string & fileName);
 	virtual void setLevel(int lvl);
 
@@ -243,11 +243,11 @@ public:
 	virtual void checkDie();
 	virtual void beginDieScript();
 	virtual void beginDie();
-	virtual void beginAttack(Point dest, GameElement * target = nullptr);
+	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	virtual void beginSpecial();
 
 	virtual void beginSit();
-	virtual void beginMagic(Point dest, GameElement * target = nullptr);
+	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	virtual void beginJump(Point dest);
 	virtual void beginRun(Point dest);
 
@@ -258,18 +258,18 @@ public:
 	virtual void changeRadiusWalk(Point dest, int radius);
 
 	bool isFollower();
-	bool isFollowAttack(NPC * npc);
+	bool isFollowAttack(std::shared_ptr<NPC> npc);
 	virtual void beginFollowWalk(Point dest);
 	virtual void beginFollowAttack(Point dest);
 	virtual void changeFollowWalk(Point dest);
 	virtual void changeFollowAttack(Point dest);
 
-	virtual void hurt(Effect * e);
-	virtual void directHurt(Effect * e);
+	virtual void hurt(std::shared_ptr<Effect> e);
+	virtual void directHurt(std::shared_ptr<Effect> e);
 	void addBody();
 
-	virtual void doAttack(Point dest, GameElement * target);
-	virtual void useMagic(Magic * m, Point dest, int level, GameElement * target);
+	virtual void doAttack(Point dest, std::shared_ptr<GameElement> target);
+	virtual void useMagic(std::shared_ptr<Magic> m, Point dest, int level, std::shared_ptr<GameElement> target);
 
 	bool frozen = false;
 	UTime frozenLastTime = 0;
@@ -297,9 +297,9 @@ public:
 	NPCRes res;
 	virtual void initFromIni(INIReader * ini, const std::string & section);
 	virtual void saveToIni(INIReader * ini, const std::string & section);
-	virtual void loadAction(NPCAction * npcAction);
+	virtual void loadActionRes(NPCActionRes * npcAction);
 	virtual void reloadAction();
-	virtual void initActionFromIni(NPCAction * npcAction, INIReader * iniReader, const std::string & section);
+	virtual void initActionFromIni(NPCActionRes * npcAction, INIReader * iniReader, const std::string & section);
 	virtual void loadSpecialAction(const std::string & fileName);
 	virtual void initRes(const std::string & fileName);	
 	virtual void loadActionFile(const std::string & fileName, int act);
@@ -310,8 +310,8 @@ protected:
 	virtual bool mouseInRect(int x, int y);
 
 	void freeNPCRes();
-	void freeNPCAction(NPCAction * act);
-	virtual void freeActionImage(NPCAction * act);
+	void freeNPCAction(NPCActionRes * act);
+	virtual void freeActionImage(NPCActionRes * act);
 
 	virtual void onUpdate();
 	virtual void updateAction(UTime frameTime);

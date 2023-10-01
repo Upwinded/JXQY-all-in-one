@@ -15,14 +15,6 @@ NPC::~NPC()
 	{
 		return;
 	}
-    if (parent != nullptr)
-    {
-        gm->npcManager.removeNPC(this);
-    }
-	if (gm->camera.followNPC == this)
-	{
-		gm->camera.followNPC = nullptr;
-	}
 }
 
 unsigned int NPC::eventRun()
@@ -43,12 +35,12 @@ void NPC::jumpTo(Point dest)
 void NPC::runTo(Point dest)
 {
 	destGE = nullptr;
-	if (position.x == dest.x && position.y == dest.y)
+	if (position == dest)
 	{
 		return;
 	}
 	int dir = calDirection(position, dest);
-	while (position.x != dest.x || position.y != dest.y)
+	while (position != dest)
 	{
 		beginRun(dest);
 		if (stepList.size() == 0)
@@ -64,12 +56,12 @@ void NPC::goTo(Point dest)
 {
 	destGE = nullptr;
 	haveDest = false;
-	if (position.x == dest.x && position.y == dest.y)
+	if (position == dest)
 	{
 		return;
 	}
 	int dir = calDirection(position, dest);
-	while (position.x != dest.x || position.y != dest.y)
+	while (position != dest)
 	{
 		beginWalk(dest);
 		if (stepList.size() == 0)
@@ -96,12 +88,12 @@ void NPC::goToDir(int dir, int distance)
 	Point pos = position;
 	for (int i = 0; i < distance; i++)
 	{
-		pos = gm->map.getSubPoint(pos, dir);
+		pos = gm->map->getSubPoint(pos, dir);
 	}
 	goTo(pos);
 }
 
-void NPC::attackTo(Point dest, GameElement * target)
+void NPC::attackTo(Point dest, std::shared_ptr<GameElement> target)
 {
 	beginAttack(dest, target);
 	eventRun();
@@ -416,7 +408,7 @@ int NPC::calDirection(Point src, Point dest)
 {
 	Point pos = Map::getTilePosition(dest, src, { 0, 0 }, { 0, 0 });
 	PointEx dir;
-	dir.x = ((double)pos.x) / TILE_WIDTH;
+	dir.x = ((double)pos.x) / TILE_HEIGHT / MapXRatio;
 	dir.y = ((double)pos.y) / TILE_HEIGHT;
 	dir.x = -dir.x;
 	double angle = atan2(dir.x, dir.y);
@@ -471,17 +463,17 @@ void NPC::saveToIni(INIReader * ini, const std::string & section)
 	ini->Set(section, "DeathScript", deathScript);
 }
 
-void NPC::loadAction(NPCAction * npcAction)
+void NPC::loadActionRes(NPCActionRes * npcAction)
 {
 	if (npcAction == nullptr)
 	{
 		return;
 	}
-	npcAction->image = gm->npcManager.loadActionImage(npcAction->imageFile);
-	npcAction->shadow = gm->npcManager.loadActionImage(npcAction->shadowFile);
+	npcAction->image = gm->npcManager->loadActionImage(npcAction->imageFile);
+	npcAction->shadow = gm->npcManager->loadActionImage(npcAction->shadowFile);
 }
 
-void NPC::initActionFromIni(NPCAction * npcAction, INIReader * iniReader, const std::string & section)
+void NPC::initActionFromIni(NPCActionRes * npcAction, INIReader * iniReader, const std::string & section)
 {
 	if (npcAction == nullptr || iniReader == nullptr)
 	{
@@ -490,7 +482,7 @@ void NPC::initActionFromIni(NPCAction * npcAction, INIReader * iniReader, const 
 	npcAction->imageFile = iniReader->Get(section, "Image", "");
 	npcAction->shadowFile = iniReader->Get(section, "Shade", "");
 	npcAction->soundFile = iniReader->Get(section, "Sound", "");
-	loadAction(npcAction);
+	loadActionRes(npcAction);
 }
 
 void NPC::loadSpecialAction(const std::string & fileName)
@@ -498,7 +490,7 @@ void NPC::loadSpecialAction(const std::string & fileName)
 	res.special.imageFile = fileName;
 	res.special.shadowFile = convert::extractFileName(fileName) + ".shd";
 	res.special.soundFile = "";
-	loadAction(&res.special);
+	loadActionRes(&res.special);
 }
 
 void NPC::initRes(const std::string & fileName)
@@ -532,7 +524,6 @@ void NPC::initRes(const std::string & fileName)
 	initNPCAction(awalk);
 	initNPCAction(arun);
 	initNPCAction(ajump);
-
 }
 
 void NPC::loadActionFile(const std::string & fileName, int act)
@@ -543,7 +534,7 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 		res.stand.imageFile = fileName;
 		res.stand.shadowFile = convert::extractFileName(fileName) + ".shd";
 		res.stand.soundFile = "";
-		loadAction(&res.stand);
+		loadActionRes(&res.stand);
 		if (nowAction == acStand)
 		{
 			beginStand();
@@ -552,7 +543,7 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 		res.stand1.imageFile = fileName;
 		res.stand1.shadowFile = convert::extractFileName(fileName) + ".shd";
 		res.stand1.soundFile = "";
-		loadAction(&res.stand1);
+		loadActionRes(&res.stand1);
 		if (nowAction == acStand1)
 		{
 			beginStand();
@@ -697,7 +688,7 @@ bool NPC::isDoingSpecialAction()
 	}
 }
 
-bool NPC::canDoAction(NPCAction * act)
+bool NPC::canDoAction(NPCActionRes * act)
 {
 	if (act == nullptr)
 	{
@@ -854,24 +845,24 @@ UTime NPC::getActionTime(int act)
 
 bool NPC::canView(Point dest)
 {
-	if (gm->map.calDistance(position, dest) > visionRadius)
+	if (gm->map->calDistance(position, dest) > visionRadius)
 	{
 		return false;
 	}
 	
-	Point subPoint = gm->map.getSubPoint(position, calDirection(position, dest));
-	if (gm->map.canView(position, dest) || (gm->map.canViewTile(subPoint) && gm->map.canView(subPoint, dest)))
+	Point subPoint = gm->map->getSubPoint(position, calDirection(position, dest));
+	if (gm->map->canView(position, dest) || (gm->map->canViewTile(subPoint) && gm->map->canView(subPoint, dest)))
 	{
 		return true;
 	}
 	/*
-	subPoint = gm->map.getSubPoint(position, calDirection(position, dest) + 1);
-	if (gm->map.canView(position, dest) || (gm->map.canViewTile(subPoint) && gm->map.canView(subPoint, dest)))
+	subPoint = gm->map->getSubPoint(position, calDirection(position, dest) + 1);
+	if (gm->map->canView(position, dest) || (gm->map->canViewTile(subPoint) && gm->map->canView(subPoint, dest)))
 	{
 		return true;
 	}
-	subPoint = gm->map.getSubPoint(position, calDirection(position, dest) - 1);
-	if (gm->map.canView(position, dest) || (gm->map.canViewTile(subPoint) && gm->map.canView(subPoint, dest)))
+	subPoint = gm->map->getSubPoint(position, calDirection(position, dest) - 1);
+	if (gm->map->canView(position, dest) || (gm->map->canViewTile(subPoint) && gm->map->canView(subPoint, dest)))
 	{
 		return true;
 	}
@@ -892,7 +883,7 @@ bool NPC::mouseInRect(int x, int y)
 	}
 }
 
-void NPC::hurt(Effect * e)
+void NPC::hurt(std::shared_ptr<Effect> e)
 {
 	if (nowAction == acDeath || nowAction == acHide || e == nullptr)
 	{
@@ -922,9 +913,9 @@ void NPC::hurt(Effect * e)
 			life = 0;
 			if (addexp)
 			{
-				gm->player->addExp(round(exp * EXP_RATE));
-				gm->magicManager.addPracticeExp(exp * EXP_RATE);
-				gm->magicManager.addUseExp(e, exp * EXP_RATE);
+				gm->player->addExp((int)round(exp * EXP_RATE));
+				gm->magicManager.addPracticeExp((int)round(exp * EXP_RATE));
+				gm->magicManager.addUseExp(e, (int)round(exp * EXP_RATE));
 			}
 			checkDie();
 		}
@@ -932,13 +923,13 @@ void NPC::hurt(Effect * e)
 		{
 			life -= damage;
 			int d = calDirection(atan2(e->flyingDirection.x, -e->flyingDirection.y));
-			Point fd = gm->map.getSubPoint(position, d);
+			Point fd = gm->map->getSubPoint(position, d);
 			if (rand() % 100 > evd)
 			{
 				if (/*!frozen && */e->magic.level[e->level].moveKind == 2 && e->magic.level[e->level].specialKind == 1)
 				{
-					unsigned int newFrozenTime = (e->level + 1) * 1000;
-					frozenLastTime = (frozen && newFrozenTime > frozenLastTime) ? newFrozenTime : frozenLastTime;
+					UTime newFrozenTime = (e->level + 1) * 1000;
+					frozenLastTime = (frozen &&  frozenLastTime > newFrozenTime) ? frozenLastTime : newFrozenTime;
 					frozen = true;
 				}
 				else if (!frozen && rand() % (20 + getEvade()) >= getEvade())
@@ -951,7 +942,7 @@ void NPC::hurt(Effect * e)
 	
 }
 
-void NPC::directHurt(Effect * e)
+void NPC::directHurt(std::shared_ptr<Effect> e)
 {
 	if (nowAction == acDeath || nowAction == acHide || e == nullptr)
 	{
@@ -970,9 +961,9 @@ void NPC::directHurt(Effect * e)
 		life = 0;
 		if (addexp)
 		{
-			gm->player->addExp(exp * EXP_RATE);
-			gm->magicManager.addPracticeExp(exp * EXP_RATE);
-			gm->magicManager.addUseExp(e, exp * EXP_RATE);
+			gm->player->addExp((int)round(exp * EXP_RATE));
+			gm->magicManager.addPracticeExp((int)round(exp * EXP_RATE));
+			gm->magicManager.addUseExp(e, (int)round(exp * EXP_RATE));
 		}
 		checkDie();
 	}
@@ -995,12 +986,12 @@ void NPC::beginJump(Point dest)
 	{
 		return;
 	}
-	Point step = gm->map.getJumpPath(position, dest);
+	Point step = gm->map->getJumpPath(position, dest);
 	stepList.resize(1);
 	stepList[0] = step;
 	direction = calDirection(stepList[0]);
 	actionBeginTime = getUpdateTime();
-	gm->map.addStepToDataMap(stepList[0], npcIndex);
+	gm->map->addStepToDataMap(stepList[0], npcIndex);
 	if (fight > 0 && canDoAction(acAJump))
 	{
 		nowAction = acAJump;
@@ -1029,9 +1020,9 @@ UTime NPC::getUpdateTime()
 void NPC::playSound(int act)
 {
 	PointEx soundOffset;
-	soundOffset.x = gm->camera.offset.x - offset.x;
-	soundOffset.y = gm->camera.offset.y - offset.y;
-	Point pos = Map::getTilePosition(position, gm->camera.position, { 0, 0 }, soundOffset);
+	soundOffset.x = gm->camera->offset.x - offset.x;
+	soundOffset.y = gm->camera->offset.y - offset.y;
+	Point pos = Map::getTilePosition(position, gm->camera->position, { 0, 0 }, soundOffset);
 	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
 	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
 	switch (act)
@@ -1097,7 +1088,7 @@ void NPC::playSound(int act)
 void NPC::reloadAction()
 {
 
-#define reloadAction(act) loadAction(&res.act)
+#define reloadAction(act) loadActionRes(&res.act)
 
 	reloadAction(stand);
 	reloadAction(stand1);
@@ -1118,7 +1109,7 @@ void NPC::reloadAction()
 	reloadAction(ajump);
 }
 
-void NPC::doAttack(Point dest, GameElement * target)
+void NPC::doAttack(Point dest, std::shared_ptr<GameElement> target)
 {
 	int launcher = 0;
 	if (kind == nkPlayer)
@@ -1144,11 +1135,11 @@ void NPC::doAttack(Point dest, GameElement * target)
 	{
 		if (npcMagic != nullptr)
 		{
-			npcMagic->addEffect(this, position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
+			Magic::addEffect(npcMagic, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
 		}
 		else if (npcMagic2 != nullptr)
 		{
-			npcMagic2->addEffect(this, position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
+			Magic::addEffect(npcMagic2, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
 		}
 	}
 	else 
@@ -1156,17 +1147,17 @@ void NPC::doAttack(Point dest, GameElement * target)
 		int idx = rand() % 2;
 		if (idx)
 		{
-			npcMagic->addEffect(this, position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
+			Magic::addEffect(npcMagic, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
 		}
 		else
 		{
-			npcMagic2->addEffect(this, position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
+			Magic::addEffect(npcMagic2, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
 		}
 	}
 
 }
 
-void NPC::useMagic(Magic * m, Point dest, int level, GameElement * target)
+void NPC::useMagic(std::shared_ptr<Magic> m, Point dest, int level, std::shared_ptr<GameElement> target)
 {
 	if (m == nullptr)
 	{
@@ -1200,14 +1191,14 @@ void NPC::useMagic(Magic * m, Point dest, int level, GameElement * target)
 			launcher = lkNeutral;
 		}
 	}
-	m->addEffect(this, position, dest, level, m->level[level].effect, getEvade(), launcher, target);
+	Magic::addEffect(m, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, level, m->level[level].effect, getEvade(), launcher, target);
 }
 
 void NPC::addBody()
 {
 	if (bodyIni != "")
 	{
-		gm->objectManager.addObject(bodyIni, position.x, position.y, direction);
+		gm->objectManager->addObject(bodyIni, position.x, position.y, direction);
 	}
 }
 
@@ -1217,11 +1208,11 @@ void NPC::clearStep()
 	{
 		if ((isWalking() || isRunning()) && stepState == ssOut)
 		{
-			gm->map.deleteStepFromDataMap(stepList[0], npcIndex);
+			gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
 		}
 		else if (isJumping() && jumpState != jsDown)
 		{
-			gm->map.deleteStepFromDataMap(stepList[0], npcIndex);
+			gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
 		}
 	}
 }
@@ -1255,10 +1246,10 @@ void NPC::beginWalk(Point dest)
 		return;
 	}
 
-	auto tempList = gm->map.getPath(position, dest);
+	auto tempList = gm->map->getPath(position, dest);
 	if (tempList.size() > 0)
 	{	
-		if (!gm->map.canWalk(tempList[0]))
+		if (!gm->map->canWalk(tempList[0]))
 		{
 			tempList.resize(0);
 			beginStand();
@@ -1271,7 +1262,7 @@ void NPC::beginWalk(Point dest)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map.addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], npcIndex);
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1356,11 +1347,11 @@ void NPC::beginDie()
 	actionBeginTime = getUpdateTime();
 }
 
-void NPC::beginAttack(Point dest, GameElement * target)
+void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 {
 	if (!canDoAction(acAttack))
 	{
-		printf("can not do action attack\n");
+		GameLog::write("can not do action attack\n");
 		return;
 	}
 	attackTarget = target;
@@ -1436,7 +1427,7 @@ void NPC::beginSit()
 	playSound(acSit);
 }
 
-void NPC::beginMagic(Point dest, GameElement * target)
+void NPC::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 {
 	if (!canDoAction(acMagic))
 	{
@@ -1462,10 +1453,10 @@ void NPC::beginRun(Point dest)
 	{
 		return;
 	}
-	auto tempList = gm->map.getPath(position, dest);
+	auto tempList = gm->map->getPath(position, dest);
 	if (tempList.size() > 0)
 	{
-		if (!gm->map.canWalk(tempList[0]))
+		if (!gm->map->canWalk(tempList[0]))
 		{
 			tempList.resize(0);
 			beginStand();
@@ -1478,7 +1469,7 @@ void NPC::beginRun(Point dest)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map.addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], npcIndex);
 		if (fight > 0 && canDoAction(acARun))
 		{
 			nowAction = acARun;
@@ -1501,9 +1492,9 @@ void NPC::beginRadiusStep(Point dest, int radius)
 	{
 		return;
 	}
-	int stepCount = gm->map.calDistance(position, dest) - radius;
+	int stepCount = gm->map->calDistance(position, dest) - radius;
 	stepCount = stepCount > NPC_STEP_MAX_COUNT ? NPC_STEP_MAX_COUNT : stepCount;
-	auto tempList = gm->map.getStepPath(position, dest, stepCount);
+	auto tempList = gm->map->getStepPath(position, dest, stepCount);
 	if (tempList.size() > 0)
 	{
 		stepList = tempList;
@@ -1513,7 +1504,7 @@ void NPC::beginRadiusStep(Point dest, int radius)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map.addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], npcIndex);
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1537,7 +1528,7 @@ void NPC::changeRadiusStep(Point dest, int radius)
 		return;
 	}
 
-	auto tempList = gm->map.getStepPath(position, dest, radius);
+	auto tempList = gm->map->getStepPath(position, dest, radius);
 	if (tempList.size() > 0)
 	{
 		stepList = tempList;
@@ -1546,7 +1537,7 @@ void NPC::changeRadiusStep(Point dest, int radius)
 		stepBeginTime += stepLastTime;
 		nowAction = acWalk;
 		calStepLastTime();
-		gm->map.addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], npcIndex);
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1571,7 +1562,7 @@ void NPC::beginRadiusWalk(Point dest, int radius)
 		return;
 	}
 
-	auto tempList = gm->map.getRadiusPath(position, dest, radius);
+	auto tempList = gm->map->getRadiusPath(position, dest, radius);
 	if (tempList.size() > 0)
 	{
 		stepList = tempList;
@@ -1581,7 +1572,7 @@ void NPC::beginRadiusWalk(Point dest, int radius)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map.addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], npcIndex);
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1606,7 +1597,7 @@ void NPC::changeRadiusWalk(Point dest, int radius)
 		{
 			return;
 		}
-		auto tempList = gm->map.getRadiusPath(position, dest, radius);
+		auto tempList = gm->map->getRadiusPath(position, dest, radius);
 		if (tempList.size() > 0)
 		{
 			stepList = tempList;
@@ -1630,7 +1621,7 @@ bool NPC::isFollower()
 	}
 	else if (followNPC != "")
 	{
-		auto fnpc = gm->npcManager.findNPC(followNPC);
+		auto fnpc = gm->npcManager->findNPC(followNPC);
 
 		if (fnpc.size() > 0)
 		{
@@ -1645,7 +1636,7 @@ bool NPC::isFollower()
 	return false;
 }
 
-bool NPC::isFollowAttack(NPC * npc)
+bool NPC::isFollowAttack(std::shared_ptr<NPC> npc)
 {
 	if (npc == nullptr)
 	{
@@ -1834,6 +1825,10 @@ void NPC::freeResource()
 	freeNPCRes();
 	npcMagic = nullptr;
 	npcMagic2 = nullptr;
+	if (gm != nullptr)
+	{
+		gm->magicManager.tryCleanAttackMagic();
+	}
 	stepList.resize(0);
 }
 
@@ -1858,7 +1853,7 @@ void NPC::freeNPCRes()
 	freeNPCAction(&res.ajump);
 }
 
-void NPC::freeNPCAction(NPCAction * act)
+void NPC::freeNPCAction(NPCActionRes * act)
 {
 	if (act == nullptr)
 	{
@@ -1870,7 +1865,7 @@ void NPC::freeNPCAction(NPCAction * act)
 	act->soundFile = "";
 }
 
-void NPC::freeActionImage(NPCAction * act)
+void NPC::freeActionImage(NPCActionRes * act)
 {
 	if (act == nullptr)
 	{
@@ -1942,13 +1937,13 @@ void NPC::onUpdate()
 		xscal = cenScreen.x / TILE_WIDTH + 3;
 		yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
 		int tileHeightScal = 10;
-		Point cenTile = gm->camera.position;
+		Point cenTile = gm->camera->position;
 
 		if (position.x >= cenTile.x - xscal && position.x < cenTile.x + xscal && position.y >= cenTile.y - yscal && position.y < cenTile.y + yscal + tileHeightScal)
 		{
 			PointEx posoffset;
-			posoffset.x = (gm->camera.offset.x - offset.x);
-			posoffset.y = (gm->camera.offset.y - offset.y);
+			posoffset.x = (gm->camera->offset.x - offset.x);
+			posoffset.y = (gm->camera->offset.y - offset.y);
 			Point pos = Map::getTilePosition(position, cenTile, cenScreen, posoffset);
 
 			int ox = 0, oy = 0, iw = 0, ih = 0;
@@ -1980,9 +1975,9 @@ void NPC::updateAction(UTime frameTime)
 	{
 		if (haveDest)
 		{
-			if (position.x != gotoExDest.x || position.y != gotoExDest.y)
+			if (position != gotoExDest)
 			{	
-				if (gm->map.canWalk(gotoExDest))
+				if (gm->map->canWalk(gotoExDest))
 				{
 					beginWalk(gotoExDest);
 				}
@@ -1994,14 +1989,14 @@ void NPC::updateAction(UTime frameTime)
 		}	
 		else if (followNPC != "" || kind == nkPartner)
 		{
-			NPC * fnpc = nullptr;
+			std::shared_ptr<NPC> fnpc = nullptr;
 			if (kind == nkPartner)
 			{
 				fnpc = gm->player;
 			}
 			else
 			{
-				auto fnpcList = gm->npcManager.findNPC(followNPC);
+				auto fnpcList = gm->npcManager->findNPC(followNPC);
 				if (fnpcList.size() > 0)
 				{
 					fnpc = fnpcList[0];
@@ -2012,7 +2007,7 @@ void NPC::updateAction(UTime frameTime)
 			{
 				if (isFollowAttack(fnpc) && kind != nkPartner)
 				{
-					if (gm->map.calDistance(position, fnpc->position) > attackRadius)
+					if (gm->map->calDistance(position, fnpc->position) > attackRadius)
 					{
 						beginFollowAttack(fnpc->position);
 					}
@@ -2023,7 +2018,7 @@ void NPC::updateAction(UTime frameTime)
 				}
 				else
 				{
-					if (gm->map.calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
+					if (gm->map->calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
 					{
 						beginFollowWalk(fnpc->position);
 					}
@@ -2081,14 +2076,14 @@ void NPC::updateAction(UTime frameTime)
 				if (followNPC != "" || kind == nkPartner)
 				{
 					canWalkNextStep = true;
-					NPC * fnpc = nullptr;
+					std::shared_ptr<NPC> fnpc = nullptr;
 					if (kind == nkPartner)
 					{
 						fnpc = gm->player;
 					}
 					else
 					{
-						auto fnpcList = gm->npcManager.findNPC(followNPC);
+						auto fnpcList = gm->npcManager->findNPC(followNPC);
 						if (fnpcList.size() > 0)
 						{
 							fnpc = fnpcList[0];
@@ -2101,7 +2096,7 @@ void NPC::updateAction(UTime frameTime)
 						{
 							offset = { 0, 0 };
 							stepList.resize(0);
-							if (gm->map.calDistance(position, fnpc->position) > attackRadius)
+							if (gm->map->calDistance(position, fnpc->position) > attackRadius)
 							{
 								changeFollowAttack(fnpc->position);
 
@@ -2116,7 +2111,7 @@ void NPC::updateAction(UTime frameTime)
 						{
 							offset = { 0, 0 };
 							stepList.resize(0);
-							if (gm->map.calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
+							if (gm->map->calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
 							{
 								changeFollowWalk(fnpc->position);						
 							}
@@ -2132,7 +2127,7 @@ void NPC::updateAction(UTime frameTime)
 						followNPC = "";
 					}
 				}
-				if (stepList.size() > 0 && (gm->map.canWalk(stepList[0])))
+				if (stepList.size() > 0 && (gm->map->canWalk(stepList[0])))
 				{
 					canWalkNextStep = true;
 					direction = calDirection(stepList[0]); 
@@ -2143,11 +2138,11 @@ void NPC::updateAction(UTime frameTime)
 
 						limitDir(&dir1);
 						limitDir(&dir2);
-						if (gm->map.canPass(gm->map.getSubPoint(position, dir1)) && gm->map.canPass(gm->map.getSubPoint(position, dir2)))
+						if (gm->map->canPass(gm->map->getSubPoint(position, dir1)) && gm->map->canPass(gm->map->getSubPoint(position, dir2)))
 						{
 							canWalkNextStep = true;
 							stepState = ssOut;
-							gm->map.addStepToDataMap(stepList[0], npcIndex);
+							gm->map->addStepToDataMap(stepList[0], npcIndex);
 							direction = calDirection(stepList[0]);
 							stepBeginTime += stepLastTime;
 							calStepLastTime();
@@ -2163,7 +2158,7 @@ void NPC::updateAction(UTime frameTime)
 						canWalkNextStep = true;
 						stepState = ssOut;
 						stepBeginTime += stepLastTime;
-						gm->map.addStepToDataMap(stepList[0], npcIndex);
+						gm->map->addStepToDataMap(stepList[0], npcIndex);
 						direction = calDirection(stepList[0]);	
 						calStepLastTime();
 						calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
@@ -2182,10 +2177,10 @@ void NPC::updateAction(UTime frameTime)
 			}
 			else if (stepState == ssOut)
 			{
-				gm->map.deleteNPCFromDataMap(position, npcIndex);
-				gm->map.deleteStepFromDataMap(stepList[0], npcIndex);
+				gm->map->deleteNPCFromDataMap(position, npcIndex);
+				gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
 				position = stepList[0];
-				gm->map.addNPCToDataMap(position, npcIndex);
+				gm->map->addNPCToDataMap(position, npcIndex);
 				stepState = ssIn;
 				stepBeginTime += stepLastTime;
 				calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
@@ -2242,7 +2237,7 @@ void NPC::onEvent()
 
 void NPC::onMouseLeftDown(int x, int y)
 {
-#ifdef _MOBILE
+#ifdef __MOBILE__
     auto player = gm->player;
     if (player->nowAction != acDeath && player->nowAction != acHide)
     {
@@ -2255,7 +2250,7 @@ void NPC::onMouseLeftDown(int x, int y)
         {
             act.action = acWalk;
         }
-        act.destGE = this;
+        act.destGE = std::dynamic_pointer_cast<NPC>(getMySharedPtr());
         if (kind == nkBattle && relation == nrHostile)
         {
             act.type = ndAttack;
@@ -2265,7 +2260,7 @@ void NPC::onMouseLeftDown(int x, int y)
             act.type = ndTalk;
         }
         act.dest = position;
-        player->addNextAction(&act);
+        player->addNextAction(act);
     }
 #endif
 }

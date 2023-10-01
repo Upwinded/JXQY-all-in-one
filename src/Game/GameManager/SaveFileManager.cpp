@@ -1,5 +1,7 @@
 #include "SaveFileManager.h"
 
+std::string SaveFileManager::_currentPath = SAVE_CURRENT_FOLDER;
+
 std::string SaveFileManager::calculateFolderName(int index)
 {
 	if (index < 0)
@@ -49,9 +51,15 @@ void SaveFileManager::CopySaveFileFrom(int index)
 	}
 }
 
-void SaveFileManager::AppendFile(std::string fileName)
+std::string SaveFileManager::CurrentPath()
+{
+	return _currentPath;
+}
+
+void SaveFileManager::AppendFile(const std::string & fileName)
 {
 	auto fileList = readFileList(-1);
+
 	bool found = false;
 	for (size_t i = 0; i < fileList.size(); i++)
 	{

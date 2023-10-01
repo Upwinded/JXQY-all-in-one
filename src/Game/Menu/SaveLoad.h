@@ -16,19 +16,19 @@ private:
 public:
 	int index = -1;
 
-	ListBox * listBox = nullptr;
+	std::shared_ptr<ListBox> listBox = nullptr;
 
-	ImageContainer * snap = nullptr;
-	Button * loadBtn = nullptr;
-	Button * saveBtn = nullptr;
-	Button * exitBtn = nullptr;
+	std::shared_ptr<ImageContainer> snap = nullptr;
+	std::shared_ptr<Button> loadBtn = nullptr;
+	std::shared_ptr<Button> saveBtn = nullptr;
+	std::shared_ptr<Button> exitBtn = nullptr;
 
 	void init();
 
 private:
 	virtual void onEvent();
 	void freeResource();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 
 };
 

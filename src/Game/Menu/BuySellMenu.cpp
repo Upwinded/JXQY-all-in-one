@@ -14,10 +14,6 @@ BuySellMenu::BuySellMenu()
 BuySellMenu::~BuySellMenu()
 {
 	freeResource();
-	if (gm->menu.toolTip != nullptr && gm->menu.toolTip->parent == this)
-	{
-		gm->menu.toolTip->changeParent(nullptr);
-	}
 	this_ = nullptr;
 }
 
@@ -34,7 +30,6 @@ void BuySellMenu::clearGoodsList()
 		goodsList[i].number = 0;
 		if (goodsList[i].goods != nullptr)
 		{
-			delete goodsList[i].goods;
 			goodsList[i].goods = nullptr;
 		}
 	}
@@ -49,7 +44,7 @@ void BuySellMenu::buy(const std::string & list)
 		item[i]->dragType = dtBuy;
 		item[i]->dragIndex = i;
 	}
-	gm->menu.goodsMenu->changeParent(this);
+	addChild(gm->menu->goodsMenu);
 	clearGoodsList();
 	std::string listName = BUYSELL_FOLDER + list;
 	std::unique_ptr<char[]> s;
@@ -73,7 +68,7 @@ void BuySellMenu::buy(const std::string & list)
 			goodsList[i].number = ini.GetInteger(section, "Number", 1);
 			if (goodsList[i].iniFile != "")
 			{
-				goodsList[i].goods = new Goods;
+				goodsList[i].goods = std::make_shared<Goods>();
 				goodsList[i].goods->initFromIni(goodsList[i].iniFile);
 			}
 			else
@@ -87,7 +82,7 @@ void BuySellMenu::buy(const std::string & list)
 	setGoodsButtonChecked();
 	run();
 	clearButtonChecked();
-	gm->menu.goodsMenu->changeParent(&gm->menu);
+	gm->menu->addChild(gm->menu->goodsMenu);
 }
 
 void BuySellMenu::sell(const std::string & list)
@@ -99,7 +94,7 @@ void BuySellMenu::sell(const std::string & list)
 		item[i]->dragType = dtSell;
 		item[i]->dragIndex = i;
 	}
-	gm->menu.goodsMenu->changeParent(this);
+	addChild(gm->menu->goodsMenu);
 	clearGoodsList();
 	if (list != "")
 	{
@@ -125,7 +120,7 @@ void BuySellMenu::sell(const std::string & list)
 				goodsList[i].number = ini.GetInteger(section, "Number", 1);
 				if (goodsList[i].iniFile != "")
 				{
-					goodsList[i].goods = new Goods;
+					goodsList[i].goods = std::make_shared<Goods>();
 					goodsList[i].goods->initFromIni(goodsList[i].iniFile);
 				}
 				else
@@ -140,7 +135,7 @@ void BuySellMenu::sell(const std::string & list)
 	setGoodsButtonChecked();
 	run();
 	clearButtonChecked();
-	gm->menu.goodsMenu->changeParent(&gm->menu);
+	gm->menu->addChild(gm->menu->goodsMenu);
 }
 
 bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
@@ -156,7 +151,7 @@ bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
 				goodsList[i].iniFile = "";
 				if (goodsList[i].goods != nullptr)
 				{
-					delete goodsList[i].goods;
+
 					goodsList[i].goods = nullptr;
 				}
 			}
@@ -174,7 +169,7 @@ bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
 		{
 			goodsList[i].number = num;
 			goodsList[i].iniFile = itemName;
-			goodsList[i].goods = new Goods;
+			goodsList[i].goods = std::make_shared<Goods>();
 			goodsList[i].goods->initFromIni(itemName);
 			updateGoods();
 			return true;
@@ -185,24 +180,24 @@ bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
 
 void BuySellMenu::setGoodsButtonChecked()
 {
-	gm->menu.goodsMenu->visible = true;
-	gm->menu.bottomMenu->goodsBtn->checked = true;
+	gm->menu->goodsMenu->visible = true;
+	gm->menu->bottomMenu->goodsBtn->checked = true;
 }
 
 void BuySellMenu::clearButtonChecked()
 {
-	gm->menu.practiceMenu->visible = false;
-	gm->menu.equipMenu->visible = false;
-	gm->menu.stateMenu->visible = false;
-	gm->menu.magicMenu->visible = false;
-	gm->menu.memoMenu->visible = false;
-	gm->menu.goodsMenu->visible = false;
-	gm->menu.bottomMenu->magicBtn->checked = false;
-	gm->menu.bottomMenu->goodsBtn->checked = false;
-	gm->menu.bottomMenu->notesBtn->checked = false;
-	gm->menu.bottomMenu->stateBtn->checked = false;
-	gm->menu.bottomMenu->xiulianBtn->checked = false;
-	gm->menu.bottomMenu->equipBtn->checked = false;
+	gm->menu->practiceMenu->visible = false;
+	gm->menu->equipMenu->visible = false;
+	gm->menu->stateMenu->visible = false;
+	gm->menu->magicMenu->visible = false;
+	gm->menu->memoMenu->visible = false;
+	gm->menu->goodsMenu->visible = false;
+	gm->menu->bottomMenu->magicBtn->checked = false;
+	gm->menu->bottomMenu->goodsBtn->checked = false;
+	gm->menu->bottomMenu->notesBtn->checked = false;
+	gm->menu->bottomMenu->stateBtn->checked = false;
+	gm->menu->bottomMenu->xiulianBtn->checked = false;
+	gm->menu->bottomMenu->equipBtn->checked = false;
 }
 
 void BuySellMenu::updateGoods()
@@ -210,12 +205,9 @@ void BuySellMenu::updateGoods()
 	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
 	{
 		item[i]->dragIndex = i + scrollbar->position * scrollbar->lineSize;
-		if (item[i]->impImage != nullptr)
-		{
-			IMP::clearIMPImage(item[i]->impImage);
-			//delete item[i]->impImage;
-			item[i]->impImage = nullptr;
-		}
+
+		item[i]->impImage = nullptr;
+
 		item[i]->setStr("");
 		if (goodsList[i + scrollbar->position * scrollbar->lineSize].iniFile != "" && goodsList[i + scrollbar->position * scrollbar->lineSize].goods != nullptr)
 		{
@@ -248,36 +240,40 @@ void BuySellMenu::onEvent()
 			{
 				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != "" && goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr)
 				{
-					gm->menu.toolTip->visible = true;
-					gm->menu.toolTip->changeParent(this);
-					gm->menu.toolTip->setGoods(goodsList[scrollbar->position * scrollbar->lineSize + i].goods);
+					gm->menu->toolTip->visible = true;
+					addChild(gm->menu->toolTip);
+					gm->menu->toolTip->setGoods(goodsList[scrollbar->position * scrollbar->lineSize + i].goods);
 				}
 				else
 				{
-					gm->menu.toolTip->visible = false;
+					gm->menu->toolTip->visible = false;
 				}
 			}
 			else
 			{
 				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != "" && goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr && goodsList[scrollbar->position * scrollbar->lineSize + i].number > 0)
 				{
-					gm->menu.toolTip->visible = true;
-					gm->menu.toolTip->changeParent(this);
-					gm->menu.toolTip->setGoods(goodsList[scrollbar->position * scrollbar->lineSize + i].goods);
+					gm->menu->toolTip->visible = true;
+					addChild(gm->menu->toolTip);
+					gm->menu->toolTip->setGoods(goodsList[scrollbar->position * scrollbar->lineSize + i].goods);
 				}
 				else
 				{
-					gm->menu.toolTip->visible = false;
+					gm->menu->toolTip->visible = false;
 				}
 			}
 		}
 		if (ret & erHideHint)
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 		}
+#ifdef __MOBILE__
+		if (ret & erClick || ret & erMouseRDown)
+#else
 		if (ret & erMouseRDown)
+#endif
 		{
-			gm->menu.toolTip->visible = false;
+			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
 			if (bsKind == bsBuy)
 			{
@@ -285,8 +281,8 @@ void BuySellMenu::onEvent()
 				{
 					if (gm->goodsManager.buyItem(goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile, 1))
 					{
-						gm->menu.goodsMenu->updateGoods();
-						gm->menu.goodsMenu->updateMoney();
+						gm->menu->goodsMenu->updateGoods();
+						gm->menu->goodsMenu->updateMoney();
 					}
 				}		
 			}
@@ -303,14 +299,13 @@ void BuySellMenu::onEvent()
 							goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile = "";
 							if (goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr)
 							{
-								delete goodsList[scrollbar->position * scrollbar->lineSize + i].goods;
 								goodsList[scrollbar->position * scrollbar->lineSize + i].goods = nullptr;
 							}
 							
 						}				
 						updateGoods();
-						gm->menu.goodsMenu->updateGoods();
-						gm->menu.goodsMenu->updateMoney();
+						gm->menu->goodsMenu->updateGoods();
+						gm->menu->goodsMenu->updateMoney();
 					}
 				}
 			}
@@ -327,26 +322,24 @@ void BuySellMenu::onEvent()
 						gm->player->money += gm->goodsManager.goodsList[item[i]->dropIndex].number * gm->goodsManager.goodsList[item[i]->dropIndex].goods->cost;
 						gm->goodsManager.goodsList[item[i]->dropIndex].number = 0;
 						gm->goodsManager.goodsList[item[i]->dropIndex].iniFile = "";
-						delete gm->goodsManager.goodsList[item[i]->dropIndex].goods;
 						gm->goodsManager.goodsList[item[i]->dropIndex].goods = nullptr;
-						gm->menu.goodsMenu->updateGoods();
-						gm->menu.goodsMenu->updateMoney();
+						gm->menu->goodsMenu->updateGoods();
+						gm->menu->goodsMenu->updateMoney();
 						updateGoods();
 						
 					}
 					else if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile == "")
 					{
 						goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile = gm->goodsManager.goodsList[item[i]->dropIndex].iniFile;
-						goodsList[scrollbar->position * scrollbar->lineSize + i].goods = new Goods;
+						goodsList[scrollbar->position * scrollbar->lineSize + i].goods = std::make_shared<Goods>();
 						goodsList[scrollbar->position * scrollbar->lineSize + i].goods->initFromIni(goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile);
 						goodsList[scrollbar->position * scrollbar->lineSize + i].number = gm->goodsManager.goodsList[item[i]->dropIndex].number;
 						gm->player->money += gm->goodsManager.goodsList[item[i]->dropIndex].number * gm->goodsManager.goodsList[item[i]->dropIndex].goods->cost;
 						gm->goodsManager.goodsList[item[i]->dropIndex].number = 0;
 						gm->goodsManager.goodsList[item[i]->dropIndex].iniFile = "";
-						delete gm->goodsManager.goodsList[item[i]->dropIndex].goods;
 						gm->goodsManager.goodsList[item[i]->dropIndex].goods = nullptr;
-						gm->menu.goodsMenu->updateGoods();
-						gm->menu.goodsMenu->updateMoney();
+						gm->menu->goodsMenu->updateGoods();
+						gm->menu->goodsMenu->updateMoney();
 						updateGoods();
 					}
 				}
@@ -356,11 +349,11 @@ void BuySellMenu::onEvent()
 
 }
 
-bool BuySellMenu::onHandleEvent(AEvent * e)
+bool BuySellMenu::onHandleEvent(AEvent & e)
 {
-	if (e->eventType == ET_KEYDOWN)
+	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e->eventData == KEY_ESCAPE)
+		if (e.eventData == KEY_ESCAPE)
 		{
 			running = false;
 			return true;
@@ -372,17 +365,17 @@ bool BuySellMenu::onHandleEvent(AEvent * e)
 void BuySellMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\buysell\\window.ini");
-	title = addImageContainer("ini\\ui\\buysell\\title.ini");
-	image = addImageContainer("ini\\ui\\buysell\\dragbox.ini");
-	closeBtn = addButton("ini\\ui\\buysell\\closebtn.ini");
+	initFromIniFileName("ini\\ui\\buysell\\window.ini");
+	title = addComponent<ImageContainer>("ini\\ui\\buysell\\title.ini");
+	image = addComponent<ImageContainer>("ini\\ui\\buysell\\dragbox.ini");
+	closeBtn = addComponent<Button>("ini\\ui\\buysell\\closebtn.ini");
 
-	scrollbar = addScrollbar("ini\\ui\\buysell\\scrollbar.ini");
+	scrollbar = addComponent<Scrollbar>("ini\\ui\\buysell\\scrollbar.ini");
 
 	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
 	{
 		std::string itemName = convert::formatString("ini\\ui\\buysell\\item%d.ini", i + 1);
-		item[i] = addItem(itemName);
+		item[i] = addComponent<Item>(itemName);
 		item[i]->dragType = dtSell;
 		item[i]->canShowHint = true;
 	}
@@ -392,12 +385,9 @@ void BuySellMenu::init()
 
 void BuySellMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+
+	impImage = nullptr;
+
 	freeCom(title);
 	freeCom(image);
 	freeCom(closeBtn);
@@ -407,4 +397,5 @@ void BuySellMenu::freeResource()
 		freeCom(item[i]);
 	}
 	clearGoodsList();
+	removeAllChild();
 }

@@ -11,22 +11,24 @@ public:
 
 	void freeResource();
 	void init();
-	virtual void onChildCallBack(Element* child);
+	virtual void onChildCallBack(PElement child);
 	virtual void onEvent();
 	virtual void onUpdate();
-	virtual bool onHandleEvent(AEvent* e);
+	virtual bool onHandleEvent(AEvent & e);
 
 	bool MouseAlreadyDown = false;
 
-#ifdef _MOBILE
+#ifdef __MOBILE__
 
-	JoystickPanel* joystickPanel = nullptr;
-	SkillsPanel* skillPanel = nullptr;
+	std::shared_ptr<JoystickPanel> joystickPanel = nullptr;
+	std::shared_ptr<SkillsPanel> skillPanel = nullptr;
 	void setFastSelectBtn(int index, bool sVisible, std::string str = "");
 
-#endif // _MOBILE
+#endif // __MOBILE__
 private:
 	int _last_magic_index = -1;
+
+	Point getPlayerRelativePosition(double angle, double distance, double xFactor);
 
 };
 

@@ -48,23 +48,18 @@ void MemoMenu::reRange(int max)
 void MemoMenu::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\memo\\window.ini");
-	title = addImageContainer("ini\\ui\\memo\\title.ini");
-	image = addImageContainer("ini\\ui\\memo\\image.ini");
-	scrollbar = addScrollbar("ini\\ui\\memo\\scrollbar.ini");
-	memoText = addMemo("ini\\ui\\memo\\memo.ini");
+	initFromIniFileName("ini\\ui\\memo\\window.ini");
+	title = addComponent<ImageContainer>("ini\\ui\\memo\\title.ini");
+	image = addComponent<ImageContainer>("ini\\ui\\memo\\image.ini");
+	scrollbar = addComponent<Scrollbar>("ini\\ui\\memo\\scrollbar.ini");
+	memoText = addComponent<MemoText>("ini\\ui\\memo\\memo.ini");
 
 	setChildRectReferToParent();
 }
 
 void MemoMenu::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
 
 	freeCom(memoText);
 	freeCom(title);

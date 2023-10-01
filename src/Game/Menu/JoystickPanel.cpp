@@ -43,18 +43,18 @@ bool JoystickPanel::isWalking()
 	return false;
 }
 
-void JoystickPanel::onChildCallBack(Element* child)
+void JoystickPanel::onChildCallBack(PElement child)
 {
 	if (child == nullptr) { return; }
 	result = child->getResult();
 	if (result & erDragEnd)
 	{
-		auto component = (DragRoundButton*)child;
+		auto component = std::dynamic_pointer_cast<DragRoundButton>(child);
 		dragEndPosition = component->getDragPosition();
 	}
 	if (parent != nullptr && parent->canCallBack)
 	{
-		parent->onChildCallBack(this);
+		parent->onChildCallBack(getMySharedPtr());
 	}
 }
 
@@ -71,20 +71,16 @@ void JoystickPanel::onEvent()
 void JoystickPanel::init()
 {
 	freeResource();
-	initFromIni("ini\\ui\\mobile\\joystick\\window.ini");
-	joystick = addJoystick("ini\\ui\\mobile\\joystick\\joystick.ini");
+	initFromIniFileName("ini\\ui\\mobile\\joystick\\window.ini");
+	joystick = addComponent<Joystick>("ini\\ui\\mobile\\joystick\\joystick.ini");
 	//addComponent(DragRoundButton, leftJumpBtn, "ini\\ui\\mobile\\skills\\leftjump.ini");
 	setChildRectReferToParent();
 }
 
 void JoystickPanel::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
+
 	freeCom(joystick);
 	//freeCom(leftJumpBtn);
 }

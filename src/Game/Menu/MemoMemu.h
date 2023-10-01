@@ -7,10 +7,10 @@ public:
 	MemoMenu();
 	virtual ~MemoMenu();
 
-	ImageContainer * title = nullptr;
-	ImageContainer * image = nullptr;
-	MemoText * memoText = nullptr;
-	Scrollbar * scrollbar = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
+	std::shared_ptr<ImageContainer> image = nullptr;
+	std::shared_ptr<MemoText> memoText = nullptr;
+	std::shared_ptr<Scrollbar> scrollbar = nullptr;
 
 	void reFresh();
 	void reset();

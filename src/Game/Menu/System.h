@@ -7,17 +7,17 @@ public:
 	System();
 	virtual ~System();
 
-	ImageContainer * title = nullptr;
-	Button * returnBtn = nullptr;
-	Button * saveloadBtn = nullptr;
-	Button * optionBtn = nullptr;
-	Button * quitBtn = nullptr;
+	std::shared_ptr<ImageContainer> title = nullptr;
+	std::shared_ptr<Button> returnBtn = nullptr;
+	std::shared_ptr<Button> saveloadBtn = nullptr;
+	std::shared_ptr<Button> optionBtn = nullptr;
+	std::shared_ptr<Button> quitBtn = nullptr;
 
 	void init();
 private:
 	void freeResource();
 	virtual void onEvent();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 	virtual void saveScreen();
 
 };

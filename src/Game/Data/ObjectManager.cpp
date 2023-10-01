@@ -15,20 +15,7 @@ ObjectManager::~ObjectManager()
 	freeResource();
 }
 
-void ObjectManager::removeObj(Object * obj)
-{
-	if (obj == nullptr) { return; }
-	for (int i = 0; i < objectList.size(); ++i) {
-		if (objectList[i] == obj)
-		{
-			objectList.erase(objectList.begin() + i);
-			removeChild(obj);
-			break;
-		}
-	}
-}
-
-bool ObjectManager::findObj(Object * object)
+bool ObjectManager::findObj(std::shared_ptr<Object> object)
 {
 	if (object == nullptr)
 	{
@@ -44,7 +31,7 @@ bool ObjectManager::findObj(Object * object)
 	return false;
 }
 
-Object * ObjectManager::findObj(const std::string & name)
+std::shared_ptr<Object> ObjectManager::findObj(const std::string & name)
 {
 	for (size_t i = 0; i < objectList.size(); i++)
 	{
@@ -56,7 +43,7 @@ Object * ObjectManager::findObj(const std::string & name)
 	return nullptr;
 }
 
-Object * ObjectManager::findNearestScriptViewObj(Point pos, int radius)
+std::shared_ptr<Object> ObjectManager::findNearestScriptViewObj(Point pos, int radius)
 {
 	int distance = radius + 1;
 	int tempIdx = -1;
@@ -65,8 +52,8 @@ Object * ObjectManager::findNearestScriptViewObj(Point pos, int radius)
 		auto tempObj = objectList[i];
 		if (tempObj != nullptr && tempObj->scriptFile != "")
 		{
-			auto tempDistance = gm->map.calDistance(tempObj->position, pos);
-			if (tempDistance < distance && gm->map.canView(pos, tempObj->position))
+			auto tempDistance = gm->map->calDistance(tempObj->position, pos);
+			if (tempDistance < distance && gm->map->canView(pos, tempObj->position))
 			{
 				distance = tempDistance;
 				tempIdx = i;
@@ -83,16 +70,16 @@ Object * ObjectManager::findNearestScriptViewObj(Point pos, int radius)
 	}
 }
 
-std::vector<Object *> ObjectManager::findRadiusScriptViewObj(Point pos, int radius)
+std::vector<std::shared_ptr<Object>> ObjectManager::findRadiusScriptViewObj(Point pos, int radius)
 {
-	std::vector<Object *> ret;
-	for (int i = 0; i < objectList.size(); ++i)
+	std::vector<std::shared_ptr<Object>> ret;
+	for (size_t i = 0; i < objectList.size(); ++i)
 	{
 		if (objectList[i] == nullptr) { continue; }
 
-		int tempDistance = Map::calDistance(pos, objectList[i]->position);
+		auto tempDistance = Map::calDistance(pos, objectList[i]->position);
 
-		if (objectList[i]->scriptFile != "" && gm->map.canView(pos, objectList[i]->position) && tempDistance <= radius)
+		if (objectList[i]->scriptFile != "" && gm->map->canView(pos, objectList[i]->position) && tempDistance <= radius)
 		{
 			ret.push_back(objectList[i]);
 		}
@@ -139,18 +126,21 @@ void ObjectManager::drawOBJ(int index, Point cenTile, Point cenScreen, PointEx o
 	}
 }
 
+void ObjectManager::deleteObjectFromOtherPlace(std::shared_ptr<Object> obj)
+{
+	removeChild(obj);
+	tryCleanObjectImageList();
+}
+
 void ObjectManager::deleteObject(std::string nName)
 {
-	std::vector<Object*> newList, deleteList;
+	std::vector<std::shared_ptr<Object>> newList;
 	newList.resize(0);
 	for (size_t i = 0; i < objectList.size(); i++)
 	{
 		if (objectList[i] == nullptr || objectList[i]->objName == nName)
 		{
-			if (objectList[i] != nullptr)
-			{
-				deleteList.push_back(objectList[i]);
-			}
+			deleteObjectFromOtherPlace(objectList[i]);
 			objectList[i] = nullptr;
 		}
 		else
@@ -158,17 +148,13 @@ void ObjectManager::deleteObject(std::string nName)
 			newList.push_back(objectList[i]);
 		}
 	}
-	for (size_t i = 0; i < deleteList.size(); i++)
-	{
-		delete deleteList[i];
-	}
 	objectList = newList;
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 }
 
 void ObjectManager::addObject(std::string iniName, int x, int y, int dir)
 {
-	auto obj = new Object;
+	auto obj = std::make_shared<Object>();
 	obj->objIndex = objectList.size();
 	std::string iniN = OBJECT_INI_FOLDER + iniName;
 	std::unique_ptr<char[]> s;
@@ -183,12 +169,12 @@ void ObjectManager::addObject(std::string iniName, int x, int y, int dir)
 	obj->direction = dir;
     objectList.push_back(obj);
 	addChild(obj);
-	gm->map.addObjectToDataMap(obj->position, obj->objIndex);
+	gm->map->addObjectToDataMap(obj->position, obj->objIndex);
 }
 
 void ObjectManager::clearBody()
 {
-	std::vector<Object *> newList, deleteList;
+	std::vector<std::shared_ptr<Object>> newList;
 	for (size_t i = 0; i < objectList.size(); i++)
 	{
 		if (objectList[i] != nullptr)
@@ -199,22 +185,20 @@ void ObjectManager::clearBody()
 			}
 			else
 			{
-				deleteList.push_back(objectList[i]);
+				deleteObjectFromOtherPlace(objectList[i]);
+				objectList[i] = nullptr;
 			}
 		}
 	}
-	for (size_t i = 0; i < deleteList.size(); i++)
-	{
-		delete deleteList[i];
-	}
 	objectList = newList;
-	gm->map.createDataMap();
+	tryCleanObjectImageList();
+	gm->map->createDataMap();
 }
 
 void ObjectManager::clearObj()
 {
 	freeResource();
-	gm->map.createDataMap();
+	gm->map->createDataMap();
 }
 
 void ObjectManager::checkDamage()
@@ -238,16 +222,27 @@ void ObjectManager::clearSelected()
 
 void ObjectManager::clearObjectImageList()
 {
-	for (size_t i = 0; i < objectImageList.size(); i++)
+	for (auto iter = objectImageList.begin(); iter != objectImageList.end(); iter++)
 	{
-		if (objectImageList[i].image != nullptr)
+		iter->second = nullptr;
+	}
+	objectImageList.clear();
+}
+
+void ObjectManager::tryCleanObjectImageList()
+{
+	auto iter = objectImageList.begin();
+	while (iter != objectImageList.end())
+	{
+		if (iter->second.use_count() <= 1)
 		{
-			IMP::clearIMPImage(objectImageList[i].image);
-			//delete objectImageList[i].image;
-			objectImageList[i].image = nullptr;
+			iter = objectImageList.erase(iter);
+		}
+		else
+		{
+			iter++;
 		}
 	}
-	objectImageList.resize(0);
 }
 
 _shared_imp ObjectManager::loadObjectImage(const std::string & imageName)
@@ -256,30 +251,28 @@ _shared_imp ObjectManager::loadObjectImage(const std::string & imageName)
 	{
 		return nullptr;
 	}
-	for (size_t i = 0; i < objectImageList.size(); i++)
+	auto img = objectImageList.find(imageName);
+	if (img != objectImageList.end())
 	{
-		if (objectImageList[i].name == imageName)
-		{
-			return objectImageList[i].image;
-		}
+		return img->second;
 	}
-	ObjectImage objImg;
-	objImg.name = imageName;
+
 	std::string tempName = OBJECT_RES_FOLDER + imageName;
-	objImg.image = IMP::createIMPImage(tempName);
-	objectImageList.push_back(objImg);
-	return objImg.image;
+	_shared_imp objImg = IMP::createIMPImage(tempName);
+	objectImageList[imageName] = objImg;
+	return objImg;
+
 }
 
 void ObjectManager::freeResource()
 {
 	removeAllChild();
-	auto deleteList = objectList;
-	for (size_t i = 0; i < deleteList.size(); i++)
+	for (size_t i = 0; i < objectList.size(); i++)
 	{
-		if (deleteList[i] != nullptr)
+		if (objectList[i] != nullptr)
 		{
-			delete deleteList[i];
+			deleteObjectFromOtherPlace(objectList[i]);
+			objectList[i] = nullptr;
 		}
 	}
 	objectList.resize(0);
@@ -298,10 +291,10 @@ void ObjectManager::load(const std::string & fileName)
 		return;
 	}
 
-	for (size_t i = 0; i < count; i++)
+	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("OBJ%03d", i);
-		auto obj = new Object;
+		auto obj = std::make_shared<Object>();
 		obj->initFromIni(&ini, section);
 		addChild(obj);
 		objectList.push_back(obj);
@@ -315,21 +308,19 @@ void ObjectManager::save(const std::string & fileName)
 		return;
 	}
 	
-	INIReader * ini = new INIReader();
+	INIReader ini;
 
 	std::string section = "Head";
-	ini->Set(section, "Map", GameManager::getInstance()->global.data.mapName);
-	ini->SetInteger(section, "Count", objectList.size());
+	ini.Set(section, "Map", GameManager::getInstance()->global.data.mapName);
+	ini.SetInteger(section, "Count", objectList.size());
 
 	for (size_t i = 0; i < objectList.size(); i++)
 	{
 		section = convert::formatString("OBJ%03d", i);
-		objectList[i]->saveToIni(ini, section);
+		objectList[i]->saveToIni(&ini, section);
 	}
-	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
-	ini->saveToFile(iniName);
-	delete ini;
-	ini = nullptr;
+	ini.saveToFile(SaveFileManager::CurrentPath() + fileName);
+
 	SaveFileManager::AppendFile(fileName);
 }
 

@@ -1,11 +1,13 @@
 ﻿#include "Element.h"
 
-Element * Element::currentDragItem = nullptr;
+PElement Element::_topParent = std::make_shared<Element>();
+
+PElement Element::currentDragItem = nullptr;
 int Element::dragParam[2] = { 0, 0 };
 EventTouchID Element::dragging = TOUCH_UNTOUCHEDID;
 Point Element::dragTouchPosition = { 0, 0 };
 Point Element::dragDownPosition = { 0, 0 };
-std::vector<Element *> Element::runningElement;
+std::vector<PElement> Element::runningElement;
 
 Element::Element()
 {
@@ -17,71 +19,74 @@ Element::Element()
 Element::~Element()
 {
 	freeResource();
-	changeParent(nullptr);
 	removeAllChild();
-	if (currentDragItem == this)
+	if (currentDragItem.get() == this)
 	{
 		currentDragItem = nullptr;
 	}
 }
 
-void Element::addChild(Element * child)
+void Element::setAsTop(PElement child)
 {
-	
-	if (child != nullptr)
-	{
-		//不允许重复添加child，先进行查重
-		int index = -1;
-		for (size_t i = 0; i < children.size(); i++)
-		{
-			if (child == children[i])
-			{
-				index = (int)i;
-				break;
-			}
-		}
-		if (index < 0)
-		{
-			child->parent = this;
-			children.push_back(child);
-			child->timer.setParent(&timer);
-			reArrangeChildren();
-		}
-	}
-}
-
-void Element::removeChild(Element * child)
-{
-	if (child == nullptr || children.size() == 0)
+	if (child.get() == nullptr)
 	{
 		return;
 	}
-	while (true)
+	if (child->parent != nullptr)
 	{
-		//是否有重复的child，一并删除
-		int index = -1;
+		child->parent->removeChild(child->getMySharedPtr());
+	}
+	_topParent->addChild(child);
+}
+
+void Element::removeFromTop(PElement child)
+{
+	_topParent->removeChild(child);
+}
+
+void Element::addChild(PElement child)
+{
+	if (child.get() != nullptr)
+	{
+		// 只允许有一个parent，其原parent需要移除此child
+		if (child->parent != nullptr)
+		{
+			child->parent->removeChild(child);
+		}
+
+		//不允许重复添加child，先进行查重
 		for (size_t i = 0; i < children.size(); i++)
-		{			
-			if (children[i] == child)
+		{
+			if (child.get() == children[i].get())
 			{
-				children[i]->timer.setParent(nullptr);
-				children[i]->parent = nullptr;
-				children[i] = nullptr;
-				index = (int)i;
-				break;
+				return;
 			}
 		}
-		if (index < 0)
+		child->parent = this;
+		children.push_back(child);
+		child->timer.setParent(&timer);
+		reArrangeChildren();
+	}
+}
+
+void Element::removeChild(PElement child)
+{
+	if (child.get() == nullptr || children.size() == 0)
+	{
+		return;
+	}
+	auto iter = children.begin();
+	while (iter != children.end())
+	{
+		if (iter->get() == child.get())
 		{
-			break;
+			iter->get()->timer.setParent(nullptr);
+			iter->get()->parent = nullptr;
+			iter = children.erase(iter);
 		}
 		else
 		{
-			for (int i = index; i < ((int)children.size()) - 1; i++)
-			{
-				children[i] = children[i + 1];
-			}
-			children.resize(children.size() - 1);
+			iter++;
 		}
 	}
 }
@@ -100,25 +105,28 @@ void Element::removeAllChild()
 	children.resize(0);
 }
 
-void Element::changeParent(Element * p)
+PElement Element::getMySharedPtr()
 {
-	if (parent == p)
-	{
-		return;
-	}
 	if (parent != nullptr)
 	{
-		parent->removeChild(this);
+		return parent->getChildSharedPtr(this);
 	}
-	parent = p;
-	if (p != nullptr)
-	{
-		p->addChild(this);
-	}
-	
+	return PElement(nullptr);
 }
 
-void Element::setChildActivated(Element * child, bool activated)
+PElement Element::getChildSharedPtr(Element* element)
+{
+	for (size_t i = 0; i < children.size(); i++)
+	{
+		if (children[i].get() == element)
+		{
+			return children[i];
+		}
+	}
+	return PElement(nullptr);
+}
+
+void Element::setChildActivated(PElement child, bool activated)
 {
 	if (child == nullptr)
 	{
@@ -201,7 +209,7 @@ void Element::setPaused(bool paused)
 
 void Element::dragEnd()
 {
-	if (currentDragItem == this)
+	if (currentDragItem.get() == this)
 	{
 		//onDragEnd(nullptr, 0, 0);
 		dragging = TOUCH_UNTOUCHEDID;
@@ -209,7 +217,7 @@ void Element::dragEnd()
 	}
 }
 
-bool cmp(Element* A, Element* B)
+bool cmp(PElement A, PElement B)
 {
 	if (A == nullptr)
 	{
@@ -270,7 +278,6 @@ void Element::freeAllChildren()
 		if (children[i] != nullptr)
 		{
 			children[i]->freeAllChildren();
-			delete children[i];
 			children[i] = nullptr;
 		}
 	}
@@ -281,32 +288,32 @@ void Element::clearTouch()
 {
 	if (touchingID != TOUCH_UNTOUCHEDID)
 	{
-		onMouseMoveOut();
+		if (activated && needEvents)
+		{
+			onMouseMoveOut();
+		}
 		touchingID = TOUCH_UNTOUCHEDID;
-		touchInRectID = TOUCH_UNTOUCHEDID;
+		touchingDownID = TOUCH_UNTOUCHEDID;
 	}
 }
 void Element::clearAllTouch()
 {
-	if (activated && needEvents && visible)
-    {
-        for (size_t i = 0; i < children.size(); ++i)
+    for (size_t i = 0; i < children.size(); ++i)
+	{
+		if (children[i] != nullptr)
 		{
-			if (children[i] != nullptr)
-			{
-				children[i]->clearAllTouch();
-			}
+			children[i]->clearAllTouch();
 		}
-		if (coverMouse)
-		{
-			clearTouch();
-		}
+	}
+	if (coverMouse)
+	{
+		clearTouch();
 	}
 }
 
 void Element::runningElementClearAllTouch()
 {
-	if (parent == nullptr || (runningElement.size() > 0 && runningElement[runningElement.size() - 1] == this))
+	if (parent == nullptr || (runningElement.size() > 0 && runningElement[runningElement.size() - 1].get() == this))
 	{
 		clearAllTouch();
 	}
@@ -331,7 +338,6 @@ void Element::drawSelf()
 				children[i]->drawSelf();
 			}
 		}
-
 		onDrawEnd();
 	}
 }
@@ -430,7 +436,7 @@ void Element::postTreatmentAll()
 	}
 }
 
-bool Element::handleEvent(AEvent * e)
+bool Element::handleEvent(AEvent & e)
 {
 	bool handled = false;
 	if (activated && needEvents)
@@ -460,7 +466,7 @@ void Element::handleEvents()
 		{
 			children[i]->handleEvents();
 		}
-		if (currentDragItem == this)
+		if (currentDragItem.get() == this)
 		{
 			onDragging(dragTouchPosition.x - dragDownPosition.x, dragTouchPosition.y - dragDownPosition.y);
 		}
@@ -486,6 +492,10 @@ bool Element::checkAllTouchDown(EventTouchID id, int x, int y)
 			TouchChecked = checkTouchDown(id, x, y);
 		}
 	}
+	else
+	{
+		clearAllTouch();
+	}
 	return TouchChecked;
 }
 
@@ -506,6 +516,10 @@ bool Element::checkAllTouchUp(EventTouchID id, int x, int y)
 		{
 			TouchChecked = checkTouchUp(id, x, y);
 		}
+	}
+	else
+	{
+		clearAllTouch();
 	}
 	return TouchChecked;
 }
@@ -529,16 +543,7 @@ bool Element::checkAllTouchMotion(EventTouchID id, int x, int y, bool touchCheck
 	}
 	else
 	{
-		if (touchInRectID != TOUCH_UNTOUCHEDID)
-		{
-			touchInRectID = TOUCH_UNTOUCHEDID;
-			onMouseLeftUp(x, y);
-		}
-		if (touchingID != TOUCH_UNTOUCHEDID)
-		{
-			touchingID = TOUCH_UNTOUCHEDID;
-			onMouseMoveOut();
-		}
+		clearAllTouch();
 	}
 	return _touchChecked;
 }
@@ -549,7 +554,7 @@ bool Element::checkTouchMotion(EventTouchID id, int x, int y, bool touchChecked)
 	{
 		if (touchingID != id)
 		{
-			touchInRectID = TOUCH_UNTOUCHEDID;
+			touchingDownID = TOUCH_UNTOUCHEDID;
 			touchingID = id;
 			onMouseMoveIn(x, y);
 			onMouseMoving(x, y);
@@ -558,11 +563,11 @@ bool Element::checkTouchMotion(EventTouchID id, int x, int y, bool touchChecked)
 		else
 		{
 			onMouseMoving(x, y);
-			if (dragging == TOUCH_UNTOUCHEDID && touchInRectID == id && canDrag && (std::abs(x - mouseLDownX) >= dragRange || std::abs(y - mouseLDownY) >= dragRange))
+			if (dragging == TOUCH_UNTOUCHEDID && touchingDownID == id && canDrag && hypot(std::abs(x - mouseLDownX), std::abs(y - mouseLDownY)) >= dragRange )
 			{
-				if (currentDragItem != this || dragging != id)
+				if (currentDragItem.get() != this || dragging != id)
 				{
-					currentDragItem = this;
+					currentDragItem = getMySharedPtr();
 					dragging = id;
 					dragDownPosition.x = mouseLDownX - rect.x;
 					dragDownPosition.y = mouseLDownY - rect.y;
@@ -580,13 +585,13 @@ bool Element::checkTouchMotion(EventTouchID id, int x, int y, bool touchChecked)
 		if (touchingID == id)
 		{
             touchingID = TOUCH_UNTOUCHEDID;
-            touchInRectID = TOUCH_UNTOUCHEDID;
+            touchingDownID = TOUCH_UNTOUCHEDID;
 			onMouseMoveOut();
-			if (touchInRectID == id && canDrag && dragging == TOUCH_UNTOUCHEDID)
+			if (touchingDownID == id && canDrag && dragging == TOUCH_UNTOUCHEDID)
 			{
-				if (currentDragItem != this || dragging != id)
+				if (currentDragItem.get() != this || dragging != id)
 				{
-					currentDragItem = this;
+					currentDragItem = getMySharedPtr();
 					dragging = id;
 					dragDownPosition.x = mouseLDownX - rect.x;
 					dragDownPosition.y = mouseLDownY - rect.y;
@@ -605,9 +610,9 @@ bool Element::checkTouchDown(EventTouchID id, int x, int y)
 {
 	if (touchingID == id)
 	{
-		if (touchInRectID != id)
+		if (touchingDownID != id)
 		{
-			touchInRectID = id;
+			touchingDownID = id;
 			mouseLDownX = x;
 			mouseLDownY = y;
 			onMouseLeftDown(x, y);
@@ -622,12 +627,12 @@ bool Element::checkTouchUp(EventTouchID id, int x, int y)
 	if (touchingID == id)
 	{
 		onMouseLeftUp(x, y);
-		if (touchInRectID == id)
+		if (touchingDownID == id)
 		{
 			onClick();
 		}
-		touchInRectID = TOUCH_UNTOUCHEDID;
-#ifdef _MOBILE
+		touchingDownID = TOUCH_UNTOUCHEDID;
+#ifdef __MOBILE__
         touchingID = TOUCH_UNTOUCHEDID;
         onMouseMoveOut();
 #endif
@@ -635,7 +640,7 @@ bool Element::checkTouchUp(EventTouchID id, int x, int y)
 		{
 			if (currentDragItem != nullptr)
 			{
-				currentDragItem->onDragEnd(this, dragTouchPosition.x - dragDownPosition.x, dragTouchPosition.y - dragDownPosition.y);
+				currentDragItem->onDragEnd(getMySharedPtr(), dragTouchPosition.x - dragDownPosition.x, dragTouchPosition.y - dragDownPosition.y);
 			}
 			if (canDrop && dragging == id)
 			{
@@ -691,13 +696,13 @@ void Element::allHandleEvents()
 			{
 				if (currentDragItem != nullptr)
 				{
-					currentDragItem->onDragEnd(nullptr, dragTouchPosition.x - dragDownPosition.x, dragTouchPosition.y - dragTouchPosition.y);
+					currentDragItem->onDragEnd(PElement(nullptr), dragTouchPosition.x - dragDownPosition.x, dragTouchPosition.y - dragTouchPosition.y);
 				}
 				dragging = TOUCH_UNTOUCHEDID;
 				currentDragItem = nullptr;
 			}
 		}
-		handleEvent(&e);
+		handleEvent(e);
 	}
 	handleEvents();
 }
@@ -789,12 +794,14 @@ void Element::quit()
 	running = false;
 }
 
+
 unsigned int Element::run()
 {
 	runningElementClearAllTouch();
-	running = true;
 
-	runningElement.push_back(this);
+	runningElement.push_back(getMySharedPtr());
+
+	running = true;
 
 	//engine->initTime(&timer);
 	if (!initial())
@@ -817,6 +824,7 @@ unsigned int Element::run()
 	runningElement.resize(runningElement.size() - 1);
 
 	return result;
+
 }
 
 unsigned int Element::stop(int ret)
@@ -833,10 +841,14 @@ void Element::freeAll()
 		if (children[i] != nullptr)
 		{
 			children[i]->freeAll();
-			delete children[i];
 			children[i] = nullptr;
 		}		
 	}
 	removeAllChild();
 	freeResource();
+}
+
+bool Element::isDragging()
+{
+	return dragging != TOUCH_UNTOUCHEDID && currentDragItem == getMySharedPtr();
 }

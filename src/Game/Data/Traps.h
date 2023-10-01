@@ -17,7 +17,7 @@ public:
 	void freeResource();
 
 private:
-	INIReader * ini = nullptr;
+	std::shared_ptr<INIReader> ini = nullptr;
 
 };
 

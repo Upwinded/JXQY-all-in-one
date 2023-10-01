@@ -32,9 +32,9 @@ void EffectManager::resumeAllEffect()
 	}
 }
 
-void EffectManager::addEffect(Effect * effect)
+void EffectManager::addEffect(std::shared_ptr<Effect> effect)
 {
-	if (effect == nullptr)
+	if (effect.get() == nullptr)
 	{
 		return;
 	}
@@ -43,16 +43,7 @@ void EffectManager::addEffect(Effect * effect)
 	effect->initTime();
 }
 
-void EffectManager::deleteEffect(Effect * effect)
-{
-	if (effect == nullptr)
-	{
-		return;
-	}
-	delete effect;
-}
-
-void EffectManager::removeEffect(Effect * effect)
+void EffectManager::deleteEffect(std::shared_ptr<Effect> effect)
 {
 	if (effect == nullptr)
 	{
@@ -72,7 +63,7 @@ void EffectManager::removeEffect(Effect * effect)
 
 void EffectManager::clearEffect()
 {
-	std::vector<Effect*> newList, deleteList;
+	std::vector<std::shared_ptr<Effect>> newList;
 	newList.resize(0);
 	for (size_t i = 0; i < effectList.size(); i++)
 	{
@@ -81,17 +72,14 @@ void EffectManager::clearEffect()
 			unsigned int ret = effectList[i]->getResult();
 			if (ret & erLifeExhaust)
 			{
-				deleteList.push_back(effectList[i]);
+				removeChild(effectList[i]);
+				effectList[i] = nullptr;
 			}
 			else
 			{
 				newList.push_back(effectList[i]);
 			}
 		}
-	}
-	for (size_t i = 0; i < deleteList.size(); i++)
-	{
-		delete deleteList[i];
 	}
 	effectList = newList;
 }
@@ -111,7 +99,7 @@ void EffectManager::load()
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("PRO%d", i + 1);
-		auto effect = new Effect;
+		auto effect = std::make_shared<Effect>();
 		addChild(effect);
 		effect->initFromIni(&ini, section);
 		effectList.push_back(effect);
@@ -130,9 +118,8 @@ void EffectManager::save()
 		effectList[i]->saveToIni(&ini, section);
 	}
 	
-	std::string iniName = SAVE_CURRENT_FOLDER;
-	iniName += EFFECT_INI;
-	ini.saveToFile(iniName);
+	std::string iniName = EFFECT_INI;
+	ini.saveToFile(SaveFileManager::CurrentPath() + iniName);
     
     SaveFileManager::AppendFile(iniName);
 }
@@ -178,12 +165,12 @@ EffectMap EffectManager::createMap(int x, int y, int w, int h)
 void EffectManager::freeResource()
 {
 	removeAllChild();
-	auto deleteList = effectList;
-	for (size_t i = 0; i < deleteList.size(); i++)
+	for (size_t i = 0; i < effectList.size(); i++)
 	{
-		if (deleteList[i] != nullptr)
+		if (effectList[i] != nullptr)
 		{
-			delete deleteList[i];
+			removeChild(effectList[i]);
+			effectList[i] = nullptr;
 		}
 	}
 	effectList.resize(0);

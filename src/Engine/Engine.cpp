@@ -68,12 +68,13 @@ int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight,
 	width = windowWidth;
 	height = windowHeight;
 
+	std::lock_guard<std::mutex> locker(_mutex);
 	if (EngineBase::initEngineBase(windowCaption, windowWidth, windowHeight, isFullScreen, engineAppEventHandler) != initOK)
 	{
 		return initError;
 	}
 
-#ifdef _MOBILE
+#ifdef __MOBILE__
     width = EngineBase::width;
     height = EngineBase::height;
 #endif
@@ -110,21 +111,25 @@ void Engine::setWindowSize(int w, int h)
 	}
 	width = w;
 	height = h;
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setWindowSize(w, h);
 }
 
 bool Engine::setWindowFullScreen(bool full)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return fullScreen = EngineBase::setFullScreen(full);
 }
 
 bool Engine::setWindowDisplayMode(bool dm)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::setDisplayMode(dm);
 }
 
 void Engine::getScreenInfo(int& w, int& h)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::getScreenInfo(w, h);
 }
 
@@ -135,6 +140,7 @@ bool Engine::getWindowFullScreen()
 
 _shared_image Engine::loadImageFromFile(const std::string & fileName)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::loadImageFromFile(fileName);
 }
 
@@ -144,36 +150,43 @@ _shared_image Engine::loadImageFromMem(std::unique_ptr<char[]>& data, int size)
 	{
 		return nullptr;
 	}
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::loadImageFromMem(data, size);	
 }
 
 int Engine::saveImageToFile(_shared_image image, int w, int h, const std::string & fileName)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::saveImageToFile(image, w, h, fileName);
 }
 
 int Engine::saveImageToFile(_shared_image image, const std::string & fileName)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::saveImageToFile(image, fileName);
 }
 
 int Engine::saveImageToMem(_shared_image image, int w, int h, std::unique_ptr<char[]>& data)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::saveImageToMem(image, w, h, data);
 }
 
 int Engine::saveImageToMem(_shared_image image, std::unique_ptr<char[]>& data)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::saveImageToMem(image, data);
 }
 
 bool Engine::pointInImage(_shared_image image, int x, int y)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::pointInImage(image, x, y);
 }
 
 _shared_image Engine::createNewImageFromImage(_shared_image image)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::createNewImageFromImage(image);
 }
 
@@ -181,6 +194,7 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 {
     if (impImage == nullptr)
     {
+		std::lock_guard<std::mutex> locker(_mutex);
         EngineBase::setCursor(nullptr);
         return;
     }
@@ -192,11 +206,12 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 	{
 		mouse.image[i].xOffset = 0;//impImage->frame[i].xOffset;
 		mouse.image[i].yOffset = 0;// impImage->frame[i].yOffset;
-		if (impImage->frame[i].dataLen > 0)
+		if (impImage->frame[i].dataLen > 0 && impImage->frame[i].data != nullptr)
 		{
+			std::lock_guard<std::mutex> locker(_mutex);
 			mouse.image[i].frame = EngineBase::loadCursorFromMem(impImage->frame[i].data, impImage->frame[i].dataLen, mouse.image[i].xOffset, mouse.image[i].yOffset);
 			mouse.image[i].softwareFrame = EngineBase::loadImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen);
-			impImage->frame[i].image = EngineBase::loadImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen);
+			impImage->frame[i].image = nullptr;
 			impImage->frame[i].data = nullptr;
 			impImage->frame[i].dataLen = 0;
 			
@@ -208,79 +223,87 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 		}
 	}
 
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setCursor(&mouse);
-
 	mouse.image.resize(0);
 }
 
 void Engine::setMouseHardware(bool hdCursor)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setCursorHardware(hdCursor);
 }
 
 bool Engine::getMouseHardware()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::hardwareCursor;
 }
 
 void Engine::showCursor()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::showCursor();
 }
 
 void Engine::hideCursor()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::hideCursor();
 }
 
 int Engine::getEventCount()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getEventCount();
 }
 
 int Engine::getEvent(AEvent& event)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getEvent(event);
 }
 
 void Engine::pushEvent(AEvent& event)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::pushEvent(event);
-}
-
-int Engine::readEventList(EventList& eList)
-{
-	return EngineBase::readEventList(eList);
 }
 
 bool Engine::getKeyPress(KeyCode key)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getKeyPress(key);
 }
 
 bool Engine::getMousePressed(MouseButtonCode button)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getMousePress(button);
 }
 
 void Engine::getMousePosition(int& x, int& y)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::getMouse(x, y);
 }
 
 void Engine::frameBegin()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::frameBegin();
 }
 
 void Engine::frameEnd()
 {
 	drawFPS();
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::frameEnd();
 }
 
 UTime Engine::getTime()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getTime();
 }
 
@@ -309,12 +332,20 @@ void Engine::drawFPS()
 
 void Engine::drawImage(_shared_image image, int x, int y)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImage(image, x, y);
 }
 
 void Engine::drawImage(_shared_image image, Rect* src, Rect* dst)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImage(image, src, dst);
+}
+
+void Engine::drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center)
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	EngineBase::drawImageEx(image, src, dst, angle / 3.14159265 * 180, center);
 }
 
 void Engine::drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha)
@@ -333,6 +364,7 @@ void Engine::drawImageWithAlpha(_shared_image image, Rect * src, Rect * dst, uns
 
 void Engine::drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithColor(image, x, y, r, g, b);
 }
 
@@ -345,6 +377,7 @@ void Engine::drawImageWithColor(_shared_image image, Rect * src, Rect * dst, uns
 
 void Engine::setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setImageColorMode(image, r, g, b);
 }
 
@@ -355,31 +388,45 @@ void Engine::setImageColorMode(_shared_image image, unsigned char r, unsigned ch
 
 int Engine::getImageSize(_shared_image image, int &w, int &h)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getImageSize(image, w, h);
 }
 
 bool Engine::beginDrawTalk(int w, int h)
 {
+	_mutex.lock();
+	_talk_drawing = true;
 	return EngineBase::beginDrawTalk(w, h);
 }
 
 _shared_image Engine::endDrawTalk()
 {
-	return EngineBase::endDrawTalk();
+	auto ret = EngineBase::endDrawTalk();
+	_talk_drawing = false;
+	_mutex.unlock();
+	return ret;
 }
 
-void Engine::drawSolidText(const std::string& text, int x, int y, int size, unsigned int color)
+void Engine::drawTalk(const std::string& text, int x, int y, int size, unsigned int color)
 {
-	EngineBase::drawSolidText(text, x, y, size, color);
+	if (!_talk_drawing)
+	{
+		std::string error = "Must use beginDrawTalk() before drawTalk()";
+		throw error;
+		return;
+	}
+	EngineBase::drawTalk(text, x, y, size, color);
 }
 
 void Engine::drawSolidUnicodeText(const std::wstring & text, int x, int y, int size, unsigned int color)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawSolidUnicodeText(text, x, y, size, color);
 }
 
 _shared_image Engine::loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::loadSaveShotFromPixels(w, h, data, size);
 }
 
@@ -395,61 +442,61 @@ _shared_image Engine::endSaveScreen()
 
 int Engine::saveImageToPixels(_shared_image image, int w, int h, std::unique_ptr<char[]>& s)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::saveImageToPixels(image, w, h, s);
 }
 
 _shared_image Engine::createRaindrop()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::createRaindrop();
 }
 
 _shared_image Engine::createSnowflake()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::createSnowflake();
 }
 
 void Engine::setFontName(const std::string & fontName)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setFontName(fontName);
 }
 
 void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setFontFromMem(data, size);
 }
 
 _shared_image Engine::createText(const std::string & text, int size, unsigned int color)
 {
-	return EngineBase::createText(text, size, color);
+	std::lock_guard<std::mutex> locker(_mutex);
+	return EngineBase::createText(text, size, color, true);
 }
 
 void Engine::drawText(const std::string & text, int x, int y, int size, unsigned int color)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawText(text, x, y, size, color);
-}
-
-_shared_image Engine::createUnicodeText(const std::wstring& text, int size, unsigned int color)
-{
-	return EngineBase::createUnicodeText(text, size, color);
-}
-
-void Engine::drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color)
-{
-	EngineBase::drawUnicodeText(text, x, y, size, color);
 }
 
 void Engine::setImageAlpha(_shared_image image, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setImageAlpha(image, a);
 }
 
 void Engine::setScreenMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::setScreenMask(r, g, b, a);
 }
 
 void Engine::drawScreenMask()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawScreenMask();
 }
 
@@ -461,73 +508,87 @@ void Engine::drawScreenMask(unsigned char r, unsigned char g, unsigned char b, u
 
 _shared_image Engine::createMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::createMask(r, g, b, a);
 }
 
 _shared_image Engine::createLumMask()
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::createLumMask();
 }
 
 //绘制遮罩
 void Engine::drawMask(_shared_image mask)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawMask(mask);
 }
 
 void Engine::drawMask(_shared_image mask, Rect * dst)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawMask(mask, dst);
 }
 
 //绘制带遮罩的
 void Engine::drawImageWithMask(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMask(image, x, y, r, g, b, a);
 }
 
 void Engine::drawImageWithMask(_shared_image image, int x, int y, _shared_image mask)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMask(image, x, y, mask);
 }
 
 void Engine::drawImageWithMask(_shared_image image, Rect * src, Rect * dst, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMask(image, src, dst, r, g, b, a);
 }
 
 void Engine::drawImageWithMask(_shared_image image, Rect * src, Rect * dst, _shared_image mask)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMask(image, src, dst, mask);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMaskEx(image, x, y, r, g, b, a);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, int x, int y, _shared_image mask)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMaskEx(image, x, y, mask);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, Rect * src, Rect * dst, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMaskEx(image, src, dst, r, g, b, a);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, Rect * src, Rect * dst, _shared_image mask)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageWithMaskEx(image, src, dst, mask);
 }
 
 void * Engine::getMem(int size)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getMem(size);
 }
 
 void Engine::freeMem(void * mem)
 {
+	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::freeMem(mem);
 }
 
@@ -557,12 +618,12 @@ _music Engine::createMusic(const std::string & fileName, bool loop, bool music3d
 	int size;
 	if (!File::readFile(fileName, data, size))
 	{
-		printf("Music File %s Readed Error\n", fileName.c_str());
+		GameLog::write("Music File %s Readed Error\n", fileName.c_str());
 		return nullptr;
 	}
 	if (data == nullptr || size <= 0)
 	{
-		printf("Music File %s Readed Error\n", fileName.c_str());
+		GameLog::write("Music File %s Readed Error\n", fileName.c_str());
 		return nullptr;
 	}
 	_music result = createMusic(data, size, loop, music3d, priority);
@@ -674,7 +735,7 @@ _channel Engine::playSound(const std::unique_ptr<char[]>& data, int size, float 
 	}
 	if (volume < 0)
 	{
-		volume = soundVolume;
+		volume = Engine::getInstance()->getSoundVolume();
 	}
 	_channel c = playSound(m, x, y, volume);
 	if (c == nullptr)

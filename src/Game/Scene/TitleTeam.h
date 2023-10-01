@@ -8,15 +8,15 @@ class TitleTeam :
 public:
 	TitleTeam();
 	virtual ~TitleTeam();
-	VideoPage * vp = nullptr;
+	std::shared_ptr<VideoPage> vp = nullptr;
 
 	void freeResource();
-	virtual void onChildCallBack(Element * child);
+	virtual void onChildCallBack(PElement child);
 private:
 	virtual bool onInitial();
 	virtual void onDraw();
 	virtual void onExit();
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 	virtual void onUpdate();
 };
 

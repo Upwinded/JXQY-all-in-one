@@ -16,7 +16,7 @@ public:
 	_shared_image strImage = nullptr;
 
 	unsigned int color = 0xFFFFFFFF;
-	virtual void initFromIni(const std::string& fileName);
+	virtual void initFromIni(INIReader & ini);
 
 	virtual void setStr(const std::string & s);
 	
@@ -28,14 +28,14 @@ protected:
 	virtual void freeResoure();
 
 	virtual void drawItemStr();
-	virtual void onDrop(Element * src, int param1, int param2);
+	virtual void onDrop(PElement src, int param1, int param2);
 	UTime moveInTime = 0;
 	virtual void onEvent();
 	virtual void onUpdate();
 	virtual void onMouseMoveIn(int x, int y);
 
 	virtual void onDrawDrag(int x, int y);
-	virtual bool onHandleEvent(AEvent * e);
+	virtual bool onHandleEvent(AEvent & e);
 	virtual void onClick();
 public:
 	virtual void onDraw();

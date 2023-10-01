@@ -7,7 +7,7 @@ public:
 	MsgBox();
 	virtual ~MsgBox();
 
-	Label * label = nullptr;
+	std::shared_ptr<Label> label = nullptr;
 	bool showed = false;
 	UTime beginTime = 0;
 	UTime showingTime = 3500;

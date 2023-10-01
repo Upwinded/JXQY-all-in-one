@@ -84,143 +84,18 @@ void Panel::setAlign()
 	rect.y += alignY;
 }
 
-Button * Panel::addButton(const std::string& fileName)
-{
-	auto button = new Button;
-	button->initFromIni(fileName);
-	addChild(button);
-	return button;
-}
-
-Scrollbar * Panel::addScrollbar(const std::string& fileName)
-{
-	auto scrollbar = new Scrollbar;
-	scrollbar->initFromIni(fileName);
-	addChild(scrollbar);
-	return scrollbar;
-}
-
-ImageContainer * Panel::addImageContainer(const std::string& fileName)
-{
-	auto imageContainer = new ImageContainer;
-	imageContainer->initFromIni(fileName);
-	addChild(imageContainer);
-	return imageContainer;
-}
-
-Item * Panel::addItem(const std::string& fileName)
-{
-	auto item = new Item;
-	item->initFromIni(fileName);
-	addChild(item);
-	return item;
-}
-
-ListBox * Panel::addListBox(const std::string & fileName)
-{
-	auto listBox = new ListBox;
-	listBox->initFromIni(fileName);
-	addChild(listBox);
-	return listBox;
-}
-
-CheckBox * Panel::addCheckBox(const std::string & fileName)
-{
-	auto checkBox = new CheckBox;
-	checkBox->initFromIni(fileName);
-	addChild(checkBox);
-	return checkBox;
-}
-
-Label * Panel::addLabel(const std::string & fileName)
-{
-	auto component = new Label;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-TalkLabel * Panel::addTalkLabel(const std::string & fileName)
-{
-	auto component = new TalkLabel;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-MemoText * Panel::addMemo(const std::string & fileName)
-{
-	auto component = new MemoText;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-ColumnImage * Panel::addColumnImage(const std::string & fileName)
-{
-	auto component = new ColumnImage;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-TransImage * Panel::addTransImage(const std::string & fileName)
-{
-	auto component = new TransImage;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-Joystick* Panel::addJoystick(const std::string& fileName)
-{
-	auto component = new Joystick;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-RoundButton* Panel::addRoundButton(const std::string& fileName)
-{
-	auto component = new RoundButton;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
-TextButton* Panel::addTextButton(const std::string& fileName)
-{
-	auto component = new TextButton;
-	component->initFromIni(fileName);
-	addChild(component);
-	return component;
-}
-
 void Panel::freeResource()
 {
-	if (impImage != nullptr)
-	{
-		IMP::clearIMPImage(impImage);
-		//delete impImage;
-		impImage = nullptr;
-	}
+	impImage = nullptr;
 	result = erNone;
-	freeAllChildren();
+	removeAllChild();
 	ImageContainer::freeResource();
 }
 
-void Panel::initFromIni(const std::string & fileName)
+void Panel::initFromIni(INIReader & ini)
 {
 	freeResource();
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len == 0)
-	{		
-		printf("no ini file: %s\n", fileName.c_str());
-		return;
-	}
-	INIReader ini(s);
+
 	align = alNone;
 
 	std::string alignStr = ini.Get("Init", "Align", convert::formatString("%d", (int)align));
@@ -264,19 +139,18 @@ void Panel::initFromIni(const std::string & fileName)
 	rect.h = ini.GetInteger("Init", "Height", rect.h);
 	name = ini.Get("Init", "Name", name);
 	std::string impName = ini.Get("Init", "Image", "");
-	impImage = IMP::createIMPImage(impName);
-
+	impImage = loadRes(impName);
 	setAlign();
 }
 
-void Panel::resetRect(Element * e, int x, int y)
+void Panel::resetRect(PElement e, int x, int y)
 {
-	if (e == nullptr)
+	if (e.get() == nullptr)
 	{
 		return;
 	}
 	int xp = x, yp = y;
-	if (e == this)
+	if (e.get() == this)
 	{
 		setAlign();
 		xp = rect.x - x;
@@ -295,5 +169,5 @@ void Panel::resetRect(Element * e, int x, int y)
 
 void Panel::resetRect()
 {
-	resetRect(this, 0, 0);
+	resetRect(getMySharedPtr(), 0, 0);
 }

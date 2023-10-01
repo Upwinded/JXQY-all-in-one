@@ -1,46 +1,37 @@
 #pragma once
 
-struct Point
+template <class T>
+struct PointBase
 {
-	int x;
-	int y;
+	T x;
+	T y;
 
-	bool operator== (Point &dest)
+	bool operator== (PointBase<T> &dest)
 	{
 		return x==dest.x && y==dest.y;
 	}
-	Point operator+ (Point& dest)
+	bool operator!= (PointBase<T>& dest)
 	{
-		Point newPoint{ x + dest.x, y + dest.y };
+		return x != dest.x || y != dest.y;
+	}
+	PointBase operator+ (PointBase<T>& dest)
+	{
+		PointBase<T> newPoint{ x + dest.x, y + dest.y };
 		return newPoint;
 	}
-	Point operator- (Point& dest)
+	PointBase operator- (PointBase<T>& dest)
 	{
-		Point newPoint{ x - dest.x, y - dest.y };
+		PointBase<T> newPoint{ x - dest.x, y - dest.y };
 		return newPoint;
+	}
+	bool is_zero()
+	{
+		return (x == 0) && (y == 0);
 	}
 };
 
-struct PointEx
-{
-	double x;
-	double y;
-	bool operator== (PointEx &dest)
-	{
-		return x==dest.x && y==dest.y;
-	}
-	PointEx operator+ (PointEx& dest)
-	{
-		PointEx newPointEx{ x + dest.x, y + dest.y };
-		return newPointEx;
-	}
-	PointEx operator- (PointEx& dest)
-	{
-		PointEx newPointEx{ x - dest.x, y - dest.y };
-		return newPointEx;
-	}
-
-};
+using Point = PointBase<int>;
+using PointEx = PointBase<double>;
 
 enum ElementPriority
 {
@@ -100,27 +91,27 @@ enum ElementType
 
 enum ElementResult
 {
-	erNone = 0x0,
-	erOK = 0b1,
-	erExit = 0b10,
-	erInitError = 0b100,
-	erClick = 0b1000,
-	erMouseLDown = 0b10000,
-	erMouseLUp = 0b100000,
-	erMouseRDown = 0b1000000,
-	erMouseRUp = 0b10000000,
-	erVideoStopped = 0b100000000,
-	erDragEnd = 0b1000000000,
-	erDragging = 0b10000000000,
-	erDropped = 0b100000000000,
-	erScrollbarSlided = 0b1000000000000,
-	erSave = 0b10000000000000,
-	erLoad = 0b100000000000000,
-	erShowHint = 0b1000000000000000,
-	erHideHint = 0b10000000000000000,
+	erNone				= 0x0,
+	erOK				= 0b1,
+	erExit				= 0b10,
+	erInitError			= 0b100,
+	erClick				= 0b1000,
+	erMouseLDown		= 0b10000,
+	erMouseLUp			= 0b100000,
+	erMouseRDown		= 0b1000000,
+	erMouseRUp			= 0b10000000,
+	erVideoStopped		= 0b100000000,
+	erDragEnd			= 0b1000000000,
+	erDragging			= 0b10000000000,
+	erDropped			= 0b100000000000,
+	erScrollbarSlided	= 0b1000000000000,
+	erSave				= 0b10000000000000,
+	erLoad				= 0b100000000000000,
+	erShowHint			= 0b1000'0000'0000'0000,
+	erHideHint			= 0b1'0000'0000'0000'0000,
 
-	erActionEnd = 0b100000000000000000,
-	erLifeExhaust = 0b1000000000000000000,
-	erExplode = 0b10000000000000000000,
-	erRunDeathScript = 0b100000000000000000000,
+	erActionEnd			= 0b10'0000'0000'0000'0000,
+	erLifeExhaust		= 0b100'0000'0000'0000'0000,
+	erExplode			= 0b1000'0000'0000'0000'0000,
+	erRunDeathScript	= 0b1'0000'0000'0000'0000'0000,
 };
