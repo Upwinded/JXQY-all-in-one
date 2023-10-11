@@ -65,9 +65,12 @@ void Option::init()
 	player->activated = true;
 	player->checked = !config->playerAlpha;
 
-	speedCB->activated = false;
-	speedCB->checked = true;
-	speed->activated = false;
+	speedCB->activated = true;
+	speedCB->checked = false;
+	speed->activated = true;
+
+	speed->setPosition(speedToPos(Config::getGameSpeed()));
+
 	dyLoad->activated = false;
 	dyLoad->checked = false;
 	
@@ -103,6 +106,32 @@ void Option::freeResource()
 
 }
 
+int Option::speedToPos(double spd)
+{
+	if (spd <= SPEED_TIME_MIN)
+	{
+		return speed->min;
+	}
+	else if (spd >= SPEED_TIME_MAX)
+	{
+		return speed->max;
+	}
+	return (int)round((spd - SPEED_TIME_MIN) / (SPEED_TIME_MAX - SPEED_TIME_MIN) * (speed->max - speed->min) + speed->min);
+}
+
+double Option::posToSpeed(int pos)
+{
+	if (pos <= speed->min)
+	{
+		return SPEED_TIME_MIN;
+	}
+	else if (pos >= speed->max)
+	{
+		return SPEED_TIME_MAX;
+	}
+	return ((double)(pos - speed->min)) / (speed->max - speed->min) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
+}
+
 void Option::onEvent()
 {
 	if (musicPos != music->position)
@@ -135,6 +164,20 @@ void Option::onEvent()
 		config->setSoundVolume(volume);
 		config->save();
 	}
+	if (speedPos != speed->position)
+	{
+		if (speed->position > speed->min)
+		{
+			speedCB->checked = false;
+		}
+		else
+		{
+			speedCB->checked = true;
+		}
+		speedPos = speed->position;
+		config->setGameSpeed(posToSpeed(speedPos));
+		config->save();
+	}
 	if (musicCB->getResult(erClick))
 	{
 		if (musicCB->checked && music->position > music->min)
@@ -142,6 +185,14 @@ void Option::onEvent()
 			music->setPosition(music->min);
 			musicPos = music->position;
 			float volume = 0.0f;
+			config->setMusicVolume(volume);
+			config->save();
+		}
+		else if (!musicCB->checked && music->position < music->max)
+		{
+			music->setPosition(music->max);
+			musicPos = music->position;
+			float volume = 1.0f;
 			config->setMusicVolume(volume);
 			config->save();
 		}
@@ -154,6 +205,25 @@ void Option::onEvent()
 			soundPos = sound->position;
 			float volume = 0.0f;
 			config->setSoundVolume(volume);
+			config->save();
+		}
+		else if (!soundCB->checked && sound->position < sound->max)
+		{
+			sound->setPosition(sound->max);
+			soundPos = sound->position;
+			float volume = 1.0f;
+			config->setSoundVolume(volume);
+			config->save();
+		}
+	}
+	if (speedCB->getResult(erClick))
+	{
+		auto default_pos = speedToPos(SPEED_TIME_DEFAULT);
+		if (speed->position != default_pos)
+		{
+			speed->setPosition(default_pos);
+			speedPos = speed->position;
+			config->setGameSpeed(posToSpeed(default_pos));
 			config->save();
 		}
 	}

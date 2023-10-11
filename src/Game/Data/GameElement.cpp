@@ -67,7 +67,7 @@ void GameElement::updateEffectPosition(UTime ftime, double flySpeed)
 		return;
 	}
 
-	double distance = flySpeed * (double)SPEED_TIME * (double)ftime / 2;
+	double distance = flySpeed * Config::getGameSpeed() * (double)ftime / 2;
 	offset.x += distance / l * (double)flyingDirection.x * (double)TILE_HEIGHT * MapXRatio;
 	offset.y += distance / l * (double)flyingDirection.y * (double)TILE_HEIGHT;
 	updatePosition();
@@ -85,7 +85,7 @@ void GameElement::updateJumpingPosition(UTime ftime, double flySpeed)
 		return;
 	}
 
-	double distance = flySpeed * (double)SPEED_TIME * (double)ftime;
+	double distance = flySpeed * Config::getGameSpeed() * (double)ftime;
 	offset.x += distance / l * (double)flyingDirection.x * (double)TILE_WIDTH;
 	offset.y += distance / l * (double)flyingDirection.y * (double)TILE_WIDTH;
 	updatePosition();

@@ -25,8 +25,16 @@ public:
 	static void getWindowSize(int& w, int& h);
 	static void setDefaultWindowSize(int w, int h);
 
+	static double getGameSpeed();
+	static double setGameSpeed(double speed);
+
 private:
 	static int windowWidth;
 	static int windowHeight;
+
+	static double gameSpeed;
+
+	static int convSpeedToInt(double speed);
+	static double convSpeedToDouble(int speed);
 };
 

@@ -374,7 +374,7 @@ UTime NPC::calStepLastTime()
 	{
 		speed = runSpeed;
 	}
-	stepLastTime = (UTime)(0.5 / ((double)speed) / (double)SPEED_TIME);
+	stepLastTime = (UTime)(0.5 / ((double)speed) / (double)Config::getGameSpeed());
 	if (direction % 4 == 2)
 	{
 		stepLastTime = (UTime)round(1.414 * stepLastTime);
@@ -1007,7 +1007,7 @@ void NPC::beginJump(Point dest)
 	}
 	flyingDirection = Map::getTilePosition(step, position, { 0, 0 }, { 0, 0 });
 
-	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / SPEED_TIME;
+	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / Config::getGameSpeed();
 	jumpState = 0;
 	
 }

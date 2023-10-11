@@ -53,6 +53,3 @@ void DragRoundButton::onDrawDrag(int x, int y)
 {
 
 }
-
-
-

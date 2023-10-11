@@ -12,9 +12,12 @@
 windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android 9以上
 
 下载地址：
-
+百度网盘：
 链接：https://pan.baidu.com/s/140vPCnQYC2DrRZKpjlb51w?pwd=juyh 
 提取码：juyh 
+
+夸克网盘：
+链接：https://pan.quark.cn/s/fcb3d950f8b3
 
 注意：ubuntu版本，如果20.04，可直接运行run_with_built-in_lib.sh开始游戏；20.04以上版本，请先运行install-runtime.sh安装运行时库，然后执行run.sh
 

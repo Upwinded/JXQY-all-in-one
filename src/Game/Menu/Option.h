@@ -32,6 +32,10 @@ private:
 
 	int musicPos = 0;
 	int soundPos = 0;
+	int speedPos = 0;
+
+	int speedToPos(double spd);
+	double posToSpeed(int pos);
 
 	virtual void onEvent();
 

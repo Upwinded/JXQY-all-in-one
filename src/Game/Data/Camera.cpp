@@ -264,7 +264,7 @@ void Camera::onUpdate()
 	else if (flying)
 	{
 		double l = hypot(distanceToFly.x, distanceToFly.y);
-		PointEx frameFlyDistance = { distanceToFly.x / l * cameraSpeed * frameTime * SPEED_TIME, distanceToFly.y / l * cameraSpeed * frameTime * SPEED_TIME };
+		PointEx frameFlyDistance = { distanceToFly.x / l * cameraSpeed * frameTime * Config::getGameSpeed(), distanceToFly.y / l * cameraSpeed * frameTime * Config::getGameSpeed()};
 		distanceFlied = distanceFlied + frameFlyDistance;
 		offset = flyStartOffset + distanceFlied;
 		position = flyStartPosition;

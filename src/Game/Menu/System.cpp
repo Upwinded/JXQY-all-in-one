@@ -55,7 +55,13 @@ void System::onEvent()
 			visible = false;
 
 			GameManager::getInstance()->weather->fadeOut();
+#ifdef LOAD_WITH_THREAD
 			GameManager::getInstance()->loadGameWithThread(index + 1);
+#else // !LOAD_WITH_THREAD
+			GameManager::getInstance()->loadGame(index + 1);
+#endif //  LOAD_WITH_THREAD
+
+
 			//GameManager::getInstance()->loadGame(index + 1);
 			GameManager::getInstance()->weather->fadeInEx();
 		}

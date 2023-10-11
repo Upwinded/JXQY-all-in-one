@@ -969,19 +969,19 @@ void Player::levelUp()
 	switch (imgIdx)
 	{
 	case 0:
-		e->magic.flyingImage = "levelup-白色气团a.mpc";
+		e->magic.flyingImage = u8"levelup-白色气团a.mpc";
 		break;
 	case 1:
-		e->magic.flyingImage = "levelup-白色气团b.mpc";
+		e->magic.flyingImage = u8"levelup-白色气团b.mpc";
 		break;
 	case 2:
-		e->magic.flyingImage = "levelup-蓝白色星星.mpc";
+		e->magic.flyingImage = u8"levelup-蓝白色星星.mpc";
 		break;
 	case 3:
-		e->magic.flyingImage = "levelup-蓝色星星.mpc";
+		e->magic.flyingImage = u8"levelup-蓝色星星.mpc";
 		break;
 	case 4:
-		e->magic.flyingImage = "levelup-三连星.mpc";
+		e->magic.flyingImage = u8"levelup-三连星.mpc";
 		break;
 	default:
 		break;
@@ -1372,7 +1372,7 @@ void Player::beginJump(Point dest)
 		playSound(acJump);
 	}
 	flyingDirection = Map::getTilePosition(step, position, { 0, 0 }, { 0, 0 });
-	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / SPEED_TIME;
+	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / Config::getGameSpeed();
 	jumpState = 0;
 }
 

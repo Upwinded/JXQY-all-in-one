@@ -234,7 +234,7 @@ void SkillsPanel::drawIndicate(Point pos)
 	{
 		return;
 	}
-	pos.x = pos.x * MapXRatio;
+	pos.x = (int)round((double)pos.x * MapXRatio);
 	auto angle = atan2(-pos.x, pos.y);
 	auto img = IMP::loadImageForTime(indicateImp, getTime());
 	if (img == nullptr)

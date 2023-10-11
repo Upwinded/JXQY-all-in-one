@@ -187,7 +187,7 @@ void Effect::calDest()
 	{
 		return;
 	}
-	int distance = (int)((speed + 5) * (double)SPEED_TIME * ((double)lifeTime + 5000));
+	int distance = (int)((speed + 5) * Config::getGameSpeed() * ((double)lifeTime + 5000));
 	if (flyingDirection.x < 10 || flyingDirection.y < 10)
 	{
 		dest.x = flyingDirection.x * 100 * distance + src.x;

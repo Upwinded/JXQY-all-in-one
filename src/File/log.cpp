@@ -7,6 +7,10 @@
 //#define fopen fopen_s
 #endif
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #define logFileName "log.txt"
 
 void GameLog::write(const char* format, ...)
@@ -38,6 +42,10 @@ void GameLog::write(const char* format, ...)
         info += "\n";
     }
     printf("%s", info.c_str());
+#ifdef __ANDROID__
+    __android_log_print(ANDROID_LOG_INFO, "native-log",  "%s", info.c_str());
+#endif // __ANDROID__
+
 
 
 #if defined(USE_LOG_FILE_PARAM) && !defined(USE_LOG_FILE)

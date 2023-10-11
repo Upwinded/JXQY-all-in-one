@@ -1788,7 +1788,7 @@ void GameManager::loadingDisplayThread(std::vector<_shared_image> loadingImage)
 				imgIndex = 0;
 			}
 		}
-		engine->delay(10);
+		engine->delay(30);
 
 		engine->drawImage(loadingImage[imgIndex], w - 320, h - 70);
 		engine->frameEnd();
@@ -1811,8 +1811,12 @@ void GameManager::onDraw()
 
 bool GameManager::onInitial()
 {
+#ifdef LOAD_WITH_THREAD
 	initMenuWithThread();
-	//initMenu();
+#else // !LOAD_WITH_THREAD
+	initMenu();
+#endif // LOAD_WITH_THREAD
+
 	if (gameIndex == 0)
 	{
 		inEvent = true;
@@ -1821,7 +1825,11 @@ bool GameManager::onInitial()
 	}
 	else
 	{
+#ifdef LOAD_WITH_THREAD
 		loadGameWithThread(gameIndex);
+#else // !LOAD_WITH_THREAD
+		loadGame(gameIndex);
+#endif // LOAD_WITH_THREAD
 		weather->fadeInEx();
 	}	
 	return true;

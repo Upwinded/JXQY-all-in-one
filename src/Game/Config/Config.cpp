@@ -5,6 +5,7 @@ bool Config::playerAlpha = true;
 bool Config::canChangeDisplayMode = false;
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
+double Config::gameSpeed = SPEED_TIME_DEFAULT;
 
 Config::Config()
 {
@@ -26,6 +27,9 @@ void Config::load()
 
 	windowWidth = ini.GetInteger("game", "windowwidth", windowWidth);
 	windowHeight = ini.GetInteger("game", "windowheight", windowHeight);
+
+	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
+	gameSpeed = convSpeedToDouble(speed);
 
 	float musicVolume = ((float)ini.GetInteger("game", "musicvolume", 100)) / 100.0f;
 	float soundVolume = ((float)ini.GetInteger("game", "soundvolume", 100)) / 100.0f;
@@ -58,6 +62,8 @@ void Config::save()
 	ini.SetBoolean("game", "playeralpha", playerAlpha);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();
+	//ini.SetReal("game", "speed", gameSpeed);
+	ini.SetInteger("game", "speed", convSpeedToInt(gameSpeed));
 	if (musicVolume < 0.0f)
 	{
 		musicVolume = 0.0f;
@@ -113,5 +119,75 @@ void Config::setDefaultWindowSize(int w, int h)
 {
     windowWidth = w;
     windowHeight = h;
+}
+
+double Config::getGameSpeed()
+{
+	return gameSpeed;
+}
+
+double Config::setGameSpeed(double speed)
+{
+	if (speed <= SPEED_TIME_MIN)
+	{
+		gameSpeed = SPEED_TIME_MIN;
+	}
+	else if(speed >= SPEED_TIME_MAX)
+	{
+		gameSpeed = SPEED_TIME_MAX;
+	}
+	else
+	{
+		gameSpeed = speed;
+	}
+	return gameSpeed;
+}
+
+double Config::convSpeedToDouble(int speed)
+{
+	const int speed_min_int = 0;
+	const int speed_max_int = 100;
+	if (speed <= speed_min_int)
+	{
+		return SPEED_TIME_MIN;
+	}
+	if (speed >= speed_max_int)
+	{
+		return SPEED_TIME_MAX;
+	}
+	auto ret = ((double)(speed - speed_min_int)) / (speed_max_int - speed_min_int) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
+	if (ret <= SPEED_TIME_MIN)
+	{
+		return SPEED_TIME_MIN;
+	}
+	else if (ret >= SPEED_TIME_MAX)
+	{
+		return SPEED_TIME_MAX;
+	}
+	return ret;
+}
+
+int Config::convSpeedToInt(double speed)
+{
+	const int speed_min_int = 0;
+	const int speed_max_int = 100;
+	if (speed <= SPEED_TIME_MIN)
+	{
+		return speed_min_int;
+	}
+	else if (speed >= SPEED_TIME_MAX)
+	{
+		return speed_max_int;
+	}
+	auto ret = (int)round((speed - SPEED_TIME_MIN) / (SPEED_TIME_MAX - SPEED_TIME_MIN) * (speed_max_int - speed_min_int)) + speed_min_int;
+	if (ret <= speed_min_int)
+	{
+		return speed_min_int;
+	}
+	if (ret >= speed_max_int)
+	{
+		return speed_max_int;
+	}
+	return ret;
 }
 

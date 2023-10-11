@@ -3,6 +3,9 @@
 #include <deque>
 #include "../Image/IMP.h"
 
+// 防界面卡死的加载方式
+#define LOAD_WITH_THREAD
+
 #define TILE_WIDTH 64
 #define TILE_HEIGHT 32
 
@@ -111,8 +114,10 @@
 #define EFFECT_FRAME_TIME (1200.0/60.0)
 //每两帧之间最大的间隔时间
 #define MAX_FRAME_TIME 40
-//游戏运行速度参数
-#define SPEED_TIME 0.004
+//人物移动和技能飞行速度参数
+#define SPEED_TIME_DEFAULT 0.004
+#define SPEED_TIME_MIN 0.0025
+#define SPEED_TIME_MAX 0.006
 //NPC闲逛间隔时间（毫秒）
 #define NPC_WALK_INTERVAL 5000
 //NPC闲逛间隔基础上增加随机额外间隔时间范围（毫秒）
