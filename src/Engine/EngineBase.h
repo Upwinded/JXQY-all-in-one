@@ -1,4 +1,4 @@
-﻿/*
+/*
 SDL、FMOD、FFMPEG等底层都封装在这里。
 */
 
@@ -13,27 +13,6 @@ SDL、FMOD、FFMPEG等底层都封装在这里。
 #include <mutex>
 #include <atomic>
 
-#if defined(__IPHONEOS__)
-#ifndef __MOBILE__
-#define __MOBILE__
-#endif // !__MOBILE__
-#endif // defined(__IPHONEOS__)
-
-#ifdef __ANDROID__
-#ifndef __MOBILE__
-#define __MOBILE__
-#endif // !__MOBILE__
-#endif // __ANDROID__
-
-#ifdef _WIN32
-#ifdef _MSC_VER
-// 是否从资源文件读取LOGO
-//#define USE_LOGO_RESOURCE
-#ifdef USE_LOGO_RESOURCE
-#include "windows.h"
-#endif
-#endif // _MSC_VER
-#endif // _WIN32
 
 #ifndef SHF_USE_AUDIO
 #define SHF_USE_AUDIO
@@ -42,7 +21,6 @@ SDL、FMOD、FFMPEG等底层都封装在这里。
 #ifndef SHF_USE_VIDEO
 #define SHF_USE_VIDEO
 #endif
-
 
 extern "C"
 {
@@ -79,6 +57,30 @@ extern "C"
 #include "../libconvert/libconvert.h"
 #include "../Types/Types.h"
 #include "../File/log.h"
+
+#if defined(__IPHONEOS__)
+#ifndef __MOBILE__
+#define __MOBILE__
+#endif // !__MOBILE__
+#endif // defined(__IPHONEOS__)
+
+#ifdef __ANDROID__
+#ifndef __MOBILE__
+#define __MOBILE__
+#endif // !__MOBILE__
+#endif // __ANDROID__
+
+#ifdef _WIN32
+#ifdef _MSC_VER
+// 是否从资源文件读取LOGO
+//#define USE_LOGO_RESOURCE
+#ifdef USE_LOGO_RESOURCE
+#include "windows.h"
+#endif
+#endif // _MSC_VER
+#endif // _WIN32
+
+
 
 #ifdef main
 #undef main
