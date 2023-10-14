@@ -1,4 +1,4 @@
-﻿#include "EngineBase.h"
+#include "EngineBase.h"
 #include <map>
 #include <iostream>
 #include <thread>
@@ -1596,9 +1596,12 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
 			This gets called when the user hits the home button, or gets a call.
 		*/
 		//_mutex.lock();
-		isBackGround = true;
-		tempRenderTarget = SDL_GetRenderTarget(renderer);
-		SDL_SetRenderTarget(renderer, nullptr);
+        if (!isBackGround)
+        {
+            isBackGround = true;
+            tempRenderTarget = SDL_GetRenderTarget(renderer);
+            SDL_SetRenderTarget(renderer, nullptr);
+        }
 		//_mutex.unlock();
 		return 0;
 	case SDL_APP_DIDENTERBACKGROUND:
@@ -1607,21 +1610,40 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
 			When you get this, you have 5 seconds to save all your state or the app will be terminated.
 			Your app is NOT active at this point.
 		*/
+        //_mutex.lock();
+        if (!isBackGround)
+        {
+            isBackGround = true;
+            tempRenderTarget = SDL_GetRenderTarget(renderer);
+            SDL_SetRenderTarget(renderer, nullptr);
+        }
+        //_mutex.unlock();
 		return 0;
 	case SDL_APP_WILLENTERFOREGROUND:
 		/* This call happens when your app is coming back to the foreground.
 			Restore all your state here.
 		*/
 		//_mutex.lock();
-		SDL_SetRenderTarget(renderer, tempRenderTarget);
-		tempRenderTarget = nullptr;
-		isBackGround = false;
+        if (isBackGround)
+        {
+            SDL_SetRenderTarget(renderer, tempRenderTarget);
+            tempRenderTarget = nullptr;
+            isBackGround = false;
+        }
 		//_mutex.unlock();
 		return 0;
 	case SDL_APP_DIDENTERFOREGROUND:
 		/* Restart your loops here.
 			Your app is interactive and getting CPU again.
 		*/
+        //_mutex.lock();
+        if (isBackGround)
+        {
+            SDL_SetRenderTarget(renderer, tempRenderTarget);
+            tempRenderTarget = nullptr;
+            isBackGround = false;
+        }
+        //_mutex.unlock();
 		return 0;
 	default:
 		/* No special processing, add it to the event queue */
@@ -1842,6 +1864,8 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 		return sdlError;
 	}
 
+	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "1");
+
 #ifdef __MOBILE__
 	int screenWidth = wWidth;
 	int screenHeight = wHeight;
@@ -1861,7 +1885,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 
 	SDL_ShowCursor(0);
 	fullScreen = isFullScreen;
-	Uint32 flags = SDL_WINDOW_RESIZABLE;
+	Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
 
@@ -1999,7 +2023,20 @@ void EngineBase::destroyCursor()
 
 void EngineBase::updateState()
 {
-	updateRect();
+    int tempWidth = 0;
+    int tempHeight = 0;
+    SDL_GetWindowSize(window, &tempWidth, &tempHeight);
+	updateRect(tempWidth, tempHeight, rect);
+#ifdef __APPLE__
+#ifdef __IPHONEOS__
+    SDL_Metal_GetDrawableSize(window, &tempWidth, &tempHeight);
+#else
+    SDL_GL_GetDrawableSize(window, &tempWidth, &tempHeight);
+#endif
+    updateRect(tempWidth, tempHeight, displayRect);
+#else
+    displayRect = rect;
+#endif
 	updateCursor();
 
 }
@@ -3801,20 +3838,18 @@ void EngineBase::displayScreen()
 	s.y = 0;
 	s.h = height;
 	s.w = width;
-	d.x = rect.x;
-	d.y = rect.y;
-	d.w = rect.w;
-	d.h = rect.h;
+	d.x = displayRect.x;
+	d.y = displayRect.y;
+	d.w = displayRect.w;
+	d.h = displayRect.h;
 	SDL_RenderCopy(renderer, realScreen.get(), &s, &d);
 	drawCursor();
 	SDL_RenderPresent(renderer);
 }
 
-void EngineBase::updateRect()
+void EngineBase::updateRect(int tempWidth, int tempHeight, Rect & rect)
 {
-	int tempWidth = 0;
-	int tempHeight = 0;
-	SDL_GetWindowSize(window, &tempWidth, &tempHeight);
+
 	if (tempWidth != windowWidth || tempHeight != windowHeight)
 	{
 		windowWidth = tempWidth;

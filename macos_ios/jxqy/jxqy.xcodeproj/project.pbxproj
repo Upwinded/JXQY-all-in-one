@@ -52,7 +52,6 @@
 		8D0F97C52AAADD4E00CB2E4D /* libswresample.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC6F625D2AAA098F006A7EC6 /* libswresample.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		8D0F97C62AAADD5600CB2E4D /* libswscale.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC6F625C2AAA098F006A7EC6 /* libswscale.framework */; settings = {ATTRIBUTES = (Required, ); }; };
 		8D0F97C72AAADD5A00CB2E4D /* libswscale.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = DC6F625C2AAA098F006A7EC6 /* libswscale.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		8D0F97C92AAAE75600CB2E4D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 8D0F97C82AAAE75600CB2E4D /* Main.storyboard */; };
 		8D53C06E2AA712620015AF51 /* libfmod_iphoneos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D53C06D2AA712620015AF51 /* libfmod_iphoneos.a */; settings = {ATTRIBUTES = (Weak, ); }; };
 		8D8CC0E12AA86E2C0092AECF /* libfmod.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D53C0462AA701EC0015AF51 /* libfmod.dylib */; settings = {ATTRIBUTES = (Weak, ); }; };
 		8D91B5792AA9ABD50067B469 /* SDL2_image.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8D37593A2AA9AB5700AE3B34 /* SDL2_image.framework */; };
@@ -380,7 +379,6 @@
 		8D0F972F2AAACFB700CB2E4D /* libboringssl.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libboringssl.tbd; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS16.4.sdk/usr/lib/libboringssl.tbd; sourceTree = DEVELOPER_DIR; };
 		8D0F97312AAACFC100CB2E4D /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS16.4.sdk/System/Library/Frameworks/Security.framework; sourceTree = DEVELOPER_DIR; };
 		8D0F97332AAACFF400CB2E4D /* CoreBluetooth.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreBluetooth.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS16.4.sdk/System/Library/Frameworks/CoreBluetooth.framework; sourceTree = DEVELOPER_DIR; };
-		8D0F97C82AAAE75600CB2E4D /* Main.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = Main.storyboard; sourceTree = "<group>"; };
 		8D0F97CA2AAAE8ED00CB2E4D /* jxqy-iOS-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "jxqy-iOS-Info.plist"; sourceTree = SOURCE_ROOT; };
 		8D3759382AA9AB4800AE3B34 /* SDL2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2.framework; path = ../../3rd/SDL2/macos/SDL2.framework; sourceTree = "<group>"; };
 		8D37593A2AA9AB5700AE3B34 /* SDL2_image.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SDL2_image.framework; path = ../../3rd/SDL2_image/macos/SDL2_image.framework; sourceTree = "<group>"; };
@@ -1120,7 +1118,6 @@
 			children = (
 				8D0F97CA2AAAE8ED00CB2E4D /* jxqy-iOS-Info.plist */,
 				DC3D2A972AA49E8000BAABFC /* LaunchScreen.storyboard */,
-				8D0F97C82AAAE75600CB2E4D /* Main.storyboard */,
 			);
 			path = "jxqy iOS";
 			sourceTree = "<group>";
@@ -1333,7 +1330,6 @@
 				DC27EA362AA6186D005104D1 /* assets in Resources */,
 				DC91C97A2AA60E8F00437A1A /* COPYING in Resources */,
 				DC3D2AB22AA49E8000BAABFC /* Assets.xcassets in Resources */,
-				8D0F97C92AAAE75600CB2E4D /* Main.storyboard in Resources */,
 				DC3D2A992AA49E8000BAABFC /* LaunchScreen.storyboard in Resources */,
 				DC91C9782AA60E8F00437A1A /* README.LZO in Resources */,
 			);
@@ -1762,11 +1758,11 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "剑侠情缘";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen.storyboard;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UIMainStoryboardFile = "";
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1825,11 +1821,11 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "剑侠情缘";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen.storyboard;
-				INFOPLIST_KEY_UIMainStoryboardFile = Main;
+				INFOPLIST_KEY_UIMainStoryboardFile = "";
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

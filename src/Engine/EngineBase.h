@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDL、FMOD、FFMPEG等底层都封装在这里。
 */
 
@@ -347,10 +347,11 @@ protected:
 	//底层处理函数
 private:
 	Rect rect = {0, 0, 0, 0};
+    Rect displayRect = {0, 0, 0, 0};
 	void clearScreen();
 	void displayScreen();
 	void updateState();
-	void updateRect();
+	void updateRect(int tempWidth, int tempHeight, Rect & rect);
 
 private:
 	void * lzoMem = nullptr;
