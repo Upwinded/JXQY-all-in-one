@@ -63,22 +63,16 @@ Engine* Engine::getInstance()
 	return _this;
 }
 
-int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight, bool isFullScreen)
+int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode)
 {
-	fullScreen = isFullScreen;
 	width = windowWidth;
 	height = windowHeight;
 
 	std::lock_guard<std::mutex> locker(_mutex);
-	if (EngineBase::initEngineBase(windowCaption, windowWidth, windowHeight, isFullScreen, engineAppEventHandler) != initOK)
+	if (EngineBase::init(windowCaption, width, height, fullScreenMode, fullScreenSolutionMode, engineAppEventHandler) != initOK)
 	{
 		return initError;
 	}
-
-#ifdef __MOBILE__
-    width = EngineBase::width;
-    height = EngineBase::height;
-#endif
 
 	return initOK;
 }
@@ -116,17 +110,12 @@ void Engine::setWindowSize(int w, int h)
 	EngineBase::setWindowSize(w, h);
 }
 
-bool Engine::setWindowFullScreen(bool full)
+void Engine::setWindowFullScreen(FullScreenMode mode)
 {
 	std::lock_guard<std::mutex> locker(_mutex);
-	return fullScreen = EngineBase::setFullScreen(full);
+	EngineBase::setFullScreen(mode);
 }
 
-bool Engine::setWindowDisplayMode(bool dm)
-{
-	std::lock_guard<std::mutex> locker(_mutex);
-	return EngineBase::setDisplayMode(dm);
-}
 
 void Engine::getScreenInfo(int& w, int& h)
 {
@@ -134,9 +123,10 @@ void Engine::getScreenInfo(int& w, int& h)
 	EngineBase::getScreenInfo(w, h);
 }
 
-bool Engine::getWindowFullScreen()
+FullScreenMode Engine::getWindowFullScreen()
 {
-	return fullScreen;
+    std::lock_guard<std::mutex> locker(_mutex);
+    return EngineBase::_fullScreenMode;
 }
 
 _shared_image Engine::loadImageFromFile(const std::string & fileName)

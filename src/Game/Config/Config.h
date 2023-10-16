@@ -5,13 +5,15 @@
 #include "../../Engine/Engine.h"
 #include "../../Engine/EngineBase.h"
 
+
 class Config
 {
 public:
 	Config();
 	virtual ~Config();
 
-	static bool fullScreen;
+    static FullScreenMode fullScreenMode;
+    static FullScreenSolutionMode fullScreenSolutionMode;
 	static bool playerAlpha;
 	static bool canChangeDisplayMode;
 

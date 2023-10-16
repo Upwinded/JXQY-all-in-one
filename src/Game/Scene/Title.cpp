@@ -176,8 +176,21 @@ bool Title::onHandleEvent(AEvent & e)
 		if (e.eventData == KEY_F)
 		{	
 			if (engine->getKeyPress(KEY_LCTRL) || engine->getKeyPress(KEY_RCTRL))
-			{ 
-				engine->setWindowFullScreen(!engine->getWindowFullScreen());
+			{
+                auto fullScreenMode = engine->getWindowFullScreen();
+                if (fullScreenMode == FullScreenMode::window) 
+                {
+                    fullScreenMode = FullScreenMode::windowFullScreen;
+                }
+                else if (fullScreenMode == FullScreenMode::windowFullScreen)
+                {
+                    fullScreenMode = FullScreenMode::fullScreen;
+                }
+                else
+                {
+                    fullScreenMode = FullScreenMode::window;
+                }
+				engine->setWindowFullScreen(fullScreenMode);
 				return true;
 			}
 		}

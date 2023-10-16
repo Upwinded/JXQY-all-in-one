@@ -1,4 +1,4 @@
-﻿#include "Effect.h"
+#include "Effect.h"
 #include "../GameManager/GameManager.h"
 
 Effect::Effect()
@@ -428,15 +428,15 @@ void Effect::playSound(int act)
 		{
 			if (level < 4)
 			{
-				soundFactor = 0.15f;
+				soundFactor = 0.09f;
 			}
 			else if (level < 7)
 			{
-				soundFactor = 0.1f;
+				soundFactor = 0.06f;
 			}
 			else
 			{
-				soundFactor = 0.05f;
+				soundFactor = 0.03f;
 			}
 		}
 		channel = playSoundFile(magic.flyingSound, x, y, engine->getSoundVolume() * soundFactor);

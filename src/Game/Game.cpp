@@ -23,11 +23,9 @@ int Game::run()
 	Config::load();
 	if (Engine::getInstance() == nullptr) { return -1; }
 
-	Engine::getInstance()->setWindowDisplayMode(Config::canChangeDisplayMode);
-
 	Config::getWindowSize(w, h);
 
-	if (Engine::getInstance()->init(gameTitle, w, h, Config::fullScreen) != initOK)
+	if (Engine::getInstance()->init(gameTitle, w, h, Config::fullScreenMode, Config::fullScreenSolutionMode) != initOK)
 	{
 		return -1;
 	}

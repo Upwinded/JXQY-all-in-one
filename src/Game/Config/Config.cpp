@@ -1,6 +1,7 @@
 #include "Config.h"
 
-bool Config::fullScreen = true;
+FullScreenMode Config::fullScreenMode = FullScreenMode::window;
+FullScreenSolutionMode Config::fullScreenSolutionMode = FullScreenSolutionMode::original;
 bool Config::playerAlpha = true;
 bool Config::canChangeDisplayMode = false;
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
@@ -21,12 +22,19 @@ void Config::load()
 	GameLog::write("load config \n");
 	INIReader ini(fileName);
 	GameLog::write("load config file done \n");
-	fullScreen = ini.GetBoolean("game", "fullScreen", fullScreen);
+#ifdef __MOBILE__
+    fullScreenMode = FullScreenMode::fullScreen;
+    fullScreenSolutionMode = FullScreenSolutionMode::adjust;
+    windowWidth = 1200;
+    windowHeight = 600;
+#else
+	fullScreenMode = (FullScreenMode)ini.GetInteger("game", "fullScreenMode", (int)fullScreenMode);
+    fullScreenSolutionMode = (FullScreenSolutionMode)ini.GetInteger("game", "fullScreenSolutionMode", (int)fullScreenSolutionMode);
+    windowWidth = ini.GetInteger("game", "windowwidth", windowWidth);
+    windowHeight = ini.GetInteger("game", "windowheight", windowHeight);
+#endif
 	playerAlpha = ini.GetBoolean("game", "playeralpha", playerAlpha);
 	canChangeDisplayMode = ini.GetBoolean("game", "canchangedisplaymode", canChangeDisplayMode);
-
-	windowWidth = ini.GetInteger("game", "windowwidth", windowWidth);
-	windowHeight = ini.GetInteger("game", "windowheight", windowHeight);
 
 	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
 	gameSpeed = convSpeedToDouble(speed);
@@ -57,7 +65,8 @@ void Config::save()
 {
 	std::string fileName = CONFIG_INI;
 	INIReader ini(fileName);
-	ini.SetBoolean("game", "fullscreen", fullScreen);
+	ini.SetInteger("game", "fullscreenmode", (int)fullScreenMode);
+    ini.SetInteger("game", "fullscreensolutionmode", (int)fullScreenSolutionMode);
 	ini.SetBoolean("game", "canchangedisplaymode", canChangeDisplayMode);
 	ini.SetBoolean("game", "playeralpha", playerAlpha);
 	float musicVolume = Engine::getInstance()->getBGMVolume();

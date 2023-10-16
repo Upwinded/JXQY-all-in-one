@@ -43,7 +43,7 @@ private:
 public:
 
 	//初始化引擎
-	int init(std::string & windowCaption, int windowWidth, int windowHeight, bool isFullScreen);
+	int init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode);
 	//释放引擎
 	void destroyEngine();
 	//获取窗口尺寸
@@ -51,11 +51,9 @@ public:
 	//设置窗口尺寸
 	void setWindowSize(int w, int h);
 	//获取是否全屏
-	bool getWindowFullScreen();
+	FullScreenMode getWindowFullScreen();
 	//设置是否全屏
-	bool setWindowFullScreen(bool full);
-	//设置全屏显示模式，是否改变分辨率
-	bool setWindowDisplayMode(bool dm);
+	void setWindowFullScreen(FullScreenMode mode);
 	//获取当前分辨率
 	void getScreenInfo(int& w, int& h);
 

@@ -51,7 +51,7 @@ Timer::~Timer()
 
 void Timer::setParent(Timer* parent)
 {
-	auto now = get();
+	auto now = getAbsolute() - _beginTime;
 	if (_parent != nullptr)
 	{
 		_parent->removeChild(this);
@@ -61,7 +61,7 @@ void Timer::setParent(Timer* parent)
 	{
 		_parent->addChild(this);
 	}
-	_beginTime += get() - now;
+	_beginTime = getAbsolute() - now;
 	//_paused = false;
 }
 
@@ -71,19 +71,9 @@ UTime Timer::get()
 	{
 		return _pauseBeginTime - _beginTime;
 	}
-	else if (_parent != nullptr)
-	{
-		return _parent->get() - _beginTime;
-	}
 	else
 	{
-
-#if (defined USE_TIME64)
-		return SDL_GetTicks64() - _beginTime;
-#else
-		return SDL_GetTicks() - _beginTime;
-#endif // (defined USE_TIME64)
-		
+		return getAbsolute() - _beginTime;
 	}
 }
 
@@ -105,19 +95,20 @@ void Timer::setPaused(bool paused)
 	}
 	if (paused)
 	{
-		_pauseBeginTime = get();
+		_pauseBeginTime = getAbsolute();
 		_paused = paused;
 	}
 	else
 	{
 		_paused = paused;
-		_beginTime += get() - _pauseBeginTime;
+		_beginTime += getAbsolute() - _pauseBeginTime;
 	}
 }
 
 void Timer::reInit()
 {
-	_beginTime += get();
+	_beginTime = getAbsolute();
+	_pauseBeginTime = _beginTime;
 }
 
 void Timer::addChild(Timer* timer)
@@ -149,12 +140,29 @@ void Timer::removeChild(Timer* timer)
 	}
 }
 
+UTime Timer::getAbsolute()
+{
+	if (_parent != nullptr)
+	{
+		return _parent->get();
+	}
+	else
+	{
+#if (defined USE_TIME64)
+		return SDL_GetTicks64();
+#else
+		return SDL_GetTicks();
+#endif // (defined USE_TIME64)
+
+	}
+}
+
 EngineBase::EngineBase()
 {
 	windowHeight = 0;
 	windowWidth = 0;
-	mousePosX = -1;
-	mousePosY = -1;
+	realMousePosX = -1;
+	realMousePosY = -1;
 }
 
 EngineBase::~EngineBase()
@@ -166,6 +174,11 @@ void EngineBase::clearCursor()
 {
 	cursorImage.image.resize(0);
 	cursorImage.interval = 0;
+}
+
+void EngineBase::updateCursor()
+{
+    
 }
 
 void EngineBase::drawCursor()
@@ -199,7 +212,25 @@ void EngineBase::drawCursor()
 		}
 		else if (!softwareCursorHidden)
 		{
-			drawImage(cursorImage.image[frameIndex].softwareFrame, mousePosX - cursorImage.image[frameIndex].xOffset, mousePosY - cursorImage.image[frameIndex].yOffset);
+            auto drawMouseX = realMousePosX;
+            auto drawMouseY = realMousePosY;
+#ifdef __APPLE__
+            int w, h, rw, rh;
+            SDL_GetWindowSize(window, &w, &h);
+            SDL_Metal_GetDrawableSize(window, &rw, &rh);
+            drawMouseX *= rw / w;
+            drawMouseY *= rh / h;
+			Rect dst;
+			dst.x = drawMouseX - cursorImage.image[frameIndex].xOffset;
+			dst.y = drawMouseY - cursorImage.image[frameIndex].yOffset;
+			getImageSize(cursorImage.image[frameIndex].softwareFrame, dst.w, dst.h);
+			dst.w *= rw / w;
+			dst.h *= rh / h;
+			drawImage(cursorImage.image[frameIndex].softwareFrame, nullptr, &dst);
+#else
+			drawImage(cursorImage.image[frameIndex].softwareFrame, drawMouseX - cursorImage.image[frameIndex].xOffset, drawMouseY - cursorImage.image[frameIndex].yOffset);
+#endif
+			
 		}
 		CursorImageIndex = frameIndex;
 	}
@@ -1285,6 +1316,8 @@ void EngineBase::handleEvent()
 			}
 			case SDL_MOUSEMOTION:
 			{
+                realMousePosX = e.motion.x;
+                realMousePosY = e.motion.y;
 #ifndef __MOBILE__
 				int tempX = -1, tempY = -1;
 				calculateCursor(e.motion.x, e.motion.y, &tempX, &tempY);
@@ -1300,6 +1333,8 @@ void EngineBase::handleEvent()
 			}
 			case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
 			{
+                realMousePosX = e.motion.x;
+                realMousePosY = e.motion.y;
 #ifndef __MOBILE__
 				//鼠标点击时增加一个鼠标移动事件
 				int tempX = -1, tempY = -1;
@@ -1664,16 +1699,19 @@ int EngineBase::SetRenderTarget(SDL_Renderer* r, SDL_Texture* t)
 	}
 }
 
-InitErrorType EngineBase::initEngineBase(const std::string & windowCaption, int wWidth, int wHeight, bool isFullScreen, AppEventHandler eventHandler)
+InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, int & wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, AppEventHandler eventHandler)
 {
 	width = wWidth;
 	height = wHeight;
-	if (initSDL(windowCaption, wWidth, wHeight, isFullScreen) != 0)
+	if (initSDL(windowCaption, wWidth, wHeight, fullScreenMode, fullScreenSolutionMode) != 0)
 	{
 		GameLog::write("Init SDL Error!\n");
 		return sdlError;
 	}
 	
+    wWidth = width;
+    wHeight = height;
+    
 	_externalEventHandler = eventHandler;
 	SDL_SetEventFilter(enginebaseAppEventHandler, nullptr);
 
@@ -1730,71 +1768,48 @@ void EngineBase::destroyEngineBase()
 	destroySDL();
 }
 
-bool EngineBase::setFullScreen(bool full)
+void EngineBase::setFullScreen(FullScreenMode mode)
 {
-	if (full == fullScreen)
+	if (mode == _fullScreenMode)
 	{
-		return fullScreen;
+		return;
 	}
-	fullScreen = full;
+    _fullScreenMode = mode;
 	unsigned int flags = SDL_GetWindowFlags(window);
-	if (fullScreen)
+	if (mode == FullScreenMode::fullScreen)
 	{
-		flags |= SDL_WINDOW_FULLSCREEN;
+        if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+            flags ^= SDL_WINDOW_FULLSCREEN_DESKTOP;
+        }
+        flags |= SDL_WINDOW_FULLSCREEN;
 	}
-	else
+	else if (mode == FullScreenMode::windowFullScreen)
 	{
-		flags ^= SDL_WINDOW_FULLSCREEN;
+        if (flags & SDL_WINDOW_FULLSCREEN) {
+            flags ^= SDL_WINDOW_FULLSCREEN;
+        }
+		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
 	}
-	if (fullScreen)
-	{
-#ifndef __MOBILE__
-		if (canChangeDisplayMode)
-		{
+    else
+    {
+        if (flags & SDL_WINDOW_FULLSCREEN) {
+            flags ^= SDL_WINDOW_FULLSCREEN;
+        }
+        if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
+            flags ^= SDL_WINDOW_FULLSCREEN_DESKTOP;
+        }
+    }
+    SDL_SetWindowFullscreen(window, flags);
+    if (mode == FullScreenMode::window) {
+//        SDL_DisplayMode dm;
+//        SDL_GetDisplayMode(0, 0, &dm);
 
-			SDL_DisplayMode dm;
-			SDL_GetDisplayMode(0, 0, &dm);
-			dm.w = width;
-			dm.h = height;
-			SDL_SetWindowSize(window, dm.w, dm.h);
-			SDL_SetWindowFullscreen(window, flags);
-		}
-		else
-		{
-#endif
-			SDL_DisplayMode dm;
-			SDL_GetDisplayMode(0, 0, &dm);
-			SDL_SetWindowSize(window, dm.w, dm.h);
-			SDL_SetWindowFullscreen(window, flags);
-#ifndef __MOBILE__
-		}
-#endif
-	}
-	else
-	{
-		SDL_DisplayMode dm;
-		SDL_GetDisplayMode(0, 0, &dm);
-		SDL_SetWindowFullscreen(window, flags);
-		if (width > dm.w || height > dm.h)
-		{
-			SDL_SetWindowSize(window, dm.w, dm.h);
-			SDL_SetWindowPosition(window, 0, 0);
-		}
-		else
-		{
-			SDL_SetWindowSize(window, width, height);
-			SDL_SetWindowPosition(window, (dm.w - width) / 2, (dm.h - height) / 2);
-		}	
-	}
+        SDL_SetWindowSize(window, width, height);
+//        SDL_SetWindowPosition(window, (dm.w - width) / 2, (dm.h - height) / 2);
+    }
+
 	updateState();
-	flags = SDL_GetWindowFlags(window);
-	return fullScreen = ((flags & SDL_WINDOW_FULLSCREEN) == SDL_WINDOW_FULLSCREEN);
-}
-
-bool EngineBase::setDisplayMode(bool dm)
-{
-	canChangeDisplayMode = dm;
-	return dm;
+    return;
 }
 
 void EngineBase::getScreenInfo(int& w, int& h)
@@ -1803,7 +1818,6 @@ void EngineBase::getScreenInfo(int& w, int& h)
 	SDL_GetCurrentDisplayMode(0, &sdl_dm);
 	w = sdl_dm.w;
 	h = sdl_dm.h;
-
 }
 
 void EngineBase::setWindowSize(int w, int h)
@@ -1856,8 +1870,15 @@ void EngineBase::countFPS()
 	}	
 }
 
-InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth, int wHeight, bool isFullScreen)
+InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth, int wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode)
 {
+#ifdef __MOBILE__
+    fullScreenMode = FullScreenMode::fullScreen;
+    fullScreenSolutionMode = FullScreenSolutionMode::adjust;
+#endif
+    _fullScreenMode = fullScreenMode;
+    _fullScreenSolutionMode = fullScreenSolutionMode;
+    
 	if (SDL_Init(SDL_INIT_EVERYTHING ^ SDL_INIT_AUDIO))
 	{
 		GameLog::write("SDL error: %s \n", SDL_GetError());
@@ -1865,68 +1886,59 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	}
 
 	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "1");
+    
+    int screenWidth = wWidth;
+    int screenHeight = wHeight;
+    getScreenInfo(screenWidth, screenHeight);
+    
 
-#ifdef __MOBILE__
-	int screenWidth = wWidth;
-	int screenHeight = wHeight;
-	getScreenInfo(screenWidth, screenHeight);
-	if (((double)screenWidth) / screenHeight > ((double)wWidth) / wHeight)
-	{
-		wWidth  = (int)round(((double)wHeight) * screenWidth / screenHeight);
-	}
-	else if (((double)screenWidth) / screenHeight < ((double)wWidth) / wHeight)
-	{
-		wHeight = (int)round(((double)wWidth) * screenHeight / screenWidth);
-	}
-	width = wWidth;
-	height = wHeight;
-    GameLog::write("window real size: %d * %d\n", width, height);
-#endif
+    if (fullScreenMode != FullScreenMode::window && fullScreenSolutionMode != FullScreenSolutionMode::forceToUseSetting)
+    {
+        if (fullScreenSolutionMode == FullScreenSolutionMode::original) 
+        {
+            width = screenWidth;
+            height = screenHeight;
+        }
+        else if (fullScreenSolutionMode == FullScreenSolutionMode::adjust)
+        {
+            if (((double)screenWidth) / screenHeight > ((double)wWidth) / wHeight)
+            {
+                wWidth  = (int)round(((double)wHeight) * screenWidth / screenHeight);
+            }
+            else if (((double)screenWidth) / screenHeight < ((double)wWidth) / wHeight)
+            {
+                wHeight = (int)round(((double)wWidth) * screenHeight / screenWidth);
+            }
+            width = wWidth;
+            height = wHeight;
+        }
+    }
 
 	SDL_ShowCursor(0);
-	fullScreen = isFullScreen;
 	Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
+    
+    if (fullScreenMode == FullScreenMode::fullScreen) 
+    {
+        flags |= SDL_WINDOW_FULLSCREEN;
+    }
+    else if (fullScreenMode == FullScreenMode::windowFullScreen)
+    {
+        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+    }
+    else
+    {
+        flags |= SDL_WINDOW_HIDDEN;
+    }
 
-	SDL_DisplayMode dm;
-	dm.w = wWidth;
-	dm.h = wHeight;
-
-#ifndef __MOBILE__
-
-	if (fullScreen)
-	{
-		if (canChangeDisplayMode)
-		{
-            flags |= SDL_WINDOW_FULLSCREEN;
-		}
-		else
-		{
-#endif
-            SDL_GetCurrentDisplayMode(0, &dm);
-            GameLog::write("current display mode: %d * %d \n", dm.w, dm.h);
-            flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
-#ifndef __MOBILE__
-		}
-	}
-	else
-	{
-		flags |= SDL_WINDOW_HIDDEN;
-	}
-#endif
-	window = SDL_CreateWindow(windowCaption.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, dm.w, dm.h, flags);
+	window = SDL_CreateWindow(windowCaption.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
 	if (window == nullptr)
 	{
 		GameLog::write("SDL Create Window Error : %s\n", SDL_GetError());
 		return sdlError;
 	}
-#ifndef __MOBILE__
-	if (fullScreen)
-	{
-		SDL_SetWindowSize(window, dm.w, dm.h);
-	}
-#endif
+
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);	
@@ -2028,17 +2040,12 @@ void EngineBase::updateState()
     SDL_GetWindowSize(window, &tempWidth, &tempHeight);
 	updateRect(tempWidth, tempHeight, rect);
 #ifdef __APPLE__
-#ifdef __IPHONEOS__
     SDL_Metal_GetDrawableSize(window, &tempWidth, &tempHeight);
-#else
-    SDL_GL_GetDrawableSize(window, &tempWidth, &tempHeight);
-#endif
     updateRect(tempWidth, tempHeight, displayRect);
 #else
     displayRect = rect;
 #endif
-	updateCursor();
-
+    updateCursor();
 }
 #ifdef SHF_USE_AUDIO
 int EngineBase::initSoundSystem()
@@ -3830,6 +3837,7 @@ void EngineBase::clearScreen()
 void EngineBase::displayScreen()
 {	
 	unsigned int engineBaseBackCol = clBG;
+
 	SetRenderTarget(renderer, nullptr);
 	SDL_SetRenderDrawColor(renderer, (engineBaseBackCol & 0xFF0000) >> 16, (engineBaseBackCol & 0xFF00) >> 8, engineBaseBackCol & 0xFF, 0);
 	SDL_RenderClear(renderer);
@@ -3843,7 +3851,7 @@ void EngineBase::displayScreen()
 	d.w = displayRect.w;
 	d.h = displayRect.h;
 	SDL_RenderCopy(renderer, realScreen.get(), &s, &d);
-	drawCursor();
+    drawCursor();
 	SDL_RenderPresent(renderer);
 }
 
@@ -3854,8 +3862,8 @@ void EngineBase::updateRect(int tempWidth, int tempHeight, Rect & rect)
 	{
 		windowWidth = tempWidth;
 		windowHeight = tempHeight;
-		if (fullScreen)
-		{ 
+		if (_fullScreenMode != FullScreenMode::window)
+		{
 			rect.x = 0;
 			rect.w = windowWidth;
 			rect.y = 0;
@@ -3931,23 +3939,17 @@ int EngineBase::lzoDecompress(const void * src, unsigned int srcLen, void * dst,
 	return -1;
 }
 
-void EngineBase::updateCursor()
-{
-	SDL_GetMouseState(&mousePosX, &mousePosY);
-	calculateCursor(mousePosX, mousePosY, &mouseX, &mouseY);
-}
-
 void EngineBase::calculateCursor(int inX, int inY, int* outX, int* outY)
 {
 	if (inX >= rect.x && inX < rect.x + rect.w && inY >= rect.y && inY < rect.y + rect.h)
 	{
 		if (outX != nullptr)
 		{
-			*outX = (int)floor((double)(inX - rect.x) / ((double)rect.w) * (double)width + 0.5);
+			*outX = (int)round((double)(inX - rect.x) / ((double)rect.w) * (double)width );
 		}
 		if (outY != nullptr)
 		{
-			*outY = (int)floor((double)(inY - rect.y) / ((double)rect.h) * (double)height + 0.5);
+			*outY = (int)round((double)(inY - rect.y) / ((double)rect.h) * (double)height );
 		}
 	}
 }

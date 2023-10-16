@@ -86,6 +86,20 @@ extern "C"
 #undef main
 #endif
 
+enum class FullScreenMode
+{
+    window = 0,
+    windowFullScreen = 1,
+    fullScreen = 2
+};
+
+enum class FullScreenSolutionMode
+{
+    original = 0,
+    adjust = 1,
+    forceToUseSetting = 2
+};
+
 struct Rect
 {
 	int x;
@@ -285,6 +299,7 @@ public:
 private:
 	void addChild(Timer* time);
 	void removeChild(Timer* time);
+	UTime getAbsolute();
 
 private:
 	UTime _beginTime = 0;
@@ -315,7 +330,7 @@ private:
 	
 	int windowWidth;
 	int windowHeight;
-	InitErrorType initSDL(const std::string& windowCaption, int wWidth, int wHeight, bool isFullScreen);
+	InitErrorType initSDL(const std::string& windowCaption, int wWidth, int wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode);
 	void destroySDL();
 
 	static int enginebaseAppEventHandler(void* userdata, SDL_Event* event);
@@ -332,14 +347,13 @@ protected:
 
 	int SetRenderTarget(SDL_Renderer* r, SDL_Texture* t);
 
-	InitErrorType initEngineBase(const std::string& windowCaption, int wWidth, int wHeight, bool isFullScreen, AppEventHandler eventHandler = NULL);
+	InitErrorType init(const std::string& windowCaption, int & wWidth, int & wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, AppEventHandler eventHandler = NULL);
 	void destroyEngineBase();
 	int width = 0;
 	int height = 0;
-	bool fullScreen = true;
-	bool canChangeDisplayMode = false;
-	bool setFullScreen(bool full);
-	bool setDisplayMode(bool dm);
+    FullScreenMode _fullScreenMode = FullScreenMode::window;
+    FullScreenSolutionMode _fullScreenSolutionMode = FullScreenSolutionMode::original;
+	void setFullScreen(FullScreenMode mode);
 	void setWindowSize(int w, int h);
 	bool hardwareCursor = true;
 	void getScreenInfo(int& w, int& h);
@@ -382,7 +396,7 @@ private:
 	int CursorImageIndex = -1;
 	void clearCursor();
 	void drawCursor();
-	void updateCursor();
+    void updateCursor();
 	void calculateCursor(int inX, int inY, int* outX, int* outY);
 	void destroyCursor();
 protected:
@@ -469,8 +483,8 @@ protected:
 
 	//事件、鼠标位置等函数
 private:
-	int mousePosX;
-	int mousePosY;
+	int realMousePosX;
+	int realMousePosY;
 	EventList eventList;
 	void handleEvent();
 	void copyEvent(AEvent& s, AEvent& d);
