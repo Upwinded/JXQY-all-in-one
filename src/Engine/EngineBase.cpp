@@ -1,4 +1,4 @@
-#include "EngineBase.h"
+﻿#include "EngineBase.h"
 #include <map>
 #include <iostream>
 #include <thread>
@@ -1815,7 +1815,7 @@ void EngineBase::setFullScreen(FullScreenMode mode)
 void EngineBase::getScreenInfo(int& w, int& h)
 {
 	SDL_DisplayMode sdl_dm;
-	SDL_GetCurrentDisplayMode(0, &sdl_dm);
+	SDL_GetDesktopDisplayMode(0, &sdl_dm);
 	w = sdl_dm.w;
 	h = sdl_dm.h;
 }
@@ -1943,7 +1943,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);	
 
-	realScreen = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, wWidth, wHeight));
+	realScreen = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, width, height));
 	
 	screenMask = make_shared_surface(SDL_CreateRGBSurface(0, 1, 1, 32, 0, 0, 0, 0));
 
