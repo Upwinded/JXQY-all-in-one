@@ -1815,7 +1815,7 @@ void EngineBase::setFullScreen(FullScreenMode mode)
 void EngineBase::getScreenInfo(int& w, int& h)
 {
 	SDL_DisplayMode sdl_dm;
-	SDL_GetDesktopDisplayMode(0, &sdl_dm);
+	SDL_GetCurrentDisplayMode(0, &sdl_dm);
 	w = sdl_dm.w;
 	h = sdl_dm.h;
 }
