@@ -731,21 +731,22 @@ bool Map::canJump(Point pos)
 	}
 	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toTrans)
 	{
-		if (dataMap.tile[pos.y][pos.x].npcIndex.size() == 0 && dataMap.tile[pos.y][pos.x].stepIndex.size() == 0)
+		/*if (dataMap.tile[pos.y][pos.x].npcIndex.size() == 0 && dataMap.tile[pos.y][pos.x].stepIndex.size() == 0)
 		{
-			if (dataMap.tile[pos.y][pos.x].objIndex.size() > 0)
+			
+		}*/
+		if (dataMap.tile[pos.y][pos.x].objIndex.size() > 0)
+		{
+			for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
 			{
-				for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
+				int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+				if (objKind == okDoor)
 				{
-					int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
-					if (objKind == okDoor)
-					{
-						return false;
-					}
+					return false;
 				}
 			}
-			return true;
 		}
+		return true;
 	}
 	return false;
 }
@@ -1048,7 +1049,7 @@ void Map::drawMap()
 			{
 				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
+					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y < 0 || (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
 					{
 						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 					}
@@ -1081,7 +1082,7 @@ void Map::drawMap()
 			{
 				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
+					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y >= 0 && gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
 					{
 						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 					}
@@ -1089,7 +1090,7 @@ void Map::drawMap()
 			}
 		}
 	}
-	
+	/*
 	int cline = abs(cenTile.y) % 2;
 	for (int iy = cenTile.y - yscal - xscal * 2 - cline; iy < cenTile.y + yscal + tileHeightScal; iy += 2)
 	{
@@ -1279,7 +1280,7 @@ void Map::drawMap()
 		}
 
 	}
-
+	*/
 	/*
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
