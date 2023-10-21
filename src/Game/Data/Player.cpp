@@ -1009,7 +1009,7 @@ void Player::addNextAction(NextAction& act)
 		}
 	}
 
-	nextAction = nextAction = std::make_shared<NextAction>();
+	nextAction = std::make_shared<NextAction>();
 	nextAction->action = act.action;
 	nextAction->dest = act.dest;
 	nextAction->type = act.type;

@@ -1,4 +1,4 @@
-#include "Effect.h"
+﻿#include "Effect.h"
 #include "../GameManager/GameManager.h"
 
 Effect::Effect()
@@ -179,7 +179,7 @@ void Effect::calTime()
 	waitTime = (unsigned int)(((double)magic.level[level].waitFrame) * EFFECT_FRAME_TIME);
 }
 
-//计算一个较远处的目标，新版寻路已不需要
+//计算一个较远处的目标，新版轨迹计算已不需要
 void Effect::calDest()
 {
 	dest = src;
@@ -428,20 +428,24 @@ void Effect::playSound(int act)
 		{
 			if (level < 4)
 			{
-				soundFactor = 0.09f;
+				soundFactor = 0.15f;
 			}
 			else if (level < 7)
 			{
-				soundFactor = 0.06f;
+				soundFactor = 0.1f;
 			}
 			else
 			{
-				soundFactor = 0.03f;
+				soundFactor = 0.05f;
 			}
 		}
 		channel = playSoundFile(magic.flyingSound, x, y, engine->getSoundVolume() * soundFactor);
 		break;
 	case ekExploding:
+		if (magic.level[level].moveKind == mmkFullScreen)
+		{
+			soundFactor = 0.2f;
+		}
 		channel = playSoundFile(magic.vanishSound, x, y, engine->getSoundVolume() * soundFactor);
 		break;
 	case ekHiding:

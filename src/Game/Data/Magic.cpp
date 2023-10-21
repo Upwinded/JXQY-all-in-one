@@ -299,7 +299,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addPointEffect(std::shared_ptr<Magic
 	}
 	else
 	{
-		e->doing = ekFlying;
+		e->beginFly();
 	}
 	e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 	e->calDest();
@@ -369,7 +369,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addFlyEffect(std::shared_ptr<Magic> 
 	}
 	else
 	{
-		e->doing = ekFlying;
+		//e->doing = ekFlying;
+		e->beginFly();
 	}
 	e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 	e->calDest();
@@ -447,7 +448,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addContinuousFlyEffect(std::shared_p
 		}
 		else
 		{
-			e->doing = ekFlying;
+			//e->doing = ekFlying;
+			e->beginFly();
 		}
 		e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
 		e->calDest();
@@ -501,7 +503,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 		}
 		else
 		{
-			e->doing = ekFlying;
+			//e->doing = ekFlying;
+			e->beginFly();
 		}
 		e->calDest();
 		gm->effectManager->addEffect(e);
@@ -586,7 +589,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr
 		}
 		else
 		{
-			e->doing = ekFlying;
+			//e->doing = ekFlying;
+			e->beginFly();
 		}
 		e->calDest();
 		gm->effectManager->addEffect(e);
@@ -654,7 +658,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 		}
 		else
 		{
-			e->doing = ekFlying;
+			//e->doing = ekFlying;
+			e->beginFly();
 		}
 		e->calDest();
 		gm->effectManager->addEffect(e);
@@ -724,8 +729,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			}
 			else
 			{
-				e->doing = ekFlying;
-
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 
@@ -773,8 +778,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			}
 			else
 			{
-				e->doing = ekFlying;
-
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -822,8 +827,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			}
 			else
 			{
-				e->doing = ekFlying;
-
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -868,8 +873,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			}
 			else
 			{
-				e->doing = ekFlying;
-
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -941,8 +946,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addLineEffect(std::shared_ptr<Magic>
 			}
 			else
 			{
-				e->doing = ekFlying;
-
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -1016,8 +1021,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addMoveLineEffect(std::shared_ptr<Ma
 			}
 			else
 			{
-				e->doing = ekFlying;
-
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -1075,7 +1080,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addSquareEffect(std::shared_ptr<Magi
 			}
 			else
 			{
-				e->doing = ekFlying;
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -1151,7 +1157,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addWaveEffect(std::shared_ptr<Magic>
 			}
 			else
 			{
-				e->doing = ekFlying;
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -1199,7 +1206,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addCrossEffect(std::shared_ptr<Magic
 			}
 			else
 			{
-				e->doing = ekFlying;
+				//e->doing = ekFlying;
+				e->beginFly();
 			}
 			e->calDest();
 			gm->effectManager->addEffect(e);
@@ -1240,7 +1248,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSelfEffect(std::shared_ptr<Magic>
 	e->calDest();
 	gm->effectManager->addEffect(e);
 	e->beginTime = e->getTime();
-	//ret.push_back(e);
+	ret.push_back(e);
 	switch (specialKind)
 	{
 	case mskAddLife:
@@ -1319,11 +1327,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<
 		e->evade = evade;
 		e->lifeTime = e->getExplodingTime();
 		e->calDest();
-		e->doing = ekExploding;
 		gm->effectManager->addEffect(e);
-		e->beginTime = e->getTime();
-		e->playSound(ekExploding);
-		ret.push_back(e);
+		e->beginExplode(e->position);		
 	}
 	gm->effectManager->setPaused(false);
 	gm->effectManager->deleteEffect(oriE);

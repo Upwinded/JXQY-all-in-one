@@ -3,8 +3,6 @@
 #include <deque>
 #include "../Image/IMP.h"
 
-// 防界面卡死的加载方式
-#define LOAD_WITH_THREAD
 
 #define TILE_WIDTH 64
 #define TILE_HEIGHT 32

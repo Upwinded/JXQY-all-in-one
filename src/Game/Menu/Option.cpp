@@ -25,7 +25,7 @@ void Option::init()
 	soundCB = addComponent<CheckBox>("ini\\ui\\option\\cbsound.ini");
 	speedCB = addComponent<CheckBox>("ini\\ui\\option\\cbspeed.ini");
 
-	player = addComponent<CheckBox>("ini\\ui\\option\\cbplayer.ini");
+	playerAlpha = addComponent<CheckBox>("ini\\ui\\option\\cbplayer.ini");
 	shadow = addComponent<CheckBox>("ini\\ui\\option\\cbshadow.ini");
 	dyLoad = addComponent<CheckBox>("ini\\ui\\option\\cbdyload.ini");
 
@@ -62,8 +62,8 @@ void Option::init()
 	}
 	soundPos = sound->position;
 
-	player->activated = true;
-	player->checked = !config->playerAlpha;
+	playerAlpha->activated = true;
+	playerAlpha->checked = !config->playerAlpha;
 
 	speedCB->activated = true;
 	speedCB->checked = false;
@@ -71,8 +71,8 @@ void Option::init()
 
 	speed->setPosition(speedToPos(Config::getGameSpeed()));
 
-	dyLoad->activated = false;
-	dyLoad->checked = false;
+	dyLoad->activated = true;
+	dyLoad->checked = !Config::loadWithThread;
 	
 	shadow->activated = false;
 	shadow->checked = false;
@@ -94,7 +94,7 @@ void Option::freeResource()
 	freeCom(music);
 	freeCom(sound);
 	freeCom(speed);
-	freeCom(player);
+	freeCom(playerAlpha);
 	freeCom(dyLoad);
 	freeCom(shadow);
 	freeCom(playerBg);
@@ -227,10 +227,15 @@ void Option::onEvent()
 			config->save();
 		}
 	}
-	if (player != nullptr && player->getResult(erClick))
+	if (playerAlpha != nullptr && playerAlpha->getResult(erClick))
 	{
-		config->playerAlpha = !player->checked;
+		config->playerAlpha = !playerAlpha->checked;
 		config->save();
+	}
+	if (dyLoad != nullptr && dyLoad->getResult(erClick))
+	{
+		Config::loadWithThread = !dyLoad->checked;
+		Config::save();
 	}
 	if (rtnBtn->getResult(erClick))
 	{

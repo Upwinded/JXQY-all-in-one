@@ -95,7 +95,7 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 	//read mpc info
 	for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 	{
-		data->mpc.mpc[i].name = std::unique_ptr<char[]>(new char[data->head.nameLen]);
+		data->mpc.mpc[i].name = std::make_unique<char[]>(data->head.nameLen);
 		mapReadData(data->mpc.mpc[i].name.get(), data->head.nameLen);
 		mapReadData(&data->mpc.mpc[i].index, 4);
 		mapReadData(&data->mpc.mpc[i].dynamic, 4);

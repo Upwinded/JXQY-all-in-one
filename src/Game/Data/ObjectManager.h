@@ -41,6 +41,7 @@ public:
 	virtual void load(const std::string & fileName);
 	virtual void save(const std::string & fileName);
 	virtual void onEvent();
+	virtual void onUpdate();
 
 };
 

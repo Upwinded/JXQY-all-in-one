@@ -62,7 +62,14 @@ void GameController::onChildCallBack(PElement child)
 	if (child == nullptr || !gm->global.data.canInput) { return; }
 #ifdef __MOBILE__
 	auto ret = child->getResult();
-	if (child == skillPanel)
+	if (child == joystickPanel)
+	{
+		if (ret & erMouseLDown)
+		{
+			gm->player->nextAction = nullptr;
+		}
+	}
+	else if (child == skillPanel)
 	{
 		if (ret & erDragEnd)
 		{
@@ -416,7 +423,7 @@ void GameController::onEvent()
 	{
 		joystickAction = false;
 	}
-	if (joystickAction)
+	if (joystickAction && (gm->player->nextAction == nullptr || gm->player->nextAction->action == acRun|| gm->player->nextAction->action == acWalk || gm->player->nextAction->action == acARun|| gm->player->nextAction->action == acAWalk))
 	{
 		auto dirList = joystickPanel->joystick->getDirectionList();
 		bool steping = false;

@@ -236,6 +236,7 @@ void ObjectManager::tryCleanObjectImageList()
 	{
 		if (iter->second.use_count() <= 1)
 		{
+			iter->second = nullptr;
 			iter = objectImageList.erase(iter);
 		}
 		else
@@ -349,4 +350,9 @@ void ObjectManager::onEvent()
 			break;
 		}*/
 	}
+}
+
+void ObjectManager::onUpdate()
+{
+	GameLog::write("OBJ Action count:%d", objectImageList.size());
 }

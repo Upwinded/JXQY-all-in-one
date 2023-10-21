@@ -14,11 +14,6 @@ public:
 	std::vector<int> getDirectionList();
 	bool isRunning();
 	bool isWalking();
-private:
-	Point dragEndPosition = { 0, 0 };
-	//std::shared_ptr<DragRoundButton> leftJumpBtn = nullptr;
-public:
-	Point getDragEndPosition() { return dragEndPosition; }
 	virtual void onChildCallBack(PElement child);
 protected:
 	virtual void onUpdate();

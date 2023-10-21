@@ -206,15 +206,8 @@ int PakFile::unpak(char * inBuffer, int inLen, char * outBuffer, int outLen, int
 	static std::mutex mutex;
 	mutex.lock();
 	const int bufferLen = blockSize + blockSize / 8 + 64;
-	//char* tempBuffer = new char[bufferLen];
 	static char tempBuffer[bufferLen];
 	
-	/*
-	if (!tempBuffer)
-	{
-		return 0;
-	}
-	*/
 	int blockCount = outLen / blockSize;
 	if ((outLen % blockSize) > 0)
 	{
@@ -338,10 +331,10 @@ bool PakFile::readPak(const std::string & pakName, int index, std::unique_ptr<ch
 
 			if (pakSize > 0 && size >= offset + pakSize && fsize > 0)
 			{
-				auto inBuffer = std::unique_ptr<char[]>(new char[pakSize]);
+				auto inBuffer = std::make_unique<char[]>(pakSize);
 				SDL_RWseek(fp, offset, 0);
 				SDL_RWread(fp, inBuffer.get(), 1, pakSize);
-				s = std::unique_ptr<char[]>(new char[fsize + 1]);
+				s = std::make_unique<char[]>(fsize + 1);
 				memset(s.get(), 0, fsize + 1);
 				len = unpak(inBuffer.get(), pakSize, s.get(), fsize, pakHead.compressType);
 				if (len > 0)

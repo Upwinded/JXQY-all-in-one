@@ -121,8 +121,6 @@ bool MenuController::onHandleEvent(AEvent & e)
 
 void MenuController::init()
 {
-//#define AddUpMenuChild(A, a); a = new A; upMenu.addChild(a);
-//#define AddMenuChild(A, a); a = new A; addChild(a);
 #define AddUpMenuChild(A, a); a = std::make_shared<A>(); upMenu->addChild(a); 
 #define AddMenuChild(A, a);  a = std::make_shared<A>(); addChild(a); 
 	

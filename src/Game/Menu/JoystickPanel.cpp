@@ -47,11 +47,6 @@ void JoystickPanel::onChildCallBack(PElement child)
 {
 	if (child == nullptr) { return; }
 	result = child->getResult();
-	if (result & erDragEnd)
-	{
-		auto component = std::dynamic_pointer_cast<DragRoundButton>(child);
-		dragEndPosition = component->getDragPosition();
-	}
 	if (parent != nullptr && parent->canCallBack)
 	{
 		parent->onChildCallBack(getMySharedPtr());

@@ -63,6 +63,7 @@ public:
 	void freeResource();
 
 	void clearActionImageList();
+	void tryCleanActionImageList();
 
 	_shared_imp loadActionImage(const std::string & imageName);
 	std::map<std::string, _shared_imp> actionImageList;

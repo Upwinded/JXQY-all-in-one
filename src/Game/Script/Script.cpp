@@ -260,11 +260,14 @@ int Script::lua_LoadMap(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-#ifdef LOAD_WITH_THREAD
-		gm->loadMapWithThread(lua_tostring(l, 1));
-#else // !LOAD_WITH_THREAD
-		gm->loadMap(lua_tostring(l, 1));
-#endif // LOAD_WITH_THREAD
+		if (Config::loadWithThread)
+		{
+			gm->loadMapWithThread(lua_tostring(l, 1));
+		}
+		else
+		{
+			gm->loadMap(lua_tostring(l, 1));
+		}
 	}
 	return 0;
 }
@@ -274,11 +277,14 @@ int Script::lua_LoadGame(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-#ifdef LOAD_WITH_THREAD
-		gm->loadGameWithThread((int)lua_tointeger(l, 1));
-#else // !LOAD_WITH_THREAD
-		gm->loadGame((int)lua_tointeger(l, 1));
-#endif // LOAD_WITH_THREAD
+		if (Config::loadWithThread)
+		{
+			gm->loadGameWithThread((int)lua_tointeger(l, 1));
+		}
+		else
+		{
+			gm->loadGame((int)lua_tointeger(l, 1));
+		}
 	}
 	return 0;
 }
@@ -324,11 +330,14 @@ int Script::lua_LoadObj(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-#ifdef LOAD_WITH_THREAD
-		gm->loadObjectWithThread(lua_tostring(l, 1));
-#else // !LOAD_WITH_THREAD
-		gm->loadObject(lua_tostring(l, 1));
-#endif // LOAD_WITH_THREAD
+		if (Config::loadWithThread)
+		{
+			gm->loadObjectWithThread(lua_tostring(l, 1));
+		}
+		else
+		{
+			gm->loadObject(lua_tostring(l, 1));
+		}
 	}
 	return 0;
 }
@@ -424,11 +433,14 @@ int Script::lua_LoadNpc(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-#ifdef LOAD_WITH_THREAD
-		gm->loadNPCWithThread(lua_tostring(l, 1));
-#else // !LOAD_WITH_THREAD
-		gm->loadNPC(lua_tostring(l, 1));
-#endif // LOAD_WITH_THREAD
+		if (Config::loadWithThread)
+		{
+			gm->loadNPCWithThread(lua_tostring(l, 1));
+		}
+		else
+		{
+			gm->loadNPC(lua_tostring(l, 1));
+		}
 	}
 	return 0;
 }

@@ -3,7 +3,7 @@
 FullScreenMode Config::fullScreenMode = FullScreenMode::window;
 FullScreenSolutionMode Config::fullScreenSolutionMode = FullScreenSolutionMode::original;
 bool Config::playerAlpha = true;
-bool Config::canChangeDisplayMode = false;
+bool Config::loadWithThread = true;
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
 double Config::gameSpeed = SPEED_TIME_DEFAULT;
@@ -34,7 +34,7 @@ void Config::load()
     windowHeight = ini.GetInteger("game", "windowheight", windowHeight);
 #endif
 	playerAlpha = ini.GetBoolean("game", "playeralpha", playerAlpha);
-	canChangeDisplayMode = ini.GetBoolean("game", "canchangedisplaymode", canChangeDisplayMode);
+	loadWithThread = ini.GetBoolean("game", "loadWithThread", loadWithThread);
 
 	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
 	gameSpeed = convSpeedToDouble(speed);
@@ -67,7 +67,7 @@ void Config::save()
 	INIReader ini(fileName);
 	ini.SetInteger("game", "fullscreenmode", (int)fullScreenMode);
     ini.SetInteger("game", "fullscreensolutionmode", (int)fullScreenSolutionMode);
-	ini.SetBoolean("game", "canchangedisplaymode", canChangeDisplayMode);
+	ini.SetBoolean("game", "loadWithThread", loadWithThread);
 	ini.SetBoolean("game", "playeralpha", playerAlpha);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();

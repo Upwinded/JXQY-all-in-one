@@ -15,7 +15,7 @@ public:
 	std::shared_ptr<Scrollbar> music = nullptr;
 	std::shared_ptr<Scrollbar> sound = nullptr;
 	std::shared_ptr<Scrollbar> speed = nullptr;
-	std::shared_ptr<CheckBox> player = nullptr;
+	std::shared_ptr<CheckBox> playerAlpha = nullptr;
 	std::shared_ptr<CheckBox> dyLoad = nullptr;
 	std::shared_ptr<CheckBox> shadow = nullptr;
 	std::shared_ptr<ImageContainer> playerBg = nullptr;

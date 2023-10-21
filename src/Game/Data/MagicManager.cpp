@@ -267,6 +267,8 @@ void MagicManager::tryCleanAttackMagic()
 	{
 		if (iter->second.use_count() <= 1)
 		{
+			iter->second->freeResource();
+			iter->second = nullptr;
 			iter = attackMagicList.erase(iter);
 		}
 		else

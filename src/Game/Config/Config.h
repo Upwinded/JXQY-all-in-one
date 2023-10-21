@@ -15,7 +15,10 @@ public:
     static FullScreenMode fullScreenMode;
     static FullScreenSolutionMode fullScreenSolutionMode;
 	static bool playerAlpha;
-	static bool canChangeDisplayMode;
+
+	// 防界面卡死的加载方式
+	// Android（MIUI14开发版）下多线程会造成卡顿，不清楚原因
+	static bool loadWithThread;
 
 	static void load();
 	static void save();

@@ -123,11 +123,16 @@ void Joystick::onMouseLeftDown(int x, int y)
 {
     touchPosition.x = x - rect.x;
     touchPosition.y = y - rect.y;
+	result |= erMouseLDown;
+	if (canCallBack && parent != nullptr && parent->canCallBack)
+	{
+		parent->onChildCallBack(getMySharedPtr());
+	}
 }
 
 void Joystick::onDraw()
 {
-	//��Բ��
+
 	int xOffset = 0, yOffset = 0;
 	auto img = IMP::loadImageForTime(image[0], getTime(), &xOffset, &yOffset);
 	if (stretch)
@@ -142,7 +147,7 @@ void Joystick::onDraw()
 		int y = rect.y + (int)round((rect.h - h) / 2);
 		engine->drawImage(img, x, y);
 	}
-	//������λ��Բ��
+
 	if (touchPosition.x > OutRange && touchPosition.y > OutRange)
 	{
 		img = IMP::loadImageForTime(image[1], getTime(), &xOffset, &yOffset);

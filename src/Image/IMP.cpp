@@ -121,7 +121,7 @@ bool IMP::loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& dat
 				}			
 				if (impImage->frame[i].dataLen > 0)
 				{
-					impImage->frame[i].data = std::unique_ptr<char[]>(new char[impImage->frame[i].dataLen]);
+					impImage->frame[i].data = std::make_unique<char[]>(impImage->frame[i].dataLen);
 					memcpy(&impImage->frame[i].data[0], data_ptr, impImage->frame[i].dataLen);
 					size -= impImage->frame[i].dataLen;
 					data_ptr += impImage->frame[i].dataLen;
@@ -228,7 +228,7 @@ void IMP::copyIMPImage(_shared_imp dst, _shared_imp src)
 			}
 			else if (src->frame[i].dataLen > 0)
 			{
-				dst->frame[i].data = std::unique_ptr<char[]>(new char[dst->frame[i].dataLen]);
+				dst->frame[i].data = std::make_unique<char[]>(dst->frame[i].dataLen);
 				memcpy(&(dst->frame[i].data[0]), &(src->frame[i].data[0]), dst->frame[i].dataLen);
 			}
 		}
@@ -371,7 +371,7 @@ _shared_imp IMP::createIMPImageFromFrame(_shared_imp impImage, int index)
 	{
 		if (img->frame[0].dataLen > 0)
 		{
-			img->frame[0].data = std::unique_ptr<char[]>(new char[img->frame[0].dataLen]);
+			img->frame[0].data = std::make_unique<char[]>(img->frame[0].dataLen);
 			memcpy(&img->frame[0].data[0], &impImage->frame[index].data[0], img->frame[0].dataLen);
 		}
 		else

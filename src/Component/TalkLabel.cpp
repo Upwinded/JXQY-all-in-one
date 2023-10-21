@@ -103,7 +103,7 @@ std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 				unsigned char c = (unsigned char) *(s[i].c_str() + j);
 				size_t utf8_char_length = convert_max(convert::GetUtf8CharLength(c), 1);
 
-				std::unique_ptr<char[]> temp_str(new char[utf8_char_length + 1]);
+				std::unique_ptr<char[]> temp_str = std::make_unique<char[]>(utf8_char_length + 1);
 				temp_str[utf8_char_length] = 0x0;
 				memcpy(temp_str.get(), &s[i][j], convert_min(utf8_char_length, s[i].length() - j));
 				twc.s = temp_str.get();

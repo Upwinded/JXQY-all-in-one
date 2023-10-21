@@ -1811,11 +1811,14 @@ void GameManager::onDraw()
 
 bool GameManager::onInitial()
 {
-#ifdef LOAD_WITH_THREAD
-	initMenuWithThread();
-#else // !LOAD_WITH_THREAD
-	initMenu();
-#endif // LOAD_WITH_THREAD
+	if (Config::loadWithThread)
+	{
+		initMenuWithThread();
+	}
+	else
+	{
+		initMenu();
+	}
 
 	if (gameIndex == 0)
 	{
@@ -1825,11 +1828,14 @@ bool GameManager::onInitial()
 	}
 	else
 	{
-#ifdef LOAD_WITH_THREAD
-		loadGameWithThread(gameIndex);
-#else // !LOAD_WITH_THREAD
-		loadGame(gameIndex);
-#endif // LOAD_WITH_THREAD
+		if (Config::loadWithThread)
+		{
+			loadGameWithThread(gameIndex);
+		}
+		else
+		{
+			loadGame(gameIndex);
+		}
 		weather->fadeInEx();
 	}	
 	return true;

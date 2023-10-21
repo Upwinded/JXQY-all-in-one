@@ -272,19 +272,7 @@ void NPCManager::deleteNPCFromOtherPlace(std::shared_ptr<NPC> npc)
 		gm->camera->followNPC = nullptr;
 	}
 	removeChild(npc);
-
-	auto iter = actionImageList.begin();
-	while (iter != actionImageList.end())
-	{
-		if (iter->second.use_count() <= 1)
-		{
-			iter = actionImageList.erase(iter);
-		}
-		else
-		{
-			iter++;
-		}
-	}
+	tryCleanActionImageList();
 }
 
 void NPCManager::npcAutoAction()
@@ -308,7 +296,21 @@ void NPCManager::npcAutoAction()
 	//友军列表添加玩家
 	if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
 	{
-		friendList.push_back(gm->player);
+		if (gm->player->kind == nkPlayer || gm->player->kind == nkBattle || gm->player->kind == nkPartner)
+		{
+			if (gm->player->relation == nrFriendly)
+			{
+				friendList.push_back(gm->player);
+			}
+			else if (gm->player->relation == nrNeutral)
+			{
+				//neutralList.push_back(gm->player);
+			}
+			else if (gm->player->relation == nrHostile)
+			{
+				enemyList.push_back(gm->player);
+			}
+		}
 	}
 
 	for (size_t i = 0; i < npcList.size(); i++)
@@ -660,7 +662,6 @@ void NPCManager::removeNPCOnlyFromList(std::shared_ptr<NPC> npc)
 	}
 }
 
-
 void NPCManager::deleteNPC(std::vector<int> idx)
 {
 	if (idx.size() == 0)
@@ -695,6 +696,7 @@ void NPCManager::deleteNPC(std::vector<int> idx)
 	}
 	npcList = newList;
 	gm->map->createDataMap();
+	tryCleanActionImageList();
 }
 
 void NPCManager::deleteNPC(int idx)
@@ -789,8 +791,24 @@ void NPCManager::clearActionImageList()
 	{
 		iter->second = nullptr;
 	}
-
 	actionImageList.clear();
+}
+
+void NPCManager::tryCleanActionImageList()
+{
+	auto iter = actionImageList.begin();
+	while (iter != actionImageList.end())
+	{
+		if (iter->second.use_count() <= 1)
+		{
+			iter->second = nullptr;
+			iter = actionImageList.erase(iter);
+		}
+		else
+		{
+			iter++;
+		}
+	}
 }
 
 _shared_imp NPCManager::loadActionImage(const std::string & imageName)
@@ -907,7 +925,7 @@ void NPCManager::onUpdate()
 	{
 		deleteNPC(idx);
 	}
-
+	GameLog::write("NPC Action count:%d", actionImageList.size());
 	npcAutoAction();
 }
 

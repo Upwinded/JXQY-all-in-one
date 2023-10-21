@@ -1,7 +1,7 @@
 ﻿#include "EngineBase.h"
 #include <map>
 #include <iostream>
-#include <thread>
+
 #ifdef __ANDROID__
 #include "../File/INIReader.h"
 #include "../Game/GameTypes.h"
@@ -312,7 +312,7 @@ bool EngineBase::pointInImage(_shared_image image, int x, int y)
 	SDL_RenderCopy(renderer, from, nullptr, nullptr);
 	SDL_SetTextureBlendMode(from, bm);
 
-	std::unique_ptr<char[]> st(new char[w * h * 4]);
+	std::unique_ptr<char[]> st = std::make_unique<char[]>(w * h * 4);
 	int pitch = 4 * w;
 	if (st.get() == nullptr)
 	{
@@ -556,7 +556,7 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 	SDL_RenderCopy(renderer, from, nullptr, nullptr);
 	SDL_SetTextureBlendMode(from, bm);
 
-	std::unique_ptr<char[]> st(new char[w * h * 4]);
+	std::unique_ptr<char[]> st = std::make_unique<char[]>(w * h * 4);
 	int pitch = 4 * w;
 	if (st == nullptr)
 	{
@@ -581,7 +581,7 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 	//delete[] st;
 
 	int rwSize = w * h * 4 + 122;
-	std::unique_ptr<char[]> rwData(new char[rwSize]);
+	std::unique_ptr<char[]> rwData = std::make_unique<char[]>(rwSize);
 	
 	SDL_RWops * bmp = SDL_RWFromMem(rwData.get(), rwSize);
 	bmp->seek(bmp, 0, RW_SEEK_SET);
@@ -596,7 +596,7 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 	int size = (int)bmp->seek(bmp, 0, RW_SEEK_END);
 	if (size >= rwSize)
 	{
-		data = std::unique_ptr<char[]>(new char[rwSize]);
+		data = std::make_unique<char[]>(rwSize);
 		bmp->seek(bmp, 0, 0);
 		bmp->read(bmp, data.get(), rwSize, 1);
 		SDL_FreeSurface(sur);
@@ -1359,6 +1359,11 @@ void EngineBase::handleEvent()
 				calculateCursor((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
+					if (e.tfinger.fingerId == TOUCH_MOUSEID)
+					{
+						mouseX = tempX;
+						mouseY = tempY;
+					}
 					eventList.event.push(AEvent(ET_FINGERMOTION, (int)e.tfinger.fingerId, tempX, tempY));
 				}
 				eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
@@ -1374,6 +1379,11 @@ void EngineBase::handleEvent()
 				calculateCursor((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
+					if (e.tfinger.fingerId == TOUCH_MOUSEID)
+					{
+						mouseX = tempX;
+						mouseY = tempY;
+					}
 					eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
 				}
 				break;
@@ -1801,11 +1811,11 @@ void EngineBase::setFullScreen(FullScreenMode mode)
     }
     SDL_SetWindowFullscreen(window, flags);
     if (mode == FullScreenMode::window) {
-//        SDL_DisplayMode dm;
-//        SDL_GetDisplayMode(0, 0, &dm);
+        SDL_DisplayMode dm;
+        SDL_GetDesktopDisplayMode(0, &dm);
 
         SDL_SetWindowSize(window, width, height);
-//        SDL_SetWindowPosition(window, (dm.w - width) / 2, (dm.h - height) / 2);
+        SDL_SetWindowPosition(window, (dm.w - width) / 2, (dm.h - height) / 2);
     }
 
 	updateState();
@@ -1884,8 +1894,10 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 		GameLog::write("SDL error: %s \n", SDL_GetError());
 		return sdlError;
 	}
-
-	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "1");
+	
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
+	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
     
     int screenWidth = wWidth;
     int screenHeight = wHeight;
@@ -1917,7 +1929,6 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	SDL_ShowCursor(0);
 	Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
 
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
     
     if (fullScreenMode == FullScreenMode::fullScreen) 
     {
@@ -1957,24 +1968,6 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	SDL_RaiseWindow(window);
 
 	fadeInLogo();
-
-//#ifdef __ANDROID__
-//	std::string path = VIDEO_FOLDER;
-//	std::string listName = path + SAVE_LIST_FILE;
-//	INIReader ini(listName);
-//	auto count = ini.GetInteger(SAVE_LIST_SECTION, SAVE_LIST_COUNT_KEY, 0);
-//	for (int i = 0; i < count; ++i)
-//	{
-//		auto videoName = ini.Get(SAVE_LIST_SECTION, convert::formatString("%d", i), "");
-//		std::string newName = path + videoName;
-//		convert::replaceAllString(newName, "\\", "/");
-//		convert::replaceAllString(newName, "/", "_");
-//		if (!File::fileExist(newName))
-//		{
-//            File::copy(path + videoName, newName);
-//		}
-//	}
-//#endif
 
 	TTF_Init();
 
