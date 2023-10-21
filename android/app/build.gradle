@@ -4,14 +4,14 @@ plugins {
 
 android {
     namespace 'upwinded.jxqy.allinone'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "upwinded.jxqy.allinone"
         minSdk 28
-        targetSdk 33
+        targetSdk 34
         versionCode 1
-        versionName "1.0"
+        versionName "1.03b"
         ndk {
             abiFilters 'arm64-v8a', 'x86_64' //, 'armeabi-v7a', 'x86'
         }

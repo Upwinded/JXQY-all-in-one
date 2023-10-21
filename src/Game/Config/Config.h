@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "../../File/INIReader.h"
 #include "../GameTypes.h"
@@ -16,8 +16,8 @@ public:
     static FullScreenSolutionMode fullScreenSolutionMode;
 	static bool playerAlpha;
 
-	// ·À½çÃæ¿¨ËÀµÄ¼ÓÔØ·½Ê½
-	// Android£¨MIUI14¿ª·¢°æ£©ÏÂ¶àÏß³Ì»áÔì³É¿¨¶Ù£¬²»Çå³şÔ­Òò
+	// é˜²ç•Œé¢å¡æ­»çš„åŠ è½½æ–¹å¼
+	// Androidï¼ˆMIUI14å¼€å‘ç‰ˆï¼‰ä¸‹å¤šçº¿ç¨‹ä¼šé€ æˆå¡é¡¿ï¼Œä¸æ¸…æ¥šåŸå› 
 	static bool loadWithThread;
 
 	static void load();

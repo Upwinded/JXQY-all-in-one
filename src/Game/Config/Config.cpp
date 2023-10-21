@@ -3,7 +3,11 @@
 FullScreenMode Config::fullScreenMode = FullScreenMode::window;
 FullScreenSolutionMode Config::fullScreenSolutionMode = FullScreenSolutionMode::original;
 bool Config::playerAlpha = true;
+#ifdef __ANDROID__
+bool Config::loadWithThread = false;
+#else
 bool Config::loadWithThread = true;
+#endif
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
 double Config::gameSpeed = SPEED_TIME_DEFAULT;
