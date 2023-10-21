@@ -132,14 +132,14 @@ void Button::onMouseMoveOut()
 
 void Button::onMouseLeftDown(int x, int y)
 {
-	initTime();
+	//initTime();
 	playSound(1);
 	result |= erMouseLDown;
 }
 
 void Button::onMouseLeftUp(int x, int y)
 {	
-	initTime();
+	//initTime();
 	playSound(2);
 	result |= erMouseLUp;
 }

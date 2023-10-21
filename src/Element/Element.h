@@ -94,6 +94,10 @@ protected:
 public:
 	EventTouchID touchingID = TOUCH_UNTOUCHEDID;	//鼠标进入状态变量
 	EventTouchID touchingDownID = TOUCH_UNTOUCHEDID;	//鼠标在区域中左键按下
+private:
+	UTime touchingDownTime = 0;
+	const UTime clickCheckMaxTime = 1000;
+
 protected:
 	bool nextFrame = false;
 

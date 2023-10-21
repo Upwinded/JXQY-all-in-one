@@ -610,14 +610,12 @@ bool Element::checkTouchDown(EventTouchID id, int x, int y)
 {
 	if (touchingID == id)
 	{
-		if (touchingDownID != id)
-		{
-			touchingDownID = id;
-			mouseLDownX = x;
-			mouseLDownY = y;
-			onMouseLeftDown(x, y);
-			return true;
-		}
+		touchingDownID = id;
+		touchingDownTime = getTime();
+		mouseLDownX = x;
+		mouseLDownY = y;
+		onMouseLeftDown(x, y);
+		return true;
 	}
 	return false;
 }
@@ -627,7 +625,12 @@ bool Element::checkTouchUp(EventTouchID id, int x, int y)
 	if (touchingID == id)
 	{
 		onMouseLeftUp(x, y);
-		if (touchingDownID == id)
+		GameLog::write("now:%d, touchdowntime:%d", getTime(), touchingDownTime);
+		if (touchingDownID == id
+#ifdef __MOBILE__
+			&& getTime() - touchingDownTime <= clickCheckMaxTime
+#endif
+			)
 		{
 			onClick();
 		}
