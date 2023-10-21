@@ -79,8 +79,10 @@ void SkillsPanel::onChildCallBack(PElement child)
 		}
 		else if (child == skillBtn[0] || child == skillBtn[1] || child == skillBtn[2] || child == skillBtn[3] || child == skillBtn[4])
 		{
-			Point childCenter =  {child->rect.x + child->rect.w / 2, child->rect.y + child->rect.h / 2};
-			dragEndPosition = component->getDragRealPosition() - childCenter;
+//			Point childCenter =  {child->rect.x + child->rect.w / 2, child->rect.y + child->rect.h / 2};
+//			dragEndPosition = component->getDragRealPosition() - childCenter;
+            Point childPos = { child->rect.x, child->rect.y };
+			dragEndPosition = component->getDragPosition() - childPos;
 		}
 	}
 	if (parent != nullptr && parent->canCallBack)
@@ -104,8 +106,10 @@ void SkillsPanel::onDraw()
 		{
 			if (skillBtn[i]->isDragging())
 			{
-				Point childCenter = { skillBtn[i]->rect.x + skillBtn[i]->rect.w / 2, skillBtn[i]->rect.y + skillBtn[i]->rect.h / 2 };
-				drawIndicate(skillBtn[i]->getDragRealPosition() - childCenter);
+//				Point childCenter = { skillBtn[i]->rect.x + skillBtn[i]->rect.w / 2, skillBtn[i]->rect.y + skillBtn[i]->rect.h / 2 };
+//				drawIndicate(skillBtn[i]->getDragRealPosition() - childCenter);
+                Point childPos = { skillBtn[i]->rect.x, skillBtn[i]->rect.y };
+				drawIndicate(skillBtn[i]->getDragPosition() - childPos);
 				break;
 			}
 		}
