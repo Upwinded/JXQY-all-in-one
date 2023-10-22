@@ -665,7 +665,6 @@ void Player::onUpdate()
 {
 	auto ft = getFrameTime();
 	updateTime = getTime();
-	//GameLog::write("player nowAction:%d \n", nowAction);
 	if (getResult() & erRunDeathScript)
 	{
 		if (!gm->inEvent)

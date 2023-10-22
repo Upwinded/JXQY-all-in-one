@@ -354,5 +354,5 @@ void ObjectManager::onEvent()
 
 void ObjectManager::onUpdate()
 {
-	GameLog::write("OBJ Action count:%d", objectImageList.size());
+
 }

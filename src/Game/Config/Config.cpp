@@ -25,7 +25,6 @@ void Config::load()
 	std::string fileName = CONFIG_INI;
 	GameLog::write("load config \n");
 	INIReader ini(fileName);
-	GameLog::write("load config file done \n");
 #ifdef __MOBILE__
     fullScreenMode = FullScreenMode::fullScreen;
     fullScreenSolutionMode = FullScreenSolutionMode::adjust;

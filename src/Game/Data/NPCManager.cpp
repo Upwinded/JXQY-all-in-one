@@ -925,7 +925,6 @@ void NPCManager::onUpdate()
 	{
 		deleteNPC(idx);
 	}
-	GameLog::write("NPC Action count:%d", actionImageList.size());
 	npcAutoAction();
 }
 

@@ -43,7 +43,6 @@ void Camera::setFlyTo(int dir, int distance)
 	}
 	dir = dir % 8;
 	flyDirection = dir;
-	GameLog::write("dir:%d\n", flyDirection);
 	switch (flyDirection)
 	{
 	case 0:
@@ -155,34 +154,10 @@ void Camera::onUpdate()
 
 			int line = std::abs(position.y) % 2;		
 			int hscal = h / TILE_HEIGHT * 2 + 2;
-			if (hscal > maph)
+			if (hscal + 1 > maph)
 			{
-				int line2 = (maph / 2) % 2;
-				if (line == line2)
-				{
-					position.y = maph / 2;
-					if (line == 1)
-					{
-						offset.y = TILE_HEIGHT / 2;
-					}
-					else
-					{
-						offset.y = 0;
-					}
-				}
-				else
-				{
-					if (line == 1)
-					{
-						position.y = maph / 2 - 1;
-						offset.y = TILE_HEIGHT / 2;
-					}
-					else
-					{
-						position.y = maph / 2 + 1;
-						offset.y = 0;
-					}
-				}
+				position.y = maph / 2;
+				offset.y = -TILE_HEIGHT / 2;;
 			}
 			else
 			{
@@ -218,9 +193,9 @@ void Camera::onUpdate()
 
 			line = std::abs(position.y) % 2;
 			int wscal = w / TILE_WIDTH + 1;
-			if (wscal > mapw)
+			if (wscal + 2 > mapw)
 			{
-				position.x = mapw / 2;
+				position.x = mapw / 2 - 1;
 				if (line == 1)
 				{
 					offset.x = 0;
@@ -239,22 +214,22 @@ void Camera::onUpdate()
 						position.x = wscal / 2;
 						offset.x = 0;
 					}
-					else if ((position.x > mapw - wscal / 2 - 1) || (position.x == mapw - wscal / 2 - 1))
+					else if (position.x >= mapw - wscal / 2 - 2)
 					{
-						position.x = mapw - wscal / 2 - 1;
+						position.x = mapw - wscal / 2 - 2;
 						offset.x = -TILE_WIDTH / 2;
 					}
 				}
 				else
 				{
-					if (position.x < wscal / 2 || (position.x == wscal / 2))
+					if (position.x <= wscal / 2)
 					{
 						position.x = wscal / 2;
 						offset.x = TILE_WIDTH / 2;
 					}
-					else if ((position.x > mapw - wscal / 2 - 1) || (position.x == mapw - wscal / 2 - 1 && offset.x > 0))
+					else if ((position.x > mapw - wscal / 2 - 2) || (position.x == mapw - wscal / 2 - 2 && offset.x > 0))
 					{
-						position.x = mapw - wscal / 2 - 1;
+						position.x = mapw - wscal / 2 - 2;
 						offset.x = 0;
 					}
 				}
