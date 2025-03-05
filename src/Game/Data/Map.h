@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "../GameTypes.h"
 #include "../../File/PakFile.h"
 #include "../../Engine/Engine.h"
@@ -73,7 +73,11 @@ public:
 	static double getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset);
 
 	void loadMapMpc();
-	std::deque<Point> getPath(Point from, Point to);
+    
+    int NormalizeDirection(int direction);
+    std::deque<Point> getPathAstar(Point from, Point to);
+    std::deque<Point> getPathTraversal(Point from, Point to);
+    std::deque<Point> getPath(Point from, Point to);
 	//得到距离to为radiusi数范围的点
 	std::deque<Point> getRadiusPath(Point from, Point to, int radius);
 	//获得单步路径叠加

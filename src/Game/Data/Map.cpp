@@ -1,4 +1,4 @@
-﻿#include "Map.h"
+#include "Map.h"
 #include "../GameManager/GameManager.h"
 
 #ifdef pi
@@ -278,7 +278,161 @@ void Map::loadMapMpc()
 }
 
 
-std::deque<Point> Map::getPath(Point from, Point to)
+int Map::NormalizeDirection(int direction)
+{
+    if (direction > 7)
+    {
+        direction = direction % 8;
+    }
+    if (direction < 0)
+    {
+        direction = direction % 8 + 8;
+    }
+    return direction;
+}
+
+std::deque<Point> Map::getPathAstar(Point from, Point to)
+{
+    // 定义节点结构体
+    struct Node {
+        Point pos;
+        float g;  // 从起点到当前节点的实际代价
+        float h;  // 从当前节点到目标节点的预估代价
+        float f;  // f = g + h
+        std::shared_ptr<Node> parent;
+
+        Node(Point p, float g_val, float h_val, std::shared_ptr<Node> par)
+            : pos(p), g(g_val), h(h_val), f(g_val + h_val), parent(par) {}
+
+        // 重载比较运算符，用于优先队列
+        bool operator>(const Node& other) const {
+            return f > other.f;
+        }
+        bool operator<(const Node& other) const {
+            return f < other.f;
+        }
+        bool operator==(const Node& other) const {
+            return f == other.f;
+        }
+        
+        class Compare
+        {
+        public:
+            bool operator()(std::shared_ptr<Node> node1, std::shared_ptr<Node> node2)
+            {
+                return node1->f > node2->f;
+            }
+        };
+    };
+    
+
+    
+    std::deque<Point> path;
+    if (to == from)
+    {
+        return path;
+    }
+    int w, h;
+    if (data == nullptr)
+    {
+        return path;
+    }
+    
+    w = data->head.width;
+    h = data->head.height;
+    if (w <= 0 || h <= 0)
+    {
+        return path;
+    }
+    
+    if (!isInMap(from) || !isInMap(to))
+    {
+        return path;
+    }
+    
+    // 开放列表，使用优先队列
+    std::priority_queue<std::shared_ptr<Node>, std::vector<std::shared_ptr<Node>>, Node::Compare> openList;
+    // 关闭列表
+    std::vector<std::vector<bool>> closedList(h, std::vector<bool>(w, false));
+    // 节点信息
+    std::vector<std::vector<std::shared_ptr<Node>>> nodes(h, std::vector<std::shared_ptr<Node>>(w, nullptr));
+
+    // 初始化起点节点
+    auto startNode = std::make_shared<Node>(from, 0, calDistance(from, to), nullptr);
+    openList.push(startNode);
+    nodes[from.y][from.x] = startNode;
+    int count_times = 0;
+    while (!openList.empty() && (count_times++ < 128*128) )
+    {
+        // 取出 f 值最小的节点
+        auto current = openList.top();
+        openList.pop();
+
+        if (current->pos == to)
+        {
+            // 找到目标节点，回溯路径
+            std::shared_ptr<Node> temp = current;
+            while (temp->parent)
+            {
+                path.push_front(temp->pos);
+                temp = temp->parent;
+            }
+//            path.push_front(from);
+            break;
+        }
+
+        // 将当前节点加入关闭列表
+        closedList[current->pos.y][current->pos.x] = true;
+
+        // 获取相邻节点
+        for (int i = 0; i < 8; i++)
+        {
+            auto neighbor = getSubPoint(current->pos, i);
+            if ((!canWalk(neighbor) && (neighbor != to)) || closedList[neighbor.y][neighbor.x])
+            {
+                continue;
+            }
+            
+            if (i % 2 == 0)
+            {
+                if (!canPass(getSubPoint(current->pos, NormalizeDirection(i - 1))) || !canPass(getSubPoint(current->pos, NormalizeDirection(i + 1))))
+                {
+                    continue;
+                }
+            }
+            
+            float temp_tentativeG = 1.0f;
+            if (i % 4 == 2)
+            {
+                temp_tentativeG = 1.414f * temp_tentativeG;
+            }
+            else if (i % 2 != 0)
+            {
+                temp_tentativeG = 1.732f / 2.0f * temp_tentativeG;
+            }
+            float tentativeG = current->g + temp_tentativeG;
+            
+            if (!nodes[neighbor.y][neighbor.x])
+            {
+                // 节点未被访问过
+                auto newNode = std::make_shared<Node>(neighbor, tentativeG, calDistance(neighbor, to), current);
+                openList.push(newNode);
+                nodes[neighbor.y][neighbor.x] = newNode;
+            }
+            else if (tentativeG < nodes[neighbor.y][neighbor.x]->g)
+            {
+                // 找到更优路径
+                nodes[neighbor.y][neighbor.x]->parent = current;
+                nodes[neighbor.y][neighbor.x]->g = tentativeG;
+                nodes[neighbor.y][neighbor.x]->f = tentativeG + nodes[neighbor.y][neighbor.x]->h;
+                openList.push(nodes[neighbor.y][neighbor.x]);
+            }
+        }
+    }
+    return path;
+}
+
+std::deque<Point> Map::getPathTraversal(Point from, Point to)
 {
 	std::deque<Point> path;
 	path.resize(0);
@@ -370,6 +524,12 @@ std::deque<Point> Map::getPath(Point from, Point to)
 	}
 
 	return path;
+}
+
+std::deque<Point> Map::getPath(Point from, Point to)
+{
+    return getPathAstar(from, to);
+//    return getPathTraversal(from, to);
 }
 
 std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius)
