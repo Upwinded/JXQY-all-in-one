@@ -3,6 +3,8 @@ assets/*/
 bin/*/
 3rd/*/
 !assets/AssetsFolder.md
+!bin/linux/
+Bin/linux/lib/
 !bin/linux/*.sh
 cmake_install.cmake
 output-metadata.json
