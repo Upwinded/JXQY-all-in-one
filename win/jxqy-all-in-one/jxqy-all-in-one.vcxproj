@@ -419,6 +419,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\..\assets\config\logo.png" />
+    <Image Include="jxqy.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
