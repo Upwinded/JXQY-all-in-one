@@ -3,23 +3,22 @@
 剑侠情缘-all-in-one（old:Sword Heroes' Fate）
 
 ## 为什么改了名字？
+
 因为一直有一个比较遥远的目标，就是把剑侠情缘三部曲都实现，并且移植到多个平台。目前剑侠情缘2能在多平台运行。
 
 # release说明
 
 作者编译的版本支持如下平台：
 
-windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android 9以上
+windows 7以上， android 9以上, ubuntu20.04 以上, macos 11.3以上, ios 12.0以上
+（最新版本1.4.0，除了苹果的平台外，都采用了Vulkan后端，有些平台可能不能支持）
 
 下载地址：
 百度网盘：
 链接：https://pan.baidu.com/s/140vPCnQYC2DrRZKpjlb51w?pwd=juyh 
 提取码：juyh 
 
-夸克网盘：
-链接：https://pan.quark.cn/s/fcb3d950f8b3
-
-注意：ubuntu版本，如果20.04，可直接运行run_with_built-in_lib.sh开始游戏；20.04以上版本，请先运行install-runtime.sh安装运行时库，然后执行run.sh
+ubuntu版本，需要20.04以上，可直接运行run.sh开始游戏
 
 # repository说明与编译
 
@@ -29,9 +28,9 @@ windows 7以上, ubuntu20.04 以上, macos 10.3以上, ios 11.0以上， android
 链接：https://pan.baidu.com/s/1NqzXZMnX0xsk0jhXNIHk_Q?pwd=60r2 
 提取码：60r2 
 
-请把解压出的3rd文件夹里面的内容 放入repo的3rd文件夹。
+devel文件夹里面是各平台的开发库，可根据平台选择压缩包进行解压，并将解压出来的各平台文件夹放置在repo的ThirdParty/devel/文件夹下。
 
-bin文件夹包含windows下的运行时库，以及linux下FMOD的运行时库，可按需合并到repo的bin文件夹。
+bin.zip文件夹包含windows下的32位运行库，将解压出来的bin文件夹放到repo的根目录下。
 
 ## 资源文件
 
