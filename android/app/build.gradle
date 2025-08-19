@@ -58,7 +58,6 @@ android {
             }
         }
     }
-
     buildTypes {
         release {
             minifyEnabled false
@@ -68,7 +67,7 @@ android {
     applicationVariants.all { variant ->
         // tasks["merge${variant.name.capitalize()}Assets"]
         //     .dependsOn("externalNativeBuild${variant.name.capitalize()}")
-        def outputAPKName = "${appNameCN}_${variant.name}.apk";
+        def outputAPKName = "${appName}_${variant.name}_${appVersion}.apk";
         def outputApkPath = variant.getPackageApplicationProvider().get().outputDirectory.getAsFile().get().getPath()
         variant.outputs.all {
             outputFileName = outputAPKName
@@ -120,12 +119,21 @@ android {
     lint {
         abortOnError = false
     }
+
+    tasks.register("copySdlAars", Copy) {
+        from fileTree("../../ThirdParty/devel/android/SDL")
+        into "libs"
+        include "*.aar"
+    }
+
+    preBuild.dependsOn(tasks.named("copySdlAars"))
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.aar'], dir: 'libs')
     implementation files('../../ThirdParty/devel/android/fmod/lib/fmod.jar')
-    implementation fileTree(include: ['*.arr'], dir: '../../ThirdParty/devel/android/SDL/')
+    //implementation fileTree(include: ['*.arr'], dir: '../../ThirdParty/devel/android/SDL/')
 }
 
 clean {
