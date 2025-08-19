@@ -15,6 +15,7 @@ Weather::Weather()
 
 Weather::~Weather()
 {
+	clearRainCustom();
 	if (snowflake != nullptr)
 	{
 		//engine->freeImage(snowflake);
@@ -117,12 +118,12 @@ void Weather::drawElementLum()
 			}
 			bool drawLumMask = false;
 			PointEx eOffset = { 0, 0 };
-			for (size_t k = 0; k < gm->map->dataMap.tile[i][j].objIndex.size(); k++)
+			for (auto iter = gm->map->dataMap.tile[i][j].objList.begin(); iter != gm->map->dataMap.tile[i][j].objList.end(); iter++)
 			{
-				if (gm->objectManager->objectList[gm->map->dataMap.tile[i][j].objIndex[k]]->lum > (int)gm->global.data.mainLum)
+				if ((*iter)->lum > (int)gm->global.data.mainLum)
 				{
 					drawLumMask = true;
-					eOffset = gm->objectManager->objectList[gm->map->dataMap.tile[i][j].objIndex[k]]->offset;
+					eOffset = (*iter)->offset;
 					break;
 				}
 			}	
@@ -241,7 +242,15 @@ void Weather::setTime(unsigned char t)
 
 int Weather::getDropNum()
 {
-	if (weatherType == wtLightRain)
+	if (weatherType == wtCustomRain)
+	{
+		return customRainDropNum;
+	}
+	else if (weatherType == wtSnow)
+	{
+		return snowDropNum;
+	}
+	else if (weatherType == wtLightRain)
 	{
 		return lrainDropNum;
 	}
@@ -257,21 +266,20 @@ int Weather::getDropNum()
 	{
 		return hrainDropNum;
 	}
-	else if (weatherType == wtSnow)
-	{
-		return snowDropNum;
-	}
+	
 	return 0;
 }
 
 void Weather::resetDrops()
 {
-	int dropNum = getDropNum();	
-	for (int i = 0; i < (int)drops.size(); i++)
-	{	
-		if (drops[i].type == wtNone && i < dropNum)
+	int dropNum = getDropNum();
+	int i = 0;
+	for (auto iter = drops.begin(); iter != drops.end(); iter++)
+	{
+		i++;
+		if (iter->type == wtNone && i < dropNum)
 		{
-			resetDrop(&drops[i], true);
+			resetDrop(&(*iter), true);
 		}		
 	}
 }
@@ -286,22 +294,30 @@ void Weather::resetDrop(WeatherDrop * drop, bool newdrop)
 	engine->getWindowSize(w, h);
 	if (drop->type == wtSnow)
 	{
-		drop->x = (float)((rand() % (w + dropWRange / 4)) - dropWRange / 4);
+		drop->x = (float)(engine->getRand(w + dropWRange / 4) - dropWRange / 4);
 	}
 	else
 	{
-		drop->x = (float)(rand() % w);	
+		drop->x = (float)(engine->getRand(w));
 	}
 	
 	if (drop->type != weatherType)
 	{
 		drop->type = weatherType;
 		if (drop->type == wtRain || drop->type == wtLightRain
-			|| drop->type == wtHeavyRain || drop->type == wtLightning)
+			|| drop->type == wtHeavyRain || drop->type == wtLightning || drop->type == wtCustomRain)
 		{			
 			int alphaRange = 160;
-			drop->dropAlpha = rand() % alphaRange + 90;
-			drop->speed = 0.8f + 0.005f * (drop->dropAlpha - 90 - alphaRange / 2);			
+			drop->dropAlpha = engine->getRand(alphaRange) + 90;
+			if (drop->type == wtCustomRain)
+			{
+				drop->speed = convert_max(0.04f * customRainSpeed + 0.005f * (drop->dropAlpha - 90 - alphaRange / 2), 0.3f);
+			}
+			else
+			{
+				drop->speed = 0.8f + 0.005f * (drop->dropAlpha - 90 - alphaRange / 2);
+			}
+					
 		}
 		else if (drop->type == wtSnow)
 		{
@@ -311,11 +327,11 @@ void Weather::resetDrop(WeatherDrop * drop, bool newdrop)
 	if (newdrop)
 	{ 
 		drop->type = weatherType;
-		drop->y = (float)(- dropRange - (rand() % (h + dropRange * 2)));
+		drop->y = (float)(- dropRange - (engine->getRand(h + dropRange * 2)));
 	}
 	else
 	{
-		drop->y = (float)(- dropRange - (rand() % (dropRange * 3)));
+		drop->y = (float)(- dropRange - (engine->getRand(dropRange * 3)));
 	}
 }
 
@@ -359,6 +375,41 @@ void Weather::updateFade()
 	}
 }
 
+void Weather::setRainCustomFromIni(std::shared_ptr<INIReader> ini)
+{
+	int customRainDropNum = maxDropNum / 2;
+	int customRainSpeed = 100;
+	int customRainBoltProb = 10000;
+
+	std::string customRainSoundName;
+	std::vector<std::string> customRainBoltSoundName;
+	_music customRainSound = nullptr;
+	_channel customRainSoundChannel = nullptr;
+	std::vector<_music> customRainBoltSound;
+}
+
+void Weather::clearRainCustom()
+{
+	customRainDropNum = maxDropNum / 2;
+	customRainSpeed = 100;
+	customRainBoltProb = 10000;
+
+	customRainSoundName = "";
+	customRainBoltSoundName.clear();
+
+	if (customRainSoundChannel != nullptr)
+	{
+		engine->stopMusic(customRainSoundChannel);
+		customRainSoundChannel = nullptr;
+	}
+
+	if (customRainSound = nullptr)
+	{
+		engine->freeMusic(customRainSound);
+		customRainSound = nullptr;
+	}
+}
+
 void Weather::draw()
 {
 	if (gm != nullptr)
@@ -372,17 +423,50 @@ void Weather::draw()
 	}
 }
 
-void Weather::setWeather(WeatherType wType)
+void Weather::setWeather(WeatherType wType, const std::string& configFIleName)
 {
-	if (weatherType == wType)
+	if (weatherType == wType && wType != wtCustomRain)
 	{
 		return;
 	}
-	srand((unsigned int)time(0));
 	weatherType = wType;
+	if (weatherType == wtCustomRain)
+	{
+		std::shared_ptr<INIReader> ini = std::make_shared<INIReader>();;
+		std::unique_ptr<char[]> s;
+		int len = 0;
+		len = PakFile::readFile(INI_MAP_FOLDER + configFIleName, s);
+		if (s == nullptr || len == 0)
+		{
+			GameLog::write("no weather ini file: %s\n", (INI_MAP_FOLDER + configFIleName).c_str());
+		}
+		else
+		{
+			ini = std::make_shared<INIReader>(s);
+		}
+		customRainDropNum = ini->GetInteger("Init", "Number", customRainDropNum);
+		customRainSpeed = ini->GetInteger("Init", "Speed", customRainSpeed);
+		customRainBoltProb = ini->GetInteger("Init", "Speed", customRainBoltProb);
+		customRainSoundName = ini->Get("RainSound", "1", "");
+		if (!customRainSoundName.empty())
+		{
+			customRainSoundName = SOUND_FOLDER + customRainSoundName;
+		}
+		customRainBoltSoundName.resize(3);
+		for (size_t i = 0; i < customRainBoltSoundName.size(); i++)
+		{
+			customRainBoltSoundName[i] = ini->Get("BoltSound", std::to_string(i + 1), ""); 
+			if (!customRainBoltSoundName[i].empty())
+			{
+				customRainBoltSoundName[i] = SOUND_FOLDER + customRainBoltSoundName[i];
+			}
+		}
+	}
+
 	if (weatherType == wtLightning)
 	{
-		lastLightningTime = getTime();
+		lightningInterval = lightningIntervalMin + engine->getRand(lightningIntervalMin * 2);
+		lastLightninUTime = getTime();
 	}
 	resetDrops();
 }
@@ -399,20 +483,20 @@ void Weather::setDay(DayType dType)
 
 void Weather::drawWeather()
 {
-	for (int i = 0; i < (int)drops.size(); i++)
+	for (auto iter = drops.begin(); iter != drops.end(); iter++)
 	{
-		if (drops[i].type == wtSnow)
+		if (iter->type == wtSnow)
 		{
-			engine->drawImage(snowflake, (int)round(drops[i].x), (int)round(drops[i].y));
+			engine->drawImage(snowflake, (int)round(iter->x), (int)round(iter->y));
 		}
-		else if (drops[i].type != wtNone)
+		else if (iter->type != wtNone)
 		{
-			unsigned char a = drops[i].dropAlpha;
+			unsigned char a = iter->dropAlpha;
 			int w, h = 0;
 			engine->getWindowSize(w, h);
-			if (drops[i].y > 0 && drops[i].y < h)
+			if (iter->y > 0 && iter->y < h)
 			{
-				unsigned char ta = (unsigned char)((float)200 * float(drops[i].y / float(h)));
+				unsigned char ta = (unsigned char)((float)200 * float(iter->y / float(h)));
 				if (a > ta)
 				{
 					a = a - ta;
@@ -422,12 +506,12 @@ void Weather::drawWeather()
 					a = 0;
 				}
 			}
-			else if (drops[i].y >= h)
+			else if (iter->y >= h)
 			{
 				a = 0;
 			}
 			engine->setImageAlpha(raindrop, a);
-			engine->drawImage(raindrop, (int)round(drops[i].x), (int)round(drops[i].y));
+			engine->drawImage(raindrop, (int)round(iter->x), (int)round(iter->y));
 		}
 	}
 	
@@ -446,87 +530,151 @@ void Weather::drawWeather()
 void Weather::updateWeather()
 {
 	auto t = getFrameTime();
-	for (int i = 0; i < (int)drops.size(); i++)
+	auto iter = drops.begin();
+	while (iter != drops.end())
 	{
-		if (drops[i].type == wtSnow)
+		if (iter->type == wtSnow)
 		{
-			drops[i].y = (((double)t) * drops[i].speed) + drops[i].y - gm->camera->differencePosition.y;
-			drops[i].x += ((double)(rand() % 4 - 2)) - gm->camera->differencePosition.x;
+			iter->y = (((double)t) * iter->speed) + iter->y - gm->camera->differencePosition.y;
+
+			iter->x += ((double)(engine->getRand(4) - 2)) - gm->camera->differencePosition.x;
 			int w, h;
 			engine->getWindowSize(w, h);
-            if (drops[i].x < -DROP_OFF_SCREEN_RANGE)
+            if (iter->x < -DROP_OFF_SCREEN_RANGE)
             {
-                drops[i].x += w + DROP_OFF_SCREEN_RANGE * 2;
+                iter->x += w + DROP_OFF_SCREEN_RANGE * 2;
             }
-            else if (drops[i].x > w + DROP_OFF_SCREEN_RANGE)
+            else if (iter->x > w + DROP_OFF_SCREEN_RANGE)
             {
-                drops[i].x -= (w + DROP_OFF_SCREEN_RANGE * 2);
+                iter->x -= (w + DROP_OFF_SCREEN_RANGE * 2);
             }
-			if (drops[i].y > h + dropRange)
+			if (iter->y > h + dropRange)
 			{
-				if (i >= getDropNum())
+				if (drops.size() > getDropNum())
 				{
-					drops[i].type = wtNone;
+					//iter->type = wtNone;
+					iter = drops.erase(iter);
+					continue;
 				}
 				else if (weatherType == wtSnow)
 				{
-					resetDrop(&drops[i], false);
+					resetDrop(&(*iter), false);
 				}
 				else
 				{
-					resetDrop(&drops[i], true);
+					resetDrop(&(*iter), true);
 				}
 			}
 		}
-		else if (drops[i].type != wtNone)
+		else if (iter->type != wtNone)
 		{
-			drops[i].y = (((double)t) * (drops[i].speed > 0.4 ? drops[i].speed : 0.4)) + drops[i].y;
+			iter->y = (((double)t) * (iter->speed > 0.4 ? iter->speed : 0.4)) + iter->y;
 			int w, h;
 			engine->getWindowSize(w, h);
-			if (drops[i].x < - dropRange || drops[i].x > w + dropRange || drops[i].y > h + dropRange)
+			if (iter->x < - dropRange || iter->x > w + dropRange || iter->y > h + dropRange)
 			{
-				if (i >= getDropNum())
+				if (drops.size() > getDropNum())
 				{
-					drops[i].type = wtNone;
+					//iter->type = wtNone;
+					iter = drops.erase(iter);
+					continue;
 				}
 				else if (weatherType == wtSnow)
 				{
-					resetDrop(&drops[i], true);
+					resetDrop(&(*iter), true);
 				}
 				else
 				{
-					resetDrop(&drops[i], false);
+					resetDrop(&(*iter), false);
 				}
 			}
 		}
+		else
+		{
+			if (drops.size() > getDropNum())
+			{
+				iter = drops.erase(iter);
+				continue;
+			}
+			else
+			{
+				resetDrop(&(*iter), true);
+			}
+		}
+		iter++;
+	}
+
+	while (drops.size() < getDropNum())
+	{
+		WeatherDrop initDrop;
+		resetDrop(&initDrop, true);
+		drops.push_back(initDrop);
 	}
 
 	if (lightningBegin)
 	{
-		if (getTime() - lightningBeginTime > lightningTime)
+		// 闪电开始后，需要闪屏
+		if (getTime() - lightningBeginTime > lightninUTime)
 		{
 			lightningBegin = false;
-			lastLightningTime = getTime();
+			lastLightninUTime = getTime();
+			if (weatherType == wtLightning)
+			{
+				lightningInterval = lightningIntervalMin + engine->getRand(lightningIntervalMin * 2);
+			}
 		}
 		else
 		{
-			if (getTime() - lightningBeginTime > lightningTime / 3)
+			if (getTime() - lightningBeginTime > lightninUTime / 3)
 			{
-				engine->setImageAlpha(lightningMask, 160 - (getTime() - lightningBeginTime - lightningTime / 3) * 140 / (lightningTime * 2 / 3));
+				engine->setImageAlpha(lightningMask, 160 - (getTime() - lightningBeginTime - lightninUTime / 3) * 140 / (lightninUTime * 2 / 3));
 			}
 			else
 			{
-				engine->setImageAlpha(lightningMask, 160 - (lightningTime / 3 - getTime() + lightningBeginTime) * 140 / (lightningTime / 3));
+				engine->setImageAlpha(lightningMask, 160 - (lightninUTime / 3 - getTime() + lightningBeginTime) * 140 / (lightninUTime / 3));
 			}
 		}
 	}
-	else if (weatherType == wtLightning)
+	else
 	{
-		if (getTime() - lastLightningTime > lightningIntervalMin + rand() % lightningIntervalMin )
+		if (weatherType == wtLightning)
 		{
-			lightningBegin = true;
+			if (getTime() - lastLightninUTime > lightningInterval)
+			{
+				lightningBegin = true;
+			}
+		}
+		else if (weatherType == wtCustomRain)
+		{
+			if (getTime() - lastLightninUTime > convert_max(lightningIntervalMin, customRainBoltProb))
+			{
+				if (customRainBoltSoundName.size() > 0)
+				{
+					auto index = engine->getRand(customRainBoltSoundName.size());
+					if (!customRainBoltSoundName[index].empty())
+					{
+						lightningBegin = true;
+
+						std::unique_ptr<char[]> s;
+						int len = PakFile::readFile(customRainBoltSoundName[index], s);
+						if (s != nullptr && len > 0)
+						{
+							engine->playSound(s, len);
+						}
+					}
+				}
+
+				if (!lightningBegin)
+				{
+					lastLightninUTime = getTime();
+				}
+			}
+		}
+		
+		if (lightningBegin)
+		{
 			lightningBeginTime = getTime();
-			lastLightningTime = lightningBeginTime;
+			lastLightninUTime = lightningBeginTime;
 			engine->setImageAlpha(lightningMask, 120);
 		}
 	}
@@ -534,11 +682,12 @@ void Weather::updateWeather()
 
 void Weather::reset()
 {
+	clearRainCustom();
 	weatherType = wtNone;
 	WeatherDrop initDrop;
-	for (size_t i = 0; i < drops.size(); i++)
+	for (auto iter = drops.begin(); iter != drops.end(); iter++)
 	{
-		drops[i] = initDrop;
+		*iter = initDrop;
 	}
 	nowLum = 255;
 }

@@ -9,6 +9,8 @@ public:
 	MagicMenu();
 	virtual ~MagicMenu();
 
+	virtual void init() override;
+
 	std::shared_ptr<ImageContainer> title = nullptr;
 	std::shared_ptr<ImageContainer> image = nullptr;
 
@@ -23,7 +25,7 @@ private:
 	int position = -1;
 	virtual void onEvent();
 
-	virtual void init();
+
 	void freeResource();
 
 };

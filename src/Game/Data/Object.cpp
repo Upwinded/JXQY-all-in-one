@@ -70,7 +70,7 @@ void Object::drawAlpha(Point cenTile, Point cenScreen, PointEx coffset)
 	}
 }
 
-void Object::draw(Point cenTile, Point cenScreen, PointEx coffset)
+void Object::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle)
 {
 	Point tile = position;
 	Point pos = Map::getTilePosition(tile, cenTile, cenScreen, coffset);
@@ -78,20 +78,21 @@ void Object::draw(Point cenTile, Point cenScreen, PointEx coffset)
 	_shared_image image = getActionShadow(&offsetX, &offsetY);
 	engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
 	image = getActionImage(&offsetX, &offsetY);
-	if (!selecting)
+	if (selecting && scriptFile != "")
 	{
-		engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
+		engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 200, 0, 150);
 	}
 	else
 	{
-		if (scriptFile != "")
-		{		
-			engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 200, 0, 150);
-		}
-		else
+		if ((colorStyle & 0xFFFFFF) == 0xFFFFFF)
 		{
 			engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
 		}
+		else
+		{
+			engine->drawImageWithColor(image, pos.x - offsetX, pos.y - offsetY, (colorStyle >> 16) & 0xFF, (colorStyle >> 8) & 0xFF, colorStyle & 0xFF);
+		}
+		
 	}
 }
 

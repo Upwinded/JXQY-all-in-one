@@ -71,7 +71,6 @@ void Item::drawItemStr()
 			strImage = engine->createText(str, fontSize, color);
 		}
 		engine->drawImage(strImage, rect.x, rect.y);
-		//engine->drawUnicodeText(wstr, rect.x, rect.y, fontSize, color);
 	}	
 }
 

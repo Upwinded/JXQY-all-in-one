@@ -7,6 +7,7 @@ enum WeatherType
 	wtRain,
 	wtLightning,
 	wtHeavyRain,
+	wtCustomRain,
 	wtSnow
 };
 

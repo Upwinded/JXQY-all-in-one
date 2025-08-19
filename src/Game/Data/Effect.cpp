@@ -33,7 +33,7 @@ UTime Effect::getFlyingImageTime()
 	}
 }
 
-UTime Effect::getExplodingTime()
+UTime Effect::getExplodinUTime()
 {
 	if (getMoveKind() == mmkSelf)
 	{
@@ -89,7 +89,7 @@ void Effect::beginExplode(Point pos)
 	if (magic.level[level].moveKind != mmkPoint)
 	{
 		beginTime = getTime();
-		lifeTime = getExplodingTime();
+		lifeTime = getExplodinUTime();
 		playSound(doing);
 	}
 	if (lifeTime == 0)
@@ -105,14 +105,14 @@ void Effect::beginFly()
 	{
 		doing = ekThrowing;
 		beginTime = getTime();
-		lifeTime = getFlyingTime();
+		lifeTime = getFlyinUTime();
 		playSound(ekFlying);
 	}
 	else
 	{
 		doing = ekFlying;
 		beginTime = getTime();
-		lifeTime = getFlyingTime();
+		lifeTime = getFlyinUTime();
 		playSound(doing);
 	}
 }
@@ -128,7 +128,7 @@ void Effect::beginDrop()
 	playSound(ekExploding);
 }
 
-UTime Effect::getFlyingTime()
+UTime Effect::getFlyinUTime()
 {
 	if (getMoveKind() == mmkThrow)
 	{
@@ -328,6 +328,7 @@ void Effect::initFromIni(INIReader * ini, const std::string & section)
 	}
 	getFrameTime();
 	user = nullptr;
+	target = nullptr;
 	fileName = ini->Get(section, "FileName", "");
 	doing = ini->GetInteger(section, "Doing", ekExploding);
 	position.x = ini->GetInteger(section, "MapX", 0);
@@ -460,7 +461,6 @@ int Effect::getDirection(Point fDir)
 	fDir.x = - fDir.x;
 	double angle = atan2((double)fDir.x, (double)fDir.y);
 
-
 	if (angle < 0)
 	{
 		angle += 2 * pi;
@@ -478,7 +478,7 @@ int Effect::calDirection()
 	return direction = getDirection(flyingDirection);
 }
 
-void Effect::draw(Point cenTile, Point cenScreen, PointEx coffset)
+void Effect::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle)
 {
 	Point tile = position;
 	Point pos = Map::getTilePosition(tile, cenTile, cenScreen, coffset);
@@ -491,8 +491,15 @@ void Effect::draw(Point cenTile, Point cenScreen, PointEx coffset)
 		auto l2 = Map::getTileDistance(src, srcOffset, dest, destOffset);
 		//抛物线Y坐标偏移
 		offsetH = int(MAGIC_THROW_HEIGHT * TILE_HEIGHT * l2 * (1 - pow(l1 / (l2 / 2) - 1, 2)) / speed);
-	}	
-	engine->drawImage(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY - offsetH);
+	}
+	if ((colorStyle & 0xFFFFFF) == 0xFFFFFF)
+	{
+		engine->drawImage(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY - offsetH);
+	}
+	else
+	{
+		engine->drawImageWithColor(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY - offsetH, (colorStyle >> 16) & 0xFF, (colorStyle >> 8) & 0xFF, colorStyle & 0xFF);
+	}
 }
 
 _shared_image Effect::loadImage(int * x, int * y)

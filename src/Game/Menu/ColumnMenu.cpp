@@ -4,10 +4,9 @@
 
 ColumnMenu::ColumnMenu()
 {
-	init();
 	visible = true;
+	init();
 }
-
 
 ColumnMenu::~ColumnMenu()
 {

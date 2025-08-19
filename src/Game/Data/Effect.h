@@ -65,11 +65,11 @@ public:
 	int getDirection(Point fDir);
 	int calDirection();
 
-	void draw(Point cenTile, Point cenScreen, PointEx coffset);
+	void draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle);
 	_shared_image loadImage(int * x, int * y);
-	UTime getFlyingTime();
+	UTime getFlyinUTime();
 	UTime getFlyingImageTime();
-	UTime getExplodingTime();
+	UTime getExplodinUTime();
 	UTime getSuperImageTime();
 	void calTime();
 	void calDest();

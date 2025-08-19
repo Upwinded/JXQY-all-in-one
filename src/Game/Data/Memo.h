@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "../GameTypes.h"
 #include "../../libconvert/libconvert.h"
@@ -6,7 +6,7 @@
 #include "../../File/INIReader.h"
 
 #define memoLine 9
-#define memoStrHead "¡ñ"
+#define memoStrHead u8"●"
 class Memo
 {
 public:

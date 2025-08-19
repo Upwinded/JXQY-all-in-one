@@ -2,7 +2,7 @@
 
 Option::Option()
 {
-	init();	
+	init();
 }
 
 Option::~Option()

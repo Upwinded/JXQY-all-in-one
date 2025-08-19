@@ -37,6 +37,8 @@ public:
 	GameManager();
 	virtual ~GameManager();
 
+	void init();
+
 	int gameIndex = 0;
 
 	void initMenuWithThread();
@@ -46,11 +48,11 @@ public:
 	static GameManager * this_;
 	static GameManager * getInstance();
 
-	std::string mapName = "";
+	std::string mapFolderName = "";
 
-	bool inThread = false;
+	std::atomic<bool> inThread;
 	std::mutex loadMutex;
-	bool loadThreadOver = false;
+	std::atomic<bool> loadThreadOver;
 	bool loadGame(int index);
 
 	void loadGameThread(int index);
@@ -72,26 +74,26 @@ public:
 #endif // __MOBILE__
 
 	// Children
-	std::shared_ptr<MenuController> menu = std::make_shared<MenuController>();
-	std::shared_ptr<GameController> controller = std::make_shared<GameController>();
+	std::shared_ptr<MenuController> menu = nullptr; // = std::make_shared<MenuController>();
+	std::shared_ptr<GameController> controller = nullptr; // = std::make_shared<GameController>();
 	
-	std::shared_ptr<Weather> weather = std::make_shared<Weather>();
+	std::shared_ptr<Weather> weather = nullptr; // = std::make_shared<Weather>();
 
-	std::shared_ptr<Camera> camera = std::make_shared<Camera>();
+	std::shared_ptr<Camera> camera = nullptr; // = std::make_shared<Camera>();
 
-	std::shared_ptr<Map> map = std::make_shared<Map>();
+	std::shared_ptr<Map> map = nullptr; // = std::make_shared<Map>();
 
-	std::shared_ptr<NPCManager> npcManager = std::make_shared<NPCManager>();
-	std::shared_ptr<ObjectManager> objectManager = std::make_shared<ObjectManager>();
-	std::shared_ptr<EffectManager> effectManager = std::make_shared<EffectManager>();
+	std::shared_ptr<NPCManager> npcManager = nullptr; // = std::make_shared<NPCManager>();
+	std::shared_ptr<ObjectManager> objectManager = nullptr; // = std::make_shared<ObjectManager>();
+	std::shared_ptr<EffectManager> effectManager = nullptr; // = std::make_shared<EffectManager>();
 
 	std::shared_ptr<VideoPlayer> video = nullptr;
+
+	std::shared_ptr<Player> player = nullptr; // = std::make_shared<Player>();
 
 	Global global;
 	Memo memo;
 	Traps traps;
-	
-	std::shared_ptr<Player> player = std::make_shared<Player>();
 
 
 	GoodsManager goodsManager;
@@ -167,6 +169,8 @@ public:
 	void setMapTrap(int idx, const std::string & trapFile);
 	void saveMapTrap();
 	void setMapTime(unsigned char t);
+	void changeASFColor(uint8_t r, uint8_t g, uint8_t b);
+	void changeMapColor(uint8_t r, uint8_t g, uint8_t b);
 
 	//物品函数
 	void loadObjectWithThread(const std::string & fileName);
@@ -205,6 +209,9 @@ public:
 	void setNPCActionType(const std::string & name, int actionType); //暂时不支持走动
 	void setNPCActionFile(const std::string & name, int action, const std::string & fileName);
 	void npcSpecialAction(const std::string & name, const std::string & fileName);
+	void changeLife(const std::string& name, int value);
+	void changeMana(const std::string& name, int value);
+	void changeThew(const std::string& name, int value);
 
 	//主角函数
 	void loadPlayer(int index);
@@ -246,6 +253,7 @@ public:
 	void addRandGoods(const std::string & fileName);
 	void deleteGoods(const std::string & name);
 	void addMagic(const std::string & name);
+	void addOneMagic(const std::string& playerName, const std::string& magicName);
 	void deleteMagic(const std::string & name);
 	void addMagicExp(const std::string & name, int addexp);
 	void fullLife();
@@ -273,13 +281,20 @@ public:
 	void showBottomWnd();
 	void hideMouseCursor();
 	void showMouseCursor();
+
+	// 天气函数
 	void showSnow(int bsnow);
 	void showRandomSnow();
 	void showRain(int brain);
 
+	void beginRain(const std::string& configFileName);
+	void endRain();
+
+	void checkYear(const std::string& varName);
+
 private:
 	void loadingDisplayThread(std::vector<_shared_image> loadingImage);
-	bool loadingDisplaying = false;
+	std::atomic<bool> loadingDisplaying;
 private:
 
 	virtual void onUpdate();

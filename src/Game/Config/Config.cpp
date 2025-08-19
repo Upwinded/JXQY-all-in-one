@@ -11,6 +11,7 @@ bool Config::loadWithThread = true;
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
 double Config::gameSpeed = SPEED_TIME_DEFAULT;
+int Config::display = 0;
 
 Config::Config()
 {
@@ -31,13 +32,14 @@ void Config::load()
     windowWidth = 1200;
     windowHeight = 600;
 #else
-	fullScreenMode = (FullScreenMode)ini.GetInteger("game", "fullScreenMode", (int)fullScreenMode);
-    fullScreenSolutionMode = (FullScreenSolutionMode)ini.GetInteger("game", "fullScreenSolutionMode", (int)fullScreenSolutionMode);
+	fullScreenMode = (FullScreenMode)ini.GetInteger("game", "fullscreenmode", (int)fullScreenMode);
+    fullScreenSolutionMode = (FullScreenSolutionMode)ini.GetInteger("game", "fullscreensolutionmode", (int)fullScreenSolutionMode);
     windowWidth = ini.GetInteger("game", "windowwidth", windowWidth);
     windowHeight = ini.GetInteger("game", "windowheight", windowHeight);
+	display = ini.GetInteger("game", "display", display);
 #endif
 	playerAlpha = ini.GetBoolean("game", "playeralpha", playerAlpha);
-	loadWithThread = ini.GetBoolean("game", "loadWithThread", loadWithThread);
+	loadWithThread = ini.GetBoolean("game", "loadwiththread", loadWithThread);
 
 	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
 	gameSpeed = convSpeedToDouble(speed);
@@ -96,6 +98,7 @@ void Config::save()
 	ini.SetInteger("game", "soundvolume", (int)(soundVolume * 100));
 	ini.SetInteger("game", "windowwidth", windowWidth);
 	ini.SetInteger("game", "windowheight", windowHeight);
+	ini.SetInteger("game", "display", display);
 	ini.saveToFile(fileName);
 }
 

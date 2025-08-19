@@ -3,8 +3,8 @@
 
 Dialog::Dialog()
 {
-	init();
 	priority = epMax;
+	init();
 }
 
 Dialog::~Dialog()
@@ -133,7 +133,7 @@ bool Dialog::onHandleEvent(AEvent & e)
 	{
 		return false;
 	}
-	if (e.eventType == ET_MOUSEDOWN || e.eventType == ET_KEYDOWN || e.eventType == ET_FINGERDOWN)
+	if (e.eventType == ET_MOUSEDOWN || e.eventType == ET_FINGERDOWN || (e.eventType == ET_KEYDOWN && (e.eventData == KEY_SPACE || !e.eventRepeat)))
 	{
 		index++;
 		if (index >= (int)talkStrList.size())

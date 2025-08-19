@@ -3,9 +3,9 @@
 
 MsgBox::MsgBox()
 {
-	init();
 	visible = false;
 	coverMouse = false;
+	init();
 }
 
 
@@ -30,7 +30,7 @@ void MsgBox::showMessage(const std::string & str)
 
 void MsgBox::onUpdate()
 {
-	if (showed && getTime() - beginTime > showingTime)
+	if (showed && getTime() - beginTime > showinUTime)
 	{
 		visible = false;
 		showed = false;

@@ -12,9 +12,10 @@
 #include <string>
 #include <vector>
 #include <stdarg.h>
-#include "File.h"
 #include <map>
-#include "../Types/Types.h"
+#include <memory>
+#include "File.h"
+
 
 struct iniKey
 {
@@ -64,7 +65,10 @@ public:
 	//(Added by Upwinded.)
 	void SetBoolean(const std::string& section, const std::string& name, bool value);
 	//(Added by Upwinded.)
-	unsigned int GetColor(const std::string& section, const std::string& name, unsigned int value);
+	void SetColor(const std::string& section, const std::string& name, uint32_t value);
+
+	//(Added by Upwinded.)
+	uint32_t GetColor(const std::string& section, const std::string& name, uint32_t value);
 
 
     // Return the result of ini_parse(), i.e., 0 on success, line number of
@@ -72,8 +76,8 @@ public:
     int ParseError() const;
 
     // Get a string value from INI file, returning default_value if not found.
-    std::string Get(const std::string& section, const std::string& name, const std::string& default_value) const;
-	
+	std::string Get(const std::string& section, const std::string& name, const std::string& default_value) const;
+
 	UTime GetTime(const std::string& section, const std::string& name, UTime default_value) const;
 
     // Get an integer (long) value from INI file, returning default_value if

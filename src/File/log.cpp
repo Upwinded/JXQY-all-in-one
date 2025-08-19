@@ -25,7 +25,7 @@ void GameLog::write(const char* format, ...)
 #if (defined(_WIN32) && !defined(_DEBUG)) || defined(__ANDROID__) || defined(__APPLE__)
     if (!use_log_file)
     {
-        return;
+        //return;
     }
 #endif // (defined(_WIN32) && !defined(_DEBUG)) || defined(__ANDROID__) || defined(__APPLE__)
 #endif // !defined(USE_LOG_FILE) && !defined(USE_LOG_FILE_PARAM)
@@ -41,12 +41,11 @@ void GameLog::write(const char* format, ...)
     {
         info += "\n";
     }
-    printf("%s", info.c_str());
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_INFO, "native-log",  "%s", info.c_str());
-#endif // __ANDROID__
+    SDL_Log("%s", info.c_str());
 
-
+//#ifdef __ANDROID__
+//    __android_log_print(ANDROID_LOG_INFO, "native-log",  "%s", info.c_str());
+//#endif // __ANDROID__
 
 #if defined(USE_LOG_FILE_PARAM) && !defined(USE_LOG_FILE)
     if (!use_log_file)

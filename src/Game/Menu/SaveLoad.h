@@ -23,7 +23,7 @@ public:
 	std::shared_ptr<Button> saveBtn = nullptr;
 	std::shared_ptr<Button> exitBtn = nullptr;
 
-	void init();
+	virtual void init() override;
 
 private:
 	virtual void onEvent();

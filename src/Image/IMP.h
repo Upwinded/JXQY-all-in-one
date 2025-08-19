@@ -27,6 +27,14 @@ struct IMPFrame
 
 struct IMPImage
 {
+private:
+	static uint32_t IMPImageCount;
+public:
+#ifdef DEBUG
+	IMPImage() { GameLog::write("IMPImageCount Inc:%d", ++IMPImageCount); }
+	~IMPImage() { GameLog::write("IMPImageCount Dec:%d", --IMPImageCount); }
+#endif // DEBUG
+
 	char head[imgHeadLen];
 	int directions = 1;
 	int interval = 1;

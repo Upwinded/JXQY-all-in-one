@@ -100,28 +100,27 @@ void Camera::reArrangeNPC()
 	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
 	int tileHeightScal = 10;
 	Point cenTile = position;
-	std::vector<int> npcIndex;
-	npcIndex.resize(0);
+	std::vector<std::shared_ptr<NPC>> npcList;
 	for (int i = cenTile.y + yscal + tileHeightScal - 1; i >= cenTile.y - yscal; i--)
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
 		{
 			if ( i >= 0 && i < gm->map->data->head.height && j >= 0 && j < gm->map->data->head.width)
 			{
-				for (size_t k = 0; k < gm->map->dataMap.tile[i][j].npcIndex.size(); k++)
+				for (auto iter = gm->map->dataMap.tile[i][j].npcList.begin(); iter != gm->map->dataMap.tile[i][j].npcList.end(); iter++)
 				{
-					if (gm->map->dataMap.tile[i][j].npcIndex[k] > 0)
+					if (*iter != nullptr && *iter != gm->player)
 					{
-						npcIndex.push_back(gm->map->dataMap.tile[i][j].npcIndex[k] - 1);
+						npcList.push_back(*iter);
 					}					
 				}
 			}
 		}
 	}
-	for (size_t i = 0; i < npcIndex.size(); i++)
+	for (size_t i = 0; i < npcList.size(); i++)
 	{
-		gm->npcManager->removeChild(gm->npcManager->npcList[npcIndex[i]]);
-		gm->npcManager->addChild(gm->npcManager->npcList[npcIndex[i]]);
+		gm->npcManager->removeChild(npcList[i]);
+		gm->npcManager->addChild(npcList[i]);
 	}
 }
 

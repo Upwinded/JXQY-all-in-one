@@ -3,6 +3,7 @@
 
 NPC::NPC()
 {
+	name = "npc";
 	priority = epNPC;
 	rect.w = TILE_WIDTH - 20;
 	rect.h = (int)((float)TILE_HEIGHT * 2.5);
@@ -539,6 +540,7 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 		{
 			beginStand();
 		}
+		break;
 	case acStand1:
 		res.stand1.imageFile = fileName;
 		res.stand1.shadowFile = convert::extractFileName(fileName) + ".shd";
@@ -548,6 +550,7 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 		{
 			beginStand();
 		}
+		break;
 	default:
 		break;
 	}
@@ -906,7 +909,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 //        damage = 0;
 //    }
 
-	if (rand() % 100 > evd)
+	if (engine->getRand(100) > evd)
 	{
 		if (damage >= life)
 		{
@@ -924,7 +927,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 			life -= damage;
 			int d = calDirection(atan2(e->flyingDirection.x, -e->flyingDirection.y));
 			Point fd = gm->map->getSubPoint(position, d);
-			if (rand() % 100 > evd)
+			if (engine->getRand(100) > evd)
 			{
 				if (/*!frozen && */e->magic.level[e->level].moveKind == 2 && e->magic.level[e->level].specialKind == 1)
 				{
@@ -932,7 +935,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 					frozenLastTime = (frozen &&  frozenLastTime > newFrozenTime) ? frozenLastTime : newFrozenTime;
 					frozen = true;
 				}
-				else if (!frozen && rand() % (20 + getEvade()) >= getEvade())
+				else if (!frozen && engine->getRand(20 + getEvade()) >= getEvade())
 				{
 					beginHurt(fd);
 				}
@@ -970,7 +973,7 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 	else
 	{
 		life -= damage;
-		if (rand() % 100 > evade)
+		if (engine->getRand(100) > evade)
 		{	
 			if (!frozen)
 			{
@@ -991,7 +994,7 @@ void NPC::beginJump(Point dest)
 	stepList[0] = step;
 	direction = calDirection(stepList[0]);
 	actionBeginTime = getUpdateTime();
-	gm->map->addStepToDataMap(stepList[0], npcIndex);
+	gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 	if (fight > 0 && canDoAction(acAJump))
 	{
 		nowAction = acAJump;
@@ -1144,7 +1147,7 @@ void NPC::doAttack(Point dest, std::shared_ptr<GameElement> target)
 	}
 	else 
 	{
-		int idx = rand() % 2;
+		int idx = engine->getRand(2);
 		if (idx)
 		{
 			Magic::addEffect(npcMagic, std::dynamic_pointer_cast<NPC>(getMySharedPtr()), position, dest, attackLevel, getAttack(), getEvade(), launcher, target);
@@ -1208,11 +1211,11 @@ void NPC::clearStep()
 	{
 		if ((isWalking() || isRunning()) && stepState == ssOut)
 		{
-			gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
+			gm->map->deleteStepFromDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		}
 		else if (isJumping() && jumpState != jsDown)
 		{
-			gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
+			gm->map->deleteStepFromDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		}
 	}
 }
@@ -1262,7 +1265,7 @@ void NPC::beginWalk(Point dest)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map->addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1355,21 +1358,25 @@ void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 		return;
 	}
 	attackTarget = target;
-	int attackCount = 1;
-	if (canDoAction(acAttack1))
-	{
-		attackCount++;
-		if (canDoAction(acAttack2))
-		{
-			attackCount++;
-		}
-	}
+    std::vector<int> attackList;
+    attackList.push_back(0);
+    
+    if (canDoAction(acAttack1))
+    {
+        attackList.push_back(1);
+    }
+    
+    if (canDoAction(acAttack2))
+    {
+        attackList.push_back(2);
+    }
 
-	int attackNum = 0;
-	if (attackCount > 1)
-	{
-		attackNum = rand() % attackCount;
-	}
+    int attackNum = 0;
+    if (attackList.size() > 0)
+    {
+        attackNum = attackList[engine->getRand((int)attackList.size() - 1)];
+    }
+    
 	clearStep();
 	stepList.resize(0);
 	offset = { 0, 0 };
@@ -1469,7 +1476,7 @@ void NPC::beginRun(Point dest)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map->addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		if (fight > 0 && canDoAction(acARun))
 		{
 			nowAction = acARun;
@@ -1504,7 +1511,7 @@ void NPC::beginRadiusStep(Point dest, int radius)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map->addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1537,7 +1544,7 @@ void NPC::changeRadiusStep(Point dest, int radius)
 		stepBeginTime += stepLastTime;
 		nowAction = acWalk;
 		calStepLastTime();
-		gm->map->addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1572,7 +1579,7 @@ void NPC::beginRadiusWalk(Point dest, int radius)
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
-		gm->map->addStepToDataMap(stepList[0], npcIndex);
+		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 		if (fight > 0 && canDoAction(acAWalk))
 		{
 			nowAction = acAWalk;
@@ -1672,37 +1679,35 @@ void NPC::changeFollowAttack(Point dest)
 	changeRadiusWalk(dest, attackRadius);
 }
 
-void NPC::draw(Point cenTile, Point cenScreen, PointEx coffset)
+void NPC::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle)
 {
 	Point tile = position;
 	Point pos = Map::getTilePosition(tile, cenTile, cenScreen, coffset);
 	int offsetX, offsetY;
 	_shared_image image = getActionShadow(&offsetX, &offsetY);
 	engine->drawImage(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY);
-	if (!selecting)
+	if (selecting && relation == nrHostile)
 	{
 		_shared_image image = getActionImage(&offsetX, &offsetY);
-		engine->drawImage(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY);
+		engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 0, 0, 220);
+	}
+	else if (selecting && scriptFile != "")
+	{
+		_shared_image image = getActionImage(&offsetX, &offsetY);
+		engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 200, 0, 180);
 	}
 	else
 	{
-		if (relation == nrHostile)
+		_shared_image image = getActionImage(&offsetX, &offsetY);
+		if ((colorStyle & 0xFFFFFF) == 0xFFFFFF)
 		{
-			_shared_image image = getActionImage(&offsetX, &offsetY);
-			engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 0, 0, 220);
-		}
-		else if (scriptFile != "")
-		{
-			_shared_image image = getActionImage(&offsetX, &offsetY);
-			engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 200, 0, 180);
+			engine->drawImage(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY);
 		}
 		else
 		{
-			_shared_image image = getActionImage(&offsetX, &offsetY);
-			engine->drawImage(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY);
+			engine->drawImageWithColor(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, (colorStyle >> 16) & 0xFF, (colorStyle >> 8) & 0xFF, colorStyle & 0xFF);
 		}
-	}
-	
+	}	
 }
 
 void NPC::drawNPCAlpha(Point cenTile, Point cenScreen, PointEx coffset)
@@ -1816,8 +1821,13 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	npcMagic = gm->magicManager.loadAttackMagic(flyIni);
 	npcMagic2 = gm->magicManager.loadAttackMagic(flyIni2);
 	initRes(npcIni);
-	walkTime = getTime() + std::abs(rand()) % (NPC_WALK_INTERVAL_RANGE * 2);
+	walkTime = getTime() + engine->getRand(NPC_WALK_INTERVAL_RANGE * 2);
 	beginStand();
+
+	if (name.compare("player") != 0)
+	{
+		name = "npc-" + npcName;
+	}
 }
 
 void NPC::freeResource()
@@ -2034,7 +2044,7 @@ void NPC::updateAction(UTime frameTime)
 			actionBeginTime += actionLastTime;
 			if (nowAction == acStand)
 			{
-				if (rand() % 5 == 0 && canDoAction(&res.stand1))
+				if (engine->getRand(5) == 0 && canDoAction(&res.stand1))
 				{
 					nowAction = acStand1;
 					actionLastTime = getActionTime(acStand1);
@@ -2047,7 +2057,7 @@ void NPC::updateAction(UTime frameTime)
 			}
 			else
 			{
-				if (rand() % 5 == 0)
+				if (engine->getRand(5) == 0)
 				{
 					nowAction = acStand;
 					actionLastTime = getActionTime(acStand);
@@ -2142,7 +2152,7 @@ void NPC::updateAction(UTime frameTime)
 						{
 							canWalkNextStep = true;
 							stepState = ssOut;
-							gm->map->addStepToDataMap(stepList[0], npcIndex);
+							gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 							direction = calDirection(stepList[0]);
 							stepBeginTime += stepLastTime;
 							calStepLastTime();
@@ -2158,7 +2168,7 @@ void NPC::updateAction(UTime frameTime)
 						canWalkNextStep = true;
 						stepState = ssOut;
 						stepBeginTime += stepLastTime;
-						gm->map->addStepToDataMap(stepList[0], npcIndex);
+						gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 						direction = calDirection(stepList[0]);	
 						calStepLastTime();
 						calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
@@ -2177,10 +2187,10 @@ void NPC::updateAction(UTime frameTime)
 			}
 			else if (stepState == ssOut)
 			{
-				gm->map->deleteNPCFromDataMap(position, npcIndex);
-				gm->map->deleteStepFromDataMap(stepList[0], npcIndex);
+				gm->map->deleteNPCFromDataMap(position, std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
+				gm->map->deleteStepFromDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 				position = stepList[0];
-				gm->map->addNPCToDataMap(position, npcIndex);
+				gm->map->addNPCToDataMap(position, std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
 				stepState = ssIn;
 				stepBeginTime += stepLastTime;
 				calOffset(getUpdateTime() - stepBeginTime, stepLastTime);

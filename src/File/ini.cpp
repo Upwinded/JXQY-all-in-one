@@ -212,25 +212,6 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
     return error;
 }
 
-/* See documentation in header file. */
-int ini_parse_file(void* file, ini_handler handler, void* user)
-{
-    return ini_parse_stream((ini_reader)fgets, file, handler, user);
-}
-
-/* See documentation in header file. */
-int ini_parse(const char* filename, ini_handler handler, void* user)
-{
-    int error;
-
-    auto file = SDL_RWFromFile(filename, "r");
-    if (!file)
-        return -1;
-    error = ini_parse_file(file, handler, user);
-    SDL_RWclose(file);
-    return error;
-}
-
 /* An ini_reader function to read the next line from a string buffer. This
    is the fgets() equivalent used by ini_parse_string(). */
 static char* ini_reader_string(char* str, int num, void* stream) {

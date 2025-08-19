@@ -43,7 +43,7 @@ private:
 public:
 
 	//初始化引擎
-	int init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode);
+	int init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display);
 	//释放引擎
 	void destroyEngine();
 	//获取窗口尺寸
@@ -69,6 +69,9 @@ public:
 	//底层引擎会在处理事件时暂停计时器，此时移动窗体，改变窗体大小等事件会使主进程阻塞，
 	//getAbsoluteTime()子程序会减掉事件处理的时间。
 	//getTime()则会另外再令计算此引擎模块的暂停时间
+
+	// 随机数
+	int getRand(int max, int min = 0);
 
 	//得到engine内置定时器的时间
 	UTime getTime();
@@ -99,7 +102,7 @@ public:
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
 	void setImageAlpha(_shared_image image, unsigned char a);
 	//void freeImage(_image image);
-	int getImageSize(_shared_image image, int &w, int &h);
+	bool getImageSize(_shared_image image, int &w, int &h);
 
 	//绘制缩略图子程序
 	_shared_image loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size);
@@ -121,7 +124,6 @@ public:
 	bool beginDrawTalk(int w, int h);
 	_shared_image endDrawTalk();
 	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
-	void drawSolidUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
 private:
 	bool _talk_drawing = false;
 
@@ -164,6 +166,7 @@ public:
 
 	bool getMousePressed(MouseButtonCode button);
 	void getMousePosition(int& x, int& y);
+	std::vector<AEvent> getAllFingersPosition();
 	//音频子程序
 private:
 	float bgmVolume = 1;

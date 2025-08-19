@@ -4,8 +4,8 @@
 
 MagicMenu::MagicMenu()
 {
-	init();
 	visible = false;
+	init();
 }
 
 

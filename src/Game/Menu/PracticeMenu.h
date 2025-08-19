@@ -8,6 +8,8 @@ public:
 	PracticeMenu();
 	virtual ~PracticeMenu();
 
+	virtual void init() override;
+
 	std::shared_ptr<ImageContainer> image = nullptr;
 	std::shared_ptr<ImageContainer> title = nullptr;
 
@@ -24,7 +26,6 @@ public:
 
 private:
 	virtual void onEvent();
-	virtual void init();
 	void freeResource();
 };
 

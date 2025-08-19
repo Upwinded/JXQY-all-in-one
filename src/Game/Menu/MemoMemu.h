@@ -7,6 +7,8 @@ public:
 	MemoMenu();
 	virtual ~MemoMenu();
 
+	virtual void init() override;
+
 	std::shared_ptr<ImageContainer> title = nullptr;
 	std::shared_ptr<ImageContainer> image = nullptr;
 	std::shared_ptr<MemoText> memoText = nullptr;
@@ -19,7 +21,6 @@ public:
 private:
 	int position = -1;
 
-	void init();
 	void freeResource();
 
 	virtual void onEvent();

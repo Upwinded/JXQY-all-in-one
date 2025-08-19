@@ -17,6 +17,7 @@ enum MapTime
 struct GlobalData
 {
 	int state = gsNone;
+
 	std::string mapName = "";
 	std::string npcName = "";
 	std::string objName = "";
@@ -24,12 +25,12 @@ struct GlobalData
 
 	int characterIndex = -1;
 
-	Uint32 asfStyle = 0xFFFFFF00;
-	Uint32 mpcStyle = 0xFFFFFF00;
+	uint32_t asfStyle = 0xFFFFFF;
+	uint32_t mpcStyle = 0xFFFFFF;
 
-	Uint32 mainLum = 31;
-	Uint32 fadeLum = 31;
-	Uint32 mapTime = mtDay;
+	uint32_t mainLum = 31;
+	uint32_t fadeLum = 31;
+	uint32_t mapTime = mtDay;
 
 	std::string rainFile = "";
 	bool water = false;

@@ -4,8 +4,8 @@
 
 PracticeMenu::PracticeMenu()
 {
-	init();
 	visible = false;
+	init();
 }
 
 

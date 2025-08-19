@@ -1,5 +1,8 @@
 ﻿#include "GameManager.h"
 #include <thread>
+#include <chrono>
+#include <ctime>
+
 
 GameManager * GameManager::this_ = nullptr;
 
@@ -7,13 +10,44 @@ GameManager * GameManager::this_ = nullptr;
 GameManager::GameManager()
 {
 	this_ = this;
+	// autoFreeResourceOnExit = true;
+
 	name = "GameManager";
     canCallBack = true;
+
+	inThread.store(false);
+	loadThreadOver.store(false);
 
 	drawFullScreen = true;
 	rectFullScreen = true;
 	priority = epMap;
 	result = erNone;
+	init();
+
+}
+
+GameManager::~GameManager()
+{
+	freeResource();
+	removeAllChild();
+    this_ = nullptr;
+}
+
+void GameManager::init()
+{
+	menu = std::make_shared<MenuController>();
+	controller = std::make_shared<GameController>();
+
+	weather = std::make_shared<Weather>();
+
+	camera = std::make_shared<Camera>();
+
+	map = std::make_shared<Map>();
+
+	npcManager = std::make_shared<NPCManager>();
+	objectManager = std::make_shared<ObjectManager>();
+	effectManager = std::make_shared<EffectManager>();
+	player = std::make_shared<Player>();
 
 	npcManager->setPlayer(player);
 
@@ -31,18 +65,11 @@ GameManager::GameManager()
 	controller->addChild(effectManager);
 }
 
-GameManager::~GameManager()
-{
-	freeResource();
-	removeAllChild();
-    this_ = nullptr;
-}
-
 void GameManager::initMenuWithThread()
 {
-	inThread = true;
-	loadThreadOver = false;
-	loadingDisplaying = true;
+	inThread.store(true);
+	loadThreadOver.store(false);
+	loadingDisplaying.store(true);
 	std::string str = u8"创建UI中";
 	std::vector<_shared_image> loadingImage;
 	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
@@ -56,7 +83,9 @@ void GameManager::initMenuWithThread()
 
 	loadingDisplayThread(loadingImage);
 	t.join();
-	inThread = false;
+	inThread.store(false);
+
+	std::atomic_thread_fence(std::memory_order_acquire);
 
 	controller->init();
 }
@@ -64,8 +93,8 @@ void GameManager::initMenuWithThread()
 void GameManager::initMenuThread()
 {
 	this_->initMenu();
-    std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver = true;
+    //std::lock_guard<std::mutex> locker(this_->loadMutex);
+	this_->loadThreadOver.store(true);
 }
 
 void GameManager::initMenu()
@@ -84,9 +113,9 @@ GameManager * GameManager::getInstance()
 
 void GameManager::loadGameWithThread(int index)
 {
-	inThread = true;
-	loadThreadOver = false;
-	loadingDisplaying = true;
+	inThread.store(true);
+	loadThreadOver.store(false);
+	loadingDisplaying.store(true);
 
 	std::string str = u8"读取游戏中";
 	std::vector<_shared_image> loadingImage;
@@ -101,7 +130,9 @@ void GameManager::loadGameWithThread(int index)
 	loadingDisplayThread(loadingImage);
 	t.join();
 
-	inThread = false;
+	inThread.store(false);
+
+	std::atomic_thread_fence(std::memory_order_acquire);
 
 	weather->setLum(global.data.mainLum);
 	weather->setTime(global.data.mapTime);
@@ -118,7 +149,7 @@ void GameManager::setMapPos(int x, int y)
 
 void GameManager::setMapTrap(int idx, const std::string & trapFile)
 {
-	traps.set(mapName, idx, trapFile);
+	traps.set(mapFolderName, idx, trapFile);
 }
 
 void GameManager::saveMapTrap()
@@ -132,11 +163,21 @@ void GameManager::setMapTime(unsigned char t)
 	weather->setTime(t);
 }
 
+void GameManager::changeASFColor(uint8_t r, uint8_t g, uint8_t b)
+{
+	global.data.asfStyle = (r << 16) | (g << 8) | b;
+}
+
+void GameManager::changeMapColor(uint8_t r, uint8_t g, uint8_t b)
+{
+	global.data.mpcStyle = (r << 16) | (g << 8) | b;
+}
+
 void GameManager::loadGameThread(int index)
 {
 	this_->loadGame(index);
-	std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver = true;
+	//std::lock_guard<std::mutex> locker(this_->loadMutex);
+	this_->loadThreadOver.store(true);
 }
 
 bool GameManager::loadGame(int index)
@@ -201,7 +242,14 @@ bool GameManager::loadGame(int index)
 	}
 	else if (global.data.rainShow)
 	{
-		weather->setWeather(wtLightning);
+		if (global.data.rainFile.empty())
+		{
+			weather->setWeather(wtLightning);
+		}
+		else
+		{
+			weather->setWeather(wtCustomRain, global.data.rainFile);
+		}
 	}
 
 	if (!inThread)
@@ -268,6 +316,7 @@ bool GameManager::menuDisplayed()
 	}
 void GameManager::freeResource()
 {
+	weather->reset();
 	camera->followNPC = nullptr;
 	safeFreeResource(controller);
 	safeFreeResource(menu);
@@ -277,7 +326,6 @@ void GameManager::freeResource()
 	safeFreeResource(objectManager);
 	safeFreeResource(player);
 	magicManager.freeResource();
-	safeFreeResource(weather);
 	safeFreeResource(map);
 }
 
@@ -304,22 +352,22 @@ Point GameManager::getMousePoint()
 void GameManager::loadMapThread(const std::string & fileName)
 {
 	this_->loadMap(fileName);
-	std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver = true;
+	//std::lock_guard<std::mutex> locker(this_->loadMutex);
+	this_->loadThreadOver.store(true);
 }
 
 void GameManager::loadNPCThread(const std::string & fileName)
 {
 	this_->loadNPC(fileName);
-	std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver = true;
+	//std::lock_guard<std::mutex> locker(this_->loadMutex);
+	this_->loadThreadOver.store(true);
 }
 
 void GameManager::loadObjectThread(const std::string & fileName)
 {
 	this_->loadObject(fileName);
-	std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver = true;
+	//std::lock_guard<std::mutex> locker(this_->loadMutex);
+	this_->loadThreadOver.store(true);
 }
 
 void GameManager::runScript(const std::string & fileName, const std::string & mapName)
@@ -359,7 +407,7 @@ void GameManager::runScript(const std::string & fileName, const std::string & ma
 
 void GameManager::runScript(const std::string & fileName)
 {
-	runScript(fileName, mapName);
+	runScript(fileName, mapFolderName);
 }
 
 void GameManager::moveScreen(int direction, int distance)
@@ -370,7 +418,16 @@ void GameManager::moveScreen(int direction, int distance)
 void GameManager::loadMap(const std::string & fileName)
 {
 	global.data.mapName = fileName;
-	mapName = convert::extractFileName(fileName);
+	mapFolderName = convert::extractFileName(fileName);
+
+	// try read mapName from mapname.ini
+	std::unique_ptr<char[]> s;
+	int len = PakFile::readFile(std::string(INI_MAP_FOLDER)+ INI_MAP_NAME_LIST, s);
+	if (len > 0 && s != nullptr)
+	{
+		INIReader ini(s);
+		mapFolderName = ini.Get("Init", mapFolderName, mapFolderName);
+	}
 
 	map->load(MAP_FOLDER + fileName);
 
@@ -394,7 +451,7 @@ void GameManager::loadMap(const std::string & fileName)
 
 void GameManager::loadMapWithThread(const std::string & fileName)
 {
-	loadThreadOver = false;
+	loadThreadOver.store(false);
 
 	std::string str = u8"读取地图中";
 	std::vector<_shared_image> loadingImage;
@@ -409,6 +466,8 @@ void GameManager::loadMapWithThread(const std::string & fileName)
 
 	loadingDisplayThread(loadingImage);
 	t.join();
+
+	std::atomic_thread_fence(std::memory_order_acquire);
 }
 
 void GameManager::playMusic(const std::string & fileName)
@@ -647,15 +706,15 @@ void GameManager::runTrapScript(int idx)
 	{
 		return;
 	}
-	scriptMapName = mapName;
+	scriptMapName = mapFolderName;
 	scriptTrapIndex = idx;
-	std::string sname = traps.get(mapName, idx);
+	std::string sname = traps.get(mapFolderName, idx);
 	if (sname != "")
 	{
 		inEvent = true;
 		effectManager->disableAllEffect();
-		traps.set(mapName, idx, "");
-		std::string tempMapName = mapName;
+		traps.set(mapFolderName, idx, "");
+		std::string tempMapName = mapFolderName;
 		scriptType = stTraps;
 		runScript(sname);
 		scriptType = stNone;
@@ -698,7 +757,7 @@ void GameManager::loadNPC(const std::string & fileName)
 
 void GameManager::loadNPCWithThread(const std::string & fileName)
 {
-	loadThreadOver = false;
+	loadThreadOver.store(false);
 
 	std::string str = u8"读取资源中";
 	std::vector<_shared_image> loadingImage;
@@ -712,6 +771,8 @@ void GameManager::loadNPCWithThread(const std::string & fileName)
 	//t.detach();
 	loadingDisplayThread(loadingImage);
 	t.join();
+
+	std::atomic_thread_fence(std::memory_order_acquire);
 }
 
 void GameManager::saveNPC(const std::string & fileName)
@@ -1122,6 +1183,36 @@ void GameManager::npcSpecialAction(const std::string & name, const std::string &
 	}
 }
 
+void GameManager::changeLife(const std::string& name, int value)
+{
+	auto npc = npcManager->findNPC(name);
+	for (size_t i = 0; i < npc.size(); i++)
+	{
+		auto maxValue = npc[i]->getLifeMax();
+		npc[i]->life = maxValue * value / 100;
+	}
+}
+
+void GameManager::changeMana(const std::string& name, int value)
+{
+	auto npc = npcManager->findNPC(name);
+	for (size_t i = 0; i < npc.size(); i++)
+	{
+		auto maxValue = npc[i]->getManaMax();
+		npc[i]->mana = maxValue * value / 100;
+	}
+}
+
+void GameManager::changeThew(const std::string& name, int value)
+{
+	auto npc = npcManager->findNPC(name);
+	for (size_t i = 0; i < npc.size(); i++)
+	{
+		auto maxValue = npc[i]->getThewMax();
+		npc[i]->thew = maxValue * value / 100;
+	}
+}
+
 void GameManager::loadPlayer(int index)
 {
 	player->load(index);
@@ -1317,7 +1408,7 @@ void GameManager::addRandMoney(int mMin, int mMax)
 	}
 	else
 	{
-		value = rand() % std::abs(mMax - mMin) + (mMax > mMin ? mMin : mMax);
+		value = engine->getRand(std::abs(mMax - mMin) + (mMax > mMin ? mMin : mMax));
 	}
 	addMoney(value);
 }
@@ -1339,13 +1430,12 @@ void GameManager::addRandGoods(const std::string & fileName)
 		int count = ini.GetInteger("Header", "Count", 0);
 		if (count > 0)
 		{
-			int idx = rand() % count;
+			int idx = engine->getRand(count);
 			std::string section = convert::formatString("%d", idx + 1);
 			std::string name = ini.Get(section, "IniFile", "");
 			addGoods(name);
 		}
 	}
-	
 }
 
 void GameManager::deleteGoods(const std::string & name)
@@ -1356,6 +1446,29 @@ void GameManager::deleteGoods(const std::string & name)
 void GameManager::addMagic(const std::string & name)
 {
 	magicManager.addMagic(name);
+}
+
+void GameManager::addOneMagic(const std::string& playerName, const std::string& magicName)
+{
+	if (player->npcName == playerName)
+	{
+		addMagic(magicName);
+		return;
+	}
+
+	for (size_t i = 0; i < 5; i++)
+	{
+		Player tempPlayer;
+		tempPlayer.load(i);
+		if (tempPlayer.npcName == playerName)
+		{
+			MagicManager tempMagicManager;
+			tempMagicManager.load(i);
+			tempMagicManager.addMagic(magicName);
+			tempMagicManager.save(i);
+			return;
+		}
+	}
 }
 
 void GameManager::deleteMagic(const std::string & name)
@@ -1430,7 +1543,7 @@ void GameManager::loadObject(const std::string & fileName)
 
 void GameManager::loadObjectWithThread(const std::string & fileName)
 {
-	loadThreadOver = false;
+	loadThreadOver.store(false);
 
 	std::string str = u8"读取资源中";
 	std::vector<_shared_image> loadingImage;
@@ -1445,6 +1558,8 @@ void GameManager::loadObjectWithThread(const std::string & fileName)
 
 	loadingDisplayThread(loadingImage);
 	t.join();
+
+	std::atomic_thread_fence(std::memory_order_acquire);
 }
 
 void GameManager::saveObject(const std::string & fileName)
@@ -1554,7 +1669,7 @@ void GameManager::talk(const std::string & part)
 {
 	std::string fileName = SCRIPT_FOLDER;
 	fileName += "map\\"; 
-	fileName += mapName + "\\" + TALK_FILE;
+	fileName += mapFolderName + "\\" + TALK_FILE;
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(fileName, s);
 	if (s == nullptr || len <= 0)
@@ -1744,11 +1859,12 @@ void GameManager::showSnow(int bsnow)
 
 void GameManager::showRandomSnow()
 {
-	showSnow(rand() % 2);
+	showSnow(engine->getRand(2));
 }
 
 void GameManager::showRain(int brain)
 {
+	global.data.rainFile = "";
 	if (brain)
 	{
 		global.data.rainShow = true;
@@ -1763,6 +1879,52 @@ void GameManager::showRain(int brain)
 	}
 }
 
+void GameManager::beginRain(const std::string& configFileName)
+{
+	global.data.rainShow = true;
+	global.data.snowShow = false;
+	global.data.rainFile = configFileName;
+	weather->setWeather(wtCustomRain, configFileName);
+}
+
+void GameManager::endRain()
+{
+	global.data.rainShow = false;
+	global.data.snowShow = false;
+	global.data.rainFile = "";
+	weather->setWeather(wtNone);
+}
+
+void GameManager::checkYear(const std::string& varName)
+{
+	// 获取当前系统时间点
+	auto now = std::chrono::system_clock::now();
+
+	// 转换为 time_t 类型（秒级精度）
+	std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+
+	// 转换为本地时间的 tm 结构体
+#ifdef _WIN32
+	std::tm tlocal_tm;
+	localtime_s(&tlocal_tm, &now_time_t);
+	auto local_tm = &tlocal_tm;
+#else
+	std::tm* local_tm = localtime(&now_time_t);
+#endif
+
+	// 判断是否为 1 月 1 日
+	// tm_mon: 月份（0=1月，11=12月）
+	// tm_mday: 日期（1-31）
+	if (local_tm->tm_mon == 0 && local_tm->tm_mday == 1)
+	{
+		varList.setInteger(varName, 1);
+	}
+	else
+	{
+		varList.setInteger(varName, 0);
+	}
+}
+
 void GameManager::loadingDisplayThread(std::vector<_shared_image> loadingImage)
 {
 	int w, h;
@@ -1772,10 +1934,10 @@ void GameManager::loadingDisplayThread(std::vector<_shared_image> loadingImage)
 
 	size_t imgIndex = 0;
 
-	loadMutex.lock();
-	while (!loadThreadOver)
+	//loadMutex.lock();
+	while (!loadThreadOver.load())
 	{
-		loadMutex.unlock();
+		//loadMutex.unlock();
 
 		engine->frameBegin();
 
@@ -1789,14 +1951,17 @@ void GameManager::loadingDisplayThread(std::vector<_shared_image> loadingImage)
 			}
 		}
 		engine->delay(30);
+		if (loadingImage.size() > 0)
+		{
+			engine->drawImage(loadingImage[imgIndex], w - 320, h - 70);
+		}
 
-		engine->drawImage(loadingImage[imgIndex], w - 320, h - 70);
 		engine->frameEnd();
 
-		loadMutex.lock();
+		//loadMutex.lock();
 	}
-	loadingDisplaying = false;
-	loadMutex.unlock();
+	loadingDisplaying.store(false);
+	//loadMutex.unlock();
 }
 
 void GameManager::onUpdate()
@@ -1838,6 +2003,7 @@ bool GameManager::onInitial()
 		}
 		weather->fadeInEx();
 	}	
+
 	return true;
 }
 

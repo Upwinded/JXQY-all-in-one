@@ -6,7 +6,7 @@ GameController::GameController()
 	coverMouse = true;
 	rectFullScreen = true;
 	canCallBack = true;
-	priority = epMap;
+	priority = epController;
 	result = erNone;
 }
 
@@ -258,7 +258,7 @@ void GameController::onEvent()
 			MouseAlreadyDown = false;
 		}
 	}
-#ifndef __MOBILE__
+//#ifndef __MOBILE__
 	if (dragging == TOUCH_UNTOUCHEDID && MouseAlreadyDown && engine->getMousePressed(MBC_MOUSE_LEFT) && touchingID != TOUCH_UNTOUCHEDID && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
 	{
 		if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
@@ -315,7 +315,6 @@ void GameController::onEvent()
 				act.dest = tempNPC->position;
 				gm->player->addNextAction(act);
 			}
-			
 		}
 	}
 	else if (dragging == TOUCH_UNTOUCHEDID && engine->getMousePressed(MBC_MOUSE_LEFT) && gm->objectManager->clickIndex >= 0 && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT))
@@ -399,10 +398,10 @@ void GameController::onEvent()
 		act.dest = dest;
 		gm->player->addNextAction(act);
 	}
-#endif
+//#endif
     
 #ifdef __MOBILE__
-    NextAction act;
+    // NextAction act;
 	bool joystickAction = true;
 	if (joystickPanel->joystick->isRunning())
 	{
@@ -439,15 +438,15 @@ void GameController::onEvent()
 				continue;
 			}
 			bool breakOut = false;
-			for (size_t j = 0; j < gm->map->dataMap.tile[step.y][step.x].stepIndex.size(); j++)
+			for (auto iter = gm->map->dataMap.tile[step.y][step.x].stepNPCList.begin(); iter != gm->map->dataMap.tile[step.y][step.x].stepNPCList.end(); iter++)
 			{
-				if (gm->map->dataMap.tile[step.y][step.x].stepIndex[j] == gm->player->npcIndex)
+				if ((*iter) == gm->player)
 				{
-					breakOut = true;
-					break;
+                    breakOut = true;
+                    break;
 				}
 			}
-			if (!breakOut && gm->map->canWalk(step))
+            if (!breakOut && gm->map->canWalkDirectlyTo(gm->player->position, dirList[i]))
 			{
 				act.dest = step;
 				steping = true;

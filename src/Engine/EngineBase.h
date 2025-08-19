@@ -1,4 +1,4 @@
-﻿/*
+/*
 SDL、FMOD、FFMPEG等底层都封装在这里。
 */
 
@@ -12,6 +12,7 @@ SDL、FMOD、FFMPEG等底层都封装在这里。
 #include <algorithm>
 #include <mutex>
 #include <atomic>
+#include <random>
 
 
 #ifndef SHF_USE_AUDIO
@@ -22,35 +23,34 @@ SDL、FMOD、FFMPEG等底层都封装在这里。
 #define SHF_USE_VIDEO
 #endif
 
+
 extern "C"
 {
 
 #ifdef SHF_USE_AUDIO
 #include "fmod.h"
 #endif // SHF_USE_AUDIO
-#ifdef __APPLE__
-#include "SDL2/SDL.h"
-#include "SDL2_image/SDL_image.h"
-#include "SDL2_ttf/SDL_ttf.h"
-#include "SDL2/SDL_main.h"
-#else
-#include "SDL.h"
-#include "SDL_image.h"
-#include "SDL_ttf.h"
-#include "SDL_main.h"
-#endif
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
+//#ifdef __APPLE__
+//#include "SDL3/SDL_metal.h"
+//#endif
+//#include "SDL3/SDL_main.h"
 
 #ifdef SHF_USE_VIDEO
-#include "libavcodec/avcodec.h"
-#include "libavutil/avutil.h"
-#include "libavutil/imgutils.h"
-#include "libavutil/opt.h"
-#include "libavformat/avformat.h"
-#include "libswresample/swresample.h"
-#include "libswscale/swscale.h"
+#include <libavformat/avio.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
+#include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
+#include <libavformat/avformat.h>
+#include <libswresample/swresample.h>
+#include <libswscale/swscale.h>
+
 #endif // SHF_USE_VIDEO
 
-#include "../../3rd/minilzo/minilzo.h"
+#include "minilzo.h"
 }
 
 #include "../File/File.h"
@@ -58,11 +58,11 @@ extern "C"
 #include "../Types/Types.h"
 #include "../File/log.h"
 
-#if defined(__IPHONEOS__)
+#if defined(__APPLE__) && (TARGET_OS_IOS)
 #ifndef __MOBILE__
 #define __MOBILE__
 #endif // !__MOBILE__
-#endif // defined(__IPHONEOS__)
+#endif // (TARGET_OS_IOS)
 
 #ifdef __ANDROID__
 #ifndef __MOBILE__
@@ -79,8 +79,6 @@ extern "C"
 #endif
 #endif // _MSC_VER
 #endif // _WIN32
-
-
 
 #ifdef main
 #undef main
@@ -118,17 +116,17 @@ typedef std::shared_ptr<Rect_t> _rect;
 
 typedef SDL_Cursor Cursor_t;
 typedef std::shared_ptr<Cursor_t> _shared_cursor;
-#define make_shared_cursor(a) std::shared_ptr<Cursor_t>(a, [](Cursor_t* b){SDL_FreeCursor(b);})
+#define make_shared_cursor(a) std::shared_ptr<Cursor_t>(a, [](Cursor_t* b){SDL_DestroyCursor(b);})
 
 typedef SDL_Texture Image_t;
 typedef std::shared_ptr<Image_t> _shared_image;
-#define make_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){SDL_DestroyTexture(b);})
+#define make_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write("Image Count:%d", EngineBase::ImageCount.load());*/}); //EngineBase::ImageCount.fetch_add(1);GameLog::write("Image Count:%d", EngineBase::ImageCount.load()); 
 
-#define make_safe_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){std::lock_guard<std::mutex> locker(EngineBase::_mutex); SDL_DestroyTexture(b);})
+#define make_safe_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){std::lock_guard<std::mutex> locker(EngineBase::_mutex); SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write("Image Count:%d", EngineBase::ImageCount.load());*/});  //EngineBase::ImageCount.fetch_add(1);GameLog::write("Image Count:%d", EngineBase::ImageCount.load());  
 
 typedef SDL_Surface Surface_t;
 typedef std::shared_ptr<Surface_t> _shared_surface;
-#define make_shared_surface(a) std::shared_ptr<Surface_t>(a, [](Surface_t* b){SDL_FreeSurface(b);})
+#define make_shared_surface(a) std::shared_ptr<Surface_t>(a, [](Surface_t* b){SDL_DestroySurface(b);})
 
 #define SaveBMPFormat SDL_PIXELFORMAT_ARGB8888
 #define SaveBMPPixelBytes 4
@@ -216,7 +214,6 @@ struct MediaContent
 struct MediaStream
 {
 	bool exists = false;
-
 	AVFormatContext * formatCtx = nullptr;
 	AVPacket * packet = nullptr;
 
@@ -226,7 +223,7 @@ struct MediaStream
 
 	bool setTS = false;
 
-    SDL_RWops * rWops = nullptr;
+    SDL_IOStream * rWops = nullptr;
     int rWops_length = 0;
 
 	double totalTime = 0;
@@ -319,6 +316,7 @@ public:
 	virtual ~EngineBase();
 
 	static std::mutex _mutex;
+	static std::atomic<uint32_t> ImageCount;
 	//初始化类函数
 private:
 	_shared_image logo = nullptr;
@@ -330,14 +328,13 @@ private:
 	
 	int windowWidth;
 	int windowHeight;
-	InitErrorType initSDL(const std::string& windowCaption, int wWidth, int wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode);
+	InitErrorType initSDL(const std::string& windowCaption, int wWidth, int wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display);
 	void destroySDL();
 
-	static int enginebaseAppEventHandler(void* userdata, SDL_Event* event);
+	static bool enginebaseAppEventHandler(void* userdata, SDL_Event* event);
 	_shared_image realScreen;
 
 protected:
-
 
     std::mutex soundMutex;
 	static std::atomic<SDL_Renderer*> renderer;
@@ -347,7 +344,7 @@ protected:
 
 	int SetRenderTarget(SDL_Renderer* r, SDL_Texture* t);
 
-	InitErrorType init(const std::string& windowCaption, int & wWidth, int & wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, AppEventHandler eventHandler = NULL);
+	InitErrorType init(const std::string& windowCaption, int & wWidth, int & wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display, AppEventHandler eventHandler = NULL);
 	void destroyEngineBase();
 	int width = 0;
 	int height = 0;
@@ -386,6 +383,7 @@ private:
 	void countFPS();
 protected:
 	static UTime getTime();
+	static int getRand(int max, int min = 0);
 protected:
 	void delay(unsigned int t);
 	int getFPS();
@@ -396,18 +394,16 @@ private:
 	int CursorImageIndex = -1;
 	void clearCursor();
 	void drawCursor();
-    void updateCursor();
-	void calculateCursor(int inX, int inY, int* outX, int* outY);
-	void destroyCursor();
+	void calculateCursorReferencePosition(int inX, int inY, int* outX, int* outY);
 protected:
-	_shared_cursor loadCursorFromMem(std::unique_ptr<char[]>& data, int size, int x, int y);
-	void setCursor(CursorImage * cursor);
+	_shared_cursor loadCursorImageFromMem(std::unique_ptr<char[]>& data, int size, int x, int y);
+	void setCursorImage(CursorImage * cursor);
 	void showCursor();
 	void hideCursor();
 	bool softwareCursorHidden = false;
 
 protected:
-//图片相关的函数
+	//图片相关的函数
 
 	void drawImage(_shared_image image, SDL_Rect * src, SDL_Rect * dst);
 	void drawImage(_shared_image image, SDL_Rect * rect);
@@ -428,7 +424,7 @@ protected:
 	void setImageAlpha(_shared_image image, unsigned char a);
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
 	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
-	int getImageSize(_shared_image image, int& w, int& h);
+	bool getImageSize(_shared_image image, int& w, int& h);
 
 private:
 	//used by save screen
@@ -438,7 +434,6 @@ protected:
 	bool beginDrawTalk(int w, int h);
 	_shared_image endDrawTalk();
 	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
-	void drawSolidUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
 
 	//从纹理像素数据生成BMP16格式截图
 	_shared_image loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size);
@@ -498,6 +493,8 @@ protected:
 	bool getKeyPress(KeyCode key);
 	bool getMousePress(MouseButtonCode button);
 	void getMouse(int& x, int& y);
+	std::vector<AEvent> getAllFingersPosition();
+
 	void resetEvent();
 	//设置是否使用SDL自带的鼠标样式显示，如果引擎自己画鼠标图标，鼠标位置更新会慢一些，但拖拽时同步性更好。
 	void setCursorHardware(bool isHardware);
@@ -505,12 +502,10 @@ protected:
 	//字符串显示相关的函数
 private:
 	std::string font = "";
-	SDL_RWops * fontData = nullptr;
+	SDL_IOStream * fontData = nullptr;
 	std::unique_ptr<char[]> fontBuffer = nullptr;
 protected:
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
-	_shared_image createUnicodeText(const std::wstring& text, int size, unsigned int color);
-	void drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color);
 	_shared_image createText(const std::string& text, int size, unsigned int color, bool safe = false);
 	void drawText(const std::string& text,int x, int y, int size, unsigned int color);
 	void setFontName(const std::string& fontName);
@@ -582,7 +577,7 @@ private:
 	void clearVideo(_video video);
 	void rearrangeVideoFrame(_video video);
 
-	int getVideoPixelFormat(int originalFormat);
+	SDL_PixelFormat getVideoPixelFormat(int originalFormat);
 	
 	void tryDecodeVideo(_video video);
 #ifdef SHF_USE_AUDIO

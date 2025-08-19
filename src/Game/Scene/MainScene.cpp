@@ -2,15 +2,20 @@
 
 MainScene::MainScene(int idx)
 {
-	game = std::make_shared<GameManager>();
-	addChild(game);
 	gameIndex = idx;
+	init();
 }
 
 MainScene::~MainScene()
 {
 	removeAllChild();
 	game = nullptr;
+}
+
+void MainScene::init()
+{
+	game = std::make_shared<GameManager>();
+	addChild(game);
 }
 
 bool MainScene::onInitial()

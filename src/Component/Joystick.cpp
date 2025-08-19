@@ -78,15 +78,7 @@ int Joystick::distanceToCenter()
 
 bool Joystick::mouseInRect(int x, int y)
 {
-	auto ret = RoundButton::mouseInRect(x, y);
-	if (touchingID != TOUCH_UNTOUCHEDID)
-	{
-		return ret;
-	}
-	else
-	{
-		return ret || (parent == nullptr ? true : parent->rect.PointInRect(x, y));
-	}
+	return RoundButton::mouseInRect(x, y) || (parent == nullptr ? true : parent->rect.PointInRect(x, y));
 }
 
 void Joystick::onMouseMoving(int x, int y)
@@ -109,8 +101,8 @@ void Joystick::onMouseMoveIn(int x, int y)
 
 void Joystick::onMouseMoveOut()
 {
-	touchPosition.x = OutRange;
-	touchPosition.y = OutRange;
+    touchPosition.x = OutRange;
+    touchPosition.y = OutRange;
 }
 
 void Joystick::onMouseLeftUp(int x, int y)

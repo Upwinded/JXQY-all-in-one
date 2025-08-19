@@ -8,6 +8,8 @@ public:
 	ColumnMenu();
 	virtual ~ColumnMenu();
 
+	virtual void init() override;
+
 	std::shared_ptr<TransImage> image = nullptr;
 	std::shared_ptr<ColumnImage> columnLife = nullptr;
 	std::shared_ptr<ColumnImage> columnThew = nullptr;
@@ -17,6 +19,6 @@ public:
 
 private:
 	virtual void onUpdate();
-	virtual void init();
+
 	void freeResource();
 };

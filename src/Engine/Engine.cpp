@@ -17,36 +17,36 @@ int Engine::engineAppEventHandler(SDL_Event* event)
 {
 	switch (event->type)
 	{
-	case SDL_APP_TERMINATING:
+	case SDL_EVENT_TERMINATING:
 		/* Terminate the app.
 			Shut everything down before returning from this function.
 		*/
 		return 0;
-	case SDL_APP_LOWMEMORY:
+	case SDL_EVENT_LOW_MEMORY:
 		/* You will get this when your app is paused and iOS wants more memory.
 			Release as much memory as possible.
 		*/
 		return 0;
-	case SDL_APP_WILLENTERBACKGROUND:
+	case SDL_EVENT_WILL_ENTER_BACKGROUND:
 		/* Prepare your app to go into the background.  Stop loops, etc.
 			This gets called when the user hits the home button, or gets a call.
 		*/
 
 		return 0;
-	case SDL_APP_DIDENTERBACKGROUND:
+	case SDL_EVENT_DID_ENTER_BACKGROUND:
 		/* This will get called if the user accepted whatever sent your app to the background.
-			If the user got a phone call and canceled it, you'll instead get an SDL_APP_DIDENTERFOREGROUND event and restart your loops.
+			If the user got a phone call and canceled it, you'll instead get an SDL_EVENT_DIDENTERFOREGROUND event and restart your loops.
 			When you get this, you have 5 seconds to save all your state or the app will be terminated.
 			Your app is NOT active at this point.
 		*/
 		getInstance()->pauseBGM();
 		return 0;
-	case SDL_APP_WILLENTERFOREGROUND:
+	case SDL_EVENT_WILL_ENTER_FOREGROUND:
 		/* This call happens when your app is coming back to the foreground.
 			Restore all your state here.
 		*/
 		return 0;
-	case SDL_APP_DIDENTERFOREGROUND:
+	case SDL_EVENT_DID_ENTER_FOREGROUND:
 		/* Restart your loops here.
 			Your app is interactive and getting CPU again.
 		*/
@@ -63,13 +63,13 @@ Engine* Engine::getInstance()
 	return _this;
 }
 
-int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode)
+int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display)
 {
 	width = windowWidth;
 	height = windowHeight;
 
 	std::lock_guard<std::mutex> locker(_mutex);
-	if (EngineBase::init(windowCaption, width, height, fullScreenMode, fullScreenSolutionMode, engineAppEventHandler) != initOK)
+	if (EngineBase::init(windowCaption, width, height, fullScreenMode, fullScreenSolutionMode, display, engineAppEventHandler) != initOK)
 	{
 		return initError;
 	}
@@ -186,7 +186,7 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
     if (impImage == nullptr)
     {
 		std::lock_guard<std::mutex> locker(_mutex);
-        EngineBase::setCursor(nullptr);
+        EngineBase::setCursorImage(nullptr);
         return;
     }
 	CursorImage mouse;
@@ -200,7 +200,7 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 		if (impImage->frame[i].dataLen > 0 && impImage->frame[i].data != nullptr)
 		{
 			std::lock_guard<std::mutex> locker(_mutex);
-			mouse.image[i].frame = EngineBase::loadCursorFromMem(impImage->frame[i].data, impImage->frame[i].dataLen, mouse.image[i].xOffset, mouse.image[i].yOffset);
+			mouse.image[i].frame = EngineBase::loadCursorImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen, mouse.image[i].xOffset, mouse.image[i].yOffset);
 			mouse.image[i].softwareFrame = EngineBase::loadImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen);
 			impImage->frame[i].image = nullptr;
 			impImage->frame[i].data = nullptr;
@@ -215,7 +215,7 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 	}
 
 	std::lock_guard<std::mutex> locker(_mutex);
-	EngineBase::setCursor(&mouse);
+	EngineBase::setCursorImage(&mouse);
 	mouse.image.resize(0);
 }
 
@@ -279,6 +279,12 @@ void Engine::getMousePosition(int& x, int& y)
 	EngineBase::getMouse(x, y);
 }
 
+std::vector<AEvent> Engine::getAllFingersPosition()
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	return EngineBase::getAllFingersPosition();
+}
+
 void Engine::frameBegin()
 {
 	std::lock_guard<std::mutex> locker(_mutex);
@@ -290,6 +296,11 @@ void Engine::frameEnd()
 	drawFPS();
 	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::frameEnd();
+}
+
+int Engine::getRand(int max, int min)
+{
+	return EngineBase::getRand(max, min);
 }
 
 UTime Engine::getTime()
@@ -310,7 +321,7 @@ int Engine::getFPS()
 
 void Engine::drawFPS()
 {
-#ifdef _CONSOLE_MODE
+#if  defined(_WIN32)
 #define _DRAW_FPS
 #endif // _CONSOLE_MODE
 
@@ -377,7 +388,7 @@ void Engine::setImageColorMode(_shared_image image, unsigned char r, unsigned ch
 //	EngineBase::freeImage(image);
 //}
 
-int Engine::getImageSize(_shared_image image, int &w, int &h)
+bool Engine::getImageSize(_shared_image image, int &w, int &h)
 {
 	std::lock_guard<std::mutex> locker(_mutex);
 	return EngineBase::getImageSize(image, w, h);
@@ -407,12 +418,6 @@ void Engine::drawTalk(const std::string& text, int x, int y, int size, unsigned 
 		return;
 	}
 	EngineBase::drawTalk(text, x, y, size, color);
-}
-
-void Engine::drawSolidUnicodeText(const std::wstring & text, int x, int y, int size, unsigned int color)
-{
-	std::lock_guard<std::mutex> locker(_mutex);
-	EngineBase::drawSolidUnicodeText(text, x, y, size, color);
 }
 
 _shared_image Engine::loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size)

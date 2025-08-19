@@ -154,14 +154,14 @@ public:
 	virtual void doSpecialAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 
 	virtual void drawAlpha(Point cenTile, Point cenScreen, PointEx coffset);
-	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset);
+	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle);
 
 	virtual void playSound(int act);
 
 	virtual void checkDie();
 	virtual void beginDie();
-	virtual void load(int index);
-	virtual void save(int index);
+	virtual void load(int index = -1);
+	virtual void save(int index = -1);
 
 };
 

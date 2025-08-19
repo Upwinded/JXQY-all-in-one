@@ -3,9 +3,9 @@
 
 ToolTip::ToolTip()
 {
-	init();
 	visible = false;
 	//coverMouse = false;
+	init();
 }
 
 ToolTip::~ToolTip()

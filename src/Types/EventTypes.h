@@ -125,6 +125,7 @@ struct AEvent
 	EventTouchID eventData;
 	int eventX = 0;
     int eventY = 0;
+	bool eventRepeat = true;
 
 	AEvent() {}
 
@@ -134,6 +135,15 @@ struct AEvent
 		eventData = aEventData; 
 		eventX = aEventX; 
 		eventY = aEventY; 
+	}
+
+	AEvent(EventType aEventType, EventTouchID aEventData, int aEventX, int aEventY, bool eRepeat)
+	{
+		eventType = aEventType;
+		eventData = aEventData;
+		eventX = aEventX;
+		eventY = aEventY;
+		eventRepeat = eRepeat;
 	}
 };
 

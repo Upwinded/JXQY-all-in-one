@@ -8,6 +8,7 @@ class Option :
 public:
 	Option();
 	virtual ~Option();
+	virtual void init() override;
 
 	Config * config = nullptr;
 
@@ -27,7 +28,7 @@ public:
 	std::shared_ptr<CheckBox> speedCB = nullptr;
 
 private:
-	void init();
+
 	void freeResource();
 
 	int musicPos = 0;

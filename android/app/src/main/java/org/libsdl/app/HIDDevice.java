@@ -1,4 +1,4 @@
-package upwinded.jxqy.allinone;
+package org.libsdl.app;
 
 import android.hardware.usb.UsbDevice;
 
@@ -13,9 +13,8 @@ interface HIDDevice
     public String getProductName();
     public UsbDevice getDevice();
     public boolean open();
-    public int sendFeatureReport(byte[] report);
-    public int sendOutputReport(byte[] report);
-    public boolean getFeatureReport(byte[] report);
+    public int writeReport(byte[] report, boolean feature);
+    public boolean readReport(byte[] report, boolean feature);
     public void setFrozen(boolean frozen);
     public void close();
     public void shutdown();

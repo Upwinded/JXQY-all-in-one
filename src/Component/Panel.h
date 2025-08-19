@@ -33,6 +33,8 @@ public:
 	Panel();
 	virtual ~Panel();
 
+	virtual void init() {}
+
 	Align align = alNone;
 	int alignX = 0;
 	int alignY = 0;

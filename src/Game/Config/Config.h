@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+
 #include "../../File/INIReader.h"
 #include "../GameTypes.h"
 #include "../../Engine/Engine.h"
@@ -32,6 +33,8 @@ public:
 
 	static double getGameSpeed();
 	static double setGameSpeed(double speed);
+
+	static int display;
 
 private:
 	static int windowWidth;

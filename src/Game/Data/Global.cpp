@@ -30,8 +30,8 @@ void Global::load()
 
     data.characterIndex = ini.GetInteger("State", "Chr", -1);
 
-    data.asfStyle = ini.GetInteger("Option", "AsfStyle", 0xFFFFFF00);
-    data.mpcStyle = ini.GetInteger("Option", "MpcStyle", 0xFFFFFF00);
+    data.asfStyle = ini.GetColor("Option", "AsfStyle", 0xFFFFFF);
+    data.mpcStyle = ini.GetColor("Option", "MpcStyle", 0xFFFFFF);
     
     data.mainLum = ini.GetInteger("Option", "MainLum", 31);
 	data.fadeLum = ini.GetInteger("Option", "FadeLum", 31);
@@ -61,8 +61,8 @@ void Global::save()
     
     ini.SetInteger("State", "Chr", data.characterIndex);
     
-    ini.SetInteger("Option", "AsfStyle", data.asfStyle);
-    ini.SetInteger("Option", "MpcStyle", data.mpcStyle);
+    ini.SetColor("Option", "AsfStyle", data.asfStyle);
+    ini.SetColor("Option", "MpcStyle", data.mpcStyle);
 
 	ini.SetInteger("Option", "MainLum", data.mainLum);
 	ini.SetInteger("Option", "FadeLum", data.fadeLum);

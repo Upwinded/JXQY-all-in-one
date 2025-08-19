@@ -1,10 +1,22 @@
 #pragma once
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "lua.h"
+#include "lualib.h"
+#include "lauxlib.h"
+
+#ifdef __cplusplus
+}
+#endif
+
 #include "../../Engine/Engine.h"
 #include "../../Types/Types.h"
 #include "../../Image/IMP.h"
 #include "../../File/PakFile.h"
 #include "../../File/INIReader.h"
-#include "../../../3rd/lua/lua.hpp"
 #include "../../libconvert/libconvert.h"
 
 class ScriptRunningHolder
@@ -61,6 +73,10 @@ private:
 	static int lua_SetMapTrap(lua_State * l);
 	static int lua_SaveMapTrap(lua_State * l);
 	static int lua_SetMapTime(lua_State * l);
+
+	static int lua_ChangeASFColor(lua_State* l);
+	static int lua_ChangeMapColor(lua_State* l);
+
 	static int lua_LoadObj(lua_State * l);
 	static int lua_SaveObj(lua_State * l);
 	static int lua_AddObj(lua_State * l);
@@ -95,6 +111,12 @@ private:
 	static int lua_SetNpcActionType(lua_State * l);
 	static int lua_SetNpcActionFile(lua_State * l);
 	static int lua_NpcSpecialAction(lua_State * l);
+
+	static int lua_ChangeLife(lua_State* l);
+	static int lua_ChangeMana(lua_State* l);
+	static int lua_ChangeThew(lua_State* l);
+
+
 	static int lua_LoadPlayer(lua_State * l);
 	static int lua_SavePlayer(lua_State * l);
 	static int lua_SetPlayerPos(lua_State * l);
@@ -132,6 +154,7 @@ private:
 	static int lua_AddGoods(lua_State * l);
 	static int lua_AddRandGoods(lua_State * l);
 	static int lua_AddMagic(lua_State * l);
+	static int lua_AddOneMagic(lua_State* l);
 	static int lua_DelGoods(lua_State * l);
 	static int lua_DelMagic(lua_State * l);
 	static int lua_AddMagicExp(lua_State * l);
@@ -147,6 +170,7 @@ private:
 	static int lua_SetMoneyNum(lua_State * l);
 
 	static int lua_ShowMessage(lua_State * l);
+	static int lua_Memo(lua_State* l);
 	static int lua_AddToMemo(lua_State * l);
 	static int lua_ClearMemo(lua_State * l);
 	static int lua_BuyGoods(lua_State * l);
@@ -162,6 +186,10 @@ private:
 	static int lua_ShowSnow(lua_State * l);
 	static int lua_ShowRandomSnow(lua_State * l);
 	static int lua_ShowRain(lua_State * l);
+	static int lua_BeginRain(lua_State* l);
+	static int lua_EndRain(lua_State* l);
+
+	static int lua_CheckYear(lua_State* l);
 
 };
 

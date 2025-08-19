@@ -251,7 +251,7 @@ void Button::setRectFromImage()
 	{
 		_shared_image img = IMP::loadImage(image[i], 0);
 		int w, h;
-		if (img != nullptr && engine->getImageSize(img, w, h) == 0)
+		if (img != nullptr && engine->getImageSize(img, w, h))
 		{
 			rect.w = w;
 			rect.h = h;

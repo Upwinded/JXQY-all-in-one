@@ -1,7 +1,0 @@
-<resources>
-    <string name="app_name">JXQY_all_in_one</string>
-    <string name="app_name_cn">剑侠情缘all_in_one</string>
-    <string name="title_activity_sdlactivity">SDLActivity</string>
-    <string name="dummy_button">Dummy Button</string>
-    <string name="dummy_content">DUMMY\nCONTENT</string>
-</resources>

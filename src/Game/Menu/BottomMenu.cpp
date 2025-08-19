@@ -4,10 +4,8 @@
 
 BottomMenu::BottomMenu()
 {
-	init();
 	visible = true;
-	columnMenu = std::make_shared<ColumnMenu>();
-	addChild(columnMenu);
+	init();
 }
 
 BottomMenu::~BottomMenu()
@@ -140,6 +138,9 @@ void BottomMenu::init()
 	}
 
 	setChildRectReferToParent();
+
+	columnMenu = std::make_shared<ColumnMenu>();
+	addChild(columnMenu);
 }
 
 void BottomMenu::onEvent()

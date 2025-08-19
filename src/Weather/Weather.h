@@ -47,29 +47,43 @@ private:
 	void drawElementLum();
 
 	const UTime lightningIntervalMin = 5000;
-	UTime lastLightningTime = 0;
+	UTime lastLightninUTime = 0;
 
 	bool lightningBegin = false;
 	UTime lightningBeginTime = 0;
-	UTime lightningTime = 300;
+	UTime lightninUTime = 300;
+	UTime lightningInterval = lightningIntervalMin;
 
 	const int dropRange = 200;
 	const int dropWRange = 100;
 	
-	const int maxDropNum = 250;
-	const int lrainDropNum = 30;
-	const int rainDropNum = 90;
-	const int hrainDropNum = 250;
+	const int maxDropNum = 500;
+	const int lrainDropNum = 50;
+	const int rainDropNum = 200;
+	const int hrainDropNum = 500;
 	const int lnDropNum = 200;
 	const int snowDropNum = 250;
 
-	std::vector<WeatherDrop> drops;
+	std::list<WeatherDrop> drops;
 
 	int getDropNum();
 	void resetDrops();
-	void resetDrop(WeatherDrop * drop, bool newdrop);
+	void resetDrop(WeatherDrop* drop, bool newdrop);
 
 	void updateFade();
+
+	int customRainDropNum = maxDropNum / 2;
+	int customRainSpeed = 100;
+	int customRainBoltProb = 10000;
+
+	std::string customRainSoundName;
+	std::vector<std::string> customRainBoltSoundName;
+	_music customRainSound = nullptr;
+	_channel customRainSoundChannel = nullptr;
+
+	void setRainCustomFromIni(std::shared_ptr<INIReader> ini);
+	void clearRainCustom();
+
 public:
 	void draw();
 
@@ -87,7 +101,7 @@ public:
 	void setLum(unsigned char l);
 	void setTime(unsigned char t);
 
-	void setWeather(WeatherType wType);
+	void setWeather(WeatherType wType, const std::string& configFIleName = "");
 	void setDay(DayType dType);
 
 	void drawWeather();

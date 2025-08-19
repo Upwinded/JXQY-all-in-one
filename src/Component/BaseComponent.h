@@ -22,4 +22,3 @@ private:
 	static std::map<std::string, _shared_imp> res;
 
 };
-

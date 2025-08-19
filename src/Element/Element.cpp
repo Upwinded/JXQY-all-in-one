@@ -1,6 +1,8 @@
 ﻿#include "Element.h"
+#include <set>
 
-PElement Element::_topParent = std::make_shared<Element>();
+
+std::list<Element*> Element::memList;
 
 PElement Element::currentDragItem = nullptr;
 int Element::dragParam[2] = { 0, 0 };
@@ -14,6 +16,10 @@ Element::Element()
 	engine = Engine::getInstance();
 	children.resize(0);
 	initTime();
+#ifdef DEBUG
+	memList.push_back(this);
+	ShowMemList();
+#endif // DEBUG
 }
 
 Element::~Element()
@@ -24,24 +30,20 @@ Element::~Element()
 	{
 		currentDragItem = nullptr;
 	}
+#ifdef DEBUG
+	memList.remove(this);
+	ShowMemList();
+#endif // DEBUG
 }
 
-void Element::setAsTop(PElement child)
+void Element::ShowMemList()
 {
-	if (child.get() == nullptr)
+	GameLog::write("当前对象列表：");
+	for (auto iter = memList.begin(); iter != memList.end(); iter++)
 	{
-		return;
+		GameLog::write("[%s] : [%s]", typeid(**iter).name(), (*iter)->name.c_str());
 	}
-	if (child->parent != nullptr)
-	{
-		child->parent->removeChild(child->getMySharedPtr());
-	}
-	_topParent->addChild(child);
-}
-
-void Element::removeFromTop(PElement child)
-{
-	_topParent->removeChild(child);
+	GameLog::write("当前对象总计：%d", memList.size());
 }
 
 void Element::addChild(PElement child)
@@ -107,23 +109,7 @@ void Element::removeAllChild()
 
 PElement Element::getMySharedPtr()
 {
-	if (parent != nullptr)
-	{
-		return parent->getChildSharedPtr(this);
-	}
-	return PElement(nullptr);
-}
-
-PElement Element::getChildSharedPtr(Element* element)
-{
-	for (size_t i = 0; i < children.size(); i++)
-	{
-		if (children[i].get() == element)
-		{
-			return children[i];
-		}
-	}
-	return PElement(nullptr);
+	return shared_from_this();
 }
 
 void Element::setChildActivated(PElement child, bool activated)
@@ -368,7 +354,6 @@ void Element::update()
 			children[i]->update();
 		}
 	}
-	
 	onUpdate();
 }
 
@@ -625,7 +610,6 @@ bool Element::checkTouchUp(EventTouchID id, int x, int y)
 	if (touchingID == id)
 	{
 		onMouseLeftUp(x, y);
-		GameLog::write("now:%d, touchdowntime:%d", getTime(), touchingDownTime);
 		if (touchingDownID == id
 #ifdef __MOBILE__
 			&& getTime() - touchingDownTime <= clickCheckMaxTime
@@ -661,13 +645,20 @@ bool Element::checkTouchUp(EventTouchID id, int x, int y)
 void Element::allHandleEvents()
 {
 	AEvent e;
+	bool mouseMoved = false;
+	std::set<EventTouchID> fingerSet;
 	while (engine->getEvent(e) > 0)
 	{
 		if (e.eventType == ET_MOUSEMOTION || e.eventType == ET_FINGERMOTION)
 		{		
 			if (e.eventType == ET_MOUSEMOTION)
 			{
+				mouseMoved = true;
 				e.eventData = TOUCH_MOUSEID;
+			}
+			else
+			{
+				fingerSet.insert(e.eventData);
 			}
 			checkAllTouchMotion(e.eventData, e.eventX, e.eventY, false);
 			if (dragging != TOUCH_UNTOUCHEDID && dragging == e.eventData && currentDragItem != nullptr)
@@ -706,6 +697,20 @@ void Element::allHandleEvents()
 			}
 		}
 		handleEvent(e);
+	}
+	if (!mouseMoved)
+	{
+		int mouseX, mouseY;
+		engine->getMousePosition(mouseX, mouseY);
+		checkAllTouchMotion(TOUCH_MOUSEID, mouseX, mouseY, false);
+	}
+	auto fingers = engine->getAllFingersPosition();
+	for (size_t i = 0; i < fingers.size(); i++)
+	{
+		if (fingerSet.find(fingers[i].eventData) != fingerSet.end())
+		{
+			checkAllTouchMotion(fingers[i].eventData, fingers[i].eventX, fingers[i].eventY, false);
+		}
 	}
 	handleEvents();
 }
@@ -824,10 +829,9 @@ unsigned int Element::run()
 	//返回时调用一次frameBegin，以免在调用的run返回时因没有再次调用frameBegin造成绘制出错
 	engine->frameBegin();
 
-	runningElement.resize(runningElement.size() - 1);
+	runningElement.pop_back();
 
 	return result;
-
 }
 
 unsigned int Element::stop(int ret)

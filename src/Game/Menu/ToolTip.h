@@ -18,7 +18,7 @@ public:
 
 	void setGoods(std::shared_ptr<Goods> goods);
 	void setMagic(std::shared_ptr<Magic> magic, int level);
-	void init();
+	virtual void init() override;
 
 private:
 	void freeResource();

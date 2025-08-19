@@ -157,13 +157,6 @@ public:
 	int kind = nkNormal;
 	std::string npcIni = "";
 
-	virtual int getEvade() {return evade;}
-	virtual int getDefend() {return defend;}
-	virtual int getAttack() {return attack;}
-	virtual int getLifeMax() {return lifeMax;}
-	virtual int getManaMax() {return manaMax;}
-	virtual int getThewMax() {return thewMax;}
-
 	int currPos = 0;
 	int action = naNone;
 	int walkSpeed = 1;
@@ -184,6 +177,13 @@ public:
 	int evade = 0;
 	int duck = 0;
 	int exp = 0;
+
+	virtual int getEvade() { return evade; }
+	virtual int getDefend() { return defend; }
+	virtual int getAttack() { return attack; }
+	virtual int getLifeMax() { return lifeMax; }
+	virtual int getManaMax() { return manaMax; }
+	virtual int getThewMax() { return thewMax; }
 
 	int levelUpExp = 0;
 	int level = 1;
@@ -251,10 +251,16 @@ public:
 	virtual void beginJump(Point dest);
 	virtual void beginRun(Point dest);
 
+	// 开始朝着目标方向走步（不寻路）（走路动作时间重置）
 	virtual void beginRadiusStep(Point dest, int radius);
+	
+	// 改变目标,朝着目标方向走步（不寻路）（走路动作时间不重置）
 	virtual void changeRadiusStep(Point dest, int radius);
 
+	// 开始朝着目标寻找路径移动（走路动作时间重置）
 	virtual void beginRadiusWalk(Point dest, int radius);
+
+	// 改变目标并朝着目标寻找路径移动（走路动作时间不重置）
 	virtual void changeRadiusWalk(Point dest, int radius);
 
 	bool isFollower();
@@ -287,7 +293,7 @@ public:
 	//绘图函数
 	_shared_image getActionImage(int * offsetx, int * offsety);
 	_shared_image getActionShadow(int * offsetx, int * offsety);
-	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset);
+	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle);
 	void drawNPCAlpha(Point cenTile, Point cenScreen, PointEx coffset);
 	
 	void limitDir(int * d);

@@ -713,7 +713,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 
 			if (randTime)
 			{
-				e->waitTime += rand() % 200;
+				e->waitTime += Engine::getInstance()->getRand(200);
 			}
 			if (srcMagic->level[lvl].lifeFrame <= 0)
 			{
@@ -769,7 +769,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 
 			if (randTime)
 			{
-				e->waitTime += rand() % 200;
+				e->waitTime += Engine::getInstance()->getRand(200);
 			}
 
 			if (e->waitTime > 0)
@@ -818,7 +818,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 
 			if (randTime)
 			{
-				e->waitTime += rand() % 200;
+				e->waitTime += Engine::getInstance()->getRand(200);
 			}
 
 			if (e->waitTime > 0)
@@ -864,7 +864,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->evade = evade;
 			if (randTime)
 			{
-				e->waitTime += rand() % 200;
+				e->waitTime += Engine::getInstance()->getRand(200);
 			}
 
 			if (e->waitTime > 0)
@@ -1069,7 +1069,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSquareEffect(std::shared_ptr<Magi
 			{
 				e->noLum = true;
 			}
-			e->lifeTime = e->getFlyingTime();
+			e->lifeTime = e->getFlyinUTime();
 			if (e->lifeTime == 0)
 			{
 				e->lifeTime = (unsigned int)(MAX_FRAME_TIME * 2);
@@ -1145,7 +1145,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addWaveEffect(std::shared_ptr<Magic>
 			{
 				e->noLum = true;
 			}
-			e->lifeTime = e->getFlyingTime();
+			e->lifeTime = e->getFlyinUTime();
 			e->waitTime += i * 60;
 			if (e->lifeTime == 0)
 			{
@@ -1195,7 +1195,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addCrossEffect(std::shared_ptr<Magic
 			e->damage = damage;
 			e->evade = evade;
 
-			e->lifeTime = e->getFlyingTime();
+			e->lifeTime = e->getFlyinUTime();
 			if (e->lifeTime == 0)
 			{
 				e->lifeTime = (unsigned int)(EFFECT_FRAME_TIME * 2);
@@ -1243,7 +1243,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSelfEffect(std::shared_ptr<Magic>
 	else
 	{
 		e->doing = ekExploding;
-		e->lifeTime = e->getExplodingTime();
+		e->lifeTime = e->getExplodinUTime();
 	}
 	e->calDest();
 	gm->effectManager->addEffect(e);
@@ -1325,7 +1325,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<
 
 		e->damage = damage;
 		e->evade = evade;
-		e->lifeTime = e->getExplodingTime();
+		e->lifeTime = e->getExplodinUTime();
 		e->calDest();
 		gm->effectManager->addEffect(e);
 		e->beginExplode(e->position);		
@@ -1368,7 +1368,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addThrowExplodeEffect(std::shared_pt
 		auto e = ret[i];
 		e->waitTime = 0;
 		e->doing = ekFlying;
-		e->lifeTime = e->getFlyingTime();
+		e->lifeTime = e->getFlyinUTime();
 		if (e->lifeTime == 0)
 		{
 			e->lifeTime = (unsigned int)(MAX_FRAME_TIME * 2);

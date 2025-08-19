@@ -30,7 +30,7 @@ bool TitleTeam::onInitial()
 	freeResource();
 	int w = 0, h = 0;
 	engine->getWindowSize(w, h);
-	vp = std::make_shared<VideoPage>("video\\team.avi");
+	vp = std::make_shared<VideoPage>(u8"video\\team.avi");
 	vp->rect.w = w - 440;
 	vp->rect.x = 0;
 	vp->rect.y = 0;

@@ -1,9 +1,12 @@
+
 #pragma once
+#include <deque>
 #include "../GameTypes.h"
 #include "../../File/PakFile.h"
 #include "../../Engine/Engine.h"
 #include "../../Element/Element.h"
-#include <deque>
+#include "NPC.h"
+#include "Object.h"
 
 /*
 位置（10进制）	大小（bytes）	说明
@@ -29,12 +32,24 @@
 2bytes : 0x00 0x1F"
 */
 
+struct DataTile
+{
+	std::list<std::shared_ptr<Object>> objList;
+	std::list<std::shared_ptr<NPC>> npcList;
+	std::list<std::shared_ptr<NPC>> stepNPCList;
+};
 
+struct DataMap
+{
+	std::vector<std::vector<DataTile>> tile;
+};
 
 struct LinePathPoint
 {
-	Point point = { 0, 0 };
-	PointEx pointEx = { 0, 0 };
+	// 坐标
+	Point pos = { 0, 0 };
+	// 像素偏移
+	PointEx pixelOffset = { 0, 0 };
 };
 
 struct PathTile
@@ -76,7 +91,7 @@ public:
     
     int NormalizeDirection(int direction);
     std::deque<Point> getPathAstar(Point from, Point to);
-    std::deque<Point> getPathTraversal(Point from, Point to);
+	std::deque<Point> getPathTraversal(Point from, Point to);
     std::deque<Point> getPath(Point from, Point to);
 	//得到距离to为radiusi数范围的点
 	std::deque<Point> getRadiusPath(Point from, Point to, int radius);
@@ -98,6 +113,7 @@ public:
 	std::string getTrapName(Point pos);
 	bool haveTraps(Point pos);
 	bool canWalk(Point pos);
+    bool canWalkDirectlyTo(Point pos, int dir);
 	bool canJump(Point pos);
 	bool canFly(Point pos);
 	bool canViewTile(Point pos);
@@ -114,22 +130,20 @@ public:
 
 	void createDataMap();
 
-	void deleteObjectFromDataMap(Point pos, int idx);
-	void addObjectToDataMap(Point pos, int idx);
-	void changeObjectInDataMap(Point pos, int idx, int newIdx);
+	void deleteObjectFromDataMap(Point pos, std::shared_ptr<Object> obj);
+	void addObjectToDataMap(Point pos, std::shared_ptr<Object> obj);
 
-	void deleteStepFromDataMap(Point pos, int idx);
-	void addStepToDataMap(Point pos, int idx);
-	void changeStepDataMap(Point pos, int idx, int newIdx);
+	void deleteStepFromDataMap(Point pos, std::shared_ptr<NPC> npc);
+	void addStepToDataMap(Point pos, std::shared_ptr<NPC> npc);
 
-	void deleteNPCFromDataMap(Point pos, int idx);
-	void addNPCToDataMap(Point pos, int idx);
-	void changeNPCInDataMap(Point pos, int idx, int newIdx);
+	void deleteNPCFromDataMap(Point pos, std::shared_ptr<NPC> npc);
+	void addNPCToDataMap(Point pos, std::shared_ptr<NPC> npc);
+
 
 	void freeResource();
 	void freeMpc();
 	void freeData();
-	void drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset);
+	void drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle);
 
 	bool isInMap(Point pos);
 private:
@@ -146,4 +160,5 @@ private:
 	bool compareMapHead(MapData * md);
 
 };
+
 

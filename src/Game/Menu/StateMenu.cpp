@@ -3,8 +3,8 @@
 
 StateMenu::StateMenu()
 {
-	init();
 	visible = false;
+	init();
 }
 
 StateMenu::~StateMenu()

@@ -17,8 +17,7 @@ public:
 	std::shared_ptr<Object> findNearestScriptViewObj(Point pos, int radius);
 	std::vector<std::shared_ptr<Object>> findRadiusScriptViewObj(Point pos, int radius);
 	bool drawOBJSelectedAlpha(Point cenTile, Point cenScreen, PointEx offset);
-	void drawOBJAlpha(int index, Point cenTile, Point cenScreen, PointEx offset);
-	void drawOBJ(int index, Point cenTile, Point cenScreen, PointEx offset);
+	void drawOBJ(std::shared_ptr<Object> obj, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle);
 
 	std::vector<std::shared_ptr<Object>> objectList;
 

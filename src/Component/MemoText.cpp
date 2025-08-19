@@ -7,12 +7,6 @@ MemoText::MemoText()
 	name = "Memo";
 	elementType = etMenu;
 	canDrag = true;
-	mstr.resize(MEMO_LINE);
-	for (size_t i = 0; i < MEMO_LINE; i++)
-	{
-		mstr[i] = std::make_shared<Label>();
-		addChild(mstr[i]);
-	}
 }
 
 MemoText::~MemoText()
@@ -50,7 +44,7 @@ void MemoText::initFromIni(INIReader & ini)
 
 void MemoText::freeResource()
 {
-	for (size_t i = 0; i < MEMO_LINE; i++)
+	for (size_t i = 0; i < mstr.size(); i++)
 	{
 		mstr[i] = nullptr;
 	}

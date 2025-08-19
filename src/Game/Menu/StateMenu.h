@@ -9,7 +9,7 @@ public:
 
 	virtual void updateLabel();
 
-	virtual void init();
+	virtual void init() override;
 
 	std::shared_ptr<ImageContainer> image = nullptr;
 	std::shared_ptr<ImageContainer> title = nullptr;

@@ -91,8 +91,6 @@ void SaveLoad::onEvent()
 				}
 			}
 		}
-
-
 	}	
 	if (exitBtn != nullptr && exitBtn->getResult(erClick))
 	{

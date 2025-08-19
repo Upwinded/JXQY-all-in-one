@@ -16,8 +16,8 @@ int Game::run()
 	GameLog::write("Init Game Engine\n");
 	int w = DEFAULT_WINDOW_WIDTH, h = DEFAULT_WINDOW_HEIGHT;
 #ifdef __MOBILE__
-	w = 1200;
-	h = 600;
+	w = 1000;
+	h = 500;
 	Config::setDefaultWindowSize(w, h);
 #endif
 	Config::load();
@@ -25,7 +25,7 @@ int Game::run()
 
 	Config::getWindowSize(w, h);
 
-	if (Engine::getInstance()->init(gameTitle, w, h, Config::fullScreenMode, Config::fullScreenSolutionMode) != initOK)
+	if (Engine::getInstance()->init(gameTitle, w, h, Config::fullScreenMode, Config::fullScreenSolutionMode, Config::display) != initOK)
 	{
 		return -1;
 	}
@@ -45,9 +45,7 @@ int Game::run()
 
 	GameLog::write("Begin Game Title\n");
 	PElement title = std::make_shared<Title>();
-	Element::setAsTop(title);
 	int ret = title->run();
-	Element::removeFromTop(title);
 
 	//GameLog::write("Release Engine!\n");
 	//Engine::getInstance()->destroyEngine();

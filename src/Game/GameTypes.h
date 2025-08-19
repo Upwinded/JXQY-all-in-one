@@ -63,7 +63,8 @@
 #define MAP_FOLDER "map\\"
 #define VARIABLE_INI "variable.ini"
 #define VARIABLE_SECTION "variable"
-
+#define INI_MAP_FOLDER "ini\\map\\"
+#define INI_MAP_NAME_LIST "mapname.ini"
 #define TALK_FILE "talk.txt"
 
 #define SAVE_SHOT_HEAD "SAVESHOT"
@@ -166,18 +167,6 @@ enum DragType
 	dtMagic = 2,
 	dtSell = 3,
 	dtBuy = 4,
-};
-
-struct DataTile
-{
-	std::vector<int> objIndex;
-	std::vector<int> npcIndex;
-	std::vector<int> stepIndex;
-};
-
-struct DataMap
-{
-	std::vector<std::vector<DataTile>> tile;
 };
 
 struct EffectTile

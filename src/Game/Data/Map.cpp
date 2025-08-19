@@ -6,6 +6,49 @@
 #endif // pi
 #define pi 3.1415926
 
+class a
+{
+};
+
+// 定义节点结构体
+struct MapNode
+{
+public:
+	Point pos;
+	float g;  // 从起点到当前节点的实际代价
+	float h;  // 从当前节点到目标节点的预估代价
+	float f;  // f = g + h
+	std::shared_ptr<MapNode> parent;
+
+	MapNode(Point p, float g_val, float h_val, std::shared_ptr<MapNode> par)
+		: pos(p), g(g_val), h(h_val), f(g_val + h_val), parent(par) 
+	{
+	}
+
+	// 重载比较运算符，用于优先队列
+	bool operator>(const MapNode& other) const 
+	{
+		return f > other.f;
+	}
+	bool operator<(const MapNode& other) const 
+	{
+		return f < other.f;
+	}
+	bool operator==(const MapNode& other) const 
+	{
+		return f == other.f;
+	}
+
+	class Compare
+	{
+	public:
+		bool operator()(std::shared_ptr<MapNode> MapNode1, std::shared_ptr<MapNode> MapNode2)
+		{
+			return MapNode1->f > MapNode2->f;
+		}
+	};
+};
+
 Map::Map()
 {
 	priority = epMap;
@@ -16,7 +59,7 @@ Map::~Map()
 	freeResource();
 }
 
-bool Map::load(const std::string & fileName)
+bool Map::load(const std::string& fileName)
 {
 	freeMpc();
 	freeData();
@@ -24,7 +67,7 @@ bool Map::load(const std::string & fileName)
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(fileName, s);
 	if (s != nullptr && len > 0)
-	{	
+	{
 		bool ret = load(s, len);
 		return ret;
 	}
@@ -85,7 +128,7 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 	}
 
 	//check length of data
-	
+
 	if ((data->head.nameLen <= 0) || (data->head.infoLen != data->head.nameLen + 32) || (size < MAP_MPC_COUNT * data->head.infoLen + (int)sizeof(MapTile) * data->head.width * data->head.height))
 	{
 		data = nullptr;
@@ -102,7 +145,7 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 		mapReadData(&data->mpc.mpc[i].obstacle, 4);
 		mapReadData(&data->mpc.mpc[i].nil, 4);
 		d += 16;
-		size -= 16;		
+		size -= 16;
 	}
 
 	//read data
@@ -112,7 +155,7 @@ bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
 		data->tile[i].resize(data->head.width);
 	}
 
-	
+
 	for (int i = 0; i < data->head.height; i++)
 	{
 		for (int j = 0; j < data->head.width; j++)
@@ -246,7 +289,7 @@ Point Map::getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx off
 double Map::getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {
 	auto pos = getTilePosition(to, from);
-	return hypot(((double)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH  * MapXRatio, ((double)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
+	return hypot(((double)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH * MapXRatio, ((double)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
 }
 
 void Map::loadMapMpc()
@@ -263,7 +306,7 @@ void Map::loadMapMpc()
 			std::string mpcName = data->head.path;
 			if (mpcName == "")
 			{
-				mpcName = "mpc\\map\\" + gm->mapName + "\\";
+				mpcName = "mpc\\map\\" + gm->mapFolderName + "\\";
 			}
 			if (mpcName.length() > 1 && mpcName.c_str()[mpcName.length() - 1] != '\\')
 			{
@@ -277,165 +320,129 @@ void Map::loadMapMpc()
 	}
 }
 
-
 int Map::NormalizeDirection(int direction)
 {
-    if (direction > 7)
-    {
-        direction = direction % 8;
-    }
-    if (direction < 0)
-    {
-        direction = direction % 8 + 8;
-    }
-    return direction;
+	if (direction > 7)
+	{
+		direction = direction % 8;
+	}
+	if (direction < 0)
+	{
+		direction = direction % 8 + 8;
+	}
+	return direction;
 }
 
 std::deque<Point> Map::getPathAstar(Point from, Point to)
 {
-    // 定义节点结构体
-    struct Node {
-        Point pos;
-        float g;  // 从起点到当前节点的实际代价
-        float h;  // 从当前节点到目标节点的预估代价
-        float f;  // f = g + h
-        std::shared_ptr<Node> parent;
+	std::deque<Point> path;
+	if (to == from)
+	{
+		return path;
+	}
+	int w, h;
+	if (data == nullptr)
+	{
+		return path;
+	}
 
-        Node(Point p, float g_val, float h_val, std::shared_ptr<Node> par)
-            : pos(p), g(g_val), h(h_val), f(g_val + h_val), parent(par) {}
+	w = data->head.width;
+	h = data->head.height;
+	if (w <= 0 || h <= 0)
+	{
+		return path;
+	}
 
-        // 重载比较运算符，用于优先队列
-        bool operator>(const Node& other) const {
-            return f > other.f;
-        }
-        bool operator<(const Node& other) const {
-            return f < other.f;
-        }
-        bool operator==(const Node& other) const {
-            return f == other.f;
-        }
-        
-        class Compare
-        {
-        public:
-            bool operator()(std::shared_ptr<Node> node1, std::shared_ptr<Node> node2)
-            {
-                return node1->f > node2->f;
-            }
-        };
-    };
-    
+	if (!isInMap(from) || !isInMap(to))
+	{
+		return path;
+	}
 
-    
-    std::deque<Point> path;
-    if (to == from)
-    {
-        return path;
-    }
-    int w, h;
-    if (data == nullptr)
-    {
-        return path;
-    }
-    
-    w = data->head.width;
-    h = data->head.height;
-    if (w <= 0 || h <= 0)
-    {
-        return path;
-    }
-    
-    if (!isInMap(from) || !isInMap(to))
-    {
-        return path;
-    }
-    
-    // 开放列表，使用优先队列
-    std::priority_queue<std::shared_ptr<Node>, std::vector<std::shared_ptr<Node>>, Node::Compare> openList;
-    // 关闭列表
-    std::vector<std::vector<bool>> closedList(h, std::vector<bool>(w, false));
-    // 节点信息
-    std::vector<std::vector<std::shared_ptr<Node>>> nodes(h, std::vector<std::shared_ptr<Node>>(w, nullptr));
+	// 开放列表，使用优先队列
+	std::priority_queue<std::shared_ptr<MapNode>, std::vector<std::shared_ptr<MapNode>>, MapNode::Compare> openList;
+	// 关闭列表
+	std::vector<std::vector<bool>> closedList(h, std::vector<bool>(w, false));
+	// 节点信息
+	std::vector<std::vector<std::shared_ptr<MapNode>>> MapNodes(h, std::vector<std::shared_ptr<MapNode>>(w, nullptr));
 
-    // 初始化起点节点
-    auto startNode = std::make_shared<Node>(from, 0, calDistance(from, to), nullptr);
-    openList.push(startNode);
-    nodes[from.y][from.x] = startNode;
-    int count_times = 0;
-    while (!openList.empty() && (count_times++ < 128*128) )
-    {
-        // 取出 f 值最小的节点
-        auto current = openList.top();
-        openList.pop();
+	// 初始化起点节点
+	auto startMapNode = std::make_shared<MapNode>(from, 0, calDistance(from, to), nullptr);
+	openList.push(startMapNode);
+	MapNodes[from.y][from.x] = startMapNode;
+	int count_times = 0;
+	while (!openList.empty() && (count_times++ < 128 * 128))
+	{
+		// 取出 f 值最小的节点
+		auto current = openList.top();
+		openList.pop();
 
-        if (current->pos == to)
-        {
-            // 找到目标节点，回溯路径
-            std::shared_ptr<Node> temp = current;
-            while (temp->parent)
-            {
-                path.push_front(temp->pos);
-                temp = temp->parent;
-            }
-//            path.push_front(from);
-            break;
-        }
+		if (current->pos == to)
+		{
+			// 找到目标节点，回溯路径
+			std::shared_ptr<MapNode> temp = current;
+			while (temp->parent)
+			{
+				path.push_front(temp->pos);
+				temp = temp->parent;
+			}
+			//            path.push_front(from);
+			break;
+		}
 
-        // 将当前节点加入关闭列表
-        closedList[current->pos.y][current->pos.x] = true;
+		// 将当前节点加入关闭列表
+		closedList[current->pos.y][current->pos.x] = true;
 
-        // 获取相邻节点
-        for (int i = 0; i < 8; i++)
-        {
-            auto neighbor = getSubPoint(current->pos, i);
-            if ((!canWalk(neighbor) && (neighbor != to)) || closedList[neighbor.y][neighbor.x])
-            {
-                continue;
-            }
-            
-            if (i % 2 == 0)
-            {
-                if (!canPass(getSubPoint(current->pos, NormalizeDirection(i - 1))) || !canPass(getSubPoint(current->pos, NormalizeDirection(i + 1))))
-                {
-                    continue;
-                }
-            }
-            
-            float temp_tentativeG = 1.0f;
-            if (i % 4 == 2)
-            {
-                temp_tentativeG = 1.414f * temp_tentativeG;
-            }
-            else if (i % 2 != 0)
-            {
-                temp_tentativeG = 1.732f / 2.0f * temp_tentativeG;
-            }
-            float tentativeG = current->g + temp_tentativeG;
-            
-            if (!nodes[neighbor.y][neighbor.x])
-            {
-                // 节点未被访问过
-                auto newNode = std::make_shared<Node>(neighbor, tentativeG, calDistance(neighbor, to), current);
-                openList.push(newNode);
-                nodes[neighbor.y][neighbor.x] = newNode;
-            }
-            else if (tentativeG < nodes[neighbor.y][neighbor.x]->g)
-            {
-                // 找到更优路径
-                nodes[neighbor.y][neighbor.x]->parent = current;
-                nodes[neighbor.y][neighbor.x]->g = tentativeG;
-                nodes[neighbor.y][neighbor.x]->f = tentativeG + nodes[neighbor.y][neighbor.x]->h;
-                openList.push(nodes[neighbor.y][neighbor.x]);
-            }
-        }
-    }
-    return path;
+		// 获取相邻节点
+		for (int i = 0; i < 8; i++)
+		{
+			auto neighbor = getSubPoint(current->pos, i);
+			if ((!canWalk(neighbor) && (neighbor != to)) || closedList[neighbor.y][neighbor.x])
+			{
+				continue;
+			}
+
+			if (i % 2 == 0)
+			{
+				if (!canPass(getSubPoint(current->pos, NormalizeDirection(i - 1))) || !canPass(getSubPoint(current->pos, NormalizeDirection(i + 1))))
+				{
+					continue;
+				}
+			}
+
+			float temp_tentativeG = 1.0f;
+			if (i % 4 == 2)
+			{
+				temp_tentativeG = 1.414f * temp_tentativeG;
+			}
+			else if (i % 2 != 0)
+			{
+				temp_tentativeG = 1.732f / 2.0f * temp_tentativeG;
+			}
+			float tentativeG = current->g + temp_tentativeG;
+
+			if (!MapNodes[neighbor.y][neighbor.x])
+			{
+				// 节点未被访问过
+				auto newMapNode = std::make_shared<MapNode>(neighbor, tentativeG, calDistance(neighbor, to), current);
+				openList.push(newMapNode);
+				MapNodes[neighbor.y][neighbor.x] = newMapNode;
+			}
+			else if (tentativeG < MapNodes[neighbor.y][neighbor.x]->g)
+			{
+				// 找到更优路径
+				MapNodes[neighbor.y][neighbor.x]->parent = current;
+				MapNodes[neighbor.y][neighbor.x]->g = tentativeG;
+				MapNodes[neighbor.y][neighbor.x]->f = tentativeG + MapNodes[neighbor.y][neighbor.x]->h;
+				openList.push(MapNodes[neighbor.y][neighbor.x]);
+			}
+		}
+	}
+	return path;
 }
 
 std::deque<Point> Map::getPathTraversal(Point from, Point to)
 {
 	std::deque<Point> path;
-	path.resize(0);
 	if (to == from)
 	{
 		return path;
@@ -528,18 +535,18 @@ std::deque<Point> Map::getPathTraversal(Point from, Point to)
 
 std::deque<Point> Map::getPath(Point from, Point to)
 {
-    return getPathAstar(from, to);
-//    return getPathTraversal(from, to);
+	return getPathAstar(from, to);
+	//    return getPathTraversal(from, to);
 }
 
 std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius)
-{	
+{
 	auto result = getPath(from, to);
 	if (result.size() == 0)
 	{
 		return result;
 	}
-	if (radius >= (int)result.size() )
+	if (radius >= (int)result.size())
 	{
 		result.resize(0);
 		return result;
@@ -553,6 +560,17 @@ std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius)
 
 std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 {
+	//    std::deque<Point> ret;
+	//    if (stepCount < 0) {
+	//        return ret;
+	//    }
+	//    ret = getPath(from, to);
+	//    if (ret.size() > stepCount)
+	//    {
+	//        ret.resize(stepCount);
+	//    }
+	//    return ret;
+
 	std::deque<Point> result;
 	Point pos = from;
 	int stepIdx = 0;
@@ -573,7 +591,7 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 			int d = i;
 			switch (d)
 			{
-			case 2: 
+			case 2:
 				d = -1;
 				break;
 			case 3:
@@ -610,7 +628,7 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 					break;
 				}
 			}
-		}	
+		}
 	}
 	return result;
 }
@@ -690,8 +708,8 @@ std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, P
 	while ((nowStep != to) && (leftStep-- > 0))
 	{
 		auto nextStep = getLineSubStepEx(nowStep, nowOffset, angle);
-		nowStep = nextStep.point;
-		nowOffset = nextStep.pointEx;
+		nowStep = nextStep.pos;
+		nowOffset = nextStep.pixelOffset;
 		result.push_back(nowStep);
 	}
 	return result;
@@ -769,7 +787,7 @@ Point Map::getJumpPath(Point from, Point to)
 			if (stepList[stepList.size() - 1] == to)
 			{
 				break;
-			}	
+			}
 		}
 		else
 		{
@@ -850,27 +868,25 @@ bool Map::canView(Point from, Point to)
 	return false;
 }
 
-
 bool Map::canWalk(Point pos)
 {
-	if (pos.x < 0 || pos.y < 0 || pos.x >= data->head.width || pos.y >= data->head.height)
-	{
-		return false;
-	}
+    if (!isInMap(pos))
+        return false;
+    
 	if (data->tile[pos.y][pos.x].obstacle != toJumpTrans && data->tile[pos.y][pos.x].obstacle != toJumpOpaque
 		&& data->tile[pos.y][pos.x].obstacle != toTrans && data->tile[pos.y][pos.x].obstacle != toObstacle)
 	{
-		if (dataMap.tile[pos.y][pos.x].npcIndex.size() == 0 && dataMap.tile[pos.y][pos.x].stepIndex.size() == 0)
+		if (dataMap.tile[pos.y][pos.x].npcList.size() == 0 && dataMap.tile[pos.y][pos.x].stepNPCList.size() == 0)
 		{
-			if (dataMap.tile[pos.y][pos.x].objIndex.size() == 0)
+			if (dataMap.tile[pos.y][pos.x].objList.size() == 0)
 			{
 				return true;
 			}
 			else
 			{
-				for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
+				for (auto iter = dataMap.tile[pos.y][pos.x].objList.begin(); iter != dataMap.tile[pos.y][pos.x].objList.end(); iter++)
 				{
-					int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+					int objKind = (*iter)->kind;
 					if (objKind == okBox || objKind == okDoor || objKind == okOrnament)
 					{
 						return false;
@@ -883,23 +899,35 @@ bool Map::canWalk(Point pos)
 	return false;
 }
 
+bool Map::canWalkDirectlyTo(Point pos, int dir)
+{
+    auto dest = getSubPoint(pos, dir);
+    if (!canWalk(dest))
+    {
+        return false;
+    }
+    if (dir % 2 != 0) {
+        return true;
+    }
+    return canPass(getSubPoint(pos, NormalizeDirection(dir - 1))) && canPass(getSubPoint(pos, NormalizeDirection(dir + 1)));
+}
+
 bool Map::canJump(Point pos)
 {
-	if (pos.x < 0 || pos.y < 0 || pos.x >= data->head.width || pos.y >= data->head.height)
-	{
-		return false;
-	}
+    if (!isInMap(pos))
+        return false;
+    
 	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toTrans)
 	{
 		/*if (dataMap.tile[pos.y][pos.x].npcIndex.size() == 0 && dataMap.tile[pos.y][pos.x].stepIndex.size() == 0)
 		{
-			
+
 		}*/
-		if (dataMap.tile[pos.y][pos.x].objIndex.size() > 0)
+		if (dataMap.tile[pos.y][pos.x].objList.size() > 0)
 		{
-			for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
+			for (auto iter = dataMap.tile[pos.y][pos.x].objList.begin(); iter != dataMap.tile[pos.y][pos.x].objList.end(); iter++)
 			{
-				int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+				int objKind = (*iter)->kind;
 				if (objKind == okDoor)
 				{
 					return false;
@@ -913,6 +941,9 @@ bool Map::canJump(Point pos)
 
 int Map::getTrapIndex(Point pos)
 {
+    if (!isInMap(pos))
+        return 0;
+    
 	if (data->tile[pos.y][pos.x].trap != 0)
 	{
 		return data->tile[pos.y][pos.x].trap;
@@ -922,9 +953,12 @@ int Map::getTrapIndex(Point pos)
 
 std::string Map::getTrapName(Point pos)
 {
-	if (data->tile[pos.y][pos.x].trap != 0) 
+    if (!isInMap(pos))
+        return "";
+    
+	if (data->tile[pos.y][pos.x].trap != 0)
 	{
-		return gm->traps.get(gm->mapName, data->tile[pos.y][pos.x].trap);
+		return gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap);
 	}
 	return "";
 }
@@ -932,7 +966,7 @@ std::string Map::getTrapName(Point pos)
 bool Map::haveTraps(Point pos)
 {
 	if (!data) { return false; }
-	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapName, data->tile[pos.y][pos.x].trap) == "")
+	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap) == "")
 	{
 		return false;
 	}
@@ -941,49 +975,47 @@ bool Map::haveTraps(Point pos)
 
 bool Map::canFly(Point pos)
 {
-	if (pos.x < 0 || pos.y < 0 || pos.x >= data->head.width || pos.y >= data->head.height)
-	{
-		return false;
-	}
+    if (!isInMap(pos))
+        return false;
+    
 	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toJumpOpaque)
 	{
-		if (dataMap.tile[pos.y][pos.x].objIndex.size() == 0)
+		if (dataMap.tile[pos.y][pos.x].objList.size() == 0)
 		{
 			return true;
 		}
 		else
 		{
-			for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
+			for (auto iter = dataMap.tile[pos.y][pos.x].objList.begin(); iter != dataMap.tile[pos.y][pos.x].objList.end(); iter++)
 			{
-				int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+				int objKind = (*iter)->kind;
 				if (objKind == okDoor || objKind == okOrnament)
 				{
 					return false;
 				}
 			}
 			return true;
-		}		
+		}
 	}
 	return false;
 }
 
 bool Map::canViewTile(Point pos)
 {
-	if (pos.x < 0 || pos.y < 0 || pos.x >= data->head.width || pos.y >= data->head.height)
-	{
-		return false;
-	}
+    if (!isInMap(pos))
+        return false;
+    
 	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toJumpOpaque)
 	{
-		if (dataMap.tile[pos.y][pos.x].objIndex.size() == 0)
+		if (dataMap.tile[pos.y][pos.x].objList.size() == 0)
 		{
 			return true;
 		}
 		else
 		{
-			for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
+			for (auto iter = dataMap.tile[pos.y][pos.x].objList.begin(); iter != dataMap.tile[pos.y][pos.x].objList.end(); iter++)
 			{
-				int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
+				int objKind = (*iter)->kind;
 				if (objKind == okDoor)
 				{
 					return false;
@@ -1077,7 +1109,6 @@ Point Map::getSubPoint(Point from, int direction)
 
 std::vector<Point> Map::getSubPointEx(Point from, int direction)
 {
-
 	std::vector<Point> result;
 	if (direction < 0)
 	{
@@ -1182,6 +1213,7 @@ void Map::drawMap()
 	Point cenTile = gm->camera->position;
 	PointEx offset = gm->camera->offset;
 
+	// 画地面
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
@@ -1191,12 +1223,12 @@ void Map::drawMap()
 				continue;
 			}
 			Point tile = { j, i };
-			drawTile(0, tile, cenTile, cenScreen, offset);
+			drawTile(0, tile, cenTile, cenScreen, offset, gm->global.data.mpcStyle);
 		}
 	}
 
 	EffectMap emap = gm->effectManager->createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
-	
+
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
@@ -1211,30 +1243,30 @@ void Map::drawMap()
 				{
 					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y < 0 || (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
 					{
-						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
 					}
 				}
 			}
-			
-			Point tile = { j, i };
-			drawTile(1, tile, cenTile, cenScreen, offset);
 
-			for (size_t k = 0; k < dataMap.tile[i][j].objIndex.size(); k++)
+			Point tile = { j, i };
+			drawTile(1, tile, cenTile, cenScreen, offset, gm->global.data.mpcStyle);
+
+			for (auto iter = dataMap.tile[i][j].objList.begin(); iter != dataMap.tile[i][j].objList.end(); iter++)
 			{
-				gm->objectManager->drawOBJ(dataMap.tile[i][j].objIndex[k], cenTile, cenScreen, offset);
+				gm->objectManager->drawOBJ(*iter, cenTile, cenScreen, offset, gm->global.data.asfStyle);
 			}
-			for (size_t k = 0; k < dataMap.tile[i][j].npcIndex.size(); k++)
+			for (auto iter = dataMap.tile[i][j].npcList.begin(); iter != dataMap.tile[i][j].npcList.end(); iter++)
 			{
-				if (dataMap.tile[i][j].npcIndex[k] == 0)
+				if (*iter == gm->player)
 				{
 					if (!gm->player->isJumping() || gm->player->jumpState != jsJumping)
 					{
-						gm->player->draw(cenTile, cenScreen, offset);
+						gm->player->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
 					}
 				}
 				else
 				{
-					gm->npcManager->drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
+					gm->npcManager->drawNPC(*iter, cenTile, cenScreen, offset, gm->global.data.asfStyle);
 				}
 			}
 
@@ -1244,7 +1276,7 @@ void Map::drawMap()
 				{
 					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y >= 0 && gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
 					{
-						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
+						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
 					}
 				}
 			}
@@ -1311,8 +1343,8 @@ void Map::drawMap()
 		line = std::abs(iy) % 2;
 		cx = cenTile.x;
 		for (int ix = 0; ix < xscal * 2 + 2; ix++)
-		{			
-			int i = iy + ix;	
+		{
+			int i = iy + ix;
 			int j = cx;
 			cx += line - 1;
 			line = 1 - line;
@@ -1321,7 +1353,7 @@ void Map::drawMap()
 				if (data == nullptr || j < 0 || j >= data->head.width || i < 0 || i >= data->head.height)
 				{
 					continue;
-				}				
+				}
 
 				drawTile(1, { j, i }, cenTile, cenScreen, offset);
 
@@ -1351,17 +1383,17 @@ void Map::drawMap()
 		for (int ix = 1; ix < xscal * 2 + 2; ix++)
 		{
 			int i = iy + ix;
-			int j = cx;	
+			int j = cx;
 			cx += line;
 			line = 1 - line;
-			
+
 			if (i >= cenTile.y - yscal && i < cenTile.y + yscal + tileHeightScal && j >= cenTile.x - xscal && j < cenTile.x + xscal)
 			{
 				if (data == nullptr || j < 0 || j >= data->head.width || i < 0 || i >= data->head.height)
 				{
 					continue;
 				}
-				
+
 				drawTile(1, { j, i }, cenTile, cenScreen, offset);
 
 				for (size_t k = 0; k < dataMap.tile[i][j].objIndex.size(); k++)
@@ -1381,7 +1413,7 @@ void Map::drawMap()
 					{
 						gm->npcManager->drawNPC(dataMap.tile[i][j].npcIndex[k] - 1, cenTile, cenScreen, offset);
 					}
-				}	
+				}
 			}
 		}
 		line = std::abs(iy) % 2;
@@ -1406,7 +1438,7 @@ void Map::drawMap()
 						{
 							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
-						
+
 					}
 				}
 			}
@@ -1436,7 +1468,7 @@ void Map::drawMap()
 						}
 					}
 				}
-			}		
+			}
 		}
 
 	}
@@ -1506,7 +1538,7 @@ void Map::drawMap()
 		}
 	}
 	*/
-	
+
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
@@ -1516,10 +1548,10 @@ void Map::drawMap()
 				continue;
 			}
 			Point tile = { j, i };
-			drawTile(2, tile, cenTile, cenScreen, offset);
+			drawTile(2, tile, cenTile, cenScreen, offset, gm->global.data.mpcStyle);
 		}
 	}
-	
+
 
 	if (!gm->objectManager->drawOBJSelectedAlpha(cenTile, cenScreen, offset))
 	{
@@ -1527,7 +1559,7 @@ void Map::drawMap()
 	}
 	if (gm->player->isJumping() && gm->player->jumpState == jsJumping)
 	{
-		gm->player->draw(cenTile, cenScreen, offset);
+		gm->player->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
 	}
 	else if (Config::playerAlpha)
 	{
@@ -1555,15 +1587,15 @@ void Map::createDataMap()
 		dataMap.tile[i].resize(w);
 		for (int j = 0; j < w; j++)
 		{
-			dataMap.tile[i][j].npcIndex.resize(0);
-			dataMap.tile[i][j].objIndex.resize(0);
-			dataMap.tile[i][j].stepIndex.resize(0);
+			dataMap.tile[i][j].npcList.resize(0);
+			dataMap.tile[i][j].objList.resize(0);
+			dataMap.tile[i][j].stepNPCList.resize(0);
 		}
 	}
 	Point pos = gm->player->position;
 	if (pos.x >= 0 && pos.x < 0 + w && pos.y >= 0 && pos.y < 0 + h)
 	{
-		dataMap.tile[pos.y][pos.x].npcIndex.push_back(0);
+		dataMap.tile[pos.y][pos.x].npcList.push_back(gm->player);
 		if (gm->player->isWalking() || gm->player->isRunning())
 		{
 			if (gm->player->stepState == ssOut && gm->player->stepList.size() > 0)
@@ -1584,13 +1616,13 @@ void Map::createDataMap()
 		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->position.x >= 0 && gm->npcManager->npcList[i]->position.x < w && gm->npcManager->npcList[i]->position.y >= 0 && gm->npcManager->npcList[i]->position.y < h)
 		{
 			gm->npcManager->npcList[i]->npcIndex = i + 1;
-			dataMap.tile[gm->npcManager->npcList[i]->position.y][gm->npcManager->npcList[i]->position.x].npcIndex.push_back(i + 1);
+			dataMap.tile[gm->npcManager->npcList[i]->position.y][gm->npcManager->npcList[i]->position.x].npcList.push_back(gm->npcManager->npcList[i]);
 		}
 		if (gm->npcManager->npcList[i] != nullptr && (gm->npcManager->npcList[i]->isWalking() || gm->npcManager->npcList[i]->isRunning()))
 		{
 			if (gm->npcManager->npcList[i]->stepState == ssOut && gm->npcManager->npcList[i]->stepList.size() > 0)
 			{
-				addStepToDataMap(gm->npcManager->npcList[i]->stepList[0], i + 1);
+				addStepToDataMap(gm->npcManager->npcList[i]->stepList[0], gm->npcManager->npcList[i]);
 			}
 		}
 	}
@@ -1598,143 +1630,59 @@ void Map::createDataMap()
 	{
 		if (gm->objectManager->objectList[i] != nullptr && gm->objectManager->objectList[i]->position.x >= 0 && gm->objectManager->objectList[i]->position.x < w && gm->objectManager->objectList[i]->position.y >= 0 && gm->objectManager->objectList[i]->position.y < h)
 		{
-			dataMap.tile[gm->objectManager->objectList[i]->position.y][gm->objectManager->objectList[i]->position.x].objIndex.push_back(i);
+			dataMap.tile[gm->objectManager->objectList[i]->position.y][gm->objectManager->objectList[i]->position.x].objList.push_back(gm->objectManager->objectList[i]);
 		}
 	}
 }
 
-void Map::deleteObjectFromDataMap(Point pos, int idx)
+void Map::deleteObjectFromDataMap(Point pos, std::shared_ptr<Object> obj)
 {
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
+	if (isInMap(pos))
 	{
-		int found = -1;
-		for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
-		{
-			if (dataMap.tile[pos.y][pos.x].objIndex[i] == idx)
-			{
-				found = i;
-				break;
-			}
-		}
-		if (found >= 0)
-		{
-			dataMap.tile[pos.y][pos.x].objIndex.erase(dataMap.tile[pos.y][pos.x].objIndex.begin() + found);
-		}
+		dataMap.tile[pos.y][pos.x].objList.remove(obj);
 	}
 }
 
-void Map::addObjectToDataMap(Point pos, int idx)
+void Map::addObjectToDataMap(Point pos, std::shared_ptr<Object> obj)
 {
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
+	if (isInMap(pos))
 	{
-		dataMap.tile[pos.y][pos.x].objIndex.push_back(idx);
+		dataMap.tile[pos.y][pos.x].objList.push_back(obj);
 	}
 }
 
-void Map::changeObjectInDataMap(Point pos, int idx, int newIdx)
+void Map::deleteStepFromDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
+	if (isInMap(pos))
 	{
-		for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].stepIndex.size(); i++)
-		{
-			if (dataMap.tile[pos.y][pos.x].stepIndex[i] == idx)
-			{
-				dataMap.tile[pos.y][pos.x].stepIndex[i] = newIdx;
-				break;
-			}
-		}
+		dataMap.tile[pos.y][pos.x].stepNPCList.remove(npc);
 	}
 }
 
-void Map::deleteStepFromDataMap(Point pos, int idx)
+void Map::addStepToDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
+	if (isInMap(pos))
 	{
-		int found = -1;
-		for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].stepIndex.size(); i++)
-		{
-			if (dataMap.tile[pos.y][pos.x].stepIndex[i] == idx)
-			{
-				found = i;
-				break;
-			}
-		}
-		if (found >= 0)
-		{
-			dataMap.tile[pos.y][pos.x].stepIndex.erase(dataMap.tile[pos.y][pos.x].stepIndex.begin() + found);
-		}
+		dataMap.tile[pos.y][pos.x].stepNPCList.push_back(npc);
 	}
 }
 
-void Map::addStepToDataMap(Point pos, int idx)
+void Map::deleteNPCFromDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
+	if (isInMap(pos))
 	{
-		dataMap.tile[pos.y][pos.x].stepIndex.push_back(idx);
+		dataMap.tile[pos.y][pos.x].npcList.remove(npc);
 	}
 }
 
-void Map::changeStepDataMap(Point pos, int idx, int newIdx)
+void Map::addNPCToDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
+	if (isInMap(pos))
 	{
-		for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].stepIndex.size(); i++)
-		{
-			if (dataMap.tile[pos.y][pos.x].stepIndex[i] == idx)
-			{
-				dataMap.tile[pos.y][pos.x].stepIndex[i] = newIdx;
-				break;
-			}
-		}
+		dataMap.tile[pos.y][pos.x].npcList.push_back(npc);
 	}
 }
 
-void Map::deleteNPCFromDataMap(Point pos, int idx)
-{
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
-	{
-		int found = -1;
-		for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].npcIndex.size(); i++)
-		{
-			if (dataMap.tile[pos.y][pos.x].npcIndex[i] == idx)
-			{
-				found = i;
-				break;
-			}
-		}
-		if (found >= 0)
-		{
-			for (size_t i = found; i < dataMap.tile[pos.y][pos.x].npcIndex.size() - 1; i++)
-			{
-				dataMap.tile[pos.y][pos.x].npcIndex[i] = dataMap.tile[pos.y][pos.x].npcIndex[i + 1];
-			}
-			dataMap.tile[pos.y][pos.x].npcIndex.resize(dataMap.tile[pos.y][pos.x].npcIndex.size() - 1);
-		}
-	}
-}
-
-void Map::addNPCToDataMap(Point pos, int idx)
-{
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
-	{
-		dataMap.tile[pos.y][pos.x].npcIndex.push_back(idx);
-	}
-}
-
-void Map::changeNPCInDataMap(Point pos, int idx, int newIdx)
-{
-	if (pos.x >= 0 && pos.y >= 0 && pos.x < data->head.width && pos.y < data->head.height)
-	{
-		for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].npcIndex.size(); i++)
-		{
-			if (dataMap.tile[pos.y][pos.x].npcIndex[i] == idx)
-			{
-				dataMap.tile[pos.y][pos.x].npcIndex[i] = newIdx;
-				break;
-			}
-		}
-	}
-}
 
 void Map::freeResource()
 {
@@ -1770,29 +1718,39 @@ void Map::freeData()
 	}
 }
 
-void Map::drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset)
+void Map::drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
 {
-	
 	if (data->tile[tile.y][tile.x].layer[layer].mpc == 0)
 	{
 		return;
 	}
 	int x, y;
 	Point point = getTilePosition(tile, cenTile, cenScreen, offset);
+	_shared_image img = nullptr;
 	if (data->mpc.mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].dynamic != 0)
 	{
-		_shared_image img = IMP::loadImageForTime(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, getTime(), &x, &y);	
-		engine->drawImage(img, point.x - x, point.y - y);
+		img = IMP::loadImageForTime(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, getTime(), &x, &y);
+		
 	}
 	else
 	{
-		_shared_image img = IMP::loadImage(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, data->tile[tile.y][tile.x].layer[layer].frame, &x, &y);
+		img = IMP::loadImage(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, data->tile[tile.y][tile.x].layer[layer].frame, &x, &y);
+	}
+	if (img == nullptr)
+	{
+		return;
+	}
+	if ((colorStyle & 0xFFFFFF) == 0xFFFFFF)
+	{
 		engine->drawImage(img, point.x - x, point.y - y);
-	}	
-
+	}
+	else
+	{	
+		engine->drawImageWithColor(img, point.x - x, point.y - y, (colorStyle >> 16) & 0xFF, (colorStyle >> 8) & 0xFF, colorStyle & 0xFF);
+	}
 }
 
-bool Map::isInMap(PathMap * pathMap, Point pos)
+bool Map::isInMap(PathMap* pathMap, Point pos)
 {
 	if (pos.x < 0 || pos.y < 0 || pos.x >= pathMap->w || pos.y >= pathMap->h)
 	{
@@ -1850,26 +1808,26 @@ double Map::calFlyDirection(Point flyDirection)
 LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, double angle)
 {
 	LinePathPoint result;
-	result.point = from;
-	result.pointEx = fromOffset;
-	result.pointEx.x /= (TILE_WIDTH / 2 / MapXRatio);
-	result.pointEx.y /= (TILE_HEIGHT / 2);
+	result.pos = from;
+	result.pixelOffset = fromOffset;
+	result.pixelOffset.x /= (TILE_WIDTH / 2 / MapXRatio);
+	result.pixelOffset.y /= (TILE_HEIGHT / 2);
 	int dir = 0;
 	if (angle <= pi / 4 || angle > pi * 7 / 4)
-	{		
-		auto p = atan2(result.pointEx.y, 1.0 - result.pointEx.x);
+	{
+		auto p = atan2(result.pixelOffset.y, 1.0 - result.pixelOffset.x);
 		if (angle > pi)
 		{
 			angle -= 2 * pi;
 		}
 		if (p > angle)
 		{
-			result.point = getSubPoint(from, 7);
+			result.pos = getSubPoint(from, 7);
 			dir = 7;
 		}
 		else
 		{
-			result.point = getSubPoint(from, 5);
+			result.pos = getSubPoint(from, 5);
 			dir = 5;
 		}
 		if (angle < 0)
@@ -1879,63 +1837,63 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, double angle
 	}
 	else if (angle <= pi * 3 / 4)
 	{
-		auto p = atan2(1.0 + result.pointEx.y, - result.pointEx.x);
+		auto p = atan2(1.0 + result.pixelOffset.y, -result.pixelOffset.x);
 		if (p < 0)
 		{
 			p += 2 * pi;
 		}
 		if (p > angle)
 		{
-			result.point = getSubPoint(from, 5);
+			result.pos = getSubPoint(from, 5);
 			dir = 5;
 		}
 		else
 		{
-			result.point = getSubPoint(from, 3);
+			result.pos = getSubPoint(from, 3);
 			dir = 3;
 		}
 	}
 	else if (angle <= pi * 5 / 4)
 	{
-		auto p = atan2(result.pointEx.y, -1.0 - result.pointEx.x);
+		auto p = atan2(result.pixelOffset.y, -1.0 - result.pixelOffset.x);
 		if (p < 0)
 		{
 			p += 2 * pi;
 		}
 		if (p > angle)
 		{
-			result.point = getSubPoint(from, 3);
+			result.pos = getSubPoint(from, 3);
 			dir = 3;
 		}
 		else
 		{
-			result.point = getSubPoint(from, 1);
+			result.pos = getSubPoint(from, 1);
 			dir = 1;
 		}
 	}
 	else
 	{
-		auto p = atan2(-1.0 + result.pointEx.y, - result.pointEx.x);
+		auto p = atan2(-1.0 + result.pixelOffset.y, -result.pixelOffset.x);
 		if (p < 0)
 		{
 			p += 2 * pi;
 		}
 		if (p > angle)
 		{
-			result.point = getSubPoint(from, 1);
+			result.pos = getSubPoint(from, 1);
 			dir = 1;
 		}
 		else
 		{
-			result.point = getSubPoint(from, 7);
+			result.pos = getSubPoint(from, 7);
 			dir = 7;
 		}
 	}
-	auto newpos = getTilePosition(result.point, from);
-	result.pointEx.x -= double(newpos.x) / (TILE_WIDTH / 2);
-	result.pointEx.y -= double(newpos.y) / (TILE_HEIGHT / 2);
-	result.pointEx.x *= (TILE_WIDTH / 2);
-	result.pointEx.y *= (TILE_HEIGHT / 2);
+	auto newpos = getTilePosition(result.pos, from);
+	result.pixelOffset.x -= double(newpos.x) / (TILE_WIDTH / 2);
+	result.pixelOffset.y -= double(newpos.y) / (TILE_HEIGHT / 2);
+	result.pixelOffset.x *= (TILE_WIDTH / 2);
+	result.pixelOffset.y *= (TILE_HEIGHT / 2);
 	return result;
 }
 
@@ -2046,7 +2004,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
 		{
 			if (angle > pi)
 			{
-				angle -= 2 * pi;				
+				angle -= 2 * pi;
 			}
 			if (newAngle > pi)
 			{
@@ -2081,7 +2039,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
 					pos.x = from.x + line;
 					pos.y = from.y - 1;
 					result.push_back(pos);
-				}			
+				}
 			}
 		}
 		else if (angle > pi / 4 && angle < 3 * pi / 4)
@@ -2330,7 +2288,7 @@ bool Map::getVHPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Poi
 	return false;
 }
 
-std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex)
+std::vector<Point> Map::getSubStep(PathMap* pathMap, Point from, Point to, int stepIndex)
 {
 	std::vector<Point> subStep;
 	subStep.resize(0);
@@ -2361,12 +2319,12 @@ std::vector<Point> Map::getSubStep(PathMap * pathMap, Point from, Point to, int 
 		}
 		getVHPath(subStep, line, pathMap, from, to, stepIndex);
 	}
-	
+
 	return subStep;
-	
+
 }
 
-bool Map::compareMapHead(MapData * md)
+bool Map::compareMapHead(MapData* md)
 {
 	//比较文件头部数据，以确认是否为MAP文件
 	if (md == nullptr)
@@ -2383,5 +2341,5 @@ bool Map::compareMapHead(MapData * md)
 	}
 
 	return true;
-	
+
 }

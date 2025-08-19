@@ -3,7 +3,7 @@
 #include <vector>
 
 #define JOYSTICK_MIN_RANGE 1 / 20
-#define JOYSTICK_MID_RANGE 1 / 5
+#define JOYSTICK_MID_RANGE 1 / 4
 #define OutRange -1000
 
 class Joystick :

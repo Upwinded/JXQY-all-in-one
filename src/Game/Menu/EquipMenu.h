@@ -9,6 +9,8 @@ public:
 	EquipMenu();
 	virtual ~EquipMenu();
 
+	virtual void init() override;
+
 	std::shared_ptr<ImageContainer> image = nullptr;
 	std::shared_ptr<ImageContainer> title = nullptr;
 	std::shared_ptr<Item> item[GOODS_BODY_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
@@ -20,7 +22,6 @@ public:
 
 private:
 	virtual void onEvent();
-	virtual void init();
 	void freeResource();
 };
 

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include <vector>
+#include <list>
 #include "../Types/Types.h"
 #include "../Engine/Engine.h"
 #include "../Image/IMP.h"
@@ -12,14 +13,16 @@ class Element;
 
 using PElement = std::shared_ptr<Element>;
 
-class Element
+class Element : public std::enable_shared_from_this<Element>
 {
 public:
 	Element();
 	virtual ~Element();
 public:
-	static void setAsTop(PElement child);
-	static void removeFromTop(PElement child);
+
+	static std::list<Element*> memList;
+	void ShowMemList();
+
 	void addChild(PElement child);
 	void removeChild(PElement child);
 	void removeAllChild();
@@ -31,13 +34,8 @@ public:
 	int index = -1;
 	int type = -1;
 	bool canCallBack = false;
-private:
-	static PElement _topParent;
-	static bool _top_initialed;
-
 protected:
 	PElement getMySharedPtr();
-	PElement getChildSharedPtr(Element* element);
 
 	Engine* engine = nullptr;
 
@@ -51,7 +49,7 @@ public:
 
 	std::string name = "Element";
 
-	Element * parent = nullptr;
+	Element* parent = nullptr;
 	std::vector<PElement> children;
 
 	UTime LastFrameTime = 0;
@@ -143,6 +141,7 @@ private:
 protected:
 	void quit();
 	bool running = false;
+	bool autoFreeResourceOnExit = false;
 
 public:
 	unsigned int run();
@@ -193,7 +192,7 @@ protected:
 	//在开始run并且初始化之后触发的事件
 	virtual void onRun() {};
 	//离开时触发的事件
-	virtual void onExit() {};		
+	virtual void onExit() { if (autoFreeResourceOnExit) freeResource(); };
 	//在每帧更新状态的触发事件
 	virtual void onUpdate() {};
 

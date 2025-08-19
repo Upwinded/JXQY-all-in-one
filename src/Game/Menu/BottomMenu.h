@@ -10,6 +10,8 @@ public:
 	BottomMenu();
 	virtual ~BottomMenu();
 
+	virtual void init() override;
+
 	void updateGoodsItem();
 	void updateGoodsItem(int index);
 	void updateGoodsNumber();
@@ -32,7 +34,6 @@ public:
 	std::shared_ptr<Item> magicItem[MAGIC_TOOLBAR_COUNT] = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 private:
-	virtual void init();
 
 	virtual void onEvent();
 	void freeResource();

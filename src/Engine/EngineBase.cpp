@@ -1,6 +1,12 @@
-﻿#include "EngineBase.h"
 #include <map>
 #include <iostream>
+#ifdef _WIN32
+#include <Windows.h>
+#include <resource.h>
+#define USE_LOGO_RESOURCE
+#endif
+
+#include "EngineBase.h"
 
 #ifdef __ANDROID__
 #include "../File/INIReader.h"
@@ -17,6 +23,7 @@ std::vector<_video> EngineBase::videoList;
 #endif // SHF_USE_VIDEO
 #endif // SHF_USE_AUDIO
 
+std::atomic<uint32_t> EngineBase::ImageCount(0);
 std::mutex EngineBase::_mutex;
 AppEventHandler EngineBase::_externalEventHandler = NULL;
 std::atomic<SDL_Renderer*> EngineBase::renderer = nullptr;
@@ -148,12 +155,7 @@ UTime Timer::getAbsolute()
 	}
 	else
 	{
-#if (defined USE_TIME64)
-		return SDL_GetTicks64();
-#else
 		return SDL_GetTicks();
-#endif // (defined USE_TIME64)
-
 	}
 }
 
@@ -174,11 +176,6 @@ void EngineBase::clearCursor()
 {
 	cursorImage.image.resize(0);
 	cursorImage.interval = 0;
-}
-
-void EngineBase::updateCursor()
-{
-    
 }
 
 void EngineBase::drawCursor()
@@ -206,9 +203,9 @@ void EngineBase::drawCursor()
 	{
 		if (hardwareCursor)
 		{
-#if  (defined _WIN32) || (defined __MACOSX__)
+#if !defined(__MOBILE__)
             SDL_SetCursor(cursorImage.image[frameIndex].frame.get());
-#endif // (defined _WIN32) || (defined TARGET_OS_MAC)
+#endif // (defined _WIN32) || ((TARGET_OS_MAC == 1) && (TARGET_OS_IOS == 0))
 		}
 		else if (!softwareCursorHidden)
 		{
@@ -217,7 +214,7 @@ void EngineBase::drawCursor()
 #ifdef __APPLE__
             int w, h, rw, rh;
             SDL_GetWindowSize(window, &w, &h);
-            SDL_Metal_GetDrawableSize(window, &rw, &rh);
+            SDL_GetWindowSizeInPixels(window, &rw, &rh);
             drawMouseX *= rw / w;
             drawMouseY *= rh / h;
 			Rect dst;
@@ -237,7 +234,7 @@ void EngineBase::drawCursor()
 	
 }
 
-void EngineBase::setCursor(CursorImage * mouse)
+void EngineBase::setCursorImage(CursorImage * mouse)
 {
 	if (mouse == nullptr)
 	{
@@ -262,14 +259,14 @@ void EngineBase::showCursor()
 {
 	if (hardwareCursor)
 	{
-		SDL_ShowCursor(1);
+		SDL_ShowCursor();
 	}
 	softwareCursorHidden = false;
 }
 
 void EngineBase::hideCursor()
 {
-	SDL_ShowCursor(0);
+	SDL_HideCursor();
 	softwareCursorHidden = true;
 }
 
@@ -279,7 +276,22 @@ void EngineBase::drawImage(_shared_image image, SDL_Rect * src, SDL_Rect * dst)
 	{
 		return;
 	}
-	SDL_RenderCopy(renderer, image.get(), src, dst);
+	SDL_FRect fsrc, fdst, *pfsrc = nullptr, *pfdst = nullptr;
+	
+	if (src != nullptr)
+	{
+		pfsrc = &fsrc;
+		SDL_RectToFRect(src, pfsrc);
+	}
+	if (dst != nullptr)
+	{
+		pfdst = &fdst;
+		SDL_RectToFRect(dst, pfdst);
+	}
+	if (!SDL_RenderTexture(renderer, image.get(), pfsrc, pfdst))
+	{
+		GameLog::write("SDL_RenderTexture Error: %s", SDL_GetError());
+	}
 }
 
 void EngineBase::drawImage(_shared_image image, SDL_Rect * rect)
@@ -288,7 +300,7 @@ void EngineBase::drawImage(_shared_image image, SDL_Rect * rect)
 	{
 		return;
 	}
-	SDL_RenderCopy(renderer, image.get(), nullptr, rect);
+	drawImage(image, nullptr, rect);
 }
 
 bool EngineBase::pointInImage(_shared_image image, int x, int y)
@@ -309,35 +321,25 @@ bool EngineBase::pointInImage(_shared_image image, int x, int y)
 	SDL_BlendMode bm;
 	SDL_GetTextureBlendMode(from, &bm);
 	SDL_SetTextureBlendMode(from, SDL_BLENDMODE_NONE);
-	SDL_RenderCopy(renderer, from, nullptr, nullptr);
+	SDL_RenderTexture(renderer, from, nullptr, nullptr);
 	SDL_SetTextureBlendMode(from, bm);
 
-	std::unique_ptr<char[]> st = std::make_unique<char[]>(w * h * 4);
-	int pitch = 4 * w;
-	if (st.get() == nullptr)
+	auto sur = SDL_RenderReadPixels(renderer, nullptr);
+	if (sur == nullptr)
 	{
 		SetRenderTarget(renderer, backendTexture);
 		return false;
 	}
-	if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, st.get(), pitch) != 0)
+	uint8_t alpha = 0;
+	if (!SDL_ReadSurfacePixel(sur, x, y, nullptr, nullptr, nullptr, &alpha))
 	{
 		SetRenderTarget(renderer, backendTexture);
 		return false;
 	}
-	SDL_Surface * sur = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
-	memcpy(sur->pixels, st.get(), pitch * h);
 	SetRenderTarget(renderer, backendTexture);
-	SDL_FreeSurface(sur);
-	bool result = false;
-	if (st != nullptr)
-	{
-		if (*(st.get() + y * pitch + x * 4 + 3) != 0)
-		{
-			result = true;
-		}
-	}
+	SDL_DestroySurface(sur);
 
-	return result;
+	return alpha != 0;
 }
 
 void EngineBase::initTime()
@@ -358,6 +360,20 @@ UTime EngineBase::getTime()
 	{
 		return SDL_GetTicks() - time.beginTime;
 	}*/
+}
+
+int EngineBase::getRand(int max, int min)
+{
+	if (min > max) {
+		std::swap(min, max);
+	}
+
+	// 线程局部存储：每个线程独立维护随机引擎和分布
+	static thread_local std::random_device rd;          // 硬件熵源（真随机种子）
+	static thread_local std::mt19937 mtEngine(rd());     // Mersenne Twister 引擎
+	std::uniform_int_distribution<unsigned int> dist(min, max);
+
+	return dist(mtEngine);
 }
 
 //void EngineBase::setTimePaused(bool paused)
@@ -453,22 +469,20 @@ _shared_image EngineBase::createNewImageFromImage(_shared_image image)
 		return nullptr;
 	}
 
-	auto ts = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, w, h));
 	auto backendTexture = SDL_GetRenderTarget(renderer);
-	SetRenderTarget(renderer, ts.get());
-	SDL_BlendMode bm;
-	SDL_GetTextureBlendMode(from, &bm);
-	SDL_SetTextureBlendMode(from, SDL_BLENDMODE_NONE);
-	SDL_RenderCopy(renderer, from, nullptr, nullptr);
-	SDL_SetTextureBlendMode(from, bm);	
 
-	auto to = make_safe_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, w, h));
-	auto pixels = std::make_unique<char[]>(w * h * 4);
-	int pitch = w * 4;
-	SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, pixels.get(), pitch);
-	SDL_UpdateTexture(to.get(), nullptr, pixels.get(), pitch);
+	SetRenderTarget(renderer, image.get());
+
+	auto sur = SDL_RenderReadPixels(renderer, nullptr);
+	if (sur == nullptr)
+	{
+		SetRenderTarget(renderer, backendTexture);
+		return nullptr;
+	}
+
+	auto to = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, sur));
+	
 	SetRenderTarget(renderer, backendTexture);
-
 	SDL_SetTextureBlendMode(to.get(), SDL_BLENDMODE_BLEND);
 	return to;
 }
@@ -479,8 +493,8 @@ _shared_image EngineBase::loadImageFromMem(std::unique_ptr<char[]>& data, int si
 	{
 		return nullptr;
 	}
-    auto img = IMG_LoadTexture_RW(renderer, SDL_RWFromMem(data.get(), size), 1);
-    //auto img = IMG_LoadTextureTyped_RW(renderer, SDL_RWFromMem(data.get(), size), 1, "ßPNG");
+    auto img = IMG_LoadTexture_IO(renderer, SDL_IOFromMem(data.get(), size), true);
+    //auto img = IMG_LoadTextureTyped_RW(renderer, SDL_IOFromMem(data.get(), size), 1, "ßPNG");
 	_shared_image ret = make_safe_shared_image(img);
 	return ret;
 }
@@ -553,59 +567,69 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 	SDL_BlendMode bm;
 	SDL_GetTextureBlendMode(from, &bm);
 	SDL_SetTextureBlendMode(from, SDL_BLENDMODE_NONE);
-	SDL_RenderCopy(renderer, from, nullptr, nullptr);
+	SDL_RenderTexture(renderer, from, nullptr, nullptr);
 	SDL_SetTextureBlendMode(from, bm);
 
+
+	SDL_Surface* sur = SDL_RenderReadPixels(renderer, nullptr);
+	if (sur == nullptr)
+	{
+		GameLog::write("reading pixels error\n");
+		SetRenderTarget(renderer, tt);
+		SDL_DestroyTexture(ts);
+		return -1;
+	}
+
 	std::unique_ptr<char[]> st = std::make_unique<char[]>(w * h * 4);
-	int pitch = 4 * w;
+
 	if (st == nullptr)
 	{
 		GameLog::write("allocing memory error\n");
 		SetRenderTarget(renderer, tt);
-		//freeImage(ts);
+		SDL_DestroyTexture(ts);
+		SDL_DestroySurface(sur);
 		return -1;
 	}
-	if (SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, st.get(), pitch) != 0)
-	{
-		GameLog::write("reading pixels error\n");
-		SetRenderTarget(renderer, tt);
-		//freeImage(ts);
-		/*delete[] st;*/
-		return -1;
-	}
-	SDL_Surface * sur = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+
+	int pitch = sur->pitch;
 	memcpy(sur->pixels, st.get(), pitch * h);
 
 	SetRenderTarget(renderer, tt);
-	//freeImage(ts);
-	//delete[] st;
+	SDL_DestroyTexture(ts);
 
-	int rwSize = w * h * 4 + 122;
+	int rwSize = w * h * 4 + 256;
 	std::unique_ptr<char[]> rwData = std::make_unique<char[]>(rwSize);
 	
-	SDL_RWops * bmp = SDL_RWFromMem(rwData.get(), rwSize);
-	bmp->seek(bmp, 0, RW_SEEK_SET);
+	SDL_IOStream * bmp = SDL_IOFromMem(rwData.get(), rwSize);
+
 	if (bmp == nullptr)
 	{
-		SDL_FreeRW(bmp);
-		SDL_FreeSurface(sur);
+		SDL_CloseIO(bmp);
+		SDL_DestroySurface(sur);
 		return -1;
 	}
-	SDL_SaveBMP_RW(sur, bmp, 0);
-
-	int size = (int)bmp->seek(bmp, 0, RW_SEEK_END);
-	if (size >= rwSize)
+	SDL_SeekIO(bmp, 0, SDL_IO_SEEK_SET);
+	if (!SDL_SaveBMP_IO(sur, bmp, false))
 	{
-		data = std::make_unique<char[]>(rwSize);
-		bmp->seek(bmp, 0, 0);
-		bmp->read(bmp, data.get(), rwSize, 1);
-		SDL_FreeSurface(sur);
-		SDL_FreeRW(bmp);
-		bmp = nullptr;
-		size = rwSize;
+		SDL_DestroySurface(sur);
+		SDL_CloseIO(bmp);
+		return -1;
 	}
-	return size;
+	SDL_DestroySurface(sur);
 
+	SDL_SeekIO(bmp, 0, SDL_IO_SEEK_END);
+	auto size = SDL_TellIO(bmp);
+	SDL_CloseIO(bmp);
+
+	if (size > rwSize)
+	{
+		return -1;
+	}
+
+	data = std::make_unique<char[]>(size);
+	memcpy(data.get(), rwData.get(), size);
+
+	return size;
 }
 
 int EngineBase::saveImageToMem(_shared_image image, std::unique_ptr<char[]>& data)
@@ -625,11 +649,11 @@ _shared_surface EngineBase::loadSurfaceFromMem(std::unique_ptr<char[]>& data, in
 	{
 		return nullptr;
 	}
-	_shared_surface image = make_shared_surface(IMG_Load_RW(SDL_RWFromMem(data.get(), size), 1));
+	_shared_surface image = make_shared_surface(IMG_Load_IO(SDL_IOFromMem(data.get(), size), true));
 	return image;
 }
 
-_shared_cursor EngineBase::loadCursorFromMem(std::unique_ptr<char[]>& data, int size, int x, int y)
+_shared_cursor EngineBase::loadCursorImageFromMem(std::unique_ptr<char[]>& data, int size, int x, int y)
 {
 	auto s = loadSurfaceFromMem(data, size);
 	auto cursor = make_shared_cursor(SDL_CreateColorCursor(s.get(), x, y));
@@ -643,7 +667,7 @@ void EngineBase::drawImage(_shared_image image, int x, int y)
 		return;
 	}
 	int w, h;
-	SDL_QueryTexture(image.get(), nullptr, nullptr, &w, &h);
+	getImageSize(image, w, h);
 	SDL_Rect s, d;
 	s.x = 0;
 	s.y = 0;
@@ -653,7 +677,7 @@ void EngineBase::drawImage(_shared_image image, int x, int y)
 	d.y = y;
 	d.w = w;
 	d.h = h;
-	SDL_RenderCopy(renderer, image.get(), nullptr, &d);
+	drawImage(image, nullptr, &d);
 }
 
 void EngineBase::drawImage(_shared_image image, Rect * rect)
@@ -669,15 +693,15 @@ void EngineBase::drawImage(_shared_image image, Rect * src, Rect * dst)
 	}
 	SDL_Rect s;
 	SDL_Rect d;
-	SDL_Rect * ps = nullptr;
-	SDL_Rect * pd = nullptr;
+	SDL_Rect * pSourceRect = nullptr;
+	SDL_Rect * pDestRect = nullptr;
 	if (src != nullptr)
 	{
 		s.x = src->x;
 		s.y = src->y;
 		s.w = src->w;
 		s.h = src->h;
-		ps = &s;
+		pSourceRect = &s;
 	}
 	if (dst != nullptr)
 	{
@@ -685,9 +709,9 @@ void EngineBase::drawImage(_shared_image image, Rect * src, Rect * dst)
 		d.y = dst->y;
 		d.w = dst->w;
 		d.h = dst->h;
-		pd = &d;
+		pDestRect = &d;
 	}
-	SDL_RenderCopy(renderer, image.get(), ps, pd);
+	drawImage(image, pSourceRect, pDestRect);
 }
 
 void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center)
@@ -696,36 +720,39 @@ void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, double a
 	{
 		return;
 	}
-	SDL_Rect s;
-	SDL_Rect d;
-	SDL_Rect* ps = nullptr;
-	SDL_Rect* pd = nullptr;
+	int sw = 0, sh = 0;
+	if (src != nullptr || center != nullptr)
+	{
+		getImageSize(image, sw, sh);
+	}
+	SDL_FRect fsrc, fdst, * pfsrc = nullptr, * pfdst = nullptr;
+	SDL_FPoint p;
+	SDL_FPoint* pCenterPoint = nullptr;
+	if (center != nullptr)
+	{
+		p.x = ((float)center->x) ;
+		p.y = ((float)center->y) ;
+		pCenterPoint = &p;
+	}
+
 	if (src != nullptr)
 	{
-		s.x = src->x;
-		s.y = src->y;
-		s.w = src->w;
-		s.h = src->h;
-		ps = &s;
+		pfsrc = &fsrc;
+		fsrc.x = ((float)src->x) ;
+		fsrc.y = ((float)src->y) ;
+		fsrc.w = ((float)src->w) ;
+		fsrc.h = ((float)src->h) ;
 	}
 	if (dst != nullptr)
 	{
-		d.x = dst->x;
-		d.y = dst->y;
-		d.w = dst->w;
-		d.h = dst->h;
-		pd = &d;
-	}
-	SDL_Point p;
-	SDL_Point* pp = nullptr;
-	if (center != nullptr)
-	{
-		p.x = center->x;
-		p.y = center->y;
-		pp = &p;
+		pfdst = &fdst;
+		fdst.x = ((float)dst->x) ;
+		fdst.y = ((float)dst->y) ;
+		fdst.w = ((float)dst->w) ;
+		fdst.h = ((float)dst->h) ;
 	}
 
-	SDL_RenderCopyEx(renderer, image.get(), ps, pd, angle, pp, SDL_FLIP_NONE);
+	SDL_RenderTextureRotated(renderer, image.get(), pfsrc, pfdst, angle, pCenterPoint, SDL_FLIP_NONE);
 }
 
 //void EngineBase::freeImage(Image_t* image)
@@ -745,39 +772,40 @@ _shared_image EngineBase::createMask(unsigned char r, unsigned char g, unsigned 
 	{
 		return nullptr;
 	}
-	_shared_image t2 = nullptr;
-	if (safe)
-	{
-		t2 = make_safe_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, 1, 1));
-	}
-	else
-	{
-		t2 = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, 1, 1));
-	}
-	
-	if (t2.get() == nullptr)
+
+	auto sur = make_shared_surface(SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_ARGB8888));
+	if (sur == nullptr)
 	{
 		return nullptr;
 	}
-	SetRenderTarget(renderer, t.get());
-	SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-	SDL_RenderClear(renderer);
-	void * pixels = getMem(4);
-	int pitch = 4;
-	SDL_RenderReadPixels(renderer, nullptr, SDL_PIXELFORMAT_ARGB8888, pixels, pitch);
-	SDL_UpdateTexture(t2.get(), nullptr, pixels, pitch);
-	SetRenderTarget(renderer, tt);
-	freeMem(pixels);
-	SDL_SetTextureBlendMode(t2.get(), SDL_BLENDMODE_BLEND);
-	setImageAlpha(t2, a);
-	//freeImage(t);
-	return t2;
+
+	if (!SDL_WriteSurfacePixel(sur.get(), 0, 0, r, g, b, 0xFF))
+	{
+		return nullptr;
+	}
+	_shared_image tex = nullptr;
+	if (safe)
+	{
+		tex = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, sur.get()));
+	}
+	else
+	{
+		tex = make_shared_image(SDL_CreateTextureFromSurface(renderer, sur.get()));
+	}
+	
+	if (tex.get() == nullptr)
+	{
+		return nullptr;
+	}
+
+	SDL_SetTextureBlendMode(tex.get(), SDL_BLENDMODE_BLEND);
+	setImageAlpha(tex, a);
+	return tex;
 }
 
 _shared_image EngineBase::createLumMask()
 {
-	SDL_Surface * s = SDL_CreateRGBSurfaceWithFormat(0, LUM_MASK_WIDTH, LUM_MASK_HEIGHT, 32, SDL_PIXELFORMAT_ARGB8888);
-	auto c = new Uint32[LUM_MASK_HEIGHT][LUM_MASK_WIDTH];
+	SDL_Surface * s = SDL_CreateSurface(LUM_MASK_WIDTH, LUM_MASK_HEIGHT, SDL_PIXELFORMAT_ARGB8888);
 	for (int i = 0; i < LUM_MASK_HEIGHT; i++)
 	{
 		for (int j = 0; j < LUM_MASK_WIDTH; j++)
@@ -785,19 +813,17 @@ _shared_image EngineBase::createLumMask()
 			double distance = std::abs(hypot(double(i - LUM_MASK_HEIGHT / 2) / (LUM_MASK_HEIGHT / 2), double(j - LUM_MASK_WIDTH / 2) / (LUM_MASK_WIDTH / 2)));
 			if (distance >= 0.5)
 			{
-				c[i][j] = 0;
+				SDL_WriteSurfacePixel(s, j, i, 0xFF, 0xFF, 0xFF, 0);
 			}
 			else
 			{
-				unsigned char a = (unsigned char)((0.5 - distance) * LUM_MASK_MAX_ALPHA);
-				c[i][j] = (a << 24) | (0xFFFFFF);
+				uint8_t a = (uint8_t)((0.5 - distance) * LUM_MASK_MAX_ALPHA);
+				SDL_WriteSurfacePixel(s, j, i, 0xFF, 0xFF, 0xFF, a);
 			}
 		}
 	}
-	memcpy(s->pixels, c, LUM_MASK_HEIGHT * LUM_MASK_WIDTH * 4);
-	delete[] c;
 	auto t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, s));
-	SDL_FreeSurface(s);
+	SDL_DestroySurface(s);
 	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_ADD);
 	return t;
 }
@@ -824,13 +850,17 @@ void EngineBase::drawImageWithColor(_shared_image image, int x, int y, unsigned 
 	SDL_SetTextureColorMod(image.get(), 255, 255, 255);
 }
 
-int EngineBase::getImageSize(_shared_image image, int& w, int& h)
+bool EngineBase::getImageSize(_shared_image image, int& w, int& h)
 {
 	if (image == nullptr)
 	{
-		return -1;
+		return false;
 	}
-	return SDL_QueryTexture(image.get(), nullptr, nullptr, &w, &h);
+	float fw = (float)w, fh = (float)h;
+	auto ret = SDL_GetTextureSize(image.get(), &fw, &fh);
+	w = (int)fw;
+	h = (int)fh;
+	return ret;
 }
 
 bool EngineBase::beginDrawTalk(int w, int h)
@@ -844,13 +874,13 @@ bool EngineBase::beginDrawTalk(int w, int h)
 	SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
 	SDL_SetTextureAlphaMod(t, 255);
 	SetRenderTarget(renderer, t);
-	SDL_Surface * ts = SDL_CreateRGBSurfaceWithFormat(0, 1, 1, 32, SDL_PIXELFORMAT_ARGB8888);
-	Uint32 color = 0xFFFFFF;
-	memcpy(ts->pixels, &color, 4);
+	SDL_Surface * ts = SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_ARGB8888);
+	SDL_WriteSurfacePixel(ts, 0, 0, 0xFF, 0xFF, 0xFF, 0x0);
+
 	SDL_Texture * t2 = SDL_CreateTextureFromSurface(renderer, ts);
-	SDL_FreeSurface(ts);
+	SDL_DestroySurface(ts);
 	SDL_SetTextureBlendMode(t2, SDL_BLENDMODE_NONE);
-	SDL_RenderCopy(renderer, t2, nullptr, nullptr);
+	SDL_RenderTexture(renderer, t2, nullptr, nullptr);
 	SDL_DestroyTexture(t2);
 	return true;
 }
@@ -860,7 +890,6 @@ _shared_image EngineBase::endDrawTalk()
 	auto t = make_shared_image(SDL_GetRenderTarget(renderer));
 	SetRenderTarget(renderer, originalTex);
 	return createNewImageFromImage(t);
-	//SDL_DestroyTexture(t);
 }
 
 _shared_image EngineBase::loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size)
@@ -900,7 +929,7 @@ _shared_image EngineBase::loadSaveShotFromPixels(int w, int h, std::unique_ptr<c
 		}
 	}*/
 	/*return make_shared_image(SDL_CreateTextureFromSurface(renderer, sur.get()));*/
-	//SDL_FreeSurface(sur);
+	//SDL_DestroySurface(sur);
 }
 
 bool EngineBase::beginSaveScreen()
@@ -937,23 +966,36 @@ int EngineBase::saveImageToPixels(_shared_image image, int w, int h, std::unique
 	SDL_BlendMode bm;
 	SDL_GetTextureBlendMode(from.get(), &bm);
 	SDL_SetTextureBlendMode(from.get(), SDL_BLENDMODE_NONE);
-	SDL_RenderCopy(renderer, from.get(), nullptr, nullptr);
+	SDL_RenderTexture(renderer, from.get(), nullptr, nullptr);
 	SDL_SetTextureBlendMode(from.get(), bm);
-
-	auto buffer = std::make_unique<char[]>(w * h * SaveBMPPixelBytes);
 	int pitch = SaveBMPPixelBytes * w;
-
-	if (SDL_RenderReadPixels(renderer, nullptr, SaveBMPFormat, buffer.get(), pitch) != 0)
+	int size = h * pitch;
+	auto buffer = std::make_unique<char[]>(size);
+	
+	auto sur = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+	if (sur == nullptr)
 	{
 		return -1;
 	}
+	if (!SDL_LockSurface(sur.get()))
+	{
+		return -1;
+	}
+
+	for (size_t y = 0; y < h; y++)
+	{
+		memcpy(buffer.get() + y * pitch, ((char*)sur.get()->pixels) + y * sur.get()->pitch, pitch);
+	}
+
+	SDL_UnlockSurface(sur.get());
+
 	s = std::move(buffer);
 	
 	SetRenderTarget(renderer, tt);
 
 	//freeImage(ts);
 
-	return w * h * SaveBMPPixelBytes;
+	return size;
 }
 
 _shared_image EngineBase::createRaindrop()
@@ -961,47 +1003,47 @@ _shared_image EngineBase::createRaindrop()
 	const int w = 2;
 	const int h = 115;
 
-	SDL_Surface * s = SDL_CreateRGBSurfaceWithFormat(0, w, h, 32, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface * s = SDL_CreateSurface(w, h, SDL_PIXELFORMAT_ARGB8888);
 	if (s == nullptr)
 	{
 		return nullptr;
 	}
 	unsigned int col = 0xFFFFFFFF;
-	//SDL_LockSurface(s);
-	memset(s->pixels, 0, w * h * 4);
+	SDL_LockSurface(s);
+	memset(s->pixels, 0, h * s->pitch);
 	for (int i = 0; i < h; i++)
 	{
 		col = 0xFFFFFF | (((unsigned int)(i * 1.3)) << 24);
 		for (int j = 0; j < w; j++)
 		{
-			memcpy(((char *)s->pixels) + j * 4 + i * w * 4, &col, 4);			
+			memcpy(((char *)s->pixels) + j * 4 + i * s->pitch, &col, 4);			
 		}
 	}
-	//SDL_UnlockSurface(s);
+	SDL_UnlockSurface(s);
 	auto t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, s));
-	SDL_FreeSurface(s);
+	SDL_DestroySurface(s);
 	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_BLEND);
 	return t;
 }
 
 _shared_image EngineBase::createSnowflake()
 {
-	SDL_Surface * s = SDL_CreateRGBSurfaceWithFormat(0, 3, 3, 32, SDL_PIXELFORMAT_ARGB8888);
+	SDL_Surface * s = SDL_CreateSurface(3, 3, SDL_PIXELFORMAT_ARGB8888);
 	if (s == nullptr)
 	{
 		return nullptr;
 	}
 	unsigned int col = 0xFFFFFFFF;
-	//SDL_LockSurface(s);
-	memset(s->pixels, 0, 3 * 3 * 4);
+	SDL_LockSurface(s);
+	memset(s->pixels, 0, 3 * s->pitch);
 	memcpy(((char *)s->pixels) + 4, &col, 4);
-	memcpy(((char *)s->pixels) + 12, &col, 4);
-	memcpy(((char *)s->pixels) + 16, &col, 4);
-	memcpy(((char *)s->pixels) + 20, &col, 4);
-	memcpy(((char *)s->pixels) + 28, &col, 4);
-	//SDL_UnlockSurface(s);
+	memcpy(((char *)s->pixels) + s->pitch * 1, &col, 4);
+	memcpy(((char *)s->pixels) + 4 + s->pitch * 1, &col, 4);
+	memcpy(((char *)s->pixels) + 8 + s->pitch * 1, &col, 4);
+	memcpy(((char *)s->pixels) + 4 + s->pitch * 2, &col, 4);
+	SDL_UnlockSurface(s);
 	auto t = make_safe_shared_image(SDL_CreateTextureFromSurface(renderer, s));
-	SDL_FreeSurface(s);
+	SDL_DestroySurface(s);
 	setImageAlpha(t, 0xB0);
 	return t;
 }
@@ -1014,15 +1056,16 @@ void EngineBase::loadLogo()
 	//	logo = nullptr;
 	//}
 	std::string logoFileName = "config\\logo.png";
+
 #ifdef USE_LOGO_RESOURCE
-	HRSRC hRsrc = FindResource(nullptr, TEXT("PNGIMAGE"), RT_RCDATA);
+	HRSRC hRsrc = FindResource(nullptr, MAKEINTRESOURCE(IDB_PNG1), "PNG");
 	if (hRsrc == nullptr)
 	{
 		logo = loadImageFromFile(logoFileName);
 		GameLog::write("Logo Loaded From File\n");
 		return;
 	}
-	GameLog::write("Logo Loaded From Resource\n");
+	GameLog::write("Loading Logo From Resource\n");
 
 	unsigned int size = SizeofResource(nullptr, hRsrc);
 	if (size == 0)
@@ -1042,10 +1085,12 @@ void EngineBase::loadLogo()
 		logo = loadImageFromFile(logoFileName);
 		return;
 	}
-	std::unique_ptr<char[]> data = std::unique_ptr<char[]>((char*)pBuffer);
+	std::unique_ptr<char[]> data = std::make_unique<char[]>(size);
+	memcpy(data.get(), pBuffer, size);
 	logo = loadImageFromMem(data, size);
 	UnlockResource(hGlobal);
 	FreeResource(hGlobal);
+	GameLog::write("Logo loaded from resource!");
 #else
 	logo = loadImageFromFile(logoFileName);
 #endif // USE_LOGO_RESOURCE
@@ -1058,7 +1103,7 @@ void EngineBase::fadeInLogo()
 		return;
 	}
 	int w, h;
-	if (getImageSize(logo, w, h) == 0)
+	if (getImageSize(logo, w, h))
 	{
 		unsigned char r, g, b;
 		r = (clLogoBG & 0xFF0000) >> 16;
@@ -1103,7 +1148,7 @@ void EngineBase::fadeOutLogo()
 		return;
 	}
 	int w, h;
-	if (getImageSize(logo, w, h) == 0)
+	if (getImageSize(logo, w, h))
 	{
 		Timer t(&timer);
 		t.reInit();
@@ -1143,7 +1188,7 @@ void EngineBase::drawImageWithMask(_shared_image image, int x, int y, _shared_im
 		return;
 	}
 	int w, h;
-	SDL_QueryTexture(image.get(), nullptr, nullptr, &w, &h);
+	getImageSize(image, w, h);
 	SDL_Texture * tt = SDL_GetRenderTarget(renderer);
 	drawImage(image, x, y);
 	SDL_Rect sdlrect;
@@ -1151,7 +1196,7 @@ void EngineBase::drawImageWithMask(_shared_image image, int x, int y, _shared_im
 	sdlrect.y = y;
 	sdlrect.w = w;
 	sdlrect.h = h;
-	SDL_RenderCopy(renderer, mask.get(), nullptr, &sdlrect);
+	drawImage(mask, nullptr, &sdlrect);
 }
 
 void EngineBase::drawImageWithMask(_shared_image image, Rect * src, Rect * dst, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
@@ -1182,7 +1227,7 @@ void EngineBase::drawImageWithMask(_shared_image image, Rect * src, Rect * dst, 
 		pd = &d;
 	}
 	drawImage(image, src, dst);
-	SDL_RenderCopy(renderer, mask.get(), nullptr, pd);
+	drawImage(mask, nullptr, pd);
 }
 
 void EngineBase::drawImageWithMaskEx(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
@@ -1234,7 +1279,7 @@ void EngineBase::drawImageWithMaskEx(_shared_image image, Rect * src, Rect * dst
 		return;
 	}
 	int w, h;
-	SDL_QueryTexture(image.get(), nullptr, nullptr, &w, &h);
+	getImageSize(image, w, h);
 	auto t = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, w, h));
 	SDL_Texture * tt = SDL_GetRenderTarget(renderer);
 	SetRenderTarget(renderer, t.get());
@@ -1255,7 +1300,7 @@ void EngineBase::setScreenMask(unsigned char r, unsigned char g, unsigned char b
 	{
 		return;
 	}
-	*(unsigned int *)(screenMask)->pixels = 0xFF << 24 | r << 16 | g << 8| b;
+	SDL_WriteSurfacePixel(screenMask.get(), 0, 0, r, g, b, 0xFF);
 	SDL_SetSurfaceAlphaMod(screenMask.get(), a);
 }
 
@@ -1292,7 +1337,7 @@ void EngineBase::drawMask(_shared_image mask, Rect* dst)
 		d.h = dst->h;
 		pd = &d;
 	}
-	SDL_RenderCopy(renderer, mask.get(), nullptr, pd);
+	drawImage(mask, nullptr, pd);
 }
 
 void EngineBase::handleEvent()
@@ -1304,23 +1349,23 @@ void EngineBase::handleEvent()
 	{
 		switch (e.type)
 		{
-			case SDL_QUIT:
+			case SDL_EVENT_QUIT:
 			{
 				eventList.event.push(AEvent(ET_QUIT , 0, 0, 0));
 				break;
 			}
-			case SDL_KEYDOWN: case SDL_KEYUP:
-			{	
-				eventList.event.push(AEvent((EventType)e.type , e.key.keysym.scancode, 0, 0));
+			case SDL_EVENT_KEY_DOWN: case SDL_EVENT_KEY_UP:
+			{
+				eventList.event.push(AEvent((EventType)e.type, e.key.scancode, 0, 0, e.key.repeat));
 				break;
 			}
-			case SDL_MOUSEMOTION:
+			case SDL_EVENT_MOUSE_MOTION:
 			{
                 realMousePosX = e.motion.x;
                 realMousePosY = e.motion.y;
-#ifndef __MOBILE__
+//#ifndef __MOBILE__
 				int tempX = -1, tempY = -1;
-				calculateCursor(e.motion.x, e.motion.y, &tempX, &tempY);
+				calculateCursorReferencePosition(e.motion.x, e.motion.y, &tempX, &tempY);
 
 				if (tempX >= 0 && tempY >= 0)
 				{
@@ -1328,17 +1373,17 @@ void EngineBase::handleEvent()
 					mouseY = tempY;
 					eventList.event.push(AEvent(EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
 				}
-#endif // (!defined __MOBILE__)
+//#endif // (!defined __MOBILE__)
 				break;
 			}
-			case SDL_MOUSEBUTTONDOWN: case SDL_MOUSEBUTTONUP:
+			case SDL_EVENT_MOUSE_BUTTON_DOWN: case SDL_EVENT_MOUSE_BUTTON_UP:
 			{
                 realMousePosX = e.motion.x;
                 realMousePosY = e.motion.y;
-#ifndef __MOBILE__
+//#ifndef __MOBILE__
 				//鼠标点击时增加一个鼠标移动事件
 				int tempX = -1, tempY = -1;
-				calculateCursor(e.motion.x, e.motion.y, &tempX, &tempY);
+				calculateCursorReferencePosition(e.motion.x, e.motion.y, &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
 					mouseX = tempX;
@@ -1346,45 +1391,45 @@ void EngineBase::handleEvent()
 					eventList.event.push(AEvent((EventType)EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
 				}
 				eventList.event.push(AEvent((EventType)e.type, e.button.button, tempX, tempY));
-#endif // (!defined __MOBILE__)
+//#endif // (!defined __MOBILE__)
 				break;
 			}
-			case SDL_FINGERDOWN: case SDL_FINGERUP: 
+			case SDL_EVENT_FINGER_DOWN: case SDL_EVENT_FINGER_UP: 
 			{
 				int tempWidth = 0;
 				int tempHeight = 0;
 				SDL_GetWindowSize(window, &tempWidth, &tempHeight);
 				int tempX = -1;
 				int tempY = -1;
-				calculateCursor((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
+				calculateCursorReferencePosition((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
-					if (e.tfinger.fingerId == TOUCH_MOUSEID)
+					if (e.tfinger.fingerID == TOUCH_MOUSEID)
 					{
 						mouseX = tempX;
 						mouseY = tempY;
 					}
-					eventList.event.push(AEvent(ET_FINGERMOTION, (int)e.tfinger.fingerId, tempX, tempY));
+					eventList.event.push(AEvent(ET_FINGERMOTION, (int)e.tfinger.fingerID, tempX, tempY));
 				}
-				eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
+				eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerID, tempX, tempY));
 				break;
 			}
-			case SDL_FINGERMOTION:
+			case SDL_EVENT_FINGER_MOTION:
 			{
 				int tempWidth = 0;
 				int tempHeight = 0;
 				SDL_GetWindowSize(window, &tempWidth, &tempHeight);
 				int tempX = -1;
 				int tempY = -1;
-				calculateCursor((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
+				calculateCursorReferencePosition((int)round(e.tfinger.x * tempWidth), (int)round(e.tfinger.y * tempHeight), &tempX, &tempY);
 				if (tempX >= 0 && tempY >= 0)
 				{
-					if (e.tfinger.fingerId == TOUCH_MOUSEID)
+					if (e.tfinger.fingerID == TOUCH_MOUSEID)
 					{
 						mouseX = tempX;
 						mouseY = tempY;
 					}
-					eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerId, tempX, tempY));
+					eventList.event.push(AEvent((EventType)e.type , (int)e.tfinger.fingerID, tempX, tempY));
 				}
 				break;
 			}
@@ -1394,32 +1439,37 @@ void EngineBase::handleEvent()
 			}			
 		}
 	}
-#ifndef __MOBILE__
-	int tempX = -1, tempY = -1, mX, mY;
+//#ifndef __MOBILE__
+	int tempX = -1, tempY = -1;
+	float mX, mY;
+	int w, h;
+	SDL_GetWindowSize(window, &w, &h);
 	SDL_GetMouseState(&mX, &mY);
-	calculateCursor(mX, mY, &tempX, &tempY);
+	mX = mX * w;
+	mY = mY * h;
+	calculateCursorReferencePosition((int)mX, (int)mY, &tempX, &tempY);
 	if (tempX >= 0 && tempY >= 0)
 	{
 		mouseX = tempX;
 		mouseY = tempY;
 		eventList.event.push(AEvent(EventType::ET_MOUSEMOTION, (int)TOUCH_MOUSEID, tempX, tempY));
 	}
-#endif // !__MOBILE__
+//#endif // !__MOBILE__
 
 	timer.setPaused(false);
 }
 
 void EngineBase::copyEvent(AEvent& s, AEvent& d)
 {
-	d.eventType = s.eventType;
-	d.eventData = s.eventData;
-	d.eventX = s.eventX;
-	d.eventY = s.eventY;
+	d = s;
 }
 
 void EngineBase::clearEventList()
 {
-	while (!eventList.event.empty()) { eventList.event.pop(); }
+	std::queue<AEvent> empty;
+	std::swap(eventList.event, empty);
+	// eventList.event = std::queue<AEvent>();
+	// while (!eventList.event.empty()) { eventList.event.pop(); }
 }
 
 int EngineBase::getEventCount()
@@ -1450,13 +1500,48 @@ bool EngineBase::getKeyPress(KeyCode key)
 
 bool EngineBase::getMousePress(MouseButtonCode button)
 {
-	return ((SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(button)) != 0);
+	return ((SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON_MASK(button)) != 0);
 }
 
 void EngineBase::getMouse(int& x, int& y)
 {
 	x = mouseX;
 	y = mouseY;
+}
+
+std::vector<AEvent> EngineBase::getAllFingersPosition()
+{
+	std::vector<AEvent> ret;
+	int touchDeviceCount = 0;
+	SDL_TouchID* ids = SDL_GetTouchDevices(&touchDeviceCount);
+	if (ids == nullptr || touchDeviceCount == 0)
+	{
+		return ret;
+	}
+
+	for (size_t i = 0; i < touchDeviceCount; i++)
+	{
+		int fingerCount = 0;
+		auto fingers = SDL_GetTouchFingers(ids[i], &fingerCount);
+		if (fingers == nullptr || fingerCount == 0)
+		{
+			continue;
+		}
+		for (size_t j = 0; j < fingerCount; j++)
+		{
+			auto finger = (*fingers)[j];
+			int tempWidth = 0;
+			int tempHeight = 0;
+			SDL_GetWindowSize(window, &tempWidth, &tempHeight);
+			int tempX = -1;
+			int tempY = -1;
+			calculateCursorReferencePosition((int)round(finger.x * tempWidth), (int)round(finger.y * tempHeight), &tempX, &tempY);
+			ret.emplace_back(ET_FINGERMOTION, finger.id, tempX, tempY);
+		}
+		SDL_free(fingers);
+	}
+	SDL_free(ids);
+	return ret;
 }
 
 void EngineBase::resetEvent()
@@ -1470,11 +1555,11 @@ void EngineBase::setCursorHardware(bool isHardware)
 	hardwareCursor = isHardware;
 	if (hardwareCursor && !softwareCursorHidden)
 	{
-		SDL_ShowCursor(1);
+		SDL_ShowCursor();
 	}
 	else
 	{
-		SDL_ShowCursor(0);
+		SDL_HideCursor();
 	}
 }
 
@@ -1483,10 +1568,10 @@ void EngineBase::setFontName(const std::string & fontName)
 	font = fontName;
 	if (fontData != nullptr)
 	{
-		SDL_FreeRW(fontData);
+		SDL_CloseIO(fontData);
 		fontData = nullptr;
 	}
-	fontData = SDL_RWFromFile(fontName.c_str(), "r+");
+	fontData = SDL_IOFromFile(fontName.c_str(), "r+");
 	if (!fontData)
 	{
 		GameLog::write("there is no fontData\n");
@@ -1501,14 +1586,6 @@ void EngineBase::drawTalk(const std::string& text, int x, int y, int size, unsig
 	//freeImage(t);
 }
 
-void EngineBase::drawSolidUnicodeText(const std::wstring & text, int x, int y, int size, unsigned int color)
-{
-	_shared_image t = createUnicodeText(text, size, color);
-	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_NONE);
-	drawImage(t, x, y);
-	//freeImage(t);
-}
-
 void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 {
 	if (data == nullptr || size <= 0)
@@ -1517,49 +1594,15 @@ void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 	}
 	if (fontData != nullptr)
 	{
-		SDL_FreeRW(fontData);
+		SDL_CloseIO(fontData);
 		fontData = nullptr;
 	}
 	if (fontBuffer != nullptr)
 	{
 		fontBuffer = nullptr;
 	}
-	fontData = SDL_RWFromMem(data.get(), size);
+	fontData = SDL_IOFromMem(data.get(), size);
 	fontBuffer = std::move(data);
-}
-
-_shared_image EngineBase::createUnicodeText(const std::wstring& text, int size, unsigned int color)
-{
-
-	TTF_Font* _font = nullptr;
-	if (!fontData)
-	{
-		_font = TTF_OpenFont(font.c_str(), size);
-	}
-	else
-	{
-		SDL_RWseek(fontData, 0, RW_SEEK_SET);
-		_font = TTF_OpenFontRW(fontData, 0, size);
-	}
-	if (!_font)
-	{
-		return nullptr;
-	}
-	SDL_Color c;
-	c.b = (color & 0xFF);
-	c.g = (color & 0xFF00) >> 8;
-	c.r = (color & 0xFF0000) >> 16;
-	c.a = (color & 0xFF000000) >> 24;
-
-	auto text_s = TTF_RenderUNICODE_Blended(_font, (Uint16*)text.c_str(), c);
-	auto text_t = make_shared_image(SDL_CreateTextureFromSurface(renderer, text_s));
-
-	setImageAlpha(text_t, c.a);
-
-	SDL_FreeSurface(text_s);
-	TTF_CloseFont(_font);
-	return text_t;
-
 }
 
 _shared_image EngineBase::createText(const std::string& text, int size, unsigned int color, bool safe)
@@ -1571,8 +1614,8 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	}
 	else
 	{
-		SDL_RWseek(fontData, 0, RW_SEEK_SET);
-		_font = TTF_OpenFontRW(fontData, 0, size);	
+		SDL_SeekIO(fontData, 0, SDL_IO_SEEK_SET);
+		_font = TTF_OpenFontIO(fontData, 0, size);	
 	}	
 	if (!_font) 
 	{ 
@@ -1585,7 +1628,7 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	c.r = (color & 0xFF0000) >> 16;	
 	c.a = (color & 0xFF000000) >> 24;
 
-	auto text_s = TTF_RenderUTF8_Blended(_font, text.c_str(), c);
+	auto text_s = TTF_RenderText_Blended(_font, text.c_str(), text.size(), c);
 	_shared_image text_t;
 	if (safe)
 	{
@@ -1598,16 +1641,9 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 
 	setImageAlpha(text_t, c.a);
 
-	SDL_FreeSurface(text_s);
+	SDL_DestroySurface(text_s);
 	TTF_CloseFont(_font);
 	return text_t;
-}
-
-void EngineBase::drawUnicodeText(const std::wstring& text, int x, int y, int size, unsigned int color)
-{
-	_shared_image t = createUnicodeText(text, size, color);
-	drawImage(t, x, y);
-	//freeImage(t);
 }
 
 void EngineBase::drawText(const std::string & text, int x, int y, int size, unsigned int color)
@@ -1617,7 +1653,7 @@ void EngineBase::drawText(const std::string & text, int x, int y, int size, unsi
 	//freeImage(t);
 }
 
-int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
+bool EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
 {
 	if (_externalEventHandler != NULL)
 	{
@@ -1626,17 +1662,17 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
 
 	switch (event->type)
 	{
-	case SDL_APP_TERMINATING:
+	case SDL_EVENT_TERMINATING:
 		/* Terminate the app.
 			Shut everything down before returning from this function.
 		*/
-		return 0;
-	case SDL_APP_LOWMEMORY:
+		return false;
+	case SDL_EVENT_LOW_MEMORY:
 		/* You will get this when your app is paused and iOS wants more memory.
 			Release as much memory as possible.
 		*/
-		return 0;
-	case SDL_APP_WILLENTERBACKGROUND:
+		return false;
+	case SDL_EVENT_WILL_ENTER_BACKGROUND:
 		/* Prepare your app to go into the background.  Stop loops, etc.
 			This gets called when the user hits the home button, or gets a call.
 		*/
@@ -1648,10 +1684,10 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
             SDL_SetRenderTarget(renderer, nullptr);
         }
 		//_mutex.unlock();
-		return 0;
-	case SDL_APP_DIDENTERBACKGROUND:
+		return false;
+	case SDL_EVENT_DID_ENTER_BACKGROUND:
 		/* This will get called if the user accepted whatever sent your app to the background.
-			If the user got a phone call and canceled it, you'll instead get an SDL_APP_DIDENTERFOREGROUND event and restart your loops.
+			If the user got a phone call and canceled it, you'll instead get an SDL_EVENT_DIDENTERFOREGROUND event and restart your loops.
 			When you get this, you have 5 seconds to save all your state or the app will be terminated.
 			Your app is NOT active at this point.
 		*/
@@ -1663,8 +1699,8 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
             SDL_SetRenderTarget(renderer, nullptr);
         }
         //_mutex.unlock();
-		return 0;
-	case SDL_APP_WILLENTERFOREGROUND:
+		return false;
+	case SDL_EVENT_WILL_ENTER_FOREGROUND:
 		/* This call happens when your app is coming back to the foreground.
 			Restore all your state here.
 		*/
@@ -1676,8 +1712,8 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
             isBackGround = false;
         }
 		//_mutex.unlock();
-		return 0;
-	case SDL_APP_DIDENTERFOREGROUND:
+		return false;
+	case SDL_EVENT_DID_ENTER_FOREGROUND:
 		/* Restart your loops here.
 			Your app is interactive and getting CPU again.
 		*/
@@ -1689,10 +1725,10 @@ int EngineBase::enginebaseAppEventHandler(void* userdata, SDL_Event* event)
             isBackGround = false;
         }
         //_mutex.unlock();
-		return 0;
+		return false;
 	default:
 		/* No special processing, add it to the event queue */
-		return 1;
+		return true;
 	}
 }
 
@@ -1709,11 +1745,11 @@ int EngineBase::SetRenderTarget(SDL_Renderer* r, SDL_Texture* t)
 	}
 }
 
-InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, int & wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, AppEventHandler eventHandler)
+InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, int & wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display, AppEventHandler eventHandler)
 {
 	width = wWidth;
 	height = wHeight;
-	if (initSDL(windowCaption, wWidth, wHeight, fullScreenMode, fullScreenSolutionMode) != 0)
+	if (initSDL(windowCaption, wWidth, wHeight, fullScreenMode, fullScreenSolutionMode, display) != initOK)
 	{
 		GameLog::write("Init SDL Error!\n");
 		return sdlError;
@@ -1746,7 +1782,7 @@ InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, 
 		GameLog::write("Init miniLZO Error!\n");
 		return LZOError;
 	}
-	SDL_StopTextInput();
+	SDL_StopTextInput(window);
 	fadeOutLogo();
 
 	resetEvent();
@@ -1788,34 +1824,31 @@ void EngineBase::setFullScreen(FullScreenMode mode)
 	unsigned int flags = SDL_GetWindowFlags(window);
 	if (mode == FullScreenMode::fullScreen)
 	{
-        if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
-            flags ^= SDL_WINDOW_FULLSCREEN_DESKTOP;
-        }
-        flags |= SDL_WINDOW_FULLSCREEN;
+		auto displayID = SDL_GetDisplayForWindow(window);
+		auto current_mode = SDL_GetCurrentDisplayMode(displayID);
+		auto mode = *current_mode;
+		mode.w = width;
+		mode.h = height;
+		SDL_SetWindowFullscreen(window, true);
+		SDL_SetWindowFullscreenMode(window, &mode);
 	}
 	else if (mode == FullScreenMode::windowFullScreen)
 	{
-        if (flags & SDL_WINDOW_FULLSCREEN) {
-            flags ^= SDL_WINDOW_FULLSCREEN;
-        }
-		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+		SDL_SetWindowFullscreen(window, true);
+		SDL_SetWindowFullscreenMode(window, nullptr);
 	}
     else
     {
-        if (flags & SDL_WINDOW_FULLSCREEN) {
-            flags ^= SDL_WINDOW_FULLSCREEN;
-        }
-        if (flags & SDL_WINDOW_FULLSCREEN_DESKTOP) {
-            flags ^= SDL_WINDOW_FULLSCREEN_DESKTOP;
-        }
+		SDL_SetWindowFullscreen(window, false);
     }
-    SDL_SetWindowFullscreen(window, flags);
+    
     if (mode == FullScreenMode::window) {
-        SDL_DisplayMode dm;
-        SDL_GetDesktopDisplayMode(0, &dm);
+		int w = 0, h = 0;
+		getScreenInfo(w, h);
 
         SDL_SetWindowSize(window, width, height);
-        SDL_SetWindowPosition(window, (dm.w - width) / 2, (dm.h - height) / 2);
+		auto displayID = SDL_GetDisplayForWindow(window);
+		SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED_DISPLAY(displayID), SDL_WINDOWPOS_CENTERED_DISPLAY(displayID));//(w - width) / 2, (h - height) / 2);
     }
 
 	updateState();
@@ -1823,11 +1856,25 @@ void EngineBase::setFullScreen(FullScreenMode mode)
 }
 
 void EngineBase::getScreenInfo(int& w, int& h)
-{
-	SDL_DisplayMode sdl_dm;
-	SDL_GetCurrentDisplayMode(0, &sdl_dm);
-	w = sdl_dm.w;
-	h = sdl_dm.h;
+{	
+	const SDL_DisplayMode* sdl_dm = nullptr;
+	if (window == nullptr)
+	{
+		sdl_dm = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+	}
+	else
+	{
+		sdl_dm = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(window));
+	}
+	
+	if (sdl_dm == nullptr)
+	{
+		GameLog::write("SDL_GetCurrentDisplayMode Error: %s", SDL_GetError()); 
+		return;
+	}
+	w = sdl_dm->w;
+	h = sdl_dm->h;
+	
 }
 
 void EngineBase::setWindowSize(int w, int h)
@@ -1880,7 +1927,7 @@ void EngineBase::countFPS()
 	}	
 }
 
-InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth, int wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode)
+InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth, int wHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display)
 {
 #ifdef __MOBILE__
     fullScreenMode = FullScreenMode::fullScreen;
@@ -1888,16 +1935,18 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 #endif
     _fullScreenMode = fullScreenMode;
     _fullScreenSolutionMode = fullScreenSolutionMode;
-    
-	if (SDL_Init(SDL_INIT_EVERYTHING ^ SDL_INIT_AUDIO))
+
+	if (!SDL_Init( SDL_INIT_AUDIO | SDL_INIT_VIDEO  | SDL_INIT_EVENTS))
 	{
 		GameLog::write("SDL error: %s \n", SDL_GetError());
 		return sdlError;
 	}
-	
+#ifdef __MOBILE__
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
 	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
 	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
-	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
+	//SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
     
     int screenWidth = wWidth;
     int screenHeight = wHeight;
@@ -1926,37 +1975,57 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
         }
     }
 
-	SDL_ShowCursor(0);
-	Uint32 flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
+	SDL_HideCursor();
+	uint32_t flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#ifdef __APPLE__
+	flags |= SDL_WINDOW_METAL;
+#else
+    flags |= SDL_WINDOW_VULKAN;
+#endif
 
-    
     if (fullScreenMode == FullScreenMode::fullScreen) 
     {
         flags |= SDL_WINDOW_FULLSCREEN;
     }
     else if (fullScreenMode == FullScreenMode::windowFullScreen)
     {
-        flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+		flags |= SDL_WINDOW_FULLSCREEN; // SDL_WINDOW_FULLSCREEN_DESKTOP;
     }
     else
     {
         flags |= SDL_WINDOW_HIDDEN;
     }
-
-	window = SDL_CreateWindow(windowCaption.c_str(), SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, flags);
-	if (window == nullptr)
+	GameLog::write("SDL Creating Window and Renderer");
+	SDL_Renderer* tempRenderer;
+	if (!SDL_CreateWindowAndRenderer(windowCaption.c_str(), width, height, flags, &window, &tempRenderer))
 	{
-		GameLog::write("SDL Create Window Error : %s\n", SDL_GetError());
+		GameLog::write("SDL Create Window and Renderer Error : %s", SDL_GetError());
 		return sdlError;
 	}
 
-	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
-	
-	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);	
+	SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED_DISPLAY(display), SDL_WINDOWPOS_CENTERED_DISPLAY(display));
+
+	if (fullScreenMode == FullScreenMode::windowFullScreen)
+	{
+		SDL_SetWindowFullscreenMode(window, NULL);
+	}
+
+	renderer.store(tempRenderer); //SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	if (!SDL_SetRenderVSync(renderer.load(), 1))
+	{
+		GameLog::write("SDL_SetRenderVSync Error : %s", SDL_GetError());
+		return sdlError;
+	}
+	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 
 	realScreen = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, width, height));
-	
-	screenMask = make_shared_surface(SDL_CreateRGBSurface(0, 1, 1, 32, 0, 0, 0, 0));
+	if (realScreen == nullptr)
+	{
+		GameLog::write("RealScreen Creation Error : %s", SDL_GetError());
+		return sdlError;
+	}
+	screenMask = make_shared_surface(SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_ARGB8888));
+	setScreenMask(0, 0, 0, 0);
 
 	initTime();
 	
@@ -1981,19 +2050,19 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 void EngineBase::destroySDL()
 {
 	GameLog::write("Begin destroy SDL\n");
-	destroyCursor();
+	clearCursor();
 	if (fontBuffer != nullptr)
 	{
 		fontBuffer = nullptr;
 	}
 	if (fontData != nullptr)
 	{
-		SDL_FreeRW(fontData);
+		SDL_CloseIO(fontData);
 		fontData = nullptr;
 	}
 	/*if (screenMask)
 	{
-		SDL_FreeSurface((SDL_Surface *)screenMask);
+		SDL_DestroySurface((SDL_Surface *)screenMask);
 		screenMask = nullptr;
 	}*/
 	//if (realScreen)
@@ -2002,9 +2071,9 @@ void EngineBase::destroySDL()
 	//	realScreen = nullptr;
 	//}
     GameLog::write("Begin destroy SDL Renderer \n");
-    SDL_SetRenderTarget(renderer, nullptr);
     if (renderer)
     {
+        SDL_SetRenderTarget(renderer, nullptr);
         SDL_DestroyRenderer(renderer);
         renderer = nullptr;
     }
@@ -2015,15 +2084,9 @@ void EngineBase::destroySDL()
         SDL_DestroyWindow(window);
         window = nullptr;
     }
-    
-    
+     
 	SDL_Quit();
 	GameLog::write("Destroy SDL done!\n");
-}
-
-void EngineBase::destroyCursor()
-{
-	clearCursor();
 }
 
 void EngineBase::updateState()
@@ -2033,12 +2096,11 @@ void EngineBase::updateState()
     SDL_GetWindowSize(window, &tempWidth, &tempHeight);
 	updateRect(tempWidth, tempHeight, rect);
 #ifdef __APPLE__
-    SDL_Metal_GetDrawableSize(window, &tempWidth, &tempHeight);
+    SDL_GetWindowSizeInPixels(window, &tempWidth, &tempHeight);
     updateRect(tempWidth, tempHeight, displayRect);
 #else
     displayRect = rect;
 #endif
-    updateCursor();
 }
 #ifdef SHF_USE_AUDIO
 int EngineBase::initSoundSystem()
@@ -2417,7 +2479,7 @@ int EngineBase::initVideo()
 
 void EngineBase::destroyVideo()
 {
-	GameLog::write("Begin destroy video\n");
+	GameLog::write("Begin to destroy video\n");
 	clearVideoList();
 	GameLog::write("Destroy video done!\n");
 }
@@ -2443,12 +2505,15 @@ void EngineBase::freeMediaStream(MediaStream * mediaStream)
 
 	if (mediaStream->formatCtx != nullptr)
 	{
+		// TODO: check if this is useful!
+        av_freep(&(mediaStream->formatCtx->pb->buffer));
+		avio_context_free(&(mediaStream->formatCtx->pb));
 		avformat_close_input(&mediaStream->formatCtx);
 	}
 
     if (mediaStream->rWops != nullptr)
     {
-        SDL_RWclose(mediaStream->rWops);
+        SDL_CloseIO(mediaStream->rWops);
         mediaStream->rWops = nullptr;
     }
 }
@@ -2494,14 +2559,14 @@ int EngineBase::openVideoFile(_video video)
 int EngineBase::read_packet(void *opaque, uint8_t *buf, int buf_size)
 {
     auto fp = ((MediaStream*)opaque)->rWops;
-    auto nowPos = SDL_RWtell(fp);
+    auto nowPos = SDL_TellIO(fp);
     int length = ((MediaStream*)opaque)->rWops_length;
     int newSize = buf_size;
     if (length - nowPos < buf_size)
     {
         newSize = (int)(length - nowPos);
     }
-    auto sz = SDL_RWread(fp, buf, 1, newSize);
+    auto sz = SDL_ReadIO(fp, buf, newSize);
 	if (sz == 0)
 	{
         ((MediaStream*)opaque)->formatCtx->pb->eof_reached = 1;
@@ -2524,16 +2589,16 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
     int ret = 0;
 
 #if defined( __ANDROID__ )
-	std::string path = SDL_AndroidGetInternalStoragePath();
+	std::string path = SDL_GetAndroidInternalStoragePath();
 	if (path.length() > 0 && *path.end() != '/') { path += '/'; }
 	convert::replaceAllString(newFileName, "\\", "/");
 //    convert::replaceAllString(newFileName, "/", "_");
 //	newFileName = path + newFileName;
-    auto *pFile = SDL_RWFromFile(newFileName.c_str(), "rb");
+    auto *pFile = SDL_IOFromFile(newFileName.c_str(), "rb");
     mediaStream->rWops = pFile;
-    SDL_RWseek(pFile, 0, RW_SEEK_END);
-    mediaStream->rWops_length = SDL_RWtell(pFile);
-    SDL_RWseek(pFile, 0, RW_SEEK_SET);
+    SDL_SeekIO(pFile, 0, SDL_IO_SEEK_END);
+    mediaStream->rWops_length = SDL_TellIO(pFile);
+    SDL_SeekIO(pFile, 0, SDL_IO_SEEK_SET);
 
     if(!pFile) {
         av_log(nullptr, AV_LOG_ERROR, "Cannot open input file\n");
@@ -2541,9 +2606,8 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
     }
 
     size_t buff_size = 10 * 1024;
-    unsigned char * buff = new unsigned char[buff_size];
-
-    AVIOContext *avio_ctx = avio_alloc_context(buff, buff_size, 0, mediaStream, read_packet, nullptr, nullptr);
+    auto buff = av_malloc(buff_size);
+    AVIOContext *avio_ctx = avio_alloc_context((unsigned char *)buff, buff_size, 0, mediaStream, read_packet, nullptr, nullptr);
     if(!avio_ctx) {
         ret = AVERROR(ENOMEM);
         return;
@@ -2552,11 +2616,11 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
     mediaStream->formatCtx->pb = avio_ctx;
     ret = avformat_open_input(&mediaStream->formatCtx, nullptr, nullptr, nullptr);
 #elif defined( __APPLE__ )
-    auto *pFile = SDL_RWFromFile(File::getAssetsName(newFileName).c_str(), "rb");
+    auto *pFile = SDL_IOFromFile(File::getAssetsName(newFileName).c_str(), "rb");
     mediaStream->rWops = pFile;
-    SDL_RWseek(pFile, 0, RW_SEEK_END);
-    mediaStream->rWops_length = SDL_RWtell(pFile);
-    SDL_RWseek(pFile, 0, RW_SEEK_SET);
+    SDL_SeekIO(pFile, 0, SDL_IO_SEEK_END);
+    mediaStream->rWops_length = SDL_TellIO(pFile);
+    SDL_SeekIO(pFile, 0, SDL_IO_SEEK_SET);
 
     if(!pFile) {
         av_log(nullptr, AV_LOG_ERROR, "Cannot open input file\n");
@@ -2564,9 +2628,8 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
     }
 
     size_t buff_size = 10 * 1024;
-    unsigned char * buff = new unsigned char[buff_size];
-
-    AVIOContext *avio_ctx = avio_alloc_context(buff, buff_size, 0, mediaStream, read_packet, nullptr, nullptr);
+	auto buff = av_malloc(buff_size);
+    AVIOContext *avio_ctx = avio_alloc_context((unsigned char *)buff, buff_size, 0, mediaStream, read_packet, nullptr, nullptr);
     if(!avio_ctx) {
         ret = AVERROR(ENOMEM);
         return;
@@ -2577,7 +2640,6 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 #else
     ret = avformat_open_input(&mediaStream->formatCtx, File::getAssetsName(newFileName).c_str(), nullptr, nullptr);
 #endif
-
 	if (ret != 0)
 	{
 		char buf[1024];
@@ -2723,7 +2785,7 @@ void EngineBase::decodeNextAudio(_video video)
 		video->audioStream.packet = av_packet_alloc();
         bool haveFrame = false;
 #ifdef __ANDROID__
-        int nowPos = SDL_RWtell(video->audioStream.rWops);
+        int nowPos = SDL_TellIO(video->audioStream.rWops);
         if (nowPos >= video->audioStream.rWops_length)
         {
             haveFrame = false;
@@ -2855,7 +2917,7 @@ void EngineBase::decodeNextVideo(_video video)
 //		bool haveFrame = (av_read_frame(video->videoStream.formatCtx, video->videoStream.packet) >= 0);
         bool haveFrame = false;
 #ifdef __ANDROID__
-        int nowPos = SDL_RWtell(video->videoStream.rWops);
+        int nowPos = SDL_TellIO(video->videoStream.rWops);
         if (nowPos >= video->videoStream.rWops_length)
         {
             haveFrame = false;
@@ -2900,8 +2962,9 @@ void EngineBase::decodeNextVideo(_video video)
 //						av_image_fill_arrays(video->sFrame->data, video->sFrame->linesize, (const uint8_t *)video->b, AV_PIX_FMT_YUV420P/*AV_PIX_FMT_RGB24*/, video->videoStream.codecCtx->width, video->videoStream.codecCtx->height, 1);
 //					}
 					AVFrame * f = video->videoStream.frame;
-					auto tex = make_shared_image(SDL_CreateTexture(renderer, (Uint32)video->pixelFormat, SDL_TEXTUREACCESS_STREAMING, video->videoStream.codecCtx->width, video->videoStream.codecCtx->height));
-					switch ((Uint32)video->pixelFormat)
+					// TODO: Check if this is right
+					auto tex = make_shared_image(SDL_CreateTexture(renderer, getVideoPixelFormat(video->pixelFormat), SDL_TEXTUREACCESS_STREAMING, video->videoStream.codecCtx->width, video->videoStream.codecCtx->height));
+					switch (getVideoPixelFormat(video->pixelFormat))
 					{
 					case SDL_PIXELFORMAT_UNKNOWN:
 						video->swsContext =	sws_getCachedContext(video->swsContext, f->width, f->height, AVPixelFormat(f->format), f->width, f->height, AV_PIX_FMT_BGRA, SWS_BICUBIC, nullptr, nullptr, nullptr);
@@ -2909,7 +2972,7 @@ void EngineBase::decodeNextVideo(_video video)
 						{
 							uint8_t* pixels[4];
 							int pitch[4];
-							if (!SDL_LockTexture(tex.get(), nullptr, (void**)pixels, pitch))
+							if (SDL_LockTexture(tex.get(), nullptr, (void**)pixels, pitch))
 							{
 								sws_scale(video->swsContext, (const uint8_t * const*)f->data, f->linesize, 0, f->height, pixels, pitch);
 								SDL_UnlockTexture(tex.get());
@@ -2919,23 +2982,30 @@ void EngineBase::decodeNextVideo(_video video)
 					case SDL_PIXELFORMAT_IYUV:
 						if (f->linesize[0] > 0 && f->linesize[1] > 0 && f->linesize[2] > 0)
 						{
+							
 //							SDL_UpdateYUVTexture(tex.get(), nullptr, f->data[0], f->linesize[0], f->data[1], f->linesize[1], f->data[2], f->linesize[2]);
 #ifdef __ANDROID__
 							SDL_UpdateYUVTexture(tex.get(), nullptr, f->data[0], f->linesize[0], f->data[2], f->linesize[2], f->data[1], f->linesize[1]);
 #else
-							SDL_UpdateYUVTexture(tex.get(), nullptr, f->data[0], f->linesize[0], f->data[1], f->linesize[1], f->data[2], f->linesize[2]);
+							if (!SDL_UpdateYUVTexture(tex.get(), nullptr, f->data[0], f->linesize[0], f->data[1], f->linesize[1], f->data[2], f->linesize[2]))
+							{
+								GameLog::write("SDL_UpdateYUVTexture Error(1): %s", SDL_GetError());
+							}
 #endif
                         }
 						else if (f->linesize[0] < 0 && f->linesize[1] < 0 && f->linesize[2] < 0)
 						{
-							SDL_UpdateYUVTexture(tex.get(), nullptr,
+							if (!SDL_UpdateYUVTexture(tex.get(), nullptr,
 								f->data[0] + f->linesize[0] * (f->height - 1), -f->linesize[0],
 								f->data[1] + f->linesize[1] * (AV_CEIL_RSHIFT(f->height, 1) - 1), -f->linesize[1],
-								f->data[2] + f->linesize[2] * (AV_CEIL_RSHIFT(f->height, 1) - 1), -f->linesize[2]);
+								f->data[2] + f->linesize[2] * (AV_CEIL_RSHIFT(f->height, 1) - 1), -f->linesize[2]))
+							{
+								GameLog::write("SDL_UpdateYUVTexture Error(2): %s", SDL_GetError());
+							}
 						}
 						else
 						{
-							GameLog::write("Mixed negative and positive line sizes are not supported.\n");
+							GameLog::write("Mixed negative and positive line sizes are not supported.");
 						}
 //						sws_scale(video->swsContext, (const uint8_t * const*)f->data, f->linesize, 0, video->videoStream.codecCtx->height, (uint8_t * const*)video->sFrame->data, video->sFrame->linesize);
 //						SDL_UpdateYUVTexture(tex, nullptr, video->sFrame->data[0], video->sFrame->linesize[0], video->sFrame->data[1], video->sFrame->linesize[1], video->sFrame->data[2], video->sFrame->linesize[2]);
@@ -3069,20 +3139,20 @@ void EngineBase::rearrangeVideoFrame(_video video)
 	}
 }
 
-int EngineBase::getVideoPixelFormat(int originalFormat)
+SDL_PixelFormat EngineBase::getVideoPixelFormat(int originalFormat)
 {
-	std::map<int, int> pix_ffmpeg_sdl =
+	std::map<int, SDL_PixelFormat> pix_ffmpeg_sdl =
 	{
 		{ AV_PIX_FMT_RGB8,           SDL_PIXELFORMAT_RGB332 },
-		{ AV_PIX_FMT_RGB444,         SDL_PIXELFORMAT_RGB444 },
-		{ AV_PIX_FMT_RGB555,         SDL_PIXELFORMAT_RGB555 },
-		{ AV_PIX_FMT_BGR555,         SDL_PIXELFORMAT_BGR555 },
+		{ AV_PIX_FMT_RGB444,         SDL_PIXELFORMAT_XRGB4444 },
+		{ AV_PIX_FMT_RGB555,         SDL_PIXELFORMAT_XRGB1555 },
+		{ AV_PIX_FMT_BGR555,         SDL_PIXELFORMAT_XBGR1555 },
 		{ AV_PIX_FMT_RGB565,         SDL_PIXELFORMAT_RGB565 },
 		{ AV_PIX_FMT_BGR565,         SDL_PIXELFORMAT_BGR565 },
 		{ AV_PIX_FMT_RGB24,          SDL_PIXELFORMAT_RGB24 },
 		{ AV_PIX_FMT_BGR24,          SDL_PIXELFORMAT_BGR24 },
-		{ AV_PIX_FMT_0RGB32,         SDL_PIXELFORMAT_RGB888 },
-		{ AV_PIX_FMT_0BGR32,         SDL_PIXELFORMAT_BGR888 },
+		{ AV_PIX_FMT_0RGB32,         SDL_PIXELFORMAT_XRGB8888 },
+		{ AV_PIX_FMT_0BGR32,         SDL_PIXELFORMAT_XBGR8888 },
 		{ AV_PIX_FMT_NE(RGB0, 0BGR), SDL_PIXELFORMAT_RGBX8888 },
 		{ AV_PIX_FMT_NE(BGR0, 0RGB), SDL_PIXELFORMAT_BGRX8888 },
 		{ AV_PIX_FMT_RGB32,          SDL_PIXELFORMAT_ARGB8888 },
@@ -3100,7 +3170,7 @@ int EngineBase::getVideoPixelFormat(int originalFormat)
 	}
 	else
 	{
-		return 0;
+		return SDL_PIXELFORMAT_UNKNOWN;
 	}	
 }
 #endif
@@ -3518,8 +3588,8 @@ void EngineBase::freeVideo(Video_t* video)
 		av_free(video->b);
 		video->b = nullptr;
 	}
+    freeMediaStream(&video->videoStream);
 	freeMediaStream(&video->audioStream);
-	freeMediaStream(&video->videoStream);
 	if (video->cg != nullptr)
 	{
 		FMOD_ChannelGroup_Release(video->cg);
@@ -3843,7 +3913,7 @@ void EngineBase::displayScreen()
 	d.y = displayRect.y;
 	d.w = displayRect.w;
 	d.h = displayRect.h;
-	SDL_RenderCopy(renderer, realScreen.get(), &s, &d);
+	drawImage(realScreen, &s, &d);
     drawCursor();
 	SDL_RenderPresent(renderer);
 }
@@ -3932,7 +4002,7 @@ int EngineBase::lzoDecompress(const void * src, unsigned int srcLen, void * dst,
 	return -1;
 }
 
-void EngineBase::calculateCursor(int inX, int inY, int* outX, int* outY)
+void EngineBase::calculateCursorReferencePosition(int inX, int inY, int* outX, int* outY)
 {
 	if (inX >= rect.x && inX < rect.x + rect.w && inY >= rect.y && inY < rect.y + rect.h)
 	{

@@ -1,6 +1,8 @@
 #include "IMP.h"
 
 
+uint32_t IMPImage::IMPImageCount;
+
 bool IMP::cmpIMGHead(_shared_imp img)
 {
 	if (img == nullptr)

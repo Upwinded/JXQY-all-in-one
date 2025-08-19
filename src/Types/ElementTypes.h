@@ -46,12 +46,12 @@ enum ElementPriority
 	epLabel = 0x23,
 	epVideo = 0x24,
 	epImage = 0x25,
+	epController = 0x2F,
 	
 	epFadeMask = 0x40,
 	epPlayer = 0x50,
 	epCamera = 0x51,
 	epGameManager = 0x52,
-	epController = 0xFE,
 	epEffectManager = 0x55,
 
 	epNPC = 0x5A,

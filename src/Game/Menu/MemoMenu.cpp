@@ -3,8 +3,8 @@
 
 MemoMenu::MemoMenu()
 {
-	init();
 	visible = false;
+	init();
 }
 
 MemoMenu::~MemoMenu()

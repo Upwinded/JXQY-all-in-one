@@ -19,7 +19,7 @@ public:
 	int talkIndex = 0;
 	std::vector<TalkString> talkStrList;
 
-	void init();
+	virtual void init() override;
 
 	void setTalkStr(const std::string & str);
 

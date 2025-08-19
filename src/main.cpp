@@ -8,18 +8,20 @@
 	2.If the codes are used in KYS related or SHF related games, the game itself shall not involve any sort of profit making aspect.
 	(KYS means Kam Yung's Stories, and SHF means Sword Heroes' Fate.)
 */
+
 #include "Game/Game.h"
+#include "SDL3/SDL_main.h"
 
 
 #if defined( __ANDROID__ )
 #include <jni.h>
 int SDL_main(int argc, char* argv[])
-#elif defined(__IPHONEOS__)
-int main(int argc, char* argv[])
-{
-    return SDL_UIKitRunApp(argc, argv, SDL_main);
-}
-int SDL_main(int argc, char* argv[])
+//#elif (TARGET_OS_IOS)
+//int main(int argc, char* argv[])
+//{
+//    return SDL_UIKitRunApp(argc, argv, SDL_main);
+//}
+//int SDL_main(int argc, char* argv[])
 #elif defined(_WIN32) && !defined(_DEBUG)
 int SDL_main(int argc, char* argv[])
 #else
@@ -38,7 +40,7 @@ int main(int argc, char* argv[])
 	}
 	Game game;
     auto ret = game.run();
-#ifdef __IPHONEOS__
+#if TARGET_OS_IOS
     exit(ret);
 #else
     return ret;

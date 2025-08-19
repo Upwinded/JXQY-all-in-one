@@ -2,22 +2,15 @@
 
 #include <string>
 #include <vector>
+#include <stdint.h>
 #include "../Types/Types.h"
+
 extern "C"
 {
-#ifdef __APPLE__
-#include "SDL2/SDL.h"
-#else
-#include "SDL.h"
-#endif
+#include <SDL3/SDL.h>
 }
-#include "../libconvert/libconvert.h"
 
-#if (defined USE_TIME64)
-typedef Uint64 UTime;
-#else
-typedef Uint32 UTime;
-#endif
+using UTime = uint64_t;
 
 namespace File
 {

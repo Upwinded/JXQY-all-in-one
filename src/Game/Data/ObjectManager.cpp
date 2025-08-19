@@ -93,36 +93,18 @@ bool ObjectManager::drawOBJSelectedAlpha(Point cenTile, Point cenScreen, PointEx
 	{
 		if (objectList[i] != nullptr && objectList[i]->selecting)
 		{
-			drawOBJAlpha(i, cenTile, cenScreen, offset);
+			objectList[i]->drawAlpha(cenTile, cenScreen, offset);
 			return true;
 		}
 	}
 	return false;
 }
 
-void ObjectManager::drawOBJAlpha(int index, Point cenTile, Point cenScreen, PointEx offset)
+void ObjectManager::drawOBJ(std::shared_ptr<Object> obj, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
 {
-	if (index < 0 || index >= (int)objectList.size())
+	if (obj != nullptr)
 	{
-		return;
-	}
-	int i = index;
-	if (objectList[i] != nullptr)
-	{
-		objectList[i]->drawAlpha(cenTile, cenScreen, offset);
-	}
-}
-
-void ObjectManager::drawOBJ(int index, Point cenTile, Point cenScreen, PointEx offset)
-{
-	if (index < 0 || index >= (int)objectList.size())
-	{
-		return;
-	}
-	int i = index;
-	if (objectList[i] != nullptr)
-	{
-		objectList[i]->draw(cenTile, cenScreen, offset);
+		obj->draw(cenTile, cenScreen, offset, colorStyle);
 	}
 }
 
@@ -169,7 +151,7 @@ void ObjectManager::addObject(std::string iniName, int x, int y, int dir)
 	obj->direction = dir;
     objectList.push_back(obj);
 	addChild(obj);
-	gm->map->addObjectToDataMap(obj->position, obj->objIndex);
+	gm->map->addObjectToDataMap(obj->position, obj);
 }
 
 void ObjectManager::clearBody()
@@ -287,11 +269,6 @@ void ObjectManager::load(const std::string & fileName)
 	INIReader ini(iniName);
 	std::string section = "Head";
 	int count = ini.GetInteger(section, "Count", 0);
-	if (count <= 0)
-	{
-		return;
-	}
-
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("OBJ%03d", i);

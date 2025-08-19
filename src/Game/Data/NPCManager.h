@@ -36,10 +36,9 @@ public:
 	void npcAutoAction();
 
 	bool drawNPCSelectedAlpha(Point cenTile, Point cenScreen, PointEx offset);
-	void drawNPCAlpha(int index, Point cenTile, Point cenScreen, PointEx offset);
-	void drawNPC(int index, Point cenTile, Point cenScreen, PointEx offset);
+	void drawNPC(std::shared_ptr<NPC> npc, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle);
 
-	void draw(Point tile, Point cenTile, Point cenScreen, PointEx offset);
+	//void draw(Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle);
 	std::vector<std::shared_ptr<NPC>> npcList;
 	void setPartnerPos(int x, int y, int dir);
 	//清理不含partner的NPC

@@ -3,10 +3,12 @@
 
 NPCManager::NPCManager()
 {
+	name = "NPC Manager";
 	priority = epGameManager;
 	npcList.resize(0);
 	needArrangeChild = false;
 	canDraw = false;
+	autoFreeResourceOnExit = true;
 }
 
 NPCManager::~NPCManager()
@@ -44,7 +46,7 @@ int NPCManager::findNPCIndex(std::shared_ptr<NPC> npc)
 	{
 		return -1;
 	}
-	if (npc.get() == gm->player.get())
+	if (npc == gm->player)
 	{
 		return 0;
 	}
@@ -267,7 +269,7 @@ std::vector<std::shared_ptr<NPC>> NPCManager::findRadiusScriptViewNPC(Point pos,
 
 void NPCManager::deleteNPCFromOtherPlace(std::shared_ptr<NPC> npc)
 {
-	if (gm->camera->followNPC.get() == npc.get())
+	if (gm->camera->followNPC == npc)
 	{
 		gm->camera->followNPC = nullptr;
 	}
@@ -359,8 +361,8 @@ void NPCManager::npcAutoAction()
 		{
 			continue;
 		}
-		int stepX = std::abs(rand()) % (NPC_WALK_STEP * 2 + 1) - NPC_WALK_STEP;
-		int stepY = std::abs(rand()) % (NPC_WALK_STEP * 2 + 1) - NPC_WALK_STEP;
+		int stepX = engine->getRand(NPC_WALK_STEP * 2) - NPC_WALK_STEP;
+		int stepY = engine->getRand(NPC_WALK_STEP * 2) - NPC_WALK_STEP;
 		if (stepX != 0 || stepY != 0)
 		{
 			stepX += normalList[i]->position.x;
@@ -370,7 +372,7 @@ void NPCManager::npcAutoAction()
 			if (normalList[i]->canView({ stepX, stepY }) && gm->map->canWalk({ stepX, stepY }))
 			{
 				normalList[i]->beginWalk({ stepX, stepY });
-				normalList[i]->walkTime = normalList[i]->getTime() + std::abs(rand()) % NPC_WALK_INTERVAL_RANGE;
+				normalList[i]->walkTime = normalList[i]->getTime() + engine->getRand(NPC_WALK_INTERVAL_RANGE);
 			}
 			normalList[i]->visionRadius = tvr;
 		}
@@ -534,69 +536,51 @@ bool NPCManager::drawNPCSelectedAlpha(Point cenTile, Point cenScreen, PointEx of
 	return false;
 }
 
-void NPCManager::drawNPCAlpha(int index, Point cenTile, Point cenScreen, PointEx offset)
-{
-	if (index < 0 || index >= (int)npcList.size())
-	{
-		return;
-	}
-	int i = index;
-	if (npcList[i] != nullptr)
-	{
-		npcList[i]->drawNPCAlpha(cenTile, cenScreen, offset);
-	}	
-}
-
-void NPCManager::drawNPC(int index, Point cenTile, Point cenScreen, PointEx offset)
+void NPCManager::drawNPC(std::shared_ptr<NPC> npc, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
 {	
-	if (index < 0 || index >= (int)npcList.size())
+	if (npc != nullptr)
 	{
-		return;
-	}
-	int i = index;
-	if (npcList[i] != nullptr)
-	{
-		npcList[i]->draw(cenTile, cenScreen, offset);
+		npc->draw(cenTile, cenScreen, offset, colorStyle);
 	}
 }
 
-void NPCManager::draw(Point tile, Point cenTile, Point cenScreen, PointEx offset)
-{
-	for (size_t i = 0; i < npcList.size(); i++)
-	{
-		if (npcList[i] != nullptr && npcList[i]->position == tile)
-		{
-			
-			Point pos = Map::getTilePosition(tile, cenTile, cenScreen, offset);
-			int offsetX, offsetY;
-			_shared_image image = npcList[i]->getActionShadow(&offsetX, &offsetY);
-			engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
-			if (!npcList[i]->selecting)
-			{		
-				image = npcList[i]->getActionImage(&offsetX, &offsetY);
-				engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
-			}
-			else
-			{
-				if (npcList[i]->relation == nrHostile)
-				{
-					image = npcList[i]->getActionImage(&offsetX, &offsetY);
-					engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 100, 100, 100);
-				}
-				else if (npcList[i]->scriptFile != "")
-				{
-					image = npcList[i]->getActionImage(&offsetX, &offsetY);
-					engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 200, 100, 100);
-				}
-				else
-				{
-					image = npcList[i]->getActionImage(&offsetX, &offsetY);
-					engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
-				}
-			}	
-		}
-	}
-}
+//void NPCManager::draw(Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
+//{
+//	for (size_t i = 0; i < npcList.size(); i++)
+//	{
+//		if (npcList[i] != nullptr && npcList[i]->position == tile)
+//		{
+//			
+//			Point pos = Map::getTilePosition(tile, cenTile, cenScreen, offset);
+//			int offsetX, offsetY;
+//			_shared_image image = npcList[i]->getActionShadow(&offsetX, &offsetY);
+//			engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
+//			if (!npcList[i]->selecting)
+//			{		
+//				image = npcList[i]->getActionImage(&offsetX, &offsetY);
+//				engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
+//			}
+//			else
+//			{
+//				if (npcList[i]->relation == nrHostile)
+//				{
+//					image = npcList[i]->getActionImage(&offsetX, &offsetY);
+//					engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 100, 100, 100);
+//				}
+//				else if (npcList[i]->scriptFile != "")
+//				{
+//					image = npcList[i]->getActionImage(&offsetX, &offsetY);
+//					engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 200, 100, 100);
+//				}
+//				else
+//				{
+//					image = npcList[i]->getActionImage(&offsetX, &offsetY);
+//					engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
+//				}
+//			}	
+//		}
+//	}
+//}
 
 void NPCManager::setPartnerPos(int x, int y, int dir)
 {
@@ -754,7 +738,7 @@ void NPCManager::addNPC(std::string iniName, int x, int y, int dir)
 	npc->position.y = y;
 	npc->direction = dir;
 	addChild(npc);
-	gm->map->addNPCToDataMap(npc->position, npcList.size());
+	gm->map->addNPCToDataMap(npc->position, npc);
 }
 
 void NPCManager::addNPC(std::shared_ptr<NPC> npc)
@@ -767,7 +751,7 @@ void NPCManager::addNPC(std::shared_ptr<NPC> npc)
 	npc->beginStand();
 	npcList.push_back(npc);
 	npc->npcIndex = npcList.size();
-	gm->map->addNPCToDataMap(npc->position, npcList.size());
+	gm->map->addNPCToDataMap(npc->position, npc);
 }
 
 void NPCManager::freeResource()
@@ -839,16 +823,6 @@ void NPCManager::load(const std::string & fileName)
 
 	std::string section = "Head";
 	int count = ini.GetInteger(section, "Count", 0);
-	if (count <= 0)
-	{
-		gm->partnerManager.addPartner();
-		gm->player->reloadAction();
-		for (size_t i = 0; i < npcList.size(); i++)
-		{
-			npcList[i]->reloadAction();
-		}
-		return;
-	}
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("NPC%03d", i);
@@ -909,7 +883,7 @@ void NPCManager::onUpdate()
 				eventInfo.scriptName = npcList[i]->deathScript;
 				//死亡脚本运行后清除
 				npcList[i]->deathScript = "";
-				eventInfo.scriptMapName = gm->mapName;
+				eventInfo.scriptMapName = gm->mapFolderName;
 				gm->eventList.push_back(eventInfo);
 			}
 			else if (ret & erLifeExhaust)
@@ -919,7 +893,6 @@ void NPCManager::onUpdate()
 			}
 		}
 	}
-
 
 	if (idx.size() > 0)
 	{

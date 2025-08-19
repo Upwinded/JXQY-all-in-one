@@ -8,10 +8,11 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include "File.h"
 #include "ini.h"
-#include "INIReader.h"
-#include "../libconvert/libconvert.h"
 
+#include "../libconvert/libconvert.h"
+#include "INIReader.h"
 using std::string;
 
 INIReader::INIReader()
@@ -55,17 +56,6 @@ INIReader::INIReader(const std::unique_ptr<char[]>& s)
 
 INIReader::~INIReader()
 {
-	//for (size_t i = 0; i < map.iniSection.size(); i++)
-	//{
-	//	for (size_t j = 0; j < map.iniSection[i].iniKey.size(); j++)
-	//	{
-	//		map.iniSection[i].iniKey[j].hash = 0;
-	//		map.iniSection[i].iniKey[j].key = "";
-	//		map.iniSection[i].iniKey[j].value = "";
-	//	}
-	//	map.iniSection[i].hash = 0;
-	//	map.iniSection[i].section = "";
-	//}
 	for (auto it = map.sections.begin(); it != map.sections.end(); ++it)
 	{
 		it->second.keys.clear();
@@ -145,7 +135,14 @@ void INIReader::SetBoolean(const std::string & section, const std::string & name
 	Set(section, name, v);
 }
 
-unsigned int INIReader::GetColor(const std::string & section, const std::string & name, unsigned int value)
+void INIReader::SetColor(const std::string& section, const std::string& name, uint32_t value)
+{
+	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
+	std::string col = std::to_string(colorData[0]) + "," + std::to_string(colorData[1]) + "," + std::to_string(colorData[2]); 
+	Set(section, name, col);
+}
+
+uint32_t INIReader::GetColor(const std::string & section, const std::string & name, uint32_t value)
 {
 	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
 	std::string col = std::to_string(colorData[0]) + "," + std::to_string(colorData[1]) + "," + std::to_string(colorData[2]);
@@ -243,15 +240,15 @@ void INIReader::saveToFile(const std::string & fileName)
 {
 	std::string s = saveToString();
 	File::writeFile(fileName, s.c_str(), s.size());
-	/*auto fp = SDL_RWFromFile(fileName.c_str(), "wb");
+	/*auto fp = SDL_IOFromFile(fileName.c_str(), "wb");
 	if (!fp)
 	{
 		GameLog::write(stderr, "Can not open file %s\n", fileName.c_str());
 		return;
 	}
-	SDL_RWseek(fp, 0, 0);
-	SDL_RWwrite(fp, s.c_str(), s.length(), 1);
-	SDL_RWclose(fp);*/
+	SDL_SeekIO(fp, 0, 0);
+	SDL_WriteIO(fp, s.c_str(), s.length(), 1);
+	SDL_CloseIO(fp);*/
 }
 
 string INIReader::MakeKey(const string& section, const string& name)

@@ -87,6 +87,8 @@ void Script::registerFunc()
 	regFunc(SetMapTrap);
 	regFunc(SaveMapTrap);
 	regFunc(SetMapTime);
+	regFunc(ChangeASFColor);
+	regFunc(ChangeMapColor);
 
 	regFunc(LoadObj);
 	regFunc(SaveObj);
@@ -123,6 +125,10 @@ void Script::registerFunc()
 	regFunc(SetNpcActionType);
 	regFunc(SetNpcActionFile);
 	regFunc(NpcSpecialAction);
+
+	regFunc(ChangeLife);
+	regFunc(ChangeMana);
+	regFunc(ChangeThew);
 
 	regFunc(LoadPlayer);
 	regFunc(SavePlayer);
@@ -161,6 +167,7 @@ void Script::registerFunc()
 	regFunc(AddGoods);
 	regFunc(AddRandGoods);
 	regFunc(AddMagic);
+	regFunc(AddOneMagic);
 	regFunc(DelGoods);
 	regFunc(DelMagic);
 	regFunc(AddMagicExp);
@@ -191,6 +198,10 @@ void Script::registerFunc()
 	regFunc(ShowSnow);
 	regFunc(ShowRandomSnow);
 	regFunc(ShowRain);
+	regFunc(BeginRain);
+	regFunc(EndRain);
+
+	regFunc(CheckYear);
 }
 
 int Script::lua_printf(lua_State * l)
@@ -321,6 +332,26 @@ int Script::lua_SetMapTime(lua_State * l)
 	if (argc >= 1)
 	{
 		gm->setMapTime((unsigned char)lua_tointeger(l, 1));
+	}
+	return 0;
+}
+
+int Script::lua_ChangeASFColor(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 3)
+	{
+		gm->changeASFColor((uint8_t)lua_tointeger(l, 1), (uint8_t)lua_tointeger(l, 2), (uint8_t)lua_tointeger(l, 3));
+	}
+	return 0;
+}
+
+int Script::lua_ChangeMapColor(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 3)
+	{
+		gm->changeMapColor((uint8_t)lua_tointeger(l, 1), (uint8_t)lua_tointeger(l, 2), (uint8_t)lua_tointeger(l, 3));
 	}
 	return 0;
 }
@@ -679,6 +710,36 @@ int Script::lua_NpcSpecialAction(lua_State * l)
 	return 0;
 }
 
+int Script::lua_ChangeLife(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 2)
+	{
+		gm->changeLife(lua_tostring(l, 1), lua_tointeger(l, 2));
+	}
+	return 0;
+}
+
+int Script::lua_ChangeMana(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 2)
+	{
+		gm->changeMana(lua_tostring(l, 1), lua_tointeger(l, 2));
+	}
+	return 0;
+}
+
+int Script::lua_ChangeThew(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 2)
+	{
+		gm->changeThew(lua_tostring(l, 1), lua_tointeger(l, 2));
+	}
+	return 0;
+}
+
 int Script::lua_LoadPlayer(lua_State * l)
 {
 	int argc = lua_gettop(l);
@@ -1023,6 +1084,16 @@ int Script::lua_AddMagic(lua_State * l)
 	return 0;
 }
 
+int Script::lua_AddOneMagic(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 2)
+	{
+		gm->addOneMagic(lua_tostring(l, 1), lua_tostring(l, 2));
+	}
+	return 0;
+}
+
 int Script::lua_DelGoods(lua_State * l)
 {
 	int argc = lua_gettop(l);
@@ -1147,6 +1218,11 @@ int Script::lua_ShowMessage(lua_State * l)
 	return 0;
 }
 
+int Script::lua_Memo(lua_State* l)
+{
+	return lua_AddToMemo(l);
+}
+
 int Script::lua_AddToMemo(lua_State * l)
 {
 	int argc = lua_gettop(l);
@@ -1257,6 +1333,32 @@ int Script::lua_ShowRain(lua_State * l)
 	if (argc >= 1)
 	{
 		gm->showRain((int)lua_tointeger(l, 1));
+	}
+	return 0;
+}
+
+int Script::lua_BeginRain(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 1)
+	{
+		gm->beginRain(lua_tostring(l, 1));
+	}
+	return 0;
+}
+
+int Script::lua_EndRain(lua_State* l)
+{
+	gm->endRain();
+	return 0;
+}
+
+int Script::lua_CheckYear(lua_State* l)
+{
+	int argc = lua_gettop(l);
+	if (argc >= 1)
+	{
+		gm->checkYear(lua_tostring(l, 1));
 	}
 	return 0;
 }

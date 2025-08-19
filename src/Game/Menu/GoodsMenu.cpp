@@ -5,8 +5,8 @@
 GoodsMenu::GoodsMenu()
 {
 	name = "goods menu inst";
-	init();
 	visible = false;
+	init();
 }
 
 GoodsMenu::~GoodsMenu()

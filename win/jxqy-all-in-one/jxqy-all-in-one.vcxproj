@@ -73,27 +73,27 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir)..\..\3rd\SDL2\win\include;$(ProjectDir)..\..\3rd\SDL2_ttf\win\include;$(ProjectDir)..\..\3rd\SDL2_image\win\include;$(ProjectDir)..\..\3rd\FMOD\win\inc;$(ProjectDir)..\..\3rd\FFMPEG\win\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)../../bin/win64/</OutDir>
     <TargetName>$(ProjectName)-debug</TargetName>
-    <LibraryPath>$(ProjectDir)..\..\3rd\fmod\win\lib\x64;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir)..\..\3rd\SDL2\win\include;$(ProjectDir)..\..\3rd\SDL2_ttf\win\include;$(ProjectDir)..\..\3rd\SDL2_image\win\include;$(ProjectDir)..\..\3rd\FMOD\win\inc;$(ProjectDir)..\..\3rd\FFMPEG\win\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <TargetName>$(ProjectName)-debug</TargetName>
     <OutDir>$(ProjectDir)../../bin/win32/</OutDir>
-    <LibraryPath>$(ProjectDir)..\..\3rd\fmod\win\lib\x86;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)..\..\3rd\SDL2\win\include;$(ProjectDir)..\..\3rd\SDL2_ttf\win\include;$(ProjectDir)..\..\3rd\SDL2_image\win\include;$(ProjectDir)..\..\3rd\FMOD\win\inc;$(ProjectDir)..\..\3rd\FFMPEG\win\include</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <CopyCppRuntimeToOutputDir>true</CopyCppRuntimeToOutputDir>
     <OutDir>$(ProjectDir)../../bin/win32/</OutDir>
-    <LibraryPath>$(ProjectDir)..\..\3rd\fmod\win\lib\x86;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x86;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(ProjectDir)..\..\3rd\SDL2\win\include;$(ProjectDir)..\..\3rd\SDL2_ttf\win\include;$(ProjectDir)..\..\3rd\SDL2_image\win\include;$(ProjectDir)..\..\3rd\FMOD\win\inc;$(ProjectDir)..\..\3rd\FFMPEG\win\include</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)../../bin/win64/</OutDir>
-    <LibraryPath>$(ProjectDir)..\..\3rd\fmod\win\lib\x64;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -111,7 +111,7 @@
       <OutputFile>$(ProjectDir)../../bin/win32/$(ProjectName)-debug$(TargetExt)</OutputFile>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x86;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;SDL2_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -132,7 +132,7 @@
       <OutputFile>$(ProjectDir)../../bin/win32/$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x86;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;SDL2_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -148,7 +148,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>$(ProjectDir)../../bin/win64/$(ProjectName)-debug$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x64;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;SDL2_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -168,44 +168,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>$(ProjectDir)../../bin/win64/$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x64;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL2.lib;SDL2main.lib;SDL2_image.lib;SDL2_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\3rd\lua\lapi.c" />
-    <ClCompile Include="..\..\3rd\lua\lauxlib.c" />
-    <ClCompile Include="..\..\3rd\lua\lbaselib.c" />
-    <ClCompile Include="..\..\3rd\lua\lbitlib.c" />
-    <ClCompile Include="..\..\3rd\lua\lcode.c" />
-    <ClCompile Include="..\..\3rd\lua\lcorolib.c" />
-    <ClCompile Include="..\..\3rd\lua\lctype.c" />
-    <ClCompile Include="..\..\3rd\lua\ldblib.c" />
-    <ClCompile Include="..\..\3rd\lua\ldebug.c" />
-    <ClCompile Include="..\..\3rd\lua\ldo.c" />
-    <ClCompile Include="..\..\3rd\lua\ldump.c" />
-    <ClCompile Include="..\..\3rd\lua\lfunc.c" />
-    <ClCompile Include="..\..\3rd\lua\lgc.c" />
-    <ClCompile Include="..\..\3rd\lua\linit.c" />
-    <ClCompile Include="..\..\3rd\lua\liolib.c" />
-    <ClCompile Include="..\..\3rd\lua\llex.c" />
-    <ClCompile Include="..\..\3rd\lua\lmathlib.c" />
-    <ClCompile Include="..\..\3rd\lua\lmem.c" />
-    <ClCompile Include="..\..\3rd\lua\loadlib.c" />
-    <ClCompile Include="..\..\3rd\lua\lobject.c" />
-    <ClCompile Include="..\..\3rd\lua\lopcodes.c" />
-    <ClCompile Include="..\..\3rd\lua\loslib.c" />
-    <ClCompile Include="..\..\3rd\lua\lparser.c" />
-    <ClCompile Include="..\..\3rd\lua\lstate.c" />
-    <ClCompile Include="..\..\3rd\lua\lstring.c" />
-    <ClCompile Include="..\..\3rd\lua\lstrlib.c" />
-    <ClCompile Include="..\..\3rd\lua\ltable.c" />
-    <ClCompile Include="..\..\3rd\lua\ltablib.c" />
-    <ClCompile Include="..\..\3rd\lua\ltm.c" />
-    <ClCompile Include="..\..\3rd\lua\lundump.c" />
-    <ClCompile Include="..\..\3rd\lua\lutf8lib.c" />
-    <ClCompile Include="..\..\3rd\lua\lvm.c" />
-    <ClCompile Include="..\..\3rd\lua\lzio.c" />
-    <ClCompile Include="..\..\3rd\minilzo\minilzo.c" />
     <ClCompile Include="..\..\src\Component\BaseComponent.cpp" />
     <ClCompile Include="..\..\src\Component\Button.cpp" />
     <ClCompile Include="..\..\src\Component\CheckBox.cpp" />
@@ -288,37 +254,42 @@
     <ClCompile Include="..\..\src\libconvert\libconvert.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\Weather\Weather.cpp" />
+    <ClCompile Include="..\..\ThirdParty\lua\lapi.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lauxlib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lbaselib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lcode.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lcorolib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lctype.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ldblib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ldebug.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ldo.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ldump.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lfunc.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lgc.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\linit.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\liolib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\llex.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lmathlib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lmem.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\loadlib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lobject.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lopcodes.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\loslib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lparser.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lstate.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lstring.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lstrlib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ltable.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ltablib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ltests.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\ltm.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lundump.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lutf8lib.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lvm.c" />
+    <ClCompile Include="..\..\ThirdParty\lua\lzio.c" />
+    <ClCompile Include="..\..\ThirdParty\minilzo\minilzo.c" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\3rd\lua\lapi.h" />
-    <ClInclude Include="..\..\3rd\lua\lauxlib.h" />
-    <ClInclude Include="..\..\3rd\lua\lcode.h" />
-    <ClInclude Include="..\..\3rd\lua\lctype.h" />
-    <ClInclude Include="..\..\3rd\lua\ldebug.h" />
-    <ClInclude Include="..\..\3rd\lua\ldo.h" />
-    <ClInclude Include="..\..\3rd\lua\lfunc.h" />
-    <ClInclude Include="..\..\3rd\lua\lgc.h" />
-    <ClInclude Include="..\..\3rd\lua\llex.h" />
-    <ClInclude Include="..\..\3rd\lua\llimits.h" />
-    <ClInclude Include="..\..\3rd\lua\lmem.h" />
-    <ClInclude Include="..\..\3rd\lua\lobject.h" />
-    <ClInclude Include="..\..\3rd\lua\lopcodes.h" />
-    <ClInclude Include="..\..\3rd\lua\lparser.h" />
-    <ClInclude Include="..\..\3rd\lua\lprefix.h" />
-    <ClInclude Include="..\..\3rd\lua\lstate.h" />
-    <ClInclude Include="..\..\3rd\lua\lstring.h" />
-    <ClInclude Include="..\..\3rd\lua\ltable.h" />
-    <ClInclude Include="..\..\3rd\lua\ltm.h" />
-    <ClInclude Include="..\..\3rd\lua\lua.h" />
-    <ClInclude Include="..\..\3rd\lua\lua.hpp" />
-    <ClInclude Include="..\..\3rd\lua\luaconf.h" />
-    <ClInclude Include="..\..\3rd\lua\lualib.h" />
-    <ClInclude Include="..\..\3rd\lua\lundump.h" />
-    <ClInclude Include="..\..\3rd\lua\lvm.h" />
-    <ClInclude Include="..\..\3rd\lua\lzio.h" />
-    <ClInclude Include="..\..\3rd\minilzo\lzoconf.h" />
-    <ClInclude Include="..\..\3rd\minilzo\lzodefs.h" />
-    <ClInclude Include="..\..\3rd\minilzo\minilzo.h" />
     <ClInclude Include="..\..\src\Component\BaseComponent.h" />
     <ClInclude Include="..\..\src\Component\Button.h" />
     <ClInclude Include="..\..\src\Component\CheckBox.h" />
@@ -413,12 +384,41 @@
     <ClInclude Include="..\..\src\Types\Types.h" />
     <ClInclude Include="..\..\src\Types\WeatherTypes.h" />
     <ClInclude Include="..\..\src\Weather\Weather.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lapi.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lauxlib.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lcode.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lctype.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\ldebug.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\ldo.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lfunc.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lgc.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\ljumptab.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\llex.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\llimits.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lmem.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lobject.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lopcodes.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lopnames.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lparser.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lprefix.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lstate.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lstring.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\ltable.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\ltests.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\ltm.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lua.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\luaconf.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lualib.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lundump.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lvm.h" />
+    <ClInclude Include="..\..\ThirdParty\lua\lzio.h" />
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\..\3rd\lua\Makefile" />
+    <ResourceCompile Include="jxqy-all-in-one.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="jxqy.res" />
+    <Image Include="..\..\assets\config\logo.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

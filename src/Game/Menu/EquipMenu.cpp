@@ -4,8 +4,8 @@
 
 EquipMenu::EquipMenu()
 {
-	init();
 	visible = false;
+	init();
 }
 
 

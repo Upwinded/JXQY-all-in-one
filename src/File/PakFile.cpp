@@ -83,16 +83,16 @@ unsigned int PakFile::hashFileName(const std::string & fileName)
 
 int PakFile::findFileInPak(unsigned int fileID, const std::string & pakName)
 {	
-	auto fp = SDL_RWFromFile(pakName.c_str(), "rb");
+	auto fp = SDL_IOFromFile(pakName.c_str(), "rb");
 	if (fp)
 	{
-		SDL_RWseek(fp, 0, 2);
-		int size = (int)SDL_RWtell(fp);
-		SDL_RWseek(fp, 0, 0);
+		SDL_SeekIO(fp, 0, SDL_IO_SEEK_END);
+		int size = (int)SDL_TellIO(fp);
+		SDL_SeekIO(fp, 0, SDL_IO_SEEK_SET);
 		if (size >= sizeof(PakHead))
 		{
 			PakHead pakHead;
-			SDL_RWread(fp, &pakHead, sizeof(PakHead), 1);
+			SDL_ReadIO(fp, &pakHead, sizeof(PakHead));
 			
 			if (cmpPakHead(pakHead))
 			{				
@@ -109,11 +109,11 @@ int PakFile::findFileInPak(unsigned int fileID, const std::string & pakName)
 					{
 						if (min == max)
 						{
-							SDL_RWseek(fp, (int)sizeof(PakHead) + min * (int)sizeof(PakFileInfo), 0);
-							SDL_RWread(fp, &pakFileInfo, sizeof(PakFileInfo), 1);
+							SDL_SeekIO(fp, (int)sizeof(PakHead) + min * (int)sizeof(PakFileInfo), SDL_IO_SEEK_SET);
+							SDL_ReadIO(fp, &pakFileInfo, sizeof(PakFileInfo));
 							if (fileID == pakFileInfo.fileID)
 							{
-								SDL_RWclose(fp);
+								SDL_CloseIO(fp);
 								return min;
 							}
 							break;
@@ -121,11 +121,11 @@ int PakFile::findFileInPak(unsigned int fileID, const std::string & pakName)
 						else if (max > min)
 						{
 							int temp = (max - min) / 2 + min;
-							SDL_RWseek(fp, (int)sizeof(PakHead) + temp * (int)sizeof(PakFileInfo), 0);
-							SDL_RWread(fp, &pakFileInfo, sizeof(PakFileInfo), 1);
+							SDL_SeekIO(fp, (int)sizeof(PakHead) + temp * (int)sizeof(PakFileInfo), SDL_IO_SEEK_SET);
+							SDL_ReadIO(fp, &pakFileInfo, sizeof(PakFileInfo));
 							if (fileID == pakFileInfo.fileID)
 							{
-								SDL_RWclose(fp);
+								SDL_CloseIO(fp);
 								return temp;
 							}
 							else if (fileID > pakFileInfo.fileID)
@@ -147,7 +147,7 @@ int PakFile::findFileInPak(unsigned int fileID, const std::string & pakName)
 				}
 			}			
 		}
-		SDL_RWclose(fp);
+		SDL_CloseIO(fp);
 	}
 	return -1;
 }
@@ -224,7 +224,7 @@ int PakFile::unpak(char * inBuffer, int inLen, char * outBuffer, int outLen, int
 		return 0;
 	}
 
-	std::vector<Uint32> bs;
+	std::vector<uint32_t> bs;
 	bs.resize(blockCount);
 	for (size_t i = 0; i < bs.size(); i++)
 	{
@@ -304,17 +304,17 @@ bool PakFile::readPak(const std::string & pakName, int index, std::unique_ptr<ch
 {
 	if (index >= 0)
 	{
-		auto fp = SDL_RWFromFile(pakName.c_str(), "rb");
+		auto fp = SDL_IOFromFile(pakName.c_str(), "rb");
 		if (fp)
 		{
-			SDL_RWseek(fp, 0, 2);
-			int size = (int)SDL_RWtell(fp);
-			SDL_RWseek(fp, 0, 0);
+			SDL_SeekIO(fp, 0, SDL_IO_SEEK_END);
+			int size = (int)SDL_TellIO(fp);
+			SDL_SeekIO(fp, 0, SDL_IO_SEEK_SET);
 			PakHead pakHead;
-			SDL_RWread(fp, &pakHead, sizeof(PakHead), 1);
-			SDL_RWseek(fp, index * sizeof(PakFileInfo) + sizeof(PakHead), 0);
+			SDL_ReadIO(fp, &pakHead, sizeof(PakHead));
+			SDL_SeekIO(fp, index * sizeof(PakFileInfo) + sizeof(PakHead), SDL_IO_SEEK_SET);
 			PakFileInfo pakFileInfo;
-			SDL_RWread(fp, &pakFileInfo, sizeof(PakFileInfo), 1);
+			SDL_ReadIO(fp, &pakFileInfo, sizeof(PakFileInfo));
 			int fsize = pakFileInfo.fileSize;
 			int offset = pakFileInfo.offset;
 			int pakSize = size;
@@ -325,25 +325,25 @@ bool PakFile::readPak(const std::string & pakName, int index, std::unique_ptr<ch
 			else
 			{
 				pakSize = pakFileInfo.offset;
-				SDL_RWread(fp, &pakFileInfo, sizeof(PakFileInfo), 1);
+				SDL_ReadIO(fp, &pakFileInfo, sizeof(PakFileInfo));
 				pakSize = pakFileInfo.offset - pakSize;
 			}
 
 			if (pakSize > 0 && size >= offset + pakSize && fsize > 0)
 			{
 				auto inBuffer = std::make_unique<char[]>(pakSize);
-				SDL_RWseek(fp, offset, 0);
-				SDL_RWread(fp, inBuffer.get(), 1, pakSize);
+				SDL_SeekIO(fp, offset, SDL_IO_SEEK_SET);
+				SDL_ReadIO(fp, inBuffer.get(), pakSize);
 				s = std::make_unique<char[]>(fsize + 1);
 				memset(s.get(), 0, fsize + 1);
 				len = unpak(inBuffer.get(), pakSize, s.get(), fsize, pakHead.compressType);
 				if (len > 0)
 				{
-					SDL_RWclose(fp);
+					SDL_CloseIO(fp);
 					return true;
 				}
 			}
-			SDL_RWclose(fp);
+			SDL_CloseIO(fp);
 		}
 	}
 	s = nullptr;
@@ -387,7 +387,7 @@ int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s)
 	
 	std::string fName = fileName;
 
-	if (fName.length() > 1 && *fName.c_str() == '\\')
+	if (fName.length() > 1 && (*fName.c_str() == '\\' || *fName.c_str() == '/'))
 	{
 		fName.erase(fName.begin());
 	}

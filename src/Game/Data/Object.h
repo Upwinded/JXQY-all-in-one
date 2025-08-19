@@ -56,7 +56,7 @@ public:
 	UTime updateTime = 0;
 
 	void drawAlpha(Point cenTile, Point cenScreen, PointEx coffset);
-	void draw(Point cenTile, Point cenScreen, PointEx coffset);
+	void draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle);
 
 	int nowAction = oaStay;
 	_shared_image getActionImage(int * offsetx, int * offsety);
