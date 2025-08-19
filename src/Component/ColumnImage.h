@@ -7,7 +7,7 @@ public:
 	ColumnImage();
 	virtual ~ColumnImage();
 
-	double percent = 1.0;
+	float percent = 1.0;
 
 private:
 	virtual void onDraw();

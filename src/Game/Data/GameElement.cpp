@@ -55,39 +55,39 @@ void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx
 	}
 }
 
-void GameElement::updateEffectPosition(UTime ftime, double flySpeed)
+void GameElement::updateEffectPosition(UTime ftime, float flySpeed)
 {
 	if (flySpeed == 0)
 	{
 		return;
 	}
-	double l = hypot(flyingDirection.x, flyingDirection.y);
+	float l = hypot(flyingDirection.x, flyingDirection.y);
 	if (l == 0)
 	{
 		return;
 	}
 
-	double distance = flySpeed * Config::getGameSpeed() * (double)ftime / 2;
-	offset.x += distance / l * (double)flyingDirection.x * (double)TILE_HEIGHT * MapXRatio;
-	offset.y += distance / l * (double)flyingDirection.y * (double)TILE_HEIGHT;
+	float distance = flySpeed * Config::getGameSpeed() * (float)ftime / 2;
+	offset.x += distance / l * (float)flyingDirection.x * (float)TILE_HEIGHT * MapXRatio;
+	offset.y += distance / l * (float)flyingDirection.y * (float)TILE_HEIGHT;
 	updatePosition();
 }
 
-void GameElement::updateJumpingPosition(UTime ftime, double flySpeed)
+void GameElement::updateJumpingPosition(UTime ftime, float flySpeed)
 {
 	if (flySpeed == 0)
 	{
 		return;
 	}
-	double l = hypot(flyingDirection.x, flyingDirection.y);
+	float l = hypot(flyingDirection.x, flyingDirection.y);
 	if (l == 0)
 	{
 		return;
 	}
 
-	double distance = flySpeed * Config::getGameSpeed() * (double)ftime;
-	offset.x += distance / l * (double)flyingDirection.x * (double)TILE_WIDTH;
-	offset.y += distance / l * (double)flyingDirection.y * (double)TILE_WIDTH;
+	float distance = flySpeed * Config::getGameSpeed() * (float)ftime;
+	offset.x += distance / l * (float)flyingDirection.x * (float)TILE_WIDTH;
+	offset.y += distance / l * (float)flyingDirection.y * (float)TILE_WIDTH;
 	updatePosition();
 }
 
@@ -103,7 +103,7 @@ UTime GameElement::getFrameTime()
 	{
 		frameTime = MAX_FRAME_TIME;
 	}
-	frameTime = (int)(((double)frameTime) * timeSlow + 0.5);
+	frameTime = (int)(((float)frameTime) * timeSlow + 0.5);
 	timer.set(LastFrameTime + frameTime);
 	LastFrameTime += frameTime;
 	return frameTime;
@@ -155,9 +155,9 @@ bool GameElement::checkCollide(std::shared_ptr<GameElement> ge1, std::shared_ptr
 	}
 	/*
 	Point p = ge2->getPosition(ge1);
-	double x = (double)p.x / TILE_WIDTH;
-	double y = (double)p.y / TILE_HEIGHT;
-	double rad = ge1->radius + ge2->radius;
+	float x = (float)p.x / TILE_WIDTH;
+	float y = (float)p.y / TILE_HEIGHT;
+	float rad = ge1->radius + ge2->radius;
 	if (hypot(x, y) <= rad)
 	{
 		return true;

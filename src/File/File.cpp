@@ -186,6 +186,13 @@ void File::writeFile(const std::string& fileName, const void* s, int len)
         fp = SDL_IOFromFile(newFileName.c_str(), "wb");
 
     }
+#else
+    if (!fp)
+    {
+        auto tempPath = convert::extractFilePath(newFileName);
+        SDL_CreateDirectory(tempPath.c_str());
+        fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
+    }
 #endif
     if (!fp)
     {
@@ -239,6 +246,13 @@ void File::appendFile(const std::string& fileName, const void* s, int len)
         SDL_CreateDirectory(tempPath.c_str());
         fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
 
+    }
+#else
+    if (!fp)
+    {
+        auto tempPath = convert::extractFilePath(newFileName);
+        SDL_CreateDirectory(tempPath.c_str());
+        fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
     }
 #endif
     if (!fp)

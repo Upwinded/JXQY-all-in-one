@@ -76,10 +76,10 @@ void Title::setTitleAlign()
 #define setBtnAlign(btn) \
 	if ((btn) != nullptr) \
 	{\
-		(btn)->rect.x = (int)round(((double)(btn)->rect.x) / DEFAULT_WINDOW_WIDTH * w + 0.5);\
-		(btn)->rect.y = (int)round(((double)(btn)->rect.y) / DEFAULT_WINDOW_HEIGHT * h + 0.5);\
-		(btn)->rect.w = (int)round(((double)(btn)->rect.w) / DEFAULT_WINDOW_WIDTH * w + 0.5);\
-		(btn)->rect.h = (int)round(((double)(btn)->rect.h) / DEFAULT_WINDOW_HEIGHT * h + 0.5);\
+		(btn)->rect.x = (int)round(((float)(btn)->rect.x) / DEFAULT_WINDOW_WIDTH * w + 0.5);\
+		(btn)->rect.y = (int)round(((float)(btn)->rect.y) / DEFAULT_WINDOW_HEIGHT * h + 0.5);\
+		(btn)->rect.w = (int)round(((float)(btn)->rect.w) / DEFAULT_WINDOW_WIDTH * w + 0.5);\
+		(btn)->rect.h = (int)round(((float)(btn)->rect.h) / DEFAULT_WINDOW_HEIGHT * h + 0.5);\
 	}
 
 	setBtnAlign(initBtn)

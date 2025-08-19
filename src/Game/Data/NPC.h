@@ -146,7 +146,7 @@ public:
 	int getInvertDirection(int dir);
 	int calDirection(Point dest);
 	UTime calStepLastTime();
-	static int calDirection(double angle);
+	static int calDirection(float angle);
 	static int calDirection(Point src, Point dest);
 	UTime walkTime = 0;
 	std::shared_ptr<Magic> npcMagic = nullptr;
@@ -279,7 +279,7 @@ public:
 
 	bool frozen = false;
 	UTime frozenLastTime = 0;
-	double jumpSpeed = 10;
+	float jumpSpeed = 10;
 	int runSpeed = 3;
 	unsigned int jumpState = 0;
 	UTime getActionTime(int act);

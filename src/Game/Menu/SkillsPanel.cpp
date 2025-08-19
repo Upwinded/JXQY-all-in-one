@@ -208,7 +208,7 @@ void SkillsPanel::drawJumpIndicate(Point pos)
 	case 1:
 	{
 		playerPos = gm->map->getTilePosition(gm->player->position, gm->camera->position, cenScreen, gm->camera->offset);
-		double param = ((double)now - actionSplitTime) / actionSplitTime;
+		float param = ((float)now - actionSplitTime) / actionSplitTime;
 		realPos.x = (int)round(param * (realPos.x - playerPos.x) + playerPos.x);
 		realPos.y = (int)round(param * (realPos.y - playerPos.y) + playerPos.y);
 		break;
@@ -238,7 +238,7 @@ void SkillsPanel::drawIndicate(Point pos)
 	{
 		return;
 	}
-	pos.x = (int)round((double)pos.x * MapXRatio);
+	pos.x = (int)round((float)pos.x * MapXRatio);
 	auto angle = atan2(-pos.x, pos.y);
 	auto img = IMP::loadImageForTime(indicateImp, getTime());
 	if (img == nullptr)

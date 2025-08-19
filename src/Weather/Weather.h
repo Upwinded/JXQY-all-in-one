@@ -9,8 +9,8 @@
 struct WeatherDrop
 {
 	WeatherType type = wtNone;
-	double x = -1;
-	double y = -1;
+	float x = -1;
+	float y = -1;
 	float speed = 1.0f;
 	int dropAlpha = 0;
 };

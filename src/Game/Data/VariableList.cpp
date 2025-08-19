@@ -45,7 +45,7 @@ int VariableList::getInteger(const std::string & name)
 	return ret;
 }
 
-double VariableList::getReal(const std::string & name)
+float VariableList::getReal(const std::string & name)
 {
 	if (ini == nullptr)
 	{
@@ -81,7 +81,7 @@ void VariableList::setInteger(const std::string & name, int value)
 	return ini->SetInteger(VARIABLE_SECTION, name, value);
 }
 
-void VariableList::setReal(const std::string & name, double value)
+void VariableList::setReal(const std::string & name, float value)
 {
 	if (ini == nullptr)
 	{

@@ -93,7 +93,7 @@ void GameController::onChildCallBack(PElement child)
 					if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
 					{
 						auto angle = atan2(-dragPos.x, dragPos.y);
-						double distance = 400;
+						float distance = 400;
 						auto pos = getPlayerRelativePosition(angle, distance, MapXRatio);
 
 						NextAction act;
@@ -115,7 +115,7 @@ void GameController::onChildCallBack(PElement child)
 				{
                     int dir = gm->player->direction;
                     auto angle = dir * pi / 4;
-                    double distance = 400;
+                    float distance = 400;
                     auto pos = getPlayerRelativePosition(angle, distance, TILE_WIDTH / TILE_HEIGHT);
 					NextAction act;
 					act.action = acJump;
@@ -140,7 +140,7 @@ void GameController::onChildCallBack(PElement child)
 					if (gm->player->nowAction != acDeath && gm->player->nowAction != acHide)
 					{
 						NextAction act;
-						if (gm->player->canRun && (gm->player->thew > (int)round((double)gm->player->info.thewMax * MIN_THEW_RATE_TO_RUN) || gm->player->thew > MIN_THEW_LIMIT_TO_RUN))
+						if (gm->player->canRun && (gm->player->thew > (int)round((float)gm->player->info.thewMax * MIN_THEW_RATE_TO_RUN) || gm->player->thew > MIN_THEW_LIMIT_TO_RUN))
 						{
 							act.action = acRun;
 						}
@@ -210,7 +210,7 @@ void GameController::onChildCallBack(PElement child)
 				case SKILL_PANEL_FAST_SELECT + 3:
 				{
 					NextAction act;
-					if (gm->player->canRun && (gm->player->thew > (int)round((double)gm->player->info.thewMax * MIN_THEW_RATE_TO_RUN) || gm->player->thew > MIN_THEW_LIMIT_TO_RUN))
+					if (gm->player->canRun && (gm->player->thew > (int)round((float)gm->player->info.thewMax * MIN_THEW_RATE_TO_RUN) || gm->player->thew > MIN_THEW_LIMIT_TO_RUN))
 					{
 						act.action = acRun;
 					}
@@ -724,7 +724,7 @@ void GameController::setFastSelectBtn(int index, bool sVisible, std::string str)
 }
 #endif // __MOBILE__
 
-Point GameController::getPlayerRelativePosition(double angle, double distance, double xFactor)
+Point GameController::getPlayerRelativePosition(float angle, float distance, float xFactor)
 {
 	Point relativePos;
 	relativePos.x = (int)round(-sin(angle) * distance * xFactor);

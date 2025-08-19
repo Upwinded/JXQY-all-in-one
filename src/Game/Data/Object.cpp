@@ -6,7 +6,7 @@ Object::Object()
 {
 	priority = epOBJ;
 	rect.w = TILE_WIDTH;
-	rect.h = (int)((double)TILE_HEIGHT * 3);
+	rect.h = (int)((float)TILE_HEIGHT * 3);
 }
 
 Object::~Object()
@@ -447,7 +447,7 @@ void Object::onMouseLeftDown(int x, int y)
 #ifdef __MOBILE__
 	auto player = gm->player;
 	NextAction act;
-    if (player->canRun && (player->thew > (int)round((double)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
+    if (player->canRun && (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
     {
 		act.action = acRun;
 	}

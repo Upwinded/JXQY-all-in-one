@@ -364,11 +364,11 @@ void Weather::updateFade()
 		{
 			if (isFadeIn)
 			{
-				nowLum = (unsigned char)(((double)(t - fadeBeginTime) / fadeLastTime) * (255 - fadeLum) + fadeLum);
+				nowLum = (unsigned char)(((float)(t - fadeBeginTime) / fadeLastTime) * (255 - fadeLum) + fadeLum);
 			}
 			else
 			{
-				nowLum = (unsigned char)(((double)(fadeLastTime - t + fadeBeginTime) / fadeLastTime) * (255 - fadeLum) + fadeLum);
+				nowLum = (unsigned char)(((float)(fadeLastTime - t + fadeBeginTime) / fadeLastTime) * (255 - fadeLum) + fadeLum);
 			}
 			engine->setImageAlpha(fadeMask, 255 - nowLum);
 		}
@@ -535,9 +535,9 @@ void Weather::updateWeather()
 	{
 		if (iter->type == wtSnow)
 		{
-			iter->y = (((double)t) * iter->speed) + iter->y - gm->camera->differencePosition.y;
+			iter->y = (((float)t) * iter->speed) + iter->y - gm->camera->differencePosition.y;
 
-			iter->x += ((double)(engine->getRand(4) - 2)) - gm->camera->differencePosition.x;
+			iter->x += ((float)(engine->getRand(4) - 2)) - gm->camera->differencePosition.x;
 			int w, h;
 			engine->getWindowSize(w, h);
             if (iter->x < -DROP_OFF_SCREEN_RANGE)
@@ -568,7 +568,7 @@ void Weather::updateWeather()
 		}
 		else if (iter->type != wtNone)
 		{
-			iter->y = (((double)t) * (iter->speed > 0.4 ? iter->speed : 0.4)) + iter->y;
+			iter->y = (((float)t) * (iter->speed > 0.4 ? iter->speed : 0.4)) + iter->y;
 			int w, h;
 			engine->getWindowSize(w, h);
 			if (iter->x < - dropRange || iter->x > w + dropRange || iter->y > h + dropRange)
@@ -613,7 +613,7 @@ void Weather::updateWeather()
 
 	if (lightningBegin)
 	{
-		// ÉÁµç¿ªÊ¼ºó£¬ÐèÒªÉÁÆÁ
+		// ï¿½ï¿½ï¿½ç¿ªÊ¼ï¿½ï¿½ï¿½ï¿½Òªï¿½ï¿½ï¿½ï¿½
 		if (getTime() - lightningBeginTime > lightninUTime)
 		{
 			lightningBegin = false;

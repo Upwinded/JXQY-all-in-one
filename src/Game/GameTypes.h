@@ -10,8 +10,8 @@
 #define DEFAULT_WINDOW_WIDTH 1280
 #define DEFAULT_WINDOW_HEIGHT 720
 
-#define EXP_RATE ((double)3.0)
-#define DAMAGE_RATE ((double)0.8)
+#define EXP_RATE ((float)3.0)
+#define DAMAGE_RATE ((float)0.8)
 
 #ifdef __ANDROID__
 #define CONFIG_INI "config.ini"

@@ -15,8 +15,8 @@ public:
 protected:
 	Point touchPosition = { OutRange, OutRange };
 private:
-	double calculateAngel(int x, int y);
-	int calculateDirection(double angle);
+	float calculateAngel(int x, int y);
+	int calculateDirection(float angle);
 	int normalizeDirection(int dir);
 public:
 	std::vector<int> getDirectionList();

@@ -1,4 +1,4 @@
-#include <map>
+﻿#include <map>
 #include <iostream>
 #ifdef _WIN32
 #include <Windows.h>
@@ -714,7 +714,7 @@ void EngineBase::drawImage(_shared_image image, Rect * src, Rect * dst)
 	drawImage(image, pSourceRect, pDestRect);
 }
 
-void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center)
+void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center)
 {
 	if (image == nullptr)
 	{
@@ -810,7 +810,7 @@ _shared_image EngineBase::createLumMask()
 	{
 		for (int j = 0; j < LUM_MASK_WIDTH; j++)
 		{
-			double distance = std::abs(hypot(double(i - LUM_MASK_HEIGHT / 2) / (LUM_MASK_HEIGHT / 2), double(j - LUM_MASK_WIDTH / 2) / (LUM_MASK_WIDTH / 2)));
+			float distance = std::abs(hypot(float(i - LUM_MASK_HEIGHT / 2) / (LUM_MASK_HEIGHT / 2), float(j - LUM_MASK_WIDTH / 2) / (LUM_MASK_WIDTH / 2)));
 			if (distance >= 0.5)
 			{
 				SDL_WriteSurfacePixel(s, j, i, 0xFF, 0xFF, 0xFF, 0);
@@ -982,7 +982,7 @@ int EngineBase::saveImageToPixels(_shared_image image, int w, int h, std::unique
 		return -1;
 	}
 
-	for (size_t y = 0; y < h; y++)
+	for (int y = 0; y < h; y++)
 	{
 		memcpy(buffer.get() + y * pitch, ((char*)sur.get()->pixels) + y * sur.get()->pitch, pitch);
 	}
@@ -1117,7 +1117,7 @@ void EngineBase::fadeInLogo()
 		{
 			frameBegin();
 			drawScreenMask();
-			unsigned char a = (unsigned char)(((double)now) / (double)1000 * (double)255);
+			unsigned char a = (unsigned char)(((float)now) / (float)1000 * (float)255);
 			setImageAlpha(logo, a);
 			drawImage(logo, (width - w) / 2, (height - h) / 2);
 			frameEnd();
@@ -1157,7 +1157,7 @@ void EngineBase::fadeOutLogo()
 		{
 			frameBegin();
 			drawScreenMask();
-			unsigned char a = (unsigned char)((1000 - now) / (double)1000 * (double)255);
+			unsigned char a = (unsigned char)((1000 - now) / (float)1000 * (float)255);
 			setImageAlpha(logo, a);
 			drawImage(logo, (width - w) / 2, (height - h) / 2);
 			frameEnd();
@@ -1519,7 +1519,7 @@ std::vector<AEvent> EngineBase::getAllFingersPosition()
 		return ret;
 	}
 
-	for (size_t i = 0; i < touchDeviceCount; i++)
+	for (int i = 0; i < touchDeviceCount; i++)
 	{
 		int fingerCount = 0;
 		auto fingers = SDL_GetTouchFingers(ids[i], &fingerCount);
@@ -1527,7 +1527,7 @@ std::vector<AEvent> EngineBase::getAllFingersPosition()
 		{
 			continue;
 		}
-		for (size_t j = 0; j < fingerCount; j++)
+		for (int j = 0; j < fingerCount; j++)
 		{
 			auto finger = (*fingers)[j];
 			int tempWidth = 0;
@@ -1962,13 +1962,13 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
         }
         else if (fullScreenSolutionMode == FullScreenSolutionMode::adjust)
         {
-            if (((double)screenWidth) / screenHeight > ((double)wWidth) / wHeight)
+            if (((float)screenWidth) / screenHeight > ((float)wWidth) / wHeight)
             {
-                wWidth  = (int)round(((double)wHeight) * screenWidth / screenHeight);
+                wWidth  = (int)round(((float)wHeight) * screenWidth / screenHeight);
             }
-            else if (((double)screenWidth) / screenHeight < ((double)wWidth) / wHeight)
+            else if (((float)screenWidth) / screenHeight < ((float)wWidth) / wHeight)
             {
-                wHeight = (int)round(((double)wWidth) * screenHeight / screenWidth);
+                wHeight = (int)round(((float)wWidth) * screenHeight / screenWidth);
             }
             width = wWidth;
             height = wHeight;
@@ -2679,7 +2679,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 }
 #endif
 
-double EngineBase::getVideoTime(_video video)
+float EngineBase::getVideoTime(_video video)
 {
 #ifdef SHF_USE_VIDEO
 	if (video == nullptr || video->cg == nullptr)
@@ -2695,7 +2695,7 @@ double EngineBase::getVideoTime(_video video)
 		unsigned long long t = 0;
 		if (FMOD_ChannelGroup_GetDSPClock(video->cg, 0, &t) == 0)
 		{
-			return ((double)t) / video->soundRate - video->time.beginTime;
+			return ((float)t) / video->soundRate - video->time.beginTime;
 		}
 	}
 #endif
@@ -2703,7 +2703,7 @@ double EngineBase::getVideoTime(_video video)
 }
 
 #ifdef SHF_USE_VIDEO
-double EngineBase::initVideoTime(_video video)
+float EngineBase::initVideoTime(_video video)
 {
 	if (video == nullptr || video->cg == nullptr)
 	{
@@ -2712,7 +2712,7 @@ double EngineBase::initVideoTime(_video video)
 	unsigned long long t = 0;
 	if (FMOD_ChannelGroup_GetDSPClock(video->cg, 0, &t) == 0)
 	{
-		video->time.beginTime = ((double)t) / video->soundRate;
+		video->time.beginTime = ((float)t) / video->soundRate;
 		video->time.pauseBeginTime = 0.0;
 		video->time.paused = false;
 		return video->time.beginTime;
@@ -2733,7 +2733,7 @@ void EngineBase::setVideoTimePaused(_video video, bool paused)
 	unsigned long long t = 0;
 	if (FMOD_ChannelGroup_GetDSPClock(video->cg, 0, &t) == 0)
 	{
-		double now = ((double)t) / video->soundRate;
+		float now = ((float)t) / video->soundRate;
 		if (paused)
 		{
 			video->time.pauseBeginTime = now;
@@ -2747,7 +2747,7 @@ void EngineBase::setVideoTimePaused(_video video, bool paused)
 	}
 }
 
-double EngineBase::setVideoTime(_video video, double timer)
+float EngineBase::setVideoTime(_video video, float timer)
 {
 	if (video == nullptr || video->cg == nullptr)
 	{
@@ -2757,7 +2757,7 @@ double EngineBase::setVideoTime(_video video, double timer)
 	return getVideoTime(video);
 }
 
-double EngineBase::getVideoSoundRate(_video video)
+float EngineBase::getVideoSoundRate(_video video)
 {
 	int outputRate = 0;
 	if (video == nullptr || video->soundSystem == nullptr)
@@ -2768,7 +2768,7 @@ double EngineBase::getVideoSoundRate(_video video)
 	{
 		FMOD_System_GetSoftwareFormat(video->soundSystem, &outputRate, 0, 0);
 	}
-	return ((double)outputRate) / 1000.0;
+	return ((float)outputRate) / 1000.0;
 
 }
 
@@ -2857,13 +2857,13 @@ void EngineBase::decodeNextAudio(_video video)
 #endif // (defined USE_FFMPEG4)
 
 						VideoSound videoSound;
-						//videoSound.t = ((double)pts * video->audioStream.timeBasePacket);
+						//videoSound.t = ((float)pts * video->audioStream.timeBasePacket);
 						videoSound.t = video->soundDelay + video->audioStream.startTime;
 
 #if (defined USE_FFMPEG4)
-						double addTime = ((double)data_length_) / 2.0 / (((double)video->audioStream.codecCtx->sample_rate) / 1000.0) / ((double)video->audioStream.codecCtx->channel_layout);
+						float addTime = ((float)data_length_) / 2.0 / (((float)video->audioStream.codecCtx->sample_rate) / 1000.0) / ((float)video->audioStream.codecCtx->channel_layout);
 #else
-						double addTime = ((double)data_length_) / 2.0 / (((double)video->audioStream.codecCtx->sample_rate) / 1000.0) / ((double)video->audioStream.codecCtx->ch_layout.nb_channels);
+						float addTime = ((float)data_length_) / 2.0 / (((float)video->audioStream.codecCtx->sample_rate) / 1000.0) / ((float)video->audioStream.codecCtx->ch_layout.nb_channels);
 #endif // (defined USE_FFMPEG4)		
 
 						video->soundDelay += addTime;
@@ -3022,7 +3022,7 @@ void EngineBase::decodeNextVideo(_video video)
 						break;
 					}
 					VideoImage videoImage;
-					videoImage.t = (double)((dts > 0 ? dts : pts)) * video->videoStream.timeBasePacket + video->videoStream.startTime;
+					videoImage.t = (float)((dts > 0 ? dts : pts)) * video->videoStream.timeBasePacket + video->videoStream.startTime;
 					videoImage.image = tex;
 					video->videoImage.push_back(videoImage);
 				}
@@ -3131,7 +3131,7 @@ void EngineBase::rearrangeVideoFrame(_video video)
 		{
 			if (video->videoImage[j].t > video->videoImage[j + 1].t)
 			{
-				double t = video->videoImage[j].t;
+				float t = video->videoImage[j].t;
 				video->videoImage[j].t = video->videoImage[j + 1].t;
 				video->videoImage[j + 1].t = t;
 			}
@@ -3768,7 +3768,7 @@ void EngineBase::drawVideoFrame(_video video)
 		rect = &video->rect;
 	}
 	//rearrangeVideoFrame(v);
-	double t = getVideoTime(video);
+	float t = getVideoTime(video);
 	if (video->videoImage.size() == 0)
 	{
 		_shared_image image = createMask(0, 0, 0, 255);
@@ -3934,19 +3934,19 @@ void EngineBase::updateRect(int tempWidth, int tempHeight, Rect & rect)
 		}
 		else
 		{
-			if ((double)windowWidth / (double)width < (double)windowHeight / (double)height)
+			if ((float)windowWidth / (float)width < (float)windowHeight / (float)height)
 			{
 				rect.x = 0;
 				rect.w = windowWidth;
-				rect.y = (int)floor(((double)windowHeight - (double)height * (double)windowWidth / (double)width) / 2 + 0.5);
-				rect.h = (int)floor((double)height * (double)windowWidth / (double)width + 0.5);
+				rect.y = (int)floor(((float)windowHeight - (float)height * (float)windowWidth / (float)width) / 2 + 0.5);
+				rect.h = (int)floor((float)height * (float)windowWidth / (float)width + 0.5);
 			}
 			else
 			{
 				rect.y = 0;
 				rect.h = windowHeight;
-				rect.x = (int)floor(((double)windowWidth - (double)width * (double)windowHeight / (double)height) / 2 + 0.5);
-				rect.w = (int)floor((double)width * (double)windowHeight / (double)height + 0.5);
+				rect.x = (int)floor(((float)windowWidth - (float)width * (float)windowHeight / (float)height) / 2 + 0.5);
+				rect.w = (int)floor((float)width * (float)windowHeight / (float)height + 0.5);
 			}
 		}
 	}
@@ -4008,11 +4008,11 @@ void EngineBase::calculateCursorReferencePosition(int inX, int inY, int* outX, i
 	{
 		if (outX != nullptr)
 		{
-			*outX = (int)round((double)(inX - rect.x) / ((double)rect.w) * (double)width );
+			*outX = (int)round((float)(inX - rect.x) / ((float)rect.w) * (float)width );
 		}
 		if (outY != nullptr)
 		{
-			*outY = (int)round((double)(inY - rect.y) / ((double)rect.h) * (double)height );
+			*outY = (int)round((float)(inY - rect.y) / ((float)rect.h) * (float)height );
 		}
 	}
 }

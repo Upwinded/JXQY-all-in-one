@@ -1,4 +1,4 @@
-
+﻿
 #pragma once
 #include <deque>
 #include "../GameTypes.h"
@@ -85,7 +85,7 @@ public:
 	static Point getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx cenTileOffset);
 	static Point getTilePosition(Point tile, Point cenTile, Point cenScreen = { 0, 0 }, PointEx cenTileOffset = { 0, 0 });
 	static Point getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx offset);
-	static double getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset);
+	static float getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset);
 
 	void loadMapMpc();
     
@@ -147,14 +147,14 @@ public:
 
 	bool isInMap(Point pos);
 private:
-	double calFlyDirection(Point flyDirection);
+	float calFlyDirection(Point flyDirection);
 
 	bool getSlantPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Point from, Point to, int stepIndex);
 	bool getVHPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Point from, Point to, int stepIndex);
 
 
-	LinePathPoint getLineSubStepEx(Point from, PointEx fromOffset, double angle);
-	std::vector<Point> getLineSubStep(Point from, Point to, double angle);
+	LinePathPoint getLineSubStepEx(Point from, PointEx fromOffset, float angle);
+	std::vector<Point> getLineSubStep(Point from, Point to, float angle);
 	std::vector<Point> getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex);
 	bool isInMap(PathMap * pathMap, Point pos);
 	bool compareMapHead(MapData * md);

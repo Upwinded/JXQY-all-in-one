@@ -61,7 +61,7 @@ public:
 	//(Added by Upwinded.)
 	void SetInteger(const std::string& section, const std::string& name, long value);
 	//(Added by Upwinded.)
-	void SetReal(const std::string& section, const std::string& name, double value);
+	void SetReal(const std::string& section, const std::string& name, float value);
 	//(Added by Upwinded.)
 	void SetBoolean(const std::string& section, const std::string& name, bool value);
 	//(Added by Upwinded.)
@@ -84,10 +84,10 @@ public:
     // not found or not a valid integer (decimal "1234", "-1234", or hex "0x4d2").
     long GetInteger(const std::string& section, const std::string& name, long default_value) const;
 
-    // Get a real (floating point double) value from INI file, returning
+    // Get a real (floating point float) value from INI file, returning
     // default_value if not found or not a valid floating point value
     // according to strtod().
-    double GetReal(const std::string& section, const std::string& name, double default_value) const;
+    float GetReal(const std::string& section, const std::string& name, float default_value) const;
 
     // Get a boolean value from INI file, returning default_value if not found or if
     // not a valid true/false value. Valid true values are "true", "yes", "on", "1",

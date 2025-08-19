@@ -17,15 +17,15 @@ void ColumnMenu::updateState()
 {
 	if (columnLife != nullptr)
 	{
-		columnLife->percent = (double)gm->player->life / (double)(gm->player->info.lifeMax > 1 ? gm->player->info.lifeMax : 1);
+		columnLife->percent = (float)gm->player->life / (float)(gm->player->info.lifeMax > 1 ? gm->player->info.lifeMax : 1);
 	}
 	if (columnThew != nullptr)
 	{
-		columnThew->percent = (double)gm->player->thew / (double)(gm->player->info.thewMax > 1 ? gm->player->info.thewMax : 1);
+		columnThew->percent = (float)gm->player->thew / (float)(gm->player->info.thewMax > 1 ? gm->player->info.thewMax : 1);
 	}
 	if (columnMana != nullptr)
 	{
-		columnMana->percent = (double)gm->player->mana / (double)(gm->player->info.manaMax > 1 ? gm->player->info.manaMax : 1);
+		columnMana->percent = (float)gm->player->mana / (float)(gm->player->info.manaMax > 1 ? gm->player->info.manaMax : 1);
 	}
 	
 }

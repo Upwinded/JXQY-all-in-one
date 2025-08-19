@@ -88,11 +88,11 @@ public:
 	static std::vector<std::shared_ptr<Effect>> addThrowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	static std::vector<std::shared_ptr<Effect>> addThrowExplodeEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 
-	static double calAngle(Point from, Point to);
+	static float calAngle(Point from, Point to);
 	static int calDirection(Point from, Point to);
-	static int calDirection(double angle);
+	static int calDirection(float angle);
 	static int calDirection(Point from, Point to, int maxDir);
-	static int calDirection(double angle, int maxDir);
+	static int calDirection(float angle, int maxDir);
 
 	void copy(Magic& magic);
 	void freeResource();
@@ -138,7 +138,7 @@ public:
 
 	MagicLevel level[MAGIC_MAX_LEVEL + 1];
 
-	static double limitAngle(double angle);
-	static int getDir(double angle, int maxDir);
+	static float limitAngle(float angle);
+	static int getDir(float angle, int maxDir);
 };
 

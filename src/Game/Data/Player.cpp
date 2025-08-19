@@ -1,6 +1,10 @@
-#include "Player.h"
+﻿#include "Player.h"
 #include "Map.h"
 #include "../GameManager/GameManager.h"
+
+#define THEW_LOW_MSG u8"体力不足!"
+#define MANA_LOW_MSG u8"内力不足!"
+#define LIFE_LOW_MSG u8"生命不足!"
 
 Player::Player()
 {
@@ -348,7 +352,7 @@ void Player::updateAction(UTime frameTime)
 						recoveryTime = getUpdateTime();
 						stepList.resize(0);
 						beginStand();
-						gm->showMessage(u8"体力不足！");
+						gm->showMessage(THEW_LOW_MSG);
 					}
 					else
 					{
@@ -579,7 +583,7 @@ void Player::updateAction(UTime frameTime)
 			}
 			else if (thew < SIT_THEW_COST)
 			{
-				gm->showMessage(u8"体力不足！");
+				gm->showMessage(THEW_LOW_MSG);
 				beginStand();
 			}
 			else
@@ -605,7 +609,7 @@ void Player::updateAction(UTime frameTime)
 			}
 			else if (thew < SIT_THEW_COST)
 			{
-				gm->showMessage(u8"体力不足！");
+				gm->showMessage(THEW_LOW_MSG);
 				beginStand();
 			}
 			else
@@ -773,15 +777,15 @@ void Player::onUpdate()
                     }
                     else if (mana < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].manaCost)
                     {
-                        gm->showMessage(u8"内力不足！");
+                        gm->showMessage(MANA_LOW_MSG);
                     }
                     else if (thew < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].thewCost)
                     {
-                        gm->showMessage(u8"体力不足！");
+                        gm->showMessage(THEW_LOW_MSG);
                     }
                     else if (life < gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].magic->level[gm->magicManager.magicList[MAGIC_COUNT + nextAction->type].level].lifeCost)
                     {
-                        gm->showMessage(u8"生命不足！");
+                        gm->showMessage(LIFE_LOW_MSG);
                     }
                     else
                     {
@@ -1130,7 +1134,7 @@ void Player::changeRun(Point dest)
 			{
 				if (thew < RUN_THEW_COST)
 				{
-					gm->showMessage(u8"体力不足！");
+					gm->showMessage(THEW_LOW_MSG);
 					if (isRunning())
 					{
 						recoveryTime = getUpdateTime();
@@ -1347,7 +1351,7 @@ void Player::beginJump(Point dest)
 	{
 		if (thew < JUMP_THEW_COST)
 		{
-			gm->showMessage(u8"体力不足！");
+			gm->showMessage(THEW_LOW_MSG);
 			return;
 		}
 		thew -= JUMP_THEW_COST;
@@ -1372,7 +1376,7 @@ void Player::beginJump(Point dest)
 		playSound(acJump);
 	}
 	flyingDirection = Map::getTilePosition(step, position, { 0, 0 }, { 0, 0 });
-	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / Config::getGameSpeed();
+	jumpSpeed = hypot((float)flyingDirection.x / TILE_WIDTH, (float)flyingDirection.y / TILE_WIDTH) / (float)(actionLastTime / 3) / Config::getGameSpeed();
 	jumpState = 0;
 }
 
@@ -1427,7 +1431,7 @@ void Player::beginRun(Point dest)
             {
                 if (thew < RUN_THEW_COST)
                 {
-                    gm->showMessage(u8"体力不足！");
+                    gm->showMessage(THEW_LOW_MSG);
                     return;
                 }
                 thew -= RUN_THEW_COST;
@@ -1467,7 +1471,7 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	attackTarget = target;
 	if (thew < ATTACK_THEW_COST)
 	{
-		gm->showMessage(u8"体力不足！");
+		gm->showMessage(THEW_LOW_MSG);
 		return;
 	}
 	thew -= ATTACK_THEW_COST;

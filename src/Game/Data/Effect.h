@@ -49,7 +49,7 @@ public:
 	PointEx srcOffset = { 0, 0 };
 	Point dest = { 0, 0 };
 	PointEx destOffset = { 0, 0 };
-	double width = 0.5;
+	float width = 0.5;
 
 	std::deque<Point> passPath;
 

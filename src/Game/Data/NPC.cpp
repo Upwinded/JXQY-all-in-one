@@ -260,7 +260,7 @@ _shared_image NPC::getActionShadow(int * offsetx, int * offsety)
 
 void NPC::calOffset(UTime nowTime, UTime totalTime)
 {
-	double percent = ((double)nowTime) / ((double)totalTime);
+	float percent = ((float)nowTime) / ((float)totalTime);
 	if (percent < 0)
 	{
 		percent = 0;
@@ -375,7 +375,7 @@ UTime NPC::calStepLastTime()
 	{
 		speed = runSpeed;
 	}
-	stepLastTime = (UTime)(0.5 / ((double)speed) / (double)Config::getGameSpeed());
+	stepLastTime = (UTime)(0.5 / ((float)speed) / (float)Config::getGameSpeed());
 	if (direction % 4 == 2)
 	{
 		stepLastTime = (UTime)round(1.414 * stepLastTime);
@@ -387,7 +387,7 @@ UTime NPC::calStepLastTime()
 	return stepLastTime;
 }
 
-int NPC::calDirection(double angle)
+int NPC::calDirection(float angle)
 {
 #ifdef pi
 #undef pi
@@ -409,10 +409,10 @@ int NPC::calDirection(Point src, Point dest)
 {
 	Point pos = Map::getTilePosition(dest, src, { 0, 0 }, { 0, 0 });
 	PointEx dir;
-	dir.x = ((double)pos.x) / TILE_HEIGHT / MapXRatio;
-	dir.y = ((double)pos.y) / TILE_HEIGHT;
+	dir.x = ((float)pos.x) / TILE_HEIGHT / MapXRatio;
+	dir.y = ((float)pos.y) / TILE_HEIGHT;
 	dir.x = -dir.x;
-	double angle = atan2(dir.x, dir.y);
+	float angle = atan2(dir.x, dir.y);
 	return calDirection(angle);
 }
 
@@ -1010,7 +1010,7 @@ void NPC::beginJump(Point dest)
 	}
 	flyingDirection = Map::getTilePosition(step, position, { 0, 0 }, { 0, 0 });
 
-	jumpSpeed = hypot((double)flyingDirection.x / TILE_WIDTH, (double)flyingDirection.y / TILE_WIDTH) / (double)(actionLastTime / 3) / Config::getGameSpeed();
+	jumpSpeed = hypot((float)flyingDirection.x / TILE_WIDTH, (float)flyingDirection.y / TILE_WIDTH) / (float)(actionLastTime / 3) / Config::getGameSpeed();
 	jumpState = 0;
 	
 }
@@ -2252,7 +2252,7 @@ void NPC::onMouseLeftDown(int x, int y)
     if (player->nowAction != acDeath && player->nowAction != acHide)
     {
         NextAction act;
-        if (player->canRun && (player->thew > (int)round((double)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
+        if (player->canRun && (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
         {
             act.action = acRun;
         }

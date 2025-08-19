@@ -94,7 +94,7 @@ public:
 	_shared_image createNewImageFromImage(_shared_image image);
 	void drawImage(_shared_image image, int x, int y);
 	void drawImage(_shared_image image, Rect* src, Rect* dst);
-	void drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center);
+	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center);
 	void drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha);
 	void drawImageWithAlpha(_shared_image image, Rect *src, Rect * dst, unsigned char alpha);
 	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
@@ -261,7 +261,7 @@ public:
 	//视频是否停止播放
 	bool getVideoStopped(_video v);
 
-	double getVideoTime(_video v);
+	float getVideoTime(_video v);
 public:
 	//引擎每一帧都必须执行的处理函数
 	//每帧开始前调用

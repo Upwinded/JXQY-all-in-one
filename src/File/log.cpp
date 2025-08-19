@@ -36,7 +36,7 @@ void GameLog::write(const char* format, ...)
     vsprintf(s, format, arg_ptr);
     va_end(arg_ptr);
     std::string info = s;
-    info = "[" + std::to_string(((double)SDL_GetTicks()) / 1000.0) + "s]:" + info;
+    info = "[" + std::to_string(((float)SDL_GetTicks()) / 1000.0) + "s]:" + info;
     if (*info.rbegin() != '\n')
     {
         info += "\n";

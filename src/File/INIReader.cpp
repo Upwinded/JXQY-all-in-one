@@ -123,7 +123,7 @@ void INIReader::SetInteger(const std::string & section, const std::string & name
 	Set(section, name, v);
 }
 
-void INIReader::SetReal(const std::string & section, const std::string & name, double value)
+void INIReader::SetReal(const std::string & section, const std::string & name, float value)
 {
 	std::string v = std::to_string(value);
 	Set(section, name, v);
@@ -194,7 +194,7 @@ long INIReader::GetInteger(const string& section, const string& name, long defau
 	}
 }
 
-double INIReader::GetReal(const string& section, const string& name, double default_value) const
+float INIReader::GetReal(const string& section, const string& name, float default_value) const
 {
     string valstr = Get(section, name, "");
 	try

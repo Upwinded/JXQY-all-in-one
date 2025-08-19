@@ -50,7 +50,7 @@ void FadeMask::onUpdate()
 		}
 		else
 		{
-			alpha = (int)(((double)t) / (double)fadeTime * 255.0);
+			alpha = (int)(((float)t) / (float)fadeTime * 255.0);
 			if (isFadeIn)
 			{
 				alpha = 255 - alpha;

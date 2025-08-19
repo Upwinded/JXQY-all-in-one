@@ -39,7 +39,7 @@ UTime Effect::getExplodinUTime()
 	{
 		if (magic.level[level].specialKind == mskAddShield)
 		{
-			return (unsigned int)(((double)magic.level[level].lifeFrame) * EFFECT_FRAME_TIME);
+			return (unsigned int)(((float)magic.level[level].lifeFrame) * EFFECT_FRAME_TIME);
 		}
 		else
 		{
@@ -140,7 +140,7 @@ UTime Effect::getFlyinUTime()
 	}
 	else
 	{
-		return (unsigned int)((double)magic.level[level].lifeFrame * EFFECT_FRAME_TIME);
+		return (unsigned int)((float)magic.level[level].lifeFrame * EFFECT_FRAME_TIME);
 	}
 }
 
@@ -175,8 +175,8 @@ void Effect::initParam()
 
 void Effect::calTime()
 {
-	lifeTime = (unsigned int)(((double)magic.level[level].lifeFrame) * EFFECT_FRAME_TIME);
-	waitTime = (unsigned int)(((double)magic.level[level].waitFrame) * EFFECT_FRAME_TIME);
+	lifeTime = (unsigned int)(((float)magic.level[level].lifeFrame) * EFFECT_FRAME_TIME);
+	waitTime = (unsigned int)(((float)magic.level[level].waitFrame) * EFFECT_FRAME_TIME);
 }
 
 //计算一个较远处的目标，新版轨迹计算已不需要
@@ -187,7 +187,7 @@ void Effect::calDest()
 	{
 		return;
 	}
-	int distance = (int)((speed + 5) * Config::getGameSpeed() * ((double)lifeTime + 5000));
+	int distance = (int)((speed + 5) * Config::getGameSpeed() * ((float)lifeTime + 5000));
 	if (flyingDirection.x < 10 || flyingDirection.y < 10)
 	{
 		dest.x = flyingDirection.x * 100 * distance + src.x;
@@ -203,22 +203,22 @@ void Effect::calDest()
 auto Effect::getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {	
 	std::deque<Point> result, tempPath[3];
-	std::vector<double> resultDistance;
+	std::vector<float> resultDistance;
 	PointEx distanceOffset[3];
 	distanceOffset[0] = { 0, 0 };
 	tempPath[0] = gm->map->getPassPathEx(from, fromOffset, to, toOffset, flyingDirection);
-	double l = hypot(flyingDirection.x, flyingDirection.y);
-	int tempX = convert_max((int)round(((double)flyingDirection.x) / l * width * TILE_WIDTH / 2) - 1, 1);
-	int tempY = convert_max((int)round((((double)flyingDirection.y) / l * width * TILE_WIDTH / 2) - 1), 1);
+	float l = hypot(flyingDirection.x, flyingDirection.y);
+	int tempX = convert_max((int)round(((float)flyingDirection.x) / l * width * TILE_WIDTH / 2) - 1, 1);
+	int tempY = convert_max((int)round((((float)flyingDirection.y) / l * width * TILE_WIDTH / 2) - 1), 1);
 	Point tempFrom, tempTo;
 	PointEx tempFromOffset, tempToOffset;
 	getNewPosition(from, { fromOffset.x + tempY , fromOffset.y - tempX }, &tempFrom, &tempFromOffset);
 	getNewPosition(to, { toOffset.x + tempY , toOffset.y - tempX }, &tempTo, &tempToOffset);
-	distanceOffset[1] = { (double)tempY, (double)- tempX};
+	distanceOffset[1] = { (float)tempY, (float)- tempX};
 	tempPath[1] = gm->map->getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
 	getNewPosition(from, { fromOffset.x - tempY , fromOffset.y + tempX }, &tempFrom, &tempFromOffset);
 	getNewPosition(to, { toOffset.x - tempY , toOffset.y + tempX }, &tempTo, &tempToOffset);
-	distanceOffset[1] = { (double)-tempY, (double)tempX };
+	distanceOffset[1] = { (float)-tempY, (float)tempX };
 	tempPath[2] = gm->map->getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
 	auto maxStep = convert_max(convert_max(tempPath[0].size(), tempPath[1].size()), tempPath[2].size());
 	for (size_t i = 0; i < maxStep; i++)
@@ -269,7 +269,7 @@ void Effect::changeFollowTarget(std::shared_ptr<GameElement> newTarget)
 	flyingDirection = Map::getTilePosition(dest, src);
 	flyingDirection.x -= (int)srcOffset.x;
 	flyingDirection.y -= (int)srcOffset.y;
-	flyingDirection.y = (int)((double)flyingDirection.y * MapXRatio);
+	flyingDirection.y = (int)((float)flyingDirection.y * MapXRatio);
 	direction = getDirection(flyingDirection);
 	lifeTime -= getUpdateTime() - beginTime;
 	beginTime = getUpdateTime();
@@ -459,7 +459,7 @@ void Effect::playSound(int act)
 int Effect::getDirection(Point fDir)
 {
 	fDir.x = - fDir.x;
-	double angle = atan2((double)fDir.x, (double)fDir.y);
+	float angle = atan2((float)fDir.x, (float)fDir.y);
 
 	if (angle < 0)
 	{
@@ -563,7 +563,7 @@ void Effect::onUpdate()
 	{
 		Point from = position;
 		PointEx fromOffset = offset;
-		updateEffectPosition(ft, (double)magic.level[level].speed);
+		updateEffectPosition(ft, (float)magic.level[level].speed);
 		Point to = position;
 		PointEx toOffset = offset;
 		//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
@@ -588,7 +588,7 @@ void Effect::onUpdate()
 		{	
 			Point from = position;
 			PointEx fromOffset = offset;
-			updateEffectPosition(ft, (double)magic.level[level].speed);
+			updateEffectPosition(ft, (float)magic.level[level].speed);
 			Point to = position;
 			PointEx toOffset = offset;
 			//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
@@ -695,13 +695,13 @@ void Effect::onUpdate()
 			if (lifeTime > 0)
 			{
 				PointEx newSpeed;
-				newSpeed.x = (double)magic.level[level].speed / hypot(flyingDirection.x, flyingDirection.y) * (double)flyingDirection.x;
-				newSpeed.y = (double)magic.level[level].speed / hypot(flyingDirection.x, flyingDirection.y) * (double)flyingDirection.y;
+				newSpeed.x = (float)magic.level[level].speed / hypot(flyingDirection.x, flyingDirection.y) * (float)flyingDirection.x;
+				newSpeed.y = (float)magic.level[level].speed / hypot(flyingDirection.x, flyingDirection.y) * (float)flyingDirection.y;
 				newSpeed.y *= TILE_HEIGHT / TILE_WIDTH;
-				double flySpeed = hypot(newSpeed.y, newSpeed.x);
+				float flySpeed = hypot(newSpeed.y, newSpeed.x);
 				Point from = position;
 				PointEx fromOffset = offset;
-				updateEffectPosition(getUpdateTime() - beginTime, (double)flySpeed);
+				updateEffectPosition(getUpdateTime() - beginTime, (float)flySpeed);
 				Point to = position;
 				PointEx toOffset = offset;
 				//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
@@ -755,7 +755,7 @@ PointEx Effect::getCollideOffset(Point pos)
 	}
 	else
 	{
-		double k0 = ((double)flyingDirection.y) / ((double)flyingDirection.x * MapXRatio);
+		float k0 = ((float)flyingDirection.y) / ((float)flyingDirection.x * MapXRatio);
 		Point p1;
 		p1.x = (int)round(((k0 * p0.x) - p0.y) / (k0 + 1 / k0));
 		p1.y = (int)round(-p1.x / k0);

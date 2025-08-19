@@ -287,7 +287,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addPointEffect(std::shared_ptr<Magic
 	}
 	else
 	{
-		e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+		e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 	}
 	e->launcherKind = launcher;
 	e->damage = damage;
@@ -354,7 +354,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addFlyEffect(std::shared_ptr<Magic> 
 	}
 	else
 	{
-		e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+		e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 	}
 	e->direction = dir;
 	e->position = from;
@@ -440,7 +440,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addContinuousFlyEffect(std::shared_p
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 		if (e->waitTime > 0)
 		{
@@ -464,7 +464,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addContinuousFlyEffect(std::shared_p
 std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
 	std::vector<std::shared_ptr<Effect>> ret;
-	double angle = -pi;
+	float angle = -pi;
 	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
@@ -494,7 +494,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 
 		if (e->waitTime > 0)
@@ -519,7 +519,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
 	std::vector<std::shared_ptr<Effect>> ret;
-	double angle = -pi;
+	float angle = -pi;
 	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
@@ -550,7 +550,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 
 		if (i < MAGIC_CIRCLE_COUNT / 4)
@@ -613,7 +613,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 		startDir += MAGIC_CIRCLE_COUNT;
 	}
 	startDir = MAGIC_CIRCLE_COUNT - startDir;
-	double angle = -pi;
+	float angle = -pi;
 	for (int i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
 		std::shared_ptr<Effect> e = std::make_shared<Effect>();
@@ -643,7 +643,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 		}
 		else
 		{
-			e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 		}
 		int count = i - startDir;
 		if (count < 0)
@@ -684,7 +684,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 	//from = Map::getSubPoint(from, NPC::calDirection(from, to));
 	auto tempPos = Map::getTilePosition(to, from);
 	tempPos.y = (int)round(MapXRatio * tempPos.y);
-	double angle = atan2(-tempPos.x, tempPos.y); //dir * pi / 4;
+	float angle = atan2(-tempPos.x, tempPos.y); //dir * pi / 4;
 	if (lvl < 4)
 	{
 		angle -= pi / 12;
@@ -721,7 +721,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			}
 			else
 			{
-				e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+				e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 			}
 			if (e->waitTime > 0)
 			{
@@ -928,7 +928,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addLineEffect(std::shared_ptr<Magic>
 			}
 			else
 			{
-				e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+				e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 			}
 			e->position = pos;
 			e->src = e->position;
@@ -1013,7 +1013,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addMoveLineEffect(std::shared_ptr<Ma
 			}
 			else
 			{
-				e->lifeTime = (unsigned int)((double)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
+				e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
 			}
 			if (e->waitTime > 0)
 			{
@@ -1377,12 +1377,12 @@ std::vector<std::shared_ptr<Effect>> Magic::addThrowExplodeEffect(std::shared_pt
 	return ret;
 }
 
-double Magic::calAngle(Point from, Point to)
+float Magic::calAngle(Point from, Point to)
 {
 	Point pos = Map::getTilePosition(to, from, { 0, 0 }, { 0, 0 });
 	PointEx dir;
-	dir.x = ((double)pos.x) / TILE_WIDTH * MapXRatio;
-	dir.y = ((double)pos.y) / TILE_HEIGHT;
+	dir.x = ((float)pos.x) / TILE_WIDTH * MapXRatio;
+	dir.y = ((float)pos.y) / TILE_HEIGHT;
 	dir.x = -dir.x;
 	return atan2(dir.x, dir.y);
 }
@@ -1392,7 +1392,7 @@ int Magic::calDirection(Point from, Point to)
 	return calDirection(calAngle(from, to));
 }
 
-int Magic::calDirection(double angle)
+int Magic::calDirection(float angle)
 {
 	return calDirection(angle, 16);
 }
@@ -1402,7 +1402,7 @@ int Magic::calDirection(Point from, Point to, int maxDir)
 	return calDirection(calAngle(from, to), maxDir);
 }
 
-int Magic::calDirection(double angle, int maxDir)
+int Magic::calDirection(float angle, int maxDir)
 {
 	if (angle < 0)
 	{
@@ -1564,7 +1564,7 @@ _shared_imp Magic::createMagicIcon()
 	return IMP::createIMPImage(fileName);
 }
 
-double Magic::limitAngle(double angle)
+float Magic::limitAngle(float angle)
 {
 	while (angle < 0)
 	{

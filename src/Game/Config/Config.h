@@ -31,8 +31,8 @@ public:
 	static void getWindowSize(int& w, int& h);
 	static void setDefaultWindowSize(int w, int h);
 
-	static double getGameSpeed();
-	static double setGameSpeed(double speed);
+	static float getGameSpeed();
+	static float setGameSpeed(float speed);
 
 	static int display;
 
@@ -40,9 +40,9 @@ private:
 	static int windowWidth;
 	static int windowHeight;
 
-	static double gameSpeed;
+	static float gameSpeed;
 
-	static int convSpeedToInt(double speed);
-	static double convSpeedToDouble(int speed);
+	static int convSpeedToInt(float speed);
+	static float convSpeedTofloat(int speed);
 };
 

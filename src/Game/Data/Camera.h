@@ -8,9 +8,9 @@ public:
 	Camera();
 	virtual ~Camera();
 private:
-	double cameraSpeed = 40;
+	float cameraSpeed = 40;
 
-	const double flyRatio = 0.625 / 10.0;
+	const float flyRatio = 0.625 / 10.0;
 	PointEx distanceToFly = { 0.0, 0.0 };
 	PointEx distanceFlied = { 0.0, 0.0 };
 	int flyDirection = 0;

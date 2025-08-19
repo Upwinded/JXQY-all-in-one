@@ -10,7 +10,7 @@ bool Config::loadWithThread = true;
 #endif
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
-double Config::gameSpeed = SPEED_TIME_DEFAULT;
+float Config::gameSpeed = SPEED_TIME_DEFAULT;
 int Config::display = 0;
 
 Config::Config()
@@ -42,7 +42,7 @@ void Config::load()
 	loadWithThread = ini.GetBoolean("game", "loadwiththread", loadWithThread);
 
 	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
-	gameSpeed = convSpeedToDouble(speed);
+	gameSpeed = convSpeedTofloat(speed);
 
 	float musicVolume = ((float)ini.GetInteger("game", "musicvolume", 100)) / 100.0f;
 	float soundVolume = ((float)ini.GetInteger("game", "soundvolume", 100)) / 100.0f;
@@ -136,12 +136,12 @@ void Config::setDefaultWindowSize(int w, int h)
     windowHeight = h;
 }
 
-double Config::getGameSpeed()
+float Config::getGameSpeed()
 {
 	return gameSpeed;
 }
 
-double Config::setGameSpeed(double speed)
+float Config::setGameSpeed(float speed)
 {
 	if (speed <= SPEED_TIME_MIN)
 	{
@@ -158,7 +158,7 @@ double Config::setGameSpeed(double speed)
 	return gameSpeed;
 }
 
-double Config::convSpeedToDouble(int speed)
+float Config::convSpeedTofloat(int speed)
 {
 	const int speed_min_int = 0;
 	const int speed_max_int = 100;
@@ -170,7 +170,7 @@ double Config::convSpeedToDouble(int speed)
 	{
 		return SPEED_TIME_MAX;
 	}
-	auto ret = ((double)(speed - speed_min_int)) / (speed_max_int - speed_min_int) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
+	auto ret = ((float)(speed - speed_min_int)) / (speed_max_int - speed_min_int) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
 	if (ret <= SPEED_TIME_MIN)
 	{
 		return SPEED_TIME_MIN;
@@ -182,7 +182,7 @@ double Config::convSpeedToDouble(int speed)
 	return ret;
 }
 
-int Config::convSpeedToInt(double speed)
+int Config::convSpeedToInt(float speed)
 {
 	const int speed_min_int = 0;
 	const int speed_max_int = 100;

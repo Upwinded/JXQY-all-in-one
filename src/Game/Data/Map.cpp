@@ -1,4 +1,4 @@
-#include "Map.h"
+﻿#include "Map.h"
 #include "../GameManager/GameManager.h"
 
 #ifdef pi
@@ -286,10 +286,10 @@ Point Map::getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx off
 }
 
 //获得距离，从斜45度矫正为平视地图比例的菱形
-double Map::getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset)
+float Map::getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {
 	auto pos = getTilePosition(to, from);
-	return hypot(((double)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH * MapXRatio, ((double)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
+	return hypot(((float)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH * MapXRatio, ((float)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
 }
 
 void Map::loadMapMpc()
@@ -664,7 +664,7 @@ std::deque<Point> Map::getPassPath(Point from, Point to, Point flyDirection, Poi
 		return result;
 	}
 
-	double angle = calFlyDirection(flyDirection);
+	float angle = calFlyDirection(flyDirection);
 
 	Point nowStep = from;
 	int leftStep = calDistance(from, to);
@@ -700,7 +700,7 @@ std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, P
 	{
 		return result;
 	}
-	double angle = calFlyDirection(flyDirection);
+	float angle = calFlyDirection(flyDirection);
 	int leftStep = calDistance(from, to) * 2;
 	Point nowStep = from;
 	PointEx nowOffset = fromOffset;
@@ -721,7 +721,7 @@ Point Map::getJumpPath(Point from, Point to)
 	{
 		return from;
 	}
-	double angle;
+	float angle;
 	if (from.x == to.x && std::abs(from.y - to.y) % 2 == 0)
 	{
 		if (from.y > to.y)
@@ -747,7 +747,7 @@ Point Map::getJumpPath(Point from, Point to)
 	else
 	{
 		Point pos = getTilePosition(to, from, { 0, 0 }, { 0, 0 });
-		angle = atan2((double)-pos.y * ((double)TILE_WIDTH / TILE_HEIGHT), (double)pos.x);
+		angle = atan2((float)-pos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)pos.x);
 		if (angle < 0)
 		{
 			angle += 2 * pi;
@@ -803,7 +803,7 @@ bool Map::canView(Point from, Point to)
 	{
 		return true;
 	}
-	double angle;
+	float angle;
 	if (from.x == to.x && std::abs(from.y - to.y) % 2 == 0)
 	{
 		if (from.y > to.y)
@@ -829,7 +829,7 @@ bool Map::canView(Point from, Point to)
 	else
 	{
 		Point pos = getTilePosition(to, from, { 0, 0 }, { 0, 0 });
-		angle = atan2((double)-pos.y * ((double)TILE_WIDTH / TILE_HEIGHT), (double)pos.x);
+		angle = atan2((float)-pos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)pos.x);
 		if (angle < 0)
 		{
 			angle += 2 * pi;
@@ -1241,7 +1241,7 @@ void Map::drawMap()
 			{
 				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y < 0 || (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
+					if ((float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y < 0 || (float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
 					{
 						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
 					}
@@ -1274,7 +1274,7 @@ void Map::drawMap()
 			{
 				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 				{
-					if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y >= 0 && gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
+					if ((float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y >= 0 && gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
 					{
 						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
 					}
@@ -1304,7 +1304,7 @@ void Map::drawMap()
 				{
 					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
+						if ((float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
 						{
 							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
@@ -1332,7 +1332,7 @@ void Map::drawMap()
 				{
 					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if (-(double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
+						if (-(float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH > 0)
 						{
 							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
@@ -1434,7 +1434,7 @@ void Map::drawMap()
 				{
 					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if ((double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
+						if ((float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
 						{
 							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
@@ -1462,7 +1462,7 @@ void Map::drawMap()
 				{
 					if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
 					{
-						if (-(double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (double)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
+						if (-(float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.x / TILE_WIDTH + (float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y / TILE_WIDTH <= 0)
 						{
 							gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset);
 						}
@@ -1768,9 +1768,9 @@ bool Map::isInMap(Point pos)
 	return true;
 }
 
-double Map::calFlyDirection(Point flyDirection)
+float Map::calFlyDirection(Point flyDirection)
 {
-	double angle;
+	float angle;
 	if (flyDirection.x == 0)
 	{
 		if (flyDirection.y > 0)
@@ -1795,8 +1795,8 @@ double Map::calFlyDirection(Point flyDirection)
 	}
 	else
 	{
-		//angle = atan2((double)-flyDirection.y * TILE_HEIGHT / TILE_WIDTH, (double)flyDirection.x);
-		angle = atan2((double)-flyDirection.y, (double)flyDirection.x);
+		//angle = atan2((float)-flyDirection.y * TILE_HEIGHT / TILE_WIDTH, (float)flyDirection.x);
+		angle = atan2((float)-flyDirection.y, (float)flyDirection.x);
 		if (angle < 0)
 		{
 			angle += 2 * pi;
@@ -1805,7 +1805,7 @@ double Map::calFlyDirection(Point flyDirection)
 	return angle;
 }
 
-LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, double angle)
+LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, float angle)
 {
 	LinePathPoint result;
 	result.pos = from;
@@ -1890,14 +1890,14 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, double angle
 		}
 	}
 	auto newpos = getTilePosition(result.pos, from);
-	result.pixelOffset.x -= double(newpos.x) / (TILE_WIDTH / 2);
-	result.pixelOffset.y -= double(newpos.y) / (TILE_HEIGHT / 2);
+	result.pixelOffset.x -= float(newpos.x) / (TILE_WIDTH / 2);
+	result.pixelOffset.y -= float(newpos.y) / (TILE_HEIGHT / 2);
 	result.pixelOffset.x *= (TILE_WIDTH / 2);
 	result.pixelOffset.y *= (TILE_HEIGHT / 2);
 	return result;
 }
 
-std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
+std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 {
 	std::vector<Point> result;
 	result.resize(0);
@@ -1967,7 +1967,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, double angle)
 	else
 	{
 		Point newPos = getTilePosition(to, from, { 0, 0 }, { 0, 0 });
-		double newAngle = atan2((double)-newPos.y * ((double)TILE_WIDTH / TILE_HEIGHT), (double)newPos.x);
+		float newAngle = atan2((float)-newPos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)newPos.x);
 		if (newAngle < 0)
 		{
 			newAngle += 2 * pi;

@@ -1,4 +1,4 @@
-/*
+﻿/*
 SDL、FMOD、FFMPEG等底层都封装在这里。
 */
 
@@ -183,9 +183,9 @@ typedef std::function<void(uint8_t*, int)> AudioCallback;
 
 struct TimeEx
 {
-	double beginTime;
+	float beginTime;
 	bool paused;
-	double pauseBeginTime;
+	float pauseBeginTime;
 };
 
 #ifdef SHF_USE_VIDEO
@@ -194,14 +194,14 @@ struct VideoSound
 {
 	_channel c = nullptr;
 	_music m = nullptr;
-	double t = 0.0;
+	float t = 0.0;
 	bool stopped = false;
 };
 
 struct VideoImage
 {
 	_shared_image image = nullptr;
-	double t = 0.0;
+	float t = 0.0;
 };
 
 struct MediaContent
@@ -226,10 +226,10 @@ struct MediaStream
     SDL_IOStream * rWops = nullptr;
     int rWops_length = 0;
 
-	double totalTime = 0;
-	double timePerFrame = 0;
-	double timeBasePacket = 0;
-	double startTime = 0;
+	float totalTime = 0;
+	float timePerFrame = 0;
+	float timeBasePacket = 0;
+	float startTime = 0;
 	bool decodeEnd = false;
 	int index = -1;
 	bool stopped = false;
@@ -249,8 +249,8 @@ struct VideoStruct
 
 	float videoVolume = 1;
 	std::deque<VideoSound> videoSounds;
-	double soundDelay = 0;
-	double soundRate = 48.0;
+	float soundDelay = 0;
+	float soundRate = 48.0;
 	FMOD_SYSTEM * soundSystem = nullptr;
 	void * b = nullptr;
 	
@@ -265,9 +265,9 @@ struct VideoStruct
 	
 	bool pausedBeforePause = false;
 	bool decodeEnd = false;
-	double totalTime = 0;
+	float totalTime = 0;
 	TimeEx time;
-	double lastTime = 0;
+	float lastTime = 0;
 	bool stopped = false;
 };
 typedef VideoStruct Video_t;
@@ -419,7 +419,7 @@ protected:
 	void drawImage(_shared_image image, int x, int y);
 	void drawImage(_shared_image image, Rect * rect);
 	void drawImage(_shared_image image, Rect * src, Rect * dst);
-	void drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center);
+	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center);
 	//void freeImage(Image_t* image);
 	void setImageAlpha(_shared_image image, unsigned char a);
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
@@ -565,10 +565,10 @@ private:
 	int openVideoFile(_video video);
 	static int read_packet(void *opaque, uint8_t *buf, int buf_size);
 	void setMediaStream(MediaStream * mediaStream, std::string& fileName, AVMediaType mediaType);
-	double initVideoTime(_video video);
+	float initVideoTime(_video video);
 	void setVideoTimePaused(_video video, bool paused);
-	double setVideoTime(_video video, double time);
-	double getVideoSoundRate(_video video);
+	float setVideoTime(_video video, float time);
+	float getVideoSoundRate(_video video);
 	void decodeNextAudio(_video video);
 	void decodeNextVideo(_video video);
 	void checkVideoDecodeEnd(_video video);
@@ -598,7 +598,7 @@ protected:
 	void resumeVideo(_video video);
 	void stopVideo(_video video);
 	void resetVideo(_video video);
-	double getVideoTime(_video video);
+	float getVideoTime(_video video);
 
 	void setVideoLoop(_video video, int loop);
 	bool getVideoStopped(_video video);

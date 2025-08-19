@@ -344,7 +344,7 @@ void Engine::drawImage(_shared_image image, Rect* src, Rect* dst)
 	EngineBase::drawImage(image, src, dst);
 }
 
-void Engine::drawImageEx(_shared_image image, Rect* src, Rect* dst, double angle, Point* center)
+void Engine::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center)
 {
 	std::lock_guard<std::mutex> locker(_mutex);
 	EngineBase::drawImageEx(image, src, dst, angle / 3.14159265 * 180, center);
@@ -923,7 +923,7 @@ bool Engine::getVideoStopped(_video v)
 	return EngineBase::getVideoStopped(v);
 }
 
-double Engine::getVideoTime(_video v)
+float Engine::getVideoTime(_video v)
 {
 	return EngineBase::getVideoTime(v);
 }

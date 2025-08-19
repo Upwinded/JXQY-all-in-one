@@ -31,7 +31,7 @@ struct PointBase
 };
 
 using Point = PointBase<int>;
-using PointEx = PointBase<double>;
+using PointEx = PointBase<float>;
 
 enum ElementPriority
 {

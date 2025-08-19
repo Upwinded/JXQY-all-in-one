@@ -34,13 +34,13 @@ void ColumnImage::onDraw()
 	Rect r;
 	r.w = w;
 	r.x = 0;
-	r.h = (int)(percent * (double)h);
+	r.h = (int)(percent * (float)h);
 	r.y = h - r.h;
 	if (stretch)
 	{
 		Rect d = rect;
 		h = d.h;
-		d.h = (int)(percent * (double)h);
+		d.h = (int)(percent * (float)h);
 		d.y += h - d.h;
 		engine->setImageAlpha(img, 180);
 		engine->drawImage(img, &r, &d);

@@ -237,7 +237,7 @@ void Camera::onUpdate()
 	}
 	else if (flying)
 	{
-		double l = hypot(distanceToFly.x, distanceToFly.y);
+		float l = hypot(distanceToFly.x, distanceToFly.y);
 		PointEx frameFlyDistance = { distanceToFly.x / l * cameraSpeed * frameTime * Config::getGameSpeed(), distanceToFly.y / l * cameraSpeed * frameTime * Config::getGameSpeed()};
 		distanceFlied = distanceFlied + frameFlyDistance;
 		offset = flyStartOffset + distanceFlied;
@@ -261,8 +261,8 @@ void Camera::onUpdate()
 		}
 	}
 	auto differencePoint = gm->map->getTilePosition(position, lastPosition);
-	differencePosition.y = ((double)differencePoint.y) - lastOffset.y + offset.y;
-	differencePosition.x = ((double)differencePoint.x) - lastOffset.x + offset.x;
+	differencePosition.y = ((float)differencePoint.y) - lastOffset.y + offset.y;
+	differencePosition.x = ((float)differencePoint.x) - lastOffset.x + offset.x;
 }
 
 void Camera::onEvent()

@@ -6,13 +6,13 @@
 #endif // pi
 #define pi 3.1415926
 
-double Joystick::calculateAngel(int x, int y)
+float Joystick::calculateAngel(int x, int y)
 {
-	double angle = atan2(-x, y);
+	float angle = atan2(-x, y);
 	return angle;
 }
 
-int Joystick::calculateDirection(double angle)
+int Joystick::calculateDirection(float angle)
 {
 	if (angle < 0)
 	{

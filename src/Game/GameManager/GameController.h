@@ -28,7 +28,7 @@ public:
 private:
 	int _last_magic_index = -1;
 
-	Point getPlayerRelativePosition(double angle, double distance, double xFactor);
+	Point getPlayerRelativePosition(float angle, float distance, float xFactor);
 
 };
 

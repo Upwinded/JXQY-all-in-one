@@ -106,7 +106,7 @@ void Option::freeResource()
 
 }
 
-int Option::speedToPos(double spd)
+int Option::speedToPos(float spd)
 {
 	if (spd <= SPEED_TIME_MIN)
 	{
@@ -119,7 +119,7 @@ int Option::speedToPos(double spd)
 	return (int)round((spd - SPEED_TIME_MIN) / (SPEED_TIME_MAX - SPEED_TIME_MIN) * (speed->max - speed->min) + speed->min);
 }
 
-double Option::posToSpeed(int pos)
+float Option::posToSpeed(int pos)
 {
 	if (pos <= speed->min)
 	{
@@ -129,7 +129,7 @@ double Option::posToSpeed(int pos)
 	{
 		return SPEED_TIME_MAX;
 	}
-	return ((double)(pos - speed->min)) / (speed->max - speed->min) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
+	return ((float)(pos - speed->min)) / (speed->max - speed->min) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
 }
 
 void Option::onEvent()
