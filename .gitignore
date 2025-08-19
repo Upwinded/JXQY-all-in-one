@@ -3,6 +3,7 @@ assets/*/
 bin/*/
 3rd/*/
 !assets/AssetsFolder.md
+!bin/linux/*.sh
 cmake_install.cmake
 output-metadata.json
 
@@ -508,4 +509,10 @@ build/
 ################################ Linux Files ################################
 linux/build/
 
+################################ Starter Files ################################
+starter/*/
+starter/*.exe
+ThirdParty/devel/
 
+3rd*/
+_*/

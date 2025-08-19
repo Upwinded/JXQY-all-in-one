@@ -1,0 +1,6 @@
+[submodule "ThirdParty/lua"]
+	path = ThirdParty/lua
+	url = https://github.com/lua/lua
+[submodule "ThirdParty/minilzo"]
+	path = ThirdParty/minilzo
+	url = https://github.com/Upwinded/minilzo
