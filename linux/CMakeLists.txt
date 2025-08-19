@@ -22,32 +22,35 @@ include_directories(
         /usr/include/x86_64-linux-gnu/
 )
 
+set(FMOD_lib ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/fmod/lib/x86_64/libfmod.so)
 add_library( fmod SHARED IMPORTED )
-
 set_target_properties(
         fmod PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/fmod/lib/x86_64/libfmod.so
+        IMPORTED_LOCATION ${FMOD_lib}
         INTERFACE_INCLUDE_DIRECTORIES  ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/fmod/inc
 )
 
+set(SDL3_lib ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/lib/libSDL3.so)
 add_library( SDL3 SHARED IMPORTED )
 set_target_properties(
         SDL3 PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/lib/libSDL3.so
+        IMPORTED_LOCATION ${SDL3_lib}
         INTERFACE_INCLUDE_DIRECTORIES  ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/include
 )
 
+set(SDL3_image_lib ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/lib/libSDL3_image.so)
 add_library( SDL3_image SHARED IMPORTED )
 set_target_properties(
         SDL3_image PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/lib/libSDL3_image.so
+        IMPORTED_LOCATION ${SDL3_image_lib}
         INTERFACE_INCLUDE_DIRECTORIES  ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/include
 )
 
+set(SDL3_ttf_lib ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/lib/libSDL3_ttf.so)
 add_library( SDL3_ttf SHARED IMPORTED )
 set_target_properties(
         SDL3_ttf PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/lib/libSDL3_ttf.so
+        IMPORTED_LOCATION ${SDL3_ttf_lib}
         INTERFACE_INCLUDE_DIRECTORIES  ${CMAKE_CURRENT_SOURCE_DIR}/../ThirdParty/devel/linux/SDL/include
 )
 
@@ -71,6 +74,12 @@ file(GLOB_RECURSE EXCLUDE_TESTES_FILES
 list(REMOVE_ITEM source_files ${EXCLUDE_TESTES_FILES})
 
 SET(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../bin/linux)
+
+file(COPY ${SDL3_lib} DESTINATION "${EXECUTABLE_OUTPUT_PATH}/lib/" FOLLOW_SYMLINK_CHAIN)
+file(COPY ${SDL3_image_lib} DESTINATION "${EXECUTABLE_OUTPUT_PATH}/lib/" FOLLOW_SYMLINK_CHAIN )
+file(COPY ${SDL3_ttf_lib} DESTINATION "${EXECUTABLE_OUTPUT_PATH}/lib/" FOLLOW_SYMLINK_CHAIN)
+file(COPY ${FMOD_lib} DESTINATION "${EXECUTABLE_OUTPUT_PATH}/lib/" FOLLOW_SYMLINK_CHAIN)
+
 add_executable( ${PROJECT_NAME} ${source_files} )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-Wl,-Bstatic -lstdc++ -lsupc++ -Wl,-Bdynamic -Wl,-rpath,.")
