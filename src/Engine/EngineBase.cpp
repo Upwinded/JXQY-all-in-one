@@ -1945,6 +1945,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
     SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 #endif
 	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
 	//SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
     
