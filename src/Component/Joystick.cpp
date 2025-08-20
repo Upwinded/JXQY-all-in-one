@@ -78,7 +78,15 @@ int Joystick::distanceToCenter()
 
 bool Joystick::mouseInRect(int x, int y)
 {
-	return RoundButton::mouseInRect(x, y) || (parent == nullptr ? true : parent->rect.PointInRect(x, y));
+	if (RoundButton::mouseInRect(x, y))
+	{
+		return true;
+	}
+	if (touchingDownID == TOUCH_UNTOUCHEDID)
+	{
+		return false;
+	}
+	return (parent == nullptr ? true : parent->rect.PointInRect(x, y));
 }
 
 void Joystick::onMouseMoving(int x, int y)
