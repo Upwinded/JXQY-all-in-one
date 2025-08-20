@@ -29,8 +29,8 @@ void Config::load()
 #ifdef __MOBILE__
     fullScreenMode = FullScreenMode::fullScreen;
     fullScreenSolutionMode = FullScreenSolutionMode::adjust;
-    windowWidth = 1200;
-    windowHeight = 600;
+    windowWidth = MOBILE_DEFAULT_WINDOW_WIDTH;
+    windowHeight = MOBILE_DEFAULT_WINDOW_HEIGHT;
 #else
 	fullScreenMode = (FullScreenMode)ini.GetInteger("game", "fullscreenmode", (int)fullScreenMode);
     fullScreenSolutionMode = (FullScreenSolutionMode)ini.GetInteger("game", "fullscreensolutionmode", (int)fullScreenSolutionMode);
