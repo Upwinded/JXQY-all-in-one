@@ -181,7 +181,7 @@
 		DC516B882E50C36B006CF61E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7C2E503961006CF61E /* AVFoundation.framework */; };
 		DC516B8A2E50C36D006CF61E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7A2E503959006CF61E /* Foundation.framework */; };
 		DC516B8C2E50C36F006CF61E /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7E2E50396A006CF61E /* IOKit.framework */; };
-		DC516B8F2E50CD98006CF61E /* libfmodL_iphoneos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B8E2E50CBE8006CF61E /* libfmodL_iphoneos.a */; };
+		DC516B912E55E947006CF61E /* libfmod_iphoneos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */; };
 		DC9FE5D22E4CAFF70099790F /* minilzo.c in Sources */ = {isa = PBXBuildFile; fileRef = DC9FE5CE2E4CAFF70099790F /* minilzo.c */; };
 		DC9FE5D42E4CAFF70099790F /* minilzo.c in Sources */ = {isa = PBXBuildFile; fileRef = DC9FE5CE2E4CAFF70099790F /* minilzo.c */; };
 		DC9FE61A2E4CB0590099790F /* lobject.c in Sources */ = {isa = PBXBuildFile; fileRef = DC9FE5FA2E4CB0590099790F /* lobject.c */; };
@@ -528,7 +528,7 @@
 		DC516B7A2E503959006CF61E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		DC516B7C2E503961006CF61E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AVFoundation.framework; sourceTree = DEVELOPER_DIR; };
 		DC516B7E2E50396A006CF61E /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/IOKit.framework; sourceTree = DEVELOPER_DIR; };
-		DC516B8E2E50CBE8006CF61E /* libfmodL_iphoneos.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfmodL_iphoneos.a; path = ../../ThirdParty/devel/mac_ios/fmod/ios/lib/libfmodL_iphoneos.a; sourceTree = "<group>"; };
+		DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfmod_iphoneos.a; path = ../../ThirdParty/devel/mac_ios/fmod/ios/lib/libfmod_iphoneos.a; sourceTree = "<group>"; };
 		DC9FE5CA2E4CAFF70099790F /* lzoconf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lzoconf.h; path = "/Users/wanghexi/program/jxqy-all-in-one-private/ThirdParty/minilzo/lzoconf.h"; sourceTree = "<absolute>"; };
 		DC9FE5CB2E4CAFF70099790F /* lzodefs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lzodefs.h; path = "/Users/wanghexi/program/jxqy-all-in-one-private/ThirdParty/minilzo/lzodefs.h"; sourceTree = "<absolute>"; };
 		DC9FE5CD2E4CAFF70099790F /* minilzo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = minilzo.h; path = "/Users/wanghexi/program/jxqy-all-in-one-private/ThirdParty/minilzo/minilzo.h"; sourceTree = "<absolute>"; };
@@ -620,7 +620,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DC516B8F2E50CD98006CF61E /* libfmodL_iphoneos.a in Frameworks */,
+				DC516B912E55E947006CF61E /* libfmod_iphoneos.a in Frameworks */,
 				DC516B882E50C36B006CF61E /* AVFoundation.framework in Frameworks */,
 				DC9FE6B62E4CC42F0099790F /* libavformat.framework in Frameworks */,
 				DC9FE68A2E4CB4540099790F /* SDL3_ttf.xcframework in Frameworks */,
@@ -1044,7 +1044,7 @@
 		DC3D8C542AA4C3AD00BAABFC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				DC516B8E2E50CBE8006CF61E /* libfmodL_iphoneos.a */,
+				DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */,
 				DC516B7E2E50396A006CF61E /* IOKit.framework */,
 				DC516B7C2E503961006CF61E /* AVFoundation.framework */,
 				DC516B7A2E503959006CF61E /* Foundation.framework */,
