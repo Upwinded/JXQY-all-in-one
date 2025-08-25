@@ -3,7 +3,10 @@ SDL、FMOD、FFMPEG等底层都封装在这里。
 */
 
 #pragma once
-
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
 #include <string>
 #include <deque>
 #include <string>
@@ -111,21 +114,24 @@ struct Rect
 	}
 };
 
-typedef Rect Rect_t;
-typedef std::shared_ptr<Rect_t> _rect;
+using Vertex = SDL_Vertex;
 
-typedef SDL_Cursor Cursor_t;
-typedef std::shared_ptr<Cursor_t> _shared_cursor;
+using Rect_t = Rect;
+using _rect = std::shared_ptr<Rect_t>;
+
+using Cursor_t = SDL_Cursor;
+using _shared_cursor = std::shared_ptr<Cursor_t>;
 #define make_shared_cursor(a) std::shared_ptr<Cursor_t>(a, [](Cursor_t* b){SDL_DestroyCursor(b);})
 
-typedef SDL_Texture Image_t;
-typedef std::shared_ptr<Image_t> _shared_image;
+using Image_t = SDL_Texture;
+using _image = SDL_Texture*;
+using _shared_image = std::shared_ptr<Image_t>;
 #define make_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write("Image Count:%d", EngineBase::ImageCount.load());*/}); //EngineBase::ImageCount.fetch_add(1);GameLog::write("Image Count:%d", EngineBase::ImageCount.load()); 
 
 #define make_safe_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){std::lock_guard<std::mutex> locker(EngineBase::_mutex); SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write("Image Count:%d", EngineBase::ImageCount.load());*/});  //EngineBase::ImageCount.fetch_add(1);GameLog::write("Image Count:%d", EngineBase::ImageCount.load());  
 
-typedef SDL_Surface Surface_t;
-typedef std::shared_ptr<Surface_t> _shared_surface;
+using Surface_t = SDL_Surface;
+using _shared_surface = std::shared_ptr<Surface_t>;
 #define make_shared_surface(a) std::shared_ptr<Surface_t>(a, [](Surface_t* b){SDL_DestroySurface(b);})
 
 #define SaveBMPFormat SDL_PIXELFORMAT_ARGB8888
@@ -425,6 +431,13 @@ protected:
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
 	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
 	bool getImageSize(_shared_image image, int& w, int& h);
+
+	_shared_image createCanvasImage(int w = -1, int h = -1);
+	bool setImageAsRenderTarget(_image image);
+	bool setSharedImageAsRenderTarget(_shared_image image);
+	_image getRenderTarget();
+	void renderClear(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t a = 0);
+	void drawGeometry(_shared_image image, const std::vector<Vertex>& vertices, const std::vector<int>& indices);
 
 private:
 	//used by save screen

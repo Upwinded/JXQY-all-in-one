@@ -1,10 +1,9 @@
-
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
 #include "Joystick.h"
 
-#ifdef pi
-#undef pi
-#endif // pi
-#define pi 3.1415926
 
 float Joystick::calculateAngel(int x, int y)
 {
@@ -16,14 +15,14 @@ int Joystick::calculateDirection(float angle)
 {
 	if (angle < 0)
 	{
-		angle += 2 * pi;
+		angle += 2 * M_PI;
 	}
-	angle += pi / 8;
-	if (angle > 2 * pi)
+	angle += M_PI / 8;
+	if (angle > 2 * M_PI)
 	{
-		angle -= 2 * pi;
+		angle -= 2 * M_PI;
 	}
-	return (int)(angle / (pi / 4));
+	return (int)(angle / (M_PI / 4));
 }
 
 int Joystick::normalizeDirection(int dir)
@@ -44,7 +43,7 @@ std::vector<int> Joystick::getDirectionList()
 		auto angel = calculateAngel(touchPosition.x - rect.w / 2, touchPosition.y - rect.h / 2);
 		auto dir = calculateDirection(angel);
 		directionList.push_back(normalizeDirection(dir));
-		if ((angel - dir * pi / 4)  > (pi / 8))
+		if ((angel - dir * M_PI / 4)  > (M_PI / 8))
 		{
 			directionList.push_back(normalizeDirection(dir + 1));
 			directionList.push_back(normalizeDirection(dir - 1));

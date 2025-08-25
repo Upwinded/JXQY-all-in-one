@@ -104,6 +104,13 @@ public:
 	//void freeImage(_image image);
 	bool getImageSize(_shared_image image, int &w, int &h);
 
+	_shared_image createCanvasImage(int w = -1, int h = -1);
+	bool setImageAsRenderTarget(_image image);
+	bool setSharedImageAsRenderTarget(_shared_image image);
+	_image getRenderTarget();
+	void renderClear(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t a = 0);
+	void drawGeometry(_shared_image image, const std::vector<Vertex>& vertices, const std::vector<int>& indices);
+
 	//绘制缩略图子程序
 	_shared_image loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size);
 	bool beginSaveScreen();

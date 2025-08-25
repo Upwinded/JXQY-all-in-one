@@ -863,6 +863,46 @@ bool EngineBase::getImageSize(_shared_image image, int& w, int& h)
 	return ret;
 }
 
+_shared_image EngineBase::createCanvasImage(int w, int h)
+{
+	if (w < 0)
+	{
+		w = width;
+	}
+	if (h < 0)
+	{
+		h = height;
+	}
+
+	return make_safe_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_TARGET, w, h));
+}
+
+bool EngineBase::setImageAsRenderTarget(_image image)
+{
+	return SDL_SetRenderTarget(renderer, image);
+}
+
+bool EngineBase::setSharedImageAsRenderTarget(_shared_image image)
+{
+	return SDL_SetRenderTarget(renderer, image.get());
+}
+
+_image EngineBase::getRenderTarget()
+{
+	return SDL_GetRenderTarget(renderer);
+}
+
+void EngineBase::renderClear(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+	SDL_SetRenderDrawColor(renderer, r, g, b, a);
+	SDL_RenderClear(renderer);
+}
+
+void EngineBase::drawGeometry(_shared_image image, const std::vector<Vertex>& vertices, const std::vector<int>& indices)
+{
+	SDL_RenderGeometry(renderer, image.get(), vertices.data(), vertices.size(), indices.data(), indices.size());
+}
+
 bool EngineBase::beginDrawTalk(int w, int h)
 {
 	if (w <= 0 || h <= 0)

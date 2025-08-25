@@ -1,14 +1,10 @@
-﻿#include "Map.h"
+﻿#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
+#include "Map.h"
 #include "../GameManager/GameManager.h"
 
-#ifdef pi
-#undef pi
-#endif // pi
-#define pi 3.1415926
-
-class a
-{
-};
 
 // 定义节点结构体
 struct MapNode
@@ -52,6 +48,7 @@ public:
 Map::Map()
 {
 	priority = epMap;
+	waterEffect.applyPresetParams();
 }
 
 Map::~Map()
@@ -726,18 +723,18 @@ Point Map::getJumpPath(Point from, Point to)
 	{
 		if (from.y > to.y)
 		{
-			angle = pi / 2;
+			angle = M_PI / 2;
 		}
 		else
 		{
-			angle = pi * 3 / 2;
+			angle = M_PI * 3 / 2;
 		}
 	}
 	else if (from.y == to.y)
 	{
 		if (from.x > to.x)
 		{
-			angle = pi;
+			angle = M_PI;
 		}
 		else
 		{
@@ -750,7 +747,7 @@ Point Map::getJumpPath(Point from, Point to)
 		angle = atan2((float)-pos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)pos.x);
 		if (angle < 0)
 		{
-			angle += 2 * pi;
+			angle += 2 * M_PI;
 		}
 	}
 	Point lastStep = from;
@@ -808,18 +805,18 @@ bool Map::canView(Point from, Point to)
 	{
 		if (from.y > to.y)
 		{
-			angle = pi / 2;
+			angle = M_PI / 2;
 		}
 		else
 		{
-			angle = pi * 3 / 2;
+			angle = M_PI * 3 / 2;
 		}
 	}
 	else if (from.y == to.y)
 	{
 		if (from.x > to.x)
 		{
-			angle = pi;
+			angle = M_PI;
 		}
 		else
 		{
@@ -832,7 +829,7 @@ bool Map::canView(Point from, Point to)
 		angle = atan2((float)-pos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)pos.x);
 		if (angle < 0)
 		{
-			angle += 2 * pi;
+			angle += 2 * M_PI;
 		}
 	}
 	Point nowStep = from;
@@ -1203,6 +1200,12 @@ void Map::drawMap()
 {
 	int w, h;
 	engine->getWindowSize(w, h);
+
+	if (gm->global.data.water)
+	{
+		waterEffect.setupEffectCanvas();
+	}
+
 	Point cenScreen;
 	cenScreen.x = (int)w / 2;
 	cenScreen.y = (int)h / 2;
@@ -1552,7 +1555,6 @@ void Map::drawMap()
 		}
 	}
 
-
 	if (!gm->objectManager->drawOBJSelectedAlpha(cenTile, cenScreen, offset))
 	{
 		gm->npcManager->drawNPCSelectedAlpha(cenTile, cenScreen, offset);
@@ -1564,6 +1566,11 @@ void Map::drawMap()
 	else if (Config::playerAlpha)
 	{
 		gm->player->drawAlpha(cenTile, cenScreen, offset);
+	}
+
+	if (gm->global.data.water)
+	{
+		waterEffect.renderEffect(getTime());
 	}
 }
 
@@ -1768,6 +1775,13 @@ bool Map::isInMap(Point pos)
 	return true;
 }
 
+void Map::addWaterRipple(float x, float y)
+{
+	auto now = getTime();
+	waterEffect.addDefaultClickRipple(static_cast<float>(x), static_cast<float>(y), now);
+	lastWaterClickRippleTime = now;
+}
+
 float Map::calFlyDirection(Point flyDirection)
 {
 	float angle;
@@ -1775,11 +1789,11 @@ float Map::calFlyDirection(Point flyDirection)
 	{
 		if (flyDirection.y > 0)
 		{
-			angle = pi * 3 / 2;
+			angle = M_PI * 3 / 2;
 		}
 		else
 		{
-			angle = pi / 2;
+			angle = M_PI / 2;
 		}
 	}
 	else if (flyDirection.y == 0)
@@ -1790,7 +1804,7 @@ float Map::calFlyDirection(Point flyDirection)
 		}
 		else
 		{
-			angle = pi;
+			angle = M_PI;
 		}
 	}
 	else
@@ -1799,7 +1813,7 @@ float Map::calFlyDirection(Point flyDirection)
 		angle = atan2((float)-flyDirection.y, (float)flyDirection.x);
 		if (angle < 0)
 		{
-			angle += 2 * pi;
+			angle += 2 * M_PI;
 		}
 	}
 	return angle;
@@ -1813,12 +1827,12 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, float angle)
 	result.pixelOffset.x /= (TILE_WIDTH / 2 / MapXRatio);
 	result.pixelOffset.y /= (TILE_HEIGHT / 2);
 	int dir = 0;
-	if (angle <= pi / 4 || angle > pi * 7 / 4)
+	if (angle <= M_PI / 4 || angle > M_PI * 7 / 4)
 	{
 		auto p = atan2(result.pixelOffset.y, 1.0 - result.pixelOffset.x);
-		if (angle > pi)
+		if (angle > M_PI)
 		{
-			angle -= 2 * pi;
+			angle -= 2 * M_PI;
 		}
 		if (p > angle)
 		{
@@ -1832,15 +1846,15 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, float angle)
 		}
 		if (angle < 0)
 		{
-			angle += 2 * pi;
+			angle += 2 * M_PI;
 		}
 	}
-	else if (angle <= pi * 3 / 4)
+	else if (angle <= M_PI * 3 / 4)
 	{
 		auto p = atan2(1.0 + result.pixelOffset.y, -result.pixelOffset.x);
 		if (p < 0)
 		{
-			p += 2 * pi;
+			p += 2 * M_PI;
 		}
 		if (p > angle)
 		{
@@ -1853,12 +1867,12 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, float angle)
 			dir = 3;
 		}
 	}
-	else if (angle <= pi * 5 / 4)
+	else if (angle <= M_PI * 5 / 4)
 	{
 		auto p = atan2(result.pixelOffset.y, -1.0 - result.pixelOffset.x);
 		if (p < 0)
 		{
-			p += 2 * pi;
+			p += 2 * M_PI;
 		}
 		if (p > angle)
 		{
@@ -1876,7 +1890,7 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, float angle)
 		auto p = atan2(-1.0 + result.pixelOffset.y, -result.pixelOffset.x);
 		if (p < 0)
 		{
-			p += 2 * pi;
+			p += 2 * M_PI;
 		}
 		if (p > angle)
 		{
@@ -1909,7 +1923,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 	//angle以向右为x、向上为y正方向的坐标系，与屏幕向下y增大的方向相反
 	//向右时
 	int line = std::abs(from.y) % 2;
-	if (angle == 0.0 || angle == 2 * pi)
+	if (angle == 0.0 || angle == 2 * M_PI)
 	{
 		Point pos;
 		pos.x = from.x + line;
@@ -1923,7 +1937,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		result.push_back(pos);
 	}
 	//向上时
-	else if (angle == pi / 2)
+	else if (angle == M_PI / 2)
 	{
 		Point pos;
 		pos.x = from.x - 1 + line;
@@ -1937,7 +1951,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		result.push_back(pos);
 	}
 	//向左时
-	else if (angle == pi)
+	else if (angle == M_PI)
 	{
 		Point pos;
 		pos.x = from.x - 1 + line;
@@ -1951,7 +1965,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		result.push_back(pos);
 	}
 	//向下时
-	else if (angle == pi * 3 / 2)
+	else if (angle == M_PI * 3 / 2)
 	{
 		Point pos;
 		pos.x = from.x - 1 + line;
@@ -1970,7 +1984,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		float newAngle = atan2((float)-newPos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)newPos.x);
 		if (newAngle < 0)
 		{
-			newAngle += 2 * pi;
+			newAngle += 2 * M_PI;
 		}
 		if (angle == atan2(1, 1))
 		{
@@ -2000,15 +2014,15 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 			pos.y = from.y + 1;
 			result.push_back(pos);
 		}
-		else if (angle < pi / 4 || angle > 7 * pi / 4)
+		else if (angle < M_PI / 4 || angle > 7 * M_PI / 4)
 		{
-			if (angle > pi)
+			if (angle > M_PI)
 			{
-				angle -= 2 * pi;
+				angle -= 2 * M_PI;
 			}
-			if (newAngle > pi)
+			if (newAngle > M_PI)
 			{
-				newAngle -= 2 * pi;
+				newAngle -= 2 * M_PI;
 			}
 			if (newAngle < angle)
 			{
@@ -2042,7 +2056,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 				}
 			}
 		}
-		else if (angle > pi / 4 && angle < 3 * pi / 4)
+		else if (angle > M_PI / 4 && angle < 3 * M_PI / 4)
 		{
 			if (newAngle < angle)
 			{
@@ -2060,7 +2074,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 			}
 			else
 			{
-				if (angle < pi / 2)
+				if (angle < M_PI / 2)
 				{
 					Point pos;
 					pos.x = from.x + line;
@@ -2076,7 +2090,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 				}
 			}
 		}
-		else if (angle > 3 * pi / 4 && angle < 5 * pi / 4)
+		else if (angle > 3 * M_PI / 4 && angle < 5 * M_PI / 4)
 		{
 			if (newAngle < angle)
 			{
@@ -2094,7 +2108,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 			}
 			else
 			{
-				if (angle < pi)
+				if (angle < M_PI)
 				{
 					Point pos;
 					pos.x = from.x - 1 + line;
@@ -2128,7 +2142,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 			}
 			else
 			{
-				if (angle < pi * 3 / 2)
+				if (angle < M_PI * 3 / 2)
 				{
 					Point pos;
 					pos.x = from.x - 1 + line;
@@ -2342,4 +2356,21 @@ bool Map::compareMapHead(MapData* md)
 
 	return true;
 
+}
+
+void Map::onUpdate()
+{
+	if (!gm->global.data.water)
+	{
+		return;
+	}
+	auto now = getTime();
+	if (now - lastWaterClickRippleTime > WaterClickRippleTimeInterval)
+	{
+		WaterClickRippleTimeInterval = engine->getRand(5000, 2000);
+		lastWaterClickRippleTime = now;
+		int x, y;
+		engine->getMousePosition(x, y);
+		waterEffect.addDefaultClickRipple(static_cast<float>(x), static_cast<float>(y), now);
+	}
 }

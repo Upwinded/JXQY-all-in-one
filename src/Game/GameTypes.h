@@ -1,4 +1,8 @@
 ﻿#pragma once
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
 #include <string>
 #include <deque>
 #include "../Image/IMP.h"
@@ -130,10 +134,6 @@
 //NPC跟随检测范围，超出此范围进行寻找
 #define NPC_FOLLOW_RADIUS 1
 
-#ifdef pi
-#undef pi
-#endif // pi
-#define pi 3.1415926
 
 //武功类延迟时间
 
@@ -142,7 +142,7 @@
 //圆形技能的effect个数
 #define MAGIC_CIRCLE_COUNT 32
 //圆形技能的相隔角度
-#define MAGIC_CIRCLE_ANGLE_SPACE (2 * pi / MAGIC_CIRCLE_COUNT)
+#define MAGIC_CIRCLE_ANGLE_SPACE (2 * M_PI / MAGIC_CIRCLE_COUNT)
 //心形技能施放延迟等参数
 #define MAGIC_HEART_DELAY 10
 #define MAGIC_HEART_DECAY 0.1

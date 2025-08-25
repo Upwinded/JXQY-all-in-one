@@ -7,6 +7,7 @@
 #include "../../Element/Element.h"
 #include "NPC.h"
 #include "Object.h"
+#include "WaterEffect.h"
 
 /*
 位置（10进制）	大小（bytes）	说明
@@ -104,8 +105,6 @@ public:
 	//得到起止之间的所有点(带偏移)
 	std::deque<Point> getPassPathEx(Point from, PointEx fromOffset, Point to, PointEx toOffset, Point flyDirection);
 
-
-
 	Point getJumpPath(Point from, Point to);
 	bool canView(Point from, Point to);
 
@@ -139,25 +138,30 @@ public:
 	void deleteNPCFromDataMap(Point pos, std::shared_ptr<NPC> npc);
 	void addNPCToDataMap(Point pos, std::shared_ptr<NPC> npc);
 
-
 	void freeResource();
 	void freeMpc();
 	void freeData();
 	void drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle);
 
 	bool isInMap(Point pos);
+
+	void addWaterRipple(float x, float y);
 private:
 	float calFlyDirection(Point flyDirection);
 
 	bool getSlantPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Point from, Point to, int stepIndex);
 	bool getVHPath(std::vector<Point>& subStep, int line, PathMap* pathMap, Point from, Point to, int stepIndex);
 
-
 	LinePathPoint getLineSubStepEx(Point from, PointEx fromOffset, float angle);
 	std::vector<Point> getLineSubStep(Point from, Point to, float angle);
 	std::vector<Point> getSubStep(PathMap * pathMap, Point from, Point to, int stepIndex);
 	bool isInMap(PathMap * pathMap, Point pos);
 	bool compareMapHead(MapData * md);
+
+	WaterEffect waterEffect;
+	UTime lastWaterClickRippleTime = 0;
+	UTime WaterClickRippleTimeInterval = 3000;
+	virtual void onUpdate() override;
 
 };
 

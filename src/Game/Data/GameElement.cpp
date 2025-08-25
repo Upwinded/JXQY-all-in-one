@@ -5,6 +5,7 @@
 
 GameElement::GameElement()
 {
+	soundVolume = engine->getSoundVolume();
 }
 
 GameElement::~GameElement()

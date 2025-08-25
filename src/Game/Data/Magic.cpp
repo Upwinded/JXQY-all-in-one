@@ -1,3 +1,7 @@
+#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
 #include "Magic.h"
 #include "Map.h"
 #include "Effect.h"
@@ -464,7 +468,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addContinuousFlyEffect(std::shared_p
 std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
 	std::vector<std::shared_ptr<Effect>> ret;
-	float angle = -pi;
+	float angle = -M_PI;
 	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
@@ -474,11 +478,11 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 		e->initFromMagic(srcMagic);
         if (srcMagic->flyImage != nullptr)
         {
-            e->direction = calDirection(-angle - pi / 2, srcMagic->flyImage->directions);
+            e->direction = calDirection(-angle - M_PI / 2, srcMagic->flyImage->directions);
         }
         else
         {
-            e->direction = calDirection(-angle - pi / 2);
+            e->direction = calDirection(-angle - M_PI / 2);
         }
 		e->flyingDirection.x = (int)(cos(angle) * 1000.0);// / TILE_HEIGHT);
 		e->flyingDirection.y = (int)(-sin(angle) * 1000.0);// / TILE_WIDTH);
@@ -519,7 +523,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
 {
 	std::vector<std::shared_ptr<Effect>> ret;
-	float angle = -pi;
+	float angle = -M_PI;
 	gm->effectManager->setPaused(true);
 	for (size_t i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
@@ -530,11 +534,11 @@ std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr
 
         if (srcMagic->flyImage != nullptr)
         {
-            e->direction = calDirection(-angle - pi / 2, srcMagic->flyImage->directions);
+            e->direction = calDirection(-angle - M_PI / 2, srcMagic->flyImage->directions);
         }
         else
         {
-            e->direction = calDirection(-angle - pi / 2);
+            e->direction = calDirection(-angle - M_PI / 2);
         }
 		e->flyingDirection.x = (int)(cos(angle) * 1000.0);// / TILE_HEIGHT);
 		e->flyingDirection.y = (int)(-sin(angle) * 1000.0);// / TILE_WIDTH);
@@ -613,7 +617,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 		startDir += MAGIC_CIRCLE_COUNT;
 	}
 	startDir = MAGIC_CIRCLE_COUNT - startDir;
-	float angle = -pi;
+	float angle = -M_PI;
 	for (int i = 0; i < MAGIC_CIRCLE_COUNT; i++)
 	{
 		std::shared_ptr<Effect> e = std::make_shared<Effect>();
@@ -623,11 +627,11 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 
         if (srcMagic->flyImage != nullptr)
         {
-            e->direction = calDirection(-angle - pi / 2, srcMagic->flyImage->directions);
+            e->direction = calDirection(-angle - M_PI / 2, srcMagic->flyImage->directions);
         }
         else
         {
-            e->direction = calDirection(-angle - pi / 2);
+            e->direction = calDirection(-angle - M_PI / 2);
         }
 		e->flyingDirection.x = (int)(cos(angle) * 1000);
 		e->flyingDirection.y = (int)(-sin(angle) * 1000);
@@ -684,10 +688,10 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 	//from = Map::getSubPoint(from, NPC::calDirection(from, to));
 	auto tempPos = Map::getTilePosition(to, from);
 	tempPos.y = (int)round(MapXRatio * tempPos.y);
-	float angle = atan2(-tempPos.x, tempPos.y); //dir * pi / 4;
+	float angle = atan2(-tempPos.x, tempPos.y); //dir * M_PI / 4;
 	if (lvl < 4)
 	{
-		angle -= pi / 12;
+		angle -= M_PI / 12;
 		for (size_t i = 0; i < 3; i++)
 		{
 			std::shared_ptr<Effect> e = std::make_shared<Effect>();
@@ -736,14 +740,14 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 
 			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
-			angle += pi / 12;
+			angle += M_PI / 12;
 
 			ret.push_back(e);
 		}
 	}
 	else if (lvl < 7)
 	{
-		angle -= pi / 10;
+		angle -= M_PI / 10;
 		for (size_t i = 0; i < 5; i++)
 		{
 			std::shared_ptr<Effect> e = std::make_shared<Effect>();
@@ -784,13 +788,13 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->calDest();
 			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
-			angle += pi / 20;
+			angle += M_PI / 20;
 			ret.push_back(e);
 		}
 	}
 	else if (lvl < MAGIC_MAX_LEVEL)
 	{
-		angle -= pi / 5;
+		angle -= M_PI / 5;
 		for (size_t i = 0; i < 7; i++)
 		{
 
@@ -833,13 +837,13 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->calDest();
 			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
-			angle += pi / 15;
+			angle += M_PI / 15;
 			ret.push_back(e);
 		}
 	}
 	else
 	{
-		angle -= pi / 4;
+		angle -= M_PI / 4;
 		for (size_t i = 0; i < 9; i++)
 		{
 			std::shared_ptr<Effect> e = std::make_shared<Effect>();
@@ -879,7 +883,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->calDest();
 			gm->effectManager->addEffect(e);
 			e->beginTime = e->getTime();
-			angle += pi / 16;
+			angle += M_PI / 16;
 			ret.push_back(e);
 		}
 	}
@@ -1406,10 +1410,10 @@ int Magic::calDirection(float angle, int maxDir)
 {
 	if (angle < 0)
 	{
-		angle += 2 * pi;
+		angle += 2 * M_PI;
 	}
-	angle += pi / maxDir;
-	int result = (int)(angle / (2 * pi / maxDir));
+	angle += M_PI / maxDir;
+	int result = (int)(angle / (2 * M_PI / maxDir));
 	if (result > maxDir)
 	{
 		result -= maxDir;
@@ -1568,11 +1572,11 @@ float Magic::limitAngle(float angle)
 {
 	while (angle < 0)
 	{
-		angle += 2 * pi;
+		angle += 2 * M_PI;
 	}
-	while (angle > 2 * pi)
+	while (angle > 2 * M_PI)
 	{
-		angle -= 2 * pi;
+		angle -= 2 * M_PI;
 	}
 	return angle;
 }

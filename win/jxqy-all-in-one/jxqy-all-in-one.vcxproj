@@ -212,6 +212,7 @@
     <ClCompile Include="..\..\src\Game\Data\Magic.cpp" />
     <ClCompile Include="..\..\src\Game\Data\MagicManager.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Map.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\WaterEffect.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Memo.cpp" />
     <ClCompile Include="..\..\src\Game\Data\NPC.cpp" />
     <ClCompile Include="..\..\src\Game\Data\NPCManager.cpp" />
@@ -332,6 +333,7 @@
     <ClInclude Include="..\..\src\Game\Data\Magic.h" />
     <ClInclude Include="..\..\src\Game\Data\MagicManager.h" />
     <ClInclude Include="..\..\src\Game\Data\Map.h" />
+    <ClInclude Include="..\..\src\Game\Data\WaterEffect.h" />
     <ClInclude Include="..\..\src\Game\Data\Memo.h" />
     <ClInclude Include="..\..\src\Game\Data\NPC.h" />
     <ClInclude Include="..\..\src\Game\Data\NPCManager.h" />

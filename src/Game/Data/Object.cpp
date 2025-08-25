@@ -378,6 +378,12 @@ void Object::onUpdate()
 
 		if (( kind == okSound) && (channel != nullptr))
 		{
+			if (engine->getSoundVolume() != soundVolume)
+			{
+				soundVolume = engine->getSoundVolume();
+				engine->setMusicVolume(channel, soundVolume);
+			}
+			
 			engine->setMusicPosition(channel, SOUND_FACTOR * (float)(pos.x - cenScreen.x) / (float)TILE_WIDTH, SOUND_FACTOR * (float)(pos.y - cenScreen.y) / (float)TILE_HEIGHT);
 		}
 		else if (kind == okRndSound)

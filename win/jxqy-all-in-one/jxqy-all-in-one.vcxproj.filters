@@ -412,6 +412,9 @@
     <ClCompile Include="..\..\ThirdParty\minilzo\minilzo.c">
       <Filter>ThirdParty\miniLZO</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\WaterEffect.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\Component\BaseComponent.h">
@@ -781,6 +784,9 @@
       <Filter>ThirdParty\lua</Filter>
     </ClInclude>
     <ClInclude Include="resource.h" />
+    <ClInclude Include="..\..\src\Game\Data\WaterEffect.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="jxqy-all-in-one.rc">

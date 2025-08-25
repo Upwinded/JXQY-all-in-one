@@ -1,3 +1,7 @@
+﻿#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
 #include "GameController.h"
 #include "GameManager.h"
 
@@ -114,7 +118,7 @@ void GameController::onChildCallBack(PElement child)
 				case SKILL_PANEL_JUMP:
 				{
                     int dir = gm->player->direction;
-                    auto angle = dir * pi / 4;
+                    auto angle = dir * M_PI / 4;
                     float distance = 400;
                     auto pos = getPlayerRelativePosition(angle, distance, TILE_WIDTH / TILE_HEIGHT);
 					NextAction act;
@@ -339,6 +343,7 @@ void GameController::onEvent()
 		}
 	}
 
+	// 键盘控制移动
 	bool KeyStep = true;
 	Point dest = gm->player->position;
 	int line = std::abs(dest.y % 2);
@@ -537,6 +542,11 @@ bool GameController::onHandleEvent(AEvent & e)
 	if (!gm->global.data.canInput)
 	{
 		return false;
+	}
+
+	if (e.eventType == ET_MOUSEDOWN || e.eventType == ET_FINGERDOWN)
+	{
+		gm->map->addWaterRipple(static_cast<float>(e.eventX), static_cast<float>(e.eventY));
 	}
 
 	if (e.eventType == ET_KEYDOWN)

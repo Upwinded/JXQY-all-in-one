@@ -394,6 +394,43 @@ bool Engine::getImageSize(_shared_image image, int &w, int &h)
 	return EngineBase::getImageSize(image, w, h);
 }
 
+_shared_image Engine::createCanvasImage(int w, int h)
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	return EngineBase::createCanvasImage(w, h);
+}
+
+bool Engine::setImageAsRenderTarget(_image image)
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	return EngineBase::setImageAsRenderTarget(image);
+}
+
+bool Engine::setSharedImageAsRenderTarget(_shared_image image)
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	return EngineBase::setSharedImageAsRenderTarget(image);
+}
+
+_image Engine::getRenderTarget()
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	return EngineBase::getRenderTarget();
+}
+
+void Engine::renderClear(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	EngineBase::renderClear(r, g, b, a);
+}
+
+void Engine::drawGeometry(_shared_image image, const std::vector<Vertex>& vertices, const std::vector<int>& indices)
+{
+	std::lock_guard<std::mutex> locker(_mutex);
+	EngineBase::drawGeometry(image, vertices, indices);
+}
+
+
 bool Engine::beginDrawTalk(int w, int h)
 {
 	_mutex.lock();

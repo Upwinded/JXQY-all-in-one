@@ -165,6 +165,11 @@ void Effect::updateSound()
 	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
 	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
 	engine->setMusicPosition(channel, x, y);
+	if (engine->getSoundVolume() != soundVolume)
+	{
+		soundVolume = engine->getSoundVolume();
+		engine->setMusicVolume(channel, soundVolume);
+	}
 }
 
 void Effect::initParam()
@@ -463,14 +468,14 @@ int Effect::getDirection(Point fDir)
 
 	if (angle < 0)
 	{
-		angle += 2 * pi;
+		angle += 2 * M_PI;
 	}
 
-	if (angle > 2 * pi)
+	if (angle > 2 * M_PI)
 	{
-		angle -= 2 * pi;
+		angle -= 2 * M_PI;
 	}
-	return (int)(angle / (pi / 8));	
+	return (int)(angle / (M_PI / 8));	
 }
 
 int Effect::calDirection()

@@ -53,5 +53,8 @@ public:
 
 	UTime stateBeginTime = 0;
 
+protected:
+	float soundVolume = 1.0;
+
 };
 

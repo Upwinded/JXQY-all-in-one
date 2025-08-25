@@ -1,4 +1,8 @@
-﻿#include "NPC.h"
+﻿#ifndef _USE_MATH_DEFINES
+#define _USE_MATH_DEFINES 
+#endif
+#include <cmath>
+#include "NPC.h"
 #include "../GameManager/GameManager.h"
 
 NPC::NPC()
@@ -389,20 +393,16 @@ UTime NPC::calStepLastTime()
 
 int NPC::calDirection(float angle)
 {
-#ifdef pi
-#undef pi
-#endif // pi
-#define pi 3.1415926
 	if (angle < 0)
 	{
-		angle += 2 * pi;
+		angle += 2 * M_PI;
 	}
-	angle += pi / 8;
-	if (angle > 2 * pi)
+	angle += M_PI / 8;
+	if (angle > 2 * M_PI)
 	{
-		angle -= 2 * pi;
+		angle -= 2 * M_PI;
 	}
-	return (int)(angle / (pi / 4));
+	return (int)(angle / (M_PI / 4));
 }
 
 int NPC::calDirection(Point src, Point dest)
