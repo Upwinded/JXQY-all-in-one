@@ -41,13 +41,13 @@ struct WaterWaveCalculatedParams
 	WaterWaveParams basicParams;
 };
 
-struct WaterColorParams
+struct WaterLightParams
 {
 	float minDistance = 0.0f;
 	float defaultAlpha = 1.0f;
 	float minAlpha = 0.0f;
 	float decay = 100.0f;
-	float lightAngle = 0.0f;
+	float angle = 0.0f;
 };
 
 struct WaterEffectParams
@@ -58,7 +58,7 @@ struct WaterEffectParams
 	int maxClickRipple = 5;
 	std::list<WaterClickRippleParams> clickRipples;
 	WaterClickRippleParams defaultClickRipple;
-	WaterColorParams color;
+	WaterLightParams light;
 };
 
 class WaterEffect
@@ -71,13 +71,14 @@ public:
 
 
 	void clearParams();
+	void initGrid();
 	void setGridSize(int gridSize);
 	void addWave(WaterWaveParams params);
 	void addFixedRipple(WaterRippleParams params);
 	void setDefaultClickRippleParams(WaterClickRippleParams params);
 	void addClickRipple(WaterClickRippleParams params);
 	void addDefaultClickRipple(float x, float y, UTime startTime);
-	void setColorParams(WaterColorParams params);
+	void setLightParams(WaterLightParams params);
 	void setMaxClickRipple(int count);
 
 private:
@@ -91,6 +92,5 @@ private:
 	std::vector<int> _indices;
 
 	void _update(float time);
-	void _initGrid();
 };
 

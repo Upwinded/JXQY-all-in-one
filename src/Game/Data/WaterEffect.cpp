@@ -53,13 +53,13 @@ void WaterEffect::applyPresetParams()
 	waveParams.phi = 0.0f;
 	addWave(waveParams);
 
-	WaterColorParams colorParams;
-	colorParams.decay = 5.0f;
-	colorParams.defaultAlpha = 0.9f;
-	colorParams.lightAngle = 5 * M_PI / 4;
-	colorParams.minAlpha = 0.85f;
-	colorParams.minDistance = 0.0f;
-	setColorParams(colorParams);
+	WaterLightParams lightParams;
+	lightParams.decay = 5.0f;
+	lightParams.defaultAlpha = 0.9f;
+	lightParams.angle = 5 * M_PI / 4;
+	lightParams.minAlpha = 0.85f;
+	lightParams.minDistance = 0.0f;
+	setLightParams(lightParams);
 
 	WaterClickRippleParams waterClickRippleParams;
 	waterClickRippleParams.lifeTime = 5.0f;
@@ -85,7 +85,7 @@ void WaterEffect::setGridSize(int gridSize)
 		return;
 	}
 	_params.gridSize = gridSize;
-	_initGrid();
+	initGrid();
 }
 
 void WaterEffect::addWave(WaterWaveParams params)
@@ -126,9 +126,9 @@ void WaterEffect::addDefaultClickRipple(float x, float y, UTime startTime)
 	addClickRipple(params);
 }
 
-void WaterEffect::setColorParams(WaterColorParams params)
+void WaterEffect::setLightParams(WaterLightParams params)
 {
-	_params.color = params;
+	_params.light = params;
 }
 
 void WaterEffect::setMaxClickRipple(int count)
@@ -222,24 +222,24 @@ void WaterEffect::_update(float time)
 
 		float distance = std::sqrt(dx * dx + dy * dy);
 
-		if (distance > _params.color.minDistance)
+		if (distance > _params.light.minDistance)
 		{
-			_vertices[i].color.a = (distance - _params.color.minDistance) * cos(atan2(-dy, dx) - _params.color.lightAngle) / _params.color.decay + _params.color.defaultAlpha;
+			_vertices[i].color.a = (distance - _params.light.minDistance) * cos(atan2(-dy, dx) - _params.light.angle) / _params.light.decay + _params.light.defaultAlpha;
 		}
 		else
 		{
-			_vertices[i].color.a = _params.color.defaultAlpha;
+			_vertices[i].color.a = _params.light.defaultAlpha;
 		}
 
 		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 0.01f, _verticesLast[i].color.a + 0.01f);
-		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _params.color.minAlpha, 1.0f);
+		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _params.light.minAlpha, 1.0f);
 
 		_verticesLast[i] = _vertices[i];
 
 	}
 }
 
-void WaterEffect::_initGrid()
+void WaterEffect::initGrid()
 {
 	auto engine = Engine::getInstance();
 	_verticesOrigin.clear();
@@ -271,7 +271,7 @@ void WaterEffect::_initGrid()
 			SDL_Vertex v;
 			v.position = { columnX, rowY };
 			v.tex_coord = { coordX, coordY };
-			v.color = { 1.0f, 1.0f, 1.0f, _params.color.defaultAlpha };
+			v.color = { 1.0f, 1.0f, 1.0f, _params.light.defaultAlpha };
 			_vertices.push_back(v);
 			_verticesOrigin.push_back(v);
 			_verticesLast.push_back(v);
