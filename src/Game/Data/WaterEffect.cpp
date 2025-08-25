@@ -32,21 +32,21 @@ void WaterEffect::applyPresetParams()
 
 	setMaxClickRipple(5);
 	WaterRippleParams fixedRippleParams;
-	fixedRippleParams.amplitude = 35.0f;
+	fixedRippleParams.amplitude = 15.0f;
 	fixedRippleParams.density = 0.015f;
-	fixedRippleParams.frequency = 2.6f;
+	fixedRippleParams.frequency = 5.0f;
 	fixedRippleParams.pos = { -100.0f, 600.0f };
 	addFixedRipple(fixedRippleParams);
 
 	WaterWaveParams waveParams;
-	waveParams.amplitude = 10.0f;
+	waveParams.amplitude = 5.0f;
 	waveParams.angle = 5 * M_PI / 6;
 	waveParams.density = 0.02f;
 	waveParams.frequency = 8.0f;
 	waveParams.phi = 1.0f;
 	addWave(waveParams);
 
-	waveParams.amplitude = 15.0f;
+	waveParams.amplitude = 8.0f;
 	waveParams.angle = 7 * M_PI / 6;
 	waveParams.density = 0.01f;
 	waveParams.frequency = 3.0f;
@@ -54,7 +54,7 @@ void WaterEffect::applyPresetParams()
 	addWave(waveParams);
 
 	WaterLightParams lightParams;
-	lightParams.decay = 5.0f;
+	lightParams.decay = 10.0f;
 	lightParams.defaultAlpha = 0.9f;
 	lightParams.angle = 5 * M_PI / 4;
 	lightParams.minAlpha = 0.85f;
@@ -63,7 +63,7 @@ void WaterEffect::applyPresetParams()
 
 	WaterClickRippleParams waterClickRippleParams;
 	waterClickRippleParams.lifeTime = 5.0f;
-	waterClickRippleParams.rippleParams.amplitude = 60.0f;
+	waterClickRippleParams.rippleParams.amplitude = 30.0f;
 	waterClickRippleParams.rippleParams.density = 0.02f;
 	waterClickRippleParams.rippleParams.frequency = 10.0f;
 	setDefaultClickRippleParams(waterClickRippleParams);
