@@ -1,4 +1,4 @@
-﻿#include "Player.h"
+#include "Player.h"
 #include "Map.h"
 #include "../GameManager/GameManager.h"
 
@@ -827,7 +827,7 @@ void Player::onUpdate()
 		nextAction = nullptr;
 	}
 
-	if (running && isStanding())
+	if (running && (isStanding() || isDying() || action == acHide))
 	{
 		running = false;
 	}

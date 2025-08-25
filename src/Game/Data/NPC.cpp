@@ -1,4 +1,4 @@
-﻿#ifndef _USE_MATH_DEFINES
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES 
 #endif
 #include <cmath>
@@ -1892,7 +1892,7 @@ void NPC::onUpdate()
 
 	if (running)
 	{
-		if (isStanding())
+		if (isStanding() || isDying() || action == acHide)
 		{
 			running = false;
 		}
@@ -1972,7 +1972,7 @@ void NPC::onUpdate()
 
 	if (running)
 	{
-		if (isStanding())
+		if (isStanding() || isDying() || action == acHide)
 		{
 			running = false;
 		}
