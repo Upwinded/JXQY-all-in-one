@@ -182,6 +182,8 @@
 		DC516B8A2E50C36D006CF61E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7A2E503959006CF61E /* Foundation.framework */; };
 		DC516B8C2E50C36F006CF61E /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7E2E50396A006CF61E /* IOKit.framework */; };
 		DC516B912E55E947006CF61E /* libfmod_iphoneos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */; };
+		DC516B942E5C9B7F006CF61E /* WaterEffect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */; };
+		DC516B952E5C9B7F006CF61E /* WaterEffect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */; };
 		DC9FE5D22E4CAFF70099790F /* minilzo.c in Sources */ = {isa = PBXBuildFile; fileRef = DC9FE5CE2E4CAFF70099790F /* minilzo.c */; };
 		DC9FE5D42E4CAFF70099790F /* minilzo.c in Sources */ = {isa = PBXBuildFile; fileRef = DC9FE5CE2E4CAFF70099790F /* minilzo.c */; };
 		DC9FE61A2E4CB0590099790F /* lobject.c in Sources */ = {isa = PBXBuildFile; fileRef = DC9FE5FA2E4CB0590099790F /* lobject.c */; };
@@ -529,6 +531,8 @@
 		DC516B7C2E503961006CF61E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AVFoundation.framework; sourceTree = DEVELOPER_DIR; };
 		DC516B7E2E50396A006CF61E /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/IOKit.framework; sourceTree = DEVELOPER_DIR; };
 		DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfmod_iphoneos.a; path = ../../ThirdParty/devel/mac_ios/fmod/ios/lib/libfmod_iphoneos.a; sourceTree = "<group>"; };
+		DC516B922E5C9B7F006CF61E /* WaterEffect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WaterEffect.h; sourceTree = "<group>"; };
+		DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WaterEffect.cpp; sourceTree = "<group>"; };
 		DC9FE5CA2E4CAFF70099790F /* lzoconf.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lzoconf.h; path = "/Users/wanghexi/program/jxqy-all-in-one-private/ThirdParty/minilzo/lzoconf.h"; sourceTree = "<absolute>"; };
 		DC9FE5CB2E4CAFF70099790F /* lzodefs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lzodefs.h; path = "/Users/wanghexi/program/jxqy-all-in-one-private/ThirdParty/minilzo/lzodefs.h"; sourceTree = "<absolute>"; };
 		DC9FE5CD2E4CAFF70099790F /* minilzo.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = minilzo.h; path = "/Users/wanghexi/program/jxqy-all-in-one-private/ThirdParty/minilzo/minilzo.h"; sourceTree = "<absolute>"; };
@@ -951,6 +955,8 @@
 				8DCE5BA42AC41A3D00BBCF22 /* Memo.h */,
 				8DCE5BA52AC41A3D00BBCF22 /* PartnerManager.h */,
 				8DCE5BA62AC41A3D00BBCF22 /* Goods.h */,
+				DC516B922E5C9B7F006CF61E /* WaterEffect.h */,
+				DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */,
 			);
 			path = Data;
 			sourceTree = "<group>";
@@ -1311,6 +1317,7 @@
 				DC9FE6532E4CB0590099790F /* ltm.c in Sources */,
 				DC9FE6542E4CB0590099790F /* lcorolib.c in Sources */,
 				DC9FE6552E4CB0590099790F /* loadlib.c in Sources */,
+				DC516B942E5C9B7F006CF61E /* WaterEffect.cpp in Sources */,
 				DC9FE6562E4CB0590099790F /* ldblib.c in Sources */,
 				DC9FE6572E4CB0590099790F /* lundump.c in Sources */,
 				DC9FE6592E4CB0590099790F /* llex.c in Sources */,
@@ -1434,6 +1441,7 @@
 				DC9FE62D2E4CB0590099790F /* ltm.c in Sources */,
 				DC9FE62E2E4CB0590099790F /* lcorolib.c in Sources */,
 				DC9FE62F2E4CB0590099790F /* loadlib.c in Sources */,
+				DC516B952E5C9B7F006CF61E /* WaterEffect.cpp in Sources */,
 				DC9FE6302E4CB0590099790F /* ldblib.c in Sources */,
 				DC9FE6312E4CB0590099790F /* lundump.c in Sources */,
 				DC9FE6332E4CB0590099790F /* llex.c in Sources */,
