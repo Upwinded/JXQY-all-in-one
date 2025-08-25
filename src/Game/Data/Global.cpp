@@ -41,7 +41,7 @@ void Global::load()
 	data.NPCAI = ini.GetBoolean("Option", "NPCAI", true);
 	data.canInput = ini.GetBoolean("Option", "CanInput", true);
     
-    data.water = ini.GetBoolean("Option", "Water", true);
+    data.water = ini.GetBoolean("Option", "Water", false);
     data.rainFile = ini.Get("Option", "RainFile", "");
 
 }
