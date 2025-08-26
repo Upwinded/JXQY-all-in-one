@@ -1,32 +1,37 @@
 @echo off
+chcp 65001 > nul
 setlocal enabledelayedexpansion
 
-:: ²ÎÊı¼ì²é
+:: å‚æ•°æ£€æŸ¥
 if "%~1"=="" (
-    echo ´íÎó£ºÇëÖ¸¶¨ĞÂ°æ±¾ºÅ£¨ÀıÈç£ºupdate_version.bat 1.4.1£©
+    echo é”™è¯¯ï¼šè¯·æŒ‡å®šæ–°ç‰ˆæœ¬å·ï¼ˆä¾‹å¦‚ï¼šupdate_version.bat 1.4.1ï¼‰
     exit /b 1
 )
 set "new_version=%~1"
 
-:: ¹¤¾ßÒÀÀµ¼ì²é£¨Ğè°²×°Git for Windows£©
+:: å·¥å…·ä¾èµ–æ£€æŸ¥ï¼ˆéœ€å®‰è£…Git for Windowsï¼‰
 where sed >nul 2>&1
 if %errorlevel% neq 0 (
-    echo ĞèÒª°²×° Git for Windows ÒÔÌá¹© sed ¹¤¾ß
-    echo ÏÂÔØµØÖ·£ºhttps://git-scm.com/download/win
+    where git >nul 2>&1
+    if %errorlevel% neq 0 (
+        echo éœ€è¦å®‰è£… Git for Windows ä»¥æä¾› sed å·¥å…·
+        echo ä¸‹è½½åœ°å€ï¼šhttps://git-scm.com/download/win
+    )
+    echo è¯·ä½¿ç”¨git bashè¿è¡Œæ­¤è„šæœ¬
     exit /b 1
 )
 
-:: µİ¹é´¦ÀíËùÓĞÆ½Ì¨ÎÄ¼ş
+:: é€’å½’å¤„ç†æ‰€æœ‰å¹³å°æ–‡ä»¶
 for /r %%f in (.) do (
     pushd "%%f"
     call :process_files
     popd
 )
-echo ËùÓĞÆ½Ì¨°æ±¾ºÅÒÑ¸üĞÂÎª %new_version% £¬µ«ÇëÊÖ¶¯¼ì²é£¡
+echo æ‰€æœ‰å¹³å°ç‰ˆæœ¬å·å·²æ›´æ–°ä¸º %new_version% ï¼Œä½†è¯·æ‰‹åŠ¨æ£€æŸ¥ï¼
 exit /b 0
 
 :process_files
-:: 1. Windows .rc ÎÄ¼ş´¦Àí
+:: 1. Windows .rc æ–‡ä»¶å¤„ç†
 set "win_file=../win/jxqy-all-in-one/jxqy-all-in-one.rc"
 set "win_new_version=%new_version:.=,%"
 sed -i "s/""FileVersion"", ""[0-9.]\+""/""FileVersion"", ""%new_version%.0""/g" "%win_file%"
@@ -34,15 +39,15 @@ sed -i "s/""ProductVersion"", ""[0-9.]\+""/""ProductVersion"", ""%new_version%.0
 sed -i "s/FILEVERSION [0-9,]\+/FILEVERSION %win_new_version%,0/g" "%win_file%"
 sed -i "s/PRODUCTVERSION [0-9,]\+/PRODUCTVERSION %win_new_version%,0/g" "%win_file%"
 
-:: 2. Xcode .pbxproj ÎÄ¼ş´¦Àí
+:: 2. Xcode .pbxproj æ–‡ä»¶å¤„ç†
 set "xcode_file=../macos_ios/jxqy/jxqy.xcodeproj/project.pbxproj"
 sed -i "s/MARKETING_VERSION = [0-9.]\+/MARKETING_VERSION = %new_version%/g" "%xcode_file%"
 
-:: 3. Android build.gradle ´¦Àí
+:: 3. Android build.gradle å¤„ç†
 set "android_file=../android/app/build.gradle"
 sed -i "s/appVersion = ""[0-9.]\+""/appVersion = ""%new_version%""/g" "%android_file%"
 
-:: 4. CMakeLists.txt ´¦Àí
+:: 4. CMakeLists.txt å¤„ç†
 set "linux_file=../linux/CMakeLists.txt"
 sed -i "s/PROJECT_VERSION [0-9.]\+/PROJECT_VERSION %new_version%/g" "%linux_file%"
 
