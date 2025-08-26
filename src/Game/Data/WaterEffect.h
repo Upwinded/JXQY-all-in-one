@@ -69,7 +69,6 @@ public:
 
 	void applyPresetParams();
 
-
 	void clearParams();
 	void initGrid();
 	void setGridSize(int gridSize);

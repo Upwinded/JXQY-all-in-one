@@ -67,7 +67,7 @@ android {
     applicationVariants.all { variant ->
         // tasks["merge${variant.name.capitalize()}Assets"]
         //     .dependsOn("externalNativeBuild${variant.name.capitalize()}")
-        def outputAPKName = "${appName}_${variant.name}_${appVersion}.apk";
+        def outputAPKName = "${appName}_${variant.name}_v${appVersion}.apk";
         def outputApkPath = variant.getPackageApplicationProvider().get().outputDirectory.getAsFile().get().getPath()
         variant.outputs.all {
             outputFileName = outputAPKName

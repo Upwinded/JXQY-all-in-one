@@ -138,7 +138,7 @@ public:
 	void deleteNPCFromDataMap(Point pos, std::shared_ptr<NPC> npc);
 	void addNPCToDataMap(Point pos, std::shared_ptr<NPC> npc);
 
-	void freeResource();
+	virtual void freeResource() override;
 	void freeMpc();
 	void freeData();
 	void drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle);

@@ -70,7 +70,7 @@ protected:
 		return component;
 	}
 
-	void freeResource();
+	virtual void freeResource() override;
 
 	void resetRect(PElement e, int x, int y);
 	void resetRect();
