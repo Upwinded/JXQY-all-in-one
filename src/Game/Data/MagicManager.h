@@ -6,7 +6,7 @@
 struct MagicInfo
 {
 	std::shared_ptr<Magic> magic = nullptr;
-	std::string iniFile = "";
+	std::string iniFile = u8"";
 	int level = 0;
 	int exp = 0;
 };

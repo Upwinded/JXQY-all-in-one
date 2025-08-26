@@ -36,7 +36,7 @@ public:
 	Magic magic;
 	std::shared_ptr<GameElement> user = nullptr;
 	std::shared_ptr<GameElement> target = nullptr;
-	std::string fileName = "";
+	std::string fileName = u8"";
 	int doing = ekExploding;
 	int level = 0;
 	int launcherKind = lkSelf;

@@ -4,7 +4,7 @@
 
 struct GoodsInfo
 {
-	std::string iniFile = "";
+	std::string iniFile = u8"";
 	int number = 0;
 	std::shared_ptr<Goods> goods = nullptr;
 };

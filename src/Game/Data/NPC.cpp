@@ -7,7 +7,7 @@
 
 NPC::NPC()
 {
-	name = "npc";
+	name = u8"npc";
 	priority = epNPC;
 	rect.w = TILE_WIDTH - 20;
 	rect.h = (int)((float)TILE_HEIGHT * 2.5);
@@ -423,45 +423,45 @@ void NPC::saveToIni(INIReader * ini, const std::string & section)
 		return;
 	}
 
-	ini->Set(section, "Name", npcName);
-	ini->SetInteger(section, "Kind", kind);
-	ini->Set(section, "NPCIni", npcIni);
-	ini->SetInteger(section, "Dir", direction);
-	ini->SetInteger(section, "MapX", position.x);
-	ini->SetInteger(section, "MapY", position.y);
-	ini->SetInteger(section, "CurrPos", currPos);
-	ini->SetInteger(section, "Action", action);
-	ini->SetInteger(section, "WalkSpeed", walkSpeed);
-	ini->SetInteger(section, "StandSpeed", standSpeed);
-	ini->SetInteger(section, "PathFinder", pathFinder);
-	ini->SetInteger(section, "DialogRadius", dialogRadius);
-	ini->Set(section, "ScriptFile", scriptFile);
-	ini->SetInteger(section, "State", state);
-	ini->SetInteger(section, "Relation", relation);
-	ini->SetInteger(section, "Life", life);
-	ini->SetInteger(section, "LifeMax", lifeMax);
-	ini->SetInteger(section, "Thew", thew);
-	ini->SetInteger(section, "ThewMax", thewMax);
-	ini->SetInteger(section, "Mana", mana);
-	ini->SetInteger(section, "ManaMax", manaMax);
-	ini->SetInteger(section, "Attack", attack);
-	ini->SetInteger(section, "Defend", defend);
-	ini->SetInteger(section, "Evade", evade);
-	ini->SetInteger(section, "Duck", duck);
-	ini->SetInteger(section, "Exp", exp);
+	ini->Set(section, u8"Name", npcName);
+	ini->SetInteger(section, u8"Kind", kind);
+	ini->Set(section, u8"NPCIni", npcIni);
+	ini->SetInteger(section, u8"Dir", direction);
+	ini->SetInteger(section, u8"MapX", position.x);
+	ini->SetInteger(section, u8"MapY", position.y);
+	ini->SetInteger(section, u8"CurrPos", currPos);
+	ini->SetInteger(section, u8"Action", action);
+	ini->SetInteger(section, u8"WalkSpeed", walkSpeed);
+	ini->SetInteger(section, u8"StandSpeed", standSpeed);
+	ini->SetInteger(section, u8"PathFinder", pathFinder);
+	ini->SetInteger(section, u8"DialogRadius", dialogRadius);
+	ini->Set(section, u8"ScriptFile", scriptFile);
+	ini->SetInteger(section, u8"State", state);
+	ini->SetInteger(section, u8"Relation", relation);
+	ini->SetInteger(section, u8"Life", life);
+	ini->SetInteger(section, u8"LifeMax", lifeMax);
+	ini->SetInteger(section, u8"Thew", thew);
+	ini->SetInteger(section, u8"ThewMax", thewMax);
+	ini->SetInteger(section, u8"Mana", mana);
+	ini->SetInteger(section, u8"ManaMax", manaMax);
+	ini->SetInteger(section, u8"Attack", attack);
+	ini->SetInteger(section, u8"Defend", defend);
+	ini->SetInteger(section, u8"Evade", evade);
+	ini->SetInteger(section, u8"Duck", duck);
+	ini->SetInteger(section, u8"Exp", exp);
 
-	ini->SetInteger(section, "LevelUpExp", levelUpExp);
-	ini->SetInteger(section, "Level", level);
-	ini->SetInteger(section, "AttackLevel", attackLevel);
-	ini->SetInteger(section, "MagicLevel", magicLevel);
-	ini->SetInteger(section, "Lum", lum);
-	ini->SetInteger(section, "VisionRadius", visionRadius);
-	ini->SetInteger(section, "AttackRadius", attackRadius);
-	ini->Set(section, "BodyIni", bodyIni);
-	ini->Set(section, "FlyIni", flyIni);
-	ini->Set(section, "FlyIni2", flyIni2);
-	ini->Set(section, "MagicIni", magicIni);
-	ini->Set(section, "DeathScript", deathScript);
+	ini->SetInteger(section, u8"LevelUpExp", levelUpExp);
+	ini->SetInteger(section, u8"Level", level);
+	ini->SetInteger(section, u8"AttackLevel", attackLevel);
+	ini->SetInteger(section, u8"MagicLevel", magicLevel);
+	ini->SetInteger(section, u8"Lum", lum);
+	ini->SetInteger(section, u8"VisionRadius", visionRadius);
+	ini->SetInteger(section, u8"AttackRadius", attackRadius);
+	ini->Set(section, u8"BodyIni", bodyIni);
+	ini->Set(section, u8"FlyIni", flyIni);
+	ini->Set(section, u8"FlyIni2", flyIni2);
+	ini->Set(section, u8"MagicIni", magicIni);
+	ini->Set(section, u8"DeathScript", deathScript);
 }
 
 void NPC::loadActionRes(NPCActionRes * npcAction)
@@ -480,17 +480,17 @@ void NPC::initActionFromIni(NPCActionRes * npcAction, INIReader * iniReader, con
 	{
 		return;
 	}
-	npcAction->imageFile = iniReader->Get(section, "Image", "");
-	npcAction->shadowFile = iniReader->Get(section, "Shade", "");
-	npcAction->soundFile = iniReader->Get(section, "Sound", "");
+	npcAction->imageFile = iniReader->Get(section, u8"Image", u8"");
+	npcAction->shadowFile = iniReader->Get(section, u8"Shade", u8"");
+	npcAction->soundFile = iniReader->Get(section, u8"Sound", u8"");
 	loadActionRes(npcAction);
 }
 
 void NPC::loadSpecialAction(const std::string & fileName)
 {
 	res.special.imageFile = fileName;
-	res.special.shadowFile = convert::extractFileName(fileName) + ".shd";
-	res.special.soundFile = "";
+	res.special.shadowFile = convert::extractFileName(fileName) + u8".shd";
+	res.special.soundFile = u8"";
 	loadActionRes(&res.special);
 }
 
@@ -533,8 +533,8 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 	{
 	case acStand:
 		res.stand.imageFile = fileName;
-		res.stand.shadowFile = convert::extractFileName(fileName) + ".shd";
-		res.stand.soundFile = "";
+		res.stand.shadowFile = convert::extractFileName(fileName) + u8".shd";
+		res.stand.soundFile = u8"";
 		loadActionRes(&res.stand);
 		if (nowAction == acStand)
 		{
@@ -543,8 +543,8 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 		break;
 	case acStand1:
 		res.stand1.imageFile = fileName;
-		res.stand1.shadowFile = convert::extractFileName(fileName) + ".shd";
-		res.stand1.soundFile = "";
+		res.stand1.shadowFile = convert::extractFileName(fileName) + u8".shd";
+		res.stand1.soundFile = u8"";
 		loadActionRes(&res.stand1);
 		if (nowAction == acStand1)
 		{
@@ -904,7 +904,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 
 	// TODO: FIXME: 
     //妈的不知道为什么，假独孤剑打不过赵升权，此处加了特殊处理,假独孤剑打其它人时不掉血，通常使用应删除
-//    if (npcName == "独孤剑" && e->user != gm->player)
+//    if (npcName == u8"独孤剑" && e->user != gm->player)
 //    {
 //        damage = 0;
 //    }
@@ -1199,7 +1199,7 @@ void NPC::useMagic(std::shared_ptr<Magic> m, Point dest, int level, std::shared_
 
 void NPC::addBody()
 {
-	if (bodyIni != "")
+	if (bodyIni != u8"")
 	{
 		gm->objectManager->addObject(bodyIni, position.x, position.y, direction);
 	}
@@ -1312,7 +1312,7 @@ void NPC::beginHurt()
 
 void NPC::checkDie()
 {
-	if (deathScript != "")
+	if (deathScript != u8"")
 	{
 		beginDieScript();
 	}
@@ -1325,7 +1325,7 @@ void NPC::checkDie()
 void NPC::beginDieScript()
 {
 	beginDie();
-	if (deathScript != "")
+	if (deathScript != u8"")
 	{
 		result |= erRunDeathScript;
 	}
@@ -1626,7 +1626,7 @@ bool NPC::isFollower()
 	{
 		return true;
 	}
-	else if (followNPC != "")
+	else if (followNPC != u8"")
 	{
 		auto fnpc = gm->npcManager->findNPC(followNPC);
 
@@ -1636,7 +1636,7 @@ bool NPC::isFollower()
 		}
 		else
 		{
-			followNPC = "";
+			followNPC = u8"";
 		}
 	}
 
@@ -1691,7 +1691,7 @@ void NPC::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorSt
 		_shared_image image = getActionImage(&offsetX, &offsetY);
 		engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 0, 0, 220);
 	}
-	else if (selecting && scriptFile != "")
+	else if (selecting && scriptFile != u8"")
 	{
 		_shared_image image = getActionImage(&offsetX, &offsetY);
 		engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 200, 0, 180);
@@ -1722,7 +1722,7 @@ void NPC::drawNPCAlpha(Point cenTile, Point cenScreen, PointEx coffset)
 		engine->drawImageWithMaskEx(image, pos.x + (int)round(offset.x) - offsetX, pos.y + (int)round(offset.y) - offsetY, 200, 0, 0, 220);
 		engine->setImageAlpha(image, 255);
 	}
-	else if (scriptFile != "")
+	else if (scriptFile != u8"")
 	{
 		_shared_image image = getActionImage(&offsetX, &offsetY);
 		engine->setImageAlpha(image, 128);
@@ -1768,56 +1768,56 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 		return;
 	}
 
-	//std::string section = "Init";
+	//std::string section = u8"Init";
 	getFrameTime();
 	destGE = nullptr;
 	attackTarget = nullptr;
-	npcName = ini->Get(section, "Name", "");
-	kind = ini->GetInteger(section, "Kind", nkNormal);
-	npcIni = ini->Get(section, "NPCIni", "");
-	direction = ini->GetInteger(section, "Dir", 0);
-	position.x = ini->GetInteger(section, "MapX", 0);
-	position.y = ini->GetInteger(section, "MapY", 0);
+	npcName = ini->Get(section, u8"Name", u8"");
+	kind = ini->GetInteger(section, u8"Kind", nkNormal);
+	npcIni = ini->Get(section, u8"NPCIni", u8"");
+	direction = ini->GetInteger(section, u8"Dir", 0);
+	position.x = ini->GetInteger(section, u8"MapX", 0);
+	position.y = ini->GetInteger(section, u8"MapY", 0);
 	//int dir = 0; //direction
 	//int mapX = 0; //position.x
 	//int mapY = 0; //position.y
-	currPos = ini->GetInteger(section, "CurrPos", 0);
-	action = ini->GetInteger(section, "Action", naNone);
-	walkSpeed = ini->GetInteger(section, "WalkSpeed", 1);
+	currPos = ini->GetInteger(section, u8"CurrPos", 0);
+	action = ini->GetInteger(section, u8"Action", naNone);
+	walkSpeed = ini->GetInteger(section, u8"WalkSpeed", 1);
 	if (walkSpeed == 0)
 	{
 		walkSpeed = 1;
 	}
-	standSpeed = ini->GetInteger(section, "StandSpeed", 0);
-	pathFinder = ini->GetInteger(section, "PathFinder", pfSingle);
-	dialogRadius = ini->GetInteger(section, "DialogRadius", 1);
-	scriptFile = ini->Get(section, "ScriptFile", "");
-	state = ini->GetInteger(section, "State", state);
-	relation = ini->GetInteger(section, "Relation", nrFriendly);
-	life = ini->GetInteger(section, "Life", 0);
-	lifeMax = ini->GetInteger(section, "LifeMax", 0);
-	thew = ini->GetInteger(section, "Thew", 0);
-	thewMax = ini->GetInteger(section, "ThewMax", 0);
-	mana = ini->GetInteger(section, "Mana", 0);
-	manaMax = ini->GetInteger(section, "ManaMax", 0);
-	attack = ini->GetInteger(section, "Attack", 0);
-	defend = ini->GetInteger(section, "Defend", 0);
-	evade = ini->GetInteger(section, "Evade", 0);
-	duck = ini->GetInteger(section, "Duck", 0);
-	exp = ini->GetInteger(section, "Exp", 0);
+	standSpeed = ini->GetInteger(section, u8"StandSpeed", 0);
+	pathFinder = ini->GetInteger(section, u8"PathFinder", pfSingle);
+	dialogRadius = ini->GetInteger(section, u8"DialogRadius", 1);
+	scriptFile = ini->Get(section, u8"ScriptFile", u8"");
+	state = ini->GetInteger(section, u8"State", state);
+	relation = ini->GetInteger(section, u8"Relation", nrFriendly);
+	life = ini->GetInteger(section, u8"Life", 0);
+	lifeMax = ini->GetInteger(section, u8"LifeMax", 0);
+	thew = ini->GetInteger(section, u8"Thew", 0);
+	thewMax = ini->GetInteger(section, u8"ThewMax", 0);
+	mana = ini->GetInteger(section, u8"Mana", 0);
+	manaMax = ini->GetInteger(section, u8"ManaMax", 0);
+	attack = ini->GetInteger(section, u8"Attack", 0);
+	defend = ini->GetInteger(section, u8"Defend", 0);
+	evade = ini->GetInteger(section, u8"Evade", 0);
+	duck = ini->GetInteger(section, u8"Duck", 0);
+	exp = ini->GetInteger(section, u8"Exp", 0);
 
-	levelUpExp = ini->GetInteger(section, "LevelUpExp", 0);
-	level = ini->GetInteger(section, "Level", 0);
-	attackLevel = ini->GetInteger(section, "AttackLevel", 0);
-	magicLevel = ini->GetInteger(section, "MagicLevel", 0);
-	lum = ini->GetInteger(section, "Lum", nlNone);
-	visionRadius = ini->GetInteger(section, "VisionRadius", 0);
-	attackRadius = ini->GetInteger(section, "AttackRadius", 0);
-	bodyIni = ini->Get(section, "BodyIni", "");
-	flyIni = ini->Get(section, "FlyIni", "");
-	flyIni2 = ini->Get(section, "FlyIni2", "");
-	magicIni = ini->Get(section, "MagicIni", "");
-	deathScript = ini->Get(section, "DeathScript", "");
+	levelUpExp = ini->GetInteger(section, u8"LevelUpExp", 0);
+	level = ini->GetInteger(section, u8"Level", 0);
+	attackLevel = ini->GetInteger(section, u8"AttackLevel", 0);
+	magicLevel = ini->GetInteger(section, u8"MagicLevel", 0);
+	lum = ini->GetInteger(section, u8"Lum", nlNone);
+	visionRadius = ini->GetInteger(section, u8"VisionRadius", 0);
+	attackRadius = ini->GetInteger(section, u8"AttackRadius", 0);
+	bodyIni = ini->Get(section, u8"BodyIni", u8"");
+	flyIni = ini->Get(section, u8"FlyIni", u8"");
+	flyIni2 = ini->Get(section, u8"FlyIni2", u8"");
+	magicIni = ini->Get(section, u8"MagicIni", u8"");
+	deathScript = ini->Get(section, u8"DeathScript", u8"");
 	npcMagic = gm->magicManager.loadAttackMagic(flyIni);
 	npcMagic2 = gm->magicManager.loadAttackMagic(flyIni2);
 	initRes(npcIni);
@@ -1826,7 +1826,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 
 	if (name.compare("player") != 0)
 	{
-		name = "npc-" + npcName;
+		name = u8"npc-" + npcName;
 	}
 }
 
@@ -1870,9 +1870,9 @@ void NPC::freeNPCAction(NPCActionRes * act)
 		return;
 	}
 	freeActionImage(act);
-	act->imageFile = "";
-	act->shadowFile = "";
-	act->soundFile = "";
+	act->imageFile = u8"";
+	act->shadowFile = u8"";
+	act->soundFile = u8"";
 }
 
 void NPC::freeActionImage(NPCActionRes * act)
@@ -1924,13 +1924,13 @@ void NPC::onUpdate()
 		updateAction(ft);
 	}
 	
-	if (kind != nkBattle && scriptFile == "")
+	if (kind != nkBattle && scriptFile == u8"")
 	{
 		//设置无用人物检测范围到屏幕外
 		rect.x = -rect.w - 100;
 		rect.y = -rect.h - 100;
 	}
-	else if (kind == nkBattle && relation == nrFriendly && scriptFile == "")
+	else if (kind == nkBattle && relation == nrFriendly && scriptFile == u8"")
 	{
 		//设置无用人物检测范围到屏幕外
 		rect.x = -rect.w - 100;
@@ -1997,7 +1997,7 @@ void NPC::updateAction(UTime frameTime)
 				haveDest = false;
 			}
 		}	
-		else if (followNPC != "" || kind == nkPartner)
+		else if (followNPC != u8"" || kind == nkPartner)
 		{
 			std::shared_ptr<NPC> fnpc = nullptr;
 			if (kind == nkPartner)
@@ -2036,7 +2036,7 @@ void NPC::updateAction(UTime frameTime)
 			}
 			else
 			{
-				followNPC = "";
+				followNPC = u8"";
 			}
 		}	
 		else if (isStanding() && getUpdateTime() - actionBeginTime >= actionLastTime)
@@ -2083,7 +2083,7 @@ void NPC::updateAction(UTime frameTime)
 			{			
 				bool canWalkNextStep = false;
 				stepList.erase(stepList.begin());
-				if (followNPC != "" || kind == nkPartner)
+				if (followNPC != u8"" || kind == nkPartner)
 				{
 					canWalkNextStep = true;
 					std::shared_ptr<NPC> fnpc = nullptr;
@@ -2134,7 +2134,7 @@ void NPC::updateAction(UTime frameTime)
 					}
 					else
 					{
-						followNPC = "";
+						followNPC = u8"";
 					}
 				}
 				if (stepList.size() > 0 && (gm->map->canWalk(stepList[0])))

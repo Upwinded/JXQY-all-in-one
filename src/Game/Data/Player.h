@@ -22,7 +22,7 @@ struct LevelInfo
 	int attack = 0;
 	int defend = 0;
 	int evade = 0;
-	std::string newMagic = "";
+	std::string newMagic = u8"";
 };
 
 struct LevelList
@@ -142,7 +142,7 @@ public:
 	bool canHurt();
 	void checkTrap();
 
-	std::string levelIni = "";
+	std::string levelIni = u8"";
 
 	LevelList levelList;
 

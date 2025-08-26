@@ -22,7 +22,7 @@ std::vector<std::string> SaveFileManager::readFileList(int index)
 	std::vector<std::string> fileList;
 	for (int i = 0; i < count; i++)
 	{
-		fileList.push_back(ini.Get(SAVE_LIST_SECTION, convert::formatString("%d", i), ""));
+		fileList.push_back(ini.Get(SAVE_LIST_SECTION, convert::formatString("%d", i), u8""));
 	}
 	return fileList;
 }

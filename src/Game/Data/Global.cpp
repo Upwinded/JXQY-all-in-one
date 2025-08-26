@@ -19,30 +19,30 @@ void Global::load()
 	fileName = SAVE_CURRENT_FOLDER + fileName;
 	INIReader ini(fileName);
 
-	gameType = ini.GetInteger("Game", "Type", gameType);
+	gameType = ini.GetInteger("Game", u8"Type", gameType);
 
-	useWav = ini.GetBoolean("Game", "UseWav", false);
+	useWav = ini.GetBoolean("Game", u8"UseWav", false);
 
-	data.mapName = ini.Get("State", "Map", "");
-	data.npcName = ini.Get("State", "Npc", "");
-	data.objName = ini.Get("State", "Obj", "");
-	data.bgmName = ini.Get("State", "Bgm", "");
+	data.mapName = ini.Get("State", u8"Map", u8"");
+	data.npcName = ini.Get("State", u8"Npc", u8"");
+	data.objName = ini.Get("State", u8"Obj", u8"");
+	data.bgmName = ini.Get("State", u8"Bgm", u8"");
 
-    data.characterIndex = ini.GetInteger("State", "Chr", -1);
+    data.characterIndex = ini.GetInteger("State", u8"Chr", -1);
 
-    data.asfStyle = ini.GetColor("Option", "AsfStyle", 0xFFFFFF);
-    data.mpcStyle = ini.GetColor("Option", "MpcStyle", 0xFFFFFF);
+    data.asfStyle = ini.GetColor("Option", u8"AsfStyle", 0xFFFFFF);
+    data.mpcStyle = ini.GetColor("Option", u8"MpcStyle", 0xFFFFFF);
     
-    data.mainLum = ini.GetInteger("Option", "MainLum", 31);
-	data.fadeLum = ini.GetInteger("Option", "FadeLum", 31);
-	data.mapTime = ini.GetInteger("Option", "mapTime", mtDay);
-	data.snowShow = ini.GetBoolean("Option", "SnowShow", false);
-	data.rainShow = ini.GetBoolean("Option", "RainShow", false);
-	data.NPCAI = ini.GetBoolean("Option", "NPCAI", true);
-	data.canInput = ini.GetBoolean("Option", "CanInput", true);
+    data.mainLum = ini.GetInteger("Option", u8"MainLum", 31);
+	data.fadeLum = ini.GetInteger("Option", u8"FadeLum", 31);
+	data.mapTime = ini.GetInteger("Option", u8"mapTime", mtDay);
+	data.snowShow = ini.GetBoolean("Option", u8"SnowShow", false);
+	data.rainShow = ini.GetBoolean("Option", u8"RainShow", false);
+	data.NPCAI = ini.GetBoolean("Option", u8"NPCAI", true);
+	data.canInput = ini.GetBoolean("Option", u8"CanInput", true);
     
-    data.water = ini.GetBoolean("Option", "Water", false);
-    data.rainFile = ini.Get("Option", "RainFile", "");
+    data.water = ini.GetBoolean("Option", u8"Water", false);
+    data.rainFile = ini.Get("Option", u8"RainFile", u8"");
 
 }
 void Global::save()
@@ -51,29 +51,29 @@ void Global::save()
 	fileName = SAVE_CURRENT_FOLDER + fileName;
 	INIReader ini(fileName);
 
-	ini.SetInteger("Game", "Type", gameType);
-	ini.SetBoolean("Game", "UseWav", useWav);
+	ini.SetInteger("Game", u8"Type", gameType);
+	ini.SetBoolean("Game", u8"UseWav", useWav);
 
-	ini.Set("State", "Map", data.mapName);
-	ini.Set("State", "Npc", data.npcName);
-	ini.Set("State", "Obj", data.objName);
-	ini.Set("State", "Bgm", data.bgmName);
+	ini.Set("State", u8"Map", data.mapName);
+	ini.Set("State", u8"Npc", data.npcName);
+	ini.Set("State", u8"Obj", data.objName);
+	ini.Set("State", u8"Bgm", data.bgmName);
     
-    ini.SetInteger("State", "Chr", data.characterIndex);
+    ini.SetInteger("State", u8"Chr", data.characterIndex);
     
-    ini.SetColor("Option", "AsfStyle", data.asfStyle);
-    ini.SetColor("Option", "MpcStyle", data.mpcStyle);
+    ini.SetColor("Option", u8"AsfStyle", data.asfStyle);
+    ini.SetColor("Option", u8"MpcStyle", data.mpcStyle);
 
-	ini.SetInteger("Option", "MainLum", data.mainLum);
-	ini.SetInteger("Option", "FadeLum", data.fadeLum);
-	ini.SetInteger("Option", "mapTime", data.mapTime);
-	ini.SetBoolean("Option", "SnowShow", data.snowShow);
-	ini.SetBoolean("Option", "RainShow", data.rainShow);
-	ini.SetBoolean("Option", "NPCAI", data.NPCAI);
-	ini.SetBoolean("Option", "CanInput", data.canInput);
+	ini.SetInteger("Option", u8"MainLum", data.mainLum);
+	ini.SetInteger("Option", u8"FadeLum", data.fadeLum);
+	ini.SetInteger("Option", u8"mapTime", data.mapTime);
+	ini.SetBoolean("Option", u8"SnowShow", data.snowShow);
+	ini.SetBoolean("Option", u8"RainShow", data.rainShow);
+	ini.SetBoolean("Option", u8"NPCAI", data.NPCAI);
+	ini.SetBoolean("Option", u8"CanInput", data.canInput);
     
-    ini.SetBoolean("Option", "Water", data.water);
-    ini.Set("Option", "RainFile", data.rainFile);
+    ini.SetBoolean("Option", u8"Water", data.water);
+    ini.Set("Option", u8"RainFile", data.rainFile);
 
 	ini.saveToFile(fileName);
 }

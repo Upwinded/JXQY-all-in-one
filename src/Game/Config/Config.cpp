@@ -32,20 +32,20 @@ void Config::load()
     windowWidth = MOBILE_DEFAULT_WINDOW_WIDTH;
     windowHeight = MOBILE_DEFAULT_WINDOW_HEIGHT;
 #else
-	fullScreenMode = (FullScreenMode)ini.GetInteger("game", "fullscreenmode", (int)fullScreenMode);
-    fullScreenSolutionMode = (FullScreenSolutionMode)ini.GetInteger("game", "fullscreensolutionmode", (int)fullScreenSolutionMode);
-    windowWidth = ini.GetInteger("game", "windowwidth", windowWidth);
-    windowHeight = ini.GetInteger("game", "windowheight", windowHeight);
-	display = ini.GetInteger("game", "display", display);
+	fullScreenMode = (FullScreenMode)ini.GetInteger("game", u8"fullscreenmode", (int)fullScreenMode);
+    fullScreenSolutionMode = (FullScreenSolutionMode)ini.GetInteger("game", u8"fullscreensolutionmode", (int)fullScreenSolutionMode);
+    windowWidth = ini.GetInteger("game", u8"windowwidth", windowWidth);
+    windowHeight = ini.GetInteger("game", u8"windowheight", windowHeight);
+	display = ini.GetInteger("game", u8"display", display);
 #endif
-	playerAlpha = ini.GetBoolean("game", "playeralpha", playerAlpha);
-	loadWithThread = ini.GetBoolean("game", "loadwiththread", loadWithThread);
+	playerAlpha = ini.GetBoolean("game", u8"playeralpha", playerAlpha);
+	loadWithThread = ini.GetBoolean("game", u8"loadwiththread", loadWithThread);
 
-	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
+	auto speed = ini.GetInteger("game", u8"speed", convSpeedToInt(gameSpeed));
 	gameSpeed = convSpeedTofloat(speed);
 
-	float musicVolume = ((float)ini.GetInteger("game", "musicvolume", 100)) / 100.0f;
-	float soundVolume = ((float)ini.GetInteger("game", "soundvolume", 100)) / 100.0f;
+	float musicVolume = ((float)ini.GetInteger("game", u8"musicvolume", 100)) / 100.0f;
+	float soundVolume = ((float)ini.GetInteger("game", u8"soundvolume", 100)) / 100.0f;
 	if (musicVolume < 0.0f)
 	{
 		musicVolume = 0.0f;
@@ -70,14 +70,14 @@ void Config::save()
 {
 	std::string fileName = CONFIG_INI;
 	INIReader ini(fileName);
-	ini.SetInteger("game", "fullscreenmode", (int)fullScreenMode);
-    ini.SetInteger("game", "fullscreensolutionmode", (int)fullScreenSolutionMode);
-	ini.SetBoolean("game", "loadWithThread", loadWithThread);
-	ini.SetBoolean("game", "playeralpha", playerAlpha);
+	ini.SetInteger("game", u8"fullscreenmode", (int)fullScreenMode);
+    ini.SetInteger("game", u8"fullscreensolutionmode", (int)fullScreenSolutionMode);
+	ini.SetBoolean("game", u8"loadWithThread", loadWithThread);
+	ini.SetBoolean("game", u8"playeralpha", playerAlpha);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();
-	//ini.SetReal("game", "speed", gameSpeed);
-	ini.SetInteger("game", "speed", convSpeedToInt(gameSpeed));
+	//ini.SetReal("game", u8"speed", gameSpeed);
+	ini.SetInteger("game", u8"speed", convSpeedToInt(gameSpeed));
 	if (musicVolume < 0.0f)
 	{
 		musicVolume = 0.0f;
@@ -94,11 +94,11 @@ void Config::save()
 	{
 		soundVolume = 1.0f;
 	}
-	ini.SetInteger("game", "musicvolume", (int)(musicVolume * 100));
-	ini.SetInteger("game", "soundvolume", (int)(soundVolume * 100));
-	ini.SetInteger("game", "windowwidth", windowWidth);
-	ini.SetInteger("game", "windowheight", windowHeight);
-	ini.SetInteger("game", "display", display);
+	ini.SetInteger("game", u8"musicvolume", (int)(musicVolume * 100));
+	ini.SetInteger("game", u8"soundvolume", (int)(soundVolume * 100));
+	ini.SetInteger("game", u8"windowwidth", windowWidth);
+	ini.SetInteger("game", u8"windowheight", windowHeight);
+	ini.SetInteger("game", u8"display", display);
 	ini.saveToFile(fileName);
 }
 

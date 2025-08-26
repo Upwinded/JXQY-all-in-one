@@ -2,7 +2,7 @@
 
 TextButton::TextButton()
 {
-	name = "textbutton";
+	name = u8"textbutton";
 	priority = epButton;
 	elementType = etButton;
 	result = erNone;
@@ -47,8 +47,8 @@ void TextButton::setUTF8Str(const std::string& s)
 void TextButton::initFromIni(INIReader & ini)
 {
 	Button::initFromIni(ini);
-	label.fontSize = ini.GetInteger("Init", "Font", label.fontSize);
-	label.color = ini.GetColor("Init", "Color", label.color);
+	label.fontSize = ini.GetInteger("Init", u8"Font", label.fontSize);
+	label.color = ini.GetColor("Init", u8"Color", label.color);
 }
 
 void TextButton::onDraw()

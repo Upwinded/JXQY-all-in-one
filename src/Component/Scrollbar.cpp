@@ -51,21 +51,21 @@ void Scrollbar::initFromIniWithName(INIReader & ini, const std::string& fileName
 {
 	freeResource();
 
-	style = (ScrollbarStyle)ini.GetInteger("Init", "Style", int(style));
-	rect.x = ini.GetInteger("Init", "Left", rect.x);
-	rect.y = ini.GetInteger("Init", "Top", rect.y);
-	rect.w = ini.GetInteger("Init", "Width", rect.w);
-	rect.h = ini.GetInteger("Init", "Height", rect.h);
-	min = ini.GetInteger("Init", "Min", min);
-	max = ini.GetInteger("Init", "Max", max);
-	lineSize = ini.GetInteger("Init", "LineSize", lineSize);
-	pageSize = ini.GetInteger("Init", "PageSize", pageSize);
-	slideBegin = ini.GetInteger("Init", "SlideBegin", slideBegin);
-	slideEnd = ini.GetInteger("Init", "SlideEnd", slideEnd);
-	max = ini.GetInteger("Init", "Max", max);
-	std::string impName = ini.Get("Init", "Image", "");
+	style = (ScrollbarStyle)ini.GetInteger("Init", u8"Style", int(style));
+	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
+	min = ini.GetInteger("Init", u8"Min", min);
+	max = ini.GetInteger("Init", u8"Max", max);
+	lineSize = ini.GetInteger("Init", u8"LineSize", lineSize);
+	pageSize = ini.GetInteger("Init", u8"PageSize", pageSize);
+	slideBegin = ini.GetInteger("Init", u8"SlideBegin", slideBegin);
+	slideEnd = ini.GetInteger("Init", u8"SlideEnd", slideEnd);
+	max = ini.GetInteger("Init", u8"Max", max);
+	std::string impName = ini.Get("Init", u8"Image", u8"");
 	impImage = loadRes(impName);
-	std::string slideBtnIni = ini.Get("Init", "SlideBtn", "");
+	std::string slideBtnIni = ini.Get("Init", u8"SlideBtn", u8"");
 	slideBtnIni = convert::extractFilePath(fileName) + slideBtnIni;
 	slideBtn = std::make_shared<DragButton>();
 	addChild(slideBtn);

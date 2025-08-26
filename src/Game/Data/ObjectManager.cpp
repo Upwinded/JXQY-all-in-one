@@ -50,7 +50,7 @@ std::shared_ptr<Object> ObjectManager::findNearestScriptViewObj(Point pos, int r
 	for (size_t i = 0; i < objectList.size(); i++)
 	{
 		auto tempObj = objectList[i];
-		if (tempObj != nullptr && tempObj->scriptFile != "")
+		if (tempObj != nullptr && tempObj->scriptFile != u8"")
 		{
 			auto tempDistance = gm->map->calDistance(tempObj->position, pos);
 			if (tempDistance < distance && gm->map->canView(pos, tempObj->position))
@@ -79,7 +79,7 @@ std::vector<std::shared_ptr<Object>> ObjectManager::findRadiusScriptViewObj(Poin
 
 		auto tempDistance = Map::calDistance(pos, objectList[i]->position);
 
-		if (objectList[i]->scriptFile != "" && gm->map->canView(pos, objectList[i]->position) && tempDistance <= radius)
+		if (objectList[i]->scriptFile != u8"" && gm->map->canView(pos, objectList[i]->position) && tempDistance <= radius)
 		{
 			ret.push_back(objectList[i]);
 		}
@@ -144,7 +144,7 @@ void ObjectManager::addObject(std::string iniName, int x, int y, int dir)
 	if (s != nullptr && len > 0)
 	{
 		INIReader ini(s);
-		obj->initFromIni(&ini, "Init");
+		obj->initFromIni(&ini, u8"Init");
 	}
 	obj->position.x = x;
 	obj->position.y = y;
@@ -230,7 +230,7 @@ void ObjectManager::tryCleanObjectImageList()
 
 _shared_imp ObjectManager::loadObjectImage(const std::string & imageName)
 {
-	if (imageName == "")
+	if (imageName == u8"")
 	{
 		return nullptr;
 	}
@@ -267,8 +267,8 @@ void ObjectManager::load(const std::string & fileName)
 	freeResource();
 	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
 	INIReader ini(iniName);
-	std::string section = "Head";
-	int count = ini.GetInteger(section, "Count", 0);
+	std::string section = u8"Head";
+	int count = ini.GetInteger(section, u8"Count", 0);
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("OBJ%03d", i);
@@ -281,16 +281,16 @@ void ObjectManager::load(const std::string & fileName)
 
 void ObjectManager::save(const std::string & fileName)
 {
-	if (fileName == "")
+	if (fileName == u8"")
 	{
 		return;
 	}
 	
 	INIReader ini;
 
-	std::string section = "Head";
-	ini.Set(section, "Map", GameManager::getInstance()->global.data.mapName);
-	ini.SetInteger(section, "Count", objectList.size());
+	std::string section = u8"Head";
+	ini.Set(section, u8"Map", GameManager::getInstance()->global.data.mapName);
+	ini.SetInteger(section, u8"Count", objectList.size());
 
 	for (size_t i = 0; i < objectList.size(); i++)
 	{

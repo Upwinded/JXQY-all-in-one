@@ -23,7 +23,7 @@ public:
 	void resetHint();
 	const std::string & getStr() { return str; }
 protected:
-	std::string str = "";
+	std::string str = u8"";
 
 	virtual void freeResoure();
 

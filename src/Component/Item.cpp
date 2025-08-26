@@ -3,7 +3,7 @@
 Item::Item()
 {
 	priority = epItem;
-	name = "Item";
+	name = u8"Item";
 	elementType = etItem;
 	canDrag = true;
 	coverMouse = true;
@@ -19,15 +19,15 @@ void Item::initFromIni(INIReader & ini)
 {
 	freeResource();
 
-	rect.x = ini.GetInteger("Init", "Left", rect.x);
-	rect.y = ini.GetInteger("Init", "Top", rect.y);
-	rect.w = ini.GetInteger("Init", "Width", rect.w);
-	rect.h = ini.GetInteger("Init", "Height", rect.h);
-	name = ini.Get("Init", "Name", name);
-	fontSize = ini.GetInteger("Init", "Font", fontSize);
-	std::string impName = ini.Get("Init", "Image", "");
+	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
+	name = ini.Get("Init", u8"Name", name);
+	fontSize = ini.GetInteger("Init", u8"Font", fontSize);
+	std::string impName = ini.Get("Init", u8"Image", u8"");
 	impImage = loadRes(impName);
-	color = ini.GetColor("Init", "Color", color);
+	color = ini.GetColor("Init", u8"Color", color);
 }
 
 void Item::setStr(const std::string & s)
@@ -64,7 +64,7 @@ void Item::freeResoure()
 
 void Item::drawItemStr()
 {
-	if (str != "")
+	if (str != u8"")
 	{
 		if (strImage == nullptr)
 		{

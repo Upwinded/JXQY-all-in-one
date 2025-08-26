@@ -29,9 +29,9 @@ std::string VariableList::get(const std::string & name)
 {
 	if (ini == nullptr)
 	{
-		return "";
+		return u8"";
 	}
-	return ini->Get(VARIABLE_SECTION, name, "");
+	return ini->Get(VARIABLE_SECTION, name, u8"");
 }
 
 int VariableList::getInteger(const std::string & name)

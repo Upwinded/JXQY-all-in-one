@@ -16,8 +16,8 @@
 struct EventInfo
 {
 	std::shared_ptr<NPC> npc = nullptr;
-	std::string scriptMapName = "";
-	std::string scriptName = "";
+	std::string scriptMapName = u8"";
+	std::string scriptName = u8"";
 };
 
 enum ScriptType
@@ -48,7 +48,7 @@ public:
 	static GameManager * this_;
 	static GameManager * getInstance();
 
-	std::string mapFolderName = "";
+	std::string mapFolderName = u8"";
 
 	std::atomic<bool> inThread;
 	std::mutex loadMutex;
@@ -125,7 +125,7 @@ public:
 	void runEventList();
 	std::shared_ptr<Goods> scriptGoods = nullptr;
 	void runGoodsScript(std::shared_ptr<Goods> goods);
-	std::string scriptMapName = "";
+	std::string scriptMapName = u8"";
 	int scriptTrapIndex = 0;
 	void runTrapScript(int idx);
 	std::vector<EventInfo> eventList;
@@ -133,7 +133,7 @@ public:
 
 	bool cheatMode = false;
 private:
-	std::string bgmName = "";
+	std::string bgmName = u8"";
 
 public:
 //脚本函数实现
@@ -174,7 +174,7 @@ public:
 
 	//物品函数
 	void loadObjectWithThread(const std::string & fileName);
-	void saveObject(const std::string & fileName = "");
+	void saveObject(const std::string & fileName = u8"");
 	void addObject(const std::string & iniName, int x, int y, int dir);
 	void deleteObject(const std::string & name);
 	void setObjectPosition(const std::string & name, int x, int y);
@@ -186,7 +186,7 @@ public:
 
 	//人物函数
 	void loadNPCWithThread(const std::string & fileName);
-	void saveNPC(const std::string & fileName = "");
+	void saveNPC(const std::string & fileName = u8"");
 	void addNPC(const std::string & iniName, int x, int y, int dir);
 	void deleteNPC(const std::string & name);
 	void setNPCRes(const std::string & name, const std::string & resName);
@@ -272,7 +272,7 @@ public:
 	void addToMemo(const std::string & str);
 	void clearMemo();
 	void buyGoods(const std::string & fileName);
-	void sellGoods(const std::string & fileName = "");
+	void sellGoods(const std::string & fileName = u8"");
 	void returnToTitle();
 	void enableInput();
 	void disableInput();

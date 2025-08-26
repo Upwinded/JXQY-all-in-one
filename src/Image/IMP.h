@@ -23,7 +23,7 @@ struct IMPFrame
 
 #define imageNullLen 5
 #define imgHeadLen 16
-#define imgHeadString "IMG File Ver1.0"
+#define imgHeadString u8"IMG File Ver1.0"
 
 struct IMPImage
 {
@@ -49,7 +49,7 @@ struct IMPList
 	int offset;
 };
 
-#define impHeadString "IMP File Ver1.0"
+#define impHeadString u8"IMP File Ver1.0"
 #define impHeadLen 16
 #define impNullLen 7
 
@@ -68,7 +68,7 @@ private:
 	static bool loadIMPImage(_shared_imp impImage, const std::string& fileName, bool directlyLoad = Directly_Load);
 	static bool loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
 	static bool loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName, bool directlyLoad = Directly_Load);
-	static bool loadIMPImageFromPak(_shared_imp impImage, const std::string& fileName, const std::string& pakName = "", bool directlyLoad = Directly_Load, bool firstReadPak = false);
+	static bool loadIMPImageFromPak(_shared_imp impImage, const std::string& fileName, const std::string& pakName = u8"", bool directlyLoad = Directly_Load, bool firstReadPak = false);
 
 public:
 
@@ -80,7 +80,7 @@ public:
 	static _shared_imp createIMPImage(unsigned int fileID, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromMem(std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromFile(const std::string& fileName, bool directlyLoad = Directly_Load);
-	static _shared_imp createIMPImageFromPak(const std::string& fileName, bool directlyLoad = Directly_Load, const std::string & pakName = "", bool firstReadPak = false);
+	static _shared_imp createIMPImageFromPak(const std::string& fileName, bool directlyLoad = Directly_Load, const std::string & pakName = u8"", bool firstReadPak = false);
 	static _shared_imp createIMPImageFromPNG(std::string pngName, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromImage(_shared_image img);
 

@@ -22,14 +22,14 @@ public:
 
 	void initFromIni(const std::string & fileName);
 
-	std::string name = "";
+	std::string name = u8"";
 	int kind = gkNormal;
-	std::string intro = "";
-	std::string effect = "";
-	std::string image = "";
-	std::string icon = "";
-	std::string part = "";
-	std::string script = "";
+	std::string intro = u8"";
+	std::string effect = u8"";
+	std::string image = u8"";
+	std::string icon = u8"";
+	std::string part = u8"";
+	std::string script = u8"";
 	int cost = 0;
 	int lifeMax = 0;
 	int thewMax = 0;

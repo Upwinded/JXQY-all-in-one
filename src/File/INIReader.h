@@ -20,8 +20,8 @@
 struct iniKey
 {
 	unsigned int hash = 0;
-	std::string key = "";
-	std::string value = "";
+	std::string key = u8"";
+	std::string value = u8"";
 };
 
 struct IniSection
@@ -44,7 +44,7 @@ public:
     // about the parsing.
     INIReader(const std::string& filename);
 	
-	// Construct INIReader from string stream.
+	// Construct INIReader from std::string stream.
 	// (Added by Upwinded.)
 	INIReader(const std::unique_ptr<char[]>& s);
 
@@ -75,13 +75,13 @@ public:
     // first error on parse error, or -1 on file open error.
     int ParseError() const;
 
-    // Get a string value from INI file, returning default_value if not found.
+    // Get a std::string value from INI file, returning default_value if not found.
 	std::string Get(const std::string& section, const std::string& name, const std::string& default_value) const;
 
 	UTime GetTime(const std::string& section, const std::string& name, UTime default_value) const;
 
     // Get an integer (long) value from INI file, returning default_value if
-    // not found or not a valid integer (decimal "1234", "-1234", or hex "0x4d2").
+    // not found or not a valid integer (decimal u8"1234", u8"-1234", or hex u8"0x4d2").
     long GetInteger(const std::string& section, const std::string& name, long default_value) const;
 
     // Get a real (floating point float) value from INI file, returning
@@ -90,8 +90,8 @@ public:
     float GetReal(const std::string& section, const std::string& name, float default_value) const;
 
     // Get a boolean value from INI file, returning default_value if not found or if
-    // not a valid true/false value. Valid true values are "true", "yes", "on", "1",
-    // and valid false values are "false", "no", "off", "0" (not case sensitive).
+    // not a valid true/false value. Valid true values are u8"true", u8"yes", u8"on", u8"1",
+    // and valid false values are u8"false", u8"no", u8"off", u8"0" (not case sensitive).
     bool GetBoolean(const std::string& section, const std::string& name, bool default_value) const;
 
 

@@ -9,8 +9,8 @@ public:
 	Game();
 	virtual ~Game();
 
-	std::string gameTitle = "Sword Heroes' Fate -- By Upwinded";
-	std::string gameFont = "font\\font.ttf";
+	std::string gameTitle = u8"Sword Heroes' Fate -- By Upwinded";
+	std::string gameFont = u8"font\\font.ttf";
 
 public:
 

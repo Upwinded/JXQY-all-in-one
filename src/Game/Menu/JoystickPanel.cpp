@@ -68,7 +68,7 @@ void JoystickPanel::init()
 	freeResource();
 	initFromIniFileName("ini\\ui\\mobile\\joystick\\window.ini");
 	joystick = addComponent<Joystick>("ini\\ui\\mobile\\joystick\\joystick.ini");
-	//addComponent(DragRoundButton, leftJumpBtn, "ini\\ui\\mobile\\skills\\leftjump.ini");
+	//addComponent(DragRoundButton, leftJumpBtn, u8"ini\\ui\\mobile\\skills\\leftjump.ini");
 	setChildRectReferToParent();
 }
 

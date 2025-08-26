@@ -8,7 +8,7 @@
 struct TalkChar
 {
 	unsigned int color = 0xFF000000;
-	std::string s = "";
+	std::string s = u8"";
 };
 
 struct TalkString

@@ -11,7 +11,7 @@
 #include <android/log.h>
 #endif
 
-#define logFileName "log.txt"
+#define logFileName u8"log.txt"
 
 void GameLog::write(const char* format, ...)
 {
@@ -36,15 +36,15 @@ void GameLog::write(const char* format, ...)
     vsprintf(s, format, arg_ptr);
     va_end(arg_ptr);
     std::string info = s;
-    info = "[" + std::to_string(((float)SDL_GetTicks()) / 1000.0) + "s]:" + info;
+    info = u8"[" + std::to_string(((float)SDL_GetTicks()) / 1000.0) + u8"s]:" + info;
     if (*info.rbegin() != '\n')
     {
-        info += "\n";
+        info += u8"\n";
     }
     SDL_Log("%s", info.c_str());
 
 //#ifdef __ANDROID__
-//    __android_log_print(ANDROID_LOG_INFO, "native-log",  "%s", info.c_str());
+//    __android_log_print(ANDROID_LOG_INFO, u8"native-log",  u8"%s", info.c_str());
 //#endif // __ANDROID__
 
 #if defined(USE_LOG_FILE_PARAM) && !defined(USE_LOG_FILE)

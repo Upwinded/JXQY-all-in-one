@@ -4,7 +4,7 @@
 
 EffectManager::EffectManager()
 {
-	name = "EffectManager";
+	name = u8"EffectManager";
 	priority = epEffectManager;
 	effectList.resize(0);
 	needArrangeChild = false;
@@ -90,8 +90,8 @@ void EffectManager::load()
 	std::string iniName = SAVE_CURRENT_FOLDER;
 	iniName += EFFECT_INI;
 	INIReader ini(iniName);
-	std::string section = "Head";
-	int count = ini.GetInteger(section, "Count", 0);
+	std::string section = u8"Head";
+	int count = ini.GetInteger(section, u8"Count", 0);
 	if (count < 0)
 	{
 		count = 0;
@@ -110,8 +110,8 @@ void EffectManager::save()
 {
 	INIReader ini;
 	int count = effectList.size();
-	std::string section = "Head";
-	ini.SetInteger(section, "Count", count);
+	std::string section = u8"Head";
+	ini.SetInteger(section, u8"Count", count);
 	for (size_t i = 0; i < effectList.size(); i++)
 	{
 		section = convert::formatString("PRO%d", i + 1);

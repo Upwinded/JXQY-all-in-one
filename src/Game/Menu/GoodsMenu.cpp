@@ -4,7 +4,7 @@
 
 GoodsMenu::GoodsMenu()
 {
-	name = "goods menu inst";
+	name = u8"goods menu inst";
 	visible = false;
 	init();
 }
@@ -51,7 +51,7 @@ void GoodsMenu::updateGoodsNumber(int index)
 	{
 		return;
 	}
-	if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number > 0 && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile != "")
+	if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number > 0 && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile != u8"")
 	{
 		item[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number));
 	}
@@ -62,7 +62,7 @@ void GoodsMenu::updateGoodsNumber(int index)
 		{
 			gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods = nullptr;
 		}
-		gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile = "";
+		gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile = u8"";
 		gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number = 0;
 	}
 }
@@ -116,7 +116,7 @@ void GoodsMenu::onEvent()
 							if (gm->goodsManager.goodsList[item[i]->dragIndex].number <= 0)
 							{
 								gm->goodsManager.goodsList[item[i]->dragIndex].number = 0;
-								gm->goodsManager.goodsList[item[i]->dragIndex].iniFile = "";
+								gm->goodsManager.goodsList[item[i]->dragIndex].iniFile = u8"";
 								if (gm->goodsManager.goodsList[item[i]->dragIndex].goods != nullptr)
 								{
 									gm->goodsManager.goodsList[item[i]->dragIndex].goods = nullptr;
@@ -161,7 +161,7 @@ void GoodsMenu::onEvent()
 			item[i]->resetHint();
 			if (item[i]->dropType == dtGoods)
 			{
-				if (gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != "" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0)
+				if (gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != u8"" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0)
 				{
 					if (item[i]->dropIndex < GOODS_COUNT)
 					{
@@ -187,9 +187,9 @@ void GoodsMenu::onEvent()
 			}
 			else if (item[i]->dropType == dtBuy)
 			{
-				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != "")
+				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != u8"")
 				{
-					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == "")
+					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == u8"")
 					{
 						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, 1))
 						{
@@ -233,16 +233,16 @@ void GoodsMenu::onEvent()
 			}
 			else if (item[i]->dropType == dtSell)
 			{
-				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != "")
+				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != u8"")
 				{
-					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == "")
+					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == u8"")
 					{
 						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number))
 						{
 							std::string iniName = BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile;
 							updateMoney();
 							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number = 0;
-							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile = "";
+							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile = u8"";
 							if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods != nullptr)
 							{
 								BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods = nullptr;
@@ -280,7 +280,7 @@ void GoodsMenu::onEvent()
 						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number))
 						{
 							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number = 0;
-							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile = "";
+							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile = u8"";
 							if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods != nullptr)
 							{
 								BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods = nullptr;

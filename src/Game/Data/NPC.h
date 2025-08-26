@@ -47,9 +47,9 @@ enum NPCActionType
 
 struct NPCActionRes
 {
-	std::string imageFile = "";
-	std::string shadowFile = "";
-	std::string soundFile = "";
+	std::string imageFile = u8"";
+	std::string shadowFile = u8"";
+	std::string soundFile = u8"";
 	_shared_imp image = nullptr;
 	_shared_imp shadow = nullptr;
 };
@@ -139,7 +139,7 @@ public:
 	int nowAction = acStand;
 	bool selecting = false;
 	int npcIndex = 1;
-	std::string followNPC = "";
+	std::string followNPC = u8"";
 
 	Point attackDest = { 0, 0 };
 	void calOffset(UTime nowTime, UTime totalTime);
@@ -153,9 +153,9 @@ public:
 	std::shared_ptr<Magic> npcMagic2 = nullptr;
 	bool magicUsed = true;
 
-	std::string npcName = "";
+	std::string npcName = u8"";
 	int kind = nkNormal;
-	std::string npcIni = "";
+	std::string npcIni = u8"";
 
 	int currPos = 0;
 	int action = naNone;
@@ -163,7 +163,7 @@ public:
 	int standSpeed = 20;
 	int pathFinder = pfSingle;
 	int dialogRadius = 1;
-	std::string scriptFile = "";
+	std::string scriptFile = u8"";
 
 	int relation = nrFriendly;
 	int life = 1000;
@@ -192,11 +192,11 @@ public:
 	int lum = nlNone;
 	int visionRadius = 18;
 	int attackRadius = 3;
-	std::string bodyIni = "";
-	std::string flyIni = "";
-	std::string flyIni2 = "";
-	std::string magicIni = "";
-	std::string deathScript = "";
+	std::string bodyIni = u8"";
+	std::string flyIni = u8"";
+	std::string flyIni2 = u8"";
+	std::string magicIni = u8"";
+	std::string deathScript = u8"";
 
 	virtual void addLife(int value);
 	virtual void addThew(int value);

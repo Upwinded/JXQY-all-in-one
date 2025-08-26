@@ -42,7 +42,7 @@ private:
 
 	void registerFunc();
 
-	std::string name = "script";
+	std::string name = u8"script";
 
 	lua_State * luaState = nullptr;
 

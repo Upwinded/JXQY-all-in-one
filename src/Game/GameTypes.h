@@ -20,60 +20,60 @@
 #define DAMAGE_RATE ((float)0.8)
 
 #ifdef __ANDROID__
-#define CONFIG_INI "config.ini"
+#define CONFIG_INI u8"config.ini"
 #else
-#define CONFIG_INI "config\\config.ini"
+#define CONFIG_INI u8"config\\config.ini"
 #endif
-#define SAVE_LIST_FILE "list.ini"
-#define SAVE_LIST_SECTION "save"
-#define SAVE_LIST_COUNT_KEY "count"
-#define SAVE_CURRENT_FOLDER "save\\game\\"
-#define SAVE_FOLDER "save\\rpg%d\\"
-#define SHOT_FOLDER "save\\shot\\"
+#define SAVE_LIST_FILE u8"list.ini"
+#define SAVE_LIST_SECTION u8"save"
+#define SAVE_LIST_COUNT_KEY u8"count"
+#define SAVE_CURRENT_FOLDER u8"save\\game\\"
+#define SAVE_FOLDER u8"save\\rpg%d\\"
+#define SHOT_FOLDER u8"save\\shot\\"
 
-#define SHOT_BMP "rpg%d.bmp"
-#define GLOBAL_INI "game.ini"
-//#define PLAYER_INI "player.ini"
-#define PLAYER_INI_NAME "player"
-#define PLAYER_INI_EXT ".ini"
-//#define PARTNER_INI_NAME "partner.ini"
-#define PARTNER_INI_NAME "partner"
-#define PARTNER_INI_EXT ".ini"
-#define MEMO_INI "memo.txt"
-#define TRAPS_INI "traps.ini"
-#define MAP_FOLDER "map\\"
-#define VIDEO_FOLDER "video\\"
-#define SOUND_FOLDER "sound\\"
-#define MUSIC_FOLDER "music\\"
-#define MPC_FOLDER "mpc\\"
-#define INI_FOLDER "ini\\"
+#define SHOT_BMP u8"rpg%d.bmp"
+#define GLOBAL_INI u8"game.ini"
+//#define PLAYER_INI u8"player.ini"
+#define PLAYER_INI_NAME u8"player"
+#define PLAYER_INI_EXT u8".ini"
+//#define PARTNER_INI_NAME u8"partner.ini"
+#define PARTNER_INI_NAME u8"partner"
+#define PARTNER_INI_EXT u8".ini"
+#define MEMO_INI u8"memo.txt"
+#define TRAPS_INI u8"traps.ini"
+#define MAP_FOLDER u8"map\\"
+#define VIDEO_FOLDER u8"video\\"
+#define SOUND_FOLDER u8"sound\\"
+#define MUSIC_FOLDER u8"music\\"
+#define MPC_FOLDER u8"mpc\\"
+#define INI_FOLDER u8"ini\\"
 
-#define SCRIPT_FOLDER "script\\"
-#define LEVEL_FOLDER "ini\\level\\"
+#define SCRIPT_FOLDER u8"script\\"
+#define LEVEL_FOLDER u8"ini\\level\\"
 
-#define HEAD_FOLDER "mpc\\portrait\\"
-#define HEAD_FILE_NAME "ini\\ui\\dialog\\headfile.ini"
+#define HEAD_FOLDER u8"mpc\\portrait\\"
+#define HEAD_FILE_NAME u8"ini\\ui\\dialog\\headfile.ini"
 
-#define NPC_INI_FOLDER "ini\\npc\\"
-#define NPC_RES_INI_FOLDER "ini\\npcres\\"
-#define NPC_RES_FOLDER "mpc\\character\\"
+#define NPC_INI_FOLDER u8"ini\\npc\\"
+#define NPC_RES_INI_FOLDER u8"ini\\npcres\\"
+#define NPC_RES_FOLDER u8"mpc\\character\\"
 
-#define OBJECT_INI_FOLDER "ini\\obj\\"
-#define OBJECT_RES_INI_FOLDER  "ini\\objres\\"
-#define OBJECT_RES_FOLDER  "mpc\\object\\"
+#define OBJECT_INI_FOLDER u8"ini\\obj\\"
+#define OBJECT_RES_INI_FOLDER  u8"ini\\objres\\"
+#define OBJECT_RES_FOLDER  u8"mpc\\object\\"
 
-#define SCRIPT_COMMON_FOLDER "script\\common\\"
-#define SCRIPT_GOODS_FOLDER "script\\goods\\"
-#define SCRIPT_MAP_FOLDER "script\\map\\"
+#define SCRIPT_COMMON_FOLDER u8"script\\common\\"
+#define SCRIPT_GOODS_FOLDER u8"script\\goods\\"
+#define SCRIPT_MAP_FOLDER u8"script\\map\\"
 
-#define MAP_FOLDER "map\\"
-#define VARIABLE_INI "variable.ini"
-#define VARIABLE_SECTION "variable"
-#define INI_MAP_FOLDER "ini\\map\\"
-#define INI_MAP_NAME_LIST "mapname.ini"
-#define TALK_FILE "talk.txt"
+#define MAP_FOLDER u8"map\\"
+#define VARIABLE_INI u8"variable.ini"
+#define VARIABLE_SECTION u8"variable"
+#define INI_MAP_FOLDER u8"ini\\map\\"
+#define INI_MAP_NAME_LIST u8"mapname.ini"
+#define TALK_FILE u8"talk.txt"
 
-#define SAVE_SHOT_HEAD "SAVESHOT"
+#define SAVE_SHOT_HEAD u8"SAVESHOT"
 #define SAVE_SHOT_HEAD_LEN 8
 
 #define MENU_ITEM_COUNT 9
@@ -82,29 +82,29 @@
 #define GOODS_COUNT 81
 #define GOODS_TOOLBAR_COUNT 3
 #define GOODS_BODY_COUNT 7
-#define GOODS_RES_FOLDER "mpc\\goods\\"
-//#define GOODS_INI "goods.ini"
-#define GOODS_INI_NAME "goods"
-#define GOODS_INI_EXT ".ini"
-#define INI_GOODS_FOLDER "ini\\goods\\"
+#define GOODS_RES_FOLDER u8"mpc\\goods\\"
+//#define GOODS_INI u8"goods.ini"
+#define GOODS_INI_NAME u8"goods"
+#define GOODS_INI_EXT u8".ini"
+#define INI_GOODS_FOLDER u8"ini\\goods\\"
 
 #define BUYSELL_GOODS_COUNT 81
-#define BUYSELL_FOLDER "ini\\buy\\"
+#define BUYSELL_FOLDER u8"ini\\buy\\"
 
 
 //魔法栏数量定义
 #define MAGIC_COUNT 36
 #define MAGIC_TOOLBAR_COUNT 5
 #define MAGIC_PRACTISE_COUNT 1
-#define MAGIC_RES_FOLDER "mpc\\magic\\"
-//#define MAGIC_INI "magic.ini"
-#define MAGIC_INI_NAME "magic"
-#define MAGIC_INI_EXT ".ini"
-#define INI_MAGIC_FOLDER "ini\\magic\\"
+#define MAGIC_RES_FOLDER u8"mpc\\magic\\"
+//#define MAGIC_INI u8"magic.ini"
+#define MAGIC_INI_NAME u8"magic"
+#define MAGIC_INI_EXT u8".ini"
+#define INI_MAGIC_FOLDER u8"ini\\magic\\"
 #define MAGIC_MAX_LEVEL 10
 
-#define EFFECT_INI "proj.ini"
-#define EFFECT_RES_FOLDER "mpc\\effect\\"
+#define EFFECT_INI u8"proj.ini"
+#define EFFECT_RES_FOLDER u8"mpc\\effect\\"
 
 //声音距离参数，数值越大衰减越大
 #define SOUND_FACTOR 0.5f
@@ -195,7 +195,7 @@ enum GameState
 	gsScript
 };
 
-#define MAP_HEADSTR "MAP File Ver2.0"
+#define MAP_HEADSTR u8"MAP File Ver2.0"
 #define MAP_HEADSTR_LEN 16
 #define MAP_nullptr 16
 #define MAP_PATH 32 

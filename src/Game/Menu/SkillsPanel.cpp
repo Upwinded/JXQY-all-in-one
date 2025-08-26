@@ -17,7 +17,7 @@ SkillsPanel::~SkillsPanel()
 void SkillsPanel::initFromIni(INIReader& ini)
 {
 	Panel::initFromIni(ini);
-	indicateImp = loadRes(ini.Get("init", "indicate", ""));
+	indicateImp = loadRes(ini.Get("init", u8"indicate", u8""));
 }
 
 void SkillsPanel::onChildCallBack(PElement child)

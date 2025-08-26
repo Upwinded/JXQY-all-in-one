@@ -6,7 +6,7 @@ VideoPlayer::VideoPlayer()
 	priority = epVideo;
 	result = erNone;
 	rect = { 0, 0, 0, 0 };
-	name = "VideoPlayer";
+	name = u8"VideoPlayer";
 	coverMouse = true;
 	canCallBack = true;
 #ifdef __MOBILE__

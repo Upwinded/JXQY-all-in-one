@@ -46,8 +46,8 @@ void RoundButton::initFromIni(INIReader & ini)
 
 	Button::initFromIni(ini);
 
-	roundRange = ini.GetInteger("Init", "Range", roundRange);
-	_text = ini.Get("Init", "text", _text);
+	roundRange = ini.GetInteger("Init", u8"Range", roundRange);
+	_text = ini.Get("Init", u8"text", _text);
 	setText(_text);
 }
 

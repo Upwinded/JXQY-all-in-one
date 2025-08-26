@@ -25,11 +25,11 @@ void ToolTip::setGoods(std::shared_ptr<Goods> goods)
 
 	image->impImage = IMP::createIMPImage(imageName);
 	name->setStr(goods->name);
-	std::string costStr = "Price:";
+	std::string costStr = u8"Price:";
 	costStr += convert::formatString("%d", goods->cost);
 	cost->setStr(costStr);
 	intro1->setStr(goods->effect);
-	std::string introStr = " <enter>" + goods->intro;
+	std::string introStr = u8" <enter>" + goods->intro;
 	intro2->setStr(introStr);
 }
 
@@ -45,7 +45,7 @@ void ToolTip::setMagic(std::shared_ptr<Magic> magic, int level)
 
 	image->impImage = IMP::createIMPImage(imageName);
 	name->setStr(magic->name);
-	std::string costStr = "Level:";
+	std::string costStr = u8"Level:";
 	costStr += convert::formatString("%d", level);
 	cost->setStr(costStr);
 	intro1->setStr("");

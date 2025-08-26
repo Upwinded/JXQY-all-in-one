@@ -3,7 +3,7 @@
 
 NPCManager::NPCManager()
 {
-	name = "NPC Manager";
+	name = u8"NPC Manager";
 	priority = epGameManager;
 	npcList.resize(0);
 	needArrangeChild = false;
@@ -228,7 +228,7 @@ std::shared_ptr<NPC> NPCManager::findNearestScriptViewNPC(Point pos, int radius)
         {
             int tempDistance = Map::calDistance(pos, npcList[i]->position);
             bool dialogRadiusLarger = (npcList[i]->dialogRadius >= tempDistance);
-            if (npcList[i]->scriptFile != "" && (gm->map->canView(pos, npcList[i]->position) || dialogRadiusLarger))
+            if (npcList[i]->scriptFile != u8"" && (gm->map->canView(pos, npcList[i]->position) || dialogRadiusLarger))
             {
                 if (tempDistance < distance || (dialogRadiusLarger && temp < 0))
                 {
@@ -258,7 +258,7 @@ std::vector<std::shared_ptr<NPC>> NPCManager::findRadiusScriptViewNPC(Point pos,
 		{
 			int tempDistance = Map::calDistance(pos, npcList[i]->position);
 			bool dialogRadiusLarger = (npcList[i]->dialogRadius >= tempDistance);
-			if (npcList[i]->scriptFile != "" && ((gm->map->canView(pos, npcList[i]->position) && tempDistance <= radius) || dialogRadiusLarger))
+			if (npcList[i]->scriptFile != u8"" && ((gm->map->canView(pos, npcList[i]->position) && tempDistance <= radius) || dialogRadiusLarger))
 			{
 				ret.push_back(npcList[i]);
 			}
@@ -567,7 +567,7 @@ void NPCManager::drawNPC(std::shared_ptr<NPC> npc, Point cenTile, Point cenScree
 //					image = npcList[i]->getActionImage(&offsetX, &offsetY);
 //					engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 100, 100, 100);
 //				}
-//				else if (npcList[i]->scriptFile != "")
+//				else if (npcList[i]->scriptFile != u8"")
 //				{
 //					image = npcList[i]->getActionImage(&offsetX, &offsetY);
 //					engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 200, 100, 100);
@@ -732,7 +732,7 @@ void NPCManager::addNPC(std::string iniName, int x, int y, int dir)
 	if (s != nullptr && len > 0)
 	{
 		INIReader ini(s);
-		npc->initFromIni(&ini, "Init");
+		npc->initFromIni(&ini, u8"Init");
 	}
 	npc->position.x = x;
 	npc->position.y = y;
@@ -821,8 +821,8 @@ void NPCManager::load(const std::string & fileName)
 	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
 	INIReader ini(iniName);
 
-	std::string section = "Head";
-	int count = ini.GetInteger(section, "Count", 0);
+	std::string section = u8"Head";
+	int count = ini.GetInteger(section, u8"Count", 0);
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("NPC%03d", i);
@@ -842,16 +842,16 @@ void NPCManager::load(const std::string & fileName)
 
 void NPCManager::save(const std::string & fileName)
 {
-	if (fileName == "")
+	if (fileName == u8"")
 	{
 		return;
 	}
 	
 	INIReader ini;
 
-	std::string section = "Head";
-	ini.Set(section, "Map", GameManager::getInstance()->global.data.mapName);
-	ini.SetInteger(section, "Count", npcList.size());
+	std::string section = u8"Head";
+	ini.Set(section, u8"Map", GameManager::getInstance()->global.data.mapName);
+	ini.SetInteger(section, u8"Count", npcList.size());
 	int npcCount = 0;
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
@@ -882,7 +882,7 @@ void NPCManager::onUpdate()
 				eventInfo.npc = npcList[i];
 				eventInfo.scriptName = npcList[i]->deathScript;
 				//死亡脚本运行后清除
-				npcList[i]->deathScript = "";
+				npcList[i]->deathScript = u8"";
 				eventInfo.scriptMapName = gm->mapFolderName;
 				gm->eventList.push_back(eventInfo);
 			}

@@ -51,7 +51,7 @@ void MagicMenu::onEvent()
 		int ret = item[i]->getResult();
 		if (ret & erShowHint)
 		{
-			if (gm->magicManager.magicList[scrollbar->position * scrollbar->lineSize + i].iniFile != "" && gm->magicManager.magicList[scrollbar->position * scrollbar->lineSize + i].magic != nullptr)
+			if (gm->magicManager.magicList[scrollbar->position * scrollbar->lineSize + i].iniFile != u8"" && gm->magicManager.magicList[scrollbar->position * scrollbar->lineSize + i].magic != nullptr)
 			{
 				gm->menu->toolTip->visible = true;
 				addChild(gm->menu->toolTip);
@@ -105,7 +105,7 @@ void MagicMenu::onEvent()
 			item[i]->resetHint();
 			if (item[i]->dropType == dtMagic)
 			{
-				if (gm->magicManager.magicList[item[i]->dropIndex].iniFile != "" && gm->magicManager.magicList[item[i]->dropIndex].magic != nullptr)
+				if (gm->magicManager.magicList[item[i]->dropIndex].iniFile != u8"" && gm->magicManager.magicList[item[i]->dropIndex].magic != nullptr)
 				{
 					if (item[i]->dropIndex < MAGIC_COUNT)
 					{

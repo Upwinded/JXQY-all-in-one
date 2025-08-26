@@ -11,15 +11,15 @@ enum class FilePos
 };
 
 #define pakHeadLen 8
-#define pakHeadString "PACKAGE"
+#define pakHeadString u8"PACKAGE"
 #define blockSize 0x10000
-#define DefaultPackageFile "data.dat"
+#define DefaultPackageFile u8"data.dat"
 #if (defined(__ANDROID__))
-#define AssetsPath ""
+#define AssetsPath u8""
 #elif (defined(__APPLE__))
-#define AssetsPath "assets/"
+#define AssetsPath u8"assets/"
 #else
-#define AssetsPath "../../assets/"
+#define AssetsPath u8"../../assets/"
 #endif
 
 struct PakHead

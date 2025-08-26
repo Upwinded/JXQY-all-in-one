@@ -14,19 +14,19 @@ PakFile::PakFile()
 
 	/*
 	pakList.resize(13);
-	pakList[0] = "data/character.dat";
-	pakList[1] = "data/effect.dat";
-	pakList[2] = "data/font.dat";
-	pakList[3] = "data/goods.dat";
-	pakList[4] = "data/ini.dat";
-	pakList[5] = "data/interface.dat";
-	pakList[6] = "data/magic.dat";
-	pakList[7] = "data/map.dat";
-	pakList[8] = "data/object.dat";
-	pakList[9] = "data/portrait.dat";
-	pakList[10] = "data/script.dat";
-	pakList[11] = "data/sound.dat";
-	pakList[12] = "data/tiled.dat";
+	pakList[0] = u8"data/character.dat";
+	pakList[1] = u8"data/effect.dat";
+	pakList[2] = u8"data/font.dat";
+	pakList[3] = u8"data/goods.dat";
+	pakList[4] = u8"data/ini.dat";
+	pakList[5] = u8"data/interface.dat";
+	pakList[6] = u8"data/magic.dat";
+	pakList[7] = u8"data/map.dat";
+	pakList[8] = u8"data/object.dat";
+	pakList[9] = u8"data/portrait.dat";
+	pakList[10] = u8"data/script.dat";
+	pakList[11] = u8"data/sound.dat";
+	pakList[12] = u8"data/tiled.dat";
 	*/
 }
 
@@ -83,7 +83,7 @@ unsigned int PakFile::hashFileName(const std::string & fileName)
 
 int PakFile::findFileInPak(unsigned int fileID, const std::string & pakName)
 {	
-	auto fp = SDL_IOFromFile(pakName.c_str(), "rb");
+	auto fp = SDL_IOFromFile(pakName.c_str(), u8"rb");
 	if (fp)
 	{
 		SDL_SeekIO(fp, 0, SDL_IO_SEEK_END);
@@ -304,7 +304,7 @@ bool PakFile::readPak(const std::string & pakName, int index, std::unique_ptr<ch
 {
 	if (index >= 0)
 	{
-		auto fp = SDL_IOFromFile(pakName.c_str(), "rb");
+		auto fp = SDL_IOFromFile(pakName.c_str(), u8"rb");
 		if (fp)
 		{
 			SDL_SeekIO(fp, 0, SDL_IO_SEEK_END);
@@ -380,7 +380,7 @@ int PakFile::readFile(unsigned int fileID, std::unique_ptr<char[]>& s)
 
 int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s)
 {
-	if (fileName == "")
+	if (fileName == u8"")
 	{
 		return 0;
 	}
@@ -406,7 +406,7 @@ int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s)
 int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s, int& len, const std::string & pakName, bool firstReadPak)
 {
 	s = nullptr;
-	if (fileName == "")
+	if (fileName == u8"")
 	{
 		return -1;
 	}

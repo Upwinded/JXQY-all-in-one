@@ -5,7 +5,7 @@ BuySellMenu * BuySellMenu::this_ = nullptr;
 
 BuySellMenu::BuySellMenu()
 {
-	name = "BuySellMenu";
+	name = u8"BuySellMenu";
 	init();
 	priority = epMax;
 	this_ = this;
@@ -26,7 +26,7 @@ void BuySellMenu::clearGoodsList()
 {
 	for (size_t i = 0; i < BUYSELL_GOODS_COUNT; i++)
 	{
-		goodsList[i].iniFile = "";
+		goodsList[i].iniFile = u8"";
 		goodsList[i].number = 0;
 		if (goodsList[i].goods != nullptr)
 		{
@@ -52,7 +52,7 @@ void BuySellMenu::buy(const std::string & list)
 	if (len > 0 && s != nullptr)
 	{
 		INIReader ini(s);
-		int count = ini.GetInteger("Header", "Count", 0);
+		int count = ini.GetInteger("Header", u8"Count", 0);
 		if (count < 0)
 		{
 			count = 0;
@@ -64,9 +64,9 @@ void BuySellMenu::buy(const std::string & list)
 		for (int i = 0; i < count; i++)
 		{
 			std::string section = convert::formatString("%d", i + 1);
-			goodsList[i].iniFile = ini.Get(section, "IniFile", "");
-			goodsList[i].number = ini.GetInteger(section, "Number", 1);
-			if (goodsList[i].iniFile != "")
+			goodsList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
+			goodsList[i].number = ini.GetInteger(section, u8"Number", 1);
+			if (goodsList[i].iniFile != u8"")
 			{
 				goodsList[i].goods = std::make_shared<Goods>();
 				goodsList[i].goods->initFromIni(goodsList[i].iniFile);
@@ -96,7 +96,7 @@ void BuySellMenu::sell(const std::string & list)
 	}
 	addChild(gm->menu->goodsMenu);
 	clearGoodsList();
-	if (list != "")
+	if (list != u8"")
 	{
 		std::string listName = BUYSELL_FOLDER + list;
 		std::unique_ptr<char[]> s;
@@ -104,7 +104,7 @@ void BuySellMenu::sell(const std::string & list)
 		if (len > 0 && s != nullptr)
 		{
 			INIReader ini(s);
-			int count = ini.GetInteger("Header", "Count", 0);
+			int count = ini.GetInteger("Header", u8"Count", 0);
 			if (count < 0)
 			{
 				count = 0;
@@ -116,9 +116,9 @@ void BuySellMenu::sell(const std::string & list)
 			for (int i = 0; i < count; i++)
 			{
 				std::string section = convert::formatString("%d", i + 1);
-				goodsList[i].iniFile = ini.Get(section, "IniFile", "");
-				goodsList[i].number = ini.GetInteger(section, "Number", 1);
-				if (goodsList[i].iniFile != "")
+				goodsList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
+				goodsList[i].number = ini.GetInteger(section, u8"Number", 1);
+				if (goodsList[i].iniFile != u8"")
 				{
 					goodsList[i].goods = std::make_shared<Goods>();
 					goodsList[i].goods->initFromIni(goodsList[i].iniFile);
@@ -148,7 +148,7 @@ bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
 			if (goodsList[i].number <= 0)
 			{
 				goodsList[i].number = 0;
-				goodsList[i].iniFile = "";
+				goodsList[i].iniFile = u8"";
 				if (goodsList[i].goods != nullptr)
 				{
 
@@ -165,7 +165,7 @@ bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
 	}
 	for (size_t i = 0; i < BUYSELL_GOODS_COUNT; i++)
 	{
-		if (goodsList[i].iniFile == "")
+		if (goodsList[i].iniFile == u8"")
 		{
 			goodsList[i].number = num;
 			goodsList[i].iniFile = itemName;
@@ -209,7 +209,7 @@ void BuySellMenu::updateGoods()
 		item[i]->impImage = nullptr;
 
 		item[i]->setStr("");
-		if (goodsList[i + scrollbar->position * scrollbar->lineSize].iniFile != "" && goodsList[i + scrollbar->position * scrollbar->lineSize].goods != nullptr)
+		if (goodsList[i + scrollbar->position * scrollbar->lineSize].iniFile != u8"" && goodsList[i + scrollbar->position * scrollbar->lineSize].goods != nullptr)
 		{
 			item[i]->impImage = goodsList[i + scrollbar->position * scrollbar->lineSize].goods->createGoodsIcon();
 			if (bsKind == bsSell)
@@ -238,7 +238,7 @@ void BuySellMenu::onEvent()
 		{
 			if (bsKind == bsBuy)
 			{
-				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != "" && goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr)
+				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != u8"" && goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr)
 				{
 					gm->menu->toolTip->visible = true;
 					addChild(gm->menu->toolTip);
@@ -251,7 +251,7 @@ void BuySellMenu::onEvent()
 			}
 			else
 			{
-				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != "" && goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr && goodsList[scrollbar->position * scrollbar->lineSize + i].number > 0)
+				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != u8"" && goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr && goodsList[scrollbar->position * scrollbar->lineSize + i].number > 0)
 				{
 					gm->menu->toolTip->visible = true;
 					addChild(gm->menu->toolTip);
@@ -277,7 +277,7 @@ void BuySellMenu::onEvent()
 			item[i]->resetHint();
 			if (bsKind == bsBuy)
 			{
-				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != "")
+				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != u8"")
 				{
 					if (gm->goodsManager.buyItem(goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile, 1))
 					{
@@ -288,7 +288,7 @@ void BuySellMenu::onEvent()
 			}
 			else
 			{
-				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != "" && goodsList[scrollbar->position * scrollbar->lineSize + i].number > 0)
+				if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile != u8"" && goodsList[scrollbar->position * scrollbar->lineSize + i].number > 0)
 				{
 					if (gm->goodsManager.buyItem(goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile, 1))
 					{
@@ -296,7 +296,7 @@ void BuySellMenu::onEvent()
 						if (goodsList[scrollbar->position * scrollbar->lineSize + i].number <= 0)
 						{
 							goodsList[scrollbar->position * scrollbar->lineSize + i].number = 0;
-							goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile = "";
+							goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile = u8"";
 							if (goodsList[scrollbar->position * scrollbar->lineSize + i].goods != nullptr)
 							{
 								goodsList[scrollbar->position * scrollbar->lineSize + i].goods = nullptr;
@@ -314,21 +314,21 @@ void BuySellMenu::onEvent()
 		{
 			if (bsKind == bsSell)
 			{
-				if (item[i]->dropType == dtGoods && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0 && gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != "" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].goods->cost > 0)
+				if (item[i]->dropType == dtGoods && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0 && gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != u8"" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].goods->cost > 0)
 				{
 					if (gm->goodsManager.goodsList[item[i]->dropIndex].iniFile == goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile)
 					{
 						goodsList[scrollbar->position * scrollbar->lineSize + i].number += gm->goodsManager.goodsList[item[i]->dropIndex].number;
 						gm->player->money += gm->goodsManager.goodsList[item[i]->dropIndex].number * gm->goodsManager.goodsList[item[i]->dropIndex].goods->cost;
 						gm->goodsManager.goodsList[item[i]->dropIndex].number = 0;
-						gm->goodsManager.goodsList[item[i]->dropIndex].iniFile = "";
+						gm->goodsManager.goodsList[item[i]->dropIndex].iniFile = u8"";
 						gm->goodsManager.goodsList[item[i]->dropIndex].goods = nullptr;
 						gm->menu->goodsMenu->updateGoods();
 						gm->menu->goodsMenu->updateMoney();
 						updateGoods();
 						
 					}
-					else if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile == "")
+					else if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile == u8"")
 					{
 						goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile = gm->goodsManager.goodsList[item[i]->dropIndex].iniFile;
 						goodsList[scrollbar->position * scrollbar->lineSize + i].goods = std::make_shared<Goods>();
@@ -336,7 +336,7 @@ void BuySellMenu::onEvent()
 						goodsList[scrollbar->position * scrollbar->lineSize + i].number = gm->goodsManager.goodsList[item[i]->dropIndex].number;
 						gm->player->money += gm->goodsManager.goodsList[item[i]->dropIndex].number * gm->goodsManager.goodsList[item[i]->dropIndex].goods->cost;
 						gm->goodsManager.goodsList[item[i]->dropIndex].number = 0;
-						gm->goodsManager.goodsList[item[i]->dropIndex].iniFile = "";
+						gm->goodsManager.goodsList[item[i]->dropIndex].iniFile = u8"";
 						gm->goodsManager.goodsList[item[i]->dropIndex].goods = nullptr;
 						gm->menu->goodsMenu->updateGoods();
 						gm->menu->goodsMenu->updateMoney();

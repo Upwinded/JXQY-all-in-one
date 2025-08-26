@@ -4,7 +4,7 @@
 
 TransImage::TransImage()
 {
-	name = "TransImage";
+	name = u8"TransImage";
 }
 
 

@@ -46,8 +46,8 @@ void PartnerManager::load(int index)
     }
     fName += PARTNER_INI_EXT;
 	INIReader ini(fName);
-	std::string section = "Head";
-	int count = ini.GetInteger(section, "Count", 0);
+	std::string section = u8"Head";
+	int count = ini.GetInteger(section, u8"Count", 0);
 	if (count <= 0)
 	{
 		partnerList.resize(0);
@@ -84,8 +84,8 @@ void PartnerManager::save(int index)
 	}
 
 	INIReader ini;
-	std::string section = "Head";
-	ini.SetInteger(section, "Count", partnerList.size());
+	std::string section = u8"Head";
+	ini.SetInteger(section, u8"Count", partnerList.size());
 	for (size_t i = 0; i < partnerList.size(); i++)
 	{
 		section = convert::formatString("%d", i + 1);

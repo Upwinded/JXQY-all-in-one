@@ -2,7 +2,7 @@
 
 Button::Button()
 {
-	name = "button";
+	name = u8"button";
 	priority = epButton;
 	elementType = etButton;
 	result = erNone;
@@ -21,7 +21,7 @@ void Button::playSound(int index)
 	}
 
 #ifdef SOUND_DYNAMIC_LOAD
-	if (sound[index] == "")
+	if (sound[index] == u8"")
 	{
 		return;
 	}
@@ -157,7 +157,7 @@ void Button::freeSound()
 	for (size_t i = 0; i < 3; i++)
 	{
 #ifdef SOUND_DYNAMIC_LOAD
-		sound[i] = "";
+		sound[i] = u8"";
 #else
 		if (sound[i] != nullptr)
 		{
@@ -179,38 +179,38 @@ void Button::freeResource()
 void Button::initFromIni(INIReader & ini)
 {
 	freeResource();
-	kind = ini.Get("Init", "Kind", kind);
-	rect.x = ini.GetInteger("Init", "Left", rect.x);
-	rect.y = ini.GetInteger("Init", "Top", rect.y);
-	rect.w = ini.GetInteger("Init", "Width", rect.w);
-	rect.h = ini.GetInteger("Init", "Height", rect.h);
-	std::string impName = ini.Get("Init", "Image", "");
+	kind = ini.Get("Init", u8"Kind", kind);
+	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
+	std::string impName = ini.Get("Init", u8"Image", u8"");
 	auto impImage = IMP::createIMPImage(impName);
 	if (impImage != nullptr)
 	{
-		if (convert::lowerCase(kind) == "trackbtn")
+		if (convert::lowerCase(kind) == u8"trackbtn")
 		{
 			int frame = 0;
-			frame = ini.GetInteger("Init", "Up", 0);
+			frame = ini.GetInteger("Init", u8"Up", 0);
 			image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger("Init", "Track", 1);
+			frame = ini.GetInteger("Init", u8"Track", 1);
 			image[1] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger("Init", "Down", 1);
+			frame = ini.GetInteger("Init", u8"Down", 1);
 			image[2] = IMP::createIMPImageFromFrame(impImage, frame);
 
-			std::string soundName = ini.Get("Init", "Sound", "");
+			std::string soundName = ini.Get("Init", u8"Sound", u8"");
 			loadSound(soundName, 1);
 			loadSound(soundName, 0);
 		}
 		else
 		{
 			int frame = 0;
-			frame = ini.GetInteger("Init", "Up", 0);
+			frame = ini.GetInteger("Init", u8"Up", 0);
 			image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger("Init", "Down", 1);
+			frame = ini.GetInteger("Init", u8"Down", 1);
 			image[2] = IMP::createIMPImageFromFrame(impImage, frame);
 
-			std::string soundName = ini.Get("Init", "Sound", "");
+			std::string soundName = ini.Get("Init", u8"Sound", u8"");
 			loadSound(soundName, 1);
 		}
 	}

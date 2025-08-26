@@ -30,7 +30,7 @@ protected:
 	Point dragPosition = { 0, 0 };
 	Point dragRealPosition = { 0, 0 };
 	DragRoundButtonType type = DragRoundButtonType::None;
-	std::string imageName = "";
+	std::string imageName = u8"";
 
 	virtual void onDragEnd(PElement dst, int x, int y);
 	virtual void onDragging(int x, int y);

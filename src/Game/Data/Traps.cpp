@@ -43,10 +43,10 @@ std::string Traps::get(const std::string & mapName, int index)
 {
 	if (ini == nullptr)
 	{
-		return "";
+		return u8"";
 	}
 	std::string name = convert::formatString("%d", index);
-	return ini->Get(mapName, name, "");
+	return ini->Get(mapName, name, u8"");
 }
 
 void Traps::set(const std::string & mapName, int index, const std::string & value)

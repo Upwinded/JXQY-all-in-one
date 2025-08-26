@@ -19,7 +19,7 @@ void PracticeMenu::updateMagic()
 
 	magic->impImage = nullptr;
 
-	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != "")
+	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
 	{
 		name->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->name);
 		intro->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->intro);
@@ -38,7 +38,7 @@ void PracticeMenu::updateMagic()
 
 void PracticeMenu::updateExp()
 {
-	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != "")
+	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
 	{
 		exp->setStr(convert::formatString("%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
 	}
@@ -50,7 +50,7 @@ void PracticeMenu::updateExp()
 
 void PracticeMenu::updateLevel()
 {
-	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != "")
+	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
 	{
 		level->setStr(convert::formatString("%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
 	}
@@ -65,7 +65,7 @@ void PracticeMenu::onEvent()
 	unsigned int ret = magic->getResult();
 	if (ret & erShowHint)
 	{
-		if (gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].iniFile != "" && gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic != nullptr)
+		if (gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].iniFile != u8"" && gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic != nullptr)
 		{
 			gm->menu->toolTip->visible = true;
 			addChild(gm->menu->toolTip);
@@ -92,7 +92,7 @@ void PracticeMenu::onEvent()
 		magic->resetHint();
 		if (magic->dropType == dtMagic)
 		{
-			if (gm->magicManager.magicList[magic->dropIndex].iniFile != "" && gm->magicManager.magicList[magic->dropIndex].magic != nullptr)
+			if (gm->magicManager.magicList[magic->dropIndex].iniFile != u8"" && gm->magicManager.magicList[magic->dropIndex].magic != nullptr)
 			{
 				gm->magicManager.exchange(magic->dropIndex, magic->dragIndex);
 				updateMagic();

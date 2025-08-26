@@ -17,18 +17,18 @@ void ListBox::initFromIni(INIReader & ini)
 {
 	freeResource();
 
-	rect.x = ini.GetInteger("Init", "Left", rect.x);
-	rect.y = ini.GetInteger("Init", "Top", rect.y);
-	rect.w = ini.GetInteger("Init", "Width", rect.w);
-	rect.h = ini.GetInteger("Init", "Height", rect.h);
-	soundName = ini.Get("Init", "Sound", "");
-	itemHeight = ini.GetInteger("Init", "ItemHeight", itemHeight);
-	itemCount = ini.GetInteger("Init", "ItemCount", itemCount);
+	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
+	soundName = ini.Get("Init", u8"Sound", u8"");
+	itemHeight = ini.GetInteger("Init", u8"ItemHeight", itemHeight);
+	itemCount = ini.GetInteger("Init", u8"ItemCount", itemCount);
 	
-	std::string soundName = ini.Get("Init", "Sound", "");
+	std::string soundName = ini.Get("Init", u8"Sound", u8"");
 
-	selColor = ini.GetColor("Init", "SelColor", color);
-	color = ini.GetColor("Init", "Color", color);	
+	selColor = ini.GetColor("Init", u8"SelColor", color);
+	color = ini.GetColor("Init", u8"Color", color);	
 
 
 	if (itemCount > 0)
@@ -40,7 +40,7 @@ void ListBox::initFromIni(INIReader & ini)
 		for (size_t i = 0; i < itemName.size(); i++)
 		{
 			itemButton[i] = std::make_shared<Button>();
-			itemName[i] = ini.Get("Items", convert::formatString("%d", i + 1), "");
+			itemName[i] = ini.Get("Items", convert::formatString("%d", i + 1), u8"");
 			
 			itemButton[i]->loadSound(soundName, 1);
 			

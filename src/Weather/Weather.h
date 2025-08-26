@@ -101,7 +101,7 @@ public:
 	void setLum(unsigned char l);
 	void setTime(unsigned char t);
 
-	void setWeather(WeatherType wType, const std::string& configFIleName = "");
+	void setWeather(WeatherType wType, const std::string& configFIleName = u8"");
 	void setDay(DayType dType);
 
 	void drawWeather();

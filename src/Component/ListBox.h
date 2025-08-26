@@ -16,7 +16,7 @@ public:
 	unsigned int selColor = 0xFFE6C864;
 	int itemHeight = 0;
 	int itemCount = 0;
-	std::string soundName = "";
+	std::string soundName = u8"";
 	std::vector<std::string> itemName;
 	std::vector<std::shared_ptr<Button>> itemButton;
 	int index = -1;

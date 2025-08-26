@@ -15,7 +15,7 @@ private:
 	static int findFileInPak(unsigned int fileID, const std::string & pakName);
 
 	static int findFileInPak(const std::string & fileName, const std::string & pakName);
-	static FilePos findFile(const std::string & fileName, int * index, const std::string & pakName = "", bool firstReadPak = false);
+	static FilePos findFile(const std::string & fileName, int * index, const std::string & pakName = u8"", bool firstReadPak = false);
 
 	static int unpak(char * inBuffer, int inLen, char * outBuffer, int outLen, int compressType);
 
@@ -29,6 +29,6 @@ public:
 
 	static int readFile(unsigned int fileID, std::unique_ptr<char[]>& s);
 	static int readFile(const std::string & fileName, std::unique_ptr<char[]>& s);
-	static int readFile(const std::string & fileName, std::unique_ptr<char[]>& s, int& len, const std::string & pakName = "", bool firstReadPak = false);
+	static int readFile(const std::string & fileName, std::unique_ptr<char[]>& s, int& len, const std::string & pakName = u8"", bool firstReadPak = false);
 };
 

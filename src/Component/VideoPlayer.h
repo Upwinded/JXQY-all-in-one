@@ -12,7 +12,7 @@ public:
 
 	_video v = nullptr;
 
-	std::string videoFileName = "";
+	std::string videoFileName = u8"";
 	
 	int loop = 0;
 

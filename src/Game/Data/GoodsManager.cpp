@@ -17,7 +17,7 @@ void GoodsManager::freeResource()
 {
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
-		goodsList[i].iniFile = "";
+		goodsList[i].iniFile = u8"";
 		goodsList[i].number = 0;
 		if (goodsList[i].goods != nullptr)
 		{
@@ -41,8 +41,8 @@ void GoodsManager::load(int index)
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
 		std::string section = convert::formatString("%d", i + 1);
-		goodsList[i].iniFile = ini.Get(section, "IniFile", "");
-		goodsList[i].number = ini.GetInteger(section, "Number", 0);
+		goodsList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
+		goodsList[i].number = ini.GetInteger(section, u8"Number", 0);
 		if (goodsList[i].iniFile.empty())
 		{
 			goodsList[i].number = 0;
@@ -52,7 +52,7 @@ void GoodsManager::load(int index)
 			if (goodsList[i].number <= 0)
 			{
 				goodsList[i].number = 0;
-				goodsList[i].iniFile = "";
+				goodsList[i].iniFile = u8"";
 			}
 			else
 			{
@@ -66,21 +66,21 @@ void GoodsManager::load(int index)
 void GoodsManager::save(int index)
 {
 	INIReader ini;
-	std::string section = "Head";
-	ini.SetInteger(section, "Count", 0);
+	std::string section = u8"Head";
+	ini.SetInteger(section, u8"Count", 0);
 	int count = 0;
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
-		if (goodsList[i].iniFile != "" && goodsList[i].number > 0)
+		if (goodsList[i].iniFile != u8"" && goodsList[i].number > 0)
 		{
 			count++;
 			section = convert::formatString("%d", i + 1);
-			ini.Set(section, "IniFile", goodsList[i].iniFile);
-			ini.SetInteger(section, "Number", goodsList[i].number);
+			ini.Set(section, u8"IniFile", goodsList[i].iniFile);
+			ini.SetInteger(section, u8"Number", goodsList[i].number);
 		}
 	}
-	section = "Head";
-	ini.SetInteger(section, "Count", count);
+	section = u8"Head";
+	ini.SetInteger(section, u8"Count", count);
     std::string fName = GOODS_INI_NAME;
     if (index >= 0)
     {
@@ -108,7 +108,7 @@ void GoodsManager::clearItem()
 {
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
-		goodsList[i].iniFile = "";
+		goodsList[i].iniFile = u8"";
 		goodsList[i].number = 0;
 		if (goodsList[i].goods != nullptr)
 		{
@@ -174,7 +174,7 @@ void GoodsManager::sellItem(const std::string & itemName)
 			gm->player->money += goodsList[i].goods->cost;
 			if (goodsList[i].number <= 0)
 			{
-				goodsList[i].iniFile = "";
+				goodsList[i].iniFile = u8"";
 				goodsList[i].goods = nullptr;
 				goodsList[i].number = 0;
 			}
@@ -218,7 +218,7 @@ bool GoodsManager::addItem(const std::string & itemName, int num)
 
 void GoodsManager::deleteItem(const std::string & itemName)
 {
-	if (itemName == "")
+	if (itemName == u8"")
 	{
 		return;
 	}
@@ -227,7 +227,7 @@ void GoodsManager::deleteItem(const std::string & itemName)
 		if (goodsList[i].iniFile == itemName)
 		{
 			goodsList[i].number = 0;
-			goodsList[i].iniFile = "";
+			goodsList[i].iniFile = u8"";
 			if (goodsList[i].goods != nullptr)
 			{
 				goodsList[i].goods = nullptr;
@@ -265,7 +265,7 @@ void GoodsManager::useItem(int itemIndex)
 {
 	if (!goodsListExists(itemIndex))
 	{
-		goodsList[itemIndex].iniFile = "";
+		goodsList[itemIndex].iniFile = u8"";
 		goodsList[itemIndex].number = 0;
 		if (goodsList[itemIndex].goods != nullptr)
 		{
@@ -274,7 +274,7 @@ void GoodsManager::useItem(int itemIndex)
 		return;
 	}
 	std::string goodsScript = goodsList[itemIndex].goods->script;
-	if (goodsScript != "")
+	if (goodsScript != u8"")
 	{
 		gm->runGoodsScript(goodsList[itemIndex].goods);
 	}
@@ -287,7 +287,7 @@ void GoodsManager::useItem(int itemIndex)
 		goodsList[itemIndex].number--;
 		if (goodsList[itemIndex].number <= 0)
 		{
-			goodsList[itemIndex].iniFile = "";
+			goodsList[itemIndex].iniFile = u8"";
 			goodsList[itemIndex].number = 0;
 			if (goodsList[itemIndex].goods != nullptr)
 			{

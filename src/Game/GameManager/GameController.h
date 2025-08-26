@@ -22,7 +22,7 @@ public:
 
 	std::shared_ptr<JoystickPanel> joystickPanel = nullptr;
 	std::shared_ptr<SkillsPanel> skillPanel = nullptr;
-	void setFastSelectBtn(int index, bool sVisible, std::string str = "");
+	void setFastSelectBtn(int index, bool sVisible, std::string str = u8"");
 
 #endif // __MOBILE__
 private:

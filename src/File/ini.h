@@ -37,15 +37,15 @@ typedef int (*ini_handler)(void* user, const char* section,
 typedef char* (*ini_reader)(char* str, int num, void* stream);
 
 /* Same as ini_parse(), but takes an ini_reader function pointer instead of
-   filename. Used for implementing custom or string-based I/O (see also
+   filename. Used for implementing custom or std::string-based I/O (see also
    ini_parse_string). */
 int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
                      void* user);
 
-/* Same as ini_parse(), but takes a zero-terminated string with the INI data
+/* Same as ini_parse(), but takes a zero-terminated std::string with the INI data
 instead of a file. Useful for parsing INI data from a network socket or
 already in memory. */
-int ini_parse_string(const char* string, ini_handler handler, void* user);
+int ini_parse_string(const char* str, ini_handler handler, void* user);
 
 /* Nonzero to allow multi-line value parsing, in the style of Python's
    configparser. If allowed, ini_parse() will call the handler with the same
@@ -67,7 +67,7 @@ int ini_parse_string(const char* string, ini_handler handler, void* user);
 #define INI_ALLOW_INLINE_COMMENTS 1
 #endif
 #ifndef INI_INLINE_COMMENT_PREFIXES
-#define INI_INLINE_COMMENT_PREFIXES ";"
+#define INI_INLINE_COMMENT_PREFIXES u8";"
 #endif
 
 /* Nonzero to use stack for line buffer, zero to use heap (malloc/free). */

@@ -14,12 +14,12 @@ public:
 
 	int buttonType = 0;
 
-	std::string kind = "";
+	std::string kind = u8"";
 
 	_shared_imp image[3] = { nullptr, nullptr, nullptr };
 
 #ifdef SOUND_DYNAMIC_LOAD
-	std::string sound[3] = { "", "", "" };
+	std::string sound[3] = { u8"", u8"", u8"" };
 #else
 	_music sound[3] = { nullptr,nullptr,nullptr };
 #endif // SOUND_DYNAMIC_LOAD

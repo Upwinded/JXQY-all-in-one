@@ -28,7 +28,7 @@ int SDL_main(int argc, char* argv[])
 int main(int argc, char* argv[])
 #endif
 {
-	std::string log_on = "-lf";
+	std::string log_on = u8"-lf";
 	for (int i = 0; i < argc; i++)
 	{
 		std::string par = argv[i];

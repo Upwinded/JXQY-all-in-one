@@ -13,35 +13,35 @@ bool File::fileExist(const std::string& fileName)
 #else
     std::string newFileName = AssetsPath + fileName;
 #endif
-    convert::replaceAllString(newFileName, "\\", "/");
+    convert::replaceAllString(newFileName, u8"\\", u8"/");
     if (newFileName.length() <= 0)
     {
         return false;
     }
-    auto fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+    auto fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
 
 #if defined( __ANDROID__)
     if (fp == nullptr)
     {
         std::string path = SDL_GetAndroidInternalStoragePath();
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
 //        auto tempPath = convert::extractFilePath(newFileName);
 //        SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
     }
 #elif defined(__APPLE__)
     if (fp == nullptr)
     {
         std::string path = SDL_GetPrefPath(ORG_NAME, APP_NAME);
-        //std::string path = "~/Library/Containers/${BundleId}";
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        //std::string path = u8"~/Library/Containers/${BundleId}";
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
 //        auto tempPath = convert::extractFilePath(newFileName);
 //        SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
     }
 #endif
 
@@ -72,31 +72,31 @@ bool File::readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int
     std::string newFileName = AssetsPath + fileName;
 #endif
 
-    convert::replaceAllString(newFileName, "\\", "/");
+    convert::replaceAllString(newFileName, u8"\\", u8"/");
     {
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
     }
-    auto fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+    auto fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
 #if defined( __ANDROID__)
     if (!fp)
     {
         std::string path = SDL_GetAndroidInternalStoragePath();
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
         
-        fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
     }
 #elif defined(__APPLE__)
     if (fp == nullptr)
     {
         std::string path = SDL_GetPrefPath(ORG_NAME, APP_NAME);
-        //std::string path = "~/Library/Containers/${BundleId}";
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-        //convert::replaceAllString(newFileName, "/", "_");
+        //std::string path = u8"~/Library/Containers/${BundleId}";
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+        //convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
-        fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
     }
 #endif
     if (!fp)
@@ -121,21 +121,21 @@ bool File::readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int
 //
 //    std::string  newFileName = AssetsPath + fileName;
 //
-//    convert::replaceAllString(newFileName, "\\", "/");
-//    auto fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+//    convert::replaceAllString(newFileName, u8"\\", u8"/");
+//    auto fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
 //#ifdef __ANDROID__
 //    if (!fp)
 //    {
 //        std::string path = SDL_AndroidGetInternalStoragePath();
-//        if (*path.end() != '/') {path += "/";}
-//        convert::replaceAllString(newFileName, "/", "_");
+//        if (*path.end() != '/') {path += u8"/";}
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
 //        newFileName = path + newFileName;
-//        fp = SDL_IOFromFile(newFileName.c_str(), "rb");
+//        fp = SDL_IOFromFile(newFileName.c_str(), u8"rb");
 //    }
 //#endif
 //    if (!fp)
 //    {
-//        GameLog::write(stderr, "Can not open file %s\n", newFileName.c_str());
+//        GameLog::write(stderr, u8"Can not open file %s\n", newFileName.c_str());
 //        return;
 //    }
 //    SDL_SeekIO(fp, 0, 0);
@@ -155,35 +155,35 @@ void File::writeFile(const std::string& fileName, const void* s, int len)
     std::string newFileName = AssetsPath + fileName;
 #endif
 
-    convert::replaceAllString(newFileName, "\\", "/");
+    convert::replaceAllString(newFileName, u8"\\", u8"/");
     
     {
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
     }
-    auto fp = SDL_IOFromFile(newFileName.c_str(), "wb");
+    auto fp = SDL_IOFromFile(newFileName.c_str(), u8"wb");
 #ifdef __ANDROID__
     if (!fp)
     {
         std::string path = SDL_GetAndroidInternalStoragePath();
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "wb");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"wb");
     }
 #elif defined( __APPLE__)
     if (fp == nullptr)
     {
         std::string path = SDL_GetPrefPath(ORG_NAME, APP_NAME);
-        //std::string path = "~/Library/Containers/${BundleId}";
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        //std::string path = u8"~/Library/Containers/${BundleId}";
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "wb");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"wb");
 
     }
 #else
@@ -191,7 +191,7 @@ void File::writeFile(const std::string& fileName, const void* s, int len)
     {
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"wb+");
     }
 #endif
     if (!fp)
@@ -221,30 +221,30 @@ void File::appendFile(const std::string& fileName, const void* s, int len)
     std::string newFileName = AssetsPath + fileName;
 #endif
 
-    convert::replaceAllString(newFileName, "\\", "/");
-    auto fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
+    convert::replaceAllString(newFileName, u8"\\", u8"/");
+    auto fp = SDL_IOFromFile(newFileName.c_str(), u8"wb+");
 #ifdef __ANDROID__
     if (!fp)
     {
         std::string path = SDL_GetAndroidInternalStoragePath();
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"wb+");
     }
 #elif defined( __APPLE__)
     if (fp == nullptr)
     {
         std::string path = SDL_GetPrefPath(ORG_NAME, APP_NAME);
-        //std::string path = "~/Library/Containers/${BundleId}";
-        if (path.length() > 0 && *(path.end() - 1) != '/') { path += "/"; }
-//        convert::replaceAllString(newFileName, "/", "_");
+        //std::string path = u8"~/Library/Containers/${BundleId}";
+        if (path.length() > 0 && *(path.end() - 1) != '/') { path += u8"/"; }
+//        convert::replaceAllString(newFileName, u8"/", u8"_");
         newFileName = path + newFileName;
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"wb+");
 
     }
 #else
@@ -252,12 +252,12 @@ void File::appendFile(const std::string& fileName, const void* s, int len)
     {
         auto tempPath = convert::extractFilePath(newFileName);
         SDL_CreateDirectory(tempPath.c_str());
-        fp = SDL_IOFromFile(newFileName.c_str(), "wb+");
+        fp = SDL_IOFromFile(newFileName.c_str(), u8"wb+");
     }
 #endif
     if (!fp)
     {
-        fprintf(stderr, "Can not open file(wb+) %s\n", fileName.c_str());
+        fprintf(stderr, u8"Can not open file(wb+) %s\n", fileName.c_str());
         return;
     }
     SDL_SeekIO(fp, 0, SDL_IO_SEEK_END);
@@ -290,7 +290,7 @@ std::string File::getAssetsName(const std::string& fileName)
 #else
     std::string newFileName = AssetsPath + fileName;
 #endif
-    convert::replaceAllString(newFileName, "\\", "/");
+    convert::replaceAllString(newFileName, u8"\\", u8"/");
     return newFileName;
 }
 

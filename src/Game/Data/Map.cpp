@@ -301,13 +301,13 @@ void Map::loadMapMpc()
 		for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 		{
 			std::string mpcName = data->head.path;
-			if (mpcName == "")
+			if (mpcName == u8"")
 			{
-				mpcName = "mpc\\map\\" + gm->mapFolderName + "\\";
+				mpcName = u8"mpc\\map\\" + gm->mapFolderName + u8"\\";
 			}
 			if (mpcName.length() > 1 && mpcName.c_str()[mpcName.length() - 1] != '\\')
 			{
-				mpcName += "\\";
+				mpcName += u8"\\";
 			}
 			mpcName += data->mpc.mpc[i].name.get();
 			mapMpc->mpc[i].img = IMP::createIMPImage(mpcName);
@@ -951,19 +951,19 @@ int Map::getTrapIndex(Point pos)
 std::string Map::getTrapName(Point pos)
 {
     if (!isInMap(pos))
-        return "";
+        return u8"";
     
 	if (data->tile[pos.y][pos.x].trap != 0)
 	{
 		return gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap);
 	}
-	return "";
+	return u8"";
 }
 
 bool Map::haveTraps(Point pos)
 {
 	if (!data) { return false; }
-	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap) == "")
+	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap) == u8"")
 	{
 		return false;
 	}

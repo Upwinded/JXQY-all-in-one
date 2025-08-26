@@ -3,7 +3,7 @@
 ImageContainer::ImageContainer()
 {
 	priority = epImage;
-	name = "ImageContainer";
+	name = u8"ImageContainer";
 	elementType = etImageContainer;
 	coverMouse = false;
 }
@@ -23,12 +23,12 @@ void ImageContainer::initFromIni(INIReader & ini)
 {
 	freeResource();
 
-	rect.x = ini.GetInteger("Init", "Left", rect.x);
-	rect.y = ini.GetInteger("Init", "Top", rect.y);
-	rect.w = ini.GetInteger("Init", "Width", rect.w);
-	rect.h = ini.GetInteger("Init", "Height", rect.h);
-	name = ini.Get("Init", "Name", name);
-	std::string impName = ini.Get("Init", "Image", "");
+	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
+	name = ini.Get("Init", u8"Name", name);
+	std::string impName = ini.Get("Init", u8"Image", u8"");
 	impImage = loadRes(impName);
 }
 

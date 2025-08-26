@@ -7,7 +7,7 @@
 
 TalkLabel::TalkLabel()
 {
-	name = "TalkLabel";
+	name = u8"TalkLabel";
 	priority = epLabel;
 	coverMouse = false;
 	canDrag = false;
@@ -53,11 +53,11 @@ void TalkLabel::drawItemStr()
 
 std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 {
-	auto s = convert::splitString(tString, "<Enter>");
+	auto s = convert::splitString(tString, u8"<Enter>");
 	std::vector<std::string> nws;
 	for (size_t i = 0; i < s.size(); i++)
 	{
-		auto rws = convert::splitString(s[i], "<enter>");
+		auto rws = convert::splitString(s[i], u8"<enter>");
 		for (size_t j = 0; j < rws.size(); j++)
 		{
 			nws.push_back(rws[j]);
@@ -77,19 +77,19 @@ std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 			if (s[i][j] == '<' && s[i].find("<color=red>", j) == j)
 			{
 				col = 0xFFFF0000;
-				std::string cc = "<color=red>";
+				std::string cc = u8"<color=red>";
 				j += cc.length();
 			}
 			else if (s[i][j] == L'<' && s[i].find("<color=black>", j) == j)
 			{
 				col = 0xFF000000;
-				std::string cc = "<color=black>";
+				std::string cc = u8"<color=black>";
 				j += cc.length();
 			}
 			else if (s[i][j] == L'<' && s[i].find("<color=default>", j) == j)
 			{
 				col = color;
-				std::string cc = "<color=default>";
+				std::string cc = u8"<color=default>";
 				j += cc.length();
 			}
 			else

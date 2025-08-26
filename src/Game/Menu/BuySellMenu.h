@@ -30,7 +30,7 @@ public:
 
 	void clearGoodsList();
 	void buy(const std::string & list);
-	void sell(const std::string & list = "");
+	void sell(const std::string & list = u8"");
 	bool addGoodsItem(const std::string & itemName, int num);
 	void setGoodsButtonChecked();
 	void clearButtonChecked();

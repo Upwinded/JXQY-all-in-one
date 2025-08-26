@@ -11,8 +11,8 @@ void DragRoundButton::initFromIni(INIReader & ini)
 {
 	freeResource();
 	RoundButton::initFromIni(ini);
-	type = (DragRoundButtonType)ini.GetInteger("Init", "IndicateType", (int)DragRoundButtonType::None);
-	auto impName = ini.Get("Init", "IndicateImage", "");
+	type = (DragRoundButtonType)ini.GetInteger("Init", u8"IndicateType", (int)DragRoundButtonType::None);
+	auto impName = ini.Get("Init", u8"IndicateImage", u8"");
 	setIndicateImage(impName);
 }
 

@@ -59,7 +59,7 @@ void BottomMenu::updateGoodsNumber(int index)
 	{
 		if (goodsItem[index] != nullptr)
 		{		
-			if (gm->goodsManager.goodsList[GOODS_COUNT + index].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + index].number > 0 && gm->goodsManager.goodsList[GOODS_COUNT + index].iniFile != "")
+			if (gm->goodsManager.goodsList[GOODS_COUNT + index].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + index].number > 0 && gm->goodsManager.goodsList[GOODS_COUNT + index].iniFile != u8"")
 			{
 				goodsItem[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[GOODS_COUNT + index].number));
 			}
@@ -70,7 +70,7 @@ void BottomMenu::updateGoodsNumber(int index)
 				{
 					gm->goodsManager.goodsList[GOODS_COUNT + index].goods = nullptr;
 				}
-				gm->goodsManager.goodsList[GOODS_COUNT + index].iniFile = "";
+				gm->goodsManager.goodsList[GOODS_COUNT + index].iniFile = u8"";
 				gm->goodsManager.goodsList[GOODS_COUNT + index].number = 0;
 			}
 		}
@@ -150,7 +150,7 @@ void BottomMenu::onEvent()
 		int ret = goodsItem[i]->getResult();
 		if (ret & erShowHint)
 		{
-			if (gm->goodsManager.goodsList[GOODS_COUNT + i].iniFile != "" && gm->goodsManager.goodsList[GOODS_COUNT + i].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + i].number > 0)
+			if (gm->goodsManager.goodsList[GOODS_COUNT + i].iniFile != u8"" && gm->goodsManager.goodsList[GOODS_COUNT + i].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + i].number > 0)
 			{
 				gm->menu->toolTip->visible = true;
 				addChild(gm->menu->toolTip);
@@ -183,7 +183,7 @@ void BottomMenu::onEvent()
 			
 			if (goodsItem[i]->dropType == dtGoods)
 			{
-				if (gm->goodsManager.goodsList[goodsItem[i]->dropIndex].iniFile != "" && gm->goodsManager.goodsList[goodsItem[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[goodsItem[i]->dropIndex].number > 0)
+				if (gm->goodsManager.goodsList[goodsItem[i]->dropIndex].iniFile != u8"" && gm->goodsManager.goodsList[goodsItem[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[goodsItem[i]->dropIndex].number > 0)
 				{	
 					if (goodsItem[i]->dropIndex < GOODS_COUNT)
 					{						

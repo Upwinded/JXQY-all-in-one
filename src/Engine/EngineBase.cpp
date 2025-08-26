@@ -494,7 +494,7 @@ _shared_image EngineBase::loadImageFromMem(std::unique_ptr<char[]>& data, int si
 		return nullptr;
 	}
     auto img = IMG_LoadTexture_IO(renderer, SDL_IOFromMem(data.get(), size), true);
-    //auto img = IMG_LoadTextureTyped_RW(renderer, SDL_IOFromMem(data.get(), size), 1, "ßPNG");
+    //auto img = IMG_LoadTextureTyped_RW(renderer, SDL_IOFromMem(data.get(), size), 1, u8"ßPNG");
 	_shared_image ret = make_safe_shared_image(img);
 	return ret;
 }
@@ -1095,10 +1095,10 @@ void EngineBase::loadLogo()
 	//	freeImage(logo);
 	//	logo = nullptr;
 	//}
-	std::string logoFileName = "config\\logo.png";
+	std::string logoFileName = u8"config\\logo.png";
 
 #ifdef USE_LOGO_RESOURCE
-	HRSRC hRsrc = FindResource(nullptr, MAKEINTRESOURCE(IDB_PNG1), "PNG");
+	HRSRC hRsrc = FindResource(nullptr, MAKEINTRESOURCE(IDB_PNG1), u8"PNG");
 	if (hRsrc == nullptr)
 	{
 		logo = loadImageFromFile(logoFileName);
@@ -1611,7 +1611,7 @@ void EngineBase::setFontName(const std::string & fontName)
 		SDL_CloseIO(fontData);
 		fontData = nullptr;
 	}
-	fontData = SDL_IOFromFile(fontName.c_str(), "r+");
+	fontData = SDL_IOFromFile(fontName.c_str(), u8"r+");
 	if (!fontData)
 	{
 		GameLog::write("there is no fontData\n");
@@ -1982,12 +1982,12 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 		return sdlError;
 	}
 #ifdef __MOBILE__
-    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, u8"LandscapeLeft LandscapeRight");
 #endif
-	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
-	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
-	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
-	//SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "best");
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, u8"0");
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, u8"0");
+	SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, u8"2");
+	//SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, u8"best");
     
     int screenWidth = wWidth;
     int screenHeight = wHeight;
@@ -2632,17 +2632,17 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 #if defined( __ANDROID__ )
 	std::string path = SDL_GetAndroidInternalStoragePath();
 	if (path.length() > 0 && *path.end() != '/') { path += '/'; }
-	convert::replaceAllString(newFileName, "\\", "/");
-//    convert::replaceAllString(newFileName, "/", "_");
+	convert::replaceAllString(newFileName, u8"\\", u8"/");
+//    convert::replaceAllString(newFileName, u8"/", u8"_");
 //	newFileName = path + newFileName;
-    auto *pFile = SDL_IOFromFile(newFileName.c_str(), "rb");
+    auto *pFile = SDL_IOFromFile(newFileName.c_str(), u8"rb");
     mediaStream->rWops = pFile;
     SDL_SeekIO(pFile, 0, SDL_IO_SEEK_END);
     mediaStream->rWops_length = SDL_TellIO(pFile);
     SDL_SeekIO(pFile, 0, SDL_IO_SEEK_SET);
 
     if(!pFile) {
-        av_log(nullptr, AV_LOG_ERROR, "Cannot open input file\n");
+        av_log(nullptr, AV_LOG_ERROR, u8"Cannot open input file\n");
         return;
     }
 
@@ -2657,14 +2657,14 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
     mediaStream->formatCtx->pb = avio_ctx;
     ret = avformat_open_input(&mediaStream->formatCtx, nullptr, nullptr, nullptr);
 #elif defined( __APPLE__ )
-    auto *pFile = SDL_IOFromFile(File::getAssetsName(newFileName).c_str(), "rb");
+    auto *pFile = SDL_IOFromFile(File::getAssetsName(newFileName).c_str(), u8"rb");
     mediaStream->rWops = pFile;
     SDL_SeekIO(pFile, 0, SDL_IO_SEEK_END);
     mediaStream->rWops_length = SDL_TellIO(pFile);
     SDL_SeekIO(pFile, 0, SDL_IO_SEEK_SET);
 
     if(!pFile) {
-        av_log(nullptr, AV_LOG_ERROR, "Cannot open input file\n");
+        av_log(nullptr, AV_LOG_ERROR, u8"Cannot open input file\n");
         return;
     }
 
@@ -3397,19 +3397,19 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
-	av_opt_set_int(swr_ctx, "in_channel_layout", src_ch_layout, 0);
+	av_opt_set_int(swr_ctx, u8"in_channel_layout", src_ch_layout, 0);
 #else
-	av_opt_set_chlayout(swr_ctx, "in_channel_layout", &codecCtx->ch_layout, 0);
+	av_opt_set_chlayout(swr_ctx, u8"in_channel_layout", &codecCtx->ch_layout, 0);
 #endif
-	av_opt_set_int(swr_ctx, "in_sample_rate", codecCtx->sample_rate, 0);
-	av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", codecCtx->sample_fmt, 0);
+	av_opt_set_int(swr_ctx, u8"in_sample_rate", codecCtx->sample_rate, 0);
+	av_opt_set_sample_fmt(swr_ctx, u8"in_sample_fmt", codecCtx->sample_fmt, 0);
 #if (defined USE_FFMPEG4)
-	av_opt_set_int(swr_ctx, "out_channel_layout", dst_ch_layout, 0);
+	av_opt_set_int(swr_ctx, u8"out_channel_layout", dst_ch_layout, 0);
 #else
-	av_opt_set_chlayout(swr_ctx, "out_channel_layout", &dst_ch_layout, 0);
+	av_opt_set_chlayout(swr_ctx, u8"out_channel_layout", &dst_ch_layout, 0);
 #endif
-	av_opt_set_int(swr_ctx, "out_sample_rate", out_sample_rate, 0);
-	av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", (AVSampleFormat)out_sample_format, 0);
+	av_opt_set_int(swr_ctx, u8"out_sample_rate", out_sample_rate, 0);
+	av_opt_set_sample_fmt(swr_ctx, u8"out_sample_fmt", (AVSampleFormat)out_sample_format, 0);
 
 	if ((ret = swr_init(swr_ctx)) < 0)
 	{

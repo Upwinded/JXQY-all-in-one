@@ -116,22 +116,22 @@ public:
 	_shared_imp createMagicImage();
 	_shared_imp createMagicIcon();
 
-	std::string iniName = "";
-	std::string name = "";
-	std::string intro = "";
+	std::string iniName = u8"";
+	std::string name = u8"";
+	std::string intro = u8"";
 
-	std::string image = "";
-	std::string icon = "";
+	std::string image = u8"";
+	std::string icon = u8"";
 
-	std::string flyingImage = "";
-	std::string flyingSound = "";
-	std::string vanishImage = "";
-	std::string vanishSound = "";
+	std::string flyingImage = u8"";
+	std::string flyingSound = u8"";
+	std::string vanishImage = u8"";
+	std::string vanishSound = u8"";
 
-	std::string actionFile = "";
-	std::string actionShadowFile = "";
-	std::string attackFile = "";
-	std::string superModeImage = "";
+	std::string actionFile = u8"";
+	std::string actionShadowFile = u8"";
+	std::string attackFile = u8"";
+	std::string superModeImage = u8"";
 
 
 	std::shared_ptr<Magic> specialMagic = nullptr;

@@ -13,13 +13,13 @@
 
 #include "../libconvert/libconvert.h"
 #include "INIReader.h"
-using std::string;
+
 
 INIReader::INIReader()
 {
 }
 
-INIReader::INIReader(const string& filename)
+INIReader::INIReader(const std::string& filename)
 {
 	std::unique_ptr<char[]> s;
 	int len;
@@ -33,7 +33,7 @@ INIReader::INIReader(const string& filename)
 	std::string newfName = fName;
 
 #ifndef _WIN32
-	convert::replaceAllString(newfName, "\\", "/");
+	convert::replaceAllString(newfName, u8"\\", u8"/");
 //	newfName = convert::lowerCase(newfName);
 #endif
 	File::readFile(newfName.c_str(), s, len);
@@ -68,7 +68,7 @@ int INIReader::ParseError() const
     return _error;
 }
 
-string INIReader::Get(const string& section, const string& name, const string& default_value) const
+std::string INIReader::Get(const std::string& section, const std::string& name, const std::string& default_value) const
 {
 	std::string s = section;
 	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
@@ -131,23 +131,23 @@ void INIReader::SetReal(const std::string & section, const std::string & name, f
 
 void INIReader::SetBoolean(const std::string & section, const std::string & name, bool value)
 {
-	std::string v = value ? "1" : "0";
+	std::string v = value ? u8"1" : u8"0";
 	Set(section, name, v);
 }
 
 void INIReader::SetColor(const std::string& section, const std::string& name, uint32_t value)
 {
 	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
-	std::string col = std::to_string(colorData[0]) + "," + std::to_string(colorData[1]) + "," + std::to_string(colorData[2]); 
+	std::string col = std::to_string(colorData[0]) + u8"," + std::to_string(colorData[1]) + u8"," + std::to_string(colorData[2]); 
 	Set(section, name, col);
 }
 
 uint32_t INIReader::GetColor(const std::string & section, const std::string & name, uint32_t value)
 {
 	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
-	std::string col = std::to_string(colorData[0]) + "," + std::to_string(colorData[1]) + "," + std::to_string(colorData[2]);
+	std::string col = std::to_string(colorData[0]) + u8"," + std::to_string(colorData[1]) + u8"," + std::to_string(colorData[2]);
 	col = Get(section, name, col);
-	std::vector<std::string> c = convert::splitString(col, ",");
+	std::vector<std::string> c = convert::splitString(col, u8",");
 	for (size_t i = 0; i < (c.size() > 3 ? 3 : c.size()); i++)
 	{
 		//char* end = nullptr;
@@ -170,7 +170,7 @@ uint32_t INIReader::GetColor(const std::string & section, const std::string & na
 
 UTime INIReader::GetTime(const std::string& section, const std::string& name, UTime default_value) const
 {
-	std::string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, u8"");
 	try
 	{
 		return (UTime)std::stoll(valstr, nullptr, 0);
@@ -181,9 +181,9 @@ UTime INIReader::GetTime(const std::string& section, const std::string& name, UT
 	}
 }
 
-long INIReader::GetInteger(const string& section, const string& name, long default_value) const
+long INIReader::GetInteger(const std::string& section, const std::string& name, long default_value) const
 {
-	std::string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, u8"");
 	try
 	{
 		return std::stol(valstr, nullptr, 0);
@@ -194,9 +194,9 @@ long INIReader::GetInteger(const string& section, const string& name, long defau
 	}
 }
 
-float INIReader::GetReal(const string& section, const string& name, float default_value) const
+float INIReader::GetReal(const std::string& section, const std::string& name, float default_value) const
 {
-	std::string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, u8"");
 	try
 	{
 		return std::stod(valstr);
@@ -207,14 +207,14 @@ float INIReader::GetReal(const string& section, const string& name, float defaul
 	}
 }
 
-bool INIReader::GetBoolean(const string& section, const string& name, bool default_value) const
+bool INIReader::GetBoolean(const std::string& section, const std::string& name, bool default_value) const
 {
-	std::string valstr = Get(section, name, "");
-    // Convert to lower case to make string comparisons case-insensitive
+	std::string valstr = Get(section, name, u8"");
+    // Convert to lower case to make std::string comparisons case-insensitive
     std::transform(valstr.begin(), valstr.end(), valstr.begin(), ::tolower);
-    if (valstr == "true" || valstr == "yes" || valstr == "on" || valstr == "1")
+    if (valstr == u8"true" || valstr == u8"yes" || valstr == u8"on" || valstr == u8"1")
         return true;
-    else if (valstr == "false" || valstr == "no" || valstr == "off" || valstr == "0")
+    else if (valstr == u8"false" || valstr == u8"no" || valstr == u8"off" || valstr == u8"0")
         return false;
     else
         return default_value;
@@ -222,15 +222,15 @@ bool INIReader::GetBoolean(const string& section, const string& name, bool defau
 
 std::string INIReader::saveToString()
 {
-	std::string s = "";
+	std::string s = u8"";
 	for (auto it = map.sections.begin(); it != map.sections.end(); ++it)
 	{
-		s += "[" + it->first + "]\r\n";
+		s += u8"[" + it->first + u8"]\r\n";
 		for (auto it_2 = it->second.keys.begin(); it_2 != it->second.keys.end(); ++it_2)
 		{
-			s += it_2->first + "=" + it_2->second + "\r\n";
+			s += it_2->first + u8"=" + it_2->second + u8"\r\n";
 		}
-		s += "\r\n";
+		s += u8"\r\n";
 	}
 
 	return s;
@@ -240,10 +240,10 @@ void INIReader::saveToFile(const std::string & fileName)
 {
 	std::string s = saveToString();
 	File::writeFile(fileName, s.c_str(), s.size());
-	/*auto fp = SDL_IOFromFile(fileName.c_str(), "wb");
+	/*auto fp = SDL_IOFromFile(fileName.c_str(), u8"wb");
 	if (!fp)
 	{
-		GameLog::write(stderr, "Can not open file %s\n", fileName.c_str());
+		GameLog::write(stderr, u8"Can not open file %s\n", fileName.c_str());
 		return;
 	}
 	SDL_SeekIO(fp, 0, 0);
@@ -251,9 +251,9 @@ void INIReader::saveToFile(const std::string & fileName)
 	SDL_CloseIO(fp);*/
 }
 
-string INIReader::MakeKey(const string& section, const string& name)
+std::string INIReader::MakeKey(const std::string& section, const std::string& name)
 {
-	std::string key = section + "=" + name;
+	std::string key = section + u8"=" + name;
     // Convert to lower case to make section/name lookups case-insensitive
     std::transform(key.begin(), key.end(), key.begin(), ::tolower);
     return key;

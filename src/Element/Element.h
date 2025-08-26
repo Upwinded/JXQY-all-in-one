@@ -47,7 +47,7 @@ public:
 	ElementType elementType = etElement;
 	int elementTypeData = 0;
 
-	std::string name = "Element";
+	std::string name = u8"Element";
 
 	Element* parent = nullptr;
 	std::vector<PElement> children;

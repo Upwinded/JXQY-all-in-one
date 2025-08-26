@@ -32,9 +32,9 @@ enum ObjectAction
 
 struct ObjectRes
 {
-	std::string imageFile = "";
-	std::string shadowFile = "";
-	std::string soundFile = "";
+	std::string imageFile = u8"";
+	std::string shadowFile = u8"";
+	std::string soundFile = u8"";
 	_shared_imp image = nullptr;
 	_shared_imp shadow = nullptr;
 };
@@ -62,10 +62,10 @@ public:
 	_shared_image getActionImage(int * offsetx, int * offsety);
 	_shared_image getActionShadow(int * offsetx, int * offsety);
 
-	std::string objName = "";
-	std::string objectFile = "";
-	std::string scriptFile = "";
-	std::string wavFile = "";
+	std::string objName = u8"";
+	std::string objectFile = u8"";
+	std::string scriptFile = u8"";
+	std::string wavFile = u8"";
 	int kind = okBody;
 
 	int lum = olNone;

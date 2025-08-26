@@ -19,20 +19,20 @@ Magic::~Magic()
 
 void Magic::reset()
 {
-	name = "";
-	intro = "";
+	name = u8"";
+	intro = u8"";
 
-	image = "";
-	icon = "";
+	image = u8"";
+	icon = u8"";
 
-	flyingImage = "";
-	flyingSound = "";
-	vanishImage = "";
-	vanishSound = "";
-	actionFile = "";
-	actionShadowFile = "";
-	attackFile = "";
-	superModeImage = "";
+	flyingImage = u8"";
+	flyingSound = u8"";
+	vanishImage = u8"";
+	vanishSound = u8"";
+	actionFile = u8"";
+	actionShadowFile = u8"";
+	attackFile = u8"";
+	superModeImage = u8"";
 
 	for (size_t i = 0; i < MAGIC_MAX_LEVEL + 1; i++)
 	{
@@ -68,53 +68,53 @@ void Magic::initFromIni(const std::string & fileName, bool loadSpecialMagic)
 	if (s != nullptr && len > 0)
 	{
 		INIReader ini(s);
-		std::string section = "Init";
-		name = ini.Get(section, "Name", "");
-		intro = ini.Get(section, "Intro", "");
-		image = ini.Get(section, "Image", "");
-		icon = ini.Get(section, "Icon", "");
-		flyingImage = ini.Get(section, "FlyingImage", "");
-		flyingSound = ini.Get(section, "FlyingSound", "");
-		vanishImage = ini.Get(section, "VanishImage", "");
-		vanishSound = ini.Get(section, "VanishSound", "");
-		actionFile = ini.Get(section, "ActionFile", "");
-		actionShadowFile = ini.Get(section, "ActionShadowFile", "");
-		attackFile = ini.Get(section, "AttackFile", "");
-		superModeImage = ini.Get(section, "SuperModeImage", "");
+		std::string section = u8"Init";
+		name = ini.Get(section, u8"Name", u8"");
+		intro = ini.Get(section, u8"Intro", u8"");
+		image = ini.Get(section, u8"Image", u8"");
+		icon = ini.Get(section, u8"Icon", u8"");
+		flyingImage = ini.Get(section, u8"FlyingImage", u8"");
+		flyingSound = ini.Get(section, u8"FlyingSound", u8"");
+		vanishImage = ini.Get(section, u8"VanishImage", u8"");
+		vanishSound = ini.Get(section, u8"VanishSound", u8"");
+		actionFile = ini.Get(section, u8"ActionFile", u8"");
+		actionShadowFile = ini.Get(section, u8"ActionShadowFile", u8"");
+		attackFile = ini.Get(section, u8"AttackFile", u8"");
+		superModeImage = ini.Get(section, u8"SuperModeImage", u8"");
 
 		for (int i = 0; i < MAGIC_MAX_LEVEL + 1; i++)
 		{
 			if (i == 0)
 			{
-				section = "Init";
+				section = u8"Init";
 			}
 			else
 			{
 				section = convert::formatString("Level%d", i);
 			}
 			int idx = i - 1 < 0 ? 0 : i - 1;
-			level[i].effect = ini.GetInteger(section, "Effect", level[idx].effect);
-			level[i].levelupExp = ini.GetInteger(section, "LevelupExp", level[idx].levelupExp);
-			level[i].lifeCost = ini.GetInteger(section, "LifeCost", level[idx].lifeCost);
-			level[i].manaCost = ini.GetInteger(section, "ManaCost", level[idx].manaCost);
-			level[i].thewCost = ini.GetInteger(section, "ThewCost", level[idx].thewCost);
+			level[i].effect = ini.GetInteger(section, u8"Effect", level[idx].effect);
+			level[i].levelupExp = ini.GetInteger(section, u8"LevelupExp", level[idx].levelupExp);
+			level[i].lifeCost = ini.GetInteger(section, u8"LifeCost", level[idx].lifeCost);
+			level[i].manaCost = ini.GetInteger(section, u8"ManaCost", level[idx].manaCost);
+			level[i].thewCost = ini.GetInteger(section, u8"ThewCost", level[idx].thewCost);
 
-			level[i].moveKind = ini.GetInteger(section, "MoveKind", level[idx].moveKind);
-			level[i].specialKind = ini.GetInteger(section, "SpecialKind", level[idx].specialKind);
-			level[i].region = ini.GetInteger(section, "Region", level[idx].region);
-			level[i].speed = ini.GetInteger(section, "Speed", level[idx].speed);
-			level[i].flyingLum = ini.GetInteger(section, "FlyingLum", level[idx].flyingLum);
-			level[i].vanishLum = ini.GetInteger(section, "VanishLum", level[idx].vanishLum);
-			level[i].waitFrame = ini.GetInteger(section, "WaitFrame", level[idx].waitFrame);
-			level[i].lifeFrame = ini.GetInteger(section, "LifeFrame", level[idx].lifeFrame);
+			level[i].moveKind = ini.GetInteger(section, u8"MoveKind", level[idx].moveKind);
+			level[i].specialKind = ini.GetInteger(section, u8"SpecialKind", level[idx].specialKind);
+			level[i].region = ini.GetInteger(section, u8"Region", level[idx].region);
+			level[i].speed = ini.GetInteger(section, u8"Speed", level[idx].speed);
+			level[i].flyingLum = ini.GetInteger(section, u8"FlyingLum", level[idx].flyingLum);
+			level[i].vanishLum = ini.GetInteger(section, u8"VanishLum", level[idx].vanishLum);
+			level[i].waitFrame = ini.GetInteger(section, u8"WaitFrame", level[idx].waitFrame);
+			level[i].lifeFrame = ini.GetInteger(section, u8"LifeFrame", level[idx].lifeFrame);
 
-			level[i].attackRadius = ini.GetInteger(section, "AttackRadius", level[idx].attackRadius);
+			level[i].attackRadius = ini.GetInteger(section, u8"AttackRadius", level[idx].attackRadius);
 
 		}
 
 		createRes();
 
-		if (loadSpecialMagic && attackFile != "")
+		if (loadSpecialMagic && attackFile != u8"")
 		{
 			specialMagic = std::make_shared<Magic>();
 			specialMagic->initFromIni(attackFile, false);
@@ -1495,7 +1495,7 @@ void Magic::createRes()
 
 _shared_imp Magic::createActionImage()
 {
-	if (actionFile == "")
+	if (actionFile == u8"")
 	{
 		return nullptr;
 	}
@@ -1506,7 +1506,7 @@ _shared_imp Magic::createActionImage()
 
 _shared_imp Magic::createActionShadow()
 {
-	if (actionShadowFile == "")
+	if (actionShadowFile == u8"")
 	{
 		return nullptr;
 	}
@@ -1517,7 +1517,7 @@ _shared_imp Magic::createActionShadow()
 
 _shared_imp Magic::createMagicFlyingImage()
 {
-	if (flyingImage == "")
+	if (flyingImage == u8"")
 	{
 		return nullptr;
 	}
@@ -1528,7 +1528,7 @@ _shared_imp Magic::createMagicFlyingImage()
 
 _shared_imp Magic::createMagicVanishImage()
 {
-	if (vanishImage == "")
+	if (vanishImage == u8"")
 	{
 		return nullptr;
 	}
@@ -1539,7 +1539,7 @@ _shared_imp Magic::createMagicVanishImage()
 
 _shared_imp Magic::createMagicSuperModeImage()
 {
-	if (superModeImage == "")
+	if (superModeImage == u8"")
 	{
 		return nullptr;
 	}
@@ -1550,7 +1550,7 @@ _shared_imp Magic::createMagicSuperModeImage()
 
 _shared_imp Magic::createMagicImage()
 {
-	if (image == "")
+	if (image == u8"")
 	{
 		return nullptr;
 	}
@@ -1560,7 +1560,7 @@ _shared_imp Magic::createMagicImage()
 
 _shared_imp Magic::createMagicIcon()
 {
-	if (icon == "")
+	if (icon == u8"")
 	{
 		return nullptr;
 	}

@@ -514,7 +514,7 @@ protected:
 
 	//字符串显示相关的函数
 private:
-	std::string font = "";
+	std::string font = u8"";
 	SDL_IOStream * fontData = nullptr;
 	std::unique_ptr<char[]> fontBuffer = nullptr;
 protected:

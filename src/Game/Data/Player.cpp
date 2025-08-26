@@ -8,7 +8,7 @@
 
 Player::Player()
 {
-	name = "player";
+	name = u8"player";
 	coverMouse = false;
 	priority = epPlayer;
 	//因为player的绘制在地图层中，不单独绘制
@@ -33,7 +33,7 @@ void Player::calInfo()
 	info.manaMax = manaMax;
 	for (size_t i = 0; i < GOODS_BODY_COUNT; i++)
 	{
-		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile == "" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number <= 0)
+		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile == u8"" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number <= 0)
 		{
 			continue;
 		}
@@ -843,7 +843,7 @@ void Player::freeResource()
 	{
 		gm->magicManager.tryCleanAttackMagic();
 	}
-	followNPC = "";
+	followNPC = u8"";
 	freeNPCRes();
 	stepList.resize(0);
 
@@ -1187,7 +1187,7 @@ void Player::runObj(std::shared_ptr<Object> obj)
 	beginStand();
 	direction = calDirection(position, obj->position);
 
-	if (obj->scriptFile != "")
+	if (obj->scriptFile != u8"")
 	{
 		gm->runObjScript(obj);
 	}
@@ -1208,7 +1208,7 @@ void Player::talkTo(std::shared_ptr<NPC> npc)
 	{
 		npc->direction -= 8;
 	}
-	if (npc->scriptFile != "")
+	if (npc->scriptFile != u8"")
 	{
 		gm->runNPCScript(npc);
 	}
@@ -1601,21 +1601,21 @@ void Player::loadLevel(const std::string& fileName)
 	if (s != nullptr && len > 0)
 	{
 		INIReader ini(s);
-		std::string section = "Head";
-		levelList.levelCount = ini.GetInteger(section, "Levels", 0);
+		std::string section = u8"Head";
+		levelList.levelCount = ini.GetInteger(section, u8"Levels", 0);
 		levelList.level.resize(levelList.levelCount);
 		
 		for (size_t i = 0; i < levelList.level.size(); i++)
 		{
 			std::string section = convert::formatString("Level%d", i + 1);
-			levelList.level[i].levelUpExp = ini.GetInteger(section, "LevelUpExp", 0);
-			levelList.level[i].lifeMax = ini.GetInteger(section, "LifeMax", 0);
-			levelList.level[i].thewMax = ini.GetInteger(section, "ThewMax", 0);
-			levelList.level[i].manaMax = ini.GetInteger(section, "ManaMax", 0);
-			levelList.level[i].attack = ini.GetInteger(section, "Attack", 0);
-			levelList.level[i].defend = ini.GetInteger(section, "Defend", 0);
-			levelList.level[i].evade = ini.GetInteger(section, "Evade", 0);
-			levelList.level[i].newMagic = ini.Get(section, "NewMagic", "");
+			levelList.level[i].levelUpExp = ini.GetInteger(section, u8"LevelUpExp", 0);
+			levelList.level[i].lifeMax = ini.GetInteger(section, u8"LifeMax", 0);
+			levelList.level[i].thewMax = ini.GetInteger(section, u8"ThewMax", 0);
+			levelList.level[i].manaMax = ini.GetInteger(section, u8"ManaMax", 0);
+			levelList.level[i].attack = ini.GetInteger(section, u8"Attack", 0);
+			levelList.level[i].defend = ini.GetInteger(section, u8"Defend", 0);
+			levelList.level[i].evade = ini.GetInteger(section, u8"Evade", 0);
+			levelList.level[i].newMagic = ini.Get(section, u8"NewMagic", u8"");
 		}
 	}
 
@@ -1765,7 +1765,7 @@ void Player::beginDie()
 	nowAction = acDeath;
 	actionLastTime = getActionTime(acDeath);
 	actionBeginTime = getUpdateTime();
-	if (deathScript != "")
+	if (deathScript != u8"")
 	{
 		result |= erRunDeathScript;
 	}
@@ -1791,16 +1791,16 @@ void Player::load(int index)
 	}
 	INIReader ini(s);
 
-	std::string section = "Init";
+	std::string section = u8"Init";
 	initFromIni(&ini, section);
 
-	magic = ini.GetInteger(section, "Magic", 0);
-	money = ini.GetInteger(section, "Money", 0);
-	canRun = ini.GetBoolean(section, "CanRun", true);
-	canJump = ini.GetBoolean(section, "CanJump", true);
-	canFight = ini.GetBoolean(section, "CanFight", true);
-	fight = ini.GetInteger(section, "Fight", 0);
-	levelIni = ini.Get(section, "LevelIni", "");
+	magic = ini.GetInteger(section, u8"Magic", 0);
+	money = ini.GetInteger(section, u8"Money", 0);
+	canRun = ini.GetBoolean(section, u8"CanRun", true);
+	canJump = ini.GetBoolean(section, u8"CanJump", true);
+	canFight = ini.GetBoolean(section, u8"CanFight", true);
+	fight = ini.GetInteger(section, u8"Fight", 0);
+	levelIni = ini.Get(section, u8"LevelIni", u8"");
 
 	loadLevel(levelIni);
 	nowAction = acStand;
@@ -1810,7 +1810,7 @@ void Player::load(int index)
 void Player::save(int index)
 {
 	INIReader ini;
-	std::string section = "Init";
+	std::string section = u8"Init";
 
 	Point tempPos = position;
 	if (isJumping() && jumpState == jsJumping)
@@ -1822,13 +1822,13 @@ void Player::save(int index)
 
 	position = tempPos;
 
-	ini.SetInteger(section, "Magic", magic);
-	ini.SetInteger(section, "Money", money);
-	ini.SetBoolean(section, "CanRun", canRun);
-	ini.SetBoolean(section, "CanJump", canJump);
-	ini.SetBoolean(section, "CanFight", canFight);
-	ini.SetInteger(section, "Fight", fight);
-	ini.Set(section, "LevelIni", levelIni);
+	ini.SetInteger(section, u8"Magic", magic);
+	ini.SetInteger(section, u8"Money", money);
+	ini.SetBoolean(section, u8"CanRun", canRun);
+	ini.SetBoolean(section, u8"CanJump", canJump);
+	ini.SetBoolean(section, u8"CanFight", canFight);
+	ini.SetInteger(section, u8"Fight", fight);
+	ini.Set(section, u8"LevelIni", levelIni);
 
 	std::string fName = PLAYER_INI_NAME;
     if (index >= 0)

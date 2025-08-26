@@ -54,7 +54,7 @@ void Object::drawAlpha(Point cenTile, Point cenScreen, PointEx coffset)
 	Point tile = position;
 	Point pos = Map::getTilePosition(tile, cenTile, cenScreen, coffset);
 	int offsetX, offsetY;
-	if (selecting && scriptFile != "")
+	if (selecting && scriptFile != u8"")
 	{
 		_shared_image image = getActionImage(&offsetX, &offsetY);
 		engine->setImageAlpha(image, 128);
@@ -78,7 +78,7 @@ void Object::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colo
 	_shared_image image = getActionShadow(&offsetX, &offsetY);
 	engine->drawImage(image, pos.x - offsetX, pos.y - offsetY);
 	image = getActionImage(&offsetX, &offsetY);
-	if (selecting && scriptFile != "")
+	if (selecting && scriptFile != u8"")
 	{
 		engine->drawImageWithMaskEx(image, pos.x - offsetX, pos.y - offsetY, 200, 200, 0, 150);
 	}
@@ -186,7 +186,7 @@ _shared_image Object::getActionShadow(int * offsetx, int * offsety)
 
 void Object::initSound(const std::string & fileName)
 {
-	if (fileName == "")
+	if (fileName == u8"")
 	{
 		return;
 	}
@@ -221,10 +221,10 @@ void Object::initRes(const std::string & fileName)
 	}
 	INIReader ini(s);
 
-	std::string section = "common";
-	res.imageFile = ini.Get(section, "Image", "");
-	res.shadowFile = ini.Get(section, "Shade", "");
-	res.soundFile = ini.Get(section, "Sound", "");
+	std::string section = u8"common";
+	res.imageFile = ini.Get(section, u8"Image", u8"");
+	res.shadowFile = ini.Get(section, u8"Shade", u8"");
+	res.soundFile = ini.Get(section, u8"Sound", u8"");
 	res.image = gm->objectManager->loadObjectImage(res.imageFile);
 	res.shadow = gm->objectManager->loadObjectImage(res.shadowFile);
 }
@@ -236,22 +236,22 @@ void Object::saveToIni(INIReader * ini, const std::string & section)
 		return;
 	}
 
-	ini->Set(section, "ObjName", objName);
-	ini->Set(section, "ObjFile", objectFile);
-	ini->Set(section, "ScriptFile", scriptFile);
-	ini->Set(section, "WavFile", wavFile);
-	ini->SetInteger(section, "Kind", kind);
-	ini->SetInteger(section, "Dir", direction);
-	ini->SetInteger(section, "MapX", position.x);
-	ini->SetInteger(section, "MapY", position.y);
-	ini->SetInteger(section, "OffsetX", (int)round(offset.x));
-	ini->SetInteger(section, "OffsetY", (int)round(offset.y));
+	ini->Set(section, u8"ObjName", objName);
+	ini->Set(section, u8"ObjFile", objectFile);
+	ini->Set(section, u8"ScriptFile", scriptFile);
+	ini->Set(section, u8"WavFile", wavFile);
+	ini->SetInteger(section, u8"Kind", kind);
+	ini->SetInteger(section, u8"Dir", direction);
+	ini->SetInteger(section, u8"MapX", position.x);
+	ini->SetInteger(section, u8"MapY", position.y);
+	ini->SetInteger(section, u8"OffsetX", (int)round(offset.x));
+	ini->SetInteger(section, u8"OffsetY", (int)round(offset.y));
 
-	ini->SetInteger(section, "Lum", lum);
-	ini->SetInteger(section, "Damage", damage);
-	ini->SetInteger(section, "Frame", frame);
-	ini->SetInteger(section, "State", nowAction);
-	ini->SetTime(section, "ActionTime", getUpdateTime() - actionBeginTime);
+	ini->SetInteger(section, u8"Lum", lum);
+	ini->SetInteger(section, u8"Damage", damage);
+	ini->SetInteger(section, u8"Frame", frame);
+	ini->SetInteger(section, u8"State", nowAction);
+	ini->SetTime(section, u8"ActionTime", getUpdateTime() - actionBeginTime);
 }
 
 void Object::initFromIni(INIReader * ini, const std::string & section)
@@ -262,22 +262,22 @@ void Object::initFromIni(INIReader * ini, const std::string & section)
 		return;
 	}
 
-	objName = ini->Get(section, "ObjName", "");
-	objectFile = ini->Get(section, "ObjFile", "");
-	scriptFile = ini->Get(section, "ScriptFile", "");
-	wavFile = ini->Get(section, "WavFile", "");
-	kind = ini->GetInteger(section, "Kind", okBody);
-	direction = ini->GetInteger(section, "Dir", 0);
-	position.x = ini->GetInteger(section, "MapX", 0);
-	position.y = ini->GetInteger(section, "MapY", 0);
-	offset.x = (float)ini->GetInteger(section, "OffsetX", 0);
-	offset.y = (float)ini->GetInteger(section, "OffsetY", 0);
+	objName = ini->Get(section, u8"ObjName", u8"");
+	objectFile = ini->Get(section, u8"ObjFile", u8"");
+	scriptFile = ini->Get(section, u8"ScriptFile", u8"");
+	wavFile = ini->Get(section, u8"WavFile", u8"");
+	kind = ini->GetInteger(section, u8"Kind", okBody);
+	direction = ini->GetInteger(section, u8"Dir", 0);
+	position.x = ini->GetInteger(section, u8"MapX", 0);
+	position.y = ini->GetInteger(section, u8"MapY", 0);
+	offset.x = (float)ini->GetInteger(section, u8"OffsetX", 0);
+	offset.y = (float)ini->GetInteger(section, u8"OffsetY", 0);
 
-	lum = ini->GetInteger(section, "Lum", olNone);
-	damage = ini->GetInteger(section, "Damage", 0);
-	frame = ini->GetInteger(section, "Frame", 0);
-	state = ini->GetInteger(section, "State", oaStay);
-	actionBeginTime = getUpdateTime() - ini->GetTime(section, "ActionTime", 0);
+	lum = ini->GetInteger(section, u8"Lum", olNone);
+	damage = ini->GetInteger(section, u8"Damage", 0);
+	frame = ini->GetInteger(section, u8"Frame", 0);
+	state = ini->GetInteger(section, u8"State", oaStay);
+	actionBeginTime = getUpdateTime() - ini->GetTime(section, u8"ActionTime", 0);
 
 	initRes(objectFile);
 	initSound(wavFile);
@@ -333,9 +333,9 @@ void Object::freeSound()
 
 void Object::freeRes()
 {
-	res.imageFile = "";
-	res.shadowFile = "";
-	res.soundFile = "";
+	res.imageFile = u8"";
+	res.shadowFile = u8"";
+	res.soundFile = u8"";
 	res.image = nullptr;
 	res.shadow = nullptr;
 }
@@ -361,7 +361,7 @@ void Object::onUpdate()
 		posoffset.x = (gm->camera->offset.x - offset.x);
 		posoffset.y = (gm->camera->offset.y - offset.y);
 		Point pos = Map::getTilePosition(position, cenTile, cenScreen, posoffset);
-		if (scriptFile != "")
+		if (scriptFile != u8"")
 		{
 			int ox = 0, oy = 0, iw = 0, ih = 0;
 			engine->getImageSize(getActionImage(&ox, &oy), iw, ih);

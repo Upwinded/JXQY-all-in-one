@@ -12,7 +12,7 @@ public:
 protected:
 	int roundRange = 50;
 private:
-	std::string _text = "";
+	std::string _text = u8"";
 #define _textImageCount 2
 	_shared_image _textImage[_textImageCount] = { nullptr, nullptr };
 	const unsigned int _textColor[_textImageCount] = {0xFF000000, 0xFFFF0000};

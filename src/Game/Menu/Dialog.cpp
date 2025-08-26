@@ -42,9 +42,9 @@ std::string Dialog::getHeadName(int index)
 {
 	if (ini != nullptr)
 	{
-		return ini->Get("PORTRAIT", convert::formatString("%d", index), "");
+		return ini->Get("PORTRAIT", convert::formatString("%d", index), u8"");
 	}
-	return "";
+	return u8"";
 }
 
 void Dialog::setTalkStr(const std::string & str)

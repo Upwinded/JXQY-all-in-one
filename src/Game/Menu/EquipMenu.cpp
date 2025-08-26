@@ -33,10 +33,10 @@ void EquipMenu::updateGoods(int index)
 		return;
 	}
 	item[index]->impImage = nullptr;	
-	if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile == "" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number <= 0)
+	if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile == u8"" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number <= 0)
 	{
 		item[index]->setStr("");
-		gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile = "";
+		gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile = u8"";
 		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods != nullptr)
 		{
 			gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods = nullptr;
@@ -54,31 +54,31 @@ void EquipMenu::updateGoods(int index)
 
 int EquipMenu::getPartIndex(const std::string & part)
 {
-	if (part == "head")
+	if (part == u8"head")
 	{
 		return 0;
 	}
-	else if (part == "neck")
+	else if (part == u8"neck")
 	{
 		return 1;
 	}
-	else if (part == "body")
+	else if (part == u8"body")
 	{
 		return 2;
 	}
-	else if (part == "back")
+	else if (part == u8"back")
 	{
 		return 3;
 	}
-	else if (part == "hand")
+	else if (part == u8"hand")
 	{
 		return 4;
 	}
-	else if (part == "wrist")
+	else if (part == u8"wrist")
 	{
 		return 5;
 	}
-	else if (part == "foot")
+	else if (part == u8"foot")
 	{
 		return 6;
 	}
@@ -92,7 +92,7 @@ void EquipMenu::onEvent()
 		unsigned int ret = item[i]->getResult();
 		if (ret & erShowHint)
 		{
-			if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile != "" && gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number > 0)
+			if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile != u8"" && gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number > 0)
 			{
 				gm->menu->toolTip->visible = true;
 				addChild(gm->menu->toolTip);
@@ -112,7 +112,7 @@ void EquipMenu::onEvent()
 		{
 			for (int j = 0; j < GOODS_COUNT; ++j)
 			{
-				if (gm->goodsManager.goodsList[j].iniFile == "")
+				if (gm->goodsManager.goodsList[j].iniFile == u8"")
 				{
 					gm->goodsManager.exchange(j, item[i]->dragIndex);
 					updateGoods(i);
@@ -137,7 +137,7 @@ void EquipMenu::onEvent()
 			item[i]->resetHint();
 			if (item[i]->dropType == dtGoods)
 			{
-				if (gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != "" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0)
+				if (gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != u8"" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0)
 				{
 					if (getPartIndex(gm->goodsManager.goodsList[item[i]->dropIndex].goods->part) == i)
 					{

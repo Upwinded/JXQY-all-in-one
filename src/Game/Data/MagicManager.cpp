@@ -39,10 +39,10 @@ void MagicManager::load(int index)
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
 		std::string section = convert::formatString("%d", i + 1);
-		magicList[i].iniFile = ini.Get(section, "IniFile", "");
-		magicList[i].level = ini.GetInteger(section, "Level", 0);
-		magicList[i].exp = ini.GetInteger(section, "Exp", 0);
-		if (magicList[i].iniFile != "")
+		magicList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
+		magicList[i].level = ini.GetInteger(section, u8"Level", 0);
+		magicList[i].exp = ini.GetInteger(section, u8"Exp", 0);
+		if (magicList[i].iniFile != u8"")
 		{
 			magicList[i].magic = std::make_shared<Magic>();
 			magicList[i].magic->initFromIni(magicList[i].iniFile);
@@ -53,22 +53,22 @@ void MagicManager::load(int index)
 void MagicManager::save(int index)
 {
 	INIReader ini;
-	std::string section = "Head";
-	ini.SetInteger(section, "Count", 0);
+	std::string section = u8"Head";
+	ini.SetInteger(section, u8"Count", 0);
 	int count = 0;
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
-		if (magicList[i].iniFile != "")
+		if (magicList[i].iniFile != u8"")
 		{
 			count++;
 			section = convert::formatString("%d", i + 1);
-			ini.Set(section, "IniFile", magicList[i].iniFile);
-			ini.SetInteger(section, "Level", magicList[i].level);
-			ini.SetInteger(section, "Exp", magicList[i].exp);
+			ini.Set(section, u8"IniFile", magicList[i].iniFile);
+			ini.SetInteger(section, u8"Level", magicList[i].level);
+			ini.SetInteger(section, u8"Exp", magicList[i].exp);
 		}
 	}
-	section = "Head";
-	ini.SetInteger(section, "Count", count);
+	section = u8"Head";
+	ini.SetInteger(section, u8"Count", count);
     std::string fName = MAGIC_INI_NAME;
     if (index >= 0)
     {
@@ -84,7 +84,7 @@ void MagicManager::freeResource()
 {
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
-		magicList[i].iniFile = "";
+		magicList[i].iniFile = u8"";
 		magicList[i].level = 0;
 		magicList[i].exp = 0;
 		if (magicList[i].magic != nullptr)
@@ -120,7 +120,7 @@ void MagicManager::addUseExp(std::shared_ptr<Effect> e, int addexp)
 {
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
-		if (magicList[i].iniFile != "" && magicList[i].magic != nullptr && magicList[i].iniFile == e->magic.iniName)
+		if (magicList[i].iniFile != u8"" && magicList[i].magic != nullptr && magicList[i].iniFile == e->magic.iniName)
 		{
 			magicList[i].exp += addexp;
 			bool lup = false;
@@ -155,7 +155,7 @@ void MagicManager::addMagicExp(const std::string & magicName, int addexp)
 
 void MagicManager::addMagic(const std::string & magicName)
 {
-	if (magicName == "")
+	if (magicName == u8"")
 	{
 		return;
 	}
@@ -164,7 +164,7 @@ void MagicManager::addMagic(const std::string & magicName)
 	{
 		for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 		{
-			if (magicList[i].iniFile == "")
+			if (magicList[i].iniFile == u8"")
 			{
 				magicList[i].iniFile = magicName;
 				magicList[i].level = 1;
@@ -181,14 +181,14 @@ void MagicManager::addMagic(const std::string & magicName)
 
 void MagicManager::deleteMagic(const std::string & magicName)
 {
-	if (magicName == "")
+	if (magicName == u8"")
 	{
 		return;
 	}
 	MagicInfo * m = findMagic(magicName);
 	if (m != nullptr)
 	{
-		m->iniFile = "";
+		m->iniFile = u8"";
 		m->level = 0;
 		m->exp = 0;
 		if (m->magic != nullptr)
@@ -243,7 +243,7 @@ bool MagicManager::magicListExists(int index)
 
 std::shared_ptr<Magic> MagicManager::loadAttackMagic(const std::string & name)
 {	
-	if (name == "")
+	if (name == u8"")
 	{
 		return std::shared_ptr<Magic>(nullptr);
 	}

@@ -3,7 +3,7 @@
 DragButton::DragButton()
 {
 	canDrag = true;
-	name = "DragButton";
+	name = u8"DragButton";
 }
 
 DragButton::~DragButton()

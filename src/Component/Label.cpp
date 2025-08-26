@@ -4,7 +4,7 @@
 
 Label::Label()
 {
-	name = "Label";
+	name = u8"Label";
 	priority = epLabel;
 	coverMouse = false;
 	canDrag = false;
@@ -35,7 +35,7 @@ void Label::setStr(const std::string & s)
 
 		if (autoNextLine)
 		{
-			auto newstrs = convert::splitString(str, "<enter>");//length);
+			auto newstrs = convert::splitString(str, u8"<enter>");//length);
 			if (engine->beginDrawTalk(rect.w, rect.h))
 			{
 				int count = 0;

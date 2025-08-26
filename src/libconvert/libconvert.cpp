@@ -31,15 +31,15 @@ void convert::split_whole_name(const std::string& whole_name, std::string& fname
 {
     if (whole_name.empty())
     {
-        fname = "";
-        ext = "";
+        fname = u8"";
+        ext = u8"";
         return;
     }
     auto pos = whole_name.find_last_of('.');
     if (pos == whole_name.npos)
     {
         fname = whole_name;
-        ext = "";
+        ext = u8"";
         return;
     }
     fname = whole_name.substr(0, pos);
@@ -50,17 +50,17 @@ void convert::split_path(const std::string& path, std::string& dir, std::string&
 {
     if (path.empty())
     {
-        dir = "";
-        fname = "";
-        ext = "";
+        dir = u8"";
+        fname = u8"";
+        ext = u8"";
         return;
     }
 
     if (*path.crbegin() == '/')
     {
         dir = path;
-        fname = "";
-        ext = "";
+        fname = u8"";
+        ext = u8"";
         return;
     }
 
@@ -68,7 +68,7 @@ void convert::split_path(const std::string& path, std::string& dir, std::string&
     std::string whole_name;
     if (p_whole_name == path.npos)
     {
-        dir = "";
+        dir = u8"";
         whole_name = path;
     }
     else
@@ -257,7 +257,7 @@ std::string convert::extractFilePath(const std::string& fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, "\\", "/");
+    replaceAllString(tempName, u8"\\", u8"/");
     split_path(tempName, dir, fName, ext);
 	return dir;
 }
@@ -267,14 +267,14 @@ std::string convert::extractFileName(const std::string& fileName)
 	//char c[MAX_FNAME_LEN];
 	//memset(c, 0, MAX_FNAME_LEN);
 	//std::string fName = fileName;
-	//replaceAllString(fName, "\\", "/");
+	//replaceAllString(fName, u8"\\", u8"/");
 	//split_path(fileName.c_str(), nullptr, nullptr, c, nullptr);
 	//std::string name = c;
 	//return name;
 
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, "\\", "/");
+    replaceAllString(tempName, u8"\\", u8"/");
     split_path(tempName, dir, fName, ext);
     return fName;
 }
@@ -283,7 +283,7 @@ std::string convert::extractFileExt(const std::string & fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, "\\", "/");
+    replaceAllString(tempName, u8"\\", u8"/");
     split_path(tempName, dir, fName, ext);
     return ext;
 }
@@ -292,7 +292,7 @@ std::string convert::extractFullName(const std::string & fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, "\\", "/");
+    replaceAllString(tempName, u8"\\", u8"/");
     split_path(tempName, dir, fName, ext);
     return fName + ext;
 }
@@ -301,7 +301,7 @@ std::vector<std::string> convert::extractFileAll(const std::string & fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, "\\", "/");
+    replaceAllString(tempName, u8"\\", u8"/");
     split_path(tempName, dir, fName, ext);
 	std::vector<std::string> s;
     s.push_back(dir);

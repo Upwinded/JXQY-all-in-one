@@ -18,10 +18,10 @@ struct GlobalData
 {
 	int state = gsNone;
 
-	std::string mapName = "";
-	std::string npcName = "";
-	std::string objName = "";
-	std::string bgmName = "";
+	std::string mapName = u8"";
+	std::string npcName = u8"";
+	std::string objName = u8"";
+	std::string bgmName = u8"";
 
 	int characterIndex = -1;
 
@@ -32,7 +32,7 @@ struct GlobalData
 	uint32_t fadeLum = 31;
 	uint32_t mapTime = mtDay;
 
-	std::string rainFile = "";
+	std::string rainFile = u8"";
 	bool water = false;
 	bool snowShow = false;
 	bool rainShow = false;

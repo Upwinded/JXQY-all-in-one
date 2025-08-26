@@ -450,7 +450,7 @@ void Engine::drawTalk(const std::string& text, int x, int y, int size, unsigned 
 {
 	if (!_talk_drawing)
 	{
-		std::string error = "Must use beginDrawTalk() before drawTalk()";
+		std::string error = u8"Must use beginDrawTalk() before drawTalk()";
 		throw error;
 		return;
 	}
