@@ -2,24 +2,28 @@
 chcp 65001 > nul
 setlocal enabledelayedexpansion
 
+:: 工具依赖检查（需安装Git for Windows）
+where git >nul 2>&1
+if %errorlevel% neq 0 (
+    echo 需要安装 Git for Windows 以提供 sed 工具
+    echo 下载地址：https://git-scm.com/download/win
+    exit /b 1
+)
+
+where sed >nul 2>&1
+if %errorlevel% neq 0 (
+    echo 请使用 git bash 运行此脚本，以使用 sed 工具
+    exit /b 1
+)
+
 :: 参数检查
 if "%~1"=="" (
-    echo 错误：请指定新版本号（例如：update_version.bat 1.4.1）
+    echo 错误：请指定新版本号（例如：.\%~nx0 1.4.1）
     exit /b 1
 )
 set "new_version=%~1"
 
-:: 工具依赖检查（需安装Git for Windows）
-where sed >nul 2>&1
-if %errorlevel% neq 0 (
-    where git >nul 2>&1
-    if %errorlevel% neq 0 (
-        echo 需要安装 Git for Windows 以提供 sed 工具
-        echo 下载地址：https://git-scm.com/download/win
-    )
-    echo 请使用git bash运行此脚本
-    exit /b 1
-)
+cd %~dp0
 
 :: 递归处理所有平台文件
 for /r %%f in (.) do (
