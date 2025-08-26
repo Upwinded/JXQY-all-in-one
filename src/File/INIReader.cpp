@@ -170,7 +170,7 @@ uint32_t INIReader::GetColor(const std::string & section, const std::string & na
 
 UTime INIReader::GetTime(const std::string& section, const std::string& name, UTime default_value) const
 {
-	string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, "");
 	try
 	{
 		return (UTime)std::stoll(valstr, nullptr, 0);
@@ -183,7 +183,7 @@ UTime INIReader::GetTime(const std::string& section, const std::string& name, UT
 
 long INIReader::GetInteger(const string& section, const string& name, long default_value) const
 {
-    string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, "");
 	try
 	{
 		return std::stol(valstr, nullptr, 0);
@@ -196,7 +196,7 @@ long INIReader::GetInteger(const string& section, const string& name, long defau
 
 float INIReader::GetReal(const string& section, const string& name, float default_value) const
 {
-    string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, "");
 	try
 	{
 		return std::stod(valstr);
@@ -209,7 +209,7 @@ float INIReader::GetReal(const string& section, const string& name, float defaul
 
 bool INIReader::GetBoolean(const string& section, const string& name, bool default_value) const
 {
-    string valstr = Get(section, name, "");
+	std::string valstr = Get(section, name, "");
     // Convert to lower case to make string comparisons case-insensitive
     std::transform(valstr.begin(), valstr.end(), valstr.begin(), ::tolower);
     if (valstr == "true" || valstr == "yes" || valstr == "on" || valstr == "1")
@@ -253,7 +253,7 @@ void INIReader::saveToFile(const std::string & fileName)
 
 string INIReader::MakeKey(const string& section, const string& name)
 {
-    string key = section + "=" + name;
+	std::string key = section + "=" + name;
     // Convert to lower case to make section/name lookups case-insensitive
     std::transform(key.begin(), key.end(), key.begin(), ::tolower);
     return key;
