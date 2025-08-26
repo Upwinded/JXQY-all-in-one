@@ -50,8 +50,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,4,0,0
- PRODUCTVERSION 1,4,0,0
+ FILEVERSION 1,4,1,0
+ PRODUCTVERSION 1,4,1,0
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -66,9 +66,9 @@ BEGIN
     BEGIN
         BLOCK "080404b0"
         BEGIN
-            VALUE "FileVersion", "1.4.0.0"
+            VALUE "FileVersion", "1.4.1.0"
             VALUE "ProductName", "剑侠情缘2"
-            VALUE "ProductVersion", "1.4.0.0"
+            VALUE "ProductVersion", "1.4.1.0"
         END
     END
     BLOCK "VarFileInfo"
