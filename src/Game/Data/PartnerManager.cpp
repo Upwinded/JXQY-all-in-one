@@ -11,28 +11,49 @@ PartnerManager::~PartnerManager()
 	freeResource();
 }
 
-void PartnerManager::loadPartner()
+void PartnerManager::extractPartnerListFromNPCManager()
 {
 	freeResource();
+	tempPartnerList = findPartnersFromNPCManager();
+	for (size_t i = 0; i < tempPartnerList.size(); ++i) {
+		gm->npcManager->removeNPCOnlyFromList(tempPartnerList[i]);
+	}
+}
+
+void PartnerManager::transferPartnerListToNPCManager()
+{
+	for (size_t i = 0; i < tempPartnerList.size(); i++)
+	{
+		gm->npcManager->addNPC(tempPartnerList[i]);
+	}
+	tempPartnerList.clear();
+}
+
+
+std::vector<std::shared_ptr<NPC>> PartnerManager::findPartnersFromNPCManager()
+{
+	std::vector<std::shared_ptr<NPC>> tempList;
+	auto npcList = gm->npcManager->npcList;
 	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
 	{
 		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->kind == nkPartner)
 		{
-			partnerList.push_back(gm->npcManager->npcList[i]);
+			tempList.push_back(gm->npcManager->npcList[i]);
 		}
 	}
-	for (size_t i = 0; i < partnerList.size(); ++i) {
-		gm->npcManager->removeNPCOnlyFromList(partnerList[i]);
-	}
+	return tempList;
 }
 
-void PartnerManager::addPartner()
+void PartnerManager::setPartnersIsBlockingPlayer(bool value)
 {
-	for (size_t i = 0; i < partnerList.size(); i++)
+	auto tempList = findPartnersFromNPCManager();
+	for (auto& partner: tempList)
 	{
-		gm->npcManager->addNPC(partnerList[i]);
+		if (partner->isStanding() || value)
+		{
+			partner->isPartnerBlockingPlayer = value;
+		}
 	}
-	partnerList.resize(0);
 }
 
 void PartnerManager::load(int index)
@@ -50,20 +71,20 @@ void PartnerManager::load(int index)
 	int count = ini.GetInteger(section, u8"Count", 0);
 	if (count <= 0)
 	{
-		partnerList.resize(0);
+		tempPartnerList.clear();
 	}
 	else
 	{
-		partnerList.resize(count);
-		for (size_t i = 0; i < partnerList.size(); i++)
+		tempPartnerList.resize(count);
+		for (size_t i = 0; i < tempPartnerList.size(); i++)
 		{
-			partnerList[i] = std::make_shared<NPC>();
-			section = convert::formatString("%d", i + 1);
-			partnerList[i]->initFromIni(&ini, section);
-			gm->npcManager->addNPC(partnerList[i]);
+			tempPartnerList[i] = std::make_shared<NPC>();
+			section = convert::formatString("Partner%03d", i);
+			tempPartnerList[i]->initFromIni(&ini, section);
+			gm->npcManager->addNPC(tempPartnerList[i]);
 		}
 	}
-	partnerList.resize(0);
+	tempPartnerList.clear();
 }
 
 void PartnerManager::save(int index)
@@ -79,19 +100,19 @@ void PartnerManager::save(int index)
 	{
 		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->kind == nkPartner)
 		{
-			partnerList.push_back(gm->npcManager->npcList[i]);
+			tempPartnerList.push_back(gm->npcManager->npcList[i]);
 		}
 	}
 
 	INIReader ini;
 	std::string section = u8"Head";
-	ini.SetInteger(section, u8"Count", partnerList.size());
-	for (size_t i = 0; i < partnerList.size(); i++)
+	ini.SetInteger(section, u8"Count", tempPartnerList.size());
+	for (size_t i = 0; i < tempPartnerList.size(); i++)
 	{
-		section = convert::formatString("%d", i + 1);
-		partnerList[i]->saveToIni(&ini, section);
+		section = convert::formatString("Partner%03d", i);
+		tempPartnerList[i]->saveToIni(&ini, section);
 	}
-	partnerList.resize(0);
+	tempPartnerList.resize(0);
 	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
     
     SaveFileManager::AppendFile(fName);
@@ -99,5 +120,5 @@ void PartnerManager::save(int index)
 
 void PartnerManager::freeResource()
 {
-	partnerList.resize(0);
+	tempPartnerList.resize(0);
 }

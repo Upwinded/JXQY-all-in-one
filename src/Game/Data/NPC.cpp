@@ -1624,7 +1624,7 @@ bool NPC::isFollower()
 {
 	if (kind == nkPartner)
 	{
-		return true;
+		return !isPartnerBlockingPlayer;
 	}
 	else if (followNPC != u8"")
 	{
@@ -1997,7 +1997,7 @@ void NPC::updateAction(UTime frameTime)
 				haveDest = false;
 			}
 		}	
-		else if (followNPC != u8"" || kind == nkPartner)
+		else if (isFollower())
 		{
 			std::shared_ptr<NPC> fnpc = nullptr;
 			if (kind == nkPartner)
@@ -2012,7 +2012,7 @@ void NPC::updateAction(UTime frameTime)
 					fnpc = fnpcList[0];
 				}				 
 			}
-			
+
 			if (fnpc != nullptr || kind == nkPartner)
 			{
 				if (isFollowAttack(fnpc) && kind != nkPartner)
@@ -2083,7 +2083,7 @@ void NPC::updateAction(UTime frameTime)
 			{			
 				bool canWalkNextStep = false;
 				stepList.erase(stepList.begin());
-				if (followNPC != u8"" || kind == nkPartner)
+				if (isFollower())
 				{
 					canWalkNextStep = true;
 					std::shared_ptr<NPC> fnpc = nullptr;
@@ -2117,7 +2117,7 @@ void NPC::updateAction(UTime frameTime)
 								return;
 							}
 						}
-						else
+						else if (kind != nkPartner || !isPartnerBlockingPlayer)
 						{
 							offset = { 0, 0 };
 							stepList.resize(0);

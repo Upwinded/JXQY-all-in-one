@@ -1062,6 +1062,7 @@ void Player::changeWalk(Point dest)
 		auto tempList = gm->map->getPath(position, dest);
 		if (tempList.size() > 0)
 		{
+			gm->partnerManager.setPartnersIsBlockingPlayer(false);
 			stepList = tempList;
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
@@ -1085,6 +1086,7 @@ void Player::changeWalk(Point dest)
 		else
 		{
 			beginStand();
+			partnerAvoidBlockingPlayer(dest);
 		}
 	}
 }
@@ -1135,15 +1137,12 @@ void Player::changeRun(Point dest)
 				if (thew < RUN_THEW_COST)
 				{
 					gm->showMessage(THEW_LOW_MSG);
-					if (isRunning())
-					{
-						recoveryTime = getUpdateTime();
-					}
 					beginStand();
 					return;
 				}
 				thew -= RUN_THEW_COST;
-			}		
+			}
+			gm->partnerManager.setPartnersIsBlockingPlayer(false);
 			stepList = tempList;
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
@@ -1167,15 +1166,9 @@ void Player::changeRun(Point dest)
 		else
 		{
 			beginStand();
-			recoveryTime = getUpdateTime();
+			partnerAvoidBlockingPlayer(dest);
 		}
 	}
-}
-
-void Player::standUp()
-{
-	recoveryTime = getUpdateTime();
-	beginStand();
 }
 
 void Player::runObj(std::shared_ptr<Object> obj)
@@ -1295,6 +1288,7 @@ void Player::beginWalk(Point dest)
 			{
 				recoveryTime = getUpdateTime();
 			}
+			gm->partnerManager.setPartnersIsBlockingPlayer(false);
 			stepList = tempList;
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
@@ -1316,6 +1310,10 @@ void Player::beginWalk(Point dest)
 				actionLastTime = getActionTime(acWalk);
 				playSound(acWalk);
 			}
+		}
+		else
+		{
+			partnerAvoidBlockingPlayer(dest);
 		}
 	}
 	
@@ -1436,6 +1434,7 @@ void Player::beginRun(Point dest)
                 }
                 thew -= RUN_THEW_COST;
             }
+			gm->partnerManager.setPartnersIsBlockingPlayer(false);
 			stepList = tempList;
 			direction = calDirection(stepList[0]);
 			stepState = ssOut;
@@ -1458,6 +1457,10 @@ void Player::beginRun(Point dest)
 				actionLastTime = getActionTime(acRun);
 				playSound(acRun);
 			}
+		}
+		else
+		{
+			partnerAvoidBlockingPlayer(dest);
 		}
 	}
 }
@@ -1572,6 +1575,35 @@ void Player::checkTrap()
 	{
 		gm->runTrapScript(gm->map->getTrapIndex(position));
 	}
+}
+
+void Player::partnerAvoidBlockingPlayer(Point dest)
+{
+	bool isBlocking = false;
+	auto partnerList = gm->partnerManager.findPartnersFromNPCManager();
+	for (auto& partner: partnerList)
+	{
+		if (partner->isStanding())
+		{
+			/*if (partner->canDoAction(acRun))
+			{
+				partner->beginRun(dest);
+			}
+			else*/
+			{
+				partner->beginWalk(dest);
+			}
+			if (!partner->isStanding())
+			{
+				isBlocking = true;
+			}
+		}
+	}
+	if (isBlocking)
+	{
+		gm->partnerManager.setPartnersIsBlockingPlayer(true);
+	}
+
 }
 
 void Player::limitAttribute()

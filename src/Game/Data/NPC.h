@@ -139,7 +139,10 @@ public:
 	int nowAction = acStand;
 	bool selecting = false;
 	int npcIndex = 1;
+
 	std::string followNPC = u8"";
+	// 作为队友挡住了玩家
+	bool isPartnerBlockingPlayer = false;
 
 	Point attackDest = { 0, 0 };
 	void calOffset(UTime nowTime, UTime totalTime);
@@ -187,7 +190,7 @@ public:
 
 	int levelUpExp = 0;
 	int level = 1;
-	int attackLevel = 1;	//技能等级
+	int attackLevel = 1;	    //技能等级
 	int magicLevel = 0;		//无用
 	int lum = nlNone;
 	int visionRadius = 18;

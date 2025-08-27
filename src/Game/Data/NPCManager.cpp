@@ -603,9 +603,9 @@ void NPCManager::setPartnerPos(int x, int y, int dir)
 
 void NPCManager::clearNPC()
 {
-	gm->partnerManager.loadPartner();
+	gm->partnerManager.extractPartnerListFromNPCManager();
 	freeResource();
-	gm->partnerManager.addPartner();
+	gm->partnerManager.transferPartnerListToNPCManager();
 	gm->map->createDataMap();
 	clearActionImageList();
 	gm->player->reloadAction();
@@ -815,7 +815,7 @@ _shared_imp NPCManager::loadActionImage(const std::string & imageName)
 
 void NPCManager::load(const std::string & fileName)
 {
-	gm->partnerManager.loadPartner();
+	gm->partnerManager.extractPartnerListFromNPCManager();
 	freeResource();
 
 	std::string iniName = SAVE_CURRENT_FOLDER + fileName;
@@ -832,7 +832,7 @@ void NPCManager::load(const std::string & fileName)
 		npcList.push_back(npc);
 	}
 
-	gm->partnerManager.addPartner();
+	gm->partnerManager.transferPartnerListToNPCManager();
 	gm->player->reloadAction();
 	for (size_t i = 0; i < npcList.size(); i++)
 	{

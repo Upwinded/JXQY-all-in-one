@@ -128,8 +128,6 @@ public:
 	virtual void changeWalk(Point dest);
 	virtual void changeRun(Point dest);
 
-	virtual void standUp();
-
 	virtual void runObj(std::shared_ptr<Object> obj);
 	virtual void talkTo(std::shared_ptr<NPC> npc);
 	virtual void beginStand();
@@ -141,6 +139,8 @@ public:
 	virtual void beginHurt(Point dest);
 	bool canHurt();
 	void checkTrap();
+
+	void partnerAvoidBlockingPlayer(Point dest);
 
 	std::string levelIni = u8"";
 

@@ -31,7 +31,6 @@ public:
 	std::vector<std::shared_ptr<NPC>> findRadiusScriptViewNPC(Point pos, int radius);
 
 
-
 	// 更新所有npc的自动AI动作
 	void npcAutoAction();
 

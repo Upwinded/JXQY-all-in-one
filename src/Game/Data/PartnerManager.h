@@ -9,17 +9,21 @@ public:
 	PartnerManager();
 	virtual ~PartnerManager();
 
-	// 从npc列表读取所有partner
+	// 从npc列表提取所有partner
     // 读取npc时临时保存所有partner
-	virtual void loadPartner();
-	virtual void addPartner();
+	void extractPartnerListFromNPCManager();
+	void transferPartnerListToNPCManager();
+
+	std::vector<std::shared_ptr<NPC>> findPartnersFromNPCManager();
+	void setPartnersIsBlockingPlayer(bool value);
 
 	virtual void load(int index);
 	virtual void save(int index);
 	void freeResource();
 
 private:
-	std::vector<std::shared_ptr<NPC>> partnerList;
+	// 临时的Partner列表，一般只在读取、保存时使用
+	std::vector<std::shared_ptr<NPC>> tempPartnerList;
 
 };
 

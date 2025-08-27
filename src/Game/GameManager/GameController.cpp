@@ -131,7 +131,7 @@ void GameController::onChildCallBack(PElement child)
 				{
 					if (gm->player->isSitting())
 					{
-						gm->player->standUp();
+						gm->player->beginStand();
 					}
 					else
 					{
@@ -555,7 +555,7 @@ bool GameController::onHandleEvent(AEvent & e)
 		{
 			if (gm->player->isSitting())
 			{
-				gm->player->standUp();
+				gm->player->beginStand();
 			}
 			else
 			{
@@ -720,6 +720,31 @@ bool GameController::onHandleEvent(AEvent & e)
 		act.dest = gm->objectManager->objectList[gm->objectManager->clickIndex]->position;
 		gm->player->addNextAction(act);
 	}
+#ifdef __MOBILE__
+	else if (e.eventType == ET_FINGERDOWN && touchingID == e.eventData)
+	{
+		auto player = gm->player;
+
+		if (player->nowAction != acDeath && player->nowAction != acHide)
+		{
+			NextAction act;
+			if (player->canRun && (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN) || player->thew > MIN_THEW_LIMIT_TO_RUN))
+			{
+				act.action = acRun;
+			}
+			else
+			{
+				act.action = acWalk;
+			}
+			Point pos = gm->getMousePoint(e.eventX, e.eventY);
+			act.destGE = nullptr;
+			act.dest = pos;
+			player->addNextAction(act);
+		}
+		return true;
+	}
+#endif
+
 	return false;
 }
 

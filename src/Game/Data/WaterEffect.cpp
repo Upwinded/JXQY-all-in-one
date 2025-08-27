@@ -231,12 +231,12 @@ void WaterEffect::_update(float time)
 			_vertices[i].color.a = _params.light.defaultAlpha;
 		}
 
-		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 0.01f, _verticesLast[i].color.a + 0.01f);
+		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 1.0f * (time - LastUpdateTime), _verticesLast[i].color.a + 1.0f * (time - LastUpdateTime));
 		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _params.light.minAlpha, 1.0f);
 
 		_verticesLast[i] = _vertices[i];
-
 	}
+	LastUpdateTime = time;
 }
 
 void WaterEffect::initGrid()

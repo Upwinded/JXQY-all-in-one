@@ -90,6 +90,8 @@ private:
 	std::vector<Vertex> _verticesLast;
 	std::vector<int> _indices;
 
+	float LastUpdateTime = 0.0f;
+
 	void _update(float time);
 };
 
