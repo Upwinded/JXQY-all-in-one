@@ -173,14 +173,12 @@
 		8DDFC0512AC5636700C810C7 /* BaseComponent.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DDFC04F2AC5636700C810C7 /* BaseComponent.cpp */; };
 		DC27EA362AA6186D005104D1 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = DC27EA352AA6186D005104D1 /* assets */; };
 		DC27EA372AA6186D005104D1 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = DC27EA352AA6186D005104D1 /* assets */; };
+		DC32CEB52E61DBCA0028F78C /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC32CEB42E61DBCA0028F78C /* AudioToolbox.framework */; };
+		DC32CEB92E61DC920028F78C /* AVFAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC32CEB82E61DC920028F78C /* AVFAudio.framework */; };
+		DC32CEBB2E61DC9E0028F78C /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC32CEBA2E61DC9E0028F78C /* Foundation.framework */; };
 		DC3D2A992AA49E8000BAABFC /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = DC3D2A972AA49E8000BAABFC /* LaunchScreen.storyboard */; };
 		DC3D2AB22AA49E8000BAABFC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DC3D2A862AA49E8000BAABFC /* Assets.xcassets */; };
 		DC3D2AB32AA49E8000BAABFC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = DC3D2A862AA49E8000BAABFC /* Assets.xcassets */; };
-		DC516B842E50C367006CF61E /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B762E503804006CF61E /* AudioToolbox.framework */; };
-		DC516B862E50C369006CF61E /* AVFAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B702E50373B006CF61E /* AVFAudio.framework */; };
-		DC516B882E50C36B006CF61E /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7C2E503961006CF61E /* AVFoundation.framework */; };
-		DC516B8A2E50C36D006CF61E /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7A2E503959006CF61E /* Foundation.framework */; };
-		DC516B8C2E50C36F006CF61E /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B7E2E50396A006CF61E /* IOKit.framework */; };
 		DC516B912E55E947006CF61E /* libfmod_iphoneos.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */; };
 		DC516B942E5C9B7F006CF61E /* WaterEffect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */; };
 		DC516B952E5C9B7F006CF61E /* WaterEffect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */; };
@@ -519,17 +517,15 @@
 		8DCE5BB62AC41A3D00BBCF22 /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
 		8DDFC04F2AC5636700C810C7 /* BaseComponent.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = BaseComponent.cpp; sourceTree = "<group>"; };
 		DC27EA352AA6186D005104D1 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = ../../assets; sourceTree = "<group>"; };
+		DC32CEB42E61DBCA0028F78C /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AudioToolbox.framework; sourceTree = DEVELOPER_DIR; };
+		DC32CEB62E61DC710028F78C /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/IOKit.framework; sourceTree = DEVELOPER_DIR; };
+		DC32CEB82E61DC920028F78C /* AVFAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFAudio.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AVFAudio.framework; sourceTree = DEVELOPER_DIR; };
+		DC32CEBA2E61DC9E0028F78C /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		DC3D2A862AA49E8000BAABFC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DC3D2A8B2AA49E8000BAABFC /* jxqy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = jxqy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC3D2A982AA49E8000BAABFC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		DC3D2AA02AA49E8000BAABFC /* jxqy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = jxqy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		DC3D2AAD2AA49E8000BAABFC /* jxqy_macOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = jxqy_macOS.entitlements; sourceTree = "<group>"; };
-		DC516B702E50373B006CF61E /* AVFAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFAudio.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AVFAudio.framework; sourceTree = DEVELOPER_DIR; };
-		DC516B732E50379E006CF61E /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/CoreAudio.framework; sourceTree = DEVELOPER_DIR; };
-		DC516B762E503804006CF61E /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AudioToolbox.framework; sourceTree = DEVELOPER_DIR; };
-		DC516B7A2E503959006CF61E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
-		DC516B7C2E503961006CF61E /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/AVFoundation.framework; sourceTree = DEVELOPER_DIR; };
-		DC516B7E2E50396A006CF61E /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.5.sdk/System/Library/Frameworks/IOKit.framework; sourceTree = DEVELOPER_DIR; };
 		DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libfmod_iphoneos.a; path = ../../ThirdParty/devel/mac_ios/fmod/ios/lib/libfmod_iphoneos.a; sourceTree = "<group>"; };
 		DC516B922E5C9B7F006CF61E /* WaterEffect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = WaterEffect.h; sourceTree = "<group>"; };
 		DC516B932E5C9B7F006CF61E /* WaterEffect.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = WaterEffect.cpp; sourceTree = "<group>"; };
@@ -625,19 +621,17 @@
 			buildActionMask = 2147483647;
 			files = (
 				DC516B912E55E947006CF61E /* libfmod_iphoneos.a in Frameworks */,
-				DC516B882E50C36B006CF61E /* AVFoundation.framework in Frameworks */,
 				DC9FE6B62E4CC42F0099790F /* libavformat.framework in Frameworks */,
 				DC9FE68A2E4CB4540099790F /* SDL3_ttf.xcframework in Frameworks */,
 				DC9FE68C2E4CB4540099790F /* SDL3.xcframework in Frameworks */,
 				DC9FE6BA2E4CC42F0099790F /* libswresample.framework in Frameworks */,
+				DC32CEBB2E61DC9E0028F78C /* Foundation.framework in Frameworks */,
+				DC32CEB52E61DBCA0028F78C /* AudioToolbox.framework in Frameworks */,
 				DC9FE6BC2E4CC42F0099790F /* libavcodec.framework in Frameworks */,
-				DC516B8A2E50C36D006CF61E /* Foundation.framework in Frameworks */,
 				DC9FE6B82E4CC42F0099790F /* libavfilter.framework in Frameworks */,
 				DC9FE6882E4CB4540099790F /* SDL3_image.xcframework in Frameworks */,
+				DC32CEB92E61DC920028F78C /* AVFAudio.framework in Frameworks */,
 				DC9FE6B02E4CC42F0099790F /* libswscale.framework in Frameworks */,
-				DC516B8C2E50C36F006CF61E /* IOKit.framework in Frameworks */,
-				DC516B842E50C367006CF61E /* AudioToolbox.framework in Frameworks */,
-				DC516B862E50C369006CF61E /* AVFAudio.framework in Frameworks */,
 				DC9FE6B22E4CC42F0099790F /* libavutil.framework in Frameworks */,
 				DC9FE6B42E4CC42F0099790F /* libavdevice.framework in Frameworks */,
 			);
@@ -1050,13 +1044,11 @@
 		DC3D8C542AA4C3AD00BAABFC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				DC32CEBA2E61DC9E0028F78C /* Foundation.framework */,
+				DC32CEB82E61DC920028F78C /* AVFAudio.framework */,
+				DC32CEB62E61DC710028F78C /* IOKit.framework */,
+				DC32CEB42E61DBCA0028F78C /* AudioToolbox.framework */,
 				DC516B902E55E8FC006CF61E /* libfmod_iphoneos.a */,
-				DC516B7E2E50396A006CF61E /* IOKit.framework */,
-				DC516B7C2E503961006CF61E /* AVFoundation.framework */,
-				DC516B7A2E503959006CF61E /* Foundation.framework */,
-				DC516B762E503804006CF61E /* AudioToolbox.framework */,
-				DC516B732E50379E006CF61E /* CoreAudio.framework */,
-				DC516B702E50373B006CF61E /* AVFAudio.framework */,
 				DC9FE67F2E4CB4370099790F /* SDL3.xcframework */,
 				DC9FE6802E4CB4370099790F /* SDL3_image.xcframework */,
 				DC9FE6812E4CB4370099790F /* SDL3_ttf.xcframework */,
@@ -1657,7 +1649,7 @@
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -1710,7 +1702,7 @@
 				INFOPLIST_KEY_UIRequiresFullScreen = YES;
 				INFOPLIST_KEY_UIStatusBarHidden = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				IPHONEOS_DEPLOYMENT_TARGET = 9.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 11.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
