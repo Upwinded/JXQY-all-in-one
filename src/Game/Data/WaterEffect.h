@@ -43,6 +43,7 @@ struct WaterWaveCalculatedParams
 
 struct WaterLightParams
 {
+	float minDistance = 0.0f;
 	float defaultAlpha = 1.0f;
 	float minAlpha = 0.0f;
 	float decay = 1000.0f;

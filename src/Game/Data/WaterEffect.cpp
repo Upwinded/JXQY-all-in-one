@@ -223,9 +223,15 @@ void WaterEffect::_update(UTime time)
 
 		if (time != _lastUpdateTime)
 		{
-			_vertices[i].color.a = distance * cos(atan2(-dy, dx) - _params.light.angle) / (static_cast<float>(time - _lastUpdateTime) / 1000) / _params.light.decay + _params.light.defaultAlpha;
+			if (abs(distance) > _params.light.minDistance)
+			{
+				_vertices[i].color.a = distance * cos(atan2(-dy, dx) - _params.light.angle) / (static_cast<float>(time - _lastUpdateTime) / 1000) / _params.light.decay + _params.light.defaultAlpha;
+			}
+			else
+			{
+				_vertices[i].color.a = _params.light.defaultAlpha;
+			}
 		}
-		
 
 		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 1.0f * static_cast<float>(time - _lastUpdateTime) / 1000, _verticesLast[i].color.a + 1.0f * static_cast<float>(time - _lastUpdateTime) / 1000);
 		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _params.light.minAlpha, 1.0f);
