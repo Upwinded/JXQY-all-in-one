@@ -7,7 +7,7 @@ plugins {
 def buildWithCMake = true; //project.hasProperty('BUILD_WITH_CMAKE');
 def appName = "jxqy2";
 def appNameCN = "剑侠情缘2";
-def appVersion = "1.4.1"
+def appVersion = "1.4.2"
 
 android {
     namespace = "org.libsdl.app"
