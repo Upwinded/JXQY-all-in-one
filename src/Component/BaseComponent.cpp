@@ -20,7 +20,7 @@ void BaseComponent::initFromIniFileName(const std::string& fileName)
 	len = PakFile::readFile(fileName, s);
 	if (s == nullptr || len == 0)
 	{
-		GameLog::write("no ini file: %s\n", fileName.c_str());
+		GameLog::write(u8"no ini file: %s\n", fileName.c_str());
 		return;
 	}
 	INIReader ini(s);

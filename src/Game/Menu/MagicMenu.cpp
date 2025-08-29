@@ -133,14 +133,14 @@ void MagicMenu::onEvent()
 void MagicMenu::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\magic\\window.ini");
-	title = addComponent<ImageContainer>("ini\\ui\\magic\\title.ini");
-	image = addComponent<ImageContainer>("ini\\ui\\magic\\dragbox.ini");
-	scrollbar = addComponent<Scrollbar>("ini\\ui\\magic\\scrollbar.ini");
+	initFromIniFileName(u8"ini\\ui\\magic\\window.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\magic\\title.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\magic\\dragbox.ini");
+	scrollbar = addComponent<Scrollbar>(u8"ini\\ui\\magic\\scrollbar.ini");
 
 	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
 	{
-		std::string itemName = convert::formatString("ini\\ui\\magic\\item%d.ini", i + 1);
+		std::string itemName = convert::formatString(u8"ini\\ui\\magic\\item%d.ini", i + 1);
 		item[i] = addComponent<Item>(itemName);
 		item[i]->dragType = dtMagic;
 		item[i]->canShowHint = true;

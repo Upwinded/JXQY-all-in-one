@@ -52,7 +52,7 @@ void BuySellMenu::buy(const std::string & list)
 	if (len > 0 && s != nullptr)
 	{
 		INIReader ini(s);
-		int count = ini.GetInteger("Header", u8"Count", 0);
+		int count = ini.GetInteger(u8"Header", u8"Count", 0);
 		if (count < 0)
 		{
 			count = 0;
@@ -63,7 +63,7 @@ void BuySellMenu::buy(const std::string & list)
 		}
 		for (int i = 0; i < count; i++)
 		{
-			std::string section = convert::formatString("%d", i + 1);
+			std::string section = convert::formatString(u8"%d", i + 1);
 			goodsList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
 			goodsList[i].number = ini.GetInteger(section, u8"Number", 1);
 			if (goodsList[i].iniFile != u8"")
@@ -104,7 +104,7 @@ void BuySellMenu::sell(const std::string & list)
 		if (len > 0 && s != nullptr)
 		{
 			INIReader ini(s);
-			int count = ini.GetInteger("Header", u8"Count", 0);
+			int count = ini.GetInteger(u8"Header", u8"Count", 0);
 			if (count < 0)
 			{
 				count = 0;
@@ -115,7 +115,7 @@ void BuySellMenu::sell(const std::string & list)
 			}
 			for (int i = 0; i < count; i++)
 			{
-				std::string section = convert::formatString("%d", i + 1);
+				std::string section = convert::formatString(u8"%d", i + 1);
 				goodsList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
 				goodsList[i].number = ini.GetInteger(section, u8"Number", 1);
 				if (goodsList[i].iniFile != u8"")
@@ -165,7 +165,7 @@ bool BuySellMenu::addGoodsItem(const std::string & itemName, int num)
 	}
 	for (size_t i = 0; i < BUYSELL_GOODS_COUNT; i++)
 	{
-		if (goodsList[i].iniFile == u8"")
+		if (goodsList[i].iniFile.empty())
 		{
 			goodsList[i].number = num;
 			goodsList[i].iniFile = itemName;
@@ -208,13 +208,13 @@ void BuySellMenu::updateGoods()
 
 		item[i]->impImage = nullptr;
 
-		item[i]->setStr("");
+		item[i]->setStr(u8"");
 		if (goodsList[i + scrollbar->position * scrollbar->lineSize].iniFile != u8"" && goodsList[i + scrollbar->position * scrollbar->lineSize].goods != nullptr)
 		{
 			item[i]->impImage = goodsList[i + scrollbar->position * scrollbar->lineSize].goods->createGoodsIcon();
 			if (bsKind == bsSell)
 			{
-				item[i]->setStr(convert::formatString("%d", goodsList[i + scrollbar->position * scrollbar->lineSize].number));
+				item[i]->setStr(convert::formatString(u8"%d", goodsList[i + scrollbar->position * scrollbar->lineSize].number));
 			}
 		}
 	}
@@ -328,7 +328,7 @@ void BuySellMenu::onEvent()
 						updateGoods();
 						
 					}
-					else if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile == u8"")
+					else if (goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile.empty())
 					{
 						goodsList[scrollbar->position * scrollbar->lineSize + i].iniFile = gm->goodsManager.goodsList[item[i]->dropIndex].iniFile;
 						goodsList[scrollbar->position * scrollbar->lineSize + i].goods = std::make_shared<Goods>();
@@ -365,16 +365,16 @@ bool BuySellMenu::onHandleEvent(AEvent & e)
 void BuySellMenu::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\buysell\\window.ini");
-	title = addComponent<ImageContainer>("ini\\ui\\buysell\\title.ini");
-	image = addComponent<ImageContainer>("ini\\ui\\buysell\\dragbox.ini");
-	closeBtn = addComponent<Button>("ini\\ui\\buysell\\closebtn.ini");
+	initFromIniFileName(u8"ini\\ui\\buysell\\window.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\buysell\\title.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\buysell\\dragbox.ini");
+	closeBtn = addComponent<Button>(u8"ini\\ui\\buysell\\closebtn.ini");
 
-	scrollbar = addComponent<Scrollbar>("ini\\ui\\buysell\\scrollbar.ini");
+	scrollbar = addComponent<Scrollbar>(u8"ini\\ui\\buysell\\scrollbar.ini");
 
 	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
 	{
-		std::string itemName = convert::formatString("ini\\ui\\buysell\\item%d.ini", i + 1);
+		std::string itemName = convert::formatString(u8"ini\\ui\\buysell\\item%d.ini", i + 1);
 		item[i] = addComponent<Item>(itemName);
 		item[i]->dragType = dtSell;
 		item[i]->canShowHint = true;

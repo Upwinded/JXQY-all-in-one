@@ -15,19 +15,19 @@ SaveLoad::~SaveLoad()
 void SaveLoad::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\saveload\\window.ini");
+	initFromIniFileName(u8"ini\\ui\\saveload\\window.ini");
 	if (save)
 	{
-		saveBtn = addComponent<Button>("ini\\ui\\saveload\\savebtn.ini");
+		saveBtn = addComponent<Button>(u8"ini\\ui\\saveload\\savebtn.ini");
 	}
 	if (load)
 	{
-		loadBtn = addComponent<Button>("ini\\ui\\saveload\\loadbtn.ini");
+		loadBtn = addComponent<Button>(u8"ini\\ui\\saveload\\loadbtn.ini");
 	}
-	exitBtn = addComponent<Button>("ini\\ui\\saveload\\exitbtn.ini");
-	snap = addComponent<ImageContainer>("ini\\ui\\saveload\\snapbmp.ini");
+	exitBtn = addComponent<Button>(u8"ini\\ui\\saveload\\exitbtn.ini");
+	snap = addComponent<ImageContainer>(u8"ini\\ui\\saveload\\snapbmp.ini");
 	snap->stretch = true;
-	listBox = addComponent<ListBox>("ini\\ui\\saveload\\listbox.ini");
+	listBox = addComponent<ListBox>(u8"ini\\ui\\saveload\\listbox.ini");
 
 	setChildRectReferToParent();
 }

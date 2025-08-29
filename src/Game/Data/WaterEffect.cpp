@@ -22,7 +22,7 @@ void WaterEffect::renderEffect(UTime time)
 {
 	auto engine = Engine::getInstance();
 	engine->setImageAsRenderTarget(_tempRenderTarget);
-	_update(static_cast<float>(time) / 1000.0f);
+	_update(time);
 	engine->drawGeometry(_waterEffectCanvas, _vertices, _indices);
 }
 
@@ -39,14 +39,14 @@ void WaterEffect::applyPresetParams()
 	addFixedRipple(fixedRippleParams);
 
 	WaterWaveParams waveParams;
-	waveParams.amplitude = 5.0f;
+	waveParams.amplitude = 6.0f;
 	waveParams.angle = 5 * M_PI / 6;
 	waveParams.density = 0.02f;
 	waveParams.frequency = 8.0f;
 	waveParams.phi = 1.0f;
 	addWave(waveParams);
 
-	waveParams.amplitude = 8.0f;
+	waveParams.amplitude = 10.0f;
 	waveParams.angle = 7 * M_PI / 6;
 	waveParams.density = 0.01f;
 	waveParams.frequency = 3.0f;
@@ -54,21 +54,20 @@ void WaterEffect::applyPresetParams()
 	addWave(waveParams);
 
 	WaterLightParams lightParams;
-	lightParams.decay = 10.0f;
+	lightParams.decay = 700.0f;
 	lightParams.defaultAlpha = 0.9f;
 	lightParams.angle = 5 * M_PI / 4;
 	lightParams.minAlpha = 0.85f;
-	lightParams.minDistance = 0.0f;
 	setLightParams(lightParams);
 
 	WaterClickRippleParams waterClickRippleParams;
-	waterClickRippleParams.lifeTime = 5.0f;
+	waterClickRippleParams.lifeTime = 5000;
 	waterClickRippleParams.rippleParams.amplitude = 30.0f;
 	waterClickRippleParams.rippleParams.density = 0.02f;
 	waterClickRippleParams.rippleParams.frequency = 10.0f;
 	setDefaultClickRippleParams(waterClickRippleParams);
 
-	setGridSize(30);
+	setGridSize(50);
 }
 
 void WaterEffect::clearParams()
@@ -121,7 +120,7 @@ void WaterEffect::addDefaultClickRipple(float x, float y, UTime startTime)
 {
 	WaterClickRippleParams params;
 	params = _params.defaultClickRipple;
-	params.startTime = static_cast<float>(startTime) / 1000.0f;
+	params.startTime = startTime;
 	params.rippleParams.pos = { x, y };
 	addClickRipple(params);
 }
@@ -136,7 +135,7 @@ void WaterEffect::setMaxClickRipple(int count)
 	_params.maxClickRipple = count;
 }
 
-void WaterEffect::_update(float time)
+void WaterEffect::_update(UTime time)
 {
 	for (size_t i = 0; i < _vertices.size(); i++)
 	{
@@ -148,7 +147,7 @@ void WaterEffect::_update(float time)
 			float y = _verticesOrigin[i].position.y;
 			float distance_to_line = (iter.A * x + iter.B * y + iter.basicParams.phi);
 
-			float line_offset = iter.basicParams.amplitude * std::sin(iter.basicParams.frequency * time - iter.basicParams.density * distance_to_line);
+			float line_offset = iter.basicParams.amplitude * std::sin(static_cast<double>(iter.basicParams.frequency) * static_cast<double>(time) / 1000.0 - iter.basicParams.density * distance_to_line);
 			offset_x += line_offset * iter.A;
 			offset_y += line_offset * iter.B;
 		}
@@ -159,8 +158,8 @@ void WaterEffect::_update(float time)
 			float dy = _verticesOrigin[i].position.y - ny;
 			float angle = atan2(-dy, dx);
 			float distance = std::sqrt(dx * dx + dy * dy);
-			offset_x += iter.amplitude * std::cos(iter.frequency * time - iter.density * distance) * cos(angle);
-			offset_y += iter.amplitude * std::cos(iter.frequency * time - iter.density * distance) * -sin(angle);
+			offset_x += static_cast<float>(iter.amplitude * std::cos(static_cast<double>(iter.frequency) * static_cast<double>(time) / 1000.0 - iter.density * distance) * cos(angle));
+			offset_y += static_cast<float>(iter.amplitude * std::cos(static_cast<double>(iter.frequency) * static_cast<double>(time) / 1000.0 - iter.density * distance) * -sin(angle));
 		}
 
 		auto clickRippleParamsIter = _params.clickRipples.begin();
@@ -176,10 +175,10 @@ void WaterEffect::_update(float time)
 			float dy = _verticesOrigin[i].position.y - iter->rippleParams.pos.y;
 			float angle = atan2(dy, dx);
 			float distance = std::sqrt(dx * dx + dy * dy);
-			float distance_to_ripple = abs((time - iter->startTime) * iter->rippleParams.frequency - distance * iter->rippleParams.density);
+			float distance_to_ripple = abs(static_cast<float>(time - iter->startTime) / 1000.0 * iter->rippleParams.frequency - distance * iter->rippleParams.density);
 
-			offset_x += iter->rippleParams.amplitude * std::cos(distance_to_ripple) * cos(angle) * exp(-distance_to_ripple) / (time - iter->startTime + 1.0f);
-			offset_y += iter->rippleParams.amplitude * std::cos(distance_to_ripple) * sin(angle) * exp(-distance_to_ripple) / (time - iter->startTime + 1.0f);
+			offset_x += iter->rippleParams.amplitude * std::cos(distance_to_ripple) * cos(angle) * exp(-distance_to_ripple) / (static_cast<float>(time - iter->startTime) / 1000 + 1.0f);
+			offset_y += iter->rippleParams.amplitude * std::cos(distance_to_ripple) * sin(angle) * exp(-distance_to_ripple) / (static_cast<float>(time - iter->startTime) / 1000 + 1.0f);
 		}
 
 		_vertices[i].position.y = _verticesOrigin[i].position.y + offset_y;
@@ -222,21 +221,18 @@ void WaterEffect::_update(float time)
 
 		float distance = std::sqrt(dx * dx + dy * dy);
 
-		if (distance > _params.light.minDistance)
+		if (time != _lastUpdateTime)
 		{
-			_vertices[i].color.a = (distance - _params.light.minDistance) * cos(atan2(-dy, dx) - _params.light.angle) / _params.light.decay + _params.light.defaultAlpha;
+			_vertices[i].color.a = distance * cos(atan2(-dy, dx) - _params.light.angle) / (static_cast<float>(time - _lastUpdateTime) / 1000) / _params.light.decay + _params.light.defaultAlpha;
 		}
-		else
-		{
-			_vertices[i].color.a = _params.light.defaultAlpha;
-		}
+		
 
-		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 1.0f * (time - LastUpdateTime), _verticesLast[i].color.a + 1.0f * (time - LastUpdateTime));
+		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 1.0f * static_cast<float>(time - _lastUpdateTime) / 1000, _verticesLast[i].color.a + 1.0f * static_cast<float>(time - _lastUpdateTime) / 1000);
 		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _params.light.minAlpha, 1.0f);
 
 		_verticesLast[i] = _vertices[i];
 	}
-	LastUpdateTime = time;
+	_lastUpdateTime = time;
 }
 
 void WaterEffect::initGrid()

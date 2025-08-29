@@ -90,7 +90,7 @@ void Magic::initFromIni(const std::string & fileName, bool loadSpecialMagic)
 			}
 			else
 			{
-				section = convert::formatString("Level%d", i);
+				section = convert::formatString(u8"Level%d", i);
 			}
 			int idx = i - 1 < 0 ? 0 : i - 1;
 			level[i].effect = ini.GetInteger(section, u8"Effect", level[idx].effect);
@@ -1495,7 +1495,7 @@ void Magic::createRes()
 
 _shared_imp Magic::createActionImage()
 {
-	if (actionFile == u8"")
+	if (actionFile.empty())
 	{
 		return nullptr;
 	}
@@ -1506,7 +1506,7 @@ _shared_imp Magic::createActionImage()
 
 _shared_imp Magic::createActionShadow()
 {
-	if (actionShadowFile == u8"")
+	if (actionShadowFile.empty())
 	{
 		return nullptr;
 	}
@@ -1517,7 +1517,7 @@ _shared_imp Magic::createActionShadow()
 
 _shared_imp Magic::createMagicFlyingImage()
 {
-	if (flyingImage == u8"")
+	if (flyingImage.empty())
 	{
 		return nullptr;
 	}
@@ -1528,7 +1528,7 @@ _shared_imp Magic::createMagicFlyingImage()
 
 _shared_imp Magic::createMagicVanishImage()
 {
-	if (vanishImage == u8"")
+	if (vanishImage.empty())
 	{
 		return nullptr;
 	}
@@ -1539,7 +1539,7 @@ _shared_imp Magic::createMagicVanishImage()
 
 _shared_imp Magic::createMagicSuperModeImage()
 {
-	if (superModeImage == u8"")
+	if (superModeImage.empty())
 	{
 		return nullptr;
 	}
@@ -1550,7 +1550,7 @@ _shared_imp Magic::createMagicSuperModeImage()
 
 _shared_imp Magic::createMagicImage()
 {
-	if (image == u8"")
+	if (image.empty())
 	{
 		return nullptr;
 	}
@@ -1560,7 +1560,7 @@ _shared_imp Magic::createMagicImage()
 
 _shared_imp Magic::createMagicIcon()
 {
-	if (icon == u8"")
+	if (icon.empty())
 	{
 		return nullptr;
 	}

@@ -17,26 +17,26 @@ void CheckBox::initFromIni(INIReader & ini)
 {
 	freeResource();
 
-	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
-	std::string impName = ini.Get("Init", u8"Image", u8"");
+	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
+	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
 	auto impImage = loadRes(impName);
 	if (impImage != nullptr)
 	{
 		int frame = 0;
-		frame = ini.GetInteger("Init", u8"Up", 0);
+		frame = ini.GetInteger(u8"Init", u8"Up", 0);
 		image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-		frame = ini.GetInteger("Init", u8"Down", 1);
+		frame = ini.GetInteger(u8"Init", u8"Down", 1);
 		image[2] = IMP::createIMPImageFromFrame(impImage, frame);		
 	}
 	else
 	{
-		GameLog::write("%s image file error\n", impName.c_str());
+		GameLog::write(u8"%s image file error\n", impName.c_str());
 	}
 
-	std::string soundName = ini.Get("Init", u8"Sound", u8"");
+	std::string soundName = ini.Get(u8"Init", u8"Sound", u8"");
 	loadSound(soundName, 1);
 
 	impImage = nullptr;

@@ -61,11 +61,11 @@ void BottomMenu::updateGoodsNumber(int index)
 		{		
 			if (gm->goodsManager.goodsList[GOODS_COUNT + index].goods != nullptr && gm->goodsManager.goodsList[GOODS_COUNT + index].number > 0 && gm->goodsManager.goodsList[GOODS_COUNT + index].iniFile != u8"")
 			{
-				goodsItem[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[GOODS_COUNT + index].number));
+				goodsItem[index]->setStr(convert::formatString(u8"%d", gm->goodsManager.goodsList[GOODS_COUNT + index].number));
 			}
 			else
 			{
-				goodsItem[index]->setStr("");
+				goodsItem[index]->setStr(u8"");
 				if (gm->goodsManager.goodsList[GOODS_COUNT + index].goods != nullptr)
 				{
 					gm->goodsManager.goodsList[GOODS_COUNT + index].goods = nullptr;
@@ -110,18 +110,18 @@ void BottomMenu::updateMagicItem(int index)
 void BottomMenu::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\bottom\\window.ini");
-	equipBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnequip.ini");
-	goodsBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btngoods.ini");
-	magicBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnmagic.ini");
-	notesBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnnotes.ini");
-	optionBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnoption.ini");
-	stateBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnstate.ini");
-	xiulianBtn = addComponent<CheckBox>("ini\\ui\\bottom\\btnxiulian.ini");
+	initFromIniFileName(u8"ini\\ui\\bottom\\window.ini");
+	equipBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btnequip.ini");
+	goodsBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btngoods.ini");
+	magicBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btnmagic.ini");
+	notesBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btnnotes.ini");
+	optionBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btnoption.ini");
+	stateBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btnstate.ini");
+	xiulianBtn = addComponent<CheckBox>(u8"ini\\ui\\bottom\\btnxiulian.ini");
 
 	for (size_t i = 0; i < GOODS_TOOLBAR_COUNT; i++)
 	{
-		std::string itemName = convert::formatString("ini\\ui\\bottom\\item%d.ini", i + 1);
+		std::string itemName = convert::formatString(u8"ini\\ui\\bottom\\item%d.ini", i + 1);
 		goodsItem[i] = addComponent<Item>(itemName);
 		goodsItem[i]->dragType = dtGoods;
 		goodsItem[i]->dragIndex = GOODS_COUNT + i;
@@ -130,7 +130,7 @@ void BottomMenu::init()
 
 	for (size_t i = 0; i <  MAGIC_TOOLBAR_COUNT; i++)
 	{
-		std::string itemName = convert::formatString("ini\\ui\\bottom\\item%d.ini", i + 1 + GOODS_TOOLBAR_COUNT);
+		std::string itemName = convert::formatString(u8"ini\\ui\\bottom\\item%d.ini", i + 1 + GOODS_TOOLBAR_COUNT);
 		magicItem[i] = addComponent<Item>(itemName);
 		magicItem[i]->dragType = dtMagic;
 		magicItem[i]->dragIndex = MAGIC_COUNT + i;

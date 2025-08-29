@@ -51,21 +51,21 @@ void Scrollbar::initFromIniWithName(INIReader & ini, const std::string& fileName
 {
 	freeResource();
 
-	style = (ScrollbarStyle)ini.GetInteger("Init", u8"Style", int(style));
-	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
-	min = ini.GetInteger("Init", u8"Min", min);
-	max = ini.GetInteger("Init", u8"Max", max);
-	lineSize = ini.GetInteger("Init", u8"LineSize", lineSize);
-	pageSize = ini.GetInteger("Init", u8"PageSize", pageSize);
-	slideBegin = ini.GetInteger("Init", u8"SlideBegin", slideBegin);
-	slideEnd = ini.GetInteger("Init", u8"SlideEnd", slideEnd);
-	max = ini.GetInteger("Init", u8"Max", max);
-	std::string impName = ini.Get("Init", u8"Image", u8"");
+	style = (ScrollbarStyle)ini.GetInteger(u8"Init", u8"Style", int(style));
+	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
+	min = ini.GetInteger(u8"Init", u8"Min", min);
+	max = ini.GetInteger(u8"Init", u8"Max", max);
+	lineSize = ini.GetInteger(u8"Init", u8"LineSize", lineSize);
+	pageSize = ini.GetInteger(u8"Init", u8"PageSize", pageSize);
+	slideBegin = ini.GetInteger(u8"Init", u8"SlideBegin", slideBegin);
+	slideEnd = ini.GetInteger(u8"Init", u8"SlideEnd", slideEnd);
+	max = ini.GetInteger(u8"Init", u8"Max", max);
+	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
 	impImage = loadRes(impName);
-	std::string slideBtnIni = ini.Get("Init", u8"SlideBtn", u8"");
+	std::string slideBtnIni = ini.Get(u8"Init", u8"SlideBtn", u8"");
 	slideBtnIni = convert::extractFilePath(fileName) + slideBtnIni;
 	slideBtn = std::make_shared<DragButton>();
 	addChild(slideBtn);
@@ -75,7 +75,7 @@ void Scrollbar::initFromIniWithName(INIReader & ini, const std::string& fileName
 	len = PakFile::readFile(slideBtnIni, s);
 	if (s == nullptr || len == 0)
 	{
-		GameLog::write("no ini file: %s\n", slideBtnIni.c_str());
+		GameLog::write(u8"no ini file: %s\n", slideBtnIni.c_str());
 		return;
 	}
 	INIReader sbIni(s);

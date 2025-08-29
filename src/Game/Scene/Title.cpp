@@ -17,7 +17,7 @@ Title::~Title()
 void Title::playTitleBGM()
 {
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile("music\\ks64.mp3", s);
+	int len = PakFile::readFile(u8"music\\ks64.mp3", s);
 	if (s != nullptr && len > 0)
 	{
 		engine->loadBGM(s, len);
@@ -162,9 +162,9 @@ void Title::onExit()
 
 void Title::onRun()
 {
-	auto vp = std::make_shared<VideoPage>("video\\logo.avi");
+	auto vp = std::make_shared<VideoPage>(u8"video\\logo.avi");
 	vp->run();
-	vp = std::make_shared<VideoPage>("video\\title.avi");
+	vp = std::make_shared<VideoPage>(u8"video\\title.avi");
 	vp->run();
 	playTitleBGM();
 }

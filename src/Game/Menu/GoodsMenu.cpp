@@ -16,7 +16,7 @@ GoodsMenu::~GoodsMenu()
 
 void GoodsMenu::updateMoney()
 {
-	money->setStr(convert::formatString("%d", gm->player->money));
+	money->setStr(convert::formatString(u8"%d", gm->player->money));
 }
 
 void GoodsMenu::updateGoods()
@@ -53,11 +53,11 @@ void GoodsMenu::updateGoodsNumber(int index)
 	}
 	if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number > 0 && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile != u8"")
 	{
-		item[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number));
+		item[index]->setStr(convert::formatString(u8"%d", gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number));
 	}
 	else
 	{
-		item[index]->setStr("");
+		item[index]->setStr(u8"");
 		if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr)
 		{
 			gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods = nullptr;
@@ -189,7 +189,7 @@ void GoodsMenu::onEvent()
 			{
 				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != u8"")
 				{
-					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == u8"")
+					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile.empty())
 					{
 						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, 1))
 						{
@@ -235,7 +235,7 @@ void GoodsMenu::onEvent()
 			{
 				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != u8"")
 				{
-					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == u8"")
+					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile.empty())
 					{
 						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number))
 						{

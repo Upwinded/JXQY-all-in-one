@@ -15,10 +15,10 @@ Dialog::~Dialog()
 void Dialog::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\dialog\\window.ini");
-	label = addComponent<TalkLabel>("ini\\ui\\dialog\\label.ini");
-	head1 = addComponent<ImageContainer>("ini\\ui\\dialog\\head1.ini");
-	head2 = addComponent<ImageContainer>("ini\\ui\\dialog\\head2.ini");
+	initFromIniFileName(u8"ini\\ui\\dialog\\window.ini");
+	label = addComponent<TalkLabel>(u8"ini\\ui\\dialog\\label.ini");
+	head1 = addComponent<ImageContainer>(u8"ini\\ui\\dialog\\head1.ini");
+	head2 = addComponent<ImageContainer>(u8"ini\\ui\\dialog\\head2.ini");
 	setChildRectReferToParent();
 
 	readHeadFiles();
@@ -32,7 +32,7 @@ void Dialog::readHeadFiles()
 	len = PakFile::readFile(fileName, s);
 	if (s == nullptr || len == 0)
 	{
-		GameLog::write("no ini file: %s\n", fileName.c_str());
+		GameLog::write(u8"no ini file: %s\n", fileName.c_str());
 		return;
 	}
 	ini = std::make_shared<INIReader>(s);
@@ -42,7 +42,7 @@ std::string Dialog::getHeadName(int index)
 {
 	if (ini != nullptr)
 	{
-		return ini->Get("PORTRAIT", convert::formatString("%d", index), u8"");
+		return ini->Get(u8"PORTRAIT", convert::formatString(u8"%d", index), u8"");
 	}
 	return u8"";
 }

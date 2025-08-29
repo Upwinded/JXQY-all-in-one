@@ -290,7 +290,7 @@ void EngineBase::drawImage(_shared_image image, SDL_Rect * src, SDL_Rect * dst)
 	}
 	if (!SDL_RenderTexture(renderer, image.get(), pfsrc, pfdst))
 	{
-		GameLog::write("SDL_RenderTexture Error: %s", SDL_GetError());
+		GameLog::write(u8"SDL_RenderTexture Error: %s", SDL_GetError());
 	}
 }
 
@@ -505,12 +505,12 @@ _shared_image EngineBase::loadImageFromFile(const std::string & fileName)
 	int size;
 	if (!File::readFile(fileName, data, size))
 	{
-		GameLog::write("Image File Readed Error\n");
+		GameLog::write(u8"Image File Readed Error\n");
 		return nullptr;
 	}
 	if (data == nullptr || size <= 0)
 	{
-		GameLog::write("Image File Readed Error\n");
+		GameLog::write(u8"Image File Readed Error\n");
 		return nullptr;
 	}
 	auto result = loadImageFromMem(data, size);
@@ -574,7 +574,7 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 	SDL_Surface* sur = SDL_RenderReadPixels(renderer, nullptr);
 	if (sur == nullptr)
 	{
-		GameLog::write("reading pixels error\n");
+		GameLog::write(u8"reading pixels error\n");
 		SetRenderTarget(renderer, tt);
 		SDL_DestroyTexture(ts);
 		return -1;
@@ -584,7 +584,7 @@ int EngineBase::saveImageToMem(_shared_image image, int w, int h, std::unique_pt
 
 	if (st == nullptr)
 	{
-		GameLog::write("allocing memory error\n");
+		GameLog::write(u8"allocing memory error\n");
 		SetRenderTarget(renderer, tt);
 		SDL_DestroyTexture(ts);
 		SDL_DestroySurface(sur);
@@ -936,7 +936,7 @@ _shared_image EngineBase::loadSaveShotFromPixels(int w, int h, std::unique_ptr<c
 {
 	if (w <= 0 || h <= 0 || data == nullptr || size <= 0 || w * h * SaveBMPPixelBytes > size)
 	{
-		GameLog::write("save shot null\n");
+		GameLog::write(u8"save shot null\n");
 		return nullptr;
 	}
 	auto pitch = w * SaveBMPPixelBytes;
@@ -1102,10 +1102,10 @@ void EngineBase::loadLogo()
 	if (hRsrc == nullptr)
 	{
 		logo = loadImageFromFile(logoFileName);
-		GameLog::write("Logo Loaded From File\n");
+		GameLog::write(u8"Logo Loaded From File\n");
 		return;
 	}
-	GameLog::write("Loading Logo From Resource\n");
+	GameLog::write(u8"Loading Logo From Resource\n");
 
 	unsigned int size = SizeofResource(nullptr, hRsrc);
 	if (size == 0)
@@ -1130,7 +1130,7 @@ void EngineBase::loadLogo()
 	logo = loadImageFromMem(data, size);
 	UnlockResource(hGlobal);
 	FreeResource(hGlobal);
-	GameLog::write("Logo loaded from resource!");
+	GameLog::write(u8"Logo loaded from resource!");
 #else
 	logo = loadImageFromFile(logoFileName);
 #endif // USE_LOGO_RESOURCE
@@ -1614,7 +1614,7 @@ void EngineBase::setFontName(const std::string & fontName)
 	fontData = SDL_IOFromFile(fontName.c_str(), u8"r+");
 	if (!fontData)
 	{
-		GameLog::write("there is no fontData\n");
+		GameLog::write(u8"there is no fontData\n");
 	}
 }
 
@@ -1791,7 +1791,7 @@ InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, 
 	height = wHeight;
 	if (initSDL(windowCaption, wWidth, wHeight, fullScreenMode, fullScreenSolutionMode, display) != initOK)
 	{
-		GameLog::write("Init SDL Error!\n");
+		GameLog::write(u8"Init SDL Error!\n");
 		return sdlError;
 	}
 	
@@ -1804,7 +1804,7 @@ InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, 
 #ifdef SHF_USE_AUDIO
 	if (initSoundSystem() != 0)
 	{
-		GameLog::write("Init Sound Error!\n");
+		GameLog::write(u8"Init Sound Error!\n");
 		return soundError;
 	}
 #endif
@@ -1812,14 +1812,14 @@ InitErrorType EngineBase::init(const std::string & windowCaption, int & wWidth, 
 #ifdef SHF_USE_VIDEO
 	if (initVideo() != 0)
 	{
-		GameLog::write("Init Video Error!\n");
+		GameLog::write(u8"Init Video Error!\n");
 		return videoError;
 	}
 #endif
 
 	if (lzo_init() != LZO_E_OK)
 	{
-		GameLog::write("Init miniLZO Error!\n");
+		GameLog::write(u8"Init miniLZO Error!\n");
 		return LZOError;
 	}
 	SDL_StopTextInput(window);
@@ -1909,7 +1909,7 @@ void EngineBase::getScreenInfo(int& w, int& h)
 	
 	if (sdl_dm == nullptr)
 	{
-		GameLog::write("SDL_GetCurrentDisplayMode Error: %s", SDL_GetError()); 
+		GameLog::write(u8"SDL_GetCurrentDisplayMode Error: %s", SDL_GetError()); 
 		return;
 	}
 	w = sdl_dm->w;
@@ -1978,7 +1978,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 
 	if (!SDL_Init( SDL_INIT_AUDIO | SDL_INIT_VIDEO  | SDL_INIT_EVENTS))
 	{
-		GameLog::write("SDL error: %s \n", SDL_GetError());
+		GameLog::write(u8"SDL error: %s \n", SDL_GetError());
 		return sdlError;
 	}
 #ifdef __MOBILE__
@@ -2036,11 +2036,11 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
     {
         flags |= SDL_WINDOW_HIDDEN;
     }
-	GameLog::write("SDL Creating Window and Renderer");
+	GameLog::write(u8"SDL Creating Window and Renderer");
 	SDL_Renderer* tempRenderer;
 	if (!SDL_CreateWindowAndRenderer(windowCaption.c_str(), width, height, flags, &window, &tempRenderer))
 	{
-		GameLog::write("SDL Create Window and Renderer Error : %s", SDL_GetError());
+		GameLog::write(u8"SDL Create Window and Renderer Error : %s", SDL_GetError());
 		return sdlError;
 	}
 
@@ -2054,7 +2054,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	renderer.store(tempRenderer); //SDL_CreateRenderer(window, -1, SDL_RENDERER_TARGETTEXTURE | SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	if (!SDL_SetRenderVSync(renderer.load(), 1))
 	{
-		GameLog::write("SDL_SetRenderVSync Error : %s", SDL_GetError());
+		GameLog::write(u8"SDL_SetRenderVSync Error : %s", SDL_GetError());
 		return sdlError;
 	}
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
@@ -2062,7 +2062,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 	realScreen = make_shared_image(SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, width, height));
 	if (realScreen == nullptr)
 	{
-		GameLog::write("RealScreen Creation Error : %s", SDL_GetError());
+		GameLog::write(u8"RealScreen Creation Error : %s", SDL_GetError());
 		return sdlError;
 	}
 	screenMask = make_shared_surface(SDL_CreateSurface(1, 1, SDL_PIXELFORMAT_ARGB8888));
@@ -2090,7 +2090,7 @@ InitErrorType EngineBase::initSDL(const std::string & windowCaption, int wWidth,
 
 void EngineBase::destroySDL()
 {
-	GameLog::write("Begin destroy SDL\n");
+	GameLog::write(u8"Begin destroy SDL\n");
 	clearCursor();
 	if (fontBuffer != nullptr)
 	{
@@ -2111,7 +2111,7 @@ void EngineBase::destroySDL()
 	//	SDL_DestroyTexture(realScreen);
 	//	realScreen = nullptr;
 	//}
-    GameLog::write("Begin destroy SDL Renderer \n");
+    GameLog::write(u8"Begin destroy SDL Renderer \n");
     if (renderer)
     {
         SDL_SetRenderTarget(renderer, nullptr);
@@ -2119,7 +2119,7 @@ void EngineBase::destroySDL()
         renderer = nullptr;
     }
     
-    GameLog::write("Begin destroy SDL Window \n");
+    GameLog::write(u8"Begin destroy SDL Window \n");
     if (window)
     {
         SDL_DestroyWindow(window);
@@ -2127,7 +2127,7 @@ void EngineBase::destroySDL()
     }
      
 	SDL_Quit();
-	GameLog::write("Destroy SDL done!\n");
+	GameLog::write(u8"Destroy SDL done!\n");
 }
 
 void EngineBase::updateState()
@@ -2171,7 +2171,7 @@ int EngineBase::initSoundSystem()
 
 void EngineBase::destroySoundSystem()
 {
-	GameLog::write("Begin destroy sound system\n");
+	GameLog::write(u8"Begin destroy sound system\n");
 	//soundMutex.lock();
 	for (size_t i = 0; i < soundList.sound.size(); i++)
 	{
@@ -2190,7 +2190,7 @@ void EngineBase::destroySoundSystem()
 		FMOD_System_Release(soundSystem);
 		soundSystem = nullptr;
 	}
-	GameLog::write("Destroy sound system done!\n");
+	GameLog::write(u8"Destroy sound system done!\n");
 }
 
 void EngineBase::updateSoundSystem()
@@ -2270,7 +2270,7 @@ _music EngineBase::createMusic(const std::unique_ptr<char[]>& data, int size, bo
 
 	if (FMOD_System_CreateSound(soundSystem, data.get(), mode, &exinfo, &sound) != 0)
 	{
-		//GameLog::write("Create Sound Error!\n");
+		//GameLog::write(u8"Create Sound Error!\n");
 		return nullptr;
 	}
 	if (priority != 128)
@@ -2283,7 +2283,7 @@ _music EngineBase::createMusic(const std::unique_ptr<char[]>& data, int size, bo
 	{
 		if (FMOD_Sound_Set3DMinMaxDistance(sound, 0.5f, 5000.0f) != 0)
 		{
-			GameLog::write("Set3DMinMaxDistance Error!\n");
+			GameLog::write(u8"Set3DMinMaxDistance Error!\n");
 		}
 	}
 
@@ -2332,7 +2332,7 @@ _music EngineBase::createVideoRAW(FMOD_SYSTEM * system, char * data, int size, b
 	int ret = FMOD_System_CreateSound(tempSystem, data, mode, &exinfo, &sound);
 	if (ret != 0)
 	{
-		//GameLog::write("Create Sound Error! %d\n", ret);
+		//GameLog::write(u8"Create Sound Error! %d\n", ret);
 		return nullptr;
 	}
 	if (priority != 128)
@@ -2345,7 +2345,7 @@ _music EngineBase::createVideoRAW(FMOD_SYSTEM * system, char * data, int size, b
 	{
 		if (FMOD_Sound_Set3DMinMaxDistance(sound, 0.5f, 5000.0f) != 0)
 		{
-			GameLog::write("Set3DMinMaxDistance Error!\n");
+			GameLog::write(u8"Set3DMinMaxDistance Error!\n");
 		}
 	}
 	return (_music)sound;
@@ -2358,7 +2358,7 @@ void EngineBase::freeMusic(_music music)
 #ifdef SHF_USE_AUDIO
 	if (music == nullptr)
 	{
-		GameLog::write("music to release is nullptr \n");
+		GameLog::write(u8"music to release is nullptr \n");
 		return;
 	}
 	FMOD_Sound_Release(music);
@@ -2375,7 +2375,7 @@ _channel EngineBase::playMusic(_music music, float volume)
 	FMOD_CHANNEL* fmod_channel_;
 	if (FMOD_System_PlaySound(soundSystem, music, nullptr, true, &fmod_channel_) != 0)
 	{
-		GameLog::write("Play Sound Error!\n");
+		GameLog::write(u8"Play Sound Error!\n");
 	}
 	_channel channel = fmod_channel_;
 	setMusicVolume(channel, volume);
@@ -2520,9 +2520,9 @@ int EngineBase::initVideo()
 
 void EngineBase::destroyVideo()
 {
-	GameLog::write("Begin to destroy video\n");
+	GameLog::write(u8"Begin to destroy video\n");
 	clearVideoList();
-	GameLog::write("Destroy video done!\n");
+	GameLog::write(u8"Destroy video done!\n");
 }
 #endif
 
@@ -2685,7 +2685,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 	{
 		char buf[1024];
 		av_strerror(ret, buf, 1024);
-		GameLog::write("video %s open error: %s\n", File::getAssetsName(newFileName).c_str(), buf);
+		GameLog::write(u8"video %s open error: %s\n", File::getAssetsName(newFileName).c_str(), buf);
 	}
 	if (ret == 0)
 	{
@@ -3030,7 +3030,7 @@ void EngineBase::decodeNextVideo(_video video)
 #else
 							if (!SDL_UpdateYUVTexture(tex.get(), nullptr, f->data[0], f->linesize[0], f->data[1], f->linesize[1], f->data[2], f->linesize[2]))
 							{
-								GameLog::write("SDL_UpdateYUVTexture Error(1): %s", SDL_GetError());
+								GameLog::write(u8"SDL_UpdateYUVTexture Error(1): %s", SDL_GetError());
 							}
 #endif
                         }
@@ -3041,12 +3041,12 @@ void EngineBase::decodeNextVideo(_video video)
 								f->data[1] + f->linesize[1] * (AV_CEIL_RSHIFT(f->height, 1) - 1), -f->linesize[1],
 								f->data[2] + f->linesize[2] * (AV_CEIL_RSHIFT(f->height, 1) - 1), -f->linesize[2]))
 							{
-								GameLog::write("SDL_UpdateYUVTexture Error(2): %s", SDL_GetError());
+								GameLog::write(u8"SDL_UpdateYUVTexture Error(2): %s", SDL_GetError());
 							}
 						}
 						else
 						{
-							GameLog::write("Mixed negative and positive line sizes are not supported.");
+							GameLog::write(u8"Mixed negative and positive line sizes are not supported.");
 						}
 //						sws_scale(video->swsContext, (const uint8_t * const*)f->data, f->linesize, 0, video->videoStream.codecCtx->height, (uint8_t * const*)video->sFrame->data, video->sFrame->linesize);
 //						SDL_UpdateYUVTexture(tex, nullptr, video->sFrame->data[0], video->sFrame->linesize[0], video->sFrame->data[1], video->sFrame->linesize[1], video->sFrame->data[2], video->sFrame->linesize[2]);
@@ -3335,7 +3335,7 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 	swr_ctx = swr_alloc();
 	if (!swr_ctx)
 	{
-		GameLog::write("swr_alloc error \n");
+		GameLog::write(u8"swr_alloc error \n");
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
@@ -3393,7 +3393,7 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 	src_nb_samples = frame->nb_samples;
 	if (src_nb_samples <= 0)
 	{
-		GameLog::write("src_nb_samples error \n");
+		GameLog::write(u8"src_nb_samples error \n");
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
@@ -3413,14 +3413,14 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 
 	if ((ret = swr_init(swr_ctx)) < 0)
 	{
-		GameLog::write("Failed to initialize the resampling context\n");
+		GameLog::write(u8"Failed to initialize the resampling context\n");
 		return -1;
 	}
 
 	max_dst_nb_samples = dst_nb_samples = (int)av_rescale_rnd(src_nb_samples, out_sample_rate, codecCtx->sample_rate, AV_ROUND_UP);
 	if (max_dst_nb_samples <= 0)
 	{
-		GameLog::write("av_rescale_rnd error \n");
+		GameLog::write(u8"av_rescale_rnd error \n");
 		return -1;
 	}
 #if (defined USE_FFMPEG4)
@@ -3431,14 +3431,14 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 	ret = av_samples_alloc_array_and_samples(&dst_data, &dst_linesize, dst_nb_channels, dst_nb_samples, (AVSampleFormat)out_sample_format, 0);
 	if (ret < 0)
 	{
-		GameLog::write("av_samples_alloc_array_and_samples error \n");
+		GameLog::write(u8"av_samples_alloc_array_and_samples error \n");
 		return -1;
 	}
 
 	dst_nb_samples = (int)av_rescale_rnd(swr_get_delay(swr_ctx, codecCtx->sample_rate) + src_nb_samples, out_sample_rate, codecCtx->sample_rate, AV_ROUND_UP);
 	if (dst_nb_samples <= 0)
 	{
-		GameLog::write("av_rescale_rnd error \n");
+		GameLog::write(u8"av_rescale_rnd error \n");
 		return -1;
 	}
 	if (dst_nb_samples > max_dst_nb_samples)
@@ -3453,20 +3453,20 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 		ret = swr_convert(swr_ctx, dst_data, dst_nb_samples, (const uint8_t**)frame->data, frame->nb_samples);
 		if (ret < 0)
 		{
-			GameLog::write("swr_convert error \n");
+			GameLog::write(u8"swr_convert error \n");
 			return -1;
 		}
 
 		resampled_data_size = av_samples_get_buffer_size(&dst_linesize, dst_nb_channels, ret, (AVSampleFormat)out_sample_format, 1);
 		if (resampled_data_size < 0)
 		{
-			GameLog::write("av_samples_get_buffer_size error \n");
+			GameLog::write(u8"av_samples_get_buffer_size error \n");
 			return -1;
 		}
 	}
 	else
 	{
-		GameLog::write("swr_ctx null error \n");
+		GameLog::write(u8"swr_ctx null error \n");
 		return -1;
 	}
 
@@ -3539,10 +3539,10 @@ void EngineBase::deleteVideoFromList(int index)
 _video EngineBase::loadVideo(const std::string& fileName)
 {
 #ifdef SHF_USE_VIDEO
-	GameLog::write("Open video %s\n", fileName.c_str());
+	GameLog::write(u8"Open video %s\n", fileName.c_str());
 	if (!File::fileExist(fileName))
 	{
-		GameLog::write("Video:%s not exists\n", fileName.c_str());
+		GameLog::write(u8"Video:%s not exists\n", fileName.c_str());
 		return nullptr;
 	}
 
@@ -3566,7 +3566,7 @@ _video EngineBase::loadVideo(const std::string& fileName)
 	video->videoVolume = 1;
 	if (openVideoFile(video) < 0)
 	{
-		GameLog::write("Open video:%s error\n", fileName.c_str());
+		GameLog::write(u8"Open video:%s error\n", fileName.c_str());
 		return nullptr;
 	}
 

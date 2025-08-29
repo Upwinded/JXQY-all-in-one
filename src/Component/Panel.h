@@ -52,7 +52,7 @@ protected:
 		len = PakFile::readFile(fileName, s);
 		if (s == nullptr || len == 0)
 		{
-			GameLog::write("no ini file: %s\n", fileName.c_str());
+			GameLog::write(u8"no ini file: %s\n", fileName.c_str());
 			return std::shared_ptr<T>(nullptr);
 		}
 		INIReader ini(s);

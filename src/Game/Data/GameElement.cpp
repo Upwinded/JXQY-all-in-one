@@ -15,7 +15,7 @@ GameElement::~GameElement()
 
 _channel GameElement::playSoundFile(const std::string & fileName, float x, float y, float volume)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return nullptr;
 	}

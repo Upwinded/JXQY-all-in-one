@@ -186,7 +186,7 @@ _shared_image Object::getActionShadow(int * offsetx, int * offsety)
 
 void Object::initSound(const std::string & fileName)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return;
 	}

@@ -14,24 +14,24 @@ void Option::init()
 {
 	freeResource();
 
-	initFromIniFileName("ini\\ui\\option\\window.ini");
-	rtnBtn = addComponent<Button>("ini\\ui\\option\\btreturn.ini");
+	initFromIniFileName(u8"ini\\ui\\option\\window.ini");
+	rtnBtn = addComponent<Button>(u8"ini\\ui\\option\\btreturn.ini");
 
-	music = addComponent<Scrollbar>("ini\\ui\\option\\sbmusic.ini");
-	sound = addComponent<Scrollbar>("ini\\ui\\option\\sbsound.ini");
-	speed = addComponent<Scrollbar>("ini\\ui\\option\\sbspeed.ini");
+	music = addComponent<Scrollbar>(u8"ini\\ui\\option\\sbmusic.ini");
+	sound = addComponent<Scrollbar>(u8"ini\\ui\\option\\sbsound.ini");
+	speed = addComponent<Scrollbar>(u8"ini\\ui\\option\\sbspeed.ini");
 
-	musicCB = addComponent<CheckBox>("ini\\ui\\option\\cbmusic.ini");
-	soundCB = addComponent<CheckBox>("ini\\ui\\option\\cbsound.ini");
-	speedCB = addComponent<CheckBox>("ini\\ui\\option\\cbspeed.ini");
+	musicCB = addComponent<CheckBox>(u8"ini\\ui\\option\\cbmusic.ini");
+	soundCB = addComponent<CheckBox>(u8"ini\\ui\\option\\cbsound.ini");
+	speedCB = addComponent<CheckBox>(u8"ini\\ui\\option\\cbspeed.ini");
 
-	playerAlpha = addComponent<CheckBox>("ini\\ui\\option\\cbplayer.ini");
-	shadow = addComponent<CheckBox>("ini\\ui\\option\\cbshadow.ini");
-	dyLoad = addComponent<CheckBox>("ini\\ui\\option\\cbdyload.ini");
+	playerAlpha = addComponent<CheckBox>(u8"ini\\ui\\option\\cbplayer.ini");
+	shadow = addComponent<CheckBox>(u8"ini\\ui\\option\\cbshadow.ini");
+	dyLoad = addComponent<CheckBox>(u8"ini\\ui\\option\\cbdyload.ini");
 
-	playerBg = addComponent<ImageContainer>("ini\\ui\\option\\lbplayer.ini");
-	shadowBg = addComponent<ImageContainer>("ini\\ui\\option\\lbshadow.ini");
-	dyLoadBg = addComponent<ImageContainer>("ini\\ui\\option\\lbdyload.ini");
+	playerBg = addComponent<ImageContainer>(u8"ini\\ui\\option\\lbplayer.ini");
+	shadowBg = addComponent<ImageContainer>(u8"ini\\ui\\option\\lbshadow.ini");
+	dyLoadBg = addComponent<ImageContainer>(u8"ini\\ui\\option\\lbdyload.ini");
 
 
 	setChildRectReferToParent();

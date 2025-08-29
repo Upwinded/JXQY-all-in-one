@@ -45,7 +45,7 @@ std::string Traps::get(const std::string & mapName, int index)
 	{
 		return u8"";
 	}
-	std::string name = convert::formatString("%d", index);
+	std::string name = convert::formatString(u8"%d", index);
 	return ini->Get(mapName, name, u8"");
 }
 
@@ -57,6 +57,6 @@ void Traps::set(const std::string & mapName, int index, const std::string & valu
 		fileName = SAVE_CURRENT_FOLDER + fileName;
 		ini = std::make_shared<INIReader>(fileName);
 	}
-	std::string name = convert::formatString("%d", index);
+	std::string name = convert::formatString(u8"%d", index);
 	ini->Set(mapName, name, value);
 }

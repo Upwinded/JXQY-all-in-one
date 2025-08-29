@@ -33,14 +33,14 @@ void GoodsManager::load(int index)
     fName += GOODS_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += GOODS_INI_EXT;
 	INIReader ini(fName);
 
 	for (size_t i = 0; i < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; i++)
 	{
-		std::string section = convert::formatString("%d", i + 1);
+		std::string section = convert::formatString(u8"%d", i + 1);
 		goodsList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
 		goodsList[i].number = ini.GetInteger(section, u8"Number", 0);
 		if (goodsList[i].iniFile.empty())
@@ -74,7 +74,7 @@ void GoodsManager::save(int index)
 		if (goodsList[i].iniFile != u8"" && goodsList[i].number > 0)
 		{
 			count++;
-			section = convert::formatString("%d", i + 1);
+			section = convert::formatString(u8"%d", i + 1);
 			ini.Set(section, u8"IniFile", goodsList[i].iniFile);
 			ini.SetInteger(section, u8"Number", goodsList[i].number);
 		}
@@ -84,7 +84,7 @@ void GoodsManager::save(int index)
     std::string fName = GOODS_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += GOODS_INI_EXT;
 	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
@@ -218,7 +218,7 @@ bool GoodsManager::addItem(const std::string & itemName, int num)
 
 void GoodsManager::deleteItem(const std::string & itemName)
 {
-	if (itemName == u8"")
+	if (itemName.empty())
 	{
 		return;
 	}

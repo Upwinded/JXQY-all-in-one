@@ -60,7 +60,7 @@ bool Map::load(const std::string& fileName)
 {
 	freeMpc();
 	freeData();
-	GameLog::write("load map file %s\n", fileName.c_str());
+	GameLog::write(u8"load map file %s\n", fileName.c_str());
 	std::unique_ptr<char[]> s;
 	int len = PakFile::readFile(fileName, s);
 	if (s != nullptr && len > 0)
@@ -68,7 +68,7 @@ bool Map::load(const std::string& fileName)
 		bool ret = load(s, len);
 		return ret;
 	}
-	GameLog::write("map file %s doesn't exist!\n", fileName.c_str());
+	GameLog::write(u8"map file %s doesn't exist!\n", fileName.c_str());
 	return false;
 }
 
@@ -301,7 +301,7 @@ void Map::loadMapMpc()
 		for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 		{
 			std::string mpcName = data->head.path;
-			if (mpcName == u8"")
+			if (mpcName.empty())
 			{
 				mpcName = u8"mpc\\map\\" + gm->mapFolderName + u8"\\";
 			}
@@ -963,7 +963,7 @@ std::string Map::getTrapName(Point pos)
 bool Map::haveTraps(Point pos)
 {
 	if (!data) { return false; }
-	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap) == u8"")
+	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap).empty())
 	{
 		return false;
 	}

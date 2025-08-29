@@ -14,7 +14,7 @@ Goods::~Goods()
 
 _shared_imp Goods::createGoodsImage()
 {
-	if (image == u8"")
+	if (image.empty())
 	{
 		return nullptr;
 	}
@@ -24,7 +24,7 @@ _shared_imp Goods::createGoodsImage()
 
 _shared_imp Goods::createGoodsIcon()
 {
-	if (icon == u8"")
+	if (icon.empty())
 	{
 		return nullptr;
 	}

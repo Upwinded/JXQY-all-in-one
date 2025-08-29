@@ -31,8 +31,8 @@ private:
 	static uint32_t IMPImageCount;
 public:
 #ifdef DEBUG
-	IMPImage() { GameLog::write("IMPImageCount Inc:%d", ++IMPImageCount); }
-	~IMPImage() { GameLog::write("IMPImageCount Dec:%d", --IMPImageCount); }
+	IMPImage() { GameLog::write(u8"IMPImageCount Inc:%d", ++IMPImageCount); }
+	~IMPImage() { GameLog::write(u8"IMPImageCount Dec:%d", --IMPImageCount); }
 #endif // DEBUG
 
 	char head[imgHeadLen];

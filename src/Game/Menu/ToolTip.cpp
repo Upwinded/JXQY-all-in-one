@@ -26,7 +26,7 @@ void ToolTip::setGoods(std::shared_ptr<Goods> goods)
 	image->impImage = IMP::createIMPImage(imageName);
 	name->setStr(goods->name);
 	std::string costStr = u8"Price:";
-	costStr += convert::formatString("%d", goods->cost);
+	costStr += convert::formatString(u8"%d", goods->cost);
 	cost->setStr(costStr);
 	intro1->setStr(goods->effect);
 	std::string introStr = u8" <enter>" + goods->intro;
@@ -46,9 +46,9 @@ void ToolTip::setMagic(std::shared_ptr<Magic> magic, int level)
 	image->impImage = IMP::createIMPImage(imageName);
 	name->setStr(magic->name);
 	std::string costStr = u8"Level:";
-	costStr += convert::formatString("%d", level);
+	costStr += convert::formatString(u8"%d", level);
 	cost->setStr(costStr);
-	intro1->setStr("");
+	intro1->setStr(u8"");
 	std::string introStr = magic->intro;
 	intro2->setStr(introStr);
 }
@@ -56,15 +56,15 @@ void ToolTip::setMagic(std::shared_ptr<Magic> magic, int level)
 void ToolTip::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\tooltip\\window.ini");
-	image = addComponent<ImageContainer>("ini\\ui\\tooltip\\image.ini");
+	initFromIniFileName(u8"ini\\ui\\tooltip\\window.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\tooltip\\image.ini");
 	image->stretch = true;
-	intro1 = addComponent<Label>("ini\\ui\\tooltip\\intro1.ini");
-	intro2 = addComponent<Label>("ini\\ui\\tooltip\\intro2.ini");
+	intro1 = addComponent<Label>(u8"ini\\ui\\tooltip\\intro1.ini");
+	intro2 = addComponent<Label>(u8"ini\\ui\\tooltip\\intro2.ini");
 	intro2->rect.y = intro1->rect.y;
 	intro2->autoNextLine = true;
-	name = addComponent<Label>("ini\\ui\\tooltip\\name.ini");
-	cost = addComponent<Label>("ini\\ui\\tooltip\\cost.ini");
+	name = addComponent<Label>(u8"ini\\ui\\tooltip\\name.ini");
+	cost = addComponent<Label>(u8"ini\\ui\\tooltip\\cost.ini");
 	setChildRectReferToParent();
 }
 

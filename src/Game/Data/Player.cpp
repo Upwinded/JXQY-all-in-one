@@ -33,7 +33,7 @@ void Player::calInfo()
 	info.manaMax = manaMax;
 	for (size_t i = 0; i < GOODS_BODY_COUNT; i++)
 	{
-		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile == u8"" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number <= 0)
+		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].iniFile.empty() || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + i].number <= 0)
 		{
 			continue;
 		}
@@ -1585,11 +1585,11 @@ void Player::partnerAvoidBlockingPlayer(Point dest)
 	{
 		if (partner->isStanding())
 		{
-			/*if (partner->canDoAction(acRun))
+			if (partner->canDoAction(acRun))
 			{
 				partner->beginRun(dest);
 			}
-			else*/
+			else
 			{
 				partner->beginWalk(dest);
 			}
@@ -1639,7 +1639,7 @@ void Player::loadLevel(const std::string& fileName)
 		
 		for (size_t i = 0; i < levelList.level.size(); i++)
 		{
-			std::string section = convert::formatString("Level%d", i + 1);
+			std::string section = convert::formatString(u8"Level%d", i + 1);
 			levelList.level[i].levelUpExp = ini.GetInteger(section, u8"LevelUpExp", 0);
 			levelList.level[i].lifeMax = ini.GetInteger(section, u8"LifeMax", 0);
 			levelList.level[i].thewMax = ini.GetInteger(section, u8"ThewMax", 0);
@@ -1810,7 +1810,7 @@ void Player::load(int index)
     fName += PLAYER_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += PLAYER_INI_EXT;
 
@@ -1865,7 +1865,7 @@ void Player::save(int index)
 	std::string fName = PLAYER_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += PLAYER_INI_EXT;
 	ini.saveToFile(SaveFileManager::CurrentPath() + fName);

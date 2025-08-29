@@ -38,12 +38,12 @@ Element::~Element()
 
 void Element::ShowMemList()
 {
-	GameLog::write("当前对象列表：");
+	GameLog::write(u8"当前对象列表：");
 	for (auto iter = memList.begin(); iter != memList.end(); iter++)
 	{
-		GameLog::write("[%s] : [%s]", typeid(**iter).name(), (*iter)->name.c_str());
+		GameLog::write(u8"[%s] : [%s]", typeid(**iter).name(), (*iter)->name.c_str());
 	}
-	GameLog::write("当前对象总计：%d", memList.size());
+	GameLog::write(u8"当前对象总计：%d", memList.size());
 }
 
 void Element::addChild(PElement child)

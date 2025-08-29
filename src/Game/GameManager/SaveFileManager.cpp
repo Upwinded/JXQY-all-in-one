@@ -22,7 +22,7 @@ std::vector<std::string> SaveFileManager::readFileList(int index)
 	std::vector<std::string> fileList;
 	for (int i = 0; i < count; i++)
 	{
-		fileList.push_back(ini.Get(SAVE_LIST_SECTION, convert::formatString("%d", i), u8""));
+		fileList.push_back(ini.Get(SAVE_LIST_SECTION, convert::formatString(u8"%d", i), u8""));
 	}
 	return fileList;
 }
@@ -77,7 +77,7 @@ void SaveFileManager::AppendFile(const std::string & fileName)
 		auto count = ini.GetInteger(SAVE_LIST_SECTION, SAVE_LIST_COUNT_KEY, 0);
 		count++;
 		ini.SetInteger(SAVE_LIST_SECTION, SAVE_LIST_COUNT_KEY, count);
-		ini.Set(SAVE_LIST_SECTION, convert::formatString("%d", count - 1), fileName);
+		ini.Set(SAVE_LIST_SECTION, convert::formatString(u8"%d", count - 1), fileName);
 		ini.saveToFile(iniName);
 	}
 }

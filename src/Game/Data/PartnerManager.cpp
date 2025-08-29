@@ -49,10 +49,7 @@ void PartnerManager::setPartnersIsBlockingPlayer(bool value)
 	auto tempList = findPartnersFromNPCManager();
 	for (auto& partner: tempList)
 	{
-		if (partner->isStanding() || value)
-		{
-			partner->isPartnerBlockingPlayer = value;
-		}
+		partner->isPartnerBlockingPlayer = value;
 	}
 }
 
@@ -63,7 +60,7 @@ void PartnerManager::load(int index)
     fName += PARTNER_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += PARTNER_INI_EXT;
 	INIReader ini(fName);
@@ -79,7 +76,7 @@ void PartnerManager::load(int index)
 		for (size_t i = 0; i < tempPartnerList.size(); i++)
 		{
 			tempPartnerList[i] = std::make_shared<NPC>();
-			section = convert::formatString("Partner%03d", i);
+			section = convert::formatString(u8"Partner%03d", i);
 			tempPartnerList[i]->initFromIni(&ini, section);
 			gm->npcManager->addNPC(tempPartnerList[i]);
 		}
@@ -93,7 +90,7 @@ void PartnerManager::save(int index)
 	std::string fName = PARTNER_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += PARTNER_INI_EXT;
 	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
@@ -109,7 +106,7 @@ void PartnerManager::save(int index)
 	ini.SetInteger(section, u8"Count", tempPartnerList.size());
 	for (size_t i = 0; i < tempPartnerList.size(); i++)
 	{
-		section = convert::formatString("Partner%03d", i);
+		section = convert::formatString(u8"Partner%03d", i);
 		tempPartnerList[i]->saveToIni(&ini, section);
 	}
 	tempPartnerList.resize(0);

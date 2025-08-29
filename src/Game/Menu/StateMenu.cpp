@@ -14,15 +14,15 @@ StateMenu::~StateMenu()
 
 void StateMenu::updateLabel()
 {
-	labLevel->setStr(convert::formatString("%d", gm->player->level));
-	labExp->setStr(convert::formatString("%d", gm->player->exp));
-	labExpUp->setStr(convert::formatString("%d", gm->player->levelUpExp));
-	labAttack->setStr(convert::formatString("%d", gm->player->info.attack));
-	labDefend->setStr(convert::formatString("%d", gm->player->info.defend));
-	labEvade->setStr(convert::formatString("%d", gm->player->info.evade));
-	labLife->setStr(convert::formatString("%d/%d", gm->player->life, gm->player->info.lifeMax));
-	labThew->setStr(convert::formatString("%d/%d", gm->player->thew, gm->player->info.thewMax));
-	labMana->setStr(convert::formatString("%d/%d", gm->player->mana, gm->player->info.manaMax));
+	labLevel->setStr(convert::formatString(u8"%d", gm->player->level));
+	labExp->setStr(convert::formatString(u8"%d", gm->player->exp));
+	labExpUp->setStr(convert::formatString(u8"%d", gm->player->levelUpExp));
+	labAttack->setStr(convert::formatString(u8"%d", gm->player->info.attack));
+	labDefend->setStr(convert::formatString(u8"%d", gm->player->info.defend));
+	labEvade->setStr(convert::formatString(u8"%d", gm->player->info.evade));
+	labLife->setStr(convert::formatString(u8"%d/%d", gm->player->life, gm->player->info.lifeMax));
+	labThew->setStr(convert::formatString(u8"%d/%d", gm->player->thew, gm->player->info.thewMax));
+	labMana->setStr(convert::formatString(u8"%d/%d", gm->player->mana, gm->player->info.manaMax));
 }
 
 

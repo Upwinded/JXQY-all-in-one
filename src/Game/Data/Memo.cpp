@@ -21,11 +21,11 @@ void Memo::load()
 	if (File::readFile(fileName, s, len) && s != nullptr && len > 0)
 	{
 		INIReader ini(s);
-		int count = ini.GetInteger("Memo", u8"Count", 0);
+		int count = ini.GetInteger(u8"Memo", u8"Count", 0);
 		memo.resize(count);
 		for (size_t i = 0; i < memo.size(); i++)
 		{
-			memo[i] = ini.Get("Memo", convert::formatString("%d", i), u8"");
+			memo[i] = ini.Get(u8"Memo", convert::formatString(u8"%d", i), u8"");
 		}
 	}
 	//gm->memoMenu->reRange((int)memo.size() > 0 ? (int)memo.size() - 1 : 0);
@@ -35,10 +35,10 @@ void Memo::save()
 {
 	std::string m = u8"[Memo]\r\n";
 	int count = memo.size();
-	m += convert::formatString("Count=%d\r\n", count);
+	m += convert::formatString(u8"Count=%d\r\n", count);
 	for (size_t i = 0; i < memo.size(); i++)
 	{
-		m += convert::formatString("%d=%s\r\n", i, memo[i].c_str());
+		m += convert::formatString(u8"%d=%s\r\n", i, memo[i].c_str());
 	}
 	std::string fileName = MEMO_INI;
 	fileName = SAVE_CURRENT_FOLDER + fileName;
@@ -47,7 +47,7 @@ void Memo::save()
 
 void Memo::add(const std::string & str)
 {
-	if (str == u8"")
+	if (str.empty())
 	{
 		return;
 	}

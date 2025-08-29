@@ -825,7 +825,7 @@ void NPCManager::load(const std::string & fileName)
 	int count = ini.GetInteger(section, u8"Count", 0);
 	for (int i = 0; i < count; i++)
 	{
-		section = convert::formatString("NPC%03d", i);
+		section = convert::formatString(u8"NPC%03d", i);
 		auto npc = std::make_shared<NPC>();
 		npc->initFromIni(&ini, section);
 		addChild(npc);
@@ -842,7 +842,7 @@ void NPCManager::load(const std::string & fileName)
 
 void NPCManager::save(const std::string & fileName)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return;
 	}
@@ -857,7 +857,7 @@ void NPCManager::save(const std::string & fileName)
 	{
 		if (npcList[i] != nullptr && npcList[i]->kind != nkPartner && npcList[i]->kind != nkPlayer)
 		{
-			section = convert::formatString("NPC%03d", npcCount++);
+			section = convert::formatString(u8"NPC%03d", npcCount++);
 			npcList[i]->saveToIni(&ini, section);
 		}
 		

@@ -322,12 +322,12 @@ int Engine::getFPS()
 void Engine::drawFPS()
 {
 #if  defined(_WIN32)
-#define _DRAW_FPS
+//#define _DRAW_FPS
 #endif // _CONSOLE_MODE
 
 #ifdef _DRAW_FPS
-	//std::string s = convert::formatString("%dfps,%0.3fs,%d,%d", getFPS(),((float)getAbsoluteTime())/ 1000, x, y);
-	std::string s = convert::formatString("FPS:%d", getFPS());
+	//std::string s = convert::formatString(u8"%dfps,%0.3fs,%d,%d", getFPS(),((float)getAbsoluteTime())/ 1000, x, y);
+	std::string s = convert::formatString(u8"FPS:%d", getFPS());
 	drawText(s, 0, 0, 25, 0xD0FFFFFF);
 #endif // _DRAW_FPS
 }
@@ -651,12 +651,12 @@ _music Engine::createMusic(const std::string & fileName, bool loop, bool music3d
 	int size;
 	if (!File::readFile(fileName, data, size))
 	{
-		GameLog::write("Music File %s Readed Error\n", fileName.c_str());
+		GameLog::write(u8"Music File %s Readed Error\n", fileName.c_str());
 		return nullptr;
 	}
 	if (data == nullptr || size <= 0)
 	{
-		GameLog::write("Music File %s Readed Error\n", fileName.c_str());
+		GameLog::write(u8"Music File %s Readed Error\n", fileName.c_str());
 		return nullptr;
 	}
 	_music result = createMusic(data, size, loop, music3d, priority);

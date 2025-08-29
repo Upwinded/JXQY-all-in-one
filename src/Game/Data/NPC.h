@@ -76,7 +76,7 @@ enum ActionCount
 	acARun = 22,			//持剑跑步动作
 	acAJump = 23,			//持剑跳跃动作
 	acSpecialAttack = 24,	//武功指定的攻击动作
-	acHide = 0xFF,
+	acHide = 0xFF,			//死亡后隐藏状态
 };
 
 enum SitState
@@ -255,22 +255,31 @@ public:
 	virtual void beginRun(Point dest);
 
 	// 开始朝着目标方向走步（不寻路）（走路动作时间重置）
-	virtual void beginRadiusStep(Point dest, int radius);
+	virtual void beginRadiusStep(Point dest, int radius, bool findNearDir = true);
 	
 	// 改变目标,朝着目标方向走步（不寻路）（走路动作时间不重置）
-	virtual void changeRadiusStep(Point dest, int radius);
+	virtual void changeRadiusStep(Point dest, int radius, bool findNearDir = true);
+
+	// 开始朝着目标寻找路径移动（走路动作时间重置）
+	virtual void beginRadiusMove(Point dest, int radius, bool isRun = false);
 
 	// 开始朝着目标寻找路径移动（走路动作时间重置）
 	virtual void beginRadiusWalk(Point dest, int radius);
 
-	// 改变目标并朝着目标寻找路径移动（走路动作时间不重置）
-	virtual void changeRadiusWalk(Point dest, int radius);
+	// 开始朝着目标寻找路径移动（走路动作时间重置）
+	virtual void beginRadiusRun(Point dest, int radius);
 
+	// 改变目标并朝着目标寻找路径移动（走路动作时间不重置）
+	virtual void changeRadiusMove(Point dest, int radius, bool isRun = false, bool dontStandWhenFailed = false);
+
+	UTime lastTimeTryingToFollow = 0;
 	bool isFollower();
 	bool isFollowAttack(std::shared_ptr<NPC> npc);
 	virtual void beginFollowWalk(Point dest);
+	virtual void beginFollowRun(Point dest);
 	virtual void beginFollowAttack(Point dest);
 	virtual void changeFollowWalk(Point dest);
+	virtual void changeFollowRun(Point dest);
 	virtual void changeFollowAttack(Point dest);
 
 	virtual void hurt(std::shared_ptr<Effect> e);

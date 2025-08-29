@@ -17,7 +17,7 @@ SkillsPanel::~SkillsPanel()
 void SkillsPanel::initFromIni(INIReader& ini)
 {
 	Panel::initFromIni(ini);
-	indicateImp = loadRes(ini.Get("init", u8"indicate", u8""));
+	indicateImp = loadRes(ini.Get(u8"init", u8"indicate", u8""));
 }
 
 void SkillsPanel::onChildCallBack(PElement child)
@@ -136,20 +136,20 @@ void SkillsPanel::onUpdate()
 void SkillsPanel::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\mobile\\skills\\window.ini");
-	attackBtn = addComponent<RoundButton>("ini\\ui\\mobile\\skills\\attack.ini");
-	sitBtn = addComponent<RoundButton>("ini\\ui\\mobile\\skills\\sit.ini");
+	initFromIniFileName(u8"ini\\ui\\mobile\\skills\\window.ini");
+	attackBtn = addComponent<RoundButton>(u8"ini\\ui\\mobile\\skills\\attack.ini");
+	sitBtn = addComponent<RoundButton>(u8"ini\\ui\\mobile\\skills\\sit.ini");
 	for (size_t i = 0; i < SKILL_PANEL_SKILL_COUNT; i++)
 	{
-		skillBtn[i] = addComponent<DragRoundButton>(convert::formatString("ini\\ui\\mobile\\skills\\skill%d.ini", i + 1));
+		skillBtn[i] = addComponent<DragRoundButton>(convert::formatString(u8"ini\\ui\\mobile\\skills\\skill%d.ini", i + 1));
 	}
 
 	for (int i = 0; i < FASTBTN_COUNT; ++i) {
-		fastBtn[i] = addComponent<TextButton>(convert::formatString("ini\\ui\\mobile\\skills\\fastbtn%d.ini", i + 1));
+		fastBtn[i] = addComponent<TextButton>(convert::formatString(u8"ini\\ui\\mobile\\skills\\fastbtn%d.ini", i + 1));
 		fastBtn[i]->visible = false;
 	}
-	rightJumpBtn = addComponent<DragRoundButton>("ini\\ui\\mobile\\skills\\rightjump.ini");
-	rightJumpBtn->setIndicateImage("mpc\\character\\jump.mpc");
+	rightJumpBtn = addComponent<DragRoundButton>(u8"ini\\ui\\mobile\\skills\\rightjump.ini");
+	rightJumpBtn->setIndicateImage(u8"mpc\\character\\jump.mpc");
 	setChildRectReferToParent();
 }
 

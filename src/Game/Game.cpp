@@ -12,8 +12,8 @@ Game::~Game()
 
 int Game::run()
 {	
-	GameLog::write("Game Run!\n");
-	GameLog::write("Init Game Engine\n");
+	GameLog::write(u8"Game Run!\n");
+	GameLog::write(u8"Init Game Engine\n");
 	int w = DEFAULT_WINDOW_WIDTH, h = DEFAULT_WINDOW_HEIGHT;
 #ifdef __MOBILE__
 	w = 1000;
@@ -29,7 +29,7 @@ int Game::run()
 	{
 		return -1;
 	}
-	GameLog::write("Init Game Font\n");
+	GameLog::write(u8"Init Game Font\n");
 
 	//设置字体
 	std::unique_ptr<char[]> s;
@@ -38,17 +38,17 @@ int Game::run()
 	{
 		Engine::getInstance()->setFontFromMem(s, len);
 	}
-	GameLog::write("Init Cursor\n");
+	GameLog::write(u8"Init Cursor\n");
 	//设置鼠标样式
-	auto cursorImage = IMP::createIMPImage("mpc\\ui\\common\\mouse.mpc", false);
+	auto cursorImage = IMP::createIMPImage(u8"mpc\\ui\\common\\mouse.mpc", false);
 	Engine::getInstance()->setMouseFromImpImage(cursorImage);
 
-	GameLog::write("Begin Game Title\n");
+	GameLog::write(u8"Begin Game Title\n");
 	PElement title = std::make_shared<Title>();
 	int ret = title->run();
 
-	//GameLog::write("Release Engine!\n");
+	//GameLog::write(u8"Release Engine!\n");
 	//Engine::getInstance()->destroyEngine();
-	GameLog::write("Game End!\n");
+	GameLog::write(u8"Game End!\n");
 	return ret;
 }

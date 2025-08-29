@@ -41,7 +41,7 @@ void GameLog::write(const char* format, ...)
     {
         info += u8"\n";
     }
-    SDL_Log("%s", info.c_str());
+    SDL_Log(u8"%s", info.c_str());
 
 //#ifdef __ANDROID__
 //    __android_log_print(ANDROID_LOG_INFO, u8"native-log",  u8"%s", info.c_str());

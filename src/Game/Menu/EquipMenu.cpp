@@ -33,9 +33,9 @@ void EquipMenu::updateGoods(int index)
 		return;
 	}
 	item[index]->impImage = nullptr;	
-	if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile == u8"" || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number <= 0)
+	if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile.empty() || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods == nullptr || gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number <= 0)
 	{
-		item[index]->setStr("");
+		item[index]->setStr(u8"");
 		gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].iniFile = u8"";
 		if (gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods != nullptr)
 		{
@@ -46,7 +46,7 @@ void EquipMenu::updateGoods(int index)
 	else
 	{	
 		item[index]->impImage = gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].goods->createGoodsIcon();
-		item[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number));
+		item[index]->setStr(convert::formatString(u8"%d", gm->goodsManager.goodsList[GOODS_COUNT + GOODS_TOOLBAR_COUNT + index].number));
 	}
 	gm->player->calInfo();
 	gm->menu->stateMenu->updateLabel();
@@ -112,7 +112,7 @@ void EquipMenu::onEvent()
 		{
 			for (int j = 0; j < GOODS_COUNT; ++j)
 			{
-				if (gm->goodsManager.goodsList[j].iniFile == u8"")
+				if (gm->goodsManager.goodsList[j].iniFile.empty())
 				{
 					gm->goodsManager.exchange(j, item[i]->dragIndex);
 					updateGoods(i);
@@ -167,12 +167,12 @@ void EquipMenu::onEvent()
 void EquipMenu::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\equip\\window.ini");
-	title = addComponent<ImageContainer>("ini\\ui\\equip\\title.ini");
-	image = addComponent<ImageContainer>("ini\\ui\\equip\\image.ini");
+	initFromIniFileName(u8"ini\\ui\\equip\\window.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\equip\\title.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\equip\\image.ini");
 	for (size_t i = 0; i < GOODS_BODY_COUNT; i++)
 	{
-		std::string iniName = convert::formatString("ini\\ui\\equip\\item%d.ini", i + 1);
+		std::string iniName = convert::formatString(u8"ini\\ui\\equip\\item%d.ini", i + 1);
 		item[i] = addComponent<Item>(iniName);
 		item[i]->dragType = dtGoods;
 		item[i]->dragIndex = GOODS_TOOLBAR_COUNT + GOODS_COUNT + i;

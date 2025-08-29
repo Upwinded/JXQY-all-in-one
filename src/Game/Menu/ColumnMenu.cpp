@@ -38,11 +38,11 @@ void ColumnMenu::onUpdate()
 void ColumnMenu::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\column\\window.ini");
-	columnLife = addComponent<ColumnImage>("ini\\ui\\column\\collife.ini");
-	columnThew = addComponent<ColumnImage>("ini\\ui\\column\\colthew.ini");
-	columnMana = addComponent<ColumnImage>("ini\\ui\\column\\colmana.ini");
-	image = addComponent<TransImage>("ini\\ui\\column\\column.ini");
+	initFromIniFileName(u8"ini\\ui\\column\\window.ini");
+	columnLife = addComponent<ColumnImage>(u8"ini\\ui\\column\\collife.ini");
+	columnThew = addComponent<ColumnImage>(u8"ini\\ui\\column\\colthew.ini");
+	columnMana = addComponent<ColumnImage>(u8"ini\\ui\\column\\colmana.ini");
+	image = addComponent<TransImage>(u8"ini\\ui\\column\\column.ini");
 	setChildRectReferToParent();
 }
 

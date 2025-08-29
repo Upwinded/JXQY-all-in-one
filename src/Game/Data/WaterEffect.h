@@ -21,8 +21,8 @@ struct WaterRippleParams
 struct WaterClickRippleParams
 {
 	WaterRippleParams rippleParams;
-	float startTime = 0.0f;
-	float lifeTime = 0.0f;
+	UTime startTime = 0;
+	UTime lifeTime = 5000;
 };
 
 struct WaterWaveParams
@@ -43,10 +43,9 @@ struct WaterWaveCalculatedParams
 
 struct WaterLightParams
 {
-	float minDistance = 0.0f;
 	float defaultAlpha = 1.0f;
 	float minAlpha = 0.0f;
-	float decay = 100.0f;
+	float decay = 1000.0f;
 	float angle = 0.0f;
 };
 
@@ -90,8 +89,8 @@ private:
 	std::vector<Vertex> _verticesLast;
 	std::vector<int> _indices;
 
-	float LastUpdateTime = 0.0f;
+	UTime _lastUpdateTime = 0;
 
-	void _update(float time);
+	void _update(UTime time);
 };
 

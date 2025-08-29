@@ -1354,7 +1354,7 @@ void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 {
 	if (!canDoAction(acAttack))
 	{
-		GameLog::write("can not do action attack\n");
+		GameLog::write(u8"can not do action attack\n");
 		return;
 	}
 	attackTarget = target;
@@ -1493,78 +1493,130 @@ void NPC::beginRun(Point dest)
 	}
 }
 
-void NPC::beginRadiusStep(Point dest, int radius)
+void NPC::beginRadiusStep(Point dest, int radius, bool findNearDir)
 {
 	if (!canDoAction(acWalk))
 	{
 		return;
 	}
-	int stepCount = gm->map->calDistance(position, dest) - radius;
-	stepCount = stepCount > NPC_STEP_MAX_COUNT ? NPC_STEP_MAX_COUNT : stepCount;
-	auto tempList = gm->map->getStepPath(position, dest, stepCount);
-	if (tempList.size() > 0)
+	if (findNearDir)
 	{
-		stepList = tempList;
-		direction = calDirection(stepList[0]);
-		stepState = ssOut;
-		nowAction = acWalk;
-		calStepLastTime();
-		stepBeginTime = getUpdateTime();
-		actionBeginTime = getUpdateTime();
-		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
-		if (fight > 0 && canDoAction(acAWalk))
+		int stepCount = gm->map->calDistance(position, dest) - radius;
+		stepCount = stepCount > NPC_STEP_MAX_COUNT ? NPC_STEP_MAX_COUNT : stepCount;
+		auto tempList = gm->map->getStepPath(position, dest, stepCount);
+		if (tempList.size() > 0)
 		{
-			nowAction = acAWalk;
-			actionLastTime = getActionTime(acAWalk);
-			playSound(acAWalk);
+			stepList = tempList;
+			direction = calDirection(stepList[0]);
+			stepState = ssOut;
+			nowAction = acWalk;
+			calStepLastTime();
+			stepBeginTime = getUpdateTime();
+			actionBeginTime = getUpdateTime();
+			gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
+			if (fight > 0 && canDoAction(acAWalk))
+			{
+				nowAction = acAWalk;
+				actionLastTime = getActionTime(acAWalk);
+				playSound(acAWalk);
+			}
+			else
+			{
+				fight = 0;
+				nowAction = acWalk;
+				actionLastTime = getActionTime(acWalk);
+				playSound(acWalk);
+			}
+		}
+	}
+	else
+	{
+		direction = calDirection(dest);
+		if (gm->map->canWalkDirectlyTo(position, direction))
+		{
+			beginWalk(gm->map->getSubPoint(position, direction));
 		}
 		else
 		{
-			fight = 0;
-			nowAction = acWalk;
-			actionLastTime = getActionTime(acWalk);
-			playSound(acWalk);
+			beginStand();
 		}
 	}
+	
 }
 
-void NPC::changeRadiusStep(Point dest, int radius)
+void NPC::changeRadiusStep(Point dest, int radius, bool findNearDir)
 {
 	if (!canDoAction(acWalk))
 	{
 		return;
 	}
-
-	auto tempList = gm->map->getStepPath(position, dest, radius);
-	if (tempList.size() > 0)
+	if (findNearDir)
 	{
-		stepList = tempList;
-		direction = calDirection(stepList[0]);
-		stepState = ssOut;
-		stepBeginTime += stepLastTime;
-		nowAction = acWalk;
-		calStepLastTime();
-		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
-		if (fight > 0 && canDoAction(acAWalk))
+		auto tempList = gm->map->getStepPath(position, dest, radius);
+		if (tempList.size() > 0)
 		{
-			nowAction = acAWalk;
-			actionLastTime = getActionTime(acAWalk);
-			playSound(acAWalk);
+			stepList = tempList;
+			direction = calDirection(stepList[0]);
+			stepState = ssOut;
+			stepBeginTime += stepLastTime;
+			nowAction = acWalk;
+			calStepLastTime();
+			gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
+			if (fight > 0 && canDoAction(acAWalk))
+			{
+				nowAction = acAWalk;
+				actionLastTime = getActionTime(acAWalk);
+				playSound(acAWalk);
+			}
+			else
+			{
+				fight = 0;
+				nowAction = acWalk;
+				actionLastTime = getActionTime(acWalk);
+				playSound(acWalk);
+			}
+			calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
+		}
+	}
+	else
+	{
+		direction = calDirection(dest);
+		if (gm->map->canWalkDirectlyTo(position, direction))
+		{
+			stepList.clear();
+			stepList.push_back(gm->map->getSubPoint(position, direction));
+			stepState = ssOut;
+			stepBeginTime += stepLastTime;
+			nowAction = acWalk;
+			calStepLastTime();
+			gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
+			if (fight > 0 && canDoAction(acAWalk))
+			{
+				nowAction = acAWalk;
+				actionLastTime = getActionTime(acAWalk);
+				playSound(acAWalk);
+			}
+			else
+			{
+				fight = 0;
+				nowAction = acWalk;
+				actionLastTime = getActionTime(acWalk);
+				playSound(acWalk);
+			}
+			calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
 		}
 		else
 		{
-			fight = 0;
-			nowAction = acWalk;
-			actionLastTime = getActionTime(acWalk);
-			playSound(acWalk);
+			beginStand();
 		}
-		calOffset(getUpdateTime() - stepBeginTime, stepLastTime);
 	}
+	
 }
 
-void NPC::beginRadiusWalk(Point dest, int radius)
+void NPC::beginRadiusMove(Point dest, int radius, bool isRun)
 {
-	if (!canDoAction(acWalk))
+	auto action = isRun ? acRun : acWalk;
+	if (!canDoAction(action))
 	{
 		return;
 	}
@@ -1575,48 +1627,80 @@ void NPC::beginRadiusWalk(Point dest, int radius)
 		stepList = tempList;
 		direction = calDirection(stepList[0]);
 		stepState = ssOut;
-		nowAction = acWalk;
+		nowAction = action;
 		calStepLastTime();
 		stepBeginTime = getUpdateTime();
 		actionBeginTime = getUpdateTime();
 		gm->map->addStepToDataMap(stepList[0], std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
-		if (fight > 0 && canDoAction(acAWalk))
+		if (fight > 0 && canDoAction(action))
 		{
-			nowAction = acAWalk;
-			actionLastTime = getActionTime(acAWalk);
-			playSound(acAWalk);
+			nowAction = action;
+			actionLastTime = getActionTime(action);
+			playSound(action);
 		}
 		else
 		{
 			fight = 0;
-			nowAction = acWalk;
-			actionLastTime = getActionTime(acWalk);
-			playSound(acWalk);
+			nowAction = action;
+			actionLastTime = getActionTime(action);
+			playSound(action);
 		}
 	}
 }
 
-void NPC::changeRadiusWalk(Point dest, int radius)
+void NPC::beginRadiusWalk(Point dest, int radius)
 {
-	if (isWalking())
-	{
-		if (!canDoAction(acWalk))
+	beginRadiusMove(dest, radius, false);
+}
+
+void NPC::beginRadiusRun(Point dest, int radius)
+{
+	beginRadiusMove(dest, radius, true);
+}
+
+void NPC::changeRadiusMove(Point dest, int radius, bool isRun, bool dontStandWhenFailed)
+{
+	if (isWalking() || isRunning())
+	{ 
+		if (isRun != isRunning())
 		{
-			return;
-		}
-		auto tempList = gm->map->getRadiusPath(position, dest, radius);
-		if (tempList.size() > 0)
-		{
-			stepList = tempList;
+			beginStand();
+			if (!isRun)
+			{
+				beginRadiusWalk(dest, radius);
+			}
+			else
+			{
+				beginRadiusRun(dest, radius);
+			}
 		}
 		else
 		{
-			beginStand();
+			auto tempList = gm->map->getRadiusPath(position, dest, radius);
+			if (tempList.size() > 0)
+			{
+				stepList = tempList;
+			}
+			else if (!dontStandWhenFailed)
+			{
+				beginStand();
+			}
+			else
+			{
+				changeRadiusStep(dest, NPC_FOLLOW_RADIUS, false);
+			}
 		}
 	}
 	else
 	{
-		beginRadiusWalk(dest, radius);
+		if (!isRun)
+		{
+			beginRadiusWalk(dest, radius);
+		}
+		else
+		{
+			beginRadiusRun(dest, radius);
+		}
 	}
 }
 
@@ -1662,21 +1746,63 @@ bool NPC::isFollowAttack(std::shared_ptr<NPC> npc)
 void NPC::beginFollowWalk(Point dest)
 {
 	beginRadiusWalk(dest, NPC_FOLLOW_RADIUS);
+	if (isStanding())
+	{
+		beginRadiusStep(dest, NPC_FOLLOW_RADIUS, false);
+	}
+	if (isStanding())
+	{
+		lastTimeTryingToFollow = getTime();
+	}
+}
+
+void NPC::beginFollowRun(Point dest)
+{
+	beginRadiusRun(dest, NPC_FOLLOW_RADIUS);
+	if (isStanding())
+	{
+		beginRadiusStep(dest, NPC_FOLLOW_RADIUS, false);
+	}
+	if (isStanding())
+	{
+		lastTimeTryingToFollow = getTime();
+	}
 }
 
 void NPC::beginFollowAttack(Point dest)
 {
 	beginRadiusWalk(dest, NPC_FOLLOW_RADIUS);
+	if (isStanding())
+	{
+		lastTimeTryingToFollow = getTime();
+	}
 }
 
 void NPC::changeFollowWalk(Point dest)
 {
-	changeRadiusWalk(dest, NPC_FOLLOW_RADIUS);
+	changeRadiusMove(dest, NPC_FOLLOW_RADIUS, false, true);
+	if (isStanding())
+	{
+		lastTimeTryingToFollow = getTime();
+	}
+}
+
+void NPC::changeFollowRun(Point dest)
+{
+	changeRadiusMove(dest, NPC_FOLLOW_RADIUS, true, true);
+	if (isStanding())
+	{
+		lastTimeTryingToFollow = getTime();
+	}
 }
 
 void NPC::changeFollowAttack(Point dest)
 {
-	changeRadiusWalk(dest, attackRadius);
+	changeRadiusMove(dest, attackRadius);
+	if (isStanding())
+	{
+		lastTimeTryingToFollow = getTime();
+	}
 }
 
 void NPC::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle)
@@ -1824,7 +1950,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	walkTime = getTime() + engine->getRand(NPC_WALK_INTERVAL_RANGE * 2);
 	beginStand();
 
-	if (name.compare("player") != 0)
+	if (name.compare(u8"player") != 0)
 	{
 		name = u8"npc-" + npcName;
 	}
@@ -1924,13 +2050,13 @@ void NPC::onUpdate()
 		updateAction(ft);
 	}
 	
-	if (kind != nkBattle && scriptFile == u8"")
+	if (kind != nkBattle && scriptFile.empty())
 	{
 		//设置无用人物检测范围到屏幕外
 		rect.x = -rect.w - 100;
 		rect.y = -rect.h - 100;
 	}
-	else if (kind == nkBattle && relation == nrFriendly && scriptFile == u8"")
+	else if (kind == nkBattle && relation == nrFriendly && scriptFile.empty())
 	{
 		//设置无用人物检测范围到屏幕外
 		rect.x = -rect.w - 100;
@@ -1999,44 +2125,52 @@ void NPC::updateAction(UTime frameTime)
 		}	
 		else if (isFollower())
 		{
-			std::shared_ptr<NPC> fnpc = nullptr;
-			if (kind == nkPartner)
+			if (getTime() - lastTimeTryingToFollow >= NPC_FOLLOW_INTERVAL)
 			{
-				fnpc = gm->player;
-			}
-			else
-			{
-				auto fnpcList = gm->npcManager->findNPC(followNPC);
-				if (fnpcList.size() > 0)
+				std::shared_ptr<NPC> fnpc = nullptr;
+				if (kind == nkPartner)
 				{
-					fnpc = fnpcList[0];
-				}				 
-			}
-
-			if (fnpc != nullptr || kind == nkPartner)
-			{
-				if (isFollowAttack(fnpc) && kind != nkPartner)
+					fnpc = gm->player;
+				}
+				else
 				{
-					if (gm->map->calDistance(position, fnpc->position) > attackRadius)
+					auto fnpcList = gm->npcManager->findNPC(followNPC);
+					if (fnpcList.size() > 0)
 					{
-						beginFollowAttack(fnpc->position);
+						fnpc = fnpcList[0];
+					}
+				}
+
+				if (fnpc != nullptr)
+				{
+					if (isFollowAttack(fnpc) && kind != nkPartner)
+					{
+						if (gm->map->calDistance(position, fnpc->position) > attackRadius)
+						{
+							beginFollowAttack(fnpc->position);
+						}
+						else
+						{
+							beginAttack(fnpc->position, fnpc);
+						}
 					}
 					else
 					{
-						beginAttack(fnpc->position, fnpc);
+						auto distance = gm->map->calDistance(position, fnpc->position);
+						if ((distance > NPC_FOLLOW_RADIUS_RUN) && canDoAction(acRun))
+						{
+							beginFollowRun(fnpc->position);
+						}
+						else if (distance > NPC_FOLLOW_RADIUS)
+						{
+							beginFollowWalk(fnpc->position);
+						}
 					}
 				}
 				else
 				{
-					if (gm->map->calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
-					{
-						beginFollowWalk(fnpc->position);
-					}
+					followNPC = u8"";
 				}
-			}
-			else
-			{
-				followNPC = u8"";
 			}
 		}	
 		else if (isStanding() && getUpdateTime() - actionBeginTime >= actionLastTime)
@@ -2070,11 +2204,19 @@ void NPC::updateAction(UTime frameTime)
 			}
 		}
 	}
-	else if (isWalking())
+	else if (isWalking() || isRunning())
 	{
 		if (getUpdateTime() - actionBeginTime >= actionLastTime)
 		{
-			playSound(acWalk);
+			if (isWalking())
+			{
+				playSound(acWalk);
+			}
+			else
+			{
+				playSound(acRun);
+			}
+			
 			actionBeginTime += actionLastTime;
 		}
 		if (getUpdateTime() - stepBeginTime >= stepLastTime)
@@ -2100,7 +2242,7 @@ void NPC::updateAction(UTime frameTime)
 						}
 					}
 
-					if (fnpc != nullptr || kind == nkPartner)
+					if (fnpc != nullptr)
 					{
 						if (isFollowAttack(fnpc) && kind != nkPartner)
 						{
@@ -2121,9 +2263,18 @@ void NPC::updateAction(UTime frameTime)
 						{
 							offset = { 0, 0 };
 							stepList.resize(0);
-							if (gm->map->calDistance(position, fnpc->position) > NPC_FOLLOW_RADIUS)
+							auto distance = gm->map->calDistance(position, fnpc->position);
+							if (canDoAction(acRun))
 							{
-								changeFollowWalk(fnpc->position);						
+								volatile int a = 0;
+							}
+							if ((distance > NPC_FOLLOW_RADIUS_RUN) && canDoAction(acRun))
+							{
+								changeFollowRun(fnpc->position);
+							}
+							else if (distance > NPC_FOLLOW_RADIUS)
+							{
+								changeFollowWalk(fnpc->position);
 							}
 							else
 							{

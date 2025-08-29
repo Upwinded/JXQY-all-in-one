@@ -101,7 +101,7 @@ bool File::readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int
 #endif
     if (!fp)
     {
-        GameLog::write("Can not open file(rb) %s\n", newFileName.c_str());
+        GameLog::write(u8"Can not open file(rb) %s\n", newFileName.c_str());
         return false;
     }
     SDL_SeekIO(fp, 0, SDL_IO_SEEK_END);
@@ -196,7 +196,7 @@ void File::writeFile(const std::string& fileName, const void* s, int len)
 #endif
     if (!fp)
     {
-        GameLog::write("Can not open file(wb) %s\n", fileName.c_str());
+        GameLog::write(u8"Can not open file(wb) %s\n", fileName.c_str());
         return;
     }
     SDL_SeekIO(fp, 0, SDL_IO_SEEK_SET);

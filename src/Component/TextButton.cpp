@@ -47,8 +47,8 @@ void TextButton::setUTF8Str(const std::string& s)
 void TextButton::initFromIni(INIReader & ini)
 {
 	Button::initFromIni(ini);
-	label.fontSize = ini.GetInteger("Init", u8"Font", label.fontSize);
-	label.color = ini.GetColor("Init", u8"Color", label.color);
+	label.fontSize = ini.GetInteger(u8"Init", u8"Font", label.fontSize);
+	label.color = ini.GetColor(u8"Init", u8"Color", label.color);
 }
 
 void TextButton::onDraw()

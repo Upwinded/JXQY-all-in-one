@@ -438,16 +438,16 @@ void Weather::setWeather(WeatherType wType, const std::string& configFIleName)
 		len = PakFile::readFile(INI_MAP_FOLDER + configFIleName, s);
 		if (s == nullptr || len == 0)
 		{
-			GameLog::write("no weather ini file: %s\n", (INI_MAP_FOLDER + configFIleName).c_str());
+			GameLog::write(u8"no weather ini file: %s\n", (INI_MAP_FOLDER + configFIleName).c_str());
 		}
 		else
 		{
 			ini = std::make_shared<INIReader>(s);
 		}
-		customRainDropNum = ini->GetInteger("Init", u8"Number", customRainDropNum);
-		customRainSpeed = ini->GetInteger("Init", u8"Speed", customRainSpeed);
-		customRainBoltProb = ini->GetInteger("Init", u8"Speed", customRainBoltProb);
-		customRainSoundName = ini->Get("RainSound", u8"1", u8"");
+		customRainDropNum = ini->GetInteger(u8"Init", u8"Number", customRainDropNum);
+		customRainSpeed = ini->GetInteger(u8"Init", u8"Speed", customRainSpeed);
+		customRainBoltProb = ini->GetInteger(u8"Init", u8"Speed", customRainBoltProb);
+		customRainSoundName = ini->Get(u8"RainSound", u8"1", u8"");
 		if (!customRainSoundName.empty())
 		{
 			customRainSoundName = SOUND_FOLDER + customRainSoundName;
@@ -455,7 +455,7 @@ void Weather::setWeather(WeatherType wType, const std::string& configFIleName)
 		customRainBoltSoundName.resize(3);
 		for (size_t i = 0; i < customRainBoltSoundName.size(); i++)
 		{
-			customRainBoltSoundName[i] = ini->Get("BoltSound", std::to_string(i + 1), u8""); 
+			customRainBoltSoundName[i] = ini->Get(u8"BoltSound", std::to_string(i + 1), u8""); 
 			if (!customRainBoltSoundName[i].empty())
 			{
 				customRainBoltSoundName[i] = SOUND_FOLDER + customRainBoltSoundName[i];

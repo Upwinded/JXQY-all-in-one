@@ -133,7 +133,10 @@
 #define NPC_STEP_MAX_COUNT 5
 //NPC跟随检测范围，超出此范围进行寻找
 #define NPC_FOLLOW_RADIUS 1
-
+//NPC跟随的跑步检测范围，超出此范围尝试跑步寻找
+#define NPC_FOLLOW_RADIUS_RUN (5 * NPC_FOLLOW_RADIUS)
+//NPC尝试跟随失败后的重试间隔
+#define NPC_FOLLOW_INTERVAL 100
 
 //武功类延迟时间
 

@@ -19,15 +19,15 @@ void Item::initFromIni(INIReader & ini)
 {
 	freeResource();
 
-	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
-	name = ini.Get("Init", u8"Name", name);
-	fontSize = ini.GetInteger("Init", u8"Font", fontSize);
-	std::string impName = ini.Get("Init", u8"Image", u8"");
+	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
+	name = ini.Get(u8"Init", u8"Name", name);
+	fontSize = ini.GetInteger(u8"Init", u8"Font", fontSize);
+	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
 	impImage = loadRes(impName);
-	color = ini.GetColor("Init", u8"Color", color);
+	color = ini.GetColor(u8"Init", u8"Color", color);
 }
 
 void Item::setStr(const std::string & s)

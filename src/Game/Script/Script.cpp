@@ -209,11 +209,11 @@ int Script::lua_printf(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
-		GameLog::write("lua_printf: %s\n", lua_tostring(l, 1));
+		GameLog::write(u8"lua_printf: %s\n", lua_tostring(l, 1));
 	}
 	else
 	{
-		GameLog::write("lua_printf: null str\n");
+		GameLog::write(u8"lua_printf: null str\n");
 	}
 	return 0;
 }
@@ -224,7 +224,7 @@ int Script::lua_RunScript(lua_State * l)
 	if (argc >= 1)
 	{
 		std::string n = lua_tostring(l, 1);
-		GameLog::write("lua_RunScript: %s\n", n.c_str());
+		GameLog::write(u8"lua_RunScript: %s\n", n.c_str());
 		gm->runScript(n);
 	}
 	return 0;

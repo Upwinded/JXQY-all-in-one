@@ -31,14 +31,14 @@ void MagicManager::load(int index)
     fName += MAGIC_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += MAGIC_INI_EXT;
 	INIReader ini(fName);
 
 	for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 	{
-		std::string section = convert::formatString("%d", i + 1);
+		std::string section = convert::formatString(u8"%d", i + 1);
 		magicList[i].iniFile = ini.Get(section, u8"IniFile", u8"");
 		magicList[i].level = ini.GetInteger(section, u8"Level", 0);
 		magicList[i].exp = ini.GetInteger(section, u8"Exp", 0);
@@ -61,7 +61,7 @@ void MagicManager::save(int index)
 		if (magicList[i].iniFile != u8"")
 		{
 			count++;
-			section = convert::formatString("%d", i + 1);
+			section = convert::formatString(u8"%d", i + 1);
 			ini.Set(section, u8"IniFile", magicList[i].iniFile);
 			ini.SetInteger(section, u8"Level", magicList[i].level);
 			ini.SetInteger(section, u8"Exp", magicList[i].exp);
@@ -72,7 +72,7 @@ void MagicManager::save(int index)
     std::string fName = MAGIC_INI_NAME;
     if (index >= 0)
     {
-        fName += convert::formatString("%d", index);
+        fName += convert::formatString(u8"%d", index);
     }
     fName += MAGIC_INI_EXT;
 	ini.saveToFile(SaveFileManager::CurrentPath() + fName);
@@ -155,7 +155,7 @@ void MagicManager::addMagicExp(const std::string & magicName, int addexp)
 
 void MagicManager::addMagic(const std::string & magicName)
 {
-	if (magicName == u8"")
+	if (magicName.empty())
 	{
 		return;
 	}
@@ -164,7 +164,7 @@ void MagicManager::addMagic(const std::string & magicName)
 	{
 		for (size_t i = 0; i < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT + MAGIC_PRACTISE_COUNT; i++)
 		{
-			if (magicList[i].iniFile == u8"")
+			if (magicList[i].iniFile.empty())
 			{
 				magicList[i].iniFile = magicName;
 				magicList[i].level = 1;
@@ -181,7 +181,7 @@ void MagicManager::addMagic(const std::string & magicName)
 
 void MagicManager::deleteMagic(const std::string & magicName)
 {
-	if (magicName == u8"")
+	if (magicName.empty())
 	{
 		return;
 	}
@@ -243,7 +243,7 @@ bool MagicManager::magicListExists(int index)
 
 std::shared_ptr<Magic> MagicManager::loadAttackMagic(const std::string & name)
 {	
-	if (name == u8"")
+	if (name.empty())
 	{
 		return std::shared_ptr<Magic>(nullptr);
 	}

@@ -380,7 +380,7 @@ int PakFile::readFile(unsigned int fileID, std::unique_ptr<char[]>& s)
 
 int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return 0;
 	}
@@ -406,7 +406,7 @@ int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s)
 int PakFile::readFile(const std::string & fileName, std::unique_ptr<char[]>& s, int& len, const std::string & pakName, bool firstReadPak)
 {
 	s = nullptr;
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return -1;
 	}

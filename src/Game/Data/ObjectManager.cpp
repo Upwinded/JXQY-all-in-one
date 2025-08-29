@@ -230,7 +230,7 @@ void ObjectManager::tryCleanObjectImageList()
 
 _shared_imp ObjectManager::loadObjectImage(const std::string & imageName)
 {
-	if (imageName == u8"")
+	if (imageName.empty())
 	{
 		return nullptr;
 	}
@@ -271,7 +271,7 @@ void ObjectManager::load(const std::string & fileName)
 	int count = ini.GetInteger(section, u8"Count", 0);
 	for (int i = 0; i < count; i++)
 	{
-		section = convert::formatString("OBJ%03d", i);
+		section = convert::formatString(u8"OBJ%03d", i);
 		auto obj = std::make_shared<Object>();
 		obj->initFromIni(&ini, section);
 		addChild(obj);
@@ -281,7 +281,7 @@ void ObjectManager::load(const std::string & fileName)
 
 void ObjectManager::save(const std::string & fileName)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return;
 	}
@@ -294,7 +294,7 @@ void ObjectManager::save(const std::string & fileName)
 
 	for (size_t i = 0; i < objectList.size(); i++)
 	{
-		section = convert::formatString("OBJ%03d", i);
+		section = convert::formatString(u8"OBJ%03d", i);
 		objectList[i]->saveToIni(&ini, section);
 	}
 	ini.saveToFile(SaveFileManager::CurrentPath() + fileName);

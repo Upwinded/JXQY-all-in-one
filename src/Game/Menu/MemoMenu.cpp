@@ -24,7 +24,7 @@ void MemoMenu::reFresh()
 			}
 			else
 			{
-				memoText->mstr[i]->setStr("");
+				memoText->mstr[i]->setStr(u8"");
 			}
 		}
 	}	
@@ -48,11 +48,11 @@ void MemoMenu::reRange(int max)
 void MemoMenu::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\memo\\window.ini");
-	title = addComponent<ImageContainer>("ini\\ui\\memo\\title.ini");
-	image = addComponent<ImageContainer>("ini\\ui\\memo\\image.ini");
-	scrollbar = addComponent<Scrollbar>("ini\\ui\\memo\\scrollbar.ini");
-	memoText = addComponent<MemoText>("ini\\ui\\memo\\memo.ini");
+	initFromIniFileName(u8"ini\\ui\\memo\\window.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\memo\\title.ini");
+	image = addComponent<ImageContainer>(u8"ini\\ui\\memo\\image.ini");
+	scrollbar = addComponent<Scrollbar>(u8"ini\\ui\\memo\\scrollbar.ini");
+	memoText = addComponent<MemoText>(u8"ini\\ui\\memo\\memo.ini");
 
 	setChildRectReferToParent();
 }

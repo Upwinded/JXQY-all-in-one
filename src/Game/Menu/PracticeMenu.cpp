@@ -23,16 +23,16 @@ void PracticeMenu::updateMagic()
 	{
 		name->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->name);
 		intro->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->intro);
-		level->setStr(convert::formatString("%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
-		exp->setStr(convert::formatString("%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
+		level->setStr(convert::formatString(u8"%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
+		exp->setStr(convert::formatString(u8"%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
 		magic->impImage = gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->createMagicIcon();
 	}
 	else
 	{
-		name->setStr("");
-		intro->setStr("");
-		level->setStr("");
-		exp->setStr("");
+		name->setStr(u8"");
+		intro->setStr(u8"");
+		level->setStr(u8"");
+		exp->setStr(u8"");
 	}
 }
 
@@ -40,11 +40,11 @@ void PracticeMenu::updateExp()
 {
 	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
 	{
-		exp->setStr(convert::formatString("%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
+		exp->setStr(convert::formatString(u8"%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
 	}
 	else
 	{
-		exp->setStr("");
+		exp->setStr(u8"");
 	}
 }
 
@@ -52,11 +52,11 @@ void PracticeMenu::updateLevel()
 {
 	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
 	{
-		level->setStr(convert::formatString("%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
+		level->setStr(convert::formatString(u8"%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
 	}
 	else
 	{
-		level->setStr("");
+		level->setStr(u8"");
 	}
 }
 

@@ -98,7 +98,7 @@ void EffectManager::load()
 	}
 	for (int i = 0; i < count; i++)
 	{
-		section = convert::formatString("PRO%d", i + 1);
+		section = convert::formatString(u8"PRO%d", i + 1);
 		auto effect = std::make_shared<Effect>();
 		addChild(effect);
 		effect->initFromIni(&ini, section);
@@ -114,7 +114,7 @@ void EffectManager::save()
 	ini.SetInteger(section, u8"Count", count);
 	for (size_t i = 0; i < effectList.size(); i++)
 	{
-		section = convert::formatString("PRO%d", i + 1);
+		section = convert::formatString(u8"PRO%d", i + 1);
 		effectList[i]->saveToIni(&ini, section);
 	}
 	

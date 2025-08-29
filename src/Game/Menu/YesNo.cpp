@@ -17,10 +17,10 @@ YesNo::~YesNo()
 void YesNo::init(const std::string & s)
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\yesno\\window.ini");
-	yes = addComponent<Button>("ini\\ui\\yesno\\btnYes.ini");
-	no = addComponent<Button>("ini\\ui\\yesno\\btnNo.ini");
-	label = addComponent<Label>("ini\\ui\\yesno\\label.ini");
+	initFromIniFileName(u8"ini\\ui\\yesno\\window.ini");
+	yes = addComponent<Button>(u8"ini\\ui\\yesno\\btnYes.ini");
+	no = addComponent<Button>(u8"ini\\ui\\yesno\\btnNo.ini");
+	label = addComponent<Label>(u8"ini\\ui\\yesno\\label.ini");
 	label->setStr(s);
 	setChildRectReferToParent();
 }

@@ -74,19 +74,19 @@ std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 		int j = 0;
 		while(j < (int)s[i].length())
 		{	
-			if (s[i][j] == '<' && s[i].find("<color=red>", j) == j)
+			if (s[i][j] == '<' && s[i].find(u8"<color=red>", j) == j)
 			{
 				col = 0xFFFF0000;
 				std::string cc = u8"<color=red>";
 				j += cc.length();
 			}
-			else if (s[i][j] == L'<' && s[i].find("<color=black>", j) == j)
+			else if (s[i][j] == L'<' && s[i].find(u8"<color=black>", j) == j)
 			{
 				col = 0xFF000000;
 				std::string cc = u8"<color=black>";
 				j += cc.length();
 			}
-			else if (s[i][j] == L'<' && s[i].find("<color=default>", j) == j)
+			else if (s[i][j] == L'<' && s[i].find(u8"<color=default>", j) == j)
 			{
 				col = color;
 				std::string cc = u8"<color=default>";

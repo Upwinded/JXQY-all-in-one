@@ -98,9 +98,9 @@ void Panel::initFromIni(INIReader & ini)
 
 	align = alNone;
 
-	std::string alignStr = ini.Get("Init", u8"Align", convert::formatString("%d", (int)align));
-	alignX = ini.GetInteger("Init", u8"AlignX", 0);
-	alignY = ini.GetInteger("Init", u8"AlignY", 0);
+	std::string alignStr = ini.Get(u8"Init", u8"Align", convert::formatString(u8"%d", (int)align));
+	alignX = ini.GetInteger(u8"Init", u8"AlignX", 0);
+	alignY = ini.GetInteger(u8"Init", u8"AlignY", 0);
 
 	const char* value = alignStr.c_str();
 	if (value != nullptr)
@@ -133,12 +133,12 @@ void Panel::initFromIni(INIReader & ini)
 		}	
 	}
 	
-	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
-	name = ini.Get("Init", u8"Name", name);
-	std::string impName = ini.Get("Init", u8"Image", u8"");
+	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
+	name = ini.Get(u8"Init", u8"Name", name);
+	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
 	impImage = loadRes(impName);
 	setAlign();
 }

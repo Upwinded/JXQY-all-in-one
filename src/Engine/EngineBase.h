@@ -126,9 +126,9 @@ using _shared_cursor = std::shared_ptr<Cursor_t>;
 using Image_t = SDL_Texture;
 using _image = SDL_Texture*;
 using _shared_image = std::shared_ptr<Image_t>;
-#define make_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write("Image Count:%d", EngineBase::ImageCount.load());*/}); //EngineBase::ImageCount.fetch_add(1);GameLog::write("Image Count:%d", EngineBase::ImageCount.load()); 
+#define make_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write(u8"Image Count:%d", EngineBase::ImageCount.load());*/}); //EngineBase::ImageCount.fetch_add(1);GameLog::write(u8"Image Count:%d", EngineBase::ImageCount.load()); 
 
-#define make_safe_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){std::lock_guard<std::mutex> locker(EngineBase::_mutex); SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write("Image Count:%d", EngineBase::ImageCount.load());*/});  //EngineBase::ImageCount.fetch_add(1);GameLog::write("Image Count:%d", EngineBase::ImageCount.load());  
+#define make_safe_shared_image(a) std::shared_ptr<Image_t>(a, [](Image_t* b){std::lock_guard<std::mutex> locker(EngineBase::_mutex); SDL_DestroyTexture(b); /*EngineBase::ImageCount.fetch_sub(1); GameLog::write(u8"Image Count:%d", EngineBase::ImageCount.load());*/});  //EngineBase::ImageCount.fetch_add(1);GameLog::write(u8"Image Count:%d", EngineBase::ImageCount.load());  
 
 using Surface_t = SDL_Surface;
 using _shared_surface = std::shared_ptr<Surface_t>;

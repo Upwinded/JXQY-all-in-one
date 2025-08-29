@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
 		if (par.compare(log_on) == 0)
 		{
 			GameLog::use_log_file = true;
-			GameLog::write("Use Log File");
+			GameLog::write(u8"Use Log File");
 		}
 	}
 	Game game;

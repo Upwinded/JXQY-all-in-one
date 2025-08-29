@@ -18,12 +18,12 @@ System::~System()
 void System::init()
 {
 	freeResource();
-	initFromIniFileName("ini\\ui\\system\\window.ini");
-	title = addComponent<ImageContainer>("ini\\ui\\system\\title.ini");
-	returnBtn = addComponent<Button>("ini\\ui\\system\\return.ini");
-	saveloadBtn = addComponent<Button>("ini\\ui\\system\\saveload.ini");
-	optionBtn = addComponent<Button>("ini\\ui\\system\\option.ini");
-	quitBtn = addComponent<Button>("ini\\ui\\system\\quit.ini");
+	initFromIniFileName(u8"ini\\ui\\system\\window.ini");
+	title = addComponent<ImageContainer>(u8"ini\\ui\\system\\title.ini");
+	returnBtn = addComponent<Button>(u8"ini\\ui\\system\\return.ini");
+	saveloadBtn = addComponent<Button>(u8"ini\\ui\\system\\saveload.ini");
+	optionBtn = addComponent<Button>(u8"ini\\ui\\system\\option.ini");
+	quitBtn = addComponent<Button>(u8"ini\\ui\\system\\quit.ini");
 
 	setChildRectReferToParent();
 }

@@ -379,28 +379,28 @@ void GameManager::runScript(const std::string & fileName, const std::string & ma
 	int len = PakFile::readFile(SCRIPT_MAP_FOLDER + mapName + u8"\\" + fileName, s);
 	if (len <= 0 || s == nullptr)
 	{
-		GameLog::write("script: %s not found\n", (SCRIPT_MAP_FOLDER + mapName + u8"\\" + fileName).c_str());
+		GameLog::write(u8"script: %s not found\n", (SCRIPT_MAP_FOLDER + mapName + u8"\\" + fileName).c_str());
 		s = nullptr;
 		int len = PakFile::readFile(SCRIPT_GOODS_FOLDER + fileName, s);
 		if (len <= 0 || s == nullptr)
 		{
-			GameLog::write("script: %s not found\n", (SCRIPT_GOODS_FOLDER + fileName).c_str());
+			GameLog::write(u8"script: %s not found\n", (SCRIPT_GOODS_FOLDER + fileName).c_str());
 			s = nullptr;
 			int len = PakFile::readFile(SCRIPT_COMMON_FOLDER + fileName, s);
 			if (len <= 0 || s == nullptr)
 			{
-				GameLog::write("script: %s not found\n", (SCRIPT_COMMON_FOLDER + fileName).c_str());
+				GameLog::write(u8"script: %s not found\n", (SCRIPT_COMMON_FOLDER + fileName).c_str());
 				return;
 			}
-			GameLog::write("run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
+			GameLog::write(u8"run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
 			script.runScript(s, len);
 			return;
 		}
-		GameLog::write("run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
+		GameLog::write(u8"run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
 		script.runScript(s, len);
 		return;
 	}
-	GameLog::write("run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER , mapName.c_str(), newName.c_str());
+	GameLog::write(u8"run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER , mapName.c_str(), newName.c_str());
 	script.runScript(s, len);
 	return;
 }
@@ -426,7 +426,7 @@ void GameManager::loadMap(const std::string & fileName)
 	if (len > 0 && s != nullptr)
 	{
 		INIReader ini(s);
-		mapFolderName = ini.Get("Init", mapFolderName, mapFolderName);
+		mapFolderName = ini.Get(u8"Init", mapFolderName, mapFolderName);
 	}
 
 	map->load(MAP_FOLDER + fileName);
@@ -481,14 +481,14 @@ void GameManager::playMusic(const std::string & fileName)
 			global.data.bgmName = convert::extractFileName(fileName) + u8".mp3";
 		}
 	}
-	GameLog::write("play bgm %s\n", global.data.bgmName.c_str());
+	GameLog::write(u8"play bgm %s\n", global.data.bgmName.c_str());
 	if (strcmp(global.data.bgmName.c_str(), bgmName.c_str()) == 0)
 	{
 		return;
 	}
 	engine->stopBGM();
 	bgmName = global.data.bgmName;
-	if (bgmName == u8"")
+	if (bgmName.empty())
 	{
 		return;
 	}
@@ -510,7 +510,7 @@ void GameManager::stopMusic()
 
 void GameManager::playSound(const std::string & fileName)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		return;
 	}
@@ -607,7 +607,7 @@ void GameManager::runNPCDeathScript(std::shared_ptr<NPC> npc, const std::string 
 	//{
 	//	return;
 	//}
-	if (scriptName == u8"")
+	if (scriptName.empty())
 	{
 		return;
 	}
@@ -733,7 +733,7 @@ void GameManager::playMovie(const std::string & fileName)
 		video = nullptr;
 	}
 	stopMusic();
-	GameLog::write("Play Movie %s\n", fileName.c_str());
+	GameLog::write(u8"Play Movie %s\n", fileName.c_str());
 	video = std::make_shared<VideoPlayer>(VIDEO_FOLDER + fileName);
 	video->drawFullScreen = true;
 	video->run();
@@ -777,7 +777,7 @@ void GameManager::loadNPCWithThread(const std::string & fileName)
 
 void GameManager::saveNPC(const std::string & fileName)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		npcManager->save(global.data.npcName);
 	}
@@ -800,7 +800,7 @@ void GameManager::deleteNPC(const std::string & name)
 
 void GameManager::setNPCRes(const std::string & name, const std::string & resName)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -822,7 +822,7 @@ void GameManager::setNPCRes(const std::string & name, const std::string & resNam
 
 void GameManager::setNPCScript(const std::string & name, const std::string & scriptName)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -842,7 +842,7 @@ void GameManager::setNPCScript(const std::string & name, const std::string & scr
 
 void GameManager::setNPCDeathScript(const std::string & name, const std::string & scriptName)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -862,7 +862,7 @@ void GameManager::setNPCDeathScript(const std::string & name, const std::string 
 
 void GameManager::goTo(const std::string & name, int x, int y)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -882,7 +882,7 @@ void GameManager::goTo(const std::string & name, int x, int y)
 
 void GameManager::goToEx(const std::string & name, int x, int y)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -902,7 +902,7 @@ void GameManager::goToEx(const std::string & name, int x, int y)
 
 void GameManager::goToDir(const std::string & name, int dir, int distance)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -951,7 +951,7 @@ void GameManager::disableNPCAI()
 
 void GameManager::attackTo(const std::string & name, int x, int y)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -974,7 +974,7 @@ void GameManager::attackTo(const std::string & name, int x, int y)
 
 void GameManager::setNPCPosition(const std::string & name, int x, int y)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1001,7 +1001,7 @@ void GameManager::setNPCPosition(const std::string & name, int x, int y)
 
 void GameManager::setNPCDir(const std::string & name, int dir)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr && npc->isStanding())
@@ -1027,7 +1027,7 @@ void GameManager::setNPCDir(const std::string & name, int dir)
 
 void GameManager::setNPCKind(const std::string & name, int kind)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1047,7 +1047,7 @@ void GameManager::setNPCKind(const std::string & name, int kind)
 
 void GameManager::setNPCLevel(const std::string & name, int level)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1069,7 +1069,7 @@ void GameManager::setNPCLevel(const std::string & name, int level)
 
 void GameManager::setNPCAction(const std::string & name, int action)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1103,7 +1103,7 @@ void GameManager::setNPCAction(const std::string & name, int action)
 
 void GameManager::setNPCRelation(const std::string & name, int relation)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1125,7 +1125,7 @@ void GameManager::setNPCRelation(const std::string & name, int relation)
 
 void GameManager::setNPCActionType(const std::string & name, int actionType)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1145,7 +1145,7 @@ void GameManager::setNPCActionType(const std::string & name, int actionType)
 
 void GameManager::setNPCActionFile(const std::string & name, int action, const std::string & fileName)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1165,7 +1165,7 @@ void GameManager::setNPCActionFile(const std::string & name, int action, const s
 
 void GameManager::npcSpecialAction(const std::string & name, const std::string & fileName)
 {
-	if (name == u8"")
+	if (name.empty())
 	{
 		std::shared_ptr<NPC> npc = scriptNPC;
 		if (npc != nullptr)
@@ -1427,11 +1427,11 @@ void GameManager::addRandGoods(const std::string & fileName)
 	if (len > 0 && s != nullptr)
 	{
 		INIReader ini(s);
-		int count = ini.GetInteger("Header", u8"Count", 0);
+		int count = ini.GetInteger(u8"Header", u8"Count", 0);
 		if (count > 0)
 		{
 			int idx = engine->getRand(count);
-			std::string section = convert::formatString("%d", idx + 1);
+			std::string section = convert::formatString(u8"%d", idx + 1);
 			std::string name = ini.Get(section, u8"IniFile", u8"");
 			addGoods(name);
 		}
@@ -1519,12 +1519,12 @@ void GameManager::clearGoods()
 
 void GameManager::getGoodsNum(const std::string & name)
 {
-	varList.setInteger("GoodsNum", goodsManager.getItemNum(name));
+	varList.setInteger(u8"GoodsNum", goodsManager.getItemNum(name));
 }
 
 void GameManager::getMoneyNum()
 {
-	varList.setInteger("MoneyNum", player->money);
+	varList.setInteger(u8"MoneyNum", player->money);
 }
 
 void GameManager::setMoneyNum(int value)
@@ -1564,7 +1564,7 @@ void GameManager::loadObjectWithThread(const std::string & fileName)
 
 void GameManager::saveObject(const std::string & fileName)
 {
-	if (fileName == u8"")
+	if (fileName.empty())
 	{
 		objectManager->save(global.data.objName);
 	}
@@ -1584,7 +1584,7 @@ void GameManager::addObject(const std::string & iniName, int x, int y, int dir)
 void GameManager::deleteObject(const std::string & name)
 {
 	std::string objName = name;
-	if (name == u8"")
+	if (name.empty())
 	{
 		if (scriptObj != nullptr)
 		{
@@ -1601,7 +1601,7 @@ void GameManager::deleteObject(const std::string & name)
 void GameManager::setObjectPosition(const std::string & name, int x, int y)
 {
 	std::shared_ptr<Object> obj = nullptr;
-	if (name == u8"")
+	if (name.empty())
 	{
 		obj = scriptObj;
 	}
@@ -1619,7 +1619,7 @@ void GameManager::setObjectPosition(const std::string & name, int x, int y)
 void GameManager::setObjectKind(const std::string & name, int kind)
 {
 	std::shared_ptr<Object> obj = nullptr;
-	if (name == u8"")
+	if (name.empty())
 	{
 		obj = scriptObj;
 	}
@@ -1636,7 +1636,7 @@ void GameManager::setObjectKind(const std::string & name, int kind)
 void GameManager::setObjectScript(const std::string & name, const std::string & scriptFile)
 {
 	std::shared_ptr<Object> obj = nullptr;
-	if (name == u8"")
+	if (name.empty())
 	{
 		obj = scriptObj;
 	}
@@ -1683,10 +1683,10 @@ void GameManager::talk(const std::string & part)
 	int talkIndex = 0;
 	while (true)
 	{
-		std::string name = convert::formatString("%d", talkIndex + 1);
+		std::string name = convert::formatString(u8"%d", talkIndex + 1);
 		
 		std::string str = ini.Get(part, name, u8"");
-		if (str == u8"")
+		if (str.empty())
 		{
 			break;
 		}
@@ -1707,7 +1707,7 @@ void GameManager::talk(const std::string & part)
 	std::string headStr = u8"head";
 	for (int i = 0; i < talkIndex; i++)
 	{
-		std::string tstr = convert::formatString("%s%d", headStr.c_str(), i + 1);
+		std::string tstr = convert::formatString(u8"%s%d", headStr.c_str(), i + 1);
 		std::string thstr = ini.Get(part, tstr, u8"NoHeadChange");
 		if (thstr != u8"NoHeadChange")
 		{
@@ -1748,7 +1748,7 @@ void GameManager::say(const std::string & str, int index)
 	}
 	else
 	{
-		dialog->setHead1("");
+		dialog->setHead1(u8"");
 	}
 	dialog->setTalkStr(str);
 	dialog->visible = true;
@@ -1988,7 +1988,7 @@ bool GameManager::onInitial()
 	if (gameIndex == 0)
 	{
 		inEvent = true;
-		runScript("newgame.txt");
+		runScript(u8"newgame.txt");
 		inEvent = false;
 	}
 	else

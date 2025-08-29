@@ -169,13 +169,13 @@ void Joystick::initFromIni(INIReader & ini)
 	std::unique_ptr<char[]> s;
 	int len = 0;
 
-	rect.x = ini.GetInteger("Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger("Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger("Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger("Init", u8"Height", rect.h);
-	roundRange = ini.GetInteger("Init", u8"range", roundRange);
-	setText("");
-	std::string impName = ini.Get("Init", u8"Image", u8"");
+	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
+	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
+	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
+	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
+	roundRange = ini.GetInteger(u8"Init", u8"range", roundRange);
+	setText(u8"");
+	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
 	auto impImage = IMP::createIMPImage(impName);
 	if (impImage != nullptr)
 	{
@@ -184,7 +184,7 @@ void Joystick::initFromIni(INIReader & ini)
 	}
 	else
 	{
-		GameLog::write("%s image file error\n", impName.c_str());
+		GameLog::write(u8"%s image file error\n", impName.c_str());
 	}
 	
 	impImage = nullptr;
