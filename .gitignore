@@ -514,6 +514,10 @@ linux/build/
 ################################ Starter Files ################################
 starter/*/
 starter/*.exe
+
+# Official release automation and publisher identity live only in the private repo.
+/private-build/
+
 ThirdParty/devel/
 
 3rd*/
