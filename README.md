@@ -1,199 +1,200 @@
-# JXQY-all-in-one（old:SHF）
+# JXQY All-in-One
 
-剑侠情缘-all-in-one（old:Sword Heroes' Fate）
+JXQY All-in-One 是面向《剑侠情缘》系列的跨平台 C++ 运行时与内容编辑工具链。项目的长期目标是以同一套运行时和资源规范支持《剑侠情缘 2》《月影传说》《新剑侠情缘》以及其他兼容 MOD。
 
-## 为什么改了名字？
+当前代码使用 C++17，游戏运行时基于 SDL3，编辑器基于 Qt 6。工程覆盖 Windows、Linux、macOS、iOS 和 Android，并包含资源选择、在线资源目录、资源安装及平台程序更新所需的运行时代码。
 
-因为一直有一个比较遥远的目标，就是把剑侠情缘三部曲都实现，并且移植到多个平台。目前剑侠情缘2能在多平台运行。
+## 工程结构
 
-# release说明
+| 路径 | 用途 |
+| --- | --- |
+| `src/` | 游戏运行时、资源系统、在线更新和跨平台实现 |
+| `jxqy-editor/` | Qt/C++ 编辑器与命令行工具 |
+| `assets/` | 本地运行资源集合 |
+| `android/` | Android Studio/Gradle 工程 |
+| `macos_ios/` | macOS 与 iOS Xcode 工程 |
+| `linux/` | Linux 依赖准备与构建入口 |
+| `win/` | Visual Studio 工程 |
+| `updater/` | 桌面程序更新辅助程序 |
+| `ThirdParty/` | 源码依赖、依赖清单及本地预编译依赖目录 |
+| `licenses/` | 第三方许可证和使用清单 |
 
-作者编译的版本支持如下平台：
+## 获取源码
 
-windows 7以上， android 9以上, ubuntu20.04 以上, macos 11.3以上, ios 12.0以上
-（最新版本1.4.0，除了苹果的平台外，都采用了Vulkan后端，有些平台可能不能支持）
+仓库使用 Git submodule 管理 Lua、minilzo 和 miniz：
 
-下载地址：
-百度网盘：
-链接：https://pan.baidu.com/s/140vPCnQYC2DrRZKpjlb51w?pwd=juyh 
-提取码：juyh 
+```sh
+git clone --recurse-submodules https://github.com/Upwinded/JXQY-all-in-one.git
+cd JXQY-all-in-one
+```
 
-ubuntu版本，需要20.04以上，可直接运行run.sh开始游戏
+已有工作区可执行：
 
-# repository说明与编译
+```sh
+git submodule update --init --recursive
+```
 
-## 依赖和运行时库
+## 预编译依赖
 
-因为多平台的依赖库找起来比较麻烦，所以我把我使用的库上传到了这里，不再放在repository里面：
-链接：https://pan.baidu.com/s/1NqzXZMnX0xsk0jhXNIHk_Q?pwd=60r2 
-提取码：60r2 
+SDL3、SDL3_image、SDL3_ttf、SDL3_mixer 和 FFmpeg 的平台开发库放在 `ThirdParty/devel/`。该目录是本地构建输入，不由主仓库跟踪。
 
-devel文件夹里面是各平台的开发库，可根据平台选择压缩包进行解压，并将解压出来的各平台文件夹放置在repo的ThirdParty/devel/文件夹下。
+各平台压缩包名称、架构、下载地址和 SHA-256 以 [`ThirdParty/dependencies.ini`](ThirdParty/dependencies.ini) 为准，也可以从 [thirdparty Release](https://cnb.cool/upwinded/jxqy-all-in-one/-/releases/tag/thirdparty) 选择对应平台包。
 
-bin.zip文件夹包含windows下的32位运行库，将解压出来的bin文件夹放到repo的根目录下。
+解压后请确认目录结构符合下表：
 
-## 资源文件
+| 平台 | 依赖目录 | 架构 |
+| --- | --- | --- |
+| Windows | `ThirdParty/devel/win/` | x86、x64 |
+| Android | `ThirdParty/devel/android/` | arm64-v8a、x86_64 |
+| Apple | `ThirdParty/devel/mac_ios/` | macOS、iOS 与模拟器 |
+| Linux | `ThirdParty/devel/linux/x86_64/` | x86_64 |
 
-剑侠情缘2的资源文件可以从 https://github.com/Upwinded/jxqy2-assets 获取，把这些文件全部放入Assets文件夹。
+Linux x86_64 也可以使用 `linux/build-dependencies.sh` 从锁定版本的上游源码构建依赖。
 
-android,iOS,macOS会自动打包assets文件夹里面的内容（如果自己修改assets内容，存档请只保留rpg0文件夹下的内容）
+## 游戏资源
 
-## windows
+运行时默认从仓库根目录的 `assets/` 读取资源集合。当前 Release 构建至少需要：
 
-使用vs2022打开 win文件夹下面的 jxqy-all-in-one.sln 文件，进行编译即可。
+```text
+assets/
+├── engine/
+└── resources.ini
+```
 
-## android
+`resources.ini` 定义集合信息及在线目录地址；各游戏或 MOD 作为资源包放在集合根目录的直接子目录中。完整资源集合不属于源码构建产物，请使用与当前资源规范兼容的资源，并保留原有目录层级和文件名大小写。
 
-使用android studio打开android文件夹，进行编译即可。
+Debug 构建可使用完整本地资源集合。Android、macOS 和 iOS 的 Release 构建只嵌入 `engine/` 与 `resources.ini`，其余可玩资源由运行时按资源目录下载到平台可写目录。
 
-## linux
+## 构建游戏
 
-cd linux
+### Windows
 
-在ubuntu下可使用 install-dependents.sh 安装依赖库，其它系统请自行解决这部分
-./install-dependents.sh
+要求 Visual Studio 2022，并准备 `ThirdParty/devel/win/`。
 
-./build.sh
+打开：
 
-## macOS && iOS
+```text
+win/jxqy-all-in-one.sln
+```
 
-进入 macos_ios/jxqy 文件夹
+选择 `x86` 或 `x64` 配置后构建 `jxqy-all-in-one`。对应架构的 SDL3 与 FFmpeg 头文件、导入库和运行库必须完整。
 
-使用 xcode 打开 jxqy.xcodeproj 工程，选择不同Target进行编译即可。
- 
-# 感谢
- 
-剑侠情缘2这个游戏是我玩的第一个武侠游戏，能够重制这款游戏一直是我埋在心里的梦想。大概3、4年前我曾经尝试使用delphi和lazarus分别做过一些，但由于水平有限同时时间也不允许，引擎只实现了显示地图，之后就搁置了。2017年10月，偶像（weyl，scarsty，bt，sb500）发布了金群的C++复刻版，他在发布时说过：这个引擎有没有人使用不那么重要，重要的是完成了自己一直的梦想。这句话一下子点燃了我重拾梦想、再次开始制作剑侠情缘引擎的想法。我的编程启蒙老师是偶像，当初拿着他的pascal版代码研究学习，一字一句的研读和练习，受益良多，而此次的剑侠情缘重制，我又参考了他的C++复刻版，只能用感激涕零来表达对他的感谢！
+### Android
 
-剑侠情缘游戏的大部分资料参考了月影传说高清版作者小试刀剑发布的资料以及剑侠情缘贴吧里面的资料，感谢小试刀剑以及各位剑侠情缘贴吧吧友的分享。
+Android 工程当前使用 compileSdk/targetSdk 36，最低系统版本为 Android 9（API 28），构建架构为 `arm64-v8a` 和 `x86_64`。
 
-这是我第一次用C++写大型的、完整的程序，代码如果存在冗余或者不合理等问题，还请见谅。
+使用近期 Android Studio 打开 `android/`，准备 Android SDK、NDK、CMake 以及 `ThirdParty/devel/android/`。也可以从命令行构建：
 
-# 使用的开发库
+```sh
+cd android
+./gradlew assembleDebug
+```
 
-SDL <https://www.libsdl.org/>
+生成的 APK 会复制到 `bin/android/`。Release 构建使用：
 
-SDL_image <https://www.libsdl.org/projects/SDL_image/>
+```sh
+./gradlew assembleRelease
+```
 
-libpng <http://www.libpng.org/pub/png/libpng.html>
+### Linux
 
-SDL_ttf <https://www.libsdl.org/projects/SDL_ttf/>
+当前 Linux 正式目标为 x86_64。Ubuntu/Debian 可先安装平台开发包：
 
-freetype <https://github.com/freetype/freetype>
+```sh
+./linux/install-dependents.sh
+```
 
-FMOD <https://www.fmod.com/>
+随后执行：
 
-FFmpeg <https://www.ffmpeg.org/>
+```sh
+./linux/build.sh
+```
 
-libiconv <https://www.gnu.org/software/libiconv/>
+脚本会检查 `ThirdParty/devel/linux/x86_64/`，缺少时从锁定版本源码构建依赖。游戏输出到 `bin/linux/`，桌面更新辅助程序输出到 `bin/updater/linux/`。
 
-lua <https://www.lua.org/>
+构建完成后可使用根目录启动脚本：
 
-minilzo <http://www.oberhumer.com/opensource/lzo>
+```sh
+./'run(put this out of bin).sh'
+```
 
-ini Reader <https://github.com/benhoyt/inih>
+### macOS 与 iOS
 
-libconvert <https://github.com/scarsty/convert>
- 
-# 授权 
+准备 `ThirdParty/devel/mac_ios/`，然后用 Xcode 打开：
 
-SHF is created by Upwinded@www.upwinded.com.
+```text
+macos_ios/jxqy/jxqy.xcodeproj
+```
 
-Special thanks to Scarsty(SunTY, Weyl, BT, SB500), XiaoShiDaoJian, DaWuXiaLunTan(www.dawuxia.net), JianXiaQingYuanTieBa@tieba.baidu.com.
+共享 Scheme：
 
-The source codes are distributed under zlib license, with two additional clauses:
+- `jxqy macOS`：macOS 10.15+，Release 同时构建 arm64 与 x86_64；
+- `jxqy iOS`：iOS 13.0+，支持真机与模拟器。
 
-1.Full right of the codes is granted if they are used in non-KYS related and non-SHF related games.
+macOS 工程会通过 Swift Package Manager 解析 Sparkle。Xcode 的构建位置应使用默认设置。Release 构建前请确认 `assets/engine/` 和 `assets/resources.ini` 已准备完整。
 
-2.If the codes are used in KYS related or SHF related games, the game itself shall not involve any sort of profit making aspect.
+命令行验证 macOS 工程时可使用：
 
-(KYS means All Heroes in Kam Yung's Stories, and SHF means Sword Heroes' Fate.)
+```sh
+xcodebuild \
+  -project macos_ios/jxqy/jxqy.xcodeproj \
+  -scheme "jxqy macOS" \
+  -configuration Release \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+```
 
-The zlib license is as followes：
+## 构建编辑器
 
-http://www.zlib.net/zlib_license.html
+`jxqy-editor` 提供资源迁移与转换、脚本语法检查、资源工程管理，以及地图、菜单、NPC、OBJ、脚本等内容编辑能力。工程同时生成桌面 GUI 和 `jxqy-editor-cli`。
 
-The license only has the following points to be accounted for:
+依赖：
 
-Software is used on 'as-is' basis. Authors are not liable for any damages arising from its use.
+- CMake 3.15+；
+- 支持 C++17 的编译器；
+- Qt 6 Core、Gui、Widgets、Multimedia、LinguistTools；
+- 非 Windows 平台需要 Iconv。
 
-The distribution of a modified version of the software is subject to the following restrictions:
+构建示例：
 
-   1.The authorship of the original software must not be misrepresented,
-   
-   2.Altered source versions must not be misrepresented as being the original software, and
-   
-   3.The license notice must not be removed from source distributions.
-   
-The license does not require source code to be made available if distributing binary code.
+```sh
+cmake \
+  -S jxqy-editor \
+  -B build/editor-release \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_PREFIX_PATH=/path/to/Qt
 
-# 游戏说明
- 
-## 作弊模式
+cmake --build build/editor-release --parallel
+```
 
-在开始新游戏或读取进度之后，按shift+F12会开启\关闭作弊模式
+如果 Qt 已位于 CMake 默认搜索路径，可以省略 `CMAKE_PREFIX_PATH`。
 
-作弊模式下：
+## 开发约定
 
-shift+Q会补满生命、体力和内力；
+- 游戏运行时功能优先在 `src/` 实现；资源格式和内容工具优先在 `jxqy-editor/` 实现。
+- 资源格式改动应同时验证编辑器输出与运行时读取行为。
+- `ThirdParty/devel/` 只保存本地平台依赖。
+- `build*`、`jxqy-editor/build*`、DerivedData、APK、DMG、IPA、归档和调试符号均为本地输出。
+- 提交前请检查 `git status`，确保源码提交只包含预期文件。
 
-shift+W会增加正在修炼的武功经验；
+## 主要第三方组件
 
-shift+E会增加自身经验。
- 
-## 引擎怎样支持mod？
-引擎支持的图片格式是我自己设计的png打包格式，与金群imz格式类似，脚本文件则全部转换为了lua语法的脚本。以上图片转换和脚本转换过程是使用Editor文件夹的工具进行了转换，今后该工具还会扩展支持贴图、地图等编辑。
- 
-## 为什么改变了图片和脚本格式？
+- [SDL3](https://www.libsdl.org/)、SDL3_image、SDL3_ttf、SDL3_mixer
+- [FFmpeg](https://ffmpeg.org/)
+- [Lua](https://www.lua.org/)
+- [minilzo](https://www.oberhumer.com/opensource/lzo/)
+- [miniz](https://github.com/richgel999/miniz)
+- [Qt](https://www.qt.io/)（编辑器）
+- [Sparkle](https://sparkle-project.org/)（macOS）
 
-### 1、图片格式更改原因：
-（1）原始的图片格式为MPC格式和SHD格式，这种格式只能是256色，且对半透明的支持也不是很好，扩展性不如直接使用PNG；
+具体版本和许可证请查看 [`licenses/THIRD_PARTY_BUILD_DEPENDENCIES.md`](licenses/THIRD_PARTY_BUILD_DEPENDENCIES.md) 与 [`licenses/THIRD_PARTY_NOTICES.md`](licenses/THIRD_PARTY_NOTICES.md)。
 
-（2）原始MPC图片存在大面积透明像素，将其转换为SDL2的Texture时，空白部分也会占用内存，严重消耗系统资源，而将其转为PNG时，剪裁掉了透明像素，保留有效像素，缩小了图像尺寸。
+## 许可证
 
-### 2、脚本格式更改原因：
-（1）以后的剧情设计可能会用到复杂的语法；
+项目源码使用 GNU General Public License v3.0，完整条款见 [`LICENSE`](LICENSE)。第三方组件适用各自许可证。
 
-（2）偷懒不愿意写脚本解析……
+## 致谢
 
-# 引擎说明：
+感谢 Scarsty、SunTY、Weyl、BT、SB500 等前辈的 C++ 武侠游戏复刻实践，也感谢《月影传说》高清版作者小试刀剑、大武侠论坛和剑侠情缘贴吧社区提供的研究资料与经验。
 
-## 引擎底层：
-
-引擎底层的实现主要封装在EngineBase类中，对外的接口则封装在Engine类中，大部分功能都已经可以使用简单的函数实现，如果没有特殊需求，此部分可以不用更改。下面对底层中一些主要的逻辑进行说明：
-
-（1）SDL2：绘图与鼠标键盘输入检测等基本功能都是使用SDL2来实现的。初始化时默认使用硬件加速和垂直同步。引擎可以选择全屏模式和窗口模式，默认分辨率在创建时给定，为方便UI设计此分辨率一般不要更改，但画面可以进行拉抻和缩放：在全屏模式下，保持当前屏幕分辨率不变，画面直接进行拉抻铺满屏幕；在窗口模式时，根据窗口大小，画面保持长宽比例，进行缩放以适应窗口大小。这种窗体大小的自适应改变只在引擎底层中体现，而引擎对外接口是不受影响的，也就是说，在游戏上层调用时，可以认为游戏画面的分辨率始终就是不变的，鼠标的位置检测也没有任何影响。
-
-（2）FFmpeg：用于视频解码。引擎中视频播放时间以音频为准，由于采用单线程解码，在有拖拽窗体等需等待的事件发生时，视频和音频会停止播放。视频播放还支持设置播放的位置，并且可以同时播放多个视频。另外需要注意的是，剑侠情缘2的视频格式过于古老，在解码之后还需调用sws_scale进行图像处理。
-
-（3）FMOD：用于音频播放，需要注意的是在播放视频解码得到音频帧时，为实现效果较好的无缝衔接，需单独创建一个FMOD_SYSTEM（作者能力有限，只会这种方法）。
-
-## Element类：
-
-学习了偶像（Weyl、Scarsty、SunTY、BT、SB500）的kys-cpp复刻版的代码，仿造其Element类，在我的引擎中也创建了Element类。此类是游戏中的基本类，基于此类创建了游戏的UI界面控件：包括菜单、按钮、滚动条、标签、图像载体、视频播放器等等控件；还创建了游戏中的NPC类，物体类，飞行技能类等等。此类可以设置一个父节点和若干子节点，子节点具有优先级属性。类的关键函数有：run、onUpdate、onEvent、onHandleEvent、onDraw，下面具体介绍一下这些函数的功能。
-
-（1）run函数：会使节点进入运行模式，直到其running属性为false时退出运行，运行时会不断调用onUpdate、onEvent、onDraw等函数。
-
-（2）onUpdate函数：此函数应用来做节点每帧的状态处理，会从当前执行run的节点向父节点寻找，直到没有父节点时的节点为顶端节点，此时顶端节点以下的节点都会执行此函数，执行顺序从优先级高的子节点到优先级低的子节点再到父节点。
-
-（3）onEvent函数：此函数应用来做节点每帧的事件处理，会以当前执行run的节点为顶端，其下的节点才会执行此函数，执行顺序从优先级高的子节点到优先级低的子节点再到父节点。
-
-（4）onHandleEvent函数：这个函数在onEvent执行后调用，必须是消息队列中有消息时才会执行，会传入一些鼠标、键盘点击等事件，节点检测事件类型，如需处理，应在函数结束后返回true，表示此事件已处理，需要从消息队列将其删除；而不需处理则返回false，表示重新压回消息队列供其它节点处理。
-
-（5）onDraw函数：这个函数是绘制自身，会从当前执行run的节点向上寻找，直到没有父节点或者节点的drawFullScreen属性为true时，以此节点为顶端向下执行，执行顺序与其它函数不同，先执行父节点，再执行优先级低的子节点、再执行优先级高的子节点。
-
-## 文件管理：
-
-引擎有一个打包文件：game\data\data.dat文件，其中包含了游戏的大部分资源文件，根据原始文件的路径和名称计算出一个文件ID，按顺序进行存储。引擎在读取文件时，优先寻找原始文件路径和名称，如果没有找到，则在打包文件中进行寻找。
-
-# 编辑器说明：
-
-目前编辑器尚未完成，只能用来转换文件格式、打包解包和查看转换后的图片。
-
-## 脚本转换：
-
-可以将剑侠情缘2的脚本转为lua语法脚本，目前有小概率可能出现错误。
-
-## 图片转换：
-
-可以将剑侠情缘系列的mpc、shd、asf格式图片转为游戏使用的IMG格式。半透明模式只对mpc文件有效，其它格式没有影响。图片转换之后可以进行剪裁，去掉图片周边的空白区域，但游戏界面所使用的图片不建议进行剪裁。
+JXQY All-in-One 源于作者对《剑侠情缘》系列的长期热爱，希望逐步形成可移植、可维护并能服务于多部作品和社区 MOD 的运行时与内容工具链。
