@@ -1,0 +1,916 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>NpcDataEditorWindow</class>
+ <widget class="QWidget" name="NpcDataEditorWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+    <string>NPC/OBJ/资源编辑器</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QToolBar" name="npcToolBar">
+     <property name="windowTitle">
+      <string>NPC 工具</string>
+     </property>
+     <addaction name="actionOpen"/>
+     <addaction name="actionSave"/>
+     <addaction name="actionSaveAs"/>
+     <addaction name="separator"/>
+     <addaction name="actionAddEntry"/>
+     <addaction name="actionRemoveEntry"/>
+     <addaction name="actionMoveUp"/>
+     <addaction name="actionMoveDown"/>
+     <addaction name="separator"/>
+     <addaction name="actionDuplicateEntry"/>
+    </widget>
+   </item>
+   <item>
+    <widget class="QSplitter" name="mainSplitter">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <widget class="QGroupBox" name="listGroupBox">
+      <property name="title">
+       <string>数据列表</string>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>200</width>
+        <height>0</height>
+       </size>
+      </property>
+      <layout class="QVBoxLayout" name="listLayout">
+       <item>
+        <widget class="QTabWidget" name="entityTabWidget">
+         <property name="currentIndex">
+          <number>0</number>
+         </property>
+         <widget class="QWidget" name="npcTab">
+          <attribute name="title">
+           <string>NPC</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="npcTabLayout">
+           <item>
+            <widget class="QListWidget" name="npcListWidget"/>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="objectTab">
+          <attribute name="title">
+           <string>物体</string>
+          </attribute>
+          <layout class="QVBoxLayout" name="objectTabLayout">
+           <item>
+            <widget class="QListWidget" name="objectListWidget"/>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QScrollArea" name="propertyScrollArea">
+      <property name="widgetResizable">
+       <bool>true</bool>
+      </property>
+      <property name="minimumSize">
+       <size>
+        <width>500</width>
+        <height>0</height>
+       </size>
+      </property>
+      <widget class="QWidget" name="propertyScrollContent">
+       <layout class="QVBoxLayout" name="propertyScrollLayout">
+        <item>
+         <widget class="QTabWidget" name="propertyTabWidget">
+          <property name="currentIndex">
+           <number>0</number>
+          </property>
+          <widget class="QWidget" name="basicTab">
+           <attribute name="title">
+            <string>基础</string>
+           </attribute>
+           <layout class="QFormLayout" name="basicFormLayout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="nameLabel">
+              <property name="text">
+               <string>名称</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="nameEdit"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="kindLabel">
+              <property name="text">
+               <string>种类</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QComboBox" name="kindCombo"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="resourceIniLabel">
+              <property name="text">
+               <string>资源INI</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="resourceIniEdit"/>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="dirLabel">
+              <property name="text">
+               <string>朝向</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QSpinBox" name="dirSpinBox">
+              <property name="minimum">
+               <number>0</number>
+              </property>
+              <property name="maximum">
+               <number>7</number>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="mapXLabel">
+              <property name="text">
+               <string>地图X</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QSpinBox" name="mapXSpinBox">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="mapYLabel">
+              <property name="text">
+               <string>地图Y</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <widget class="QSpinBox" name="mapYSpinBox">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="scriptLabel">
+              <property name="text">
+               <string>脚本文件</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <widget class="QLineEdit" name="scriptEdit"/>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="behaviorTab">
+           <attribute name="title">
+            <string>行为</string>
+           </attribute>
+           <layout class="QFormLayout" name="behaviorFormLayout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="actionLabel">
+              <property name="text">
+               <string>漫游意图</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QComboBox" name="actionCombo"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="walkSpeedLabel">
+              <property name="text">
+               <string>行走速度</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QSpinBox" name="walkSpeedSpinBox">
+              <property name="minimum">
+               <number>0</number>
+              </property>
+              <property name="maximum">
+               <number>99</number>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="standSpeedLabel">
+              <property name="text">
+               <string>站立速度</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QSpinBox" name="standSpeedSpinBox">
+              <property name="minimum">
+               <number>0</number>
+              </property>
+              <property name="maximum">
+               <number>99</number>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="pathFinderLabel">
+              <property name="text">
+               <string>寻路方式</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QComboBox" name="pathFinderCombo"/>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="dialogRadiusLabel">
+              <property name="text">
+               <string>对话半径</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QSpinBox" name="dialogRadiusSpinBox">
+              <property name="minimum">
+               <number>0</number>
+              </property>
+              <property name="maximum">
+               <number>99</number>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="relationLabel">
+              <property name="text">
+               <string>关系</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <widget class="QComboBox" name="relationCombo"/>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="visionRadiusLabel">
+              <property name="text">
+               <string>视野半径</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <widget class="QSpinBox" name="visionRadiusSpinBox">
+              <property name="maximum">
+               <number>999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="attackRadiusLabel">
+              <property name="text">
+               <string>攻击半径</string>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="1">
+             <widget class="QSpinBox" name="attackRadiusSpinBox">
+              <property name="maximum">
+               <number>999</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="combatTab">
+           <attribute name="title">
+            <string>战斗</string>
+           </attribute>
+           <layout class="QFormLayout" name="combatFormLayout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="lifeLabel">
+              <property name="text">
+               <string>生命值</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QSpinBox" name="lifeSpinBox">
+              <property name="maximum">
+               <number>999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="lifeMaxLabel">
+              <property name="text">
+               <string>最大生命</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QSpinBox" name="lifeMaxSpinBox">
+              <property name="maximum">
+               <number>999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="thewLabel">
+              <property name="text">
+               <string>体力</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QSpinBox" name="thewSpinBox">
+              <property name="maximum">
+               <number>999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="thewMaxLabel">
+              <property name="text">
+               <string>最大体力</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QSpinBox" name="thewMaxSpinBox">
+              <property name="maximum">
+               <number>999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="manaLabel">
+              <property name="text">
+               <string>内力</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QSpinBox" name="manaSpinBox">
+              <property name="maximum">
+               <number>999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="manaMaxLabel">
+              <property name="text">
+               <string>最大内力</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <widget class="QSpinBox" name="manaMaxSpinBox">
+              <property name="maximum">
+               <number>999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="attackLabel">
+              <property name="text">
+               <string>攻击力</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <widget class="QSpinBox" name="attackSpinBox">
+              <property name="maximum">
+               <number>99999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="defendLabel">
+              <property name="text">
+               <string>防御力</string>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="1">
+             <widget class="QSpinBox" name="defendSpinBox">
+              <property name="maximum">
+               <number>99999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="8" column="0">
+             <widget class="QLabel" name="evadeLabel">
+              <property name="text">
+               <string>闪避</string>
+              </property>
+             </widget>
+            </item>
+            <item row="8" column="1">
+             <widget class="QSpinBox" name="evadeSpinBox">
+              <property name="maximum">
+               <number>99999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="0">
+             <widget class="QLabel" name="duckLabel">
+              <property name="text">
+               <string>躲避</string>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="1">
+             <widget class="QSpinBox" name="duckSpinBox">
+              <property name="maximum">
+               <number>99999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="10" column="0">
+             <widget class="QLabel" name="expLabel">
+              <property name="text">
+               <string>经验值</string>
+              </property>
+             </widget>
+            </item>
+            <item row="10" column="1">
+             <widget class="QSpinBox" name="expSpinBox">
+              <property name="maximum">
+               <number>9999999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="11" column="0">
+             <widget class="QLabel" name="levelLabel">
+              <property name="text">
+               <string>等级</string>
+              </property>
+             </widget>
+            </item>
+            <item row="11" column="1">
+             <widget class="QSpinBox" name="levelSpinBox">
+              <property name="maximum">
+               <number>999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="12" column="0">
+             <widget class="QLabel" name="levelUpExpLabel">
+              <property name="text">
+               <string>升级所需经验</string>
+              </property>
+             </widget>
+            </item>
+            <item row="12" column="1">
+             <widget class="QSpinBox" name="levelUpExpSpinBox">
+              <property name="maximum">
+               <number>2147483647</number>
+              </property>
+             </widget>
+            </item>
+            <item row="13" column="0">
+             <widget class="QLabel" name="attackLevelLabel">
+              <property name="text">
+               <string>攻击等级</string>
+              </property>
+             </widget>
+            </item>
+            <item row="13" column="1">
+             <widget class="QSpinBox" name="attackLevelSpinBox">
+              <property name="maximum">
+               <number>2147483647</number>
+              </property>
+             </widget>
+            </item>
+            <item row="14" column="0">
+             <widget class="QLabel" name="magicLevelLabel">
+              <property name="text">
+               <string>魔法等级</string>
+              </property>
+             </widget>
+            </item>
+            <item row="14" column="1">
+             <widget class="QSpinBox" name="magicLevelSpinBox">
+              <property name="maximum">
+               <number>2147483647</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="resourceTab">
+           <attribute name="title">
+            <string>资源</string>
+           </attribute>
+           <layout class="QFormLayout" name="resourceFormLayout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="bodyIniLabel">
+              <property name="text">
+               <string>尸体INI</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="bodyIniEdit"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="flyIniLabel">
+              <property name="text">
+               <string>飞行魔法1</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="flyIniEdit"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="flyIni2Label">
+              <property name="text">
+               <string>飞行魔法2</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="flyIni2Edit"/>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="flyInisLabel">
+              <property name="text">
+               <string>飞行魔法列表</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QLineEdit" name="flyInisEdit"/>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="magicIniLabel">
+              <property name="text">
+               <string>魔法INI</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QLineEdit" name="magicIniEdit"/>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="deathScriptLabel">
+              <property name="text">
+               <string>死亡脚本</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <widget class="QLineEdit" name="deathScriptEdit"/>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="lumLabel">
+              <property name="text">
+               <string>光照效果</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <widget class="QComboBox" name="lumCombo"/>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="stateLabel">
+              <property name="text">
+               <string>状态</string>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="1">
+             <widget class="QSpinBox" name="stateSpinBox">
+              <property name="maximum">
+               <number>999</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="objectTab_props">
+           <attribute name="title">
+            <string>物体属性</string>
+           </attribute>
+           <layout class="QFormLayout" name="objectFormLayout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="objNameLabel">
+              <property name="text">
+               <string>名称</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="objNameEdit"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="objFileLabel">
+              <property name="text">
+               <string>资源INI</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="objFileEdit"/>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="objScriptLabel">
+              <property name="text">
+               <string>脚本文件</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="objScriptEdit"/>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="wavFileLabel">
+              <property name="text">
+               <string>音效文件</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QLineEdit" name="wavFileEdit"/>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="objKindLabel">
+              <property name="text">
+               <string>种类</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QComboBox" name="objKindCombo"/>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="objDirLabel">
+              <property name="text">
+               <string>朝向</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="1">
+             <widget class="QSpinBox" name="objDirSpinBox">
+              <property name="maximum">
+               <number>7</number>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="objMapXLabel">
+              <property name="text">
+               <string>地图X</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="1">
+             <widget class="QSpinBox" name="objMapXSpinBox">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="objMapYLabel">
+              <property name="text">
+               <string>地图Y</string>
+              </property>
+             </widget>
+            </item>
+            <item row="7" column="1">
+             <widget class="QSpinBox" name="objMapYSpinBox">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="8" column="0">
+             <widget class="QLabel" name="offsetXLabel">
+              <property name="text">
+               <string>X偏移</string>
+              </property>
+             </widget>
+            </item>
+            <item row="8" column="1">
+             <widget class="QSpinBox" name="offsetXSpinBox">
+              <property name="minimum">
+               <number>-9999</number>
+              </property>
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="0">
+             <widget class="QLabel" name="offsetYLabel">
+              <property name="text">
+               <string>Y偏移</string>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="1">
+             <widget class="QSpinBox" name="offsetYSpinBox">
+              <property name="minimum">
+               <number>-9999</number>
+              </property>
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="10" column="0">
+             <widget class="QLabel" name="objLumLabel">
+              <property name="text">
+               <string>光照效果</string>
+              </property>
+             </widget>
+            </item>
+            <item row="10" column="1">
+             <widget class="QComboBox" name="objLumCombo"/>
+            </item>
+            <item row="11" column="0">
+             <widget class="QLabel" name="damageLabel">
+              <property name="text">
+               <string>伤害值</string>
+              </property>
+             </widget>
+            </item>
+            <item row="11" column="1">
+             <widget class="QSpinBox" name="damageSpinBox">
+              <property name="maximum">
+               <number>99999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="12" column="0">
+             <widget class="QLabel" name="frameLabel">
+              <property name="text">
+               <string>动画帧</string>
+              </property>
+             </widget>
+            </item>
+            <item row="12" column="1">
+             <widget class="QSpinBox" name="frameSpinBox">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="13" column="0">
+             <widget class="QLabel" name="objStateLabel">
+              <property name="text">
+               <string>动作状态</string>
+              </property>
+             </widget>
+            </item>
+            <item row="13" column="1">
+             <widget class="QComboBox" name="objStateCombo"/>
+            </item>
+            <item row="14" column="0">
+             <widget class="QLabel" name="actionTimeLabel">
+              <property name="text">
+               <string>动作已进行毫秒</string>
+              </property>
+             </widget>
+            </item>
+            <item row="14" column="1">
+             <widget class="QLineEdit" name="actionTimeEdit">
+              <property name="placeholderText">
+               <string>0 到 9223372036854775807</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </widget>
+        </item>
+        <item>
+         <spacer name="propertySpacer">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>20</width>
+            <height>40</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+  <action name="actionOpen">
+   <property name="text">
+    <string>打开</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+   <property name="statusTip">
+    <string>打开NPC/物体数据文件</string>
+   </property>
+  </action>
+  <action name="actionSave">
+   <property name="text">
+    <string>保存</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+   <property name="statusTip">
+    <string>保存当前数据文件</string>
+   </property>
+  </action>
+  <action name="actionSaveAs">
+   <property name="text">
+    <string>另存为</string>
+   </property>
+   <property name="statusTip">
+    <string>保存到新文件</string>
+   </property>
+  </action>
+  <action name="actionAddEntry">
+   <property name="text">
+    <string>添加</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+   <property name="statusTip">
+    <string>添加新实体</string>
+   </property>
+  </action>
+  <action name="actionRemoveEntry">
+   <property name="text">
+    <string>删除</string>
+   </property>
+   <property name="shortcut">
+    <string>Del</string>
+   </property>
+   <property name="statusTip">
+    <string>删除选中实体</string>
+   </property>
+  </action>
+  <action name="actionMoveUp">
+   <property name="text">
+    <string>上移</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Up</string>
+   </property>
+   <property name="statusTip">
+    <string>上移选中实体</string>
+   </property>
+  </action>
+  <action name="actionMoveDown">
+   <property name="text">
+    <string>下移</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Down</string>
+   </property>
+   <property name="statusTip">
+    <string>下移选中实体</string>
+   </property>
+  </action>
+  <action name="actionDuplicateEntry">
+   <property name="text">
+    <string>复制</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+D</string>
+   </property>
+   <property name="statusTip">
+    <string>复制选中实体</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

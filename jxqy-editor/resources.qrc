@@ -1,0 +1,17 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="application.ico">../win/jxqy-all-in-one/jxqy.ico</file>
+        <file alias="application.png">../branding/jxqy-all-in-one-icon-1024.png</file>
+        <file alias="sword.png">resources/sword.png</file>
+        <file alias="map_tools/tool-area.png">resources/map_tools/tool-area.png</file>
+        <file alias="map_tools/tool-fill.png">resources/map_tools/tool-fill.png</file>
+        <file alias="map_tools/tool-npc.png">resources/map_tools/tool-npc.png</file>
+        <file alias="map_tools/tool-object.png">resources/map_tools/tool-object.png</file>
+        <file alias="map_tools/tool-obstacle.png">resources/map_tools/tool-obstacle.png</file>
+        <file alias="map_tools/tool-pan.png">resources/map_tools/tool-pan.png</file>
+        <file alias="map_tools/tool-picker.png">resources/map_tools/tool-picker.png</file>
+        <file alias="map_tools/tool-select.png">resources/map_tools/tool-select.png</file>
+        <file alias="map_tools/tool-tile-paint.png">resources/map_tools/tool-tile-paint.png</file>
+        <file alias="map_tools/tool-trap.png">resources/map_tools/tool-trap.png</file>
+    </qresource>
+</RCC>

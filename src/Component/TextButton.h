@@ -10,17 +10,21 @@ class TextButton :
 public:
 	TextButton();
 	virtual ~TextButton();
-	Label label;
+
 
 	void setFontSize(int fontSize);
+	int getFontSize() const;
 	void setStrColor(unsigned int color);
+	unsigned int getTextColor() const;
 	virtual void setStr(const std::string& s);
     virtual void setUTF8Str(const std::string& s);
 	virtual void initFromIni(INIReader & ini);
-
+	
+protected:
+	Label label;
 	virtual void onDraw();
     virtual void onMouseLeftDown(int x, int y);
 	virtual void onClick();
+	
 
 };
-

@@ -17,4 +17,5 @@
 #include "Goods.h"
 #include "GoodsManager.h"
 #include "PartnerManager.h"
+#include "TalkTextList.h"
 #include "CollisionDetector.h"

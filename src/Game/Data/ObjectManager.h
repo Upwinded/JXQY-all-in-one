@@ -1,16 +1,56 @@
 #pragma once
 #include "Object.h"
+#include "ImageResourcePathResolver.h"
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
 #include <vector>
 #include <deque>
+
+inline std::vector<std::string> buildObjectImageResourceCandidates(const std::string& imageName)
+{
+	return buildImageResourceCandidatesForCategory(
+		imageName,
+		"object",
+		OBJECT_RES_FOLDER_ASF,
+		OBJECT_RES_FOLDER);
+}
+
+class INIReader;
+class ObjectManager;
+
+class PreparedObjectLoad final
+{
+public:
+	PreparedObjectLoad() = default;
+	PreparedObjectLoad(PreparedObjectLoad&& other) noexcept = default;
+	PreparedObjectLoad& operator=(PreparedObjectLoad&& other) noexcept = default;
+
+	PreparedObjectLoad(const PreparedObjectLoad&) = delete;
+	PreparedObjectLoad& operator=(const PreparedObjectLoad&) = delete;
+
+	bool isPrepared() const noexcept;
+	std::size_t objectCount() const noexcept;
+
+private:
+	std::shared_ptr<INIReader> reader;
+	int count = 0;
+
+	friend class ObjectManager;
+};
 
 class ObjectManager:
 	public Element
 {
+private:
+	void releaseManagedObjects(bool clearObjectImages);
+
 public:
 	ObjectManager();
 	virtual ~ObjectManager();
 
-	int clickIndex = 0;
+	int clickIndex = -1;
 
 	bool findObj(std::shared_ptr<Object> object);
 	std::shared_ptr<Object> findObj(const std::string & name);
@@ -22,8 +62,10 @@ public:
 	std::vector<std::shared_ptr<Object>> objectList;
 
 	void deleteObject(std::string nName);
+	void deleteObject(std::shared_ptr<Object> object);
 	void deleteObjectFromOtherPlace(std::shared_ptr<Object> obj);
-	void addObject(std::string iniName, int x, int y, int dir);
+	std::shared_ptr<Object> addObject(std::string iniName, int x, int y, int dir, PointEx offset = { 0, 0 });
+	std::vector<std::shared_ptr<Object>> takeBodiesInRadius(Point pos, int radius);
 	void clearBody();
 	void clearObj();
 	void checkDamage();
@@ -37,10 +79,32 @@ public:
 	_shared_imp loadObjectImage(const std::string & imageName);
 
 	void freeResource();
-	virtual void load(const std::string & fileName);
-	virtual void save(const std::string & fileName);
+	virtual bool load(
+		const std::string& fileName,
+		const std::function<void()>& beforeMutation = {},
+		const std::function<bool()>& preparationCheckpoint = {});
+	bool prepareLoad(
+		const std::string& fileName,
+		PreparedObjectLoad& preparedLoad,
+		bool allowIncompleteSectionList = false) const;
+	bool prepareExactResourceBytes(
+		const std::string& virtualPath,
+		const std::vector<std::uint8_t>& bytes,
+		PreparedObjectLoad& preparedLoad) const;
+	bool commitPreparedLoad(
+		PreparedObjectLoad&& preparedLoad,
+		const std::function<void()>& beforeMutation = {},
+		const std::function<bool()>& preparationCheckpoint = {});
+	bool validate(const std::string& fileName);
+	bool loadExactResourceBytes(
+		const std::string& virtualPath,
+		const std::vector<std::uint8_t>& bytes,
+		const std::function<void()>& beforeMutation = {},
+		const std::function<bool()>& preparationCheckpoint = {});
+	virtual bool save(const std::string & fileName);
 	virtual void onEvent();
 	virtual void onUpdate();
 
+protected:
+	virtual bool shouldUpdateChild(PElement child) override;
 };
-

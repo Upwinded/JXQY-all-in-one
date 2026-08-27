@@ -2,8 +2,6 @@
 #include "RoundButton.h"
 #include <vector>
 
-#define JOYSTICK_MIN_RANGE 1 / 20
-#define JOYSTICK_MID_RANGE 1 / 5
 #define OutRange -1000
 
 class Joystick :
@@ -15,16 +13,18 @@ public:
 protected:
 	Point touchPosition = { OutRange, OutRange };
 private:
-	float calculateAngel(int x, int y);
-	int calculateDirection(float angle);
-	int normalizeDirection(int dir);
+	bool useStaticImages = false;
 public:
 	std::vector<int> getDirectionList();
 	bool isRunning();
 	bool isWalking();
 	int distanceToCenter();
+	void resetInput();
 protected:
 	virtual bool mouseInRect(int x, int y);
+	virtual bool shouldKeepTouchWhenPointerLeaves(int x, int y);
+	virtual bool onPointerInteractionCanceled(EventTouchID pointerID) override;
+	virtual void onAllPointerInteractionsCanceled() override;
 public:
 	virtual void onMouseMoving(int x, int y);
 	virtual void onMouseMoveIn(int x, int y);
@@ -39,4 +39,3 @@ public:
 public:
 	virtual void initFromIni(INIReader & ini);
 };
-

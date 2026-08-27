@@ -1,8 +1,7 @@
 #include "Engine.h"
+#include "AudioDecodeSafety.h"
+#include "LogicalResolutionPolicy.h"
 #include "../Image/IMP.h"
-
-Engine Engine::engine;
-Engine* Engine::_this = &Engine::engine;
 
 Engine::Engine()
 {
@@ -15,12 +14,15 @@ Engine::~Engine()
 
 int Engine::engineAppEventHandler(SDL_Event* event)
 {
+	Engine* engine = getInstance();
 	switch (event->type)
 	{
+	case SDL_EVENT_QUIT:
+	case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+		// 用户发起的关闭请求仍需由当前场景决定如何响应。
+		return 1;
 	case SDL_EVENT_TERMINATING:
-		/* Terminate the app.
-			Shut everything down before returning from this function.
-		*/
+		engine->requestApplicationQuit();
 		return 0;
 	case SDL_EVENT_LOW_MEMORY:
 		/* You will get this when your app is paused and iOS wants more memory.
@@ -28,47 +30,124 @@ int Engine::engineAppEventHandler(SDL_Event* event)
 		*/
 		return 0;
 	case SDL_EVENT_WILL_ENTER_BACKGROUND:
-		/* Prepare your app to go into the background.  Stop loops, etc.
-			This gets called when the user hits the home button, or gets a call.
-		*/
-
-		return 0;
 	case SDL_EVENT_DID_ENTER_BACKGROUND:
-		/* This will get called if the user accepted whatever sent your app to the background.
-			If the user got a phone call and canceled it, you'll instead get an SDL_EVENT_DIDENTERFOREGROUND event and restart your loops.
-			When you get this, you have 5 seconds to save all your state or the app will be terminated.
-			Your app is NOT active at this point.
-		*/
-		getInstance()->pauseBGM();
+		engine->applicationBackgrounded.store(true);
 		return 0;
 	case SDL_EVENT_WILL_ENTER_FOREGROUND:
-		/* This call happens when your app is coming back to the foreground.
-			Restore all your state here.
-		*/
 		return 0;
 	case SDL_EVENT_DID_ENTER_FOREGROUND:
-		/* Restart your loops here.
-			Your app is interactive and getting CPU again.
-		*/
-		getInstance()->resumeBGM();
+		engine->applicationBackgrounded.store(false);
 		return 0;
+	case SDL_EVENT_WINDOW_FOCUS_LOST:
+	case SDL_EVENT_WINDOW_FOCUS_GAINED:
+		// Losing desktop window focus must not pause gameplay or media. True
+		// application suspension is handled by the lifecycle background events.
+		return 1;
 	default:
 		/* No special processing, add it to the event queue */
 		return 1;
 	}
 }
 
+void Engine::requestApplicationQuit()
+{
+	applicationQuitRequested.store(true);
+}
+
+void Engine::resetApplicationQuitRequest()
+{
+	applicationQuitRequested.store(false);
+}
+
+bool Engine::isApplicationQuitRequested() const
+{
+	return applicationQuitRequested.load();
+}
+
+bool Engine::isApplicationActive() const
+{
+	return !applicationBackgrounded.load() &&
+		!isRenderAdmissionClosed();
+}
+
+bool Engine::isMainThread() const
+{
+	return SDL_IsMainThread();
+}
+
+const GameInput::PhysicalInputManager& Engine::inputActions() const
+{
+	return EngineBase::inputActions();
+}
+
+bool Engine::consumeInputAction(GameInput::InputAction inputAction)
+{
+	return EngineBase::consumeInputAction(inputAction);
+}
+
+void Engine::releasePhysicalInputsForContextTransition()
+{
+	EngineBase::releasePhysicalInputsForContextTransition();
+}
+
+bool Engine::canPrepareRenderFrame() const
+{
+	return EngineBase::canPrepareRenderFrame() &&
+		isApplicationActive() &&
+		!isApplicationQuitRequested();
+}
+
+void Engine::updateApplicationMediaState()
+{
+	const bool shouldPause = !isApplicationActive();
+	if (shouldPause)
+	{
+		if (applicationMediaPaused.exchange(true))
+		{
+			return;
+		}
+		applicationPausedBGMChannel = pauseMusicIfPlaying(channelBGM)
+			? channelBGM : nullptr;
+		applicationPausedTalkChannel = pauseMusicIfPlaying(channelTalk)
+			? channelTalk : nullptr;
+#ifdef SHF_USE_VIDEO
+		pauseAllVideo();
+#endif
+		return;
+	}
+
+	if (!applicationMediaPaused.exchange(false))
+	{
+		return;
+	}
+	resumeMusic(applicationPausedBGMChannel);
+	resumeMusic(applicationPausedTalkChannel);
+	applicationPausedBGMChannel = nullptr;
+	applicationPausedTalkChannel = nullptr;
+#ifdef SHF_USE_VIDEO
+	resumeAllVideo();
+#endif
+}
+
 Engine* Engine::getInstance()
 {
-	return _this;
+	// Construct the process singleton on first use so its destructor runs
+	// before the File and GameLog namespace-static state used by shutdown.
+	static Engine engine;
+	return &engine;
 }
 
 int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display)
 {
-	width = windowWidth;
-	height = windowHeight;
+	resetApplicationQuitRequest();
+	applicationBackgrounded.store(false);
+	applicationMediaPaused.store(false);
+	applicationPausedBGMChannel = nullptr;
+	applicationPausedTalkChannel = nullptr;
+	width = LogicalResolutionPolicy::constrainWidth(windowWidth);
+	height = LogicalResolutionPolicy::constrainHeight(windowHeight);
 
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	if (EngineBase::init(windowCaption, width, height, fullScreenMode, fullScreenSolutionMode, display, engineAppEventHandler) != initOK)
 	{
 		return initError;
@@ -83,55 +162,72 @@ void Engine::destroyEngine()
 	{
 		freeMusic(bgm);
 		bgm = nullptr;
+		channelBGM = nullptr;
+		applicationPausedBGMChannel = nullptr;
 	}
 	if (talk != nullptr)
 	{
 		freeMusic(talk);
 		talk = nullptr;
+		channelTalk = nullptr;
+		applicationPausedTalkChannel = nullptr;
 	}
     //EngineBase::destroyEngineBase();
 }
 
 void Engine::getWindowSize(int& w, int& h)
 {
-	w = width;
-	h = height;
+	getLogicalWindowSize(w, h);
 }
 
 void Engine::setWindowSize(int w, int h)
 {
-	if (w < 0 || h < 0)
-	{
-		return;
-	}
-	width = w;
-	height = h;
-	std::lock_guard<std::mutex> locker(_mutex);
+	LogicalResolutionPolicy::constrain(w, h);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setWindowSize(w, h);
 }
 
 void Engine::setWindowFullScreen(FullScreenMode mode)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setFullScreen(mode);
+}
+
+std::vector<DesktopDisplayInfo> Engine::getDesktopDisplays()
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::getDesktopDisplays();
+}
+
+DesktopDisplaySettings Engine::getDesktopDisplaySettings()
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::getDesktopDisplaySettings();
+}
+
+bool Engine::applyDesktopDisplaySettings(
+	const DesktopDisplaySettings& settings)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::applyDesktopDisplaySettings(settings);
 }
 
 
 void Engine::getScreenInfo(int& w, int& h)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::getScreenInfo(w, h);
 }
 
 FullScreenMode Engine::getWindowFullScreen()
 {
-    std::lock_guard<std::mutex> locker(_mutex);
+    ConditionalLock locker(_mutex, multiThreadedMode);
     return EngineBase::_fullScreenMode;
 }
 
 _shared_image Engine::loadImageFromFile(const std::string & fileName)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::loadImageFromFile(fileName);
 }
 
@@ -141,57 +237,78 @@ _shared_image Engine::loadImageFromMem(std::unique_ptr<char[]>& data, int size)
 	{
 		return nullptr;
 	}
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::loadImageFromMem(data, size);	
 }
 
 int Engine::saveImageToFile(_shared_image image, int w, int h, const std::string & fileName)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::saveImageToFile(image, w, h, fileName);
 }
 
 int Engine::saveImageToFile(_shared_image image, const std::string & fileName)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::saveImageToFile(image, fileName);
 }
 
 int Engine::saveImageToMem(_shared_image image, int w, int h, std::unique_ptr<char[]>& data)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::saveImageToMem(image, w, h, data);
 }
 
 int Engine::saveImageToMem(_shared_image image, std::unique_ptr<char[]>& data)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::saveImageToMem(image, data);
+}
+
+int Engine::saveImageToPngMemory(_shared_image image, int width, int height,
+	std::unique_ptr<char[]>& data)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::saveImageToPngMemory(image, width, height, data);
 }
 
 bool Engine::pointInImage(_shared_image image, int x, int y)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::pointInImage(image, x, y);
 }
 
 _shared_image Engine::createNewImageFromImage(_shared_image image)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createNewImageFromImage(image);
+}
+
+_shared_image Engine::getGrayscaleImage(_shared_image image)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::getGrayscaleImage(image);
 }
 
 void Engine::setMouseFromImpImage(_shared_imp impImage)
 {
-    if (impImage == nullptr)
-    {
-		std::lock_guard<std::mutex> locker(_mutex);
-        EngineBase::setCursorImage(nullptr);
-        return;
-    }
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: mouse cursor images must be created on the SDL main thread\n");
+		return;
+	}
+	if (impImage == nullptr)
+	{
+		ConditionalLock locker(_mutex, multiThreadedMode);
+		EngineBase::setCursorImage(nullptr);
+		return;
+	}
 	CursorImage mouse;
 	mouse.interval = impImage->interval;
 	mouse.image.resize(impImage->frame.size());
+	std::vector<_shared_surface> cursorFrameSurfaces(
+		mouse.image.size());
 
 	for (size_t i = 0; i < mouse.image.size(); i++)
 	{
@@ -199,13 +316,43 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 		mouse.image[i].yOffset = 0;// impImage->frame[i].yOffset;
 		if (impImage->frame[i].dataLen > 0 && impImage->frame[i].data != nullptr)
 		{
-			std::lock_guard<std::mutex> locker(_mutex);
-			mouse.image[i].frame = EngineBase::loadCursorImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen, mouse.image[i].xOffset, mouse.image[i].yOffset);
-			mouse.image[i].softwareFrame = EngineBase::loadImageFromMem(impImage->frame[i].data, impImage->frame[i].dataLen);
+			ConditionalLock locker(_mutex, multiThreadedMode);
+			cursorFrameSurfaces[i] = EngineBase::loadSurfaceFromMem(
+				impImage->frame[i].data,
+				impImage->frame[i].dataLen);
+			mouse.image[i].frame =
+				EngineBase::createCursorImageFromSurface(
+					cursorFrameSurfaces[i].get(),
+					mouse.image[i].xOffset,
+					mouse.image[i].yOffset);
+			mouse.image[i].softwareFrame =
+				EngineBase::createImageFromSurface(
+					cursorFrameSurfaces[i].get());
 			impImage->frame[i].image = nullptr;
 			impImage->frame[i].data = nullptr;
 			impImage->frame[i].dataLen = 0;
 			
+		}
+		else if (!impImage->frame[i].pixelData.empty() &&
+			impImage->frame[i].pixelWidth > 0 && impImage->frame[i].pixelHeight > 0)
+		{
+			ConditionalLock locker(_mutex, multiThreadedMode);
+			cursorFrameSurfaces[i] =
+				EngineBase::createCursorSurfaceFromPixelData(
+					impImage->frame[i].pixelData.data(),
+					impImage->frame[i].pixelWidth,
+					impImage->frame[i].pixelHeight);
+			mouse.image[i].frame =
+				EngineBase::createCursorImageFromSurface(
+					cursorFrameSurfaces[i].get(),
+					mouse.image[i].xOffset,
+					mouse.image[i].yOffset);
+			mouse.image[i].softwareFrame =
+				EngineBase::createImageFromSurface(
+					cursorFrameSurfaces[i].get());
+			std::vector<uint8_t>().swap(impImage->frame[i].pixelData);
+			impImage->frame[i].pixelWidth = 0;
+			impImage->frame[i].pixelHeight = 0;
 		}
 		else
 		{
@@ -214,88 +361,159 @@ void Engine::setMouseFromImpImage(_shared_imp impImage)
 		}
 	}
 
-	std::lock_guard<std::mutex> locker(_mutex);
-	EngineBase::setCursorImage(&mouse);
+	{
+		ConditionalLock locker(_mutex, multiThreadedMode);
+		mouse.nativeAnimatedCursor =
+			EngineBase::createNativeAnimatedCursor(
+				cursorFrameSurfaces,
+				mouse.interval,
+				mouse.image.empty()
+					? 0
+					: mouse.image.front().xOffset,
+				mouse.image.empty()
+					? 0
+					: mouse.image.front().yOffset);
+		EngineBase::setCursorImage(&mouse);
+	}
 	mouse.image.resize(0);
 }
 
 void Engine::setMouseHardware(bool hdCursor)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setCursorHardware(hdCursor);
 }
 
 bool Engine::getMouseHardware()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::hardwareCursor;
 }
 
 void Engine::showCursor()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::showCursor();
 }
 
 void Engine::hideCursor()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::hideCursor();
+}
+
+bool Engine::getCursorVisible()
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::getCursorVisible();
 }
 
 int Engine::getEventCount()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getEventCount();
 }
 
 int Engine::getEvent(AEvent& event)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getEvent(event);
 }
 
 void Engine::pushEvent(AEvent& event)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::pushEvent(event);
+}
+
+void Engine::acknowledgeLogicalResizeEvent(
+	std::uint32_t generation,
+	int logicalWidth,
+	int logicalHeight)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	EngineBase::acknowledgeLogicalResizeEvent(
+		generation,
+		logicalWidth,
+		logicalHeight);
 }
 
 bool Engine::getKeyPress(KeyCode key)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getKeyPress(key);
 }
 
 bool Engine::getMousePressed(MouseButtonCode button)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getMousePress(button);
 }
 
 void Engine::getMousePosition(int& x, int& y)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::getMouse(x, y);
 }
 
 std::vector<AEvent> Engine::getAllFingersPosition()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getAllFingersPosition();
+}
+
+void Engine::pumpEvents()
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	updateApplicationMediaState();
+	EngineBase::pumpEvents();
+	updateApplicationMediaState();
 }
 
 void Engine::frameBegin()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	updateApplicationMediaState();
+	// Always let the SDL event pump run. Foreground lifecycle events are what
+	// make a suspended application active again, so short-circuiting before
+	// EngineBase::frameBegin() can leave the application permanently paused.
 	EngineBase::frameBegin();
+	updateApplicationMediaState();
+	if (!isApplicationActive() || isApplicationQuitRequested())
+	{
+		currentFrameReady.store(false);
+	}
 }
 
 void Engine::frameEnd()
 {
-	drawFPS();
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	updateApplicationMediaState();
+	if (!isApplicationActive() || isApplicationQuitRequested() ||
+		!EngineBase::isFrameReady())
+	{
+		currentFrameReady.store(false);
+		return;
+	}
+	drawFPSWithoutLock();
+	if (!isApplicationActive() ||
+		isApplicationQuitRequested() ||
+		!EngineBase::isFrameReady())
+	{
+		currentFrameReady.store(false);
+		return;
+	}
 	EngineBase::frameEnd();
+}
+
+void Engine::setMultiThreadedMode(bool enabled)
+{
+	multiThreadedMode.store(enabled);
+}
+
+bool Engine::isMultiThreadedMode() const
+{
+	return multiThreadedMode.load();
 }
 
 int Engine::getRand(int max, int min)
@@ -305,7 +523,7 @@ int Engine::getRand(int max, int min)
 
 UTime Engine::getTime()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getTime();
 }
 
@@ -321,33 +539,59 @@ int Engine::getFPS()
 
 void Engine::drawFPS()
 {
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	drawFPSWithoutLock();
+}
+
+void Engine::drawFPSWithoutLock()
+{
 #if  defined(_WIN32)
 //#define _DRAW_FPS
 #endif // _CONSOLE_MODE
 
 #ifdef _DRAW_FPS
-	//std::string s = convert::formatString(u8"%dfps,%0.3fs,%d,%d", getFPS(),((float)getAbsoluteTime())/ 1000, x, y);
-	std::string s = convert::formatString(u8"FPS:%d", getFPS());
-	drawText(s, 0, 0, 25, 0xD0FFFFFF);
+	//std::string s = convert::formatString("%dfps,%0.3fs,%d,%d", getFPS(),((float)getTimeReferToParentTime())/ 1000, x, y);
+	std::string s = convert::formatString("FPS:%d", getFPS());
+	EngineBase::drawText(s, 0, 0, 25, 0xD0FFFFFF);
 #endif // _DRAW_FPS
 }
 
 void Engine::drawImage(_shared_image image, int x, int y)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImage(image, x, y);
 }
 
 void Engine::drawImage(_shared_image image, Rect* src, Rect* dst)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImage(image, src, dst);
 }
 
 void Engine::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageEx(image, src, dst, angle / 3.14159265 * 180, center);
+}
+
+void Engine::drawAspectFitImage(
+	_shared_image image,
+	const Rect& sourceRect,
+	const Rect& destinationRect,
+	bool fadeMirroredBars,
+	std::uint8_t alpha,
+	UTime mirroredBarsAnimationTime,
+	const std::vector<AspectFitPointerRipple>* pointerRipples)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	EngineBase::drawAspectFitImage(
+		image,
+		sourceRect,
+		destinationRect,
+		fadeMirroredBars,
+		alpha,
+		mirroredBarsAnimationTime,
+		pointerRipples);
 }
 
 void Engine::drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha)
@@ -366,7 +610,7 @@ void Engine::drawImageWithAlpha(_shared_image image, Rect * src, Rect * dst, uns
 
 void Engine::drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithColor(image, x, y, r, g, b);
 }
 
@@ -379,7 +623,7 @@ void Engine::drawImageWithColor(_shared_image image, Rect * src, Rect * dst, uns
 
 void Engine::setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setImageColorMode(image, r, g, b);
 }
 
@@ -390,77 +634,193 @@ void Engine::setImageColorMode(_shared_image image, unsigned char r, unsigned ch
 
 bool Engine::getImageSize(_shared_image image, int &w, int &h)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getImageSize(image, w, h);
+}
+
+bool Engine::getImageContentBounds(_shared_image image, Rect& bounds, bool ignoreBlack)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::getImageContentBounds(image, bounds, ignoreBlack);
 }
 
 _shared_image Engine::createCanvasImage(int w, int h)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createCanvasImage(w, h);
 }
 
 bool Engine::setImageAsRenderTarget(_image image)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::setImageAsRenderTarget(image);
 }
 
 bool Engine::setSharedImageAsRenderTarget(_shared_image image)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::setSharedImageAsRenderTarget(image);
+}
+
+bool Engine::restoreImageRenderTargetAfterAcceptedOperation(
+	_image originalTarget,
+	const _shared_image& activeTarget)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::
+		restoreImageRenderTargetAfterAcceptedOperation(
+			originalTarget,
+			activeTarget);
 }
 
 _image Engine::getRenderTarget()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getRenderTarget();
 }
 
 void Engine::renderClear(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::renderClear(r, g, b, a);
+}
+
+void Engine::fillRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	EngineBase::fillRect(x, y, w, h, r, g, b, a);
 }
 
 void Engine::drawGeometry(_shared_image image, const std::vector<Vertex>& vertices, const std::vector<int>& indices)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawGeometry(image, vertices, indices);
 }
 
 
 bool Engine::beginDrawTalk(int w, int h)
 {
-	_mutex.lock();
-	_talk_drawing = true;
-	return EngineBase::beginDrawTalk(w, h);
+	{
+		std::lock_guard<std::mutex> locker(_talk_drawing_state_mutex);
+		if (_talk_drawing_state != TalkDrawingState::idle)
+		{
+			return false;
+		}
+		_talk_drawing_state = TalkDrawingState::beginning;
+		_talk_drawing_thread = std::this_thread::get_id();
+	}
+
+	_talk_drawing_lock_held = multiThreadedMode.load();
+	if (_talk_drawing_lock_held)
+	{
+		try
+		{
+			_mutex.lock();
+		}
+		catch (...)
+		{
+			_talk_drawing_lock_held = false;
+			clearTalkDrawingState();
+			throw;
+		}
+	}
+
+	bool beganDrawing = false;
+	try
+	{
+		beganDrawing = EngineBase::beginDrawTalk(w, h);
+	}
+	catch (...)
+	{
+		releaseTalkDrawingLock();
+		clearTalkDrawingState();
+		throw;
+	}
+
+	if (!beganDrawing)
+	{
+		releaseTalkDrawingLock();
+		clearTalkDrawingState();
+		return false;
+	}
+
+	{
+		std::lock_guard<std::mutex> locker(_talk_drawing_state_mutex);
+		_talk_drawing_state = TalkDrawingState::drawing;
+	}
+	return true;
 }
 
 _shared_image Engine::endDrawTalk()
 {
-	auto ret = EngineBase::endDrawTalk();
-	_talk_drawing = false;
+	{
+		std::lock_guard<std::mutex> locker(_talk_drawing_state_mutex);
+		if (_talk_drawing_state != TalkDrawingState::drawing ||
+			_talk_drawing_thread != std::this_thread::get_id())
+		{
+			return nullptr;
+		}
+		_talk_drawing_state = TalkDrawingState::ending;
+	}
+
+	_shared_image result;
+	try
+	{
+		result = EngineBase::endDrawTalk();
+	}
+	catch (...)
+	{
+		releaseTalkDrawingLock();
+		clearTalkDrawingState();
+		throw;
+	}
+
+	releaseTalkDrawingLock();
+	clearTalkDrawingState();
+	return result;
+}
+
+void Engine::clearTalkDrawingState()
+{
+	std::lock_guard<std::mutex> locker(_talk_drawing_state_mutex);
+	_talk_drawing_state = TalkDrawingState::idle;
+	_talk_drawing_thread = std::thread::id();
+}
+
+void Engine::releaseTalkDrawingLock()
+{
+	if (!_talk_drawing_lock_held)
+	{
+		return;
+	}
+	_talk_drawing_lock_held = false;
 	_mutex.unlock();
-	return ret;
 }
 
 void Engine::drawTalk(const std::string& text, int x, int y, int size, unsigned int color)
 {
-	if (!_talk_drawing)
 	{
-		std::string error = u8"Must use beginDrawTalk() before drawTalk()";
-		throw error;
-		return;
+		std::lock_guard<std::mutex> locker(_talk_drawing_state_mutex);
+		if (_talk_drawing_state != TalkDrawingState::drawing ||
+			_talk_drawing_thread != std::this_thread::get_id())
+		{
+			std::string error = "Must use beginDrawTalk() on this thread before drawTalk()";
+			throw error;
+		}
 	}
 	EngineBase::drawTalk(text, x, y, size, color);
 }
 
-_shared_image Engine::loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size)
+_shared_image Engine::loadSaveShotFromPixels(int w, int h, const char* data, int size)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::loadSaveShotFromPixels(w, h, data, size);
+}
+
+_shared_image Engine::createImageFromPixelData(const uint8_t* pixelData, int width, int height)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::createImageFromPixelData(pixelData, width, height);
 }
 
 bool Engine::beginSaveScreen()
@@ -475,61 +835,80 @@ _shared_image Engine::endSaveScreen()
 
 int Engine::saveImageToPixels(_shared_image image, int w, int h, std::unique_ptr<char[]>& s)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::saveImageToPixels(image, w, h, s);
 }
 
 _shared_image Engine::createRaindrop()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createRaindrop();
 }
 
 _shared_image Engine::createSnowflake()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createSnowflake();
 }
 
 void Engine::setFontName(const std::string & fontName)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setFontName(fontName);
 }
 
 void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setFontFromMem(data, size);
 }
 
 _shared_image Engine::createText(const std::string & text, int size, unsigned int color)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createText(text, size, color, true);
+}
+
+_shared_image Engine::createTextWithFontData(
+	const void* data,
+	std::size_t dataSize,
+	const std::string& text,
+	int size,
+	unsigned int color,
+	int wrapWidth)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::createTextWithFontData(
+		data, dataSize, text, size, color, wrapWidth, true);
 }
 
 void Engine::drawText(const std::string & text, int x, int y, int size, unsigned int color)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawText(text, x, y, size, color);
 }
 
 void Engine::setImageAlpha(_shared_image image, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setImageAlpha(image, a);
+}
+
+void Engine::drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode)
+{
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	EngineBase::drawImageWithBlendAlpha(image, x, y, alpha, blendMode);
 }
 
 void Engine::setScreenMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setScreenMask(r, g, b, a);
 }
 
 void Engine::drawScreenMask()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawScreenMask();
 }
 
@@ -541,87 +920,87 @@ void Engine::drawScreenMask(unsigned char r, unsigned char g, unsigned char b, u
 
 _shared_image Engine::createMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createMask(r, g, b, a);
 }
 
 _shared_image Engine::createLumMask()
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createLumMask();
 }
 
 //绘制遮罩
 void Engine::drawMask(_shared_image mask)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawMask(mask);
 }
 
 void Engine::drawMask(_shared_image mask, Rect * dst)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawMask(mask, dst);
 }
 
 //绘制带遮罩的
 void Engine::drawImageWithMask(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMask(image, x, y, r, g, b, a);
 }
 
 void Engine::drawImageWithMask(_shared_image image, int x, int y, _shared_image mask)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMask(image, x, y, mask);
 }
 
 void Engine::drawImageWithMask(_shared_image image, Rect * src, Rect * dst, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMask(image, src, dst, r, g, b, a);
 }
 
 void Engine::drawImageWithMask(_shared_image image, Rect * src, Rect * dst, _shared_image mask)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMask(image, src, dst, mask);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMaskEx(image, x, y, r, g, b, a);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, int x, int y, _shared_image mask)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMaskEx(image, x, y, mask);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, Rect * src, Rect * dst, unsigned char r, unsigned char g, unsigned char b, unsigned char a)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMaskEx(image, src, dst, r, g, b, a);
 }
 
 void Engine::drawImageWithMaskEx(_shared_image image, Rect * src, Rect * dst, _shared_image mask)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageWithMaskEx(image, src, dst, mask);
 }
 
 void * Engine::getMem(int size)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::getMem(size);
 }
 
 void Engine::freeMem(void * mem)
 {
-	std::lock_guard<std::mutex> locker(_mutex);
+	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::freeMem(mem);
 }
 
@@ -648,15 +1027,16 @@ _music Engine::createMusic(const std::unique_ptr<char[]>& data, int size, bool l
 _music Engine::createMusic(const std::string & fileName, bool loop, bool music3d, unsigned char priority)
 {
 	std::unique_ptr<char[]> data;
-	int size;
-	if (!File::readFile(fileName, data, size))
+	int size = 0;
+	if (!File::readFile(fileName, data, size,
+		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)))
 	{
-		GameLog::write(u8"Music File %s Readed Error\n", fileName.c_str());
+		GameLog::write("Music File %s Readed Error\n", fileName.c_str());
 		return nullptr;
 	}
 	if (data == nullptr || size <= 0)
 	{
-		GameLog::write(u8"Music File %s Readed Error\n", fileName.c_str());
+		GameLog::write("Music File %s Readed Error\n", fileName.c_str());
 		return nullptr;
 	}
 	_music result = createMusic(data, size, loop, music3d, priority);
@@ -759,6 +1139,11 @@ _channel Engine::playSound(_music music)
 	return playSound(music, 0, 0);
 }
 
+void Engine::stopAllSounds()
+{
+	EngineBase::stopSoundsExcept(channelBGM, channelTalk);
+}
+
 _channel Engine::playSound(const std::unique_ptr<char[]>& data, int size, float x, float y, float volume)
 {
 	_music m = loadSound(data, size);
@@ -793,6 +1178,8 @@ _music Engine::loadBGM(const std::unique_ptr<char[]>& data, int size)
 	{
 		freeMusic(bgm);
 		bgm = nullptr;
+		channelBGM = nullptr;
+		applicationPausedBGMChannel = nullptr;
 	}
 	bgm = createMusic(data, size, true, false, 0);
 	return bgm;
@@ -804,6 +1191,8 @@ _music Engine::loadBGM(const std::string & fileName)
 	{
 		freeMusic(bgm);
 		bgm = nullptr;
+		channelBGM = nullptr;
+		applicationPausedBGMChannel = nullptr;
 	}
 	bgm = createMusic(fileName, true, false, 0);
 	return bgm;
@@ -813,6 +1202,7 @@ void Engine::setBGMVolume(float volume)
 {
 	bgmVolume = volume;
 	EngineBase::setMusicVolume(channelBGM, bgmVolume);
+	updateAllVideoVolume(bgmVolume);
 }
 
 float Engine::getBGMVolume()
@@ -829,6 +1219,8 @@ _channel Engine::playBGM()
 void Engine::stopBGM()
 {
 	EngineBase::stopMusic(channelBGM);
+	channelBGM = nullptr;
+	applicationPausedBGMChannel = nullptr;
 }
 
 void Engine::pauseBGM()
@@ -847,6 +1239,8 @@ _music Engine::loadTalk(const std::unique_ptr<char[]>& data, int size)
 	{
 		freeMusic(talk);
 		talk = nullptr;
+		channelTalk = nullptr;
+		applicationPausedTalkChannel = nullptr;
 	}
 	talk = createMusic(data, size, false, false, 0);
 	return talk;
@@ -858,6 +1252,8 @@ _music Engine::loadTalk(const std::string & fileName)
 	{
 		freeMusic(talk);
 		talk = nullptr;
+		channelTalk = nullptr;
+		applicationPausedTalkChannel = nullptr;
 	}
 	talk = createMusic(fileName, false, false, 0);
 	return talk;
@@ -883,6 +1279,8 @@ _channel Engine::playtalk()
 void Engine::stopTalk()
 {
 	EngineBase::stopMusic(channelTalk);
+	channelTalk = nullptr;
+	applicationPausedTalkChannel = nullptr;
 }
 
 void Engine::pauseTalk()
@@ -897,7 +1295,12 @@ void Engine::resumeTalk()
 
 _video Engine::loadVideo(const std::string & fileName)
 {
-	return EngineBase::loadVideo(fileName);
+	auto v = EngineBase::loadVideo(fileName);
+	if (v != nullptr)
+	{
+		v->videoVolume = bgmVolume;
+	}
+	return v;
 }
 
 void Engine::setVideoRect(_video v, Rect * rect)

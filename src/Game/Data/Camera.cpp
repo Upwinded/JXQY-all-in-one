@@ -1,10 +1,11 @@
 #include "Camera.h"
+#include "../../Engine/Engine.h"
 #include "Map.h"
 #include "../GameManager/GameManager.h"
 
 Camera::Camera()
 {
-	priority = epCamera;
+	setPriority(epCamera);
 	needEvents = true;
 }
 
@@ -13,70 +14,85 @@ Camera::~Camera()
 {
 }
 
-void Camera::flyTo(int dir, int distance)
+void Camera::flyTo(int dir, int distance, int speed)
 {
 	if (distance > 0)
 	{
-		setFlyTo(dir, distance);
+		setFlyTo(dir, distance, speed);
 		run();
 	}
 }
 
-void Camera::flyToEx(int dir, int distance)
+void Camera::flyToEx(int dir, int distance, int speed)
 {
 	if (distance > 0)
 	{
-		setFlyTo(dir, distance);
+		setFlyTo(dir, distance, speed);
 	}
 }
 
-void Camera::setFlyTo(int dir, int distance)
+void Camera::flyToPosition(int x, int y, int speed)
 {
 	followPlayer = false;
+	clearDirectionalFrameMove();
 	distanceToFly = { 0.0, 0.0 };
 	distanceFlied = { 0.0, 0.0 };
 	flyStartPosition = position;
 	flyStartOffset = offset;
-	if (dir < 0)
+	flySpeed = normalizeFlySpeed(speed);
+	Point targetPixel = Map::getTilePosition({ x, y }, position, { 0, 0 }, offset);
+	distanceToFly.x = (float)targetPixel.x;
+	distanceToFly.y = (float)targetPixel.y;
+	if (isZeroFlightDistance(distanceToFly))
 	{
-		dir = 7 - (-dir) % 8;
-	}
-	dir = dir % 8;
-	flyDirection = dir;
-	switch (flyDirection)
-	{
-	case 0:
-		distanceToFly.y = flyRatio * distance * TILE_HEIGHT;
-		break;
-	case 1:
-		distanceToFly.y = flyRatio * distance * TILE_HEIGHT / 2;
-		distanceToFly.x = -flyRatio * distance * TILE_WIDTH / 2;
-		break;
-	case 2:
-		distanceToFly.x = -flyRatio * distance * TILE_WIDTH / 2;
-		break;
-	case 3:
-		distanceToFly.y = -flyRatio * distance * TILE_HEIGHT / 2;
-		distanceToFly.x = -flyRatio * distance * TILE_WIDTH / 2;
-		break;
-	case 4:
-		distanceToFly.y = -flyRatio * distance * TILE_HEIGHT;
-		break;
-	case 5:
-		distanceToFly.y = -flyRatio * distance * TILE_HEIGHT / 2;
-		distanceToFly.x = flyRatio * distance * TILE_WIDTH / 2;
-		break;
-	case 6:
-		distanceToFly.x = flyRatio * distance * TILE_WIDTH / 2;
-		break;
-	case 7:
-		distanceToFly.y = flyRatio * distance * TILE_HEIGHT / 2;
-		distanceToFly.x = flyRatio * distance * TILE_WIDTH / 2;
-		break;
-	default:
-		break;
+		flying = false;
+		logicRunning = false;
+		return;
 	}
 	flying = true;
+}
+
+void Camera::setFlyTo(int dir, int distance, int speed)
+{
+	followPlayer = false;
+	clearDirectionalFrameMove();
+	distanceToFly = { 0.0, 0.0 };
+	distanceFlied = { 0.0, 0.0 };
+	flyStartPosition = position;
+	flyStartOffset = offset;
+	flyDirection = normalizeDir(dir);
+	flySpeed = normalizeFlySpeed(speed);
+	static const PointEx dirOffset[8] = {
+		{ 0.0,  1.0},
+		{-0.5,  0.5},
+		{-0.5,  0.0},
+		{-0.5, -0.5},
+		{ 0.0, -1.0},
+		{ 0.5, -0.5},
+		{ 0.5,  0.0},
+		{ 0.5,  0.5}
+	};
+	distanceToFly.x = dirOffset[flyDirection].x * flyRatio * distance * TILE_WIDTH;
+	distanceToFly.y = dirOffset[flyDirection].y * flyRatio * distance * TILE_HEIGHT;
+	flying = true;
+}
+
+void Camera::moveForFrameCount(int dir, int frameCount, int speed)
+{
+	if (frameCount <= 0)
+	{
+		return;
+	}
+
+	followPlayer = false;
+	flying = false;
+	distanceToFly = { 0.0, 0.0 };
+	distanceFlied = { 0.0, 0.0 };
+	directionalMoveDirection = dir >= 0 && dir <= 7 ? dir : 0;
+	directionalMoveFramesRemaining = frameCount;
+	directionalMoveSpeed = speed;
+	directionalMoveRemainder = { 0.0, 0.0 };
+	run();
 }
 
 void Camera::setFollowPlayer()
@@ -84,44 +100,244 @@ void Camera::setFollowPlayer()
 	followPlayer = true;
 }
 
-void Camera::reArrangeNPC()
+void Camera::snapToFollowTarget()
 {
-	if (gm->map->data == nullptr)
+	if (gm == nullptr || gm->map == nullptr || gm->map->data == nullptr)
 	{
 		return;
 	}
+
+	std::shared_ptr<NPC> npcPlayer = gm->player;
+	auto followNPCPtr = followNPC.lock();
+	if (followNPCPtr && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(followNPCPtr)))
+	{
+		npcPlayer = std::dynamic_pointer_cast<NPC>(followNPCPtr);
+	}
+	else
+	{
+		followNPC.reset();
+	}
+	if (npcPlayer == nullptr)
+	{
+		return;
+	}
+
+	position = npcPlayer->getPosition();
+	offset = npcPlayer->getOffset();
+	clampToMapBounds();
+}
+
+void Camera::clampToMapBounds()
+{
+	if (gm == nullptr || gm->map == nullptr || gm->map->data == nullptr)
+	{
+		return;
+	}
+	int mapw = gm->map->data->head.width;
+	int maph = gm->map->data->head.height;
+	if (mapw <= 0 || maph <= 0)
+	{
+		return;
+	}
+
 	int w, h;
 	engine->getWindowSize(w, h);
-	Point cenScreen;
-	cenScreen.x = (int)w / 2;
-	cenScreen.y = (int)h / 2;
-	int xscal, yscal;
-	xscal = cenScreen.x / TILE_WIDTH + 3;
-	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
-	int tileHeightScal = 10;
-	Point cenTile = position;
-	std::vector<std::shared_ptr<NPC>> npcList;
-	for (int i = cenTile.y + yscal + tileHeightScal - 1; i >= cenTile.y - yscal; i--)
-	{
-		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
+	constexpr int topBoundaryTileMargin = 1;
+
+	auto clampFloat = [](float value, float minValue, float maxValue) {
+		if (value < minValue)
 		{
-			if ( i >= 0 && i < gm->map->data->head.height && j >= 0 && j < gm->map->data->head.width)
-			{
-				for (auto iter = gm->map->dataMap.tile[i][j].npcList.begin(); iter != gm->map->dataMap.tile[i][j].npcList.end(); iter++)
-				{
-					if (*iter != nullptr && *iter != gm->player)
-					{
-						npcList.push_back(*iter);
-					}					
-				}
-			}
+			return minValue;
+		}
+		if (value > maxValue)
+		{
+			return maxValue;
+		}
+		return value;
+	};
+	auto clampInt = [](int value, int minValue, int maxValue) {
+		if (value < minValue)
+		{
+			return minValue;
+		}
+		if (value > maxValue)
+		{
+			return maxValue;
+		}
+		return value;
+	};
+
+	PointEx cameraWorldPosition = Map::getTilePositionEx(position, { 0, 0 }, { 0, 0 }, { 0, 0 }) + offset;
+
+	int hscal = h / TILE_HEIGHT * 2 + 2;
+	if (hscal + 1 > maph)
+	{
+		// Center rows 0..maph-1 in world Y; avoid integer truncation on odd heights.
+		cameraWorldPosition.y = (float)(maph - 1) * ((float)TILE_HEIGHT / 2.0f) / 2.0f;
+	}
+	else
+	{
+		int line2 = std::abs(hscal / 2 - 1) % 2;
+		int line3 = std::abs(maph - hscal / 2 - 2) % 2;
+		float minWorldY = (float)(hscal / 2 - 1 - line2) * ((float)TILE_HEIGHT / 2.0f);
+		float maxWorldY = (float)(maph - hscal / 2 - 2 - line3) * ((float)TILE_HEIGHT / 2.0f);
+		minWorldY += (float)topBoundaryTileMargin * ((float)TILE_HEIGHT / 2.0f);
+		if (maxWorldY < minWorldY)
+		{
+			cameraWorldPosition.y = (minWorldY + maxWorldY) / 2.0f;
+		}
+		else
+		{
+			cameraWorldPosition.y = clampFloat(cameraWorldPosition.y, minWorldY, maxWorldY);
 		}
 	}
-	for (size_t i = 0; i < npcList.size(); i++)
+	position.y = clampInt((int)round(cameraWorldPosition.y / ((float)TILE_HEIGHT / 2.0f)), 0, maph > 0 ? maph - 1 : 0);
+	offset.y = cameraWorldPosition.y - (float)position.y * ((float)TILE_HEIGHT / 2.0f);
+
+	int wscal = w / TILE_WIDTH + 1;
+	if (wscal + 2 > mapw)
 	{
-		gm->npcManager->removeChild(npcList[i]);
-		gm->npcManager->addChild(npcList[i]);
+		// Center the visual bounds. Multi-row maps include the odd-row TILE_WIDTH/2 shift;
+		// a single-row map has no odd-row extension and is centered by columns.
+		if (maph <= 1)
+		{
+			cameraWorldPosition.x = (float)(mapw - 1) * (float)TILE_WIDTH / 2.0f;
+		}
+		else
+		{
+			cameraWorldPosition.x = ((float)mapw * (float)TILE_WIDTH - (float)TILE_WIDTH / 2.0f) / 2.0f;
+		}
 	}
+	else
+	{
+		// JxqyHD and NewSword define the horizontal world span as
+		// (columnCount - 1) * TILE_WIDTH, then clamp the viewport's left edge
+		// between zero and worldWidth - viewportWidth. Express the same rule
+		// with this camera's center coordinate so edge objects remain visible.
+		const float halfViewportWidth = (float)w / 2.0f;
+		const float mapPixelWidth = (float)(mapw - 1) * (float)TILE_WIDTH;
+		// Keep the left camera boundary half a tile inside the logical map. The
+		// right boundary intentionally retains the existing reference behavior.
+		float minWorldX = halfViewportWidth +
+			static_cast<float>(TILE_WIDTH) / 2.0f;
+		float maxWorldX = mapPixelWidth - halfViewportWidth;
+		if (maxWorldX < minWorldX)
+		{
+			cameraWorldPosition.x = (minWorldX + maxWorldX) / 2.0f;
+		}
+		else
+		{
+			cameraWorldPosition.x = clampFloat(cameraWorldPosition.x, minWorldX, maxWorldX);
+		}
+	}
+	int line = std::abs(position.y) % 2;
+	if (line == 0)
+	{
+		position.x = clampInt((int)round(cameraWorldPosition.x / (float)TILE_WIDTH), 0, mapw > 0 ? mapw - 1 : 0);
+	}
+	else
+	{
+		position.x = clampInt((int)round((cameraWorldPosition.x - (float)TILE_WIDTH / 2.0f) / (float)TILE_WIDTH), 0, mapw > 0 ? mapw - 1 : 0);
+	}
+	PointEx cameraTileWorldPosition = Map::getTilePositionEx(position, { 0, 0 }, { 0, 0 }, { 0, 0 });
+	offset.x = cameraWorldPosition.x - cameraTileWorldPosition.x;
+	offset.y = cameraWorldPosition.y - cameraTileWorldPosition.y;
+}
+
+void Camera::resetView()
+{
+	clearVibrationOffset();
+	vibratingDegree = 0;
+	followPlayer = true;
+	followNPC.reset();
+	flying = false;
+	clearDirectionalFrameMove();
+	snapToFollowTarget();
+	// Map changes are teleports; do not send a large camera delta to visual systems.
+	differencePosition = { 0.0, 0.0 };
+}
+
+void Camera::vibrate(int degree)
+{
+	vibratingDegree = resolveVibrationDegree(vibratingDegree, degree);
+}
+
+void Camera::clearVibrationOffset()
+{
+	removeVibrationOffset();
+	vibrationOffset = { 0.0f, 0.0f };
+}
+
+void Camera::removeVibrationOffset()
+{
+	if (vibrationOffset.x == 0.0f && vibrationOffset.y == 0.0f)
+	{
+		return;
+	}
+	offset.x -= vibrationOffset.x;
+	offset.y -= vibrationOffset.y;
+}
+
+void Camera::updateVibrationOffset()
+{
+	if (vibratingDegree <= 0 || engine == nullptr)
+	{
+		return;
+	}
+
+	int xSign = engine->getRand(1) == 0 ? -1 : 1;
+	int ySign = engine->getRand(1) == 0 ? -1 : 1;
+	PointEx proposedAddition =
+	{
+		(float)(xSign * engine->getRand(vibratingDegree)),
+		(float)(ySign * engine->getRand(vibratingDegree))
+	};
+	vibrationOffset = resolveVibrationOffsetAfterFrame(
+		vibrationOffset,
+		vibratingDegree,
+		proposedAddition);
+	offset.x += vibrationOffset.x;
+	offset.y += vibrationOffset.y;
+	vibratingDegree = decayVibrationDegreeAfterFrame(vibratingDegree);
+}
+
+void Camera::clearDirectionalFrameMove()
+{
+	directionalMoveDirection = 0;
+	directionalMoveFramesRemaining = 0;
+	directionalMoveSpeed = 0;
+	directionalMoveRemainder = { 0.0, 0.0 };
+}
+
+void Camera::updateDirectionalFrameMove()
+{
+	const DirectionalFrameMoveStep step =
+		calculateDirectionalFrameMoveStep(
+			directionalMoveRemainder,
+			directionalMoveDirection,
+			directionalMoveSpeed);
+	directionalMoveRemainder = step.remainder;
+	offset.x += static_cast<float>(step.distance.x);
+	offset.y += static_cast<float>(step.distance.y);
+	updatePosition();
+	clampToMapBounds();
+
+	--directionalMoveFramesRemaining;
+	if (directionalMoveFramesRemaining <= 0)
+	{
+		clearDirectionalFrameMove();
+		logicRunning = false;
+		if (gm != nullptr && gm->player != nullptr &&
+			position == gm->player->getPosition())
+		{
+			setFollowPlayer();
+		}
+	}
+}
+
+void Camera::reArrangeNPC()
+{
+	gm->npcManager->sortChildrenByY();
 }
 
 void Camera::onUpdate()
@@ -129,143 +345,75 @@ void Camera::onUpdate()
 	auto frameTime = getFrameTime();
 	auto lastPosition = position;
 	auto lastOffset = offset;
+	removeVibrationOffset();
 	if (followPlayer)
 	{
-		std::shared_ptr<NPC> npcPlayer = gm->player;
-		if (followNPC != nullptr && gm->npcManager->findNPC(std::dynamic_pointer_cast<NPC>(followNPC)))
-		{
-			npcPlayer = std::dynamic_pointer_cast<NPC>(followNPC);
-		}
-		else
-		{
-			followNPC = nullptr;
-		}
-
-		position = npcPlayer->position;
-		offset = npcPlayer->offset;	
-	
-		if (gm->map->data != nullptr)
-		{
-			int mapw = gm->map->data->head.width;
-			int maph = gm->map->data->head.height;
-			int w, h;
-			engine->getWindowSize(w, h);
-
-			int line = std::abs(position.y) % 2;		
-			int hscal = h / TILE_HEIGHT * 2 + 2;
-			if (hscal + 1 > maph)
-			{
-				position.y = maph / 2;
-				offset.y = -TILE_HEIGHT / 2;;
-			}
-			else
-			{
-				int line2 = std::abs(hscal / 2 - 1) % 2;
-				int line3 = std::abs(maph - hscal / 2 - 2) % 2;
-				if (line == 0)
-				{
-					if ((position.y < hscal / 2 - 1 - line2) || (position.y == hscal / 2 - 1 - line2 && offset.y < 0))
-					{
-						position.y = hscal / 2 - 1 - line2;
-						offset.y = 0;
-					}
-					else if ((position.y > maph - hscal / 2 - 2 - line3) || (position.y == maph - hscal / 2 - 2 - line3 && offset.y > 0))
-					{
-						position.y = maph - hscal / 2 - 2 - line3;
-						offset.y = 0;
-					}
-				}
-				else
-				{
-					if ((position.y < hscal / 2 - 2 - line2) || (position.y == hscal / 2 - 2 - line2))
-					{
-						position.y = hscal / 2 - 2 - line2;
-						offset.y = TILE_HEIGHT / 2;
-					}
-					else if ((position.y > maph - hscal / 2 - 1 - line3) || (position.y == maph - hscal / 2 - 1 - line3))
-					{
-						position.y = maph - hscal / 2 - 1 - line3;
-						offset.y = -TILE_HEIGHT / 2;
-					}
-				}
-			}
-
-			line = std::abs(position.y) % 2;
-			int wscal = w / TILE_WIDTH + 1;
-			if (wscal + 2 > mapw)
-			{
-				position.x = mapw / 2 - 1;
-				if (line == 1)
-				{
-					offset.x = 0;
-				}
-				else
-				{
-					offset.x = TILE_WIDTH / 2;
-				}
-			}
-			else
-			{
-				if (line == 1)
-				{
-					if (position.x < wscal / 2 || (position.x == wscal / 2 && offset.x < 0))
-					{
-						position.x = wscal / 2;
-						offset.x = 0;
-					}
-					else if (position.x >= mapw - wscal / 2 - 2)
-					{
-						position.x = mapw - wscal / 2 - 2;
-						offset.x = -TILE_WIDTH / 2;
-					}
-				}
-				else
-				{
-					if (position.x <= wscal / 2)
-					{
-						position.x = wscal / 2;
-						offset.x = TILE_WIDTH / 2;
-					}
-					else if ((position.x > mapw - wscal / 2 - 2) || (position.x == mapw - wscal / 2 - 2 && offset.x > 0))
-					{
-						position.x = mapw - wscal / 2 - 2;
-						offset.x = 0;
-					}
-				}
-			}
-		}
+		snapToFollowTarget();
+	}
+	else if (directionalMoveFramesRemaining > 0)
+	{
+		updateDirectionalFrameMove();
 	}
 	else if (flying)
 	{
 		float l = hypot(distanceToFly.x, distanceToFly.y);
-		PointEx frameFlyDistance = { distanceToFly.x / l * cameraSpeed * frameTime * Config::getGameSpeed(), distanceToFly.y / l * cameraSpeed * frameTime * Config::getGameSpeed()};
+		if (l <= 0.0001f)
+		{
+			l = 1.0f;
+		}
+		PointEx frameFlyDistance = { distanceToFly.x / l * cameraSpeed * frameTime * flySpeed * Config::getGameSpeed(), distanceToFly.y / l * cameraSpeed * frameTime * flySpeed * Config::getGameSpeed()};
 		distanceFlied = distanceFlied + frameFlyDistance;
 		offset = flyStartOffset + distanceFlied;
 		position = flyStartPosition;
 		if (std::abs(distanceFlied.x) >= std::abs(distanceToFly.x) && std::abs(distanceFlied.y) >= std::abs(distanceToFly.y))
 		{
 			flying = false;
-			running = false;
+			logicRunning = false;
 			offset = flyStartOffset + distanceToFly;
 			position = flyStartPosition;
 			distanceToFly = { 0.0, 0.0 };
 			distanceFlied = { 0.0, 0.0 };
 		}
 		updatePosition();
-		if (not flying)
+		clampToMapBounds();
+		if (!flying)
 		{
-			if (position == gm->player->position)
+			if (position == gm->player->getPosition())
 			{
 				setFollowPlayer();
 			}
 		}
 	}
+	updateVibrationOffset();
 	auto differencePoint = gm->map->getTilePosition(position, lastPosition);
 	differencePosition.y = ((float)differencePoint.y) - lastOffset.y + offset.y;
 	differencePosition.x = ((float)differencePoint.x) - lastOffset.x + offset.x;
+
 }
 
 void Camera::onEvent()
 {
 	reArrangeNPC();
+}
+
+void Camera::onWindowResize(int width, int height)
+{
+	(void)width;
+	(void)height;
+
+	// A resize can be dispatched while a nested system menu has paused gameplay,
+	// so the regular update loop cannot be relied on to apply the new map bounds.
+	clearVibrationOffset();
+	if (followPlayer)
+	{
+		snapToFollowTarget();
+	}
+	else
+	{
+		clampToMapBounds();
+	}
+
+	// Resizing the viewport is not camera movement. Avoid shifting weather
+	// particles by the potentially large boundary correction on the next frame.
+	differencePosition = { 0.0, 0.0 };
 }

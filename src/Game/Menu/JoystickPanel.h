@@ -2,7 +2,7 @@
 #include "../../Component/Component.h"
 
 class JoystickPanel :
-	public Panel
+	public ConfigDrivenPanel
 {
 public:
 	JoystickPanel();
@@ -16,10 +16,8 @@ public:
 	bool isWalking();
 	virtual void onChildCallBack(PElement child);
 protected:
-	virtual void onUpdate();
-	virtual void init();
+	virtual void onUpdate() override;
+	virtual void init() override;
 	void freeResource();
-	virtual void onEvent();
-
+	virtual void onEvent() override;
 };
-

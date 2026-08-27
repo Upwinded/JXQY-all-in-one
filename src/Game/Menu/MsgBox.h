@@ -1,7 +1,8 @@
 #pragma once
-#include "../../Component/Panel.h"
+#include "../../Component/Component.h"
+
 class MsgBox :
-	public Panel
+	public ConfigDrivenPanel
 {
 public:
 	MsgBox();
@@ -11,9 +12,10 @@ public:
 	bool showed = false;
 	UTime beginTime = 0;
 	UTime showinUTime = 3500;
-	void showMessage(const std::string & str);
-	virtual void onUpdate();
+	std::string currentMessage;
+	void showMessage(const std::string & str, UTime duration = 3500);
+	virtual void onUpdate() override;
 	virtual void init() override;
 	void freeResource();
+	virtual void onWindowResize(int width, int height) override;
 };
-

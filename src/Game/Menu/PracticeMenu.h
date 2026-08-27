@@ -1,8 +1,11 @@
 #pragma once
 #include "../../Component/Component.h"
+#include "ControllerFocusParticipant.h"
+#include "SlotGridController.h"
 
 class PracticeMenu :
-	public Panel
+	public ConfigDrivenPanel,
+	public ControllerTransferParticipant
 {
 public:
 	PracticeMenu();
@@ -23,9 +26,23 @@ public:
 	void updateMagic();
 	void updateExp();
 	void updateLevel();
+	virtual bool activateControllerFocus(
+		ControllerFocusTarget target) override;
+	bool focusControllerDefault();
+	virtual bool isControllerFocusActive() const override;
+	virtual void deactivateControllerFocus() override;
+	virtual PElement controllerFocusedElement() const override;
+	virtual std::vector<PElement> controllerFocusCandidates() const override;
+	virtual bool focusControllerElement(
+		const PElement& element) override;
+	virtual void refreshControllerTransferHighlight() override;
 
 private:
-	virtual void onEvent();
+	SlotInteractionController slotController;
+	void configureControllerFocus();
+	void showControllerMagicDetails(int logicalIndex);
+	void hideControllerMagicDetails();
+	virtual void onEvent() override;
+	virtual bool onHandleUIAction(UIAction action) override;
 	void freeResource();
 };
-

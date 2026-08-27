@@ -1,8 +1,20 @@
 #include "FadeMask.h"
+#include "../Engine/Engine.h"
+#include "ComponentRegistry.h"
+
+namespace
+{
+	bool registeredFadeMask = []
+	{
+		ComponentRegistry::getInstance().registerType("FadeMask",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<FadeMask>(); });
+		return true;
+	}();
+}
 
 FadeMask::FadeMask()
 {
-	priority = epFadeMask;
+	setPriority(epFadeMask);
 	mask = engine->createMask(0, 0, 0, 255);
 }
 
@@ -39,14 +51,14 @@ void FadeMask::onUpdate()
 	{
 		if (t > sleepTime)
 		{
-			running = false;
+			logicRunning = false;
 		}
 	}
 	else
 	{
 		if (t > fadeTime)
 		{
-			running = false;
+			logicRunning = false;
 		}
 		else
 		{

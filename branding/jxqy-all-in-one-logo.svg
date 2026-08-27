@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="backgroundGlow" cx="74%" cy="20%" r="76%">
+      <stop offset="0" stop-color="#3a2a1c" />
+      <stop offset="0.42" stop-color="#141a17" />
+      <stop offset="1" stop-color="#0d1110" />
+    </radialGradient>
+    <linearGradient id="sealStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#84372f" />
+      <stop offset="1" stop-color="#d25b4d" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#backgroundGlow)" />
+
+  <g fill="none" stroke="#c8974e" opacity="0.17">
+    <circle cx="760" cy="214" r="152" stroke-width="3" />
+    <circle cx="760" cy="214" r="220" stroke-width="3" />
+    <circle cx="760" cy="214" r="306" stroke-width="2" />
+    <circle cx="834" cy="302" r="256" stroke-width="2" />
+  </g>
+
+  <g transform="rotate(-3 512 454)">
+    <rect x="230" y="174" width="564" height="564" rx="66" fill="#111815" stroke="url(#sealStroke)" stroke-width="19" />
+    <rect x="258" y="202" width="508" height="508" rx="47" fill="none" stroke="#c8974e" stroke-width="4" opacity="0.28" />
+    <text x="512" y="590" text-anchor="middle" fill="#d25b4d" font-family="Microsoft YaHei, Noto Serif CJK SC, serif" font-size="320" font-weight="700">剑</text>
+  </g>
+
+  <text x="512" y="792" text-anchor="middle" fill="#f3eee4" font-family="Georgia, Times New Roman, serif" font-size="52" font-weight="700" letter-spacing="8">JXQY ALL-IN-ONE</text>
+  <text x="512" y="850" text-anchor="middle" fill="#c8974e" font-family="Consolas, ui-monospace, monospace" font-size="25" font-weight="700" letter-spacing="7">UPWINDED.COM</text>
+
+  <g transform="translate(192 884)">
+    <image href="third-party/SDL_logo_clean.png" x="0" y="7" width="150" height="83" preserveAspectRatio="xMidYMid meet" />
+    <line x1="190" y1="13" x2="190" y2="82" stroke="#c8974e" opacity="0.28" />
+    <rect x="216" y="13" width="218" height="68" rx="9" fill="#f3eee4" />
+    <svg x="225" y="22" width="200" height="50" viewBox="83 234 626 144" preserveAspectRatio="xMidYMid meet">
+      <image href="third-party/ffmpeg-logo.svg" x="0" y="0" width="792" height="612" />
+    </svg>
+    <line x1="468" y1="13" x2="468" y2="82" stroke="#c8974e" opacity="0.28" />
+    <image href="third-party/lua-logo.gif" x="523" y="0" width="94" height="94" preserveAspectRatio="xMidYMid meet" />
+  </g>
+</svg>

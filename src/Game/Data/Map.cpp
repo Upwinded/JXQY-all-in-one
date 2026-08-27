@@ -1,36 +1,50 @@
-﻿#ifndef _USE_MATH_DEFINES
+#ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES 
 #endif
 #include <cmath>
+#include "../../Engine/Engine.h"
+#include <algorithm>
+#include <array>
+#include <climits>
+#include <cstdlib>
+#include <cstdint>
+#include <cstring>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "Map.h"
+#include "ProjectedMovement.h"
+#include "ColorStyle.h"
+#include "../../Image/ImageAnimationPlayback.h"
 #include "../GameManager/GameManager.h"
-
 
 // 定义节点结构体
 struct MapNode
 {
 public:
 	Point pos;
-	float g;  // 从起点到当前节点的实际代价
-	float h;  // 从当前节点到目标节点的预估代价
-	float f;  // f = g + h
-	std::shared_ptr<MapNode> parent;
+	float g;
+	float h;
+	float f;
+	float priorityScore;
+	float directionBias;
+	int firstDir;
+	MapNode* parent;
 
-	MapNode(Point p, float g_val, float h_val, std::shared_ptr<MapNode> par)
-		: pos(p), g(g_val), h(h_val), f(g_val + h_val), parent(par) 
+	MapNode(Point p, float g_val, float h_val, MapNode* par, int firstDirection = -1, float bias = 0.0f)
+		: pos(p), g(g_val), h(h_val), f(g_val + h_val), priorityScore(g_val + h_val + bias * 0.001f), directionBias(bias), firstDir(firstDirection), parent(par)
 	{
 	}
 
-	// 重载比较运算符，用于优先队列
-	bool operator>(const MapNode& other) const 
+	bool operator>(const MapNode& other) const
 	{
 		return f > other.f;
 	}
-	bool operator<(const MapNode& other) const 
+	bool operator<(const MapNode& other) const
 	{
 		return f < other.f;
 	}
-	bool operator==(const MapNode& other) const 
+	bool operator==(const MapNode& other) const
 	{
 		return f == other.f;
 	}
@@ -38,16 +52,240 @@ public:
 	class Compare
 	{
 	public:
-		bool operator()(std::shared_ptr<MapNode> MapNode1, std::shared_ptr<MapNode> MapNode2)
+		bool operator()(MapNode* node1, MapNode* node2)
 		{
-			return MapNode1->f > MapNode2->f;
+			if (node1->priorityScore != node2->priorityScore)
+			{
+				return node1->priorityScore > node2->priorityScore;
+			}
+			if (node1->directionBias != node2->directionBias)
+			{
+				return node1->directionBias > node2->directionBias;
+			}
+			if (node1->h != node2->h)
+			{
+				return node1->h > node2->h;
+			}
+			return node1->g > node2->g;
 		}
 	};
 };
 
+static int normalizeDirection8(int direction)
+{
+	return ((direction % 8) + 8) % 8;
+}
+
+static int getDirectionDistance8(int dir1, int dir2)
+{
+	int delta = std::abs(normalizeDirection8(dir1) - normalizeDirection8(dir2));
+	return std::min(delta, 8 - delta);
+}
+
+static void drawFeatheredThumbnail(Engine* engine, const _shared_image& source,
+	const Rect& sourceRect, int sourceWidth, int sourceHeight,
+	int thumbnailWidth, int thumbnailHeight)
+{
+	if (engine == nullptr || source == nullptr || sourceWidth <= 0 || sourceHeight <= 0
+		|| thumbnailWidth <= 0 || thumbnailHeight <= 0)
+	{
+		return;
+	}
+
+	const float feather = static_cast<float>(std::min({
+		MapThumbnailStyle::FeatherPixels,
+		thumbnailWidth / 2,
+		thumbnailHeight / 2,
+	}));
+	const std::array<float, 4> positionsX = {
+		0.0f,
+		feather,
+		static_cast<float>(thumbnailWidth) - feather,
+		static_cast<float>(thumbnailWidth),
+	};
+	const std::array<float, 4> positionsY = {
+		0.0f,
+		feather,
+		static_cast<float>(thumbnailHeight) - feather,
+		static_cast<float>(thumbnailHeight),
+	};
+
+	std::vector<Vertex> vertices;
+	vertices.reserve(16);
+	for (int row = 0; row < 4; row++)
+	{
+		for (int column = 0; column < 4; column++)
+		{
+			const float x = positionsX[column];
+			const float y = positionsY[row];
+			const float sourceX = static_cast<float>(sourceRect.x)
+				+ x / static_cast<float>(thumbnailWidth) * static_cast<float>(sourceRect.w);
+			const float sourceY = static_cast<float>(sourceRect.y)
+				+ y / static_cast<float>(thumbnailHeight) * static_cast<float>(sourceRect.h);
+
+			Vertex vertex;
+			vertex.position = { x, y };
+			vertex.tex_coord = {
+				sourceX / static_cast<float>(sourceWidth),
+				sourceY / static_cast<float>(sourceHeight),
+			};
+			const bool atOuterEdge = row == 0 || row == 3 || column == 0 || column == 3;
+			vertex.color = { 1.0f, 1.0f, 1.0f, atOuterEdge ? 0.0f : 1.0f };
+			vertices.push_back(vertex);
+		}
+	}
+
+	std::vector<int> indices;
+	indices.reserve(54);
+	for (int row = 0; row < 3; row++)
+	{
+		for (int column = 0; column < 3; column++)
+		{
+			const int topLeft = row * 4 + column;
+			const int topRight = topLeft + 1;
+			const int bottomLeft = topLeft + 4;
+			const int bottomRight = bottomLeft + 1;
+			indices.insert(indices.end(), {
+				topLeft, topRight, bottomRight,
+				topLeft, bottomRight, bottomLeft,
+			});
+		}
+	}
+
+	SDL_SetTextureBlendMode(source.get(), SDL_BLENDMODE_BLEND);
+	engine->drawGeometry(source, vertices, indices);
+}
+
+template <typename NPCList>
+bool hasBlockingNPC(const NPCList& npcList, const NPC* ignoredNPC = nullptr)
+{
+	for (const auto& npc : npcList)
+	{
+		if (npc != nullptr && npc.get() != ignoredNPC
+			&& npc->isObstacleForCharacter())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static std::string toLowerAsciiPath(std::string value)
+{
+	for (char& ch : value)
+	{
+		if (ch >= 'A' && ch <= 'Z')
+		{
+			ch = static_cast<char>(ch + ('a' - 'A'));
+		}
+	}
+	return value;
+}
+
+static bool isMapHeader(const char* head, const char* expected)
+{
+	return std::memcmp(head, expected, MAP_HEADSTR_LEN) == 0;
+}
+
+static int readMapInt32(const char* data)
+{
+	int value = 0;
+	std::memcpy(&value, data, sizeof(value));
+	return value;
+}
+
+static std::string readFixedMapString(const char* data, size_t capacity)
+{
+	size_t length = 0;
+	while (length < capacity && data[length] != '\0')
+	{
+		length++;
+	}
+	return std::string(data, length);
+}
+
+static bool isValidUtf8(const char* data, size_t length)
+{
+	if (data == nullptr)
+	{
+		return true;
+	}
+
+	size_t index = 0;
+	while (index < length)
+	{
+		unsigned char lead = static_cast<unsigned char>(data[index]);
+		if (lead < 0x80)
+		{
+			index++;
+			continue;
+		}
+
+		size_t extraBytes = 0;
+		uint32_t codePoint = 0;
+		if ((lead & 0xE0) == 0xC0)
+		{
+			extraBytes = 1;
+			codePoint = lead & 0x1F;
+			if (codePoint == 0)
+			{
+				return false;
+			}
+		}
+		else if ((lead & 0xF0) == 0xE0)
+		{
+			extraBytes = 2;
+			codePoint = lead & 0x0F;
+		}
+		else if ((lead & 0xF8) == 0xF0)
+		{
+			extraBytes = 3;
+			codePoint = lead & 0x07;
+		}
+		else
+		{
+			return false;
+		}
+
+		if (index + extraBytes >= length)
+		{
+			return false;
+		}
+
+		for (size_t offset = 1; offset <= extraBytes; offset++)
+		{
+			unsigned char continuation = static_cast<unsigned char>(data[index + offset]);
+			if ((continuation & 0xC0) != 0x80)
+			{
+				return false;
+			}
+			codePoint = (codePoint << 6) | (continuation & 0x3F);
+		}
+
+		if ((extraBytes == 1 && codePoint < 0x80) ||
+			(extraBytes == 2 && codePoint < 0x800) ||
+			(extraBytes == 3 && codePoint < 0x10000) ||
+			codePoint > 0x10FFFF ||
+			(codePoint >= 0xD800 && codePoint <= 0xDFFF))
+		{
+			return false;
+		}
+
+		index += extraBytes + 1;
+	}
+
+	return true;
+}
+
+static bool readUtf8MapString(const char* data, size_t capacity, std::string& text)
+{
+	text = readFixedMapString(data, capacity);
+	return isValidUtf8(text.data(), text.size());
+}
+
 Map::Map()
 {
-	priority = epMap;
+	setPriority(epMap);
 	waterEffect.applyPresetParams();
 }
 
@@ -56,125 +294,357 @@ Map::~Map()
 	freeResource();
 }
 
-bool Map::load(const std::string& fileName)
+bool Map::load(
+	const std::string& fileName,
+	const std::function<void()>& beforeMutation,
+	const std::function<bool()>& preparationCheckpoint)
 {
-	freeMpc();
-	freeData();
-	GameLog::write(u8"load map file %s\n", fileName.c_str());
+	GameLog::write("load map file %s\n", fileName.c_str());
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(fileName, s);
-	if (s != nullptr && len > 0)
+	int len = 0;
+	if (File::readFile(fileName, s, len, MapSafety::MaximumFileBytes)
+		&& s != nullptr && len > 0)
 	{
-		bool ret = load(s, len);
-		return ret;
+		return load(
+			s,
+			len,
+			beforeMutation,
+			preparationCheckpoint);
 	}
-	GameLog::write(u8"map file %s doesn't exist!\n", fileName.c_str());
+	GameLog::write("map file %s doesn't exist!\n", fileName.c_str());
 	return false;
 }
 
-bool Map::load(std::unique_ptr<char[]>& temp_d, int len)
+bool Map::load(
+	std::unique_ptr<char[]>& temp_d,
+	int len,
+	const std::function<void()>& beforeMutation,
+	const std::function<bool()>& preparationCheckpoint)
 {
-	auto d = temp_d.get();
+	PreparedLoadCandidate candidate;
+	if (!prepareLoadCandidate(
+			temp_d,
+			len,
+			candidate,
+			preparationCheckpoint))
+	{
+		return false;
+	}
+	return commitPreparedLoadCandidate(
+		std::move(candidate),
+		beforeMutation,
+		preparationCheckpoint);
+}
+
+bool Map::validate(const std::string& fileName)
+{
+	// Save-generation validation is structural only. Reading and decoding map
+	// image packages belongs to an actual load preparation, never preflight.
+	std::unique_ptr<char[]> sourceData;
+	int length = 0;
+	PreparedLoadCandidate candidate;
+	return File::readFile(
+			fileName,
+			sourceData,
+			length,
+			MapSafety::MaximumFileBytes) &&
+		sourceData != nullptr &&
+		length > 0 &&
+		parsePreparedLoadCandidate(
+			sourceData,
+			length,
+		candidate,
+		{},
+		{},
+		false);
+}
+
+bool Map::validate(
+	std::unique_ptr<char[]>& data,
+	int length)
+{
+	// Keep in-memory validation parse-only for the same reason as file-backed
+	// validation above.
+	PreparedLoadCandidate candidate;
+	return parsePreparedLoadCandidate(
+		data,
+		length,
+		candidate,
+		{},
+		{},
+		false);
+}
+
+bool Map::prepareLoadCandidate(
+	const std::string& fileName,
+	PreparedLoadCandidate& candidate,
+	const std::function<bool()>& preparationCheckpoint,
+	const std::string& fallbackMpcFolder)
+{
+	candidate.parsedData.reset();
+	candidate.preparedMapMpc.reset();
+	candidate.mapMpcPrepared = false;
+	std::unique_ptr<char[]> sourceData;
+	int length = 0;
+	return File::readFile(
+			fileName,
+			sourceData,
+			length,
+			MapSafety::MaximumFileBytes) &&
+		sourceData != nullptr &&
+		length > 0 &&
+		prepareLoadCandidate(
+			sourceData,
+			length,
+			candidate,
+			preparationCheckpoint,
+			fallbackMpcFolder);
+}
+
+bool Map::prepareLoadCandidate(
+	std::unique_ptr<char[]>& sourceData,
+	int length,
+	PreparedLoadCandidate& candidate,
+	const std::function<bool()>& preparationCheckpoint,
+	const std::string& fallbackMpcFolder)
+{
+	candidate.parsedData.reset();
+	candidate.preparedMapMpc.reset();
+	candidate.mapMpcPrepared = false;
+	return parsePreparedLoadCandidate(
+		sourceData,
+		length,
+		candidate,
+		preparationCheckpoint,
+		fallbackMpcFolder,
+		true);
+}
+
+bool Map::commitPreparedLoadCandidate(
+	PreparedLoadCandidate candidate,
+	const std::function<void()>& beforeMutation,
+	const std::function<bool()>& preparationCheckpoint)
+{
+	if (!candidate.isValid() ||
+		engine == nullptr)
+	{
+		return false;
+	}
+	if (!engine->isMainThread())
+	{
+		GameLog::write(
+			"Map: prepared map commit must run on the SDL main thread\n");
+		return false;
+	}
+
+	std::shared_ptr<MapMpc> preparedMapMpc;
+	if (candidate.mapMpcPrepared)
+	{
+		preparedMapMpc = std::move(candidate.preparedMapMpc);
+	}
+	else
+	{
+		preparedMapMpc = createMapMpc(
+			candidate.parsedData,
+			preparationCheckpoint);
+	}
+	if (preparedMapMpc == nullptr)
+	{
+		return false;
+	}
+	if (beforeMutation)
+	{
+		beforeMutation();
+	}
+	data = std::move(candidate.parsedData);
+	mapMpc = std::move(preparedMapMpc);
+	dataMap = std::move(candidate.preparedDataMap);
+	initTime();
+	return true;
+}
+
+bool Map::parsePreparedLoadCandidate(
+	std::unique_ptr<char[]>& sourceData,
+	int length,
+	PreparedLoadCandidate& candidate,
+	const std::function<bool()>& preparationCheckpoint,
+	const std::string& fallbackMpcFolder,
+	bool prepareMapImages)
+{
+	if (sourceData == nullptr ||
+		length < MAP_HEAD_LEN ||
+		length > MapSafety::MaximumFileBytes)
+	{
+		return false;
+	}
+
+	auto d = sourceData.get();
+	auto parsedData = std::make_shared<MapData>();
 #define mapReadData(_dst, _len) \
+	if ((_len) < 0 || size < (int)(_len)) { return false; } \
 	memcpy(_dst, d, _len);\
 	d += _len;\
 	size -= _len;
 
-	freeData();
+	int size = length;
+	mapReadData(&parsedData->head, MAP_HEADSTR_LEN);
 
-	int size = len;
-	//check length of head
-	if (size >= MAP_HEAD_LEN)
+	if (!isMapHeader(parsedData->head.head, MAP_HEADSTR_V3))
 	{
-		data = std::make_shared<MapData>();
-		if (data == nullptr)
+		GameLog::write("unsupported map format: MAP File Ver3.0 is required\n");
+		return false;
+	}
+
+	mapReadData(parsedData->head.dataNil, MAP_nullptr);
+	mapReadData(parsedData->head.path, MAP_PATH);
+	mapReadData(&parsedData->head.dataLen, 4);
+	mapReadData(&parsedData->head.width, 4);
+	mapReadData(&parsedData->head.height, 4);
+	mapReadData(&parsedData->head.infoLen, 4);
+	mapReadData(&parsedData->head.nameLen, 4);
+	mapReadData(parsedData->head.dataNil2, MAP_nullptr_2);
+
+	int headerSize = readMapInt32(parsedData->head.dataNil2);
+	int pathLen = readMapInt32(parsedData->head.dataNil2 + 4);
+	int flags = readMapInt32(parsedData->head.dataNil2 + 8);
+	int mpcCount = readMapInt32(parsedData->head.dataNil2 + 12);
+	if (headerSize < MAP_HEAD_LEN ||
+		pathLen < 0 ||
+		pathLen > MapSafety::MaximumMetadataBytes ||
+		static_cast<int64_t>(MAP_HEAD_LEN) + pathLen != headerSize ||
+		mpcCount != MAP_MPC_COUNT ||
+		(flags & MAP_V3_FLAG_UTF8) == 0)
+	{
+		return false;
+	}
+	if (pathLen > 0)
+	{
+		if (size < pathLen)
+		{
+			return false;
+		}
+		if (!readUtf8MapString(d, static_cast<size_t>(pathLen), parsedData->mpcPath))
+		{
+			return false;
+		}
+		d += pathLen;
+		size -= pathLen;
+	}
+	else
+	{
+		if (!readUtf8MapString(parsedData->head.path, MAP_PATH, parsedData->mpcPath))
 		{
 			return false;
 		}
 	}
-	else
+
+	const int64_t tileCount = static_cast<int64_t>(parsedData->head.width) * parsedData->head.height;
+	int64_t tileBytes = (int64_t)sizeof(MapTile) * tileCount;
+	int64_t mpcBytes = (int64_t)MAP_MPC_COUNT * parsedData->head.infoLen;
+	if (parsedData->head.width <= 0 || parsedData->head.height <= 0 ||
+		parsedData->head.width > MapSafety::MaximumDimension ||
+		parsedData->head.height > MapSafety::MaximumDimension ||
+		tileCount <= 0 || tileCount > MapSafety::MaximumTileCount ||
+		parsedData->head.nameLen <= 0 ||
+		parsedData->head.nameLen > MapSafety::MaximumMetadataBytes ||
+		parsedData->head.infoLen < parsedData->head.nameLen + 16 ||
+		parsedData->head.infoLen > MapSafety::MaximumMetadataBytes ||
+		tileBytes < 0 ||
+		mpcBytes < 0 ||
+		mpcBytes + tileBytes > size)
 	{
 		return false;
 	}
-	//read head
-	mapReadData(&data->head, MAP_HEADSTR_LEN);
 
-	if (!compareMapHead(data.get()))
-	{
-		data = nullptr;
-		return false;
-	}
-
-	mapReadData(data->head.dataNil, MAP_nullptr);
-	mapReadData(data->head.path, MAP_PATH);
-	mapReadData(&data->head.dataLen, 4);
-	mapReadData(&data->head.width, 4);
-	mapReadData(&data->head.height, 4);
-	mapReadData(&data->head.infoLen, 4);
-	mapReadData(&data->head.nameLen, 4);
-	mapReadData(data->head.dataNil2, MAP_nullptr_2);
-	data->head.infoLen = 0x40;
-	data->head.nameLen = 0x20;
-	if (data->head.width < 0)
-	{
-		data->head.width = 0;
-	}
-	if (data->head.height < 0)
-	{
-		data->head.height = 0;
-	}
-
-	//check length of data
-
-	if ((data->head.nameLen <= 0) || (data->head.infoLen != data->head.nameLen + 32) || (size < MAP_MPC_COUNT * data->head.infoLen + (int)sizeof(MapTile) * data->head.width * data->head.height))
-	{
-		data = nullptr;
-		return false;
-	}
-
-	//read mpc info
 	for (size_t i = 0; i < MAP_MPC_COUNT; i++)
 	{
-		data->mpc.mpc[i].name = std::make_unique<char[]>(data->head.nameLen);
-		mapReadData(data->mpc.mpc[i].name.get(), data->head.nameLen);
-		mapReadData(&data->mpc.mpc[i].index, 4);
-		mapReadData(&data->mpc.mpc[i].dynamic, 4);
-		mapReadData(&data->mpc.mpc[i].obstacle, 4);
-		mapReadData(&data->mpc.mpc[i].nil, 4);
-		d += 16;
-		size -= 16;
+		std::vector<char> rawName(static_cast<size_t>(parsedData->head.nameLen));
+		mapReadData(rawName.data(), parsedData->head.nameLen);
+		std::string utf8Name;
+		if (!readUtf8MapString(rawName.data(), rawName.size(), utf8Name))
+		{
+			return false;
+		}
+		parsedData->mpc.mpc[i].name = std::make_unique<char[]>(utf8Name.size() + 1);
+		std::memset(parsedData->mpc.mpc[i].name.get(), 0, utf8Name.size() + 1);
+		if (!utf8Name.empty())
+		{
+			std::memcpy(parsedData->mpc.mpc[i].name.get(), utf8Name.data(), utf8Name.size());
+		}
+		mapReadData(&parsedData->mpc.mpc[i].index, 4);
+		mapReadData(&parsedData->mpc.mpc[i].dynamic, 4);
+		mapReadData(&parsedData->mpc.mpc[i].obstacle, 4);
+		mapReadData(&parsedData->mpc.mpc[i].nil, 4);
+		int reservedLen = parsedData->head.infoLen - parsedData->head.nameLen - 16;
+		if (reservedLen < 0 || size < reservedLen)
+		{
+			return false;
+		}
+		d += reservedLen;
+		size -= reservedLen;
 	}
 
 	//read data
-	data->tile.resize(data->head.height);
-	for (int i = 0; i < data->head.height; i++)
+	parsedData->tile.resize(parsedData->head.height);
+	for (int i = 0; i < parsedData->head.height; i++)
 	{
-		data->tile[i].resize(data->head.width);
+		parsedData->tile[i].resize(parsedData->head.width);
 	}
 
 
-	for (int i = 0; i < data->head.height; i++)
+	for (int i = 0; i < parsedData->head.height; i++)
 	{
-		for (int j = 0; j < data->head.width; j++)
+		if (preparationCheckpoint &&
+			!preparationCheckpoint())
+		{
+			return false;
+		}
+		for (int j = 0; j < parsedData->head.width; j++)
 		{
 			for (size_t k = 0; k < MAP_TILE_LAYER; k++)
 			{
-				mapReadData(&data->tile[i][j].layer[k].frame, 1);
-				mapReadData(&data->tile[i][j].layer[k].mpc, 1);
+				mapReadData(&parsedData->tile[i][j].layer[k].frame, 1);
+				mapReadData(&parsedData->tile[i][j].layer[k].mpc, 1);
 			}
-			mapReadData(&data->tile[i][j].obstacle, 1);
-			mapReadData(&data->tile[i][j].trap, 1);
-			mapReadData(&data->tile[i][j].end[0], 1);
-			mapReadData(&data->tile[i][j].end[1], 1);
+			mapReadData(&parsedData->tile[i][j].obstacle, 1);
+			mapReadData(&parsedData->tile[i][j].trap, 1);
+			mapReadData(&parsedData->tile[i][j].end[0], 1);
+			mapReadData(&parsedData->tile[i][j].end[1], 1);
 		}
 	}
 
-	//load map mpc
-	loadMapMpc();
+	DataMap preparedDataMap;
+	preparedDataMap.tile.resize(
+		static_cast<std::size_t>(parsedData->head.height));
+	for (auto& row : preparedDataMap.tile)
+	{
+		row.resize(
+			static_cast<std::size_t>(parsedData->head.width));
+	}
 
-	initTime();
+	std::shared_ptr<MapMpc> preparedMapMpc;
+	const bool canPrepareMapMpc =
+		prepareMapImages &&
+		(!parsedData->mpcPath.empty() ||
+			!fallbackMpcFolder.empty());
+	if (canPrepareMapMpc)
+	{
+		preparedMapMpc = prepareMapMpc(
+			parsedData,
+			fallbackMpcFolder,
+			preparationCheckpoint);
+		if (preparedMapMpc == nullptr)
+		{
+			return false;
+		}
+	}
 
+	candidate.parsedData = std::move(parsedData);
+	candidate.preparedDataMap = std::move(preparedDataMap);
+	candidate.preparedMapMpc = std::move(preparedMapMpc);
+	candidate.mapMpcPrepared = canPrepareMapMpc;
 	return true;
+#undef mapReadData
 }
 
 Point Map::getElementPosition(Point pos, Point cenTile, Point cenScreen, PointEx cenTileOffset)
@@ -248,28 +718,37 @@ Point Map::getMousePosition(Point mouse, Point cenTile, Point cenScreen, PointEx
 
 Point Map::getTilePosition(Point tile, Point cenTile, Point cenScreen, PointEx cenTileOffset)
 {
+	PointEx pointEx = getTilePositionEx(tile, cenTile, cenScreen, cenTileOffset);
 	Point point;
+	point.x = static_cast<int>(std::clamp<double>(std::round(pointEx.x), INT_MIN, INT_MAX));
+	point.y = static_cast<int>(std::clamp<double>(std::round(pointEx.y), INT_MIN, INT_MAX));
+	return point;
+}
+
+PointEx Map::getTilePositionEx(Point tile, Point cenTile, Point cenScreen, PointEx cenTileOffset)
+{
+	PointEx point;
 	int line = std::abs(cenTile.y % 2);
-	cenScreen.x -= (int)round(cenTileOffset.x);
-	cenScreen.y -= (int)round(cenTileOffset.y);
+	float screenX = (float)cenScreen.x - cenTileOffset.x;
+	float screenY = (float)cenScreen.y - cenTileOffset.y;
 	int line2 = std::abs(tile.y % 2);
-	int x = tile.x - cenTile.x;
-	int y = tile.y - cenTile.y;
+	const int64_t x = static_cast<int64_t>(tile.x) - cenTile.x;
+	const int64_t y = static_cast<int64_t>(tile.y) - cenTile.y;
 	if (line == line2)
 	{
-		point.x = x * TILE_WIDTH + cenScreen.x;
-		point.y = y * TILE_HEIGHT / 2 + cenScreen.y;
+		point.x = static_cast<float>(static_cast<double>(x) * TILE_WIDTH + screenX);
+		point.y = static_cast<float>(static_cast<double>(y) * TILE_HEIGHT / 2.0 + screenY);
 	}
 	else
 	{
-		point.y = y * TILE_HEIGHT / 2 + cenScreen.y;
+		point.y = static_cast<float>(static_cast<double>(y) * TILE_HEIGHT / 2.0 + screenY);
 		if (line == 0)
 		{
-			point.x = x * TILE_WIDTH + cenScreen.x + TILE_WIDTH / 2;
+			point.x = static_cast<float>(static_cast<double>(x) * TILE_WIDTH + TILE_WIDTH / 2.0 + screenX);
 		}
 		else
 		{
-			point.x = x * TILE_WIDTH + cenScreen.x - TILE_WIDTH / 2;
+			point.x = static_cast<float>(static_cast<double>(x) * TILE_WIDTH - TILE_WIDTH / 2.0 + screenX);
 		}
 	}
 	return point;
@@ -286,51 +765,96 @@ Point Map::getTileCenter(Point tile, Point cenTile, Point cenScreen, PointEx off
 float Map::getTileDistance(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {
 	auto pos = getTilePosition(to, from);
-	return hypot(((float)pos.x + toOffset.x - fromOffset.x) / TILE_WIDTH * MapXRatio, ((float)pos.y + toOffset.y - fromOffset.y) / TILE_HEIGHT);
+	PointEx delta =
+	{
+		(float)pos.x + toOffset.x - fromOffset.x,
+		(float)pos.y + toOffset.y - fromOffset.y
+	};
+	return getProjectedTileUnitDistance(delta);
 }
 
 void Map::loadMapMpc()
 {
-	freeMpc();
+	std::shared_ptr<MapMpc> loadedMapMpc =
+		createMapMpc(data);
+	mapMpc = std::move(loadedMapMpc);
+}
 
-	engine->delay(1);
-	if (data != nullptr)
+std::shared_ptr<MapMpc> Map::createMapMpc(
+	const std::shared_ptr<MapData>& mapData,
+	const std::function<bool()>& preparationCheckpoint)
+{
+	std::string fallbackFolder;
+	if (gm != nullptr)
 	{
-		mapMpc = std::make_shared<MapMpc>();
+		fallbackFolder =
+			"mpc\\map\\" + gm->mapFolderName + "\\";
+	}
+	return prepareMapMpc(
+		mapData,
+		fallbackFolder,
+		preparationCheckpoint);
+}
 
-		for (size_t i = 0; i < MAP_MPC_COUNT; i++)
+std::shared_ptr<MapMpc> Map::prepareMapMpc(
+	const std::shared_ptr<MapData>& mapData,
+	const std::string& fallbackFolder,
+	const std::function<bool()>& preparationCheckpoint)
+{
+	if (mapData == nullptr)
+	{
+		return nullptr;
+	}
+
+	auto loadedMapMpc = std::make_shared<MapMpc>();
+	std::unordered_map<std::string, _shared_imp> loadedImages;
+	for (size_t i = 0; i < MAP_MPC_COUNT; i++)
+	{
+		if (preparationCheckpoint &&
+			!preparationCheckpoint())
 		{
-			std::string mpcName = data->head.path;
-			if (mpcName.empty())
-			{
-				mpcName = u8"mpc\\map\\" + gm->mapFolderName + u8"\\";
-			}
-			if (mpcName.length() > 1 && mpcName.c_str()[mpcName.length() - 1] != '\\')
-			{
-				mpcName += u8"\\";
-			}
-			mpcName += data->mpc.mpc[i].name.get();
-			mapMpc->mpc[i].img = IMP::createIMPImage(mpcName);
-
+			return nullptr;
+		}
+		const char* slotName = mapData->mpc.mpc[i].name.get();
+		if (slotName == nullptr || slotName[0] == '\0')
+		{
+			continue;
 		}
 
+		std::string mpcName = mapData->mpcPath;
+		if (mpcName.empty())
+		{
+			mpcName = fallbackFolder;
+		}
+		if (mpcName.length() > 1 &&
+			mpcName.back() != '\\' &&
+			mpcName.back() != '/')
+		{
+			mpcName += "\\";
+		}
+		mpcName += slotName;
+		mpcName = toLowerAsciiPath(mpcName);
+
+		std::string cacheKey = mpcName;
+		std::replace(cacheKey.begin(), cacheKey.end(), '\\', '/');
+		auto loadedImage = loadedImages.find(cacheKey);
+		if (loadedImage == loadedImages.end())
+		{
+			loadedImage = loadedImages.emplace(
+				cacheKey,
+				IMP::createIMPImage(mpcName, false)).first;
+		}
+		loadedMapMpc->mpc[i].img = loadedImage->second;
 	}
+	return loadedMapMpc;
 }
 
 int Map::NormalizeDirection(int direction)
 {
-	if (direction > 7)
-	{
-		direction = direction % 8;
-	}
-	if (direction < 0)
-	{
-		direction = direction % 8 + 8;
-	}
-	return direction;
+	return ((direction % 8) + 8) % 8;
 }
 
-std::deque<Point> Map::getPathAstar(Point from, Point to)
+std::deque<Point> Map::getPathAstar(Point from, Point to, int directionCount, int maxTryCount)
 {
 	std::deque<Point> path;
 	if (to == from)
@@ -356,43 +880,58 @@ std::deque<Point> Map::getPathAstar(Point from, Point to)
 	}
 
 	// 开放列表，使用优先队列
-	std::priority_queue<std::shared_ptr<MapNode>, std::vector<std::shared_ptr<MapNode>>, MapNode::Compare> openList;
-	// 关闭列表
-	std::vector<std::vector<bool>> closedList(h, std::vector<bool>(w, false));
-	// 节点信息
-	std::vector<std::vector<std::shared_ptr<MapNode>>> MapNodes(h, std::vector<std::shared_ptr<MapNode>>(w, nullptr));
+	std::vector<MapNode> nodePool;
+	nodePool.reserve(static_cast<size_t>(w) * static_cast<size_t>(h));
 
-	// 初始化起点节点
-	auto startMapNode = std::make_shared<MapNode>(from, 0, calDistance(from, to), nullptr);
+	std::priority_queue<MapNode*, std::vector<MapNode*>, MapNode::Compare> openList;
+	std::vector<std::vector<bool>> closedList(h, std::vector<bool>(w, false));
+	std::vector<std::vector<MapNode*>> mapNodes(h, std::vector<MapNode*>(w, nullptr));
+	int startPreferredDir = NPC::getDirection(from, to);
+
+	nodePool.emplace_back(from, 0.0f, static_cast<float>(calDistance(from, to)), nullptr);
+	MapNode* startMapNode = &nodePool.back();
 	openList.push(startMapNode);
-	MapNodes[from.y][from.x] = startMapNode;
+	mapNodes[from.y][from.x] = startMapNode;
 	int count_times = 0;
-	while (!openList.empty() && (count_times++ < 128 * 128))
+	while (!openList.empty() && (maxTryCount < 0 || count_times++ <= maxTryCount))
 	{
-		// 取出 f 值最小的节点
-		auto current = openList.top();
+		MapNode* current = openList.top();
 		openList.pop();
 
 		if (current->pos == to)
 		{
-			// 找到目标节点，回溯路径
-			std::shared_ptr<MapNode> temp = current;
+			MapNode* temp = current;
 			while (temp->parent)
 			{
 				path.push_front(temp->pos);
 				temp = temp->parent;
 			}
-			//            path.push_front(from);
 			break;
 		}
 
-		// 将当前节点加入关闭列表
 		closedList[current->pos.y][current->pos.x] = true;
 
-		// 获取相邻节点
-		for (int i = 0; i < 8; i++)
+		int preferredDir = NPC::getDirection(current->pos, to);
+		int dirList[8] = {
+			preferredDir,
+			(preferredDir + 1) % 8, (preferredDir + 7) % 8,
+			(preferredDir + 2) % 8, (preferredDir + 6) % 8,
+			(preferredDir + 3) % 8, (preferredDir + 5) % 8,
+			(preferredDir + 4) % 8
+		};
+
+		for (int di = 0; di < 8; di++)
 		{
+			int i = dirList[di];
+			if (!NPC::canMoveInDirection(i, directionCount))
+			{
+				continue;
+			}
 			auto neighbor = getSubPoint(current->pos, i);
+			if (!isInMap(neighbor))
+			{
+				continue;
+			}
 			if ((!canWalk(neighbor) && (neighbor != to)) || closedList[neighbor.y][neighbor.x])
 			{
 				continue;
@@ -407,38 +946,43 @@ std::deque<Point> Map::getPathAstar(Point from, Point to)
 			}
 
 			float temp_tentativeG = 1.0f;
-			if (i % 4 == 2)
+			if (i % 2 == 0)
 			{
 				temp_tentativeG = 1.414f * temp_tentativeG;
 			}
-			else if (i % 2 != 0)
-			{
-				temp_tentativeG = 1.732f / 2.0f * temp_tentativeG;
-			}
 			float tentativeG = current->g + temp_tentativeG;
+			int firstDir = (current->parent == nullptr) ? i : current->firstDir;
+			float directionBias = (float)getDirectionDistance8(firstDir, startPreferredDir) * 8.0f +
+				(float)getDirectionDistance8(i, preferredDir);
+			float candidatePriorityScore = tentativeG + calDistance(neighbor, to) + directionBias * 0.001f;
 
-			if (!MapNodes[neighbor.y][neighbor.x])
+			if (!mapNodes[neighbor.y][neighbor.x])
 			{
-				// 节点未被访问过
-				auto newMapNode = std::make_shared<MapNode>(neighbor, tentativeG, calDistance(neighbor, to), current);
-				openList.push(newMapNode);
-				MapNodes[neighbor.y][neighbor.x] = newMapNode;
+				nodePool.emplace_back(neighbor, tentativeG, static_cast<float>(calDistance(neighbor, to)), current, firstDir, directionBias);
+				MapNode* newNode = &nodePool.back();
+				openList.push(newNode);
+				mapNodes[neighbor.y][neighbor.x] = newNode;
 			}
-			else if (tentativeG < MapNodes[neighbor.y][neighbor.x]->g)
+			else if (tentativeG < mapNodes[neighbor.y][neighbor.x]->g ||
+				(std::abs(tentativeG - mapNodes[neighbor.y][neighbor.x]->g) < 0.0001f &&
+					candidatePriorityScore < mapNodes[neighbor.y][neighbor.x]->priorityScore))
 			{
-				// 找到更优路径
-				MapNodes[neighbor.y][neighbor.x]->parent = current;
-				MapNodes[neighbor.y][neighbor.x]->g = tentativeG;
-				MapNodes[neighbor.y][neighbor.x]->f = tentativeG + MapNodes[neighbor.y][neighbor.x]->h;
-				openList.push(MapNodes[neighbor.y][neighbor.x]);
+				mapNodes[neighbor.y][neighbor.x]->parent = current;
+				mapNodes[neighbor.y][neighbor.x]->g = tentativeG;
+				mapNodes[neighbor.y][neighbor.x]->f = tentativeG + mapNodes[neighbor.y][neighbor.x]->h;
+				mapNodes[neighbor.y][neighbor.x]->firstDir = firstDir;
+				mapNodes[neighbor.y][neighbor.x]->directionBias = directionBias;
+				mapNodes[neighbor.y][neighbor.x]->priorityScore = candidatePriorityScore;
+				openList.push(mapNodes[neighbor.y][neighbor.x]);
 			}
 		}
 	}
 	return path;
 }
 
-std::deque<Point> Map::getPathTraversal(Point from, Point to)
+std::deque<Point> Map::getPathTraversal(Point from, Point to, int directionCount)
 {
+	(void)directionCount;
 	std::deque<Point> path;
 	if (to == from)
 	{
@@ -530,32 +1074,193 @@ std::deque<Point> Map::getPathTraversal(Point from, Point to)
 	return path;
 }
 
-std::deque<Point> Map::getPath(Point from, Point to)
+std::deque<Point> Map::findPath(Point from, Point to, int directionCount, int maxTryCount)
 {
-	return getPathAstar(from, to);
+	return getPathAstar(from, to, directionCount, maxTryCount);
 	//    return getPathTraversal(from, to);
 }
 
-std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius)
+std::deque<Point> Map::findSimplePath(Point from, Point to, int directionCount, int maxTryCount)
 {
-	auto result = getPath(from, to);
-	if (result.size() == 0)
+	std::deque<Point> path;
+	if (to == from || data == nullptr)
 	{
-		return result;
+		return path;
 	}
-	if (radius >= (int)result.size())
+
+	int w = data->head.width;
+	int h = data->head.height;
+	if (w <= 0 || h <= 0 || !isInMap(from) || !isInMap(to))
 	{
-		result.resize(0);
-		return result;
+		return path;
 	}
-	for (int i = 0; i < radius; i++)
+
+	std::vector<MapNode> nodePool;
+	nodePool.reserve(static_cast<size_t>(w) * static_cast<size_t>(h));
+
+	std::priority_queue<MapNode*, std::vector<MapNode*>, MapNode::Compare> frontier;
+	std::vector<std::vector<bool>> visited(h, std::vector<bool>(w, false));
+	std::vector<std::vector<MapNode*>> mapNodes(h, std::vector<MapNode*>(w, nullptr));
+
+	nodePool.emplace_back(from, 0.0f, static_cast<float>(calDistance(from, to)), nullptr);
+	MapNode* startMapNode = &nodePool.back();
+	frontier.push(startMapNode);
+	mapNodes[from.y][from.x] = startMapNode;
+
+	int tryCount = 0;
+	while (!frontier.empty())
 	{
-		result.pop_back();
+		if (maxTryCount >= 0 && tryCount++ > maxTryCount)
+		{
+			break;
+		}
+
+		MapNode* current = frontier.top();
+		frontier.pop();
+		if (visited[current->pos.y][current->pos.x])
+		{
+			continue;
+		}
+		visited[current->pos.y][current->pos.x] = true;
+		if (current->pos == to)
+		{
+			MapNode* temp = current;
+			while (temp->parent)
+			{
+				path.push_front(temp->pos);
+				temp = temp->parent;
+			}
+			break;
+		}
+		if (current->pos != from && !canWalk(current->pos))
+		{
+			continue;
+		}
+
+		int preferredDir = NPC::getDirection(current->pos, to);
+		int dirList[8] = {
+			preferredDir,
+			(preferredDir + 1) % 8, (preferredDir + 7) % 8,
+			(preferredDir + 2) % 8, (preferredDir + 6) % 8,
+			(preferredDir + 3) % 8, (preferredDir + 5) % 8,
+			(preferredDir + 4) % 8
+		};
+
+		for (int di = 0; di < 8; di++)
+		{
+			int direction = dirList[di];
+			if (!NPC::canMoveInDirection(direction, directionCount))
+			{
+				continue;
+			}
+			Point neighbor = getSubPoint(current->pos, direction);
+			if (!isInMap(neighbor) || visited[neighbor.y][neighbor.x] || mapNodes[neighbor.y][neighbor.x] != nullptr)
+			{
+				continue;
+			}
+			if (!canWalk(neighbor) && neighbor != to)
+			{
+				continue;
+			}
+			if (direction % 2 == 0
+				&& (!canPass(getSubPoint(current->pos, NormalizeDirection(direction - 1)))
+					|| !canPass(getSubPoint(current->pos, NormalizeDirection(direction + 1)))))
+			{
+				continue;
+			}
+
+			float priority = static_cast<float>(calDistance(neighbor, to));
+			nodePool.emplace_back(neighbor, 0.0f, priority, current, direction);
+			MapNode* newNode = &nodePool.back();
+			newNode->priorityScore = priority;
+			frontier.push(newNode);
+			mapNodes[neighbor.y][neighbor.x] = newNode;
+		}
 	}
-	return result;
+
+	return path;
 }
 
-std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
+std::deque<Point> Map::getLinePath(Point from, Point to, int maxStep)
+{
+	std::deque<Point> path;
+	if (from == to || maxStep <= 0)
+	{
+		return path;
+	}
+	if (!isInMap(from) || !isInMap(to))
+	{
+		return path;
+	}
+
+	Point current = from;
+	while (current != to && maxStep-- > 0)
+	{
+		int direction = NPC::getDirection(current, to);
+		Point next = getSubPoint(current, direction);
+		if (next == current || !isInMap(next))
+		{
+			break;
+		}
+		path.push_back(next);
+		current = next;
+	}
+	return path;
+}
+
+std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius, int directionCount)
+{
+	auto result = findPath(from, to, directionCount);
+	if (!result.empty())
+	{
+		if (radius >= (int)result.size())
+		{
+			result.clear();
+			return result;
+		}
+		for (int i = 0; i < radius; i++)
+		{
+			result.pop_back();
+		}
+		return result;
+	}
+	if (radius <= 0 || data == nullptr || calDistance(from, to) <= radius)
+	{
+		return result;
+	}
+
+	// The target tile can be occupied or enclosed even though a reachable tile
+	// inside the requested radius exists. Search those approach tiles only when
+	// the legacy exact-target path fails, keeping the common path fast.
+	const int minimumX = std::max(0, to.x - radius);
+	const int maximumX = std::min(data->head.width - 1, to.x + radius);
+	const int minimumY = std::max(0, to.y - radius * 2);
+	const int maximumY = std::min(data->head.height - 1, to.y + radius * 2);
+	std::deque<Point> bestPath;
+	for (int y = minimumY; y <= maximumY; ++y)
+	{
+		for (int x = minimumX; x <= maximumX; ++x)
+		{
+			const Point candidate = { x, y };
+			if (calDistance(candidate, to) > radius || !canWalk(candidate))
+			{
+				continue;
+			}
+			auto candidatePath = findPath(from, candidate, directionCount);
+			if (candidatePath.empty())
+			{
+				continue;
+			}
+			if (bestPath.empty() || candidatePath.size() < bestPath.size())
+			{
+				bestPath = std::move(candidatePath);
+			}
+		}
+	}
+	return bestPath;
+}
+
+std::deque<Point> Map::traceTowardTarget(Point from, Point to, int stepCount, int directionCount)
 {
 	//    std::deque<Point> ret;
 	//    if (stepCount < 0) {
@@ -600,7 +1305,12 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 			default:
 				break;
 			}
-			std::vector<Point> tempSteps = gm->map->getSubPointEx(pos, NPC::calDirection(pos, to) + d);
+			int direction = NPC::getDirection(pos, to) + d;
+			if (!NPC::canMoveInDirection(direction, directionCount))
+			{
+				continue;
+			}
+			std::vector<Point> tempSteps = gm->map->getSubPointEx(pos, direction);
 			if (tempSteps.size() > 0)
 			{
 				bool canContinue = true;
@@ -630,14 +1340,18 @@ std::deque<Point> Map::getStepPath(Point from, Point to, int stepCount)
 	return result;
 }
 
-std::deque<Point> Map::getStep(Point from, Point to)
+std::deque<Point> Map::stepTowardTarget(Point from, Point to, int directionCount)
 {
 	std::deque<Point> result;
 	if (from == to)
 	{
 		return result;
 	}
-	int dir = NPC::calDirection(from, to);
+	int dir = NPC::getDirection(from, to);
+	if (!NPC::canMoveInDirection(dir, directionCount))
+	{
+		return result;
+	}
 	Point pos = gm->map->getSubPoint(from, dir);
 	if (gm->map->canWalk(pos))
 	{
@@ -718,8 +1432,12 @@ Point Map::getJumpPath(Point from, Point to)
 	{
 		return from;
 	}
+	if (!isInMap(from) || !isInMap(to))
+	{
+		return from;
+	}
 	float angle;
-	if (from.x == to.x && std::abs(from.y - to.y) % 2 == 0)
+	if (from.x == to.x && std::llabs(static_cast<int64_t>(from.y) - to.y) % 2 == 0)
 	{
 		if (from.y > to.y)
 		{
@@ -794,14 +1512,21 @@ Point Map::getJumpPath(Point from, Point to)
 	return lastStep;
 }
 
-bool Map::canView(Point from, Point to)
+bool Map::canSee(Point from, Point to)
 {
 	if (from == to)
 	{
 		return true;
 	}
+	// The target occupies its own tile, so that tile must not occlude the
+	// target itself. This preserves the legacy canView contract: only terrain
+	// and closed doors between the viewer and target block visibility.
+	if (!isInMap(from) || !isInMap(to))
+	{
+		return false;
+	}
 	float angle;
-	if (from.x == to.x && std::abs(from.y - to.y) % 2 == 0)
+	if (from.x == to.x && std::llabs(static_cast<int64_t>(from.y) - to.y) % 2 == 0)
 	{
 		if (from.y > to.y)
 		{
@@ -840,15 +1565,15 @@ bool Map::canView(Point from, Point to)
 		{
 			return false;
 		}
-		bool canViewNext = false;
+		bool canSeeNext = false;
 		for (size_t i = 0; i < stepList.size() - 1; i++)
 		{
-			if (canViewTile(stepList[i]))
+			if (canSeeTile(stepList[i]))
 			{
-				canViewNext = true;
+				canSeeNext = true;
 			}
 		}
-		if (stepList.size() > 1 && canViewNext == false)
+		if (stepList.size() > 1 && canSeeNext == false)
 		{
 			return false;
 		}
@@ -856,7 +1581,7 @@ bool Map::canView(Point from, Point to)
 		{
 			return true;
 		}
-		if (!canViewTile(stepList[stepList.size() - 1]))
+		if (!canSeeTile(stepList[stepList.size() - 1]))
 		{
 			return false;
 		}
@@ -867,13 +1592,27 @@ bool Map::canView(Point from, Point to)
 
 bool Map::canWalk(Point pos)
 {
+	return canWalkForActor(pos, nullptr);
+}
+
+bool Map::canWalkForActor(
+	Point pos, const std::shared_ptr<NPC>& ignoredActor)
+{
     if (!isInMap(pos))
         return false;
-    
-	if (data->tile[pos.y][pos.x].obstacle != toJumpTrans && data->tile[pos.y][pos.x].obstacle != toJumpOpaque
-		&& data->tile[pos.y][pos.x].obstacle != toTrans && data->tile[pos.y][pos.x].obstacle != toObstacle)
+
+	if (gm != nullptr && gm->effectManager != nullptr && gm->effectManager->hasSolidEffectAt(pos))
 	{
-		if (dataMap.tile[pos.y][pos.x].npcList.size() == 0 && dataMap.tile[pos.y][pos.x].stepNPCList.size() == 0)
+		return false;
+	}
+    
+	if (tileObstacleAllowsWalk(data->tile[pos.y][pos.x].obstacle))
+	{
+		const NPC* ignoredNPC = ignoredActor.get();
+		if (!hasBlockingNPC(
+				dataMap.tile[pos.y][pos.x].npcList, ignoredNPC)
+			&& !hasBlockingNPC(
+				dataMap.tile[pos.y][pos.x].stepNPCList, ignoredNPC))
 		{
 			if (dataMap.tile[pos.y][pos.x].objList.size() == 0)
 			{
@@ -884,7 +1623,7 @@ bool Map::canWalk(Point pos)
 				for (auto iter = dataMap.tile[pos.y][pos.x].objList.begin(); iter != dataMap.tile[pos.y][pos.x].objList.end(); iter++)
 				{
 					int objKind = (*iter)->kind;
-					if (objKind == okBox || objKind == okDoor || objKind == okOrnament)
+					if (isObjectObstacleKind(objKind))
 					{
 						return false;
 					}
@@ -914,12 +1653,8 @@ bool Map::canJump(Point pos)
     if (!isInMap(pos))
         return false;
     
-	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toTrans)
+	if (tileObstacleAllowsJump(data->tile[pos.y][pos.x].obstacle))
 	{
-		/*if (dataMap.tile[pos.y][pos.x].npcIndex.size() == 0 && dataMap.tile[pos.y][pos.x].stepIndex.size() == 0)
-		{
-
-		}*/
 		if (dataMap.tile[pos.y][pos.x].objList.size() > 0)
 		{
 			for (auto iter = dataMap.tile[pos.y][pos.x].objList.begin(); iter != dataMap.tile[pos.y][pos.x].objList.end(); iter++)
@@ -951,19 +1686,23 @@ int Map::getTrapIndex(Point pos)
 std::string Map::getTrapName(Point pos)
 {
     if (!isInMap(pos))
-        return u8"";
+        return "";
     
 	if (data->tile[pos.y][pos.x].trap != 0)
 	{
 		return gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap);
 	}
-	return u8"";
+	return "";
 }
 
 bool Map::haveTraps(Point pos)
 {
+	if (!isInMap(pos))
+		return false;
 	if (!data) { return false; }
-	if (data->tile[pos.y][pos.x].trap == 0 || gm->traps.get(gm->mapFolderName, data->tile[pos.y][pos.x].trap).empty())
+	const int trapIndex = data->tile[pos.y][pos.x].trap;
+	if (trapIndex == 0 || gm->traps.hasTriggered(trapIndex) ||
+		gm->traps.get(gm->mapFolderName, trapIndex).empty())
 	{
 		return false;
 	}
@@ -975,7 +1714,7 @@ bool Map::canFly(Point pos)
     if (!isInMap(pos))
         return false;
     
-	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toJumpOpaque)
+	if (tileObstacleAllowsMagic(data->tile[pos.y][pos.x].obstacle))
 	{
 		if (dataMap.tile[pos.y][pos.x].objList.size() == 0)
 		{
@@ -997,12 +1736,12 @@ bool Map::canFly(Point pos)
 	return false;
 }
 
-bool Map::canViewTile(Point pos)
+bool Map::canSeeTile(Point pos)
 {
     if (!isInMap(pos))
         return false;
     
-	if (data->tile[pos.y][pos.x].obstacle != toObstacle && data->tile[pos.y][pos.x].obstacle != toJumpOpaque)
+	if (tileObstacleAllowsSight(data->tile[pos.y][pos.x].obstacle))
 	{
 		if (dataMap.tile[pos.y][pos.x].objList.size() == 0)
 		{
@@ -1027,76 +1766,46 @@ bool Map::canViewTile(Point pos)
 bool Map::canPass(Point pos)
 {
 	return (canWalk(pos) || canFly(pos));
-	/*if (canWalk(pos))
-	{
-		return true;
-	}
-	if (canFly(pos))
-	{
-		if (dataMap.tile[pos.y][pos.x].npcIndex.size() == 0 && dataMap.tile[pos.y][pos.x].stepIndex.size() == 0)
-		{
-			if (dataMap.tile[pos.y][pos.x].objIndex.size() == 0)
-			{
-				return true;
-			}
-			else
-			{
-				for (size_t i = 0; i < dataMap.tile[pos.y][pos.x].objIndex.size(); i++)
-				{
-					int objKind = gm->objectManager->objectList[dataMap.tile[pos.y][pos.x].objIndex[i]]->kind;
-					if (objKind == okBox || objKind == okDoor || objKind == okOrnament)
-					{
-						return false;
-					}
-				}
-				return true;
-			}
-		}
-	}
-	return false;*/
 }
 
 Point Map::getSubPoint(Point from, int direction)
 {
-	if (direction < 0)
-	{
-		direction += 8;
-	}
-	else if (direction > 7)
-	{
-		direction -= 8;
-	}
-	int line = std::abs(from.y) % 2;
+	direction = ((direction % 8) + 8) % 8;
+	int line = std::abs(from.y % 2);
+	auto addCoordinate = [](int value, int delta) {
+		const int64_t result = static_cast<int64_t>(value) + delta;
+		return static_cast<int>(std::clamp<int64_t>(result, INT_MIN, INT_MAX));
+	};
 	Point to = from;
 	switch (direction)
 	{
 	case 0:
-		to.y += 2;
+		to.y = addCoordinate(to.y, 2);
 		break;
 	case 1:
-		to.y++;
-		to.x += line - 1;
+		to.y = addCoordinate(to.y, 1);
+		to.x = addCoordinate(to.x, line - 1);
 		break;
 	case 2:
-		to.x--;
+		to.x = addCoordinate(to.x, -1);
 		break;
 	case 3:
-		to.y--;
-		to.x += line - 1;
+		to.y = addCoordinate(to.y, -1);
+		to.x = addCoordinate(to.x, line - 1);
 		break;
 	case 4:
-		to.y -= 2;
+		to.y = addCoordinate(to.y, -2);
 		break;
 	case 5:
-		to.y--;
-		to.x += line;
+		to.y = addCoordinate(to.y, -1);
+		to.x = addCoordinate(to.x, line);
 		break;
 	case 6:
-		to.x++;
+		to.x = addCoordinate(to.x, 1);
 		break;
 	case 7:
-		to.y++;
-		to.x += line;
+		to.y = addCoordinate(to.y, 1);
+		to.x = addCoordinate(to.x, line);
 		break;
 	default:
 		break;
@@ -1107,65 +1816,26 @@ Point Map::getSubPoint(Point from, int direction)
 std::vector<Point> Map::getSubPointEx(Point from, int direction)
 {
 	std::vector<Point> result;
-	if (direction < 0)
-	{
-		direction += 8;
-	}
-	else if (direction > 7)
-	{
-		direction -= 8;
-	}
-	int line = std::abs(from.y) % 2;
-	Point to = from;
+	direction = ((direction % 8) + 8) % 8;
 	if (direction % 2 == 0)
 	{
 		result.push_back(getSubPoint(from, direction - 1));
 		result.push_back(getSubPoint(from, direction + 1));
 	}
-	switch (direction)
-	{
-	case 0:
-		to.y += 2;
-		break;
-	case 1:
-		to.y++;
-		to.x += line - 1;
-		break;
-	case 2:
-		to.x--;
-		break;
-	case 3:
-		to.y--;
-		to.x += line - 1;
-		break;
-	case 4:
-		to.y -= 2;
-		break;
-	case 5:
-		to.y--;
-		to.x += line;
-		break;
-	case 6:
-		to.x++;
-		break;
-	case 7:
-		to.y++;
-		to.x += line;
-		break;
-	default:
-		break;
-	}
-	result.push_back(to);
+	result.push_back(getSubPoint(from, direction));
 	return result;
 }
 
 int Map::calDistance(Point from, Point to)
 {
-	int line1 = std::abs(from.y) % 2;
-	int line2 = std::abs(to.y) % 2;
+	int line1 = std::abs(from.y % 2);
+	int line2 = std::abs(to.y % 2);
+	const int64_t deltaY = std::llabs(static_cast<int64_t>(to.y) - from.y) / 2;
+	const int64_t deltaX = static_cast<int64_t>(to.x) - from.x;
+	int64_t distance = 0;
 	if (line1 == line2)
 	{
-		return std::abs(to.y - from.y) / 2 + abs(to.x - from.x);
+		distance = deltaY + std::llabs(deltaX);
 	}
 	else
 	{
@@ -1173,26 +1843,27 @@ int Map::calDistance(Point from, Point to)
 		{
 			if (to.x >= from.x)
 			{
-				return std::abs(to.y - from.y) / 2 + 1 + to.x - from.x;
+				distance = deltaY + 1 + deltaX;
 			}
 			else
 			{
-				return std::abs(to.y - from.y) / 2 + from.x - to.x;
+				distance = deltaY - deltaX;
 			}
 		}
 		else
 		{
 			if (to.x > from.x)
 			{
-				return std::abs(to.y - from.y) / 2 + to.x - from.x;
+				distance = deltaY + deltaX;
 
 			}
 			else
 			{
-				return std::abs(to.y - from.y) / 2 + 1 + from.x - to.x;
+				distance = deltaY + 1 - deltaX;
 			}
 		}
 	}
+	return static_cast<int>(std::min<int64_t>(distance, INT_MAX));
 }
 
 
@@ -1200,8 +1871,21 @@ void Map::drawMap()
 {
 	int w, h;
 	engine->getWindowSize(w, h);
+	const bool useRainSceneTint = gm->global.data.rainShow
+		&& gm->global.feature.rainSceneTint;
+	const uint32_t mapColorStyle = useRainSceneTint
+		? 0x00808080
+		: gm->global.data.mpcStyle;
+	const uint32_t actorColorStyle = useRainSceneTint
+		? 0x00808080
+		: gm->global.data.asfStyle;
+	// Both C# ports tint maps and ordinary sprites gray in rain, while magic
+	// sprites remain white so their effects do not become muddy.
+	const uint32_t effectColorStyle = useRainSceneTint
+		? 0x00FFFFFF
+		: gm->global.data.asfStyle;
 
-	if (gm->global.data.water)
+	if (gm->global.data.waterEffect)
 	{
 		waterEffect.setupEffectCanvas();
 	}
@@ -1210,8 +1894,8 @@ void Map::drawMap()
 	cenScreen.x = (int)w / 2;
 	cenScreen.y = (int)h / 2;
 	int xscal, yscal;
-	xscal = cenScreen.x / TILE_WIDTH + 2;
-	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2;
+	xscal = cenScreen.x / TILE_WIDTH + 2 + LUM_MASK_WIDTH / TILE_WIDTH + 1;
+	yscal = cenScreen.y / TILE_HEIGHT * 2 + 2 + LUM_MASK_HEIGHT / TILE_HEIGHT + 1;
 	int tileHeightScal = 15;
 	Point cenTile = gm->camera->position;
 	PointEx offset = gm->camera->offset;
@@ -1226,60 +1910,84 @@ void Map::drawMap()
 				continue;
 			}
 			Point tile = { j, i };
-			drawTile(0, tile, cenTile, cenScreen, offset, gm->global.data.mpcStyle);
+			drawTile(0, tile, cenTile, cenScreen, offset, mapColorStyle);
 		}
 	}
 
-	EffectMap emap = gm->effectManager->createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
+	if (gm->weather != nullptr)
+	{
+		gm->weather->drawElementLum();
+	}
+
+	const EffectMap& emap = gm->effectManager->createMap(cenTile.x - xscal, cenTile.y - yscal, xscal * 2, yscal * 2 + tileHeightScal);
 
 	for (int i = cenTile.y - yscal; i < cenTile.y + yscal + tileHeightScal; i++)
 	{
+		int emapRow = i - (cenTile.y - yscal);
 		for (int j = cenTile.x - xscal; j < cenTile.x + xscal; j++)
 		{
 			if (data == nullptr || j < 0 || j >= data->head.width || i < 0 || i >= data->head.height)
 			{
 				continue;
 			}
-			for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
+			int emapCol = j - (cenTile.x - xscal);
+			auto& effectTileIndices = emap.tile[emapRow][emapCol].index;
+			for (size_t k = 0; k < effectTileIndices.size(); k++)
 			{
-				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+				auto effect = gm->effectManager->effectList[effectTileIndices[k]];
+				if (effect != nullptr)
 				{
-					if ((float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y < 0 || (float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y > 0)
+					if (effect->getMoveKind() == mmkFollow)
 					{
-						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
+						continue;
+					}
+					if ((float)effect->offset.y < 0 || (float)effect->flyingDirection.y > 0)
+					{
+						effect->draw(cenTile, cenScreen, offset, effectColorStyle);
 					}
 				}
 			}
 
 			Point tile = { j, i };
-			drawTile(1, tile, cenTile, cenScreen, offset, gm->global.data.mpcStyle);
+			drawTile(1, tile, cenTile, cenScreen, offset, mapColorStyle);
 
 			for (auto iter = dataMap.tile[i][j].objList.begin(); iter != dataMap.tile[i][j].objList.end(); iter++)
 			{
-				gm->objectManager->drawOBJ(*iter, cenTile, cenScreen, offset, gm->global.data.asfStyle);
+				gm->objectManager->drawOBJ(*iter, cenTile, cenScreen, offset, actorColorStyle);
 			}
 			for (auto iter = dataMap.tile[i][j].npcList.begin(); iter != dataMap.tile[i][j].npcList.end(); iter++)
 			{
 				if (*iter == gm->player)
 				{
-					if (!gm->player->isJumping() || gm->player->jumpState != jsJumping)
+					if (!gm->player->isJumping() || gm->player->getJumpState() != jsJumping)
 					{
-						gm->player->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
+						gm->player->draw(cenTile, cenScreen, offset, actorColorStyle);
 					}
 				}
 				else
 				{
-					gm->npcManager->drawNPC(*iter, cenTile, cenScreen, offset, gm->global.data.asfStyle);
+					gm->npcManager->drawNPC(*iter, cenTile, cenScreen, offset, actorColorStyle);
 				}
 			}
 
-			for (size_t k = 0; k < emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index.size(); k++)
+			for (size_t k = 0; k < effectTileIndices.size(); k++)
 			{
-				if (gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]] != nullptr)
+				auto effect = gm->effectManager->effectList[effectTileIndices[k]];
+				if (effect != nullptr)
 				{
-					if ((float)gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->offset.y >= 0 && gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->flyingDirection.y <= 0)
+					if (effect->getMoveKind() == mmkFollow)
 					{
-						gm->effectManager->effectList[emap.tile[i - (cenTile.y - yscal)][j - (cenTile.x - xscal)].index[k]]->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
+						auto followTarget = effect->target.lock();
+						if (followTarget == gm->player && gm->player->isJumping() && gm->player->getJumpState() == jsJumping)
+						{
+							continue;
+						}
+						effect->draw(cenTile, cenScreen, offset, effectColorStyle);
+						continue;
+					}
+					if ((float)effect->offset.y >= 0 && effect->flyingDirection.y <= 0)
+					{
+						effect->draw(cenTile, cenScreen, offset, effectColorStyle);
 					}
 				}
 			}
@@ -1368,7 +2076,7 @@ void Map::drawMap()
 				{
 					if (dataMap.tile[i][j].npcIndex[k] == 0)
 					{
-						if (!gm->player->isJumping() || gm->player->jumpState != jsJumping)
+						if (!gm->player->isJumping() || gm->player->getJumpState() != jsJumping)
 						{
 							gm->player->draw(cenTile, cenScreen, offset);
 						}
@@ -1407,7 +2115,7 @@ void Map::drawMap()
 				{
 					if (dataMap.tile[i][j].npcIndex[k] == 0)
 					{
-						if (!gm->player->isJumping() || gm->player->jumpState != jsJumping)
+						if (!gm->player->isJumping() || gm->player->getJumpState() != jsJumping)
 						{
 							gm->player->draw(cenTile, cenScreen, offset);
 						}
@@ -1496,7 +2204,7 @@ void Map::drawMap()
 			{
 				if (dataMap.tile[i][j].npcIndex[k] == 0)
 				{
-					if (!gm->player->isJumping() || gm->player->jumpState != jsJumping)
+					if (!gm->player->isJumping() || gm->player->getJumpState() != jsJumping)
 					{
 						gm->player->draw(cenTile, cenScreen, offset);
 					}
@@ -1551,7 +2259,7 @@ void Map::drawMap()
 				continue;
 			}
 			Point tile = { j, i };
-			drawTile(2, tile, cenTile, cenScreen, offset, gm->global.data.mpcStyle);
+			drawTile(2, tile, cenTile, cenScreen, offset, mapColorStyle);
 		}
 	}
 
@@ -1559,80 +2267,287 @@ void Map::drawMap()
 	{
 		gm->npcManager->drawNPCSelectedAlpha(cenTile, cenScreen, offset);
 	}
-	if (gm->player->isJumping() && gm->player->jumpState == jsJumping)
+	if (gm->player->isJumping() && gm->player->getJumpState() == jsJumping)
 	{
-		gm->player->draw(cenTile, cenScreen, offset, gm->global.data.asfStyle);
+		gm->player->draw(cenTile, cenScreen, offset, actorColorStyle);
+		for (size_t i = 0; i < gm->effectManager->effectList.size(); i++)
+		{
+			auto effect = gm->effectManager->effectList[i];
+			if (effect != nullptr && effect->getMoveKind() == mmkFollow)
+			{
+				auto followTarget = effect->target.lock();
+				if (followTarget == gm->player)
+				{
+					effect->draw(cenTile, cenScreen, offset, effectColorStyle);
+				}
+			}
+		}
 	}
 	else if (Config::playerAlpha)
 	{
 		gm->player->drawAlpha(cenTile, cenScreen, offset);
 	}
 
-	if (gm->global.data.water)
+	if (gm->global.data.waterEffect)
 	{
-		waterEffect.renderEffect(getTime());
+		PointEx cameraPos;
+		Point cameraPosInt = getTilePosition(gm->camera->position, {0, 0});
+		cameraPos.x = static_cast<float>(cameraPosInt.x) + gm->camera->offset.x;
+		cameraPos.y = static_cast<float>(cameraPosInt.y) + gm->camera->offset.y;
+		waterEffect.renderEffect(getTime(), cameraPos);
 	}
+}
+
+bool Map::warmVisibleTextures(
+	int viewportWidth,
+	int viewportHeight,
+	Point centerTile,
+	const std::function<bool()>& checkpoint,
+	std::size_t maximumFramesPerCheckpoint,
+	std::size_t* warmedFrameCount,
+	std::size_t* attemptedFrameCount)
+{
+	if (warmedFrameCount != nullptr)
+	{
+		*warmedFrameCount = 0;
+	}
+	if (attemptedFrameCount != nullptr)
+	{
+		*attemptedFrameCount = 0;
+	}
+	if (data == nullptr || mapMpc == nullptr ||
+		viewportWidth <= 0 || viewportHeight <= 0)
+	{
+		return true;
+	}
+
+	maximumFramesPerCheckpoint =
+		std::max<std::size_t>(maximumFramesPerCheckpoint, 1);
+	const Point centerScreen =
+	{
+		viewportWidth / 2,
+		viewportHeight / 2
+	};
+	const int horizontalScale =
+		centerScreen.x / TILE_WIDTH + 2 +
+		LUM_MASK_WIDTH / TILE_WIDTH + 1;
+	const int verticalScale =
+		centerScreen.y / TILE_HEIGHT * 2 + 2 +
+		LUM_MASK_HEIGHT / TILE_HEIGHT + 1;
+	constexpr int TileHeightScale = 15;
+	const UTime currentTime = getTime();
+	std::unordered_set<const IMPFrame*> visitedFrames;
+	std::size_t framesSinceCheckpoint = 0;
+	std::size_t warmedCount = 0;
+	std::size_t attemptedCount = 0;
+
+	const auto checkpointCanContinue = [&]()
+	{
+		if (!checkpoint)
+		{
+			return true;
+		}
+		try
+		{
+			return checkpoint();
+		}
+		catch (...)
+		{
+			return false;
+		}
+	};
+	const auto warmTile =
+		[this,
+		 currentTime,
+		 &visitedFrames,
+		 &framesSinceCheckpoint,
+		 &warmedCount,
+		 &attemptedCount,
+		 maximumFramesPerCheckpoint,
+		 &checkpointCanContinue](int layer, int x, int y)
+		{
+			const MapTileLayer& tileLayer = data->tile[y][x].layer[layer];
+			if (tileLayer.mpc == 0)
+			{
+				return true;
+			}
+			const Mpc& resource = mapMpc->mpc[tileLayer.mpc - 1];
+			const _shared_imp& image = resource.img;
+			if (image == nullptr || image->frame.empty())
+			{
+				return true;
+			}
+
+			std::optional<std::size_t> frameIndex;
+			if (data->mpc.mpc[tileLayer.mpc - 1].dynamic != 0)
+			{
+				frameIndex = ImageAnimationPlayback::frameIndex(
+					image->frame.size(),
+					1,
+					0,
+					currentTime,
+					image->interval);
+			}
+			else if (static_cast<std::size_t>(tileLayer.frame) <
+				image->frame.size())
+			{
+				frameIndex = static_cast<std::size_t>(tileLayer.frame);
+			}
+			if (!frameIndex.has_value())
+			{
+				return true;
+			}
+
+			IMPFrame& frame = image->frame[*frameIndex];
+			if (!visitedFrames.insert(&frame).second || frame.image != nullptr)
+			{
+				return true;
+			}
+			if ((frame.data == nullptr || frame.dataLen <= 0) &&
+				frame.pixelData.empty())
+			{
+				return true;
+			}
+			if (framesSinceCheckpoint >= maximumFramesPerCheckpoint)
+			{
+				if (!checkpointCanContinue())
+				{
+					return false;
+				}
+				framesSinceCheckpoint = 0;
+			}
+			const _shared_image loadedImage = IMP::loadImage(
+				image, static_cast<int>(*frameIndex));
+			++framesSinceCheckpoint;
+			++attemptedCount;
+			if (loadedImage != nullptr)
+			{
+				++warmedCount;
+			}
+			return true;
+		};
+	const auto publishCounts = [&]()
+	{
+		if (warmedFrameCount != nullptr)
+		{
+			*warmedFrameCount = warmedCount;
+		}
+		if (attemptedFrameCount != nullptr)
+		{
+			*attemptedFrameCount = attemptedCount;
+		}
+	};
+
+	for (int layer = 0; layer < MAP_TILE_LAYER; ++layer)
+	{
+		for (int y = centerTile.y - verticalScale;
+			y < centerTile.y + verticalScale + TileHeightScale;
+			++y)
+		{
+			for (int x = centerTile.x - horizontalScale;
+				x < centerTile.x + horizontalScale;
+				++x)
+			{
+				if (x < 0 || x >= data->head.width ||
+					y < 0 || y >= data->head.height)
+				{
+					continue;
+				}
+				if (!warmTile(layer, x, y))
+				{
+					publishCounts();
+					return false;
+				}
+			}
+		}
+	}
+	if (framesSinceCheckpoint > 0 && !checkpointCanContinue())
+	{
+		publishCounts();
+		return false;
+	}
+	publishCounts();
+	return true;
 }
 
 void Map::createDataMap()
 {
-	dataMap.tile.resize(0);
 	int w, h;
 	if (data == nullptr)
 	{
+		dataMap.tile.clear();
 		return;
 	}
 	w = data->head.width;
 	h = data->head.height;
 	if (w <= 0 || h <= 0)
 	{
+		dataMap.tile.clear();
 		return;
 	}
-	dataMap.tile.resize(h);
-	for (int i = 0; i < h; i++)
-	{
-		dataMap.tile[i].resize(w);
-		for (int j = 0; j < w; j++)
-		{
-			dataMap.tile[i][j].npcList.resize(0);
-			dataMap.tile[i][j].objList.resize(0);
-			dataMap.tile[i][j].stepNPCList.resize(0);
-		}
-	}
-	Point pos = gm->player->position;
-	if (pos.x >= 0 && pos.x < 0 + w && pos.y >= 0 && pos.y < 0 + h)
-	{
-		dataMap.tile[pos.y][pos.x].npcList.push_back(gm->player);
-		if (gm->player->isWalking() || gm->player->isRunning())
-		{
-			if (gm->player->stepState == ssOut && gm->player->stepList.size() > 0)
+	const bool currentDimensionsMatch =
+		dataMap.tile.size() ==
+			static_cast<std::size_t>(h) &&
+		std::all_of(
+			dataMap.tile.cbegin(),
+			dataMap.tile.cend(),
+			[w](const std::vector<DataTile>& row)
 			{
-				addStepToDataMap(gm->player->stepList[0], 0);
-			}
-		}
-		else if (gm->player->isJumping())
+				return row.size() ==
+					static_cast<std::size_t>(w);
+			});
+	if (currentDimensionsMatch)
+	{
+		for (auto& row : dataMap.tile)
 		{
-			if (gm->player->jumpState != jsDown && gm->player->stepList.size() > 0)
+			for (auto& tile : row)
 			{
-				addStepToDataMap(gm->player->stepList[0], 0);
+				tile.npcList.clear();
+				tile.objList.clear();
+				tile.stepNPCList.clear();
 			}
 		}
 	}
+	else
+	{
+		dataMap.tile.clear();
+		dataMap.tile.resize(static_cast<std::size_t>(h));
+		for (auto& row : dataMap.tile)
+		{
+			row.resize(static_cast<std::size_t>(w));
+		}
+	}
+	if (gm == nullptr || gm->npcManager == nullptr ||
+		gm->objectManager == nullptr)
+	{
+		return;
+	}
+
+	auto addNPCToDataMapWithStep = [this, w, h](std::shared_ptr<NPC> npc, int index) {
+		if (!npc) return;
+		if (!npc->isVisibleByVariable) return;
+		if (npc->isHiding()) return;
+		Point pos = npc->getPosition();
+		if (pos.x >= 0 && pos.x < w && pos.y >= 0 && pos.y < h)
+		{
+			dataMap.tile[pos.y][pos.x].npcList.push_back(npc);
+			std::vector<Point> stepPositions = npc->getStepPositions();
+			for (const Point& stepPos : stepPositions)
+			{
+				if (stepPos.x >= 0 && stepPos.x < w && stepPos.y >= 0 && stepPos.y < h)
+				{
+					addStepToDataMap(stepPos, npc);
+				}
+			}
+		}
+	};
+
+	addNPCToDataMapWithStep(gm->player, 0);
 	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
 	{
-		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->position.x >= 0 && gm->npcManager->npcList[i]->position.x < w && gm->npcManager->npcList[i]->position.y >= 0 && gm->npcManager->npcList[i]->position.y < h)
-		{
-			gm->npcManager->npcList[i]->npcIndex = i + 1;
-			dataMap.tile[gm->npcManager->npcList[i]->position.y][gm->npcManager->npcList[i]->position.x].npcList.push_back(gm->npcManager->npcList[i]);
-		}
-		if (gm->npcManager->npcList[i] != nullptr && (gm->npcManager->npcList[i]->isWalking() || gm->npcManager->npcList[i]->isRunning()))
-		{
-			if (gm->npcManager->npcList[i]->stepState == ssOut && gm->npcManager->npcList[i]->stepList.size() > 0)
-			{
-				addStepToDataMap(gm->npcManager->npcList[i]->stepList[0], gm->npcManager->npcList[i]);
-			}
-		}
+		addNPCToDataMapWithStep(gm->npcManager->npcList[i], static_cast<int>(i + 1));
 	}
+
 	for (size_t i = 0; i < gm->objectManager->objectList.size(); i++)
 	{
 		if (gm->objectManager->objectList[i] != nullptr && gm->objectManager->objectList[i]->position.x >= 0 && gm->objectManager->objectList[i]->position.x < w && gm->objectManager->objectList[i]->position.y >= 0 && gm->objectManager->objectList[i]->position.y < h)
@@ -1644,7 +2559,7 @@ void Map::createDataMap()
 
 void Map::deleteObjectFromDataMap(Point pos, std::shared_ptr<Object> obj)
 {
-	if (isInMap(pos))
+	if (isInMap(pos) && pos.y < (int)dataMap.tile.size() && pos.x < (int)dataMap.tile[pos.y].size())
 	{
 		dataMap.tile[pos.y][pos.x].objList.remove(obj);
 	}
@@ -1652,7 +2567,7 @@ void Map::deleteObjectFromDataMap(Point pos, std::shared_ptr<Object> obj)
 
 void Map::addObjectToDataMap(Point pos, std::shared_ptr<Object> obj)
 {
-	if (isInMap(pos))
+	if (isInMap(pos) && pos.y < (int)dataMap.tile.size() && pos.x < (int)dataMap.tile[pos.y].size())
 	{
 		dataMap.tile[pos.y][pos.x].objList.push_back(obj);
 	}
@@ -1660,7 +2575,7 @@ void Map::addObjectToDataMap(Point pos, std::shared_ptr<Object> obj)
 
 void Map::deleteStepFromDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (isInMap(pos))
+	if (isInMap(pos) && pos.y < (int)dataMap.tile.size() && pos.x < (int)dataMap.tile[pos.y].size())
 	{
 		dataMap.tile[pos.y][pos.x].stepNPCList.remove(npc);
 	}
@@ -1668,7 +2583,7 @@ void Map::deleteStepFromDataMap(Point pos, std::shared_ptr<NPC> npc)
 
 void Map::addStepToDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (isInMap(pos))
+	if (isInMap(pos) && pos.y < (int)dataMap.tile.size() && pos.x < (int)dataMap.tile[pos.y].size())
 	{
 		dataMap.tile[pos.y][pos.x].stepNPCList.push_back(npc);
 	}
@@ -1676,7 +2591,7 @@ void Map::addStepToDataMap(Point pos, std::shared_ptr<NPC> npc)
 
 void Map::deleteNPCFromDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (isInMap(pos))
+	if (isInMap(pos) && pos.y < (int)dataMap.tile.size() && pos.x < (int)dataMap.tile[pos.y].size())
 	{
 		dataMap.tile[pos.y][pos.x].npcList.remove(npc);
 	}
@@ -1684,15 +2599,119 @@ void Map::deleteNPCFromDataMap(Point pos, std::shared_ptr<NPC> npc)
 
 void Map::addNPCToDataMap(Point pos, std::shared_ptr<NPC> npc)
 {
-	if (isInMap(pos))
+	if (isInMap(pos) && pos.y < (int)dataMap.tile.size() && pos.x < (int)dataMap.tile[pos.y].size())
 	{
 		dataMap.tile[pos.y][pos.x].npcList.push_back(npc);
 	}
 }
 
 
+void Map::generateThumbnail()
+{
+	if (data == nullptr || mapMpc == nullptr)
+	{
+		thumbnailSourceRect = { 0, 0, 0, 0 };
+		return;
+	}
+
+	int mapWidth = data->head.width;
+	int mapHeight = data->head.height;
+	if (mapWidth <= 0 || mapHeight <= 0)
+	{
+		thumbnailSourceRect = { 0, 0, 0, 0 };
+		return;
+	}
+
+	int tilePixelWidth = mapWidth * TILE_WIDTH;
+	int tilePixelHeight = (mapHeight - 1) * TILE_HEIGHT / 2;
+
+	int paddingX = TILE_WIDTH;
+	int paddingY = TILE_HEIGHT;
+
+	int canvasWidth = tilePixelWidth + paddingX * 2;
+	int canvasHeight = tilePixelHeight + paddingY * 2;
+
+	auto canvas = engine->createCanvasImage(canvasWidth, canvasHeight);
+	if (canvas == nullptr)
+	{
+		return;
+	}
+	SDL_SetTextureBlendMode(canvas.get(), SDL_BLENDMODE_BLEND);
+
+	auto originalTarget = engine->getRenderTarget();
+	if (!engine->setSharedImageAsRenderTarget(canvas))
+	{
+		return;
+	}
+	engine->renderClear(0, 0, 0, 0);
+
+	Point cenScreen = { paddingX, paddingY };
+	Point cenTile = { 0, 0 };
+	PointEx offset = { 0.0, 0.0 };
+
+	for (int i = 0; i < mapHeight; i++)
+	{
+		for (int j = 0; j < mapWidth; j++)
+		{
+			Point tile = { j, i };
+			for (int layer = 0; layer < MAP_TILE_LAYER; layer++)
+			{
+				drawTile(layer, tile, cenTile, cenScreen, offset, 0xFFFFFF);
+			}
+		}
+	}
+
+	int thumbnailWidth = MapThumbnailStyle::CanvasWidth;
+	int thumbnailHeight = MapThumbnailStyle::CanvasHeight;
+	auto thumbnailCanvas = engine->createCanvasImage(thumbnailWidth, thumbnailHeight);
+	if (thumbnailCanvas != nullptr)
+	{
+		if (!engine->setSharedImageAsRenderTarget(
+			thumbnailCanvas))
+		{
+			(void)engine->
+				restoreImageRenderTargetAfterAcceptedOperation(
+					originalTarget,
+					canvas);
+			return;
+		}
+		engine->renderClear(0, 0, 0, 0);
+
+		Rect srcRect = { paddingX, paddingY, tilePixelWidth - TILE_WIDTH / 2, tilePixelHeight - TILE_HEIGHT / 2 };
+		thumbnailSourceRect = srcRect;
+		drawFeatheredThumbnail(engine, canvas, srcRect, canvasWidth, canvasHeight,
+			thumbnailWidth, thumbnailHeight);
+
+		if (!engine->
+			restoreImageRenderTargetAfterAcceptedOperation(
+				originalTarget,
+				thumbnailCanvas))
+		{
+			return;
+		}
+		SDL_SetTextureBlendMode(thumbnailCanvas.get(), SDL_BLENDMODE_BLEND);
+
+		thumbnailImage = IMP::createIMPImageFromImage(thumbnailCanvas);
+	}
+	else
+	{
+		if (!engine->
+			restoreImageRenderTargetAfterAcceptedOperation(
+				originalTarget,
+				canvas))
+		{
+			return;
+		}
+		thumbnailSourceRect = { 0, 0, canvasWidth, canvasHeight };
+		thumbnailImage = IMP::createIMPImageFromImage(canvas);
+	}
+}
+
 void Map::freeResource()
 {
+	thumbnailImage = nullptr;
+	thumbnailSourceRect = { 0, 0, 0, 0 };
+	dataMap.tile.clear();
 	freeMpc();
 	freeData();
 }
@@ -1727,6 +2746,10 @@ void Map::freeData()
 
 void Map::drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
 {
+	if (!isInMap(tile))
+	{
+		return;
+	}
 	if (data->tile[tile.y][tile.x].layer[layer].mpc == 0)
 	{
 		return;
@@ -1747,14 +2770,7 @@ void Map::drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointE
 	{
 		return;
 	}
-	if ((colorStyle & 0xFFFFFF) == 0xFFFFFF)
-	{
-		engine->drawImage(img, point.x - x, point.y - y);
-	}
-	else
-	{	
-		engine->drawImageWithColor(img, point.x - x, point.y - y, (colorStyle >> 16) & 0xFF, (colorStyle >> 8) & 0xFF, colorStyle & 0xFF);
-	}
+	ColorStyle::drawImage(engine, img, point.x - x, point.y - y, colorStyle);
 }
 
 bool Map::isInMap(PathMap* pathMap, Point pos)
@@ -1768,6 +2784,10 @@ bool Map::isInMap(PathMap* pathMap, Point pos)
 
 bool Map::isInMap(Point pos)
 {
+	if (data == nullptr)
+	{
+		return false;
+	}
 	if (pos.x < 0 || pos.y < 0 || pos.x >= data->head.width || pos.y >= data->head.height)
 	{
 		return false;
@@ -1775,11 +2795,52 @@ bool Map::isInMap(Point pos)
 	return true;
 }
 
+Point Map::clampToWalkable(Point pos)
+{
+	if (data == nullptr)
+	{
+		return { 0, 0 };
+	}
+	int width = data->head.width;
+	int height = data->head.height;
+	if (width <= 0 || height <= 0)
+	{
+		return { 0, 0 };
+	}
+	if (isInMap(pos) && canWalk(pos))
+	{
+		return pos;
+	}
+	int clampedX = pos.x < 0 ? 0 : (pos.x >= width ? width - 1 : pos.x);
+	int clampedY = pos.y < 0 ? 0 : (pos.y >= height ? height - 1 : pos.y);
+	int maxRadius = std::max(width, height);
+	for (int radius = 0; radius < maxRadius; radius++)
+	{
+		for (int dy = -radius; dy <= radius; dy++)
+		{
+			for (int dx = -radius; dx <= radius; dx++)
+			{
+				if (std::abs(dx) != radius && std::abs(dy) != radius)
+				{
+					continue;
+				}
+				Point candidate = { clampedX + dx, clampedY + dy };
+				if (isInMap(candidate) && canWalk(candidate))
+				{
+					return candidate;
+				}
+			}
+		}
+	}
+	return { clampedX, clampedY };
+}
+
 void Map::addWaterRipple(float x, float y)
 {
 	auto now = getTime();
-	waterEffect.addDefaultClickRipple(static_cast<float>(x), static_cast<float>(y), now);
-	lastWaterClickRippleTime = now;
+	Point cameraPosInt = getTilePosition(gm->camera->position, { 0, 0 });
+	PointEx cameraPos = { static_cast<float>(cameraPosInt.x) + gm->camera->offset.x, static_cast<float>(cameraPosInt.y) + gm->camera->offset.y };
+	waterEffect.addDefaultClickRipple(cameraPos.x + x, cameraPos.y + y, now);
 }
 
 float Map::calFlyDirection(Point flyDirection)
@@ -1922,7 +2983,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 	}
 	//angle以向右为x、向上为y正方向的坐标系，与屏幕向下y增大的方向相反
 	//向右时
-	int line = std::abs(from.y) % 2;
+	int line = std::abs(from.y % 2);
 	if (angle == 0.0 || angle == 2 * M_PI)
 	{
 		Point pos;
@@ -2314,9 +3375,9 @@ std::vector<Point> Map::getSubStep(PathMap* pathMap, Point from, Point to, int s
 	{
 		return subStep;
 	}
-	int line = std::abs(from.y) % 2;
+	int line = std::abs(from.y % 2);
 
-	auto dir = NPC::calDirection(from, to);
+	auto dir = NPC::getDirection(from, to);
 	if (dir % 2 == 0)
 	{
 		if (getVHPath(subStep, line, pathMap, from, to, stepIndex))
@@ -2346,31 +3407,6 @@ bool Map::compareMapHead(MapData* md)
 		return false;
 	}
 
-	for (int i = 0; i < MAP_HEADSTR_LEN; i++)
-	{
-		if (MAP_HEADSTR[i] != md->head.head[i])
-		{
-			return false;
-		}
-	}
+	return isMapHeader(md->head.head, MAP_HEADSTR_V3);
 
-	return true;
-
-}
-
-void Map::onUpdate()
-{
-	if (!gm->global.data.water)
-	{
-		return;
-	}
-	auto now = getTime();
-	if (now - lastWaterClickRippleTime > WaterClickRippleTimeInterval)
-	{
-		WaterClickRippleTimeInterval = engine->getRand(5000, 2000);
-		lastWaterClickRippleTime = now;
-		int x, y;
-		engine->getMousePosition(x, y);
-		waterEffect.addDefaultClickRipple(static_cast<float>(x), static_cast<float>(y), now);
-	}
 }

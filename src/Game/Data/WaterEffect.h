@@ -1,7 +1,29 @@
 #pragma once
-#include <list>
 #include <vector>
-#include "../../Engine/Engine.h"
+#include <algorithm>
+#include "../../Engine/AspectFitLayout.h"
+#include "../../Engine/ImageTypes.h"
+#include "../../Types/Types.h"
+
+namespace WaterEffectSafety
+{
+inline constexpr int MaximumGridSize = 256;
+inline constexpr int MaximumClickRippleCount = 64;
+
+inline bool isValidGridSize(int gridSize)
+{
+	return gridSize > 0 && gridSize <= MaximumGridSize;
+}
+
+inline bool isClickRippleActive(
+	UTime currentTime,
+	UTime startTime,
+	UTime lifeTime)
+{
+	return lifeTime > 0 &&
+		(currentTime < startTime || currentTime - startTime < lifeTime);
+}
+}
 
 
 struct FPoint
@@ -20,9 +42,9 @@ struct WaterRippleParams
 
 struct WaterClickRippleParams
 {
-	WaterRippleParams rippleParams;
+	FPoint pos = { 0.0f, 0.0f };
 	UTime startTime = 0;
-	UTime lifeTime = 5000;
+	UTime lifeTime = AspectFitLayout::PointerRippleDurationMilliseconds;
 };
 
 struct WaterWaveParams
@@ -44,19 +66,18 @@ struct WaterWaveCalculatedParams
 struct WaterLightParams
 {
 	float minDistance = 0.0f;
-	float defaultAlpha = 1.0f;
-	float minAlpha = 0.0f;
+	float minimumBrightness = 0.94f;
 	float decay = 1000.0f;
 	float angle = 0.0f;
 };
 
 struct WaterEffectParams
 {
-	int gridSize = 30;
-	std::list<WaterWaveCalculatedParams> waves;
-	std::list<WaterRippleParams> fixedRipples;
+	int gridSize = 50;
+	std::vector<WaterWaveCalculatedParams> waves;
+	std::vector<WaterRippleParams> fixedRipples;
 	int maxClickRipple = 5;
-	std::list<WaterClickRippleParams> clickRipples;
+	std::vector<WaterClickRippleParams> clickRipples;
 	WaterClickRippleParams defaultClickRipple;
 	WaterLightParams light;
 };
@@ -65,7 +86,7 @@ class WaterEffect
 {
 public:
 	void setupEffectCanvas();
-	void renderEffect(UTime time);
+	void renderEffect(UTime time, PointEx cameraPos);
 
 	void applyPresetParams();
 
@@ -85,13 +106,14 @@ private:
 
 	_image _tempRenderTarget = nullptr;
 	_shared_image _waterEffectCanvas = nullptr;
+	bool _effectRenderTargetActive = false;
 	std::vector<Vertex> _vertices;
 	std::vector<Vertex> _verticesOrigin;
 	std::vector<Vertex> _verticesLast;
 	std::vector<int> _indices;
-
 	UTime _lastUpdateTime = 0;
+	int _canvasWidth = 0;
+	int _canvasHeight = 0;
 
-	void _update(UTime time);
+	void _update(UTime time, PointEx cameraPos);
 };
-

@@ -1,10 +1,18 @@
 #include "ColumnMenu.h"
 #include "../GameManager/GameManager.h"
+#include "../Data/Global.h"
 
 
 ColumnMenu::ColumnMenu()
 {
+	name = "ColumnMenu";
 	visible = true;
+	needEvents = false;
+	// Independent ColumnMenu (YYCS/XJXQY) needs higher draw priority than BottomMenu
+	if (GameManager::getInstance()->global.feature.topButtonsLayout)
+	{
+		setPriority(epImage - 1);
+	}
 	init();
 }
 
@@ -27,6 +35,11 @@ void ColumnMenu::updateState()
 	{
 		columnMana->percent = (float)gm->player->mana / (float)(gm->player->info.manaMax > 1 ? gm->player->info.manaMax : 1);
 	}
+	if (columnRage != nullptr)
+	{
+		columnRage->visible = gm->global.feature.rageSystem;
+		columnRage->percent = (float)gm->player->rage / (float)(gm->player->rageMax > 1 ? gm->player->rageMax : 1);
+	}
 	
 }
 
@@ -38,21 +51,23 @@ void ColumnMenu::onUpdate()
 void ColumnMenu::init()
 {
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\column\\window.ini");
-	columnLife = addComponent<ColumnImage>(u8"ini\\ui\\column\\collife.ini");
-	columnThew = addComponent<ColumnImage>(u8"ini\\ui\\column\\colthew.ini");
-	columnMana = addComponent<ColumnImage>(u8"ini\\ui\\column\\colmana.ini");
-	image = addComponent<TransImage>(u8"ini\\ui\\column\\column.ini");
+	loadMenuDefinition("ini\\ui\\column\\column.menu.ini");
+
+	columnLife = getComponentByName<ColumnImage>("columnLife");
+	columnThew = getComponentByName<ColumnImage>("columnThew");
+	columnMana = getComponentByName<ColumnImage>("columnMana");
+	columnRage = getComponentByName<ColumnImage>("columnRage");
+	image = getComponentByName<TransImage>("image");
+
 	setChildRectReferToParent();
 }
 
 void ColumnMenu::freeResource()
 {
-
-	impImage = nullptr;
-
-	freeCom(image);
-	freeCom(columnLife);
-	freeCom(columnThew);
-	freeCom(columnMana);
+	image = nullptr;
+	columnLife = nullptr;
+	columnThew = nullptr;
+	columnMana = nullptr;
+	columnRage = nullptr;
+	ConfigDrivenPanel::freeResource();
 }

@@ -1,5 +1,16 @@
 
 #include "DragRoundButton.h"
+#include "ComponentRegistry.h"
+
+namespace
+{
+	bool registeredDragRoundButton = []
+	{
+		ComponentRegistry::getInstance().registerType("DragRoundButton",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<DragRoundButton>(); });
+		return true;
+	}();
+}
 
 void DragRoundButton::setIndicateImage(std::string fileName)
 {
@@ -11,8 +22,8 @@ void DragRoundButton::initFromIni(INIReader & ini)
 {
 	freeResource();
 	RoundButton::initFromIni(ini);
-	type = (DragRoundButtonType)ini.GetInteger(u8"Init", u8"IndicateType", (int)DragRoundButtonType::None);
-	auto impName = ini.Get(u8"Init", u8"IndicateImage", u8"");
+	type = (DragRoundButtonType)ini.GetInteger("Init", "IndicateType", (int)DragRoundButtonType::None);
+	auto impName = ini.Get("Init", "IndicateImage", "");
 	setIndicateImage(impName);
 }
 
@@ -53,3 +64,4 @@ void DragRoundButton::onDrawDrag(int x, int y)
 {
 
 }
+

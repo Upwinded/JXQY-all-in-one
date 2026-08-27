@@ -4,3 +4,6 @@
 [submodule "ThirdParty/minilzo"]
 	path = ThirdParty/minilzo
 	url = https://github.com/Upwinded/minilzo
+[submodule "ThirdParty/miniz"]
+	path = ThirdParty/miniz
+	url = https://github.com/richgel999/miniz.git

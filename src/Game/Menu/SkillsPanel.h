@@ -11,22 +11,28 @@
 #define SKILL_PANEL_SKILL4 3
 #define SKILL_PANEL_SKILL5 4
 #define SKILL_PANEL_JUMP 7
+#define SKILL_PANEL_MINIMAP 8
 
 #define SKILL_PANEL_FAST_SELECT 20
 #define FASTBTN_COUNT 4
 
+class MinimapToggleButton;
+
 class SkillsPanel :
-	public Panel
+	public ConfigDrivenPanel
 {
+	friend class MobileExternalInputRuntimeTestAccess;
 public:
 	SkillsPanel();
 	virtual ~SkillsPanel();
+	void resetInput();
 
 	std::shared_ptr<RoundButton> attackBtn = nullptr;
 	std::shared_ptr<RoundButton> sitBtn = nullptr;
 	std::shared_ptr<DragRoundButton> skillBtn[SKILL_PANEL_SKILL_COUNT];
 	std::shared_ptr<TextButton> fastBtn[FASTBTN_COUNT] = { nullptr, nullptr, nullptr, nullptr };
 	std::shared_ptr<DragRoundButton> rightJumpBtn = nullptr;
+	std::shared_ptr<MinimapToggleButton> minimapButton = nullptr;
 private:
 	int clickIndex = 0;
 	Point dragEndPosition = { 0, 0 };
@@ -49,6 +55,4 @@ protected:
 	void drawIndicate(Point pos);
 
 	_shared_imp indicateImp;
-
 };
-

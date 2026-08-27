@@ -1,4 +1,17 @@
 #include "CheckBox.h"
+#include "../Engine/Engine.h"
+#include "../File/log.h"
+#include "ComponentRegistry.h"
+
+namespace
+{
+	bool registeredCheckBox = []
+	{
+		ComponentRegistry::getInstance().registerType("CheckBox",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<CheckBox>(); });
+		return true;
+	}();
+}
 
 
 
@@ -17,26 +30,31 @@ void CheckBox::initFromIni(INIReader & ini)
 {
 	freeResource();
 
-	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
-	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
-	auto impImage = loadRes(impName);
+	rect.x = ini.GetInteger("Init", "Left", rect.x);
+	rect.y = ini.GetInteger("Init", "Top", rect.y);
+	rect.w = ini.GetInteger("Init", "Width", rect.w);
+	rect.h = ini.GetInteger("Init", "Height", rect.h);
+	stretch = ini.GetBoolean("Init", "Stretch", stretch);
+	std::string impName = ini.Get("Init", "Image", "");
+	if (impName.empty())
+	{
+		impName = ini.Get("Init", "Bitmap", "");
+	}
+	auto impImage = impName.empty() ? nullptr : loadRes(impName);
 	if (impImage != nullptr)
 	{
 		int frame = 0;
-		frame = ini.GetInteger(u8"Init", u8"Up", 0);
+		frame = ini.GetInteger("Init", "Up", 0);
 		image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-		frame = ini.GetInteger(u8"Init", u8"Down", 1);
+		frame = ini.GetInteger("Init", "Down", 1);
 		image[2] = IMP::createIMPImageFromFrame(impImage, frame);		
 	}
-	else
+	else if (!impName.empty())
 	{
-		GameLog::write(u8"%s image file error\n", impName.c_str());
+		GameLog::write("CheckBox:%s,%s image file error\n", ini.fileName.c_str(), impName.c_str());
 	}
 
-	std::string soundName = ini.Get(u8"Init", u8"Sound", u8"");
+	std::string soundName = ini.Get("Init", "Sound", "");
 	loadSound(soundName, 1);
 
 	impImage = nullptr;
@@ -78,6 +96,7 @@ void CheckBox::onDraw()
 	{
 		engine->drawImage(img, rect.x, rect.y);
 	}
+	drawFocusBorder();
 }
 
 void CheckBox::onClick()

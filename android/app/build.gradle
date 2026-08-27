@@ -1,27 +1,177 @@
-import groovy.xml.XmlParser
+import com.android.build.api.artifact.SingleArtifact
+import org.apache.tools.ant.DirectoryScanner
 
 plugins {
      id 'com.android.application'
 }
 
 def buildWithCMake = true; //project.hasProperty('BUILD_WITH_CMAKE');
-def appName = "jxqy2";
-def appNameCN = "剑侠情缘2";
-def appVersion = "1.4.3"
+def artifactName = "jxqy-all-in-one";
+def displayName = "剑侠情缘 All-in-One";
+def applicationIdentifier = "com.upwinded.jxqy_all_in_one";
+def appVersion = "1.0.0"
+def appVersionParts = appVersion.tokenize('.').collect {
+    Integer.parseInt(it)
+}
+if (appVersionParts.size() != 3 ||
+    appVersionParts[0] < 0 || appVersionParts[0] > 2100 ||
+    appVersionParts[1] < 0 || appVersionParts[1] > 999 ||
+    appVersionParts[2] < 0 || appVersionParts[2] > 999) {
+    throw new GradleException(
+        'appVersion must be major.minor.patch with major <= 2100 and ' +
+        'minor/patch <= 999')
+}
+// Android requires an integer versionCode. Derive it from the public semantic
+// version instead of maintaining or publishing a separate build counter.
+def appVersionCode = appVersionParts[0] * 1_000_000 +
+    appVersionParts[1] * 1_000 + appVersionParts[2]
+if (appVersionCode > 2_100_000_000) {
+    throw new GradleException(
+        'appVersion produces an Android versionCode above 2100000000')
+}
+
+def readReleaseSigningValue = { String propertyName, String environmentName ->
+    def propertyValue = providers.gradleProperty(propertyName).orNull
+    propertyValue != null ? propertyValue : System.getenv(environmentName)
+}
+def releaseStoreFilePath = readReleaseSigningValue(
+    'jxqyReleaseStoreFile', 'JXQY_ANDROID_KEYSTORE')
+def releaseStorePassword = readReleaseSigningValue(
+    'jxqyReleaseStorePassword', 'JXQY_ANDROID_STORE_PASSWORD')
+def releaseKeyAlias = readReleaseSigningValue(
+    'jxqyReleaseKeyAlias', 'JXQY_ANDROID_KEY_ALIAS')
+def releaseKeyPassword = readReleaseSigningValue(
+    'jxqyReleaseKeyPassword', 'JXQY_ANDROID_KEY_PASSWORD')
+def releaseSigningValues = [
+    releaseStoreFilePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+]
+def releaseSigningConfigured = releaseSigningValues.every {
+    it != null && !it.isEmpty()
+}
+if (releaseSigningValues.any { it != null && !it.isEmpty() } &&
+    !releaseSigningConfigured) {
+    throw new GradleException(
+        'Android release signing configuration is incomplete. Configure all ' +
+        'four jxqyRelease* Gradle properties or JXQY_ANDROID_* environment variables.')
+}
+
+// Debug packages keep the full local asset repository for development. Release
+// packages contain only engine and resources.ini. Common and playable resource
+// packs are downloaded into the application-writable assets directory after
+// installation.
+def androidAssetExcludes = [
+    '**/save/rpg0/**',
+    '**/save/game/**',
+    '**/save/rpg1/**',
+    '**/save/rpg2/**',
+    '**/save/rpg3/**',
+    '**/save/rpg4/**',
+    '**/save/rpg5/**',
+    '**/save/rpg6/**',
+    '**/save/rpg7/**',
+    '**/save/rpg8/**',
+    '**/save/rpg9/**',
+    '**/save/rpg_auto/**',
+    '**/save/shot/**',
+    '**/save/system/resource_selection.ini',
+    '**/save/system/**',
+    '**/save/game_build/**',
+    '**/save/load_candidate/**',
+    '**/save/load_rollback/**',
+    '**/save/live_rollback/**',
+    '**/save/save_rollback/**',
+    '**/save/save_secondary_rollback/**',
+    '**/save/save_journal_build/**',
+    '**/save/save_journal/**',
+    '**/save/.jxqy-*/**',
+    '**/save/.jxqy-*',
+    '**/common/config/*.ini',
+    '**/log.txt',
+    '**/*.log',
+    '**/*.tmp',
+    '**/*.bak',
+    '**/*.orig',
+    '**/migration_report.*',
+    '**/conversion_report.*',
+    '**/*migration-report*.*',
+    '**/*conversion-report*.*',
+    '**/*迁移报告*.*',
+    '**/*转换报告*.*',
+    '**/vssver.scc',
+    '**/*.zip',
+    '**/*.rar',
+    '**/*.7z',
+    'assets-folder.md',
+    '**/README.md',
+    '**/readme.md',
+    '**/.git/**',
+    '**/.gitignore',
+    '**/.gitattributes',
+    '**/.DS_Store',
+    '**/Thumbs.db',
+    '**/*~'
+]
+
+def findAndroidAssetEntries = { File assetsDirectory, List<String> patterns ->
+    def scanner = new DirectoryScanner()
+    scanner.setBasedir(assetsDirectory)
+    scanner.setIncludes(patterns as String[])
+    scanner.scan()
+    [
+        files: scanner.includedFiles.collect { relativePath ->
+            new File(assetsDirectory, relativePath)
+        },
+        directories: scanner.includedDirectories.collect { relativePath ->
+            new File(assetsDirectory, relativePath)
+        }
+    ]
+}
+
+def keepOnlyReleaseBootstrapAssets = { File assetsDirectory ->
+    if (!assetsDirectory.isDirectory()) {
+        throw new GradleException(
+            "Android merged asset directory is missing: ${assetsDirectory}")
+    }
+    assetsDirectory.listFiles().each { entry ->
+        if (entry.name != 'engine' && entry.name != 'resources.ini') {
+            project.delete(entry)
+            if (entry.exists()) {
+                throw new GradleException(
+                    "Failed to remove non-bootstrap Android asset: ${entry}")
+            }
+        }
+    }
+    def unexpectedFiles = fileTree(assetsDirectory).files.findAll { file ->
+        def relativePath = assetsDirectory.toPath()
+            .relativize(file.toPath()).toString().replace('\\', '/')
+        relativePath != 'resources.ini' &&
+            !relativePath.startsWith('engine/')
+    }
+    if (!unexpectedFiles.isEmpty()) {
+        throw new GradleException(
+            "Android release contains non-bootstrap assets: " +
+            "${unexpectedFiles.collect { it.absolutePath }.sort().take(10)}")
+    }
+}
 
 android {
     namespace = "org.libsdl.app"
     compileSdk 36
     buildFeatures {
-        prefab true
+        prefab = true
+    }
+    androidResources {
+        noCompress += ['mp4', 'wmv', 'avi', 'mpg', 'mpeg']
     }
     defaultConfig {
-        resValue "string", "app_name", appName
-        resValue "string", "app_name_cn", appNameCN
-        applicationId = "com.jxqy_all_in_one.${appName}";
+        resValue "string", "app_name", displayName
+        applicationId = applicationIdentifier;
         minSdkVersion 28
         targetSdk 36
-        versionCode 1
+        versionCode appVersionCode
         versionName "${appVersion}"
         externalNativeBuild {
             ndkBuild {
@@ -40,63 +190,42 @@ android {
     }
 
     sourceSets {
-        main {
+        debug {
             assets {
                 srcDirs = ['../../assets']
-                exclude '../../assets/save/game/*'
-                exclude '../../assets/save/rpg1/*'
-                exclude '../../assets/save/rpg2/*'
-                exclude '../../assets/save/rpg3/*'
-                exclude '../../assets/save/rpg4/*'
-                exclude '../../assets/save/rpg5/*'
-                exclude '../../assets/save/rpg6/*'
-                exclude '../../assets/save/rpg7/*'
-                exclude '../../assets/save/rpg8/*'
-                exclude '../../assets/save/rpg9/*'
-                exclude '../../assets/save/shot/*'
-                exclude '../../assets/config/*.ini'
+                androidAssetExcludes.each { pattern ->
+                    exclude pattern
+                }
+            }
+        }
+        release {
+            assets {
+                srcDirs = ['../../assets']
+            }
+        }
+    }
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
             }
         }
     }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-    }
-    applicationVariants.all { variant ->
-        // tasks["merge${variant.name.capitalize()}Assets"]
-        //     .dependsOn("externalNativeBuild${variant.name.capitalize()}")
-        def outputAPKName = "${appName}_${variant.name}_v${appVersion}.apk";
-        def outputApkPath = variant.getPackageApplicationProvider().get().outputDirectory.getAsFile().get().getPath()
-        variant.outputs.all {
-            outputFileName = outputAPKName
-        }
-        variant.outputs.all {
-            variant.assembleProvider.get().doLast {
-                //cp位置
-                copy {
-                    //apk files
-                    from outputApkPath
-                    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-                    include '**/*.apk'
-
-                    into '../../bin/android'
-                }
-//                delete outputFile
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
             }
-        }
-        variant.mergeAssets.doLast {
-            delete(fileTree(dir: variant.mergeAssets.outputDir, includes: ['save/game/*.npc', 'save/game/*.obj','save/game/*.ini','save/game/*.txt',
-                                                                           'save/rpg1/*.npc', 'save/rpg1/*.obj','save/rpg1/*.ini','save/rpg1/*.txt',
-                                                                           'save/rpg2/*.npc', 'save/rpg2/*.obj','save/rpg2/*.ini','save/rpg2/*.txt',
-                                                                           'save/rpg3/*.npc', 'save/rpg3/*.obj','save/rpg3/*.ini','save/rpg3/*.txt',
-                                                                           'save/rpg4/*.npc', 'save/rpg4/*.obj','save/rpg4/*.ini','save/rpg4/*.txt',
-                                                                           'save/rpg5/*.npc', 'save/rpg5/*.obj','save/rpg5/*.ini','save/rpg5/*.txt',
-                                                                           'save/rpg6/*.npc', 'save/rpg6/*.obj','save/rpg6/*.ini','save/rpg6/*.txt',
-                                                                           'save/rpg7/*.npc', 'save/rpg7/*.obj','save/rpg7/*.ini','save/rpg7/*.txt',
-                                                                           'save/shot/*.bmp', 'config/*.ini']))
-
+            minifyEnabled false
+            // 注意：minifyEnabled false 时 R8 不运行，此 proguard 配置实际不生效。
+            // 这里使用 proguard-android-optimize.txt 仅为了满足新版 AGP 的评估要求
+            // （旧 proguard-android.txt 因含 -dontoptimize 已被 AGP 拒绝）。
+            // 若将来要真正启用代码优化/混淆，需将 minifyEnabled 改为 true，
+            // 并在 proguard-rules.pro 中补齐 keep 规则。
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
     if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
@@ -116,23 +245,105 @@ android {
         }
 
     }
-    lint {
-        abortOnError = false
-    }
-
     tasks.register("copySdlAars", Copy) {
         from fileTree("../../ThirdParty/devel/android/SDL")
         into "libs"
         include "*.aar"
+        doFirst {
+            delete fileTree("libs") {
+                include "SDL3*.aar"
+            }
+        }
     }
 
     preBuild.dependsOn(tasks.named("copySdlAars"))
+    tasks.matching { it.name.startsWith("externalNativeBuildClean") }.configureEach {
+        dependsOn(tasks.named("copySdlAars"))
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def variantTaskSuffix =
+            variant.name.substring(0, 1).toUpperCase(Locale.ROOT) +
+            variant.name.substring(1)
+        def isReleaseVariant = variant.buildType == 'release'
+        def variantAssetExcludes = androidAssetExcludes.toList()
+
+        def mergedAssetsDirectoryProvider =
+            variant.artifacts.get(SingleArtifact.ASSETS.INSTANCE)
+        tasks.matching {
+            it.name == "merge${variantTaskSuffix}Assets"
+        }.configureEach {
+            if (isReleaseVariant) {
+                doLast {
+                    keepOnlyReleaseBootstrapAssets(
+                        mergedAssetsDirectoryProvider.get().asFile)
+                }
+            } else {
+                doLast {
+                    def mergedAssetsDirectory =
+                        mergedAssetsDirectoryProvider.get().asFile
+                    def excludedAssetEntries = findAndroidAssetEntries(
+                        mergedAssetsDirectory,
+                        variantAssetExcludes)
+                    excludedAssetEntries.files.each { excludedFile ->
+                        if (!excludedFile.delete() && excludedFile.exists()) {
+                            throw new GradleException(
+                                "Failed to remove excluded Android asset: ${excludedFile}")
+                        }
+                    }
+                    excludedAssetEntries.directories
+                        .sort { left, right ->
+                            right.absolutePath.length() <=> left.absolutePath.length()
+                        }
+                        .each { excludedDirectory ->
+                            if (!excludedDirectory.delete() && excludedDirectory.exists()) {
+                                throw new GradleException(
+                                    "Failed to remove excluded Android asset directory: " +
+                                    "${excludedDirectory}")
+                            }
+                        }
+
+                    def remainingExcludedEntries = findAndroidAssetEntries(
+                        mergedAssetsDirectory,
+                        variantAssetExcludes)
+                    def remainingExcludedPaths =
+                        remainingExcludedEntries.files +
+                        remainingExcludedEntries.directories
+                    if (!remainingExcludedPaths.isEmpty()) {
+                        def samples = remainingExcludedPaths
+                            .collect { it.absolutePath }
+                            .sort()
+                            .take(10)
+                        throw new GradleException(
+                            "Android merged assets still contain excluded files: ${samples}")
+                    }
+                }
+            }
+        }
+
+        def outputAPKName = "${artifactName}_${variant.name}_v${appVersion}.apk";
+        def copyApkTask = tasks.register(
+            "copy${variantTaskSuffix}ApkToDistribution", Copy) {
+            from(variant.artifacts.get(SingleArtifact.APK.INSTANCE)) {
+                include '*.apk'
+                rename { outputAPKName }
+            }
+            duplicatesStrategy = DuplicatesStrategy.INCLUDE
+            into rootProject.file('../bin/android')
+        }
+        tasks.matching {
+            it.name == "assemble${variantTaskSuffix}"
+        }.configureEach {
+            dependsOn(copyApkTask)
+        }
+    }
 }
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation fileTree(include: ['*.aar'], dir: 'libs')
-    implementation files('../../ThirdParty/devel/android/fmod/lib/fmod.jar')
     //implementation fileTree(include: ['*.arr'], dir: '../../ThirdParty/devel/android/SDL/')
 }
 

@@ -1,9 +1,7 @@
-﻿#pragma once
+#pragma once
 #include "../../Element/Element.h"
 #include "../GameTypes.h"
 #include "math.h"
-
-#define MapXRatio 1.414f
 
 class GameElement:
 	public Element
@@ -36,13 +34,11 @@ public:
 	void updateJumpingPosition(UTime ftime, float flySpeed);
 	void updatePosition();
 
-	virtual UTime getFrameTime();
-	virtual void beginNewState(int newState);
 
 	//得到的是当前元素的像素位置,实际在中心点下方距离(TILE_HEIGHT/2)处
 	//因所有元素位置都下移了，所以检测碰撞时，可以直接使用
-	Point getPosition(Point cenTile, PointEx cenOffset);
-	Point getPosition(std::shared_ptr<GameElement> camera);
+	Point getScreenPosition(Point cenTile, PointEx cenOffset);
+	Point getDrawPosition(std::shared_ptr<GameElement> camera);
 
 	bool checkCollide(std::shared_ptr<GameElement> ge1, std::shared_ptr<GameElement> ge2);
 	bool checkCollide(std::shared_ptr<GameElement> ge);
@@ -51,10 +47,14 @@ public:
 
 	virtual void draw() {};
 
-	UTime stateBeginTime = 0;
+	virtual void updateFrameTime() override;
+
+	static int normalizeDir(int dir)
+	{
+		return ((dir % 8) + 8) % 8;
+	}
 
 protected:
 	float soundVolume = 1.0;
 
 };
-

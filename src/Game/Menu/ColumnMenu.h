@@ -2,7 +2,7 @@
 #include "../../Component/Component.h"
 
 class ColumnMenu :
-	public Panel
+	public ConfigDrivenPanel
 {
 public:
 	ColumnMenu();
@@ -14,11 +14,12 @@ public:
 	std::shared_ptr<ColumnImage> columnLife = nullptr;
 	std::shared_ptr<ColumnImage> columnThew = nullptr;
 	std::shared_ptr<ColumnImage> columnMana = nullptr;
+	std::shared_ptr<ColumnImage> columnRage = nullptr;
 
 	void updateState();
 
 private:
-	virtual void onUpdate();
+	virtual void onUpdate() override;
 
 	void freeResource();
 };

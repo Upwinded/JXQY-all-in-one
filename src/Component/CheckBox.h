@@ -19,3 +19,4 @@ private:
 	virtual void onMouseLeftUp(int x, int y);
 };
 
+

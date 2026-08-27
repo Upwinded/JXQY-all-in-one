@@ -3,9 +3,10 @@
 
 JoystickPanel::JoystickPanel()
 {
+	name = "JoystickPanel";
 	init();
 	coverMouse = false;
-	priority = epMin;
+	setPriority(epController);
 	canCallBack = true;
 }
 
@@ -66,16 +67,15 @@ void JoystickPanel::onEvent()
 void JoystickPanel::init()
 {
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\mobile\\joystick\\window.ini");
-	joystick = addComponent<Joystick>(u8"ini\\ui\\mobile\\joystick\\joystick.ini");
-	//addComponent(DragRoundButton, leftJumpBtn, u8"ini\\ui\\mobile\\skills\\leftjump.ini");
+	loadMenuDefinition("ini\\ui\\mobile\\joystick\\joystick.menu.ini");
+
+	joystick = getComponentByName<Joystick>("joystick");
+
 	setChildRectReferToParent();
 }
 
 void JoystickPanel::freeResource()
 {
-	impImage = nullptr;
-
-	freeCom(joystick);
-	//freeCom(leftJumpBtn);
+	joystick = nullptr;
+	ConfigDrivenPanel::freeResource();
 }

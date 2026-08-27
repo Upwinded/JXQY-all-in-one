@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <defs>
+    <radialGradient id="backgroundGlow" cx="82%" cy="18%" r="88%">
+      <stop offset="0" stop-color="#34251a" />
+      <stop offset="0.45" stop-color="#131916" />
+      <stop offset="1" stop-color="#080c0b" />
+    </radialGradient>
+    <linearGradient id="sealStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#84372f" />
+      <stop offset="1" stop-color="#d25b4d" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="600" fill="url(#backgroundGlow)" />
+
+  <g fill="none" stroke="#c8974e" opacity="0.15">
+    <circle cx="1060" cy="80" r="135" stroke-width="2" />
+    <circle cx="1060" cy="80" r="205" stroke-width="2" />
+    <circle cx="1060" cy="80" r="285" stroke-width="2" />
+  </g>
+
+  <g transform="rotate(-3 260 300)">
+    <rect x="74" y="114" width="372" height="372" rx="44" fill="#101613" stroke="url(#sealStroke)" stroke-width="13" />
+    <rect x="92" y="132" width="336" height="336" rx="32" fill="none" stroke="#c8974e" stroke-width="3" opacity="0.28" />
+    <text x="260" y="385" text-anchor="middle" fill="#d25b4d" font-family="Microsoft YaHei, Noto Serif CJK SC, serif" font-size="224" font-weight="700">剑</text>
+  </g>
+
+  <text x="530" y="205" fill="#f3eee4" font-family="Microsoft YaHei, Noto Serif CJK SC, serif" font-size="76" font-weight="700" letter-spacing="4">剑侠情缘</text>
+  <text x="528" y="288" fill="#f3eee4" font-family="Georgia, Times New Roman, serif" font-size="66" font-weight="700" letter-spacing="7">ALL-IN-ONE</text>
+  <text x="532" y="345" fill="#c8974e" font-family="Consolas, ui-monospace, monospace" font-size="24" font-weight="700" letter-spacing="7">UPWINDED.COM</text>
+
+  <text x="532" y="407" fill="#7f8b85" font-family="Consolas, ui-monospace, monospace" font-size="14" font-weight="700" letter-spacing="4">BUILT WITH</text>
+  <g transform="translate(528 429)">
+    <image href="third-party/SDL_logo_clean.png" x="0" y="4" width="142" height="78" preserveAspectRatio="xMidYMid meet" />
+    <line x1="174" y1="9" x2="174" y2="76" stroke="#c8974e" opacity="0.26" />
+    <rect x="196" y="10" width="224" height="66" rx="9" fill="#f3eee4" />
+    <svg x="205" y="19" width="206" height="48" viewBox="83 234 626 144" preserveAspectRatio="xMidYMid meet">
+      <image href="third-party/ffmpeg-logo.svg" x="0" y="0" width="792" height="612" />
+    </svg>
+    <line x1="437" y1="9" x2="437" y2="76" stroke="#c8974e" opacity="0.26" />
+    <image href="third-party/lua-logo.gif" x="484" y="0" width="86" height="86" preserveAspectRatio="xMidYMid meet" />
+  </g>
+</svg>

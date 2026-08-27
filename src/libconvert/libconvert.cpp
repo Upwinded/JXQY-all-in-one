@@ -21,25 +21,21 @@
 #endif
 
 #include "libconvert.h"
-
-#ifdef _MSC_VER
-#define  vsprintf  vsprintf_s
-//#define fopen fopen_s
-#endif
+#include <charconv>
 
 void convert::split_whole_name(const std::string& whole_name, std::string& fname, std::string& ext)
 {
     if (whole_name.empty())
     {
-        fname = u8"";
-        ext = u8"";
+        fname = "";
+        ext = "";
         return;
     }
     auto pos = whole_name.find_last_of('.');
     if (pos == whole_name.npos)
     {
         fname = whole_name;
-        ext = u8"";
+        ext = "";
         return;
     }
     fname = whole_name.substr(0, pos);
@@ -50,17 +46,17 @@ void convert::split_path(const std::string& path, std::string& dir, std::string&
 {
     if (path.empty())
     {
-        dir = u8"";
-        fname = u8"";
-        ext = u8"";
+        dir = "";
+        fname = "";
+        ext = "";
         return;
     }
 
     if (*path.crbegin() == '/')
     {
         dir = path;
-        fname = u8"";
-        ext = u8"";
+        fname = "";
+        ext = "";
         return;
     }
 
@@ -68,7 +64,7 @@ void convert::split_path(const std::string& path, std::string& dir, std::string&
     std::string whole_name;
     if (p_whole_name == path.npos)
     {
-        dir = u8"";
+        dir = "";
         whole_name = path;
     }
     else
@@ -104,24 +100,111 @@ int convert::replaceAllString(std::string& s, const std::string& oldstring, cons
 }
 
 
+std::string convert::vformatString(const char* format, va_list arguments)
+{
+    if (format == nullptr)
+    {
+        return "";
+    }
+
+    va_list lengthArguments;
+    va_copy(lengthArguments, arguments);
+    int requiredLength = vsnprintf(nullptr, 0, format, lengthArguments);
+    va_end(lengthArguments);
+    if (requiredLength < 0)
+    {
+        return "";
+    }
+
+    std::vector<char> buffer(static_cast<size_t>(requiredLength) + 1);
+    va_list writeArguments;
+    va_copy(writeArguments, arguments);
+    int writtenLength = vsnprintf(buffer.data(), buffer.size(), format, writeArguments);
+    va_end(writeArguments);
+    if (writtenLength < 0 || writtenLength > requiredLength)
+    {
+        return "";
+    }
+    return std::string(buffer.data(), static_cast<size_t>(writtenLength));
+}
+
 std::string convert::formatString(const char* format, ...)
 {
-    char s[1000];
-    va_list arg_ptr;
-    va_start(arg_ptr, format);
-     vsprintf(s, format, arg_ptr);
-    va_end(arg_ptr);
-    return s;
+    va_list arguments;
+    va_start(arguments, format);
+    std::string result = vformatString(format, arguments);
+    va_end(arguments);
+    return result;
 }
 
 void convert::formatAppendString(std::string& str, const char* format, ...)
 {
-    char s[1000];
-    va_list arg_ptr;
-    va_start(arg_ptr, format);
-     vsprintf(s, format, arg_ptr);
-    va_end(arg_ptr);
-    str += s;
+    va_list arguments;
+    va_start(arguments, format);
+    str += vformatString(format, arguments);
+    va_end(arguments);
+}
+
+bool convert::formatIntegerValues(
+    const std::string& format,
+    const std::vector<int>& values,
+    std::string& result)
+{
+    std::string formatted;
+    size_t valueIndex = 0;
+    for (size_t index = 0; index < format.size(); index++)
+    {
+        if (format[index] != '%')
+        {
+            formatted.push_back(format[index]);
+            continue;
+        }
+
+        index++;
+        if (index >= format.size())
+        {
+            result.clear();
+            return false;
+        }
+        if (format[index] == '%')
+        {
+            formatted.push_back('%');
+            continue;
+        }
+        if (format[index] != 'd' || valueIndex >= values.size())
+        {
+            result.clear();
+            return false;
+        }
+        formatted += std::to_string(values[valueIndex++]);
+    }
+
+    if (valueIndex != values.size())
+    {
+        result.clear();
+        return false;
+    }
+    result = std::move(formatted);
+    return true;
+}
+
+bool convert::parseInteger(const std::string& text, int& value)
+{
+    if (text.empty())
+    {
+        return false;
+    }
+
+    int parsedValue = 0;
+    const char* begin = text.data();
+    const char* end = begin + text.size();
+    auto result = std::from_chars(begin, end, parsedValue, 10);
+    if (result.ec != std::errc() || result.ptr != end)
+    {
+        return false;
+    }
+    value = parsedValue;
+    return true;
 }
 
 std::vector<std::string> convert::splitString(std::string str, std::string pattern)
@@ -257,7 +340,7 @@ std::string convert::extractFilePath(const std::string& fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, u8"\\", u8"/");
+    replaceAllString(tempName, "\\", "/");
     split_path(tempName, dir, fName, ext);
 	return dir;
 }
@@ -267,14 +350,14 @@ std::string convert::extractFileName(const std::string& fileName)
 	//char c[MAX_FNAME_LEN];
 	//memset(c, 0, MAX_FNAME_LEN);
 	//std::string fName = fileName;
-	//replaceAllString(fName, u8"\\", u8"/");
+	//replaceAllString(fName, "\\", "/");
 	//split_path(fileName.c_str(), nullptr, nullptr, c, nullptr);
 	//std::string name = c;
 	//return name;
 
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, u8"\\", u8"/");
+    replaceAllString(tempName, "\\", "/");
     split_path(tempName, dir, fName, ext);
     return fName;
 }
@@ -283,7 +366,7 @@ std::string convert::extractFileExt(const std::string & fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, u8"\\", u8"/");
+    replaceAllString(tempName, "\\", "/");
     split_path(tempName, dir, fName, ext);
     return ext;
 }
@@ -292,7 +375,7 @@ std::string convert::extractFullName(const std::string & fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, u8"\\", u8"/");
+    replaceAllString(tempName, "\\", "/");
     split_path(tempName, dir, fName, ext);
     return fName + ext;
 }
@@ -301,7 +384,7 @@ std::vector<std::string> convert::extractFileAll(const std::string & fileName)
 {
     std::string tempName = fileName;
     std::string fName, dir, ext;
-    replaceAllString(tempName, u8"\\", u8"/");
+    replaceAllString(tempName, "\\", "/");
     split_path(tempName, dir, fName, ext);
 	std::vector<std::string> s;
     s.push_back(dir);

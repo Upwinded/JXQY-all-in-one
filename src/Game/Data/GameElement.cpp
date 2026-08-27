@@ -1,5 +1,9 @@
 #include "GameElement.h"
+#include "../../Engine/Engine.h"
 #include "Map.h"
+#include "MediaPathResolver.h"
+#include "ProjectedMovement.h"
+#include "../../Engine/AudioDecodeSafety.h"
 #include "../GameManager/GameManager.h"
 
 
@@ -13,16 +17,29 @@ GameElement::~GameElement()
 	freeResource();
 }
 
+void GameElement::updateFrameTime()
+{
+	Element::updateFrameTime();
+	if (timeSlow != 1.0f)
+	{
+		auto slowFrameTime = (UTime)((float)frameTime * timeSlow + 0.5f);
+		unifiedTime -= frameTime;
+		unifiedTime += slowFrameTime;
+		frameTime = slowFrameTime;
+	}
+}
+
 _channel GameElement::playSoundFile(const std::string & fileName, float x, float y, float volume)
 {
 	if (fileName.empty())
 	{
 		return nullptr;
 	}
-	std::string soundName = SOUND_FOLDER + fileName;
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(soundName, s);
-	if (len > 0 && s != nullptr)
+	int len = 0;
+	if (File::readFile(resolveSoundAssetPath(fileName), s, len,
+		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)) &&
+		len > 0 && s != nullptr)
 	{
 		if (volume == -1.0f)
 		{
@@ -58,37 +75,35 @@ void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx
 
 void GameElement::updateEffectPosition(UTime ftime, float flySpeed)
 {
-	if (flySpeed == 0)
+	if (flySpeed <= 0.0f || ftime == 0)
 	{
 		return;
 	}
-	float l = hypot(flyingDirection.x, flyingDirection.y);
-	if (l == 0)
+	PointEx movementVector = getEffectProjectedMovementVector(flyingDirection);
+	if (getProjectedMovementLength(movementVector) <= 0.0f)
 	{
 		return;
 	}
 
-	float distance = flySpeed * Config::getGameSpeed() * (float)ftime / 2;
-	offset.x += distance / l * (float)flyingDirection.x * (float)TILE_HEIGHT * MapXRatio;
-	offset.y += distance / l * (float)flyingDirection.y * (float)TILE_HEIGHT;
+	float distance = getProjectedMagicFrameDistance(flySpeed, (float)ftime, Config::getGameSpeed());
+	offset = advanceProjectedMovement(offset, movementVector, distance);
 	updatePosition();
 }
 
 void GameElement::updateJumpingPosition(UTime ftime, float flySpeed)
 {
-	if (flySpeed == 0)
+	if (flySpeed <= 0.0f || ftime == 0)
 	{
 		return;
 	}
-	float l = hypot(flyingDirection.x, flyingDirection.y);
-	if (l == 0)
+	PointEx movementVector = { (float)flyingDirection.x, (float)flyingDirection.y };
+	if (getProjectedMovementLength(movementVector) <= 0.0f)
 	{
 		return;
 	}
 
-	float distance = flySpeed * Config::getGameSpeed() * (float)ftime;
-	offset.x += distance / l * (float)flyingDirection.x * (float)TILE_WIDTH;
-	offset.y += distance / l * (float)flyingDirection.y * (float)TILE_WIDTH;
+	float distance = getProjectedFrameDistance(flySpeed, (float)ftime, Config::getGameSpeed());
+	offset = advanceProjectedMovement(offset, movementVector, distance);
 	updatePosition();
 }
 
@@ -97,38 +112,18 @@ void GameElement::updatePosition()
 	getNewPosition(position, offset, &position, &offset);
 }
 
-UTime GameElement::getFrameTime()
-{
-	auto frameTime = getTime() - LastFrameTime;
-	if (frameTime > MAX_FRAME_TIME)
-	{
-		frameTime = MAX_FRAME_TIME;
-	}
-	frameTime = (int)(((float)frameTime) * timeSlow + 0.5);
-	timer.set(LastFrameTime + frameTime);
-	LastFrameTime += frameTime;
-	return frameTime;
-}
-
-void GameElement::beginNewState(int newState)
-{
-	state = newState;
-	initTime();
-	stateBeginTime = getTime();
-}
-
-Point GameElement::getPosition(Point cenTile, PointEx cenOffset)
+Point GameElement::getScreenPosition(Point cenTile, PointEx cenOffset)
 {
 	int w, h;
 	engine->getWindowSize(w, h);
-	Point pos = Map::getTilePosition(position, cenTile, { w / 2, h / 2 }, cenOffset);
-	pos.x += (int)round(offset.x);
-	pos.y += (int)round(offset.y);
-
-	return pos;
+	PointEx posoffset;
+	posoffset.x = cenOffset.x - offset.x;
+	posoffset.y = cenOffset.y - offset.y;
+	PointEx pos = Map::getTilePositionEx(position, cenTile, { w / 2, h / 2 }, posoffset);
+	return { (int)round(pos.x), (int)round(pos.y) };
 }
 
-Point GameElement::getPosition(std::shared_ptr<GameElement> camera)
+Point GameElement::getDrawPosition(std::shared_ptr<GameElement> camera)
 {
 	if (camera == nullptr)
 	{
@@ -137,7 +132,8 @@ Point GameElement::getPosition(std::shared_ptr<GameElement> camera)
 	PointEx coffset = camera->offset;
 	coffset.x -= offset.x;
 	coffset.y -= offset.y;
-	return Map::getTilePosition(position, camera->position, { 0, 0 }, coffset);
+	PointEx pos = Map::getTilePositionEx(position, camera->position, { 0, 0 }, coffset);
+	return { (int)round(pos.x), (int)round(pos.y) };
 }
 
 bool GameElement::checkCollide(std::shared_ptr<GameElement> ge1, std::shared_ptr<GameElement> ge2)
@@ -154,24 +150,9 @@ bool GameElement::checkCollide(std::shared_ptr<GameElement> ge1, std::shared_ptr
 	{
 		return true;
 	}
-	/*
-	Point p = ge2->getPosition(ge1);
-	float x = (float)p.x / TILE_WIDTH;
-	float y = (float)p.y / TILE_HEIGHT;
-	float rad = ge1->radius + ge2->radius;
-	if (hypot(x, y) <= rad)
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-	*/
 }
 
 bool GameElement::checkCollide(std::shared_ptr<GameElement> ge)
 {
 	return checkCollide(std::dynamic_pointer_cast<GameElement>(getMySharedPtr()), ge);
 }
-

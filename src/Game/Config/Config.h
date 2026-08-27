@@ -1,10 +1,9 @@
-﻿#pragma once
+#pragma once
 
 
 #include "../../File/INIReader.h"
 #include "../GameTypes.h"
-#include "../../Engine/Engine.h"
-#include "../../Engine/EngineBase.h"
+#include "../../Engine/WindowTypes.h"
 
 
 class Config
@@ -19,7 +18,10 @@ public:
 
 	// 防界面卡死的加载方式
 	// Android（MIUI14开发版）下多线程会造成卡顿，不清楚原因
-	static bool loadWithThread;
+	static bool loadAsync;
+
+	// 移动端是否启用外部资源目录扫描（用户在资源选择页切换，持久化到 config.ini）。
+	static bool externalResourcesEnabled;
 
 	static void load();
 	static void save();
@@ -30,6 +32,8 @@ public:
 
 	static void getWindowSize(int& w, int& h);
 	static void setDefaultWindowSize(int w, int h);
+	static void setDesktopDisplaySettings(
+		const DesktopDisplaySettings& settings);
 
 	static float getGameSpeed();
 	static float setGameSpeed(float speed);
@@ -45,4 +49,3 @@ private:
 	static int convSpeedToInt(float speed);
 	static float convSpeedTofloat(int speed);
 };
-

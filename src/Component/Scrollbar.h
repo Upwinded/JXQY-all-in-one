@@ -18,8 +18,10 @@ public:
 	int pageSize = 9;
 	int slideBegin = 5;
 	int slideEnd = 145;
+	int slideBeginOriginal = 0;
+	int slideEndOriginal = 0;
 
-	void positionChanged(int tempPosition);
+	void positionChanged(int newPosition);
 
 	std::shared_ptr<DragButton> slideBtn = nullptr;
 
@@ -31,13 +33,19 @@ public:
 	void freeResource();
 
 	virtual void initFromIniWithName(INIReader & ini, const std::string & fileName);
-	void limitPos(int * p, int minp, int maxp);
+	void limitPos(int& p, int minVal, int maxVal);
 
 	void setSlideBtnRect();
 
 	void setPosition(int pos);
 
 private:
+	int getSlidePos() const;
+	void setSlidePos(int pos);
+	int getMouseCoord(int x, int y) const;
+	void syncSlideButtonPosition();
+	void updatePositionFromSlide();
+	
 	virtual void onUpdate();
 	virtual void onMouseLeftDown(int x, int y);
 	virtual void onDraw();

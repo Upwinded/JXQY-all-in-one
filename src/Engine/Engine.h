@@ -1,18 +1,14 @@
-﻿/*
-	Engine模块是位于EngineBase模块上层的引擎，供游戏实际调用。
-	EngineBase封装了SDL、FMOD、FFMPEG等模块，实现了引擎大部分的底层功能。
-	Engine模块是对EngineBase的再封装，提供了最主要的常用接口和一些EngineBase
-	没写的专用接口（例如将声音播放区分为背景音乐、音效、对话等）。
+/*
+	Engine是供游戏代码调用的公开引擎外观。
+	EngineBase封装SDL、FFmpeg等底层实现，不是Engine的公开基类。
+	当前保留私有继承以复用历史实现，对外只显式暴露游戏需要的接口。
 */
 
 #pragma once
 
 #include "EngineBase.h"
 
-struct IMPImage;
-
-typedef std::shared_ptr<IMPImage> _shared_imp;
-#define make_shared_imp() std::make_shared<IMPImage>()
+#include <thread>
 
 enum MusicType
 {
@@ -22,8 +18,12 @@ enum MusicType
 	mtTALK = 4
 };
 
-class Engine: public EngineBase
+class Engine final : private EngineBase
 {
+	friend class CoreLifecycleTestAccess;
+	friend class GamepadWorldRuntimeTestAccess;
+	friend class MobileExternalInputRuntimeTestAccess;
+	friend bool runMediaRuntimeTests();
 private:
 	int width = 800;
 	int height = 600;
@@ -32,15 +32,32 @@ private:
 public:
 	static Engine* getInstance();
 private:
-	static Engine engine;
-	static Engine* _this;
-private:
 	Engine();
 public:
 	virtual ~Engine();
 private:
 	static int engineAppEventHandler(SDL_Event* event);
+	void updateApplicationMediaState();
+	bool canPrepareRenderFrame() const override;
+	std::atomic<bool> applicationQuitRequested = false;
+	std::atomic<bool> applicationBackgrounded = false;
+	std::atomic<bool> applicationMediaPaused = false;
+	_channel applicationPausedBGMChannel = nullptr;
+	_channel applicationPausedTalkChannel = nullptr;
 public:
+	void requestApplicationQuit();
+	void resetApplicationQuitRequest();
+	bool isApplicationQuitRequested() const;
+	bool isApplicationActive() const;
+	bool isMainThread() const;
+	const GameInput::PhysicalInputManager& inputActions() const;
+	bool consumeInputAction(GameInput::InputAction inputAction);
+	void releasePhysicalInputsForContextTransition();
+	bool isFrameReady() const
+	{
+		return EngineBase::isFrameReady() &&
+			isApplicationActive();
+	}
 
 	//初始化引擎
 	int init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display);
@@ -54,6 +71,11 @@ public:
 	FullScreenMode getWindowFullScreen();
 	//设置是否全屏
 	void setWindowFullScreen(FullScreenMode mode);
+	// 桌面端显示器、窗口模式和分辨率设置。
+	std::vector<DesktopDisplayInfo> getDesktopDisplays();
+	DesktopDisplaySettings getDesktopDisplaySettings();
+	bool applyDesktopDisplaySettings(
+		const DesktopDisplaySettings& settings);
 	//获取当前分辨率
 	void getScreenInfo(int& w, int& h);
 
@@ -64,10 +86,11 @@ public:
 	bool getMouseHardware();
 	void showCursor();
 	void hideCursor();
+	bool getCursorVisible();
 	
 	//时间与定时器子程序
 	//底层引擎会在处理事件时暂停计时器，此时移动窗体，改变窗体大小等事件会使主进程阻塞，
-	//getAbsoluteTime()子程序会减掉事件处理的时间。
+	//getTimeReferToParentTime()子程序会减掉事件处理的时间。
 	//getTime()则会另外再令计算此引擎模块的暂停时间
 
 	// 随机数
@@ -83,6 +106,11 @@ public:
 	int getFPS();
 	void drawFPS();
 
+private:
+	void drawFPSWithoutLock();
+
+public:
+
 	//绘图子程序
 	_shared_image loadImageFromFile(const std::string & fileName);
 	_shared_image loadImageFromMem(std::unique_ptr<char[]>& data, int size);
@@ -90,32 +118,51 @@ public:
 	int saveImageToFile(_shared_image image, const std::string & fileName);
 	int saveImageToMem(_shared_image image, int w, int h, std::unique_ptr<char[]>& data);
 	int saveImageToMem(_shared_image image, std::unique_ptr<char[]>& data);
+	int saveImageToPngMemory(_shared_image image, int width, int height,
+		std::unique_ptr<char[]>& data);
 	bool pointInImage(_shared_image image, int x, int y);
 	_shared_image createNewImageFromImage(_shared_image image);
+	_shared_image getGrayscaleImage(_shared_image image);
 	void drawImage(_shared_image image, int x, int y);
 	void drawImage(_shared_image image, Rect* src, Rect* dst);
 	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center);
+	void drawAspectFitImage(
+		_shared_image image,
+		const Rect& sourceRect,
+		const Rect& destinationRect,
+		bool fadeMirroredBars,
+		std::uint8_t alpha = 255,
+		UTime mirroredBarsAnimationTime = 0,
+		const std::vector<AspectFitPointerRipple>* pointerRipples = nullptr);
 	void drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha);
 	void drawImageWithAlpha(_shared_image image, Rect *src, Rect * dst, unsigned char alpha);
 	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
 	void drawImageWithColor(_shared_image image, Rect* src, Rect* dst, unsigned char r, unsigned char g, unsigned char b);
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
 	void setImageAlpha(_shared_image image, unsigned char a);
+	void drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode);
 	//void freeImage(_image image);
 	bool getImageSize(_shared_image image, int &w, int &h);
+	bool getImageContentBounds(_shared_image image, Rect& bounds, bool ignoreBlack);
 
 	_shared_image createCanvasImage(int w = -1, int h = -1);
 	bool setImageAsRenderTarget(_image image);
 	bool setSharedImageAsRenderTarget(_shared_image image);
+	bool restoreImageRenderTargetAfterAcceptedOperation(
+		_image originalTarget,
+		const _shared_image& activeTarget);
 	_image getRenderTarget();
 	void renderClear(uint8_t r = 0, uint8_t g = 0, uint8_t b = 0, uint8_t a = 0);
+	void fillRect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 	void drawGeometry(_shared_image image, const std::vector<Vertex>& vertices, const std::vector<int>& indices);
 
 	//绘制缩略图子程序
-	_shared_image loadSaveShotFromPixels(int w, int h, std::unique_ptr<char[]>& data, int size);
+	_shared_image loadSaveShotFromPixels(int w, int h, const char* data, int size);
 	bool beginSaveScreen();
 	_shared_image endSaveScreen();
 	int saveImageToPixels(_shared_image image, int w, int h, std::unique_ptr<char[]>& s);
+
+	_shared_image createImageFromPixelData(const uint8_t* pixelData, int width, int height);
 
 	//天气类图像
 	_shared_image createRaindrop();
@@ -125,6 +172,13 @@ public:
 	void setFontName(const std::string& fontName);
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
 	_shared_image createText(const std::string& text, int size, unsigned int color);
+	_shared_image createTextWithFontData(
+		const void* data,
+		std::size_t dataSize,
+		const std::string& text,
+		int size,
+		unsigned int color,
+		int wrapWidth);
 	void drawText(const std::string& text, int x, int y, int size, unsigned int color);
 
 	//保存字符串到图片子程序
@@ -132,7 +186,19 @@ public:
 	_shared_image endDrawTalk();
 	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
 private:
-	bool _talk_drawing = false;
+	enum class TalkDrawingState
+	{
+		idle,
+		beginning,
+		drawing,
+		ending
+	};
+	std::mutex _talk_drawing_state_mutex;
+	TalkDrawingState _talk_drawing_state = TalkDrawingState::idle;
+	std::thread::id _talk_drawing_thread;
+	bool _talk_drawing_lock_held = false;
+	void clearTalkDrawingState();
+	void releaseTalkDrawingLock();
 
 public:
 
@@ -169,6 +235,16 @@ public:
 	int getEventCount();
 	int getEvent(AEvent& event);
 	void pushEvent(AEvent& event);
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	void pushEvent(AEvent&& event)
+	{
+		pushEvent(event);
+	}
+#endif
+	void acknowledgeLogicalResizeEvent(
+		std::uint32_t generation,
+		int logicalWidth,
+		int logicalHeight);
 	bool getKeyPress(KeyCode key);
 
 	bool getMousePressed(MouseButtonCode button);
@@ -213,6 +289,7 @@ public:
 	_channel playSound(_music music, float x, float y, float volume);
 	_channel playSound(_music music, float x, float y);
 	_channel playSound(_music music);
+	void stopAllSounds();
 
 	//播放结束自动释放
 	_channel playSound(const std::unique_ptr<char[]>& data, int size, float x = 0.0f, float y = 0.0f, float volume = -1.0f);
@@ -271,9 +348,16 @@ public:
 	float getVideoTime(_video v);
 public:
 	//引擎每一帧都必须执行的处理函数
+	//只轮询平台事件，不开始渲染帧
+	void pumpEvents();
 	//每帧开始前调用
 	void frameBegin();
 	//每帧结束后调用
 	void frameEnd();
+
+	//多线程模式控制
+	//当加载线程与渲染线程并发运行时应设为true，单线程运行时为false
+	void setMultiThreadedMode(bool enabled);
+	bool isMultiThreadedMode() const;
 
 };

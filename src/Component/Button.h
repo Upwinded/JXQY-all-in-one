@@ -11,15 +11,17 @@ public:
 	virtual ~Button();
 
 	bool stretch = false;
+	bool animateFrames = false;
+	bool hoverSoundEnabled = true;
 
 	int buttonType = 0;
 
-	std::string kind = u8"";
+	std::string kind = "";
 
 	_shared_imp image[3] = { nullptr, nullptr, nullptr };
 
 #ifdef SOUND_DYNAMIC_LOAD
-	std::string sound[3] = { u8"", u8"", u8"" };
+	std::string sound[3] = { "", "", "" };
 #else
 	_music sound[3] = { nullptr,nullptr,nullptr };
 #endif // SOUND_DYNAMIC_LOAD
@@ -38,6 +40,8 @@ protected:
 	void playSound(int index);
 	void draw();
 	void draw(int x, int y);
+	void drawFocusBorder();
+	_shared_image loadButtonImage(int& xOffset, int& yOffset, int first, int second, int third);
 
 	virtual void onClick();
 	virtual void onExit();
@@ -50,4 +54,3 @@ protected:
 public:
 	virtual void onDraw();
 };
-

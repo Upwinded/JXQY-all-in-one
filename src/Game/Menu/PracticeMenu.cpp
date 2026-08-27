@@ -1,9 +1,14 @@
 #include "PracticeMenu.h"
 #include "../GameManager/GameManager.h"
+#include "../../libconvert/libconvert.h"
+#include "MenuResource.h"
+
+#include <utility>
 
 
 PracticeMenu::PracticeMenu()
 {
+	Element::name = "PracticeMenu";
 	visible = false;
 	init();
 }
@@ -16,60 +21,80 @@ PracticeMenu::~PracticeMenu()
 
 void PracticeMenu::updateMagic()
 {
+	if (magic == nullptr)
+	{
+		refreshControllerTransferHighlight();
+		return;
+	}
 
 	magic->impImage = nullptr;
+	int practiceIndex = gm->magicManager.practiceIndex();
 
-	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
+	if (gm->magicManager.magicListExists(practiceIndex))
 	{
-		name->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->name);
-		intro->setStr(gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->intro);
-		level->setStr(convert::formatString(u8"%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
-		exp->setStr(convert::formatString(u8"%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
-		magic->impImage = gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->createMagicIcon();
+		if (name) name->setStr(gm->magicManager.magicList[practiceIndex].magic->name);
+		if (intro) intro->setStr(gm->magicManager.magicList[practiceIndex].magic->intro);
+		if (level) level->setStr(convert::formatString("%d", gm->magicManager.magicList[practiceIndex].level));
+		if (exp) exp->setStr(convert::formatString("%d/%d", gm->magicManager.magicList[practiceIndex].exp, gm->magicManager.magicList[practiceIndex].magic->level[gm->magicManager.magicList[practiceIndex].level].levelupExp));
+		magic->impImage = MenuResource::createMagicMenuImage(gm->magicManager.magicList[practiceIndex].magic);
 	}
 	else
 	{
-		name->setStr(u8"");
-		intro->setStr(u8"");
-		level->setStr(u8"");
-		exp->setStr(u8"");
+		if (name) name->setStr("");
+		if (intro) intro->setStr("");
+		if (level) level->setStr("");
+		if (exp) exp->setStr("");
 	}
+	refreshControllerTransferHighlight();
 }
 
 void PracticeMenu::updateExp()
 {
-	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
+	int practiceIndex = gm->magicManager.practiceIndex();
+	if (gm->magicManager.magicListExists(practiceIndex))
 	{
-		exp->setStr(convert::formatString(u8"%d/%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].exp, gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic->level[gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level].levelupExp));
+		if (exp) exp->setStr(convert::formatString("%d/%d", gm->magicManager.magicList[practiceIndex].exp, gm->magicManager.magicList[practiceIndex].magic->level[gm->magicManager.magicList[practiceIndex].level].levelupExp));
 	}
 	else
 	{
-		exp->setStr(u8"");
+		if (exp) exp->setStr("");
 	}
 }
 
 void PracticeMenu::updateLevel()
 {
-	if (gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].iniFile != u8"")
+	int practiceIndex = gm->magicManager.practiceIndex();
+	if (gm->magicManager.magicListExists(practiceIndex))
 	{
-		level->setStr(convert::formatString(u8"%d", gm->magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level));
+		if (level) level->setStr(convert::formatString("%d", gm->magicManager.magicList[practiceIndex].level));
 	}
 	else
 	{
-		level->setStr(u8"");
+		if (level) level->setStr("");
 	}
 }
 
 void PracticeMenu::onEvent()
 {
+	if (magic == nullptr) return;
+	if (gm != nullptr && gm->menu != nullptr
+		&& gm->menu->controllerTransfers().active(ControllerSlotKind::Magic)
+		&& currentDragItem != nullptr)
+	{
+		gm->menu->cancelControllerInteraction();
+	}
+
 	unsigned int ret = magic->getResult();
+	int practiceIndex = gm->magicManager.practiceIndex();
 	if (ret & erShowHint)
 	{
-		if (gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].iniFile != u8"" && gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic != nullptr)
+		if (gm->magicManager.magicListExists(practiceIndex))
 		{
-			gm->menu->toolTip->visible = true;
-			addChild(gm->menu->toolTip);
-			gm->menu->toolTip->setMagic(gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].magic, gm->magicManager.magicList[MAGIC_TOOLBAR_COUNT + MAGIC_COUNT].level);
+			gm->menu->showMagicToolTip(
+				getMySharedPtr(),
+				gm->magicManager.magicList[practiceIndex].magic,
+				gm->magicManager.magicList[practiceIndex].level,
+				magic);
 		}
 		else
 		{
@@ -83,25 +108,27 @@ void PracticeMenu::onEvent()
 	}
 	if (ret & erMouseRDown)
 	{
+		gm->menu->cancelControllerInteraction();
 		gm->menu->toolTip->visible = false;
 		magic->resetHint();
 	}
 	if (ret & erDropped)
 	{
+		gm->menu->cancelControllerInteraction();
 		gm->menu->toolTip->visible = false;
 		magic->resetHint();
 		if (magic->dropType == dtMagic)
 		{
-			if (gm->magicManager.magicList[magic->dropIndex].iniFile != u8"" && gm->magicManager.magicList[magic->dropIndex].magic != nullptr)
+			if (gm->magicManager.magicListExists(magic->dropIndex))
 			{
 				gm->magicManager.exchange(magic->dropIndex, magic->dragIndex);
 				updateMagic();
 			}
-			if (magic->dropIndex < MAGIC_COUNT)
+			if (gm->magicManager.isStoreIndex(magic->dropIndex))
 			{
 				gm->menu->magicMenu->updateMagic();
 			}
-			else if (magic->dropIndex < MAGIC_COUNT + MAGIC_TOOLBAR_COUNT)
+			else if (gm->magicManager.isBottomIndex(magic->dropIndex))
 			{
 				gm->menu->bottomMenu->updateMagicItem();
 			}
@@ -112,34 +139,133 @@ void PracticeMenu::onEvent()
 void PracticeMenu::init()
 {
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\equip\\window.ini");
-	title = addComponent<ImageContainer>(u8"ini\\ui\\xiulian\\title.ini");
-	image = addComponent<ImageContainer>(u8"ini\\ui\\xiulian\\image.ini");
+	loadMenuDefinition("ini\\ui\\xiulian\\xiulian.menu.ini");
 
-	name = addComponent<Label>(u8"ini\\ui\\xiulian\\name.ini");
-	intro = addComponent<Label>(u8"ini\\ui\\xiulian\\intro.ini");
-	intro->autoNextLine = true;
-	level = addComponent<Label>(u8"ini\\ui\\xiulian\\level.ini");
-	exp = addComponent<Label>(u8"ini\\ui\\xiulian\\exp.ini");
+	title = getComponentByName<ImageContainer>("title");
+	image = getComponentByName<ImageContainer>("image");
+	name = getComponentByName<Label>("name");
+	intro = getComponentByName<Label>("intro");
+	level = getComponentByName<Label>("level");
+	exp = getComponentByName<Label>("exp");
+	magic = getComponentByName<Item>("magic");
 
-	magic = addComponent<Item>(u8"ini\\ui\\xiulian\\magic.ini");
-	magic->dragIndex = MAGIC_TOOLBAR_COUNT + MAGIC_COUNT;
-	magic->dragType = dtMagic;
-	magic->canShowHint = true;
+	if (intro)
+	{
+		intro->autoNextLine = true;
+	}
+	if (magic)
+	{
+		magic->dragIndex = gm->magicManager.practiceIndex();
+		magic->dragType = dtMagic;
+		magic->canShowHint = true;
+	}
+
 	setChildRectReferToParent();
+	configureControllerFocus();
 }
 
 void PracticeMenu::freeResource()
 {
+	slotController.clear();
+	image = nullptr;
+	title = nullptr;
+	level = nullptr;
+	exp = nullptr;
+	name = nullptr;
+	intro = nullptr;
+	magic = nullptr;
+	ConfigDrivenPanel::freeResource();
+}
 
-	impImage = nullptr;
+void PracticeMenu::configureControllerFocus()
+{
+	SlotInteractionBinding binding =
+		MenuController::makeControllerSlotInteractionBinding(
+			gm,
+			ControllerSlotKind::Magic,
+			ControllerSlotDomain::Practice);
+	binding.grid.focusIdPrefix = "practice-magic-";
+	binding.grid.items = { magic };
+	binding.grid.resolveLogicalIndex = [this](int)
+	{
+		return gm != nullptr ? gm->magicManager.practiceIndex() : -1;
+	};
+	binding.grid.details = [this](int logicalIndex, int)
+	{
+		showControllerMagicDetails(logicalIndex);
+	};
+	binding.grid.hideDetails = [this]() { hideControllerMagicDetails(); };
+	slotController.bind(std::move(binding));
+}
 
-	freeCom(image);
-	freeCom(title);
-	freeCom(level);
-	freeCom(exp);
-	freeCom(name);
-	freeCom(intro);
-	freeCom(magic);
+bool PracticeMenu::activateControllerFocus(ControllerFocusTarget target)
+{
+	return (target == ControllerFocusTarget::Default
+		|| target == ControllerFocusTarget::Practice)
+		&& focusControllerDefault();
+}
 
+bool PracticeMenu::focusControllerDefault()
+{
+	return slotController.activate();
+}
+
+bool PracticeMenu::isControllerFocusActive() const
+{
+	return slotController.isActive();
+}
+
+void PracticeMenu::deactivateControllerFocus()
+{
+	slotController.deactivate();
+}
+
+PElement PracticeMenu::controllerFocusedElement() const
+{
+	return slotController.controllerFocusedElement();
+}
+
+std::vector<PElement> PracticeMenu::controllerFocusCandidates() const
+{
+	return slotController.controllerFocusCandidates();
+}
+
+bool PracticeMenu::focusControllerElement(const PElement& element)
+{
+	return slotController.focusControllerElement(element);
+}
+
+void PracticeMenu::showControllerMagicDetails(int logicalIndex)
+{
+	if (gm == nullptr || gm->menu == nullptr || gm->menu->toolTip == nullptr
+		|| gm->menu->upMenu == nullptr || magic == nullptr
+		|| !gm->magicManager.isPracticeIndex(logicalIndex)
+		|| !gm->magicManager.magicListExists(logicalIndex))
+	{
+		hideControllerMagicDetails();
+		return;
+	}
+	gm->menu->showMagicToolTip(
+		getMySharedPtr(),
+		gm->magicManager.magicList[logicalIndex].magic,
+		gm->magicManager.magicList[logicalIndex].level,
+		magic);
+}
+
+void PracticeMenu::hideControllerMagicDetails()
+{
+	if (gm != nullptr && gm->menu != nullptr)
+	{
+		gm->menu->hideToolTip();
+	}
+}
+
+void PracticeMenu::refreshControllerTransferHighlight()
+{
+	slotController.refreshTransferSelection();
+}
+
+bool PracticeMenu::onHandleUIAction(UIAction action)
+{
+	return slotController.handleAction(action);
 }

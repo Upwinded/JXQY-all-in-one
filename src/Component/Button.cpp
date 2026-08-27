@@ -1,9 +1,25 @@
 #include "Button.h"
+#include "../Engine/Engine.h"
+#include "../File/log.h"
+#include "../libconvert/libconvert.h"
+#include "ComponentRegistry.h"
+#include "../Engine/AudioDecodeSafety.h"
+#include "../Game/Data/MediaPathResolver.h"
+
+namespace
+{
+	bool registeredButton = []
+	{
+		ComponentRegistry::getInstance().registerType("Button",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<Button>(); });
+		return true;
+	}();
+}
 
 Button::Button()
 {
-	name = u8"button";
-	priority = epButton;
+	name = "button";
+	setPriority(epButton);
 	elementType = etButton;
 	result = erNone;
 }
@@ -26,8 +42,10 @@ void Button::playSound(int index)
 		return;
 	}
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(sound[index], s);
-	if (s != nullptr && len > 0)
+	int len = 0;
+	if (File::readFile(sound[index], s, len,
+		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)) &&
+		s != nullptr && len > 0)
 	{
 		engine->playSound(s, len);
 	}
@@ -42,53 +60,38 @@ void Button::draw()
 	draw(rect.x, rect.y);
 }
 
+_shared_image Button::loadButtonImage(int& xOffset, int& yOffset, int first, int second, int third)
+{
+	_shared_image img = IMP::loadImageForTime(image[first], getTime(), &xOffset, &yOffset);
+	if (img == nullptr)
+	{
+		img = IMP::loadImageForTime(image[second], getTime(), &xOffset, &yOffset);
+	}
+	if (img == nullptr)
+	{
+		img = IMP::loadImageForTime(image[third], getTime(), &xOffset, &yOffset);
+	}
+	return img;
+}
+
 void Button::draw(int x, int y)
 {
 	int xOffset, yOffset;
 	_shared_image img = nullptr;
 	if (touchingDownID != TOUCH_UNTOUCHEDID || (dragging != TOUCH_UNTOUCHEDID && currentDragItem == getMySharedPtr()))
 	{
-		img = IMP::loadImageForTime(image[2], getTime(), &xOffset, &yOffset);
-		if (img == nullptr)
-		{
-			img = IMP::loadImageForTime(image[1], getTime(), &xOffset, &yOffset);
-		}
-		if (img == nullptr)
-		{
-			img = IMP::loadImageForTime(image[0], getTime(), &xOffset, &yOffset);
-		}
+		img = loadButtonImage(xOffset, yOffset, 2, 1, 0);
 	}
-	else if (touchingID != TOUCH_UNTOUCHEDID)
+	else if (touchingID != TOUCH_UNTOUCHEDID || isFocused())
 	{
-		img = IMP::loadImageForTime(image[1], getTime(), &xOffset, &yOffset);
-		if (img == nullptr)
-		{
-			img = IMP::loadImageForTime(image[0], getTime(), &xOffset, &yOffset);
-		}
-		if (img == nullptr)
-		{
-			img = IMP::loadImageForTime(image[2], getTime(), &xOffset, &yOffset);
-		}
+		img = loadButtonImage(xOffset, yOffset, 1, 0, 2);
 	}
 	else
 	{
-		img = IMP::loadImageForTime(image[0], getTime(), &xOffset, &yOffset);
-		if (img == nullptr)
-		{
-			img = IMP::loadImageForTime(image[1], getTime(), &xOffset, &yOffset);
-		}
-		if (img == nullptr)
-		{
-			img = IMP::loadImageForTime(image[2], getTime(), &xOffset, &yOffset);
-		}
+		img = loadButtonImage(xOffset, yOffset, 0, 1, 2);
 	}
 	if (stretch)
 	{
-		Rect tempRect;
-		tempRect.x = x;
-		tempRect.y = y;
-		tempRect.w = rect.w;
-		tempRect.h = rect.h;
 		engine->drawImage(img, nullptr, &rect);
 	}
 	else
@@ -113,6 +116,27 @@ void Button::onClick()
 void Button::onDraw()
 {
 	draw();
+	drawFocusBorder();
+}
+
+void Button::drawFocusBorder()
+{
+	if (isFocused() && rect.w >= 2 && rect.h >= 2)
+	{
+		constexpr int FocusBorderWidth = 2;
+		constexpr uint8_t FocusRed = 255;
+		constexpr uint8_t FocusGreen = 214;
+		constexpr uint8_t FocusBlue = 92;
+		constexpr uint8_t FocusAlpha = 240;
+		engine->fillRect(rect.x, rect.y, rect.w, FocusBorderWidth,
+			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+		engine->fillRect(rect.x, rect.y + rect.h - FocusBorderWidth,
+			rect.w, FocusBorderWidth, FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+		engine->fillRect(rect.x, rect.y, FocusBorderWidth, rect.h,
+			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+		engine->fillRect(rect.x + rect.w - FocusBorderWidth, rect.y,
+			FocusBorderWidth, rect.h, FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+	}
 }
 
 void Button::onExit()
@@ -122,7 +146,10 @@ void Button::onExit()
 void Button::onMouseMoveIn(int x, int y)
 {
 	initTime();
-	playSound(0);
+	if (hoverSoundEnabled)
+	{
+		playSound(0);
+	}
 }
 
 void Button::onMouseMoveOut()
@@ -157,7 +184,7 @@ void Button::freeSound()
 	for (size_t i = 0; i < 3; i++)
 	{
 #ifdef SOUND_DYNAMIC_LOAD
-		sound[i] = u8"";
+		sound[i] = "";
 #else
 		if (sound[i] != nullptr)
 		{
@@ -179,46 +206,62 @@ void Button::freeResource()
 void Button::initFromIni(INIReader & ini)
 {
 	freeResource();
-	kind = ini.Get(u8"Init", u8"Kind", kind);
-	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
-	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
+	animateFrames = false;
+	hoverSoundEnabled = ini.GetBoolean("Init", "HoverSound", true);
+	kind = ini.Get("Init", "Kind", kind);
+	rect.x = ini.GetInteger("Init", "Left", rect.x);
+	rect.y = ini.GetInteger("Init", "Top", rect.y);
+	rect.w = ini.GetInteger("Init", "Width", rect.w);
+	rect.h = ini.GetInteger("Init", "Height", rect.h);
+	animateFrames = ini.GetBoolean("Init", "Animate", animateFrames);
+	std::string impName = ini.Get("Init", "Image", "");
+	if (impName.empty())
+	{
+		impName = ini.Get("Init", "Bitmap", "");
+	}
 	auto impImage = IMP::createIMPImage(impName);
 	if (impImage != nullptr)
 	{
-		if (convert::lowerCase(kind) == u8"trackbtn")
+		if (animateFrames)
+		{
+			image[0] = impImage;
+			image[1] = impImage;
+			image[2] = impImage;
+
+			std::string soundName = ini.Get("Init", "Sound", "");
+			loadSound(soundName, 1);
+		}
+		else if (convert::lowerCase(kind) == "trackbtn")
 		{
 			int frame = 0;
-			frame = ini.GetInteger(u8"Init", u8"Up", 0);
+			frame = ini.GetInteger("Init", "Up", 0);
 			image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger(u8"Init", u8"Track", 1);
+			frame = ini.GetInteger("Init", "Track", 1);
 			image[1] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger(u8"Init", u8"Down", 1);
+			frame = ini.GetInteger("Init", "Down", 1);
 			image[2] = IMP::createIMPImageFromFrame(impImage, frame);
 
-			std::string soundName = ini.Get(u8"Init", u8"Sound", u8"");
-			loadSound(soundName, 1);
+			std::string soundName = ini.Get("Init", "Sound", "");
 			loadSound(soundName, 0);
 		}
 		else
 		{
 			int frame = 0;
-			frame = ini.GetInteger(u8"Init", u8"Up", 0);
+			frame = ini.GetInteger("Init", "Up", 0);
 			image[0] = IMP::createIMPImageFromFrame(impImage, frame);
-			frame = ini.GetInteger(u8"Init", u8"Down", 1);
+			frame = ini.GetInteger("Init", "Down", 1);
 			image[2] = IMP::createIMPImageFromFrame(impImage, frame);
 
-			std::string soundName = ini.Get(u8"Init", u8"Sound", u8"");
+			std::string soundName = ini.Get("Init", "Sound", "");
 			loadSound(soundName, 1);
 		}
 	}
 	else
 	{
-		GameLog::write(u8"%s image file error\n", impName.c_str());
+		GameLog::write("Button:%s,%s image file error\n", ini.fileName.c_str(), impName.c_str());
 	}
 
+	stretch = ini.GetBoolean("Init", "Stretch", stretch);
 	impImage = nullptr;
 }
 
@@ -228,12 +271,19 @@ void Button::loadSound(const std::string & fileName, int index)
 	{
 		return;
 	}
+	if (fileName.empty())
+	{
+		return;
+	}
+	std::string soundPath = resolveSoundAssetPath(fileName);
 #ifdef SOUND_DYNAMIC_LOAD
-	sound[index] = fileName;
+	sound[index] = soundPath;
 #else
 	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(fileName, s);
-	if (s != nullptr && len > 0)
+	int len = 0;
+	if (File::readFile(soundPath, s, len,
+		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)) &&
+		s != nullptr && len > 0)
 	{
 		if (sound[index] != nullptr)
 		{

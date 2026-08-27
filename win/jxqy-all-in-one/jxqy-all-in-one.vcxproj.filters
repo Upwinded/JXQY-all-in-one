@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="资源文件">
@@ -17,8 +17,14 @@
     <Filter Include="Src\Engine">
       <UniqueIdentifier>{a4cfe0ef-e229-4e13-9c1d-4a12a90d8580}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Input">
+      <UniqueIdentifier>{0b1ef38c-7c61-4b4a-9ea7-a0325d277b64}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\File">
       <UniqueIdentifier>{afb1da7c-2ab3-4eea-9e57-ced57fe279b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Launch">
+      <UniqueIdentifier>{2edbab72-cc7e-4c1f-8cd1-c5780bff2af6}</UniqueIdentifier>
     </Filter>
     <Filter Include="Src\Game">
       <UniqueIdentifier>{bb494344-909f-4039-a910-9fc67a2bcce2}</UniqueIdentifier>
@@ -44,6 +50,9 @@
     <Filter Include="Src\Game\GameManager">
       <UniqueIdentifier>{cbf3400e-1d6b-4999-a929-93ad4df04984}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Game\Loading">
+      <UniqueIdentifier>{38d85be8-2c05-4ea3-bd0b-47dd4a17e2d4}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Game\Menu">
       <UniqueIdentifier>{af894b4b-0d3b-4adb-ad96-954b2c75875e}</UniqueIdentifier>
     </Filter>
@@ -61,6 +70,21 @@
     </Filter>
     <Filter Include="ThirdParty\miniLZO">
       <UniqueIdentifier>{8808592d-0f65-45ef-8d73-dcb510cc534c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ThirdParty\miniz">
+      <UniqueIdentifier>{a73f7bb4-cb4b-42d0-9d8d-dc42bd6fd9cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Game\Data\NPCAction">
+      <UniqueIdentifier>{521399bf-c28a-4c58-8906-75634fe5869e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Resource">
+      <UniqueIdentifier>{ceae5301-7a1b-482d-aa6e-183a28e0c285}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Update">
+      <UniqueIdentifier>{90a70173-5475-4b90-970d-40e47d082910}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Platform">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -112,6 +136,12 @@
     <ClCompile Include="..\..\src\Component\Scrollbar.cpp">
       <Filter>Src\Component</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Component\FlatScrollbar.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Component\FlatTextButton.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Component\TalkLabel.cpp">
       <Filter>Src\Component</Filter>
     </ClCompile>
@@ -130,19 +160,70 @@
     <ClCompile Include="..\..\src\Engine\Engine.cpp">
       <Filter>Src\Engine</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Engine\AspectFitLayout.cpp">
+      <Filter>Src\Engine</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Engine\EngineBase.cpp">
       <Filter>Src\Engine</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Engine\ImageTypes.cpp">
+      <Filter>Src\Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Engine\Timer.cpp">
+      <Filter>Src\Engine</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Input\PhysicalInputManager.cpp">
+      <Filter>Src\Input</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\File\File.cpp">
       <Filter>Src\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\File\RootedResourceReader.cpp">
+      <Filter>Src\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\File\StrictRelativeResourcePath.cpp">
+      <Filter>Src\File</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunDescriptor.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunDiagnostics.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunDiagnosticsFile.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunOrchestration.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunOrchestrationProduction.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunResourceRouting.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeSession.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTrace.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceFile.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceWriter.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\EditorRunSceneApplication.cpp">
+      <Filter>Src\Launch</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Launch\GameLaunchArguments.cpp">
+      <Filter>Src\Launch</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\File\ini.cpp">
       <Filter>Src\File</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\File\INIReader.cpp">
-      <Filter>Src\File</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\File\PakFile.cpp">
       <Filter>Src\File</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Game.cpp">
@@ -152,6 +233,9 @@
       <Filter>Src\Game\Config</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Data\CollisionDetector.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\ColorStyle.cpp">
       <Filter>Src\Game\Data</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Data\Effect.cpp">
@@ -182,6 +266,9 @@
       <Filter>Src\Game\Data</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Data\Memo.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\MemoPersistence.cpp">
       <Filter>Src\Game\Data</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Data\NPC.cpp">
@@ -217,19 +304,40 @@
     <ClCompile Include="..\..\src\Game\GameManager\GameManager.cpp">
       <Filter>Src\Game\GameManager</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\GameManager\RuntimeSaveGenerationPolicy.cpp">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\GameManager\SaveGeneration.cpp">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\GameManager\WorldInteractionResolver.cpp">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Game\GameManager\MenuController.cpp">
       <Filter>Src\Game\GameManager</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\GameManager\SaveFileManager.cpp">
       <Filter>Src\Game\GameManager</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Loading\ExclusiveLoadingRunner.cpp">
+      <Filter>Src\Game\Loading</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\BottomMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\TopMenu.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\BuySellMenu.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\ColumnMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ControllerTransferCoordinator.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ControllerTransferPolicies.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\Dialog.cpp">
@@ -265,13 +373,28 @@
     <ClCompile Include="..\..\src\Game\Menu\SkillsPanel.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\SlotGridController.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\StateMenu.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\System.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ControllerHelpOverlay.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ControllerPromptPresenter.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\SystemNotice.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\ToolTip.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\UIFocusManager.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\YesNo.cpp">
@@ -415,6 +538,198 @@
     <ClCompile Include="..\..\src\Game\Data\WaterEffect.cpp">
       <Filter>Src\Game\Data</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionAttack.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionBase.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionDeath.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionHide.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionHurt.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionJump.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionMagic.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionManager.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionRun.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionSit.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionSpecial.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionStand.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionWalk.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Script\ScriptAPI.cpp">
+      <Filter>Src\Game\Script</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ChooseMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\TimerMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Component\ChooseTextButton.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Component\ComponentRegistry.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Component\ConfigDrivenPanel.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Image\PicDecoder.cpp">
+      <Filter>Src\Image</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\MapThumbnailMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\NpcInfoPanel.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Platform\AndroidExternalStorage.cpp">
+      <Filter>Src\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Platform\AndroidProgramUpdate.cpp">
+      <Filter>Src\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Platform\MobileNetwork.cpp">
+      <Filter>Src\Platform</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourceManager.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourceCatalog.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourceManifest.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ModReleaseAssets.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ModReleaseMetadata.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\SemanticVersion.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourcePackCard.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourcePackList.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourceSelectScene.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\OnlineUpdateCatalog.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\HttpsDownload.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\ResourcePackageArchive.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\ResourceDownloadPlanner.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\ResourceDownloadPreparation.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\ResourceInstallTransaction.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Update\ArtifactChecksum.cpp">
+      <Filter>Src\Update</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz.c">
+      <Filter>ThirdParty\miniz</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz_zip.c">
+      <Filter>ThirdParty\miniz</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz_tinfl.c">
+      <Filter>ThirdParty\miniz</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz_tdef.c">
+      <Filter>ThirdParty\miniz</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\GambleMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\DiceGambleState.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\FishGameState.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\MinimapToggleButton.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\PartnerEquipMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\PartnerHeadMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Component\TextLayout.cpp">
+      <Filter>Src\Component</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\BuySellInventory.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\MagicBeginPosition.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NewYearPeriod.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\MagicControl.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\MagicRegionFile.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\MagicTransport.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\MediaPathResolver.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionBounce.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionMagicForcedMove.cpp">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\GameManager\ScriptRuntimeState.cpp">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ChooseMenuLayout.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\ChooseMultipleSelection.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\Component\BaseComponent.h">
@@ -468,6 +783,15 @@
     <ClInclude Include="..\..\src\Component\Scrollbar.h">
       <Filter>Src\Component</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Component\FlatComponentPolicy.h">
+      <Filter>Src\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Component\FlatScrollbar.h">
+      <Filter>Src\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Component\FlatTextButton.h">
+      <Filter>Src\Component</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Component\TalkLabel.h">
       <Filter>Src\Component</Filter>
     </ClInclude>
@@ -486,8 +810,32 @@
     <ClInclude Include="..\..\src\Engine\Engine.h">
       <Filter>Src\Engine</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Engine\AspectFitLayout.h">
+      <Filter>Src\Engine</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Engine\EngineBase.h">
       <Filter>Src\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Engine\ImageTypes.h">
+      <Filter>Src\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Engine\MediaTypes.h">
+      <Filter>Src\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Engine\Timer.h">
+      <Filter>Src\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Engine\WindowTypes.h">
+      <Filter>Src\Engine</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Input\InputAction.h">
+      <Filter>Src\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Input\PhysicalInputManager.h">
+      <Filter>Src\Input</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Input\GamepadConnectionObserver.h">
+      <Filter>Src\Input</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\File\File.h">
       <Filter>Src\File</Filter>
@@ -498,8 +846,38 @@
     <ClInclude Include="..\..\src\File\INIReader.h">
       <Filter>Src\File</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\File\PakFile.h">
-      <Filter>Src\File</Filter>
+    <ClInclude Include="..\..\src\Launch\EditorRunDescriptor.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunDiagnostics.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunDiagnosticsFile.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunOrchestration.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunResourceRouting.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeSession.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeTrace.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeTraceFile.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeTraceWriter.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\EditorRunSceneApplication.h">
+      <Filter>Src\Launch</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Launch\GameLaunchArguments.h">
+      <Filter>Src\Launch</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Game.h">
       <Filter>Src\Game</Filter>
@@ -516,7 +894,13 @@
     <ClInclude Include="..\..\src\Game\Data\CollisionDetector.h">
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\ColorStyle.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Game\Data\Data.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\DefeatedNpcExperience.h">
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Data\Effect.h">
@@ -549,6 +933,9 @@
     <ClInclude Include="..\..\src\Game\Data\Memo.h">
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\MemoPersistence.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Game\Data\NPC.h">
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
@@ -579,6 +966,9 @@
     <ClInclude Include="..\..\src\Game\GameManager\GameManager.h">
       <Filter>Src\Game\GameManager</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\GameManager\WorldInteractionResolver.h">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Game\GameManager\MenuController.h">
       <Filter>Src\Game\GameManager</Filter>
     </ClInclude>
@@ -588,10 +978,22 @@
     <ClInclude Include="..\..\src\Game\Menu\BottomMenu.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\TopMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\BuySellMenu.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\ColumnMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\ControllerFocusParticipant.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\ControllerTransferCoordinator.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\ControllerTransferPolicies.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\Dialog.h">
@@ -630,13 +1032,28 @@
     <ClInclude Include="..\..\src\Game\Menu\SkillsPanel.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\SlotGridController.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\StateMenu.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\System.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\SystemNotice.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\ControllerHelpOverlay.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\ControllerPromptPresenter.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\ToolTip.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\UIFocusManager.h">
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\YesNo.h">
@@ -669,6 +1086,9 @@
     <ClInclude Include="..\..\src\Types\CommonTypes.h">
       <Filter>Src\Types</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Types\PlatformDefinitions.h">
+      <Filter>Src\Types</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\Types\ComponentTypes.h">
       <Filter>Src\Types</Filter>
     </ClInclude>
@@ -682,9 +1102,6 @@
       <Filter>Src\Types</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Types\MapTypes.h">
-      <Filter>Src\Types</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\Types\PakTypes.h">
       <Filter>Src\Types</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Types\Types.h">
@@ -787,6 +1204,150 @@
     <ClInclude Include="..\..\src\Game\Data\WaterEffect.h">
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionBase.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionAttack.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionDeath.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionHide.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionHurt.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionJump.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionMagic.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionManager.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionRun.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionSit.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionSpecial.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionType.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionStand.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionWalk.h">
+      <Filter>Src\Game\Data\NPCAction</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Script\ScriptAPI.h">
+      <Filter>Src\Game\Script</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\TalkTextList.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\ChooseMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\TimerMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Component\ChooseTextButton.h">
+      <Filter>Src\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Component\ComponentRegistry.h">
+      <Filter>Src\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Component\ConfigDrivenPanel.h">
+      <Filter>Src\Component</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Image\PicDecoder.h">
+      <Filter>Src\Image</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\MapThumbnailMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\NpcInfoPanel.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\ResourceCatalog.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Platform\AndroidExternalStorage.h">
+      <Filter>Src\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Platform\AndroidProgramUpdate.h">
+      <Filter>Src\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Platform\MobileNetwork.h">
+      <Filter>Src\Platform</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\ResourceManager.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\ResourceManifest.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\ResourcePackCard.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\ResourcePackList.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\ResourceSelectScene.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\OnlineUpdateCatalog.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\HttpsDownload.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\ResourcePackageArchive.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\ResourceDownloadPlanner.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\ResourceDownloadPreparation.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\ResourceInstallTransaction.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Update\ArtifactChecksum.h">
+      <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\GambleMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\DiceGambleState.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\FishGameState.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\NewYearPeriod.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\MenuResource.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\MinimapToggleButton.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\PartnerEquipMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\PartnerHeadMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="jxqy-all-in-one.rc">
@@ -794,7 +1355,7 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\..\assets\config\logo.png">
+    <Image Include="..\..\assets\engine\config\logo.png">
       <Filter>资源文件</Filter>
     </Image>
     <Image Include="jxqy.ico">

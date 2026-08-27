@@ -28,8 +28,11 @@ namespace convert
 
     int replaceString(std::string& s, const std::string& oldstring, const std::string& newstring, int pos0 = 0);
     int replaceAllString(std::string& s, const std::string& oldstring, const std::string& newstring);
+    std::string vformatString(const char* format, va_list arguments);
     std::string formatString(const char* format, ...);
     void formatAppendString(std::string& str, const char* format, ...);
+    bool formatIntegerValues(const std::string& format, const std::vector<int>& values, std::string& result);
+    bool parseInteger(const std::string& text, int& value);
 
     std::vector<std::string> splitString(std::string str, std::string pattern);
     std::vector<std::string> splitString(const std::string & str, int length);

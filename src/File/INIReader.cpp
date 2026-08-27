@@ -6,13 +6,164 @@
 // https://github.com/benhoyt/inih
 
 #include <algorithm>
+#include "log.h"
 #include <cctype>
+#include <climits>
 #include <cstdlib>
+#include <cstring>
 #include "File.h"
 #include "ini.h"
 
 #include "../libconvert/libconvert.h"
 #include "INIReader.h"
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
+namespace
+{
+std::string toLowerAscii(std::string value)
+{
+	for (char& character : value)
+	{
+		if (character >= 'A' && character <= 'Z')
+		{
+			character = static_cast<char>(character + ('a' - 'A'));
+		}
+	}
+	return value;
+}
+
+bool isValidUtf8(const char* data, size_t length)
+{
+	if (data == nullptr)
+	{
+		return true;
+	}
+
+	size_t index = 0;
+	while (index < length)
+	{
+		unsigned char lead = static_cast<unsigned char>(data[index]);
+		if (lead < 0x80)
+		{
+			index++;
+			continue;
+		}
+
+		size_t extraBytes = 0;
+		uint32_t codePoint = 0;
+		if ((lead & 0xE0) == 0xC0)
+		{
+			extraBytes = 1;
+			codePoint = lead & 0x1F;
+			if (codePoint == 0)
+			{
+				return false;
+			}
+		}
+		else if ((lead & 0xF0) == 0xE0)
+		{
+			extraBytes = 2;
+			codePoint = lead & 0x0F;
+		}
+		else if ((lead & 0xF8) == 0xF0)
+		{
+			extraBytes = 3;
+			codePoint = lead & 0x07;
+		}
+		else
+		{
+			return false;
+		}
+
+		if (index + extraBytes >= length)
+		{
+			return false;
+		}
+
+		for (size_t offset = 1; offset <= extraBytes; offset++)
+		{
+			unsigned char continuation = static_cast<unsigned char>(data[index + offset]);
+			if ((continuation & 0xC0) != 0x80)
+			{
+				return false;
+			}
+			codePoint = (codePoint << 6) | (continuation & 0x3F);
+		}
+
+		if ((extraBytes == 1 && codePoint < 0x80) ||
+			(extraBytes == 2 && codePoint < 0x800) ||
+			(extraBytes == 3 && codePoint < 0x10000) ||
+			codePoint > 0x10FFFF ||
+			(codePoint >= 0xD800 && codePoint <= 0xDFFF))
+		{
+			return false;
+		}
+
+		index += extraBytes + 1;
+	}
+
+	return true;
+}
+
+std::string convertGbkToUtf8(const std::string& text)
+{
+#if defined(_WIN32)
+	if (text.empty())
+	{
+		return text;
+	}
+
+	int wideLength = MultiByteToWideChar(936, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+	if (wideLength <= 0)
+	{
+		return "";
+	}
+
+	std::wstring wideText(wideLength, L'\0');
+	MultiByteToWideChar(936, 0, text.data(), static_cast<int>(text.size()), &wideText[0], wideLength);
+
+	int utf8Length = WideCharToMultiByte(CP_UTF8, 0, wideText.data(), wideLength, nullptr, 0, nullptr, nullptr);
+	if (utf8Length <= 0)
+	{
+		return "";
+	}
+
+	std::string utf8Text(utf8Length, '\0');
+	WideCharToMultiByte(CP_UTF8, 0, wideText.data(), wideLength, &utf8Text[0], utf8Length, nullptr, nullptr);
+	return utf8Text;
+#else
+	return "";
+#endif
+}
+
+std::string normalizeIniTextEncoding(const char* data, size_t length)
+{
+	if (data == nullptr)
+	{
+		return "";
+	}
+
+	std::string text(data, length);
+	if (isValidUtf8(text.data(), text.size()))
+	{
+		return text;
+	}
+
+	std::string converted = convertGbkToUtf8(text);
+	if (!converted.empty() && isValidUtf8(converted.data(), converted.size()))
+	{
+		return converted;
+	}
+
+	return text;
+}
+}
 
 
 INIReader::INIReader()
@@ -21,6 +172,7 @@ INIReader::INIReader()
 
 INIReader::INIReader(const std::string& filename)
 {
+	fileName = filename;
 	std::unique_ptr<char[]> s;
 	int len;
 
@@ -33,7 +185,7 @@ INIReader::INIReader(const std::string& filename)
 	std::string newfName = fName;
 
 #ifndef _WIN32
-	convert::replaceAllString(newfName, u8"\\", u8"/");
+	convert::replaceAllString(newfName, "\\", "/");
 //	newfName = convert::lowerCase(newfName);
 #endif
 	File::readFile(newfName.c_str(), s, len);
@@ -42,7 +194,8 @@ INIReader::INIReader(const std::string& filename)
 		_error = -1;
 		return;
 	}
-    _error = ini_parse_string(s.get(), ValueHandler, this);
+	std::string content = normalizeIniTextEncoding(s.get(), static_cast<size_t>(len));
+    _error = ini_parse_string(content.c_str(), ValueHandler, this);
 }
 
 INIReader::INIReader(const std::unique_ptr<char[]>& s)
@@ -50,7 +203,8 @@ INIReader::INIReader(const std::unique_ptr<char[]>& s)
 	_error = -1;
 	if (s != nullptr)
 	{
-		_error = ini_parse_string(s.get(), ValueHandler, this);
+		std::string content = normalizeIniTextEncoding(s.get(), strlen(s.get()));
+		_error = ini_parse_string(content.c_str(), ValueHandler, this);
 	}
 }
 
@@ -70,10 +224,8 @@ int INIReader::ParseError() const
 
 std::string INIReader::Get(const std::string& section, const std::string& name, const std::string& default_value) const
 {
-	std::string s = section;
-	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-	auto sn = name;
-	std::transform(sn.begin(), sn.end(), sn.begin(), ::tolower);
+	std::string s = toLowerAscii(section);
+	std::string sn = toLowerAscii(name);
 
 	auto sec = map.sections.find(s);
 	if (sec != map.sections.end())
@@ -90,12 +242,8 @@ std::string INIReader::Get(const std::string& section, const std::string& name, 
 void INIReader::Set(const std::string& section, const std::string& name,
 	const std::string& value)
 {
-	int findSection = -1;
-	int findName = -1;
-	std::string s = section;
-	std::string sn = name;
-	std::transform(s.begin(), s.end(), s.begin(), ::tolower);
-	std::transform(sn.begin(), sn.end(), sn.begin(), ::tolower);
+	std::string s = toLowerAscii(section);
+	std::string sn = toLowerAscii(name);
 
 	auto sec = map.sections.find(s);
 	if (sec == map.sections.end())
@@ -109,6 +257,55 @@ void INIReader::Set(const std::string& section, const std::string& name,
 		sec->second.keys[sn] = value;
 	}
 
+}
+
+void INIReader::Remove(const std::string& section, const std::string& name)
+{
+	std::string normalizedSection = toLowerAscii(section);
+	std::string normalizedName = toLowerAscii(name);
+
+	auto sectionIterator = map.sections.find(normalizedSection);
+	if (sectionIterator == map.sections.end())
+	{
+		return;
+	}
+
+	sectionIterator->second.keys.erase(normalizedName);
+}
+
+bool INIReader::HasSection(const std::string& section) const
+{
+	return map.sections.find(toLowerAscii(section)) != map.sections.end();
+}
+
+std::vector<std::string> INIReader::GetSectionNames() const
+{
+	std::vector<std::string> sectionNames;
+	sectionNames.reserve(map.sections.size());
+	for (const auto& section : map.sections)
+	{
+		sectionNames.push_back(section.first);
+	}
+	return sectionNames;
+}
+
+std::vector<std::string> INIReader::GetSectionKeys(const std::string& section) const
+{
+	std::string normalizedSection = toLowerAscii(section);
+
+	std::vector<std::string> keyNames;
+	auto sectionIterator = map.sections.find(normalizedSection);
+	if (sectionIterator == map.sections.end())
+	{
+		return keyNames;
+	}
+
+	keyNames.reserve(sectionIterator->second.keys.size());
+	for (const auto& key : sectionIterator->second.keys)
+	{
+		keyNames.push_back(key.first);
+	}
+	return keyNames;
 }
 
 void INIReader::SetTime(const std::string& section, const std::string& name, UTime value)
@@ -131,46 +328,86 @@ void INIReader::SetReal(const std::string & section, const std::string & name, f
 
 void INIReader::SetBoolean(const std::string & section, const std::string & name, bool value)
 {
-	std::string v = value ? u8"1" : u8"0";
+	std::string v = value ? "1" : "0";
 	Set(section, name, v);
 }
 
 void INIReader::SetColor(const std::string& section, const std::string& name, uint32_t value)
 {
-	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
-	std::string col = std::to_string(colorData[0]) + u8"," + std::to_string(colorData[1]) + u8"," + std::to_string(colorData[2]); 
+	unsigned char colorData[4] =
+	{
+		(unsigned char)((value & 0xFF0000) >> 16),
+		(unsigned char)((value & 0xFF00) >> 8),
+		(unsigned char)(value & 0xFF),
+		(unsigned char)((value & 0xFF000000) >> 24)
+	};
+	std::string col = std::to_string(colorData[0]) + "," +
+		std::to_string(colorData[1]) + "," +
+		std::to_string(colorData[2]);
+	if (colorData[3] != 0xFF)
+	{
+		col += "," + std::to_string(colorData[3]);
+	}
 	Set(section, name, col);
 }
 
 uint32_t INIReader::GetColor(const std::string & section, const std::string & name, uint32_t value)
 {
-	unsigned char colorData[3] = { (unsigned char)((value & 0xFF0000) >> 16) ,(unsigned char)((value & 0xFF00) >> 8) , (unsigned char)((value & 0xFF)) };
-	std::string col = std::to_string(colorData[0]) + u8"," + std::to_string(colorData[1]) + u8"," + std::to_string(colorData[2]);
-	col = Get(section, name, col);
-	std::vector<std::string> c = convert::splitString(col, u8",");
-	for (size_t i = 0; i < (c.size() > 3 ? 3 : c.size()); i++)
+	std::string col = Get(section, name, "");
+	if (col.empty())
 	{
-		//char* end = nullptr;
-		//long n = strtol(c[i].c_str(), &end, 0);
-		//colorData[i] = (unsigned char)(end > c[i].c_str() ? n : colorData[i]);
-		if (!c[i].empty())
-		{
-			try
-			{
-				colorData[i] = (unsigned char)std::stoul(c[i]);
-			}
-			catch (const std::exception&)
-			{
+		return value;
+	}
 
-			}
+	std::vector<std::string> c = convert::splitString(col, ",");
+	if (c.size() == 1)
+	{
+		// Compatibility with early editor builds that incorrectly serialized a
+		// packed ARGB integer instead of the runtime RGB/RGBA tuple.
+		try
+		{
+			uint32_t packed = (uint32_t)std::stoul(c[0], nullptr, 0);
+			return packed <= 0xFFFFFF ? 0xFF000000 | packed : packed;
+		}
+		catch (const std::exception&)
+		{
+			return value;
 		}
 	}
-	return 0xFF000000 | ((colorData[0] << 16) + (colorData[1] << 8) + colorData[2]);
+
+	unsigned char colorData[4] =
+	{
+		(unsigned char)((value & 0xFF0000) >> 16),
+		(unsigned char)((value & 0xFF00) >> 8),
+		(unsigned char)(value & 0xFF),
+		0xFF
+	};
+	for (size_t i = 0; i < (c.size() > 4 ? 4 : c.size()); i++)
+	{
+		if (c[i].empty())
+			continue;
+		try
+		{
+			unsigned long component = std::stoul(c[i], nullptr, 0);
+			if (component <= 0xFF)
+			{
+				colorData[i] = (unsigned char)component;
+			}
+		}
+		catch (const std::exception&)
+		{
+			// Preserve the corresponding default component.
+		}
+	}
+	return ((uint32_t)colorData[3] << 24) |
+		((uint32_t)colorData[0] << 16) |
+		((uint32_t)colorData[1] << 8) |
+		(uint32_t)colorData[2];
 }
 
 UTime INIReader::GetTime(const std::string& section, const std::string& name, UTime default_value) const
 {
-	std::string valstr = Get(section, name, u8"");
+	std::string valstr = Get(section, name, "");
 	try
 	{
 		return (UTime)std::stoll(valstr, nullptr, 0);
@@ -183,7 +420,7 @@ UTime INIReader::GetTime(const std::string& section, const std::string& name, UT
 
 long INIReader::GetInteger(const std::string& section, const std::string& name, long default_value) const
 {
-	std::string valstr = Get(section, name, u8"");
+	std::string valstr = Get(section, name, "");
 	try
 	{
 		return std::stol(valstr, nullptr, 0);
@@ -196,7 +433,7 @@ long INIReader::GetInteger(const std::string& section, const std::string& name, 
 
 float INIReader::GetReal(const std::string& section, const std::string& name, float default_value) const
 {
-	std::string valstr = Get(section, name, u8"");
+	std::string valstr = Get(section, name, "");
 	try
 	{
 		return std::stod(valstr);
@@ -209,12 +446,12 @@ float INIReader::GetReal(const std::string& section, const std::string& name, fl
 
 bool INIReader::GetBoolean(const std::string& section, const std::string& name, bool default_value) const
 {
-	std::string valstr = Get(section, name, u8"");
+	std::string valstr = Get(section, name, "");
     // Convert to lower case to make std::string comparisons case-insensitive
-    std::transform(valstr.begin(), valstr.end(), valstr.begin(), ::tolower);
-    if (valstr == u8"true" || valstr == u8"yes" || valstr == u8"on" || valstr == u8"1")
+	valstr = toLowerAscii(valstr);
+    if (valstr == "true" || valstr == "yes" || valstr == "on" || valstr == "1")
         return true;
-    else if (valstr == u8"false" || valstr == u8"no" || valstr == u8"off" || valstr == u8"0")
+    else if (valstr == "false" || valstr == "no" || valstr == "off" || valstr == "0")
         return false;
     else
         return default_value;
@@ -222,28 +459,33 @@ bool INIReader::GetBoolean(const std::string& section, const std::string& name, 
 
 std::string INIReader::saveToString()
 {
-	std::string s = u8"";
+	std::string s = "";
 	for (auto it = map.sections.begin(); it != map.sections.end(); ++it)
 	{
-		s += u8"[" + it->first + u8"]\r\n";
+		s += "[" + it->first + "]\r\n";
 		for (auto it_2 = it->second.keys.begin(); it_2 != it->second.keys.end(); ++it_2)
 		{
-			s += it_2->first + u8"=" + it_2->second + u8"\r\n";
+			s += it_2->first + "=" + it_2->second + "\r\n";
 		}
-		s += u8"\r\n";
+		s += "\r\n";
 	}
 
 	return s;
 }
 
-void INIReader::saveToFile(const std::string & fileName)
+bool INIReader::saveToFile(const std::string & filename)
 {
 	std::string s = saveToString();
-	File::writeFile(fileName, s.c_str(), s.size());
-	/*auto fp = SDL_IOFromFile(fileName.c_str(), u8"wb");
+	if (s.size() > static_cast<size_t>(INT_MAX))
+	{
+		return false;
+	}
+	return File::writeFileChecked(
+		filename, s.data(), static_cast<int>(s.size()));
+	/*auto fp = SDL_IOFromFile(fileName.c_str(), "wb");
 	if (!fp)
 	{
-		GameLog::write(stderr, u8"Can not open file %s\n", fileName.c_str());
+		GameLog::write(stderr, "Can not open file %s\n", fileName.c_str());
 		return;
 	}
 	SDL_SeekIO(fp, 0, 0);
@@ -253,10 +495,7 @@ void INIReader::saveToFile(const std::string & fileName)
 
 std::string INIReader::MakeKey(const std::string& section, const std::string& name)
 {
-	std::string key = section + u8"=" + name;
-    // Convert to lower case to make section/name lookups case-insensitive
-    std::transform(key.begin(), key.end(), key.begin(), ::tolower);
-    return key;
+	return toLowerAscii(section + "=" + name);
 }
 
 int INIReader::ValueHandler(void* user, const char* section, const char* name,
@@ -270,4 +509,3 @@ int INIReader::ValueHandler(void* user, const char* section, const char* name,
 
     return 1;
 }
-

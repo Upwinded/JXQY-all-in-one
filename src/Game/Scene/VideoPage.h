@@ -1,5 +1,5 @@
 #pragma once
-#include "../../Component/Component.h"
+#include "../../Component/VideoPlayer.h"
 class VideoPage :
 	public VideoPlayer
 {
@@ -8,4 +8,5 @@ public:
 	VideoPage(const std::string & fileName);
 	virtual ~VideoPage();
 };
+
 

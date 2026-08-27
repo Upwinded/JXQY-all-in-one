@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../Engine/Engine.h"
 #include "../Types/Types.h"
 #include "../Element/Element.h"
 
@@ -12,7 +11,25 @@ struct WeatherDrop
 	float x = -1;
 	float y = -1;
 	float speed = 1.0f;
+	float horizontalSpeed = 0.0f;
+	float cameraParallax = 0.0f;
+	float swayPhase = 0.0f;
+	float swayAngularSpeed = 0.0f;
+	float swayAmplitude = 0.0f;
+	float visualAngle = 0.0f;
+	int visualWidth = 1;
+	int visualLength = 1;
 	int dropAlpha = 0;
+};
+
+struct LightSource
+{
+	Point position;
+	PointEx offset;
+	uint8_t red = 0xFF;
+	uint8_t green = 0xFF;
+	uint8_t blue = 0xFF;
+	float intensity = 1.0f;
 };
 
 class Weather :
@@ -25,7 +42,8 @@ public:
 private:
 	bool init = false;
 
-	WeatherType weatherType = wtNone;
+	WeatherType rainWeatherType = wtNone;
+	bool snowVisible = false;
 	DayType dayType = dtDay;
 	void resetDay();
 
@@ -44,7 +62,10 @@ private:
 	_shared_image lumMask = nullptr;
 
 	void createLumMask();
-	void drawElementLum();
+	bool isAmbientLumOverlayEnabled() const;
+	void collectLightSources(std::vector<LightSource>& lights, Point cenTile, PointEx offset, Point cenScreen, int xscal, int yscal, int tileHeightScal);
+	void drawLightingOverlay();
+	void mergeLightSources(std::vector<LightSource>& lights);
 
 	const UTime lightningIntervalMin = 5000;
 	UTime lastLightninUTime = 0;
@@ -64,11 +85,17 @@ private:
 	const int lnDropNum = 200;
 	const int snowDropNum = 250;
 
-	std::list<WeatherDrop> drops;
+	std::list<WeatherDrop> rainDrops;
+	std::list<WeatherDrop> snowDrops;
 
-	int getDropNum();
-	void resetDrops();
-	void resetDrop(WeatherDrop* drop, bool newdrop);
+	int getDropNum(WeatherType weatherType) const;
+	void resetDrops(std::list<WeatherDrop>& weatherDrops, WeatherType weatherType);
+	void resetDrop(WeatherDrop* drop, WeatherType weatherType, bool newdrop);
+	void drawDrops(const std::list<WeatherDrop>& weatherDrops);
+	void updateDrops(
+		std::list<WeatherDrop>& weatherDrops,
+		WeatherType weatherType,
+		PointEx cameraDelta);
 
 	void updateFade();
 
@@ -86,6 +113,7 @@ private:
 
 public:
 	void draw();
+	void drawElementLum();
 
 	unsigned char nowLum = 255;
 	unsigned char fadeLum = 0;
@@ -99,18 +127,26 @@ public:
 	void setFadeLum(unsigned char l);
 
 	void setLum(unsigned char l);
-	void setTime(unsigned char t);
+	void setTime(int time);
 
-	void setWeather(WeatherType wType, const std::string& configFIleName = u8"");
+	void setWeather(WeatherType weatherType, const std::string& configFileName = "");
+	void setRainWeather(WeatherType weatherType, const std::string& configFileName = "");
+	void setSnowVisible(bool visible);
 	void setDay(DayType dType);
 
 	void drawWeather();
 	void updateWeather();
 
 	void reset();
+	int getConfiguredRainDropCount() const { return customRainDropNum; }
+	int getConfiguredRainSpeed() const { return customRainSpeed; }
+	int getConfiguredBoltProbability() const { return customRainBoltProb; }
+	const std::string& getConfiguredRainSoundName() const { return customRainSoundName; }
+	bool hasCustomRainSoundChannel() const { return customRainSoundChannel != nullptr; }
+	bool isRaining() const { return rainWeatherType != wtNone; }
+	bool isSnowing() const { return snowVisible; }
 
 private:
 	virtual void onDraw();
 	virtual void onUpdate();
 };
-

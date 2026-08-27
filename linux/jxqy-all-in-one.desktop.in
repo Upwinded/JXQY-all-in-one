@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=剑侠情缘
+Name[en]=JXQY
+Comment=剑侠情缘游戏
+Exec="@JXQY_LINUX_DESKTOP_EXECUTABLE@"
+Icon=@JXQY_LINUX_DESKTOP_ICON@
+Terminal=false
+Categories=Game;RolePlaying;
+StartupNotify=true
+StartupWMClass=com.jxqy.jxqy-all-in-one
+X-GNOME-UsesNotifications=false

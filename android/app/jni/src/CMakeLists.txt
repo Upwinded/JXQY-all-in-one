@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.6)
+cmake_minimum_required(VERSION 3.11)
 
 project(jxqy_all_in_one)
 
@@ -10,15 +10,14 @@ set(ANDROID_STL "c++_shared")
 
 
 include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/devel/android/fmod/inc
-
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/devel/android/ffmpeg/${ANDROID_ABI}/include
 
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/minilzo
         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/miniz
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../cmake
 )
 
-add_library( fmod SHARED IMPORTED )
 add_library( libavcodec SHARED IMPORTED )
 add_library( libavformat SHARED IMPORTED )
 add_library( libavutil SHARED IMPORTED )
@@ -29,12 +28,6 @@ add_library( libavfilter SHARED IMPORTED )
 add_library( libavdevice SHARED IMPORTED )
 #add_library( libpostproc SHARED IMPORTED )
 
-
-set_target_properties(
-        fmod PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/devel/android/fmod/lib/${ANDROID_ABI}/libfmod.so
-        INTERFACE_INCLUDE_DIRECTORIES  ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/devel/android/fmod/inc
-)
 
 set_target_properties(
         libavcodec PROPERTIES
@@ -85,18 +78,41 @@ set_target_properties(
 find_package(SDL3 REQUIRED CONFIG)
 find_package(SDL3_ttf REQUIRED CONFIG)
 find_package(SDL3_image REQUIRED CONFIG)
+find_package(SDL3_mixer REQUIRED CONFIG)
 
-file(GLOB_RECURSE source_files
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/*
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/minilzo/*
-        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/*
+file(GLOB_RECURSE source_files CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/minilzo/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/*.c
         )
+
+list(APPEND source_files
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/miniz/miniz.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/miniz/miniz_zip.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/miniz/miniz_tinfl.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/miniz/miniz_tdef.c
+)
 
 list( REMOVE_ITEM source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/minilzo/testmini.c
 		${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/onelua.c
 		${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/lua.c
 )
+
+# Tests under src/tests belong to dedicated test targets and must never be
+# compiled into the Android game library.
+file(GLOB_RECURSE src_test_files
+		"${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/tests/*"
+)
+list(REMOVE_ITEM source_files ${src_test_files})
+
+# Windows-only automation launchers are separate helper targets in the root
+# build and must not be compiled into the Android shared library.
+file(GLOB_RECURSE src_automation_files
+		"${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/automation/*"
+)
+list(REMOVE_ITEM source_files ${src_automation_files})
 
 file(GLOB_RECURSE EXCLUDE_TESTES_FILES
 		"${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/testes/*"
@@ -125,6 +141,7 @@ target_link_libraries( # Specifies the target library.
         SDL3::SDL3
 	SDL3_image::SDL3_image
 	SDL3_ttf::SDL3_ttf
+	SDL3_mixer::SDL3_mixer
         libavcodec
         libavformat
         libavutil
@@ -134,5 +151,4 @@ target_link_libraries( # Specifies the target library.
 #       libfdk-aac
         libavdevice
 #        libpostproc
-        fmod
         )

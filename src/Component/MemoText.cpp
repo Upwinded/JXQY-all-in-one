@@ -1,10 +1,21 @@
 #include "MemoText.h"
+#include "ComponentRegistry.h"
+
+namespace
+{
+	bool registeredMemoText = []
+	{
+		ComponentRegistry::getInstance().registerType("MemoText",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<MemoText>(); });
+		return true;
+	}();
+}
 
 
 MemoText::MemoText()
 {
-	priority = epMenu;
-	name = u8"Memo";
+	setPriority(epMenu);
+	name = "Memo";
 	elementType = etMenu;
 	canDrag = true;
 }
@@ -24,13 +35,13 @@ void MemoText::initFromIni(INIReader & ini)
 		addChild(mstr[i]);
 	}
 
-	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
-	name = ini.Get(u8"Init", u8"Name", name);
-	fontSize = ini.GetInteger(u8"Init", u8"Font", fontSize);
-	color = ini.GetColor(u8"Init", u8"Color", color);
+	rect.x = ini.GetInteger("Init", "Left", rect.x);
+	rect.y = ini.GetInteger("Init", "Top", rect.y);
+	rect.w = ini.GetInteger("Init", "Width", rect.w);
+	rect.h = ini.GetInteger("Init", "Height", rect.h);
+	name = ini.Get("Init", "Name", name);
+	fontSize = ini.GetInteger("Init", "Font", fontSize);
+	color = ini.GetColor("Init", "Color", color);
 	for (size_t i = 0; i < MEMO_LINE; i++)
 	{
 		mstr[i]->rect.x = 0;
@@ -51,3 +62,4 @@ void MemoText::freeResource()
 	mstr.resize(0);
 	removeAllChild();
 }
+

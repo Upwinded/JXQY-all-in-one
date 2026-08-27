@@ -1,30 +1,49 @@
 #pragma once
 
+#include <memory>
+
+struct Rect
+{
+	int x;
+	int y;
+	int w;
+	int h;
+
+	bool PointInRect(int pointX, int pointY)
+	{
+		return pointX >= x && pointX < x + w &&
+			pointY >= y && pointY < y + h;
+	}
+};
+
+using Rect_t = Rect;
+using _rect = std::shared_ptr<Rect_t>;
+
 template <class T>
 struct PointBase
 {
 	T x;
 	T y;
 
-	bool operator== (PointBase<T> &dest)
+	bool operator== (const PointBase<T> &dest) const
 	{
 		return x==dest.x && y==dest.y;
 	}
-	bool operator!= (PointBase<T>& dest)
+	bool operator!= (const PointBase<T>& dest) const
 	{
 		return x != dest.x || y != dest.y;
 	}
-	PointBase operator+ (PointBase<T>& dest)
+	PointBase operator+ (const PointBase<T>& dest) const
 	{
 		PointBase<T> newPoint{ x + dest.x, y + dest.y };
 		return newPoint;
 	}
-	PointBase operator- (PointBase<T>& dest)
+	PointBase operator- (const PointBase<T>& dest) const
 	{
 		PointBase<T> newPoint{ x - dest.x, y - dest.y };
 		return newPoint;
 	}
-	bool is_zero()
+	bool is_zero() const
 	{
 		return (x == 0) && (y == 0);
 	}
@@ -50,14 +69,15 @@ enum ElementPriority
 	
 	epFadeMask = 0x40,
 	epPlayer = 0x50,
-	epCamera = 0x51,
+
 	epGameManager = 0x52,
 	epEffectManager = 0x55,
 
 	epNPC = 0x5A,
 	epOBJ = 0x5B,
 	epMap = 0x70,
-	epWeather = 0x90
+	epWeather = 0x90,
+	epCamera = 0xA0
 };
 
 enum ElementType
@@ -114,4 +134,5 @@ enum ElementResult
 	erLifeExhaust		= 0b100'0000'0000'0000'0000,
 	erExplode			= 0b1000'0000'0000'0000'0000,
 	erRunDeathScript	= 0b1'0000'0000'0000'0000'0000,
+	erReturnToTitle		= 0b10'0000'0000'0000'0000'0000,
 };

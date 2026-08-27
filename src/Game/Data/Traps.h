@@ -1,23 +1,38 @@
 #pragma once
 #include "../../File/INIReader.h"
-#include "../../File/PakFile.h"
 #include "../GameTypes.h"
 #include "../../libconvert/libconvert.h"
+
+#include <set>
 
 class Traps
 {
 public:
 	Traps();
+	explicit Traps(const std::shared_ptr<INIReader>& iniReader);
 	virtual ~Traps();
+
+	static constexpr int MinimumScriptIndex = 1;
+	static constexpr int MaximumScriptIndex = 255;
+	static constexpr int MaximumTriggeredIndicesFileBytes = 4096;
+	static bool isValidIndex(int index);
 
 	std::string get(const std::string & mapName, int index);
 	void set(const std::string & mapName, int index, const std::string & value);
+	bool hasTriggered(int index) const;
+	void markTriggered(int index);
+	void reactivate(int index);
+	void beginMapVisit();
 	void load();
-	void save();
+	bool saveDefinitions();
+	bool save();
 	void freeResource();
 
 private:
+	void loadDefinitions();
+	void loadTriggeredIndices();
+	bool saveTriggeredIndices() const;
+	void removeInvalidZeroKeys();
 	std::shared_ptr<INIReader> ini = nullptr;
-
+	std::set<int> triggeredIndices;
 };
-

@@ -1,29 +1,168 @@
-﻿#include "GameManager.h"
-#include <thread>
+#include "GameManager.h"
+#include "../../Engine/Engine.h"
+#include "RuntimeSaveGenerationPolicy.h"
+#include "ScriptRuntimeState.h"
+#include "../Data/TimeStopUpdateGate.h"
+#include "../../File/File.h"
+#include "../../File/INIReader.h"
+#include "../../File/RootedResourceReader.h"
+#include "../../File/log.h"
+#include "../../Input/PhysicalInputManager.h"
+#include "../../Resource/ResourceManager.h"
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <ctime>
+#include <climits>
+#include <cmath>
+#include <cstring>
+
+namespace
+{
+bool ownerCheckpointCanContinue(
+	const std::function<bool()>& ownerCheckpoint) noexcept
+{
+	if (!ownerCheckpoint)
+	{
+		return true;
+	}
+	try
+	{
+		return ownerCheckpoint();
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+bool canQueuePlayerInteraction(std::shared_ptr<Player> player)
+{
+	if (player == nullptr)
+	{
+		return false;
+	}
+	auto actionActor = player->getActionActor();
+	return actionActor != nullptr && actionActor->nowAction != acDeath && actionActor->nowAction != acHide;
+}
+
+NPCActionType getInteractionMoveAction(std::shared_ptr<Player> player, bool running)
+{
+	if (running
+		&& player != nullptr
+		&& player->canRun
+		&& (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN)
+			|| player->thew > MIN_THEW_LIMIT_TO_RUN))
+	{
+		return acRun;
+	}
+	return acWalk;
+}
+
+const EditorRun::SearchRoot* findPreparedSearchRoot(
+	const EditorRun::ResolvedTargetFile& file,
+	const std::vector<EditorRun::SearchRoot>& roots)
+{
+	return file.searchRootIndex < roots.size()
+		? &roots[file.searchRootIndex]
+		: nullptr;
+}
+
+constexpr std::size_t MaximumEditorRunPlayerTemplateBytes =
+	1024 * 1024;
+struct EditorRunPlayerTemplateCandidate
+{
+	const char* sourceVirtualPath;
+	const char* isolatedVirtualPath;
+	int characterIndex;
+};
+
+constexpr std::array<EditorRunPlayerTemplateCandidate, 2>
+	EditorRunPlayerTemplateCandidates =
+	{
+		EditorRunPlayerTemplateCandidate
+		{
+			"ini/save/player0.ini",
+			"save/game/player0.ini",
+			0
+		},
+		EditorRunPlayerTemplateCandidate
+		{
+			"ini/save/player.ini",
+			"save/game/player.ini",
+			-1
+		}
+	};
+}
+
+int GameManager::getBindValue(const std::string& bindPath)
+{
+	if (bindPath == "player.level") return player->level;
+	if (bindPath == "player.exp") return player->exp;
+	if (bindPath == "player.levelUpExp") return player->levelUpExp;
+	if (bindPath == "player.info.attack") return player->info.attack;
+	if (bindPath == "player.info.defend") return player->info.defend;
+	if (bindPath == "player.info.evade") return player->info.evade;
+	if (bindPath == "player.life") return player->life;
+	if (bindPath == "player.info.lifeMax") return player->info.lifeMax;
+	if (bindPath == "player.thew") return player->thew;
+	if (bindPath == "player.info.thewMax") return player->info.thewMax;
+	if (bindPath == "player.mana") return player->mana;
+	if (bindPath == "player.info.manaMax") return player->info.manaMax;
+	if (bindPath == "player.rage") return player->rage;
+	if (bindPath == "player.rageMax") return player->rageMax;
+	if (bindPath == "player.money") return player->money;
+	return 0;
+}
 
 
 GameManager * GameManager::this_ = nullptr;
 
 
-GameManager::GameManager()
+GameManager::GameManager() :
+	GameManager(ScriptLibraryProfile::Full, nullptr)
 {
+}
+
+GameManager::GameManager(
+	const EditorRun::SceneTarget& target,
+	const EditorRun::PreparedResourcePhase& preparedResources,
+	EditorRun::RuntimeTraceWriter* writer) :
+	GameManager(ScriptLibraryProfile::EditorRunSafe, writer)
+{
+	editorRunMode = true;
+	editorRunTarget = target;
+	editorRunPreparedTarget = preparedResources.target;
+	editorRunSearchRoots = preparedResources.orderedSearchRoots;
+}
+
+GameManager::GameManager(
+	ScriptLibraryProfile scriptLibraryProfile,
+	EditorRun::RuntimeTraceWriter* writer) :
+	script(scriptLibraryProfile, writer),
+	scriptAPI(this)
+{
+	runtimeTraceWriter = writer;
+	varList.setRuntimeTraceContext(
+		writer,
+		[this]()
+		{
+			return script.currentExecutionId();
+		});
 	this_ = this;
 	// autoFreeResourceOnExit = true;
 
-	name = u8"GameManager";
+	name = "GameManager";
     canCallBack = true;
 
 	inThread.store(false);
-	loadThreadOver.store(false);
 
 	drawFullScreen = true;
 	rectFullScreen = true;
-	priority = epMap;
+	setPriority(epMap);
 	result = erNone;
 	init();
-
+	
 }
 
 GameManager::~GameManager()
@@ -51,6 +190,8 @@ void GameManager::init()
 
 	npcManager->setPlayer(player);
 
+	talkTextList.load();
+
 	addChild(controller);
 	addChild(menu);
 	addChild(weather);
@@ -65,45 +206,872 @@ void GameManager::init()
 	controller->addChild(effectManager);
 }
 
-void GameManager::initMenuWithThread()
+void GameManager::setStartupIntegerVariables(const std::vector<std::pair<std::string, int>>& variables)
 {
-	inThread.store(true);
-	loadThreadOver.store(false);
-	loadingDisplaying.store(true);
-	std::string str = u8"创建UI中";
-	std::vector<_shared_image> loadingImage;
-	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8".", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"..", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"...", 50, 0xFFFFFFFF));
-
-	std::thread t(&GameManager::initMenuThread, this);
-	//std::thread t(&GameManager::loadingDisplayThread, this, loadingImage);
-	//t.detach();
-
-	loadingDisplayThread(loadingImage);
-	t.join();
-	inThread.store(false);
-
-	std::atomic_thread_fence(std::memory_order_acquire);
-
-	controller->init();
+	startupIntegerVariables = variables;
 }
 
-void GameManager::initMenuThread()
+void GameManager::setExpectedIntegerVariables(const std::vector<std::pair<std::string, int>>& variables)
 {
-	this_->initMenu();
-    //std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver.store(true);
+	expectedIntegerVariables = variables;
 }
 
-void GameManager::initMenu()
+void GameManager::setAutomationHooksEnabled(bool enabled)
 {
-	menu->init();
-	if (!inThread)
+	automationHooksEnabled = enabled;
+}
+
+bool GameManager::areAutomationHooksEnabled() const noexcept
+{
+	return automationHooksEnabled;
+}
+
+void GameManager::setExitAfterNewGameScript(bool enabled)
+{
+	exitAfterNewGameScript = enabled;
+}
+
+void GameManager::setPostNewGameAutomationWaitMilliseconds(UTime milliseconds)
+{
+	postNewGameAutomationWaitMilliseconds = milliseconds;
+}
+
+bool GameManager::hasAutomationCheckFailed() const
+{
+	return automationCheckFailed;
+}
+
+bool GameManager::isEditorRunMode() const noexcept
+{
+	return editorRunMode;
+}
+
+bool GameManager::hasEditorRunSceneApplicationResult() const noexcept
+{
+	return editorRunSceneApplicationCompleted;
+}
+
+const EditorRun::SceneApplicationResult&
+	GameManager::getEditorRunSceneApplicationResult() const noexcept
+{
+	return editorRunSceneApplicationResult;
+}
+
+bool GameManager::initializeEditorRunPlayerBaseline(
+	std::string& failureMessage,
+	std::string& templateVirtualPath,
+	std::string& isolatedPlayerVirtualPath,
+	int& characterIndex,
+	bool& resourceMissing)
+{
+	failureMessage.clear();
+	templateVirtualPath.clear();
+	isolatedPlayerVirtualPath.clear();
+	characterIndex = -1;
+	resourceMissing = false;
+	if (!editorRunMode ||
+		player == nullptr ||
+		!File::hasEditorRunFileLayout())
 	{
-		controller->init();
+		failureMessage =
+			"Editor-run isolated file layout or player runtime is unavailable";
+		return false;
 	}
+
+	RootedResourceReader::Result templateBytes;
+	bool templateSelected = false;
+	for (const EditorRun::SearchRoot& searchRoot :
+		editorRunSearchRoots)
+	{
+		for (const EditorRunPlayerTemplateCandidate& candidate :
+			EditorRunPlayerTemplateCandidates)
+		{
+			templateBytes =
+				searchRoot.kind ==
+						EditorRun::SearchRootKind::Overlay
+					? RootedResourceReader::
+						readBoundedFileFromRoot(
+							searchRoot.anchor,
+							candidate.sourceVirtualPath,
+							MaximumEditorRunPlayerTemplateBytes)
+					: RootedResourceReader::
+						readBoundedFileFromRoot(
+							searchRoot.root,
+							candidate.sourceVirtualPath,
+							MaximumEditorRunPlayerTemplateBytes);
+			if (templateBytes.status ==
+				RootedResourceReader::Status::NotFound)
+			{
+				continue;
+			}
+			templateVirtualPath =
+				candidate.sourceVirtualPath;
+			isolatedPlayerVirtualPath =
+				candidate.isolatedVirtualPath;
+			characterIndex =
+				candidate.characterIndex;
+			if (!templateBytes.succeeded())
+			{
+				failureMessage =
+					"Editor-run player template could not be read from its prepared resource root";
+				return false;
+			}
+			templateSelected = true;
+			break;
+		}
+		if (templateSelected)
+		{
+			break;
+		}
+	}
+
+	if (!templateSelected)
+	{
+		resourceMissing = true;
+		failureMessage =
+			"Editor-run player template is missing";
+		return false;
+	}
+	if (templateBytes.bytes.empty() ||
+		templateBytes.bytes.size() >
+			static_cast<std::size_t>(INT_MAX) ||
+		std::find(
+			templateBytes.bytes.begin(),
+			templateBytes.bytes.end(),
+			std::uint8_t{ 0 }) != templateBytes.bytes.end())
+	{
+		failureMessage =
+			"Editor-run player template is invalid";
+		return false;
+	}
+
+	auto templateData =
+		std::make_unique<char[]>(templateBytes.bytes.size() + 1);
+	std::memcpy(
+		templateData.get(),
+		templateBytes.bytes.data(),
+		templateBytes.bytes.size());
+	templateData[templateBytes.bytes.size()] = '\0';
+	INIReader templateIni(templateData);
+	const std::string expectedNpcIni =
+		templateIni.Get("Init", "NpcIni", "");
+	if (templateIni.ParseError() != 0 ||
+		!templateIni.HasSection("Init") ||
+		expectedNpcIni.empty() ||
+		templateIni.GetInteger("Init", "Level", 0) < 1 ||
+		templateIni.GetInteger("Init", "LifeMax", 0) <= 0 ||
+		templateIni.GetInteger("Init", "ThewMax", 0) <= 0 ||
+		templateIni.GetInteger("Init", "ManaMax", 0) <= 0)
+	{
+		failureMessage =
+			"Editor-run player template does not contain a runnable Init baseline";
+		return false;
+	}
+
+	if (!File::writeFileChecked(
+			isolatedPlayerVirtualPath,
+			templateBytes.bytes.data(),
+			static_cast<int>(templateBytes.bytes.size())))
+	{
+		failureMessage =
+			"Editor-run player template could not be written to isolated save state";
+		return false;
+	}
+
+	std::unique_ptr<char[]> persistedTemplate;
+	int persistedLength = 0;
+	if (!File::readFile(
+			isolatedPlayerVirtualPath,
+			persistedTemplate,
+			persistedLength,
+			static_cast<int>(
+				MaximumEditorRunPlayerTemplateBytes)) ||
+		persistedTemplate == nullptr ||
+		persistedLength !=
+			static_cast<int>(templateBytes.bytes.size()) ||
+		std::memcmp(
+			persistedTemplate.get(),
+			templateBytes.bytes.data(),
+			templateBytes.bytes.size()) != 0)
+	{
+		failureMessage =
+			"Editor-run isolated player template verification failed";
+		return false;
+	}
+
+	global.data.characterIndex = characterIndex;
+	player->load(characterIndex);
+	player->calInfo();
+	if (player->npcIni != expectedNpcIni ||
+		player->level < 1 ||
+		player->getLifeMax() <= 0 ||
+		player->getThewMax() <= 0 ||
+		player->getManaMax() <= 0 ||
+		player->res.stand.imageFile.empty() ||
+		player->res.stand.imagePackage == nullptr)
+	{
+		failureMessage =
+			"Editor-run player template did not initialize runnable attributes and stand resources";
+		return false;
+	}
+	return true;
+}
+
+EditorRun::SceneApplicationResult GameManager::applyEditorRunSceneTarget()
+{
+	enum class ApplicationStage
+	{
+		IntegerVariable,
+		Map,
+		Npc,
+		Object,
+		PlayerPosition,
+		EntryScript
+	};
+	ApplicationStage applicationStage =
+		ApplicationStage::IntegerVariable;
+	std::string playerInitializationFailure;
+	std::string playerTemplateVirtualPath;
+	std::string isolatedPlayerVirtualPath;
+	int playerCharacterIndex = -1;
+	bool playerResourceMissing = false;
+	const bool deferredResourceLookup =
+		editorRunPreparedTarget.map.searchRootIndex ==
+			EditorRun::SearchAllResourceRoots;
+	const bool playerBaselineReady =
+		initializeEditorRunPlayerBaseline(
+		playerInitializationFailure,
+		playerTemplateVirtualPath,
+		isolatedPlayerVirtualPath,
+		playerCharacterIndex,
+		playerResourceMissing);
+	if (!playerBaselineReady &&
+		(!deferredResourceLookup || !playerResourceMissing))
+	{
+		EditorRun::SceneApplicationResult result;
+		result.error =
+			EditorRun::SceneApplicationError::
+				PlayerInitializationFailed;
+		result.diagnosticCode =
+			"editor_run.target.player_initialization_failed";
+		result.fieldPath = "target";
+		result.virtualPath =
+			std::move(playerTemplateVirtualPath);
+		result.message =
+			std::move(playerInitializationFailure);
+		return result;
+	}
+	if (!playerBaselineReady)
+	{
+		GameLog::write(
+			"GameManager: editor-run player resource is unavailable; continuing without a player baseline path=%s reason=%s\n",
+			playerTemplateVirtualPath.c_str(),
+			playerInitializationFailure.c_str());
+	}
+
+	bool editorRunWorldMutationStarted = false;
+	EditorRun::SceneApplicationCallbacks callbacks;
+	callbacks.setIntegerVariable =
+		[this, &applicationStage](
+			const std::string& name,
+			std::int32_t value)
+		{
+			applicationStage =
+				ApplicationStage::IntegerVariable;
+			if (name.empty())
+			{
+				return false;
+			}
+			varList.ensureInitialized();
+			varList.setInteger(name, static_cast<int>(value));
+			return true;
+		};
+	callbacks.loadMap =
+		[this,
+		 &applicationStage,
+		 &editorRunWorldMutationStarted](
+			const EditorRun::ResolvedTargetFile& file)
+		{
+			applicationStage = ApplicationStage::Map;
+			if (file.searchRootIndex ==
+				EditorRun::SearchAllResourceRoots)
+			{
+				const bool loaded =
+					scriptAPI.loadMapFromEditorRunRoots(
+						editorRunSearchRoots,
+						file.virtualPath,
+						false);
+				if (loaded)
+				{
+					editorRunWorldMutationStarted = true;
+					return true;
+				}
+				GameLog::write(
+					"GameManager: editor-run MAP resource is unavailable; using an empty map path=%s\n",
+					file.virtualPath.c_str());
+				map->freeResource();
+				effectManager->clearEffect();
+				npcManager->clearNPC();
+				objectManager->clearObj();
+				traps.freeResource();
+				global.data.mapName.clear();
+				global.data.npcName.clear();
+				global.data.objName.clear();
+				editorRunWorldMutationStarted = true;
+				return true;
+			}
+			const EditorRun::SearchRoot* root =
+				findPreparedSearchRoot(
+					file,
+					editorRunSearchRoots);
+			if (root == nullptr ||
+				!scriptAPI.loadMapFromExactRoot(
+					*root,
+					file.virtualPath,
+					false))
+			{
+				return false;
+			}
+			editorRunWorldMutationStarted = true;
+			return true;
+		};
+	callbacks.loadNpc =
+		[this, &applicationStage](
+			const EditorRun::ResolvedTargetFile& file)
+		{
+			applicationStage = ApplicationStage::Npc;
+			if (file.searchRootIndex ==
+				EditorRun::SearchAllResourceRoots)
+			{
+				if (scriptAPI.loadNPCFromEditorRunRoots(
+					editorRunSearchRoots,
+					file.virtualPath))
+				{
+					return true;
+				}
+				GameLog::write(
+					"GameManager: editor-run NPC resource is unavailable; using an empty NPC list path=%s\n",
+					file.virtualPath.c_str());
+				npcManager->clearNPC();
+				global.data.npcName.clear();
+				return true;
+			}
+			const EditorRun::SearchRoot* root =
+				findPreparedSearchRoot(
+					file,
+					editorRunSearchRoots);
+			return root != nullptr &&
+				scriptAPI.loadNPCFromExactRoot(
+					*root,
+					file.virtualPath);
+		};
+	callbacks.loadObject =
+		[this, &applicationStage](
+			const EditorRun::ResolvedTargetFile& file)
+		{
+			applicationStage = ApplicationStage::Object;
+			if (file.searchRootIndex ==
+				EditorRun::SearchAllResourceRoots)
+			{
+				if (scriptAPI.loadObjectFromEditorRunRoots(
+					editorRunSearchRoots,
+					file.virtualPath))
+				{
+					return true;
+				}
+				GameLog::write(
+					"GameManager: editor-run object resource is unavailable; using an empty object list path=%s\n",
+					file.virtualPath.c_str());
+				objectManager->clearObj();
+				global.data.objName.clear();
+				return true;
+			}
+			const EditorRun::SearchRoot* root =
+				findPreparedSearchRoot(
+					file,
+					editorRunSearchRoots);
+			return root != nullptr &&
+				scriptAPI.loadObjectFromExactRoot(
+					*root,
+					file.virtualPath);
+		};
+	callbacks.setPlayerPositionAndCamera =
+		[this,
+		 &applicationStage,
+		 deferredResourceLookup,
+		 playerBaselineReady](
+			std::int32_t x,
+			std::int32_t y)
+		{
+			applicationStage =
+				ApplicationStage::PlayerPosition;
+			if (!deferredResourceLookup)
+			{
+				return scriptAPI.setEditorRunPlayerPositionAndCamera(x, y);
+			}
+			if (!playerBaselineReady)
+			{
+				GameLog::write(
+					"GameManager: editor-run player position was skipped because the player resource is empty\n");
+				return true;
+			}
+			if (!scriptAPI.setEditorRunPlayerPositionAndCamera(x, y))
+			{
+				GameLog::write(
+					"GameManager: editor-run player position is unavailable for the current map; continuing\n");
+			}
+			return true;
+		};
+	callbacks.runEntryScript =
+		[this, &applicationStage](
+			const EditorRun::ResolvedTargetFile& file)
+		{
+			applicationStage = ApplicationStage::EntryScript;
+			if (file.searchRootIndex ==
+				EditorRun::SearchAllResourceRoots)
+			{
+				const bool wasInEvent = inEvent;
+				inEvent = true;
+				ExactScriptExecutionResult scriptResult;
+				try
+				{
+					scriptResult =
+						scriptAPI.runScriptFromEditorRunRoots(
+							editorRunSearchRoots,
+							file.virtualPath);
+				}
+				catch (...)
+				{
+					inEvent = wasInEvent;
+					throw;
+				}
+				inEvent = wasInEvent;
+				EditorRun::EntryScriptExecutionResult result;
+				result.line = scriptResult.line;
+				result.column = scriptResult.column;
+				result.message = scriptResult.message;
+				switch (scriptResult.status)
+				{
+				case ExactScriptExecutionStatus::Success:
+					result.status =
+						EditorRun::EntryScriptExecutionStatus::Success;
+					break;
+				case ExactScriptExecutionStatus::LoadFailed:
+					result.status =
+						EditorRun::EntryScriptExecutionStatus::LoadFailed;
+					break;
+				case ExactScriptExecutionStatus::RuntimeFailed:
+					result.status =
+						EditorRun::EntryScriptExecutionStatus::RuntimeFailed;
+					break;
+				}
+				if (result.status !=
+					EditorRun::EntryScriptExecutionStatus::Success)
+				{
+					GameLog::write(
+						"GameManager: editor-run entry script is unavailable; continuing without it path=%s line=%u column=%u message=%s\n",
+						file.virtualPath.c_str(),
+						result.line,
+						result.column,
+						result.message.c_str());
+					result = {};
+				}
+				return result;
+			}
+			const EditorRun::SearchRoot* root =
+				findPreparedSearchRoot(
+					file,
+					editorRunSearchRoots);
+			if (root == nullptr)
+			{
+				EditorRun::EntryScriptExecutionResult result;
+				result.status =
+					EditorRun::EntryScriptExecutionStatus::
+						LoadFailed;
+				result.message =
+					"Editor-run entry script prepared root is unavailable";
+				return result;
+			}
+			const bool wasInEvent = inEvent;
+			inEvent = true;
+			ExactScriptExecutionResult scriptResult;
+			try
+			{
+				scriptResult =
+					scriptAPI.runScriptFromExactRoot(
+						*root,
+						file.virtualPath);
+			}
+			catch (...)
+			{
+				inEvent = wasInEvent;
+				throw;
+			}
+			inEvent = wasInEvent;
+			EditorRun::EntryScriptExecutionResult result;
+			result.line = scriptResult.line;
+			result.column = scriptResult.column;
+			result.message = scriptResult.message;
+			switch (scriptResult.status)
+			{
+			case ExactScriptExecutionStatus::Success:
+				result.status =
+					EditorRun::EntryScriptExecutionStatus::
+						Success;
+				break;
+			case ExactScriptExecutionStatus::LoadFailed:
+				result.status =
+					EditorRun::EntryScriptExecutionStatus::
+						LoadFailed;
+				break;
+			case ExactScriptExecutionStatus::RuntimeFailed:
+			default:
+				result.status =
+					EditorRun::EntryScriptExecutionStatus::
+						RuntimeFailed;
+				break;
+			}
+			return result;
+		};
+	EditorRun::SceneApplicationResult result;
+	try
+	{
+		result = EditorRun::applyEditorRunScene(
+			editorRunTarget,
+			editorRunPreparedTarget,
+			callbacks);
+	}
+	catch (const std::exception& error)
+	{
+		switch (applicationStage)
+		{
+		case ApplicationStage::IntegerVariable:
+			result.error =
+				EditorRun::SceneApplicationError::
+					IntegerVariableFailed;
+			result.diagnosticCode =
+				"editor_run.target.variable_exception";
+			result.fieldPath = "variables";
+			break;
+		case ApplicationStage::Map:
+			result.error =
+				EditorRun::SceneApplicationError::MapLoadFailed;
+			result.diagnosticCode =
+				"editor_run.target.map_exception";
+			result.fieldPath = "target.map";
+			break;
+		case ApplicationStage::Npc:
+			result.error =
+				EditorRun::SceneApplicationError::NpcLoadFailed;
+			result.diagnosticCode =
+				"editor_run.target.npc_exception";
+			result.fieldPath = "target.npc";
+			break;
+		case ApplicationStage::Object:
+			result.error =
+				EditorRun::SceneApplicationError::
+					ObjectLoadFailed;
+			result.diagnosticCode =
+				"editor_run.target.object_exception";
+			result.fieldPath = "target.object";
+			break;
+		case ApplicationStage::PlayerPosition:
+			result.error =
+				EditorRun::SceneApplicationError::
+					PlayerPositionFailed;
+			result.diagnosticCode =
+				"editor_run.target.position_exception";
+			result.fieldPath = "target.player";
+			break;
+		case ApplicationStage::EntryScript:
+		default:
+			result.error =
+				EditorRun::SceneApplicationError::
+					EntryScriptRuntimeFailed;
+			result.diagnosticCode =
+				"editor_run.target.entry_script_exception";
+			result.fieldPath = "target.entry_script";
+			break;
+		}
+		result.message =
+			std::string(
+				"Editor-run scene callback threw: ") +
+			error.what();
+	}
+	catch (...)
+	{
+		switch (applicationStage)
+		{
+		case ApplicationStage::IntegerVariable:
+			result.error =
+				EditorRun::SceneApplicationError::
+					IntegerVariableFailed;
+			result.diagnosticCode =
+				"editor_run.target.variable_exception";
+			result.fieldPath = "variables";
+			break;
+		case ApplicationStage::Map:
+			result.error =
+				EditorRun::SceneApplicationError::MapLoadFailed;
+			result.diagnosticCode =
+				"editor_run.target.map_exception";
+			result.fieldPath = "target.map";
+			break;
+		case ApplicationStage::Npc:
+			result.error =
+				EditorRun::SceneApplicationError::NpcLoadFailed;
+			result.diagnosticCode =
+				"editor_run.target.npc_exception";
+			result.fieldPath = "target.npc";
+			break;
+		case ApplicationStage::Object:
+			result.error =
+				EditorRun::SceneApplicationError::
+					ObjectLoadFailed;
+			result.diagnosticCode =
+				"editor_run.target.object_exception";
+			result.fieldPath = "target.object";
+			break;
+		case ApplicationStage::PlayerPosition:
+			result.error =
+				EditorRun::SceneApplicationError::
+					PlayerPositionFailed;
+			result.diagnosticCode =
+				"editor_run.target.position_exception";
+			result.fieldPath = "target.player";
+			break;
+		case ApplicationStage::EntryScript:
+		default:
+			result.error =
+				EditorRun::SceneApplicationError::
+					EntryScriptRuntimeFailed;
+			result.diagnosticCode =
+				"editor_run.target.entry_script_exception";
+			result.fieldPath = "target.entry_script";
+			break;
+		}
+		result.message =
+			"Editor-run scene callback threw an unknown exception";
+	}
+	if (!result.succeeded() &&
+		editorRunWorldMutationStarted &&
+		engine != nullptr &&
+		!engine->isApplicationQuitRequested())
+	{
+		scriptAPI.recoverFromPartialWorldFailure(
+			"editor-run scene");
+	}
+	return result;
+}
+
+void GameManager::applyStartupIntegerVariables()
+{
+	if (startupIntegerVariables.empty())
+	{
+		return;
+	}
+	if (!automationHooksEnabled)
+	{
+		GameLog::write(
+			"GameManager: ignored unauthorized startup integer variables\n");
+		return;
+	}
+
+	varList.ensureInitialized();
+	for (const auto& item : startupIntegerVariables)
+	{
+		if (item.first.empty())
+		{
+			continue;
+		}
+		varList.setInteger(item.first, item.second);
+		GameLog::write("GameManager: startup int %s=%d\n", item.first.c_str(), item.second);
+	}
+}
+
+void GameManager::drainImmediateScriptTasksForAutomation()
+{
+	const int maxIterations = 16;
+	for (int i = 0; i < maxIterations; i++)
+	{
+		bool hasImmediateTask = false;
+		{
+			std::lock_guard<std::mutex> lock(scriptTaskMutex);
+			for (const auto& task : scriptTaskList)
+			{
+				if (task.remainingMilliseconds <= 0)
+				{
+					hasImmediateTask = true;
+					break;
+				}
+			}
+		}
+		if (!hasImmediateTask)
+		{
+			return;
+		}
+		runScriptTaskList();
+	}
+	GameLog::write("GameManager: automation script task drain reached iteration limit\n");
+}
+
+void GameManager::checkExpectedIntegerVariables()
+{
+	if (expectedIntegerVariables.empty())
+	{
+		return;
+	}
+	if (!automationHooksEnabled)
+	{
+		GameLog::write(
+			"GameManager: ignored unauthorized expected integer assertions\n");
+		return;
+	}
+
+	for (const auto& item : expectedIntegerVariables)
+	{
+		if (item.first.empty())
+		{
+			continue;
+		}
+		int actualValue = varList.getInteger(item.first);
+		bool ok = (actualValue == item.second);
+		GameLog::write("GameManager: expect int %s=%d actual=%d %s\n",
+			item.first.c_str(), item.second, actualValue, ok ? "OK" : "FAILED");
+		if (!ok)
+		{
+			automationCheckFailed = true;
+		}
+	}
+
+	if (automationCheckFailed)
+	{
+		GameLog::write("GameManager: automation variable assertions failed\n");
+	}
+}
+
+void GameManager::finishNewGameAutomationAndExit()
+{
+	drainImmediateScriptTasksForAutomation();
+	checkExpectedIntegerVariables();
+	GameLog::write("GameManager: exit after new game script by launch argument\n");
+	stop(erOK);
+}
+
+bool GameManager::shouldUpdateChild(PElement child)
+{
+	if (gameplayPaused)
+	{
+		// System/Option/SaveLoad are temporarily attached directly to GameManager
+		// and must remain interactive. World, HUD and weather stay frozen.
+		return child != controller && child != menu && child != weather;
+	}
+	return shouldUpdateGameManagerChildDuringTimeStop(effectManager != nullptr && effectManager->hasActiveTimeStopper(),
+		child == weather);
+}
+
+void GameManager::setGameplayPaused(bool paused)
+{
+	if (paused && controller != nullptr)
+	{
+		controller->cancelControllerWorldInteraction();
+	}
+	if (gameplayPaused == paused)
+	{
+		return;
+	}
+	gameplayPaused = paused;
+	if (paused)
+	{
+		controllerPausedBeforeGameplayPause = controller != nullptr && controller->isPaused();
+		menuPausedBeforeGameplayPause = menu != nullptr && menu->isPaused();
+		weatherPausedBeforeGameplayPause = weather != nullptr && weather->isPaused();
+		if (controller != nullptr)
+		{
+			controller->setPaused(true);
+		}
+		if (menu != nullptr)
+		{
+			menu->setPaused(true);
+		}
+		if (weather != nullptr)
+		{
+			weather->setPaused(true);
+		}
+		return;
+	}
+	if (controller != nullptr && !controllerPausedBeforeGameplayPause)
+	{
+		controller->setPaused(false);
+	}
+	if (menu != nullptr && !menuPausedBeforeGameplayPause)
+	{
+		menu->setPaused(false);
+	}
+	if (weather != nullptr && !weatherPausedBeforeGameplayPause)
+	{
+		weather->setPaused(false);
+	}
+}
+
+bool GameManager::isGameplayPaused() const
+{
+	return gameplayPaused;
+}
+
+void GameManager::handleSystemResult(unsigned int systemResult, int selectedSaveIndex)
+{
+	// The system menu freezes controller, HUD and weather timers. Resume that
+	// state before loading so map/weather transitions cannot wait on a paused
+	// timer. JxqyHD also closes the save/load UI before invoking the loader.
+	setGameplayPaused(false);
+	if ((systemResult & erLoad) != 0 && selectedSaveIndex >= 0)
+	{
+		if (weather != nullptr)
+		{
+			weather->fadeOut();
+		}
+		bool loaded = false;
+		if (Config::loadAsync)
+		{
+			loaded = scriptAPI.loadGameAsync(selectedSaveIndex + 1);
+		}
+		else
+		{
+			loaded = scriptAPI.loadGame(selectedSaveIndex + 1);
+		}
+		if (!loaded)
+		{
+			GameLog::write(
+				"GameManager: in-game save load failed; restoring the current world presentation\n");
+		}
+		if (weather != nullptr && !engine->isApplicationQuitRequested())
+		{
+			// Fade back in for both outcomes: a successful load reveals the new
+			// world, while a rejected save must restore the still-live old world.
+			weather->fadeInEx();
+		}
+	}
+
+	unsigned int propagatedResult = systemResult & (erExit | erReturnToTitle);
+	if (propagatedResult != 0)
+	{
+		result |= propagatedResult;
+		logicRunning = false;
+	}
+}
+
+bool GameManager::initMenu()
+{
+	if (!engine->isMainThread())
+	{
+		GameLog::write(
+			"GameManager: menu initialization must run on the SDL main thread\n");
+		return false;
+	}
+	menu->init();
+	controller->init();
+	return true;
 }
 
 GameManager * GameManager::getInstance()
@@ -111,178 +1079,260 @@ GameManager * GameManager::getInstance()
 	return this_;
 }
 
-void GameManager::loadGameWithThread(int index)
-{
-	inThread.store(true);
-	loadThreadOver.store(false);
-	loadingDisplaying.store(true);
-
-	std::string str = u8"读取游戏中";
-	std::vector<_shared_image> loadingImage;
-	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8".", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"..", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"...", 50, 0xFFFFFFFF));
-
-	std::thread t(&GameManager::loadGameThread, this, index);
-	//t.detach();
-
-	loadingDisplayThread(loadingImage);
-	t.join();
-
-	inThread.store(false);
-
-	std::atomic_thread_fence(std::memory_order_acquire);
-
-	weather->setLum(global.data.mainLum);
-	weather->setTime(global.data.mapTime);
-	menu->update();
-
-}
-
-void GameManager::setMapPos(int x, int y)
-{
-	camera->followPlayer = false;
-	camera->position = { x + 5, y + 15};
-	camera->offset = { 0, 0 };
-}
-
-void GameManager::setMapTrap(int idx, const std::string & trapFile)
-{
-	traps.set(mapFolderName, idx, trapFile);
-}
-
-void GameManager::saveMapTrap()
-{
-	traps.save();
-}
-
-void GameManager::setMapTime(unsigned char t)
-{
-	global.data.mapTime = t;
-	weather->setTime(t);
-}
-
-void GameManager::changeASFColor(uint8_t r, uint8_t g, uint8_t b)
-{
-	global.data.asfStyle = (r << 16) | (g << 8) | b;
-}
-
-void GameManager::changeMapColor(uint8_t r, uint8_t g, uint8_t b)
-{
-	global.data.mpcStyle = (r << 16) | (g << 8) | b;
-}
-
-void GameManager::loadGameThread(int index)
-{
-	this_->loadGame(index);
-	//std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver.store(true);
-}
-
 bool GameManager::loadGame(int index)
 {
-	if (index < 0)
+	return scriptAPI.loadGame(index);
+}
+
+bool GameManager::writeSaveGenerationDraft(
+	const std::string& generationDirectory,
+	const SaveGenerationLimits& copyLimits,
+	const std::function<bool()>& ownerCheckpoint)
+{
+	if (!File::recoverDirectoryCopy(SAVE_CURRENT_FOLDER))
 	{
+		GameLog::write(
+			"GameManager: can not recover current save generation\n");
+		return false;
+	}
+	const bool draftReady =
+		SaveFileManager::CopySaveGenerationWithinLimits(
+		SAVE_CURRENT_FOLDER,
+		generationDirectory,
+		copyLimits,
+		{ SAVE_LIST_FILE },
+		[ownerCheckpoint]()
+		{
+			return !ownerCheckpointCanContinue(
+				ownerCheckpoint);
+		});
+	if (!draftReady)
+	{
+		GameLog::write(
+			"GameManager: can not prepare save draft generation %s\n",
+			generationDirectory.c_str());
 		return false;
 	}
 
-	stopMusic();
-
-	initAllTime();
-	timer.setPaused(true);
-
-	SaveFileManager::CopySaveFileFrom(index);
-	global.load();
-	std::string tempNpcName = global.data.npcName;
-	std::string tempObjName = global.data.objName;
-	loadMap(global.data.mapName);
-	global.data.npcName = tempNpcName;
-	global.data.objName = tempObjName;
-
-	effectManager->freeResource();
-
-	varList.load();
-	memo.load();
-	//traps.load();
-
-    player->load(global.data.characterIndex);
-
-    magicManager.load(global.data.characterIndex);
-
-    goodsManager.load(global.data.characterIndex);
-
-	npcManager->clearAllNPC();
-
-	partnerManager.load(global.data.characterIndex);
-
-	npcManager->load(global.data.npcName);
-
-	objectManager->load(global.data.objName);
-
-	effectManager->load();
-
-	if (map->data != nullptr)
+	bool saved = false;
 	{
-		map->createDataMap();
-	}
-
-	weather->reset();
-
-	clearMenu();
-
-	weather->setFadeLum(global.data.fadeLum);
-	
-	timer.setPaused(false);
-	playMusic(global.data.bgmName);
-
-	if (global.data.snowShow)
-	{
-		weather->setWeather(wtSnow);
-	}
-	else if (global.data.rainShow)
-	{
-		if (global.data.rainFile.empty())
+		SaveFileManager::CurrentPathScope draftPath(
+			generationDirectory);
+		if (!draftPath.valid())
 		{
-			weather->setWeather(wtLightning);
+			GameLog::write(
+				"GameManager: invalid save draft generation path %s\n",
+				generationDirectory.c_str());
+			return false;
 		}
-		else
+
+		saved = true;
+		saved = global.save() && saved;
+		saved = varList.save() && saved;
+		saved = memo.save() && saved;
+		saved = traps.save() && saved;
+		if (!ownerCheckpointCanContinue(
+				ownerCheckpoint))
 		{
-			weather->setWeather(wtCustomRain, global.data.rainFile);
+			return false;
+		}
+
+		saved = player->save(
+			global.data.characterIndex) && saved;
+		saved = partnerManager.save(
+			global.data.characterIndex) && saved;
+		if (!ownerCheckpointCanContinue(
+				ownerCheckpoint))
+		{
+			return false;
+		}
+
+		saved = magicManager.save(
+			global.data.characterIndex) && saved;
+		saved = goodsManager.save(
+			global.data.characterIndex) && saved;
+		if (!ownerCheckpointCanContinue(
+				ownerCheckpoint))
+		{
+			return false;
+		}
+
+		saved = npcManager->save(
+			global.data.npcName) && saved;
+		saved = objectManager->save(
+			global.data.objName) && saved;
+		if (!ownerCheckpointCanContinue(
+				ownerCheckpoint))
+		{
+			return false;
+		}
+		saved = effectManager->save() && saved;
+		saved = saveScriptRuntimeState() && saved;
+	}
+	return saved &&
+		ownerCheckpointCanContinue(ownerCheckpoint);
+}
+
+bool GameManager::saveGame(int index)
+{
+	if (engine == nullptr || !engine->isMainThread())
+	{
+		GameLog::write(
+			"GameManager: save commit must run on the SDL main thread\n");
+		return false;
+	}
+	SaveFileManager::OperationScope saveOperation;
+	const std::string draftDirectory =
+		"save\\game_build\\";
+	const SaveGenerationPreflightPolicy policy =
+		createRuntimeSaveGenerationPolicy(
+			*this,
+			RuntimeSaveGenerationPolicyMode::GeneratedSave);
+	if (!SaveFileManager::RecoverInterruptedSaveOperations())
+	{
+		GameLog::write(
+			"GameManager: one or more save directories could not be recovered; continuing with unaffected slots\n");
+	}
+	SaveFileManager::ScratchGenerationScope draftCleanup(
+		draftDirectory);
+	if (!draftCleanup.valid())
+	{
+		GameLog::write(
+			"GameManager: invalid save draft cleanup path\n");
+		return false;
+	}
+	if (!writeSaveGenerationDraft(
+			draftDirectory,
+			policy.limits))
+	{
+		GameLog::write("GameManager: save generation failed; slot publication skipped\n");
+		return false;
+	}
+
+	if (index != 0)
+	{
+		const std::string secondaryDirectory =
+			index > 0
+				? convert::formatString(
+					SAVE_FOLDER, index)
+				: std::string(SAVE_AUTO_FOLDER);
+		const SaveGenerationResult slotPublication =
+			SaveFileManager::PublishPreparedSaveGeneration(
+				draftDirectory,
+				secondaryDirectory,
+				policy.limits,
+				{ SAVE_LIST_FILE });
+		if (!slotPublication.succeeded())
+		{
+			GameLog::write(
+				"GameManager: slot save publication failed error=%s path=%s\n",
+				SaveFileManager::DescribeSaveGenerationError(
+					slotPublication.error),
+				slotPublication.errorPath.c_str());
+			return false;
 		}
 	}
 
-	if (!inThread)
+	const SaveGenerationResult currentPublication =
+		SaveFileManager::PublishPreparedSaveGeneration(
+			draftDirectory,
+			SAVE_CURRENT_FOLDER,
+			policy.limits,
+			{ SAVE_LIST_FILE });
+	if (!currentPublication.succeeded())
 	{
-		weather->setLum(global.data.mainLum);
-		weather->setTime(global.data.mapTime);
-		menu->update();
+		GameLog::write(
+			"GameManager: current save publication failed error=%s path=%s\n",
+			SaveFileManager::DescribeSaveGenerationError(
+				currentPublication.error),
+			currentPublication.errorPath.c_str());
+		return false;
 	}
-
-	setPlayerScn();
-
 	return true;
 }
 
-void GameManager::saveGame(int index)
+bool GameManager::saveScriptRuntimeState()
 {
-	global.save();
-	varList.save();
-	memo.save();
-	traps.save();
-    
-    player->save(global.data.characterIndex);
-	partnerManager.save(global.data.characterIndex);
-    
-	magicManager.save(global.data.characterIndex);
-	goodsManager.save(global.data.characterIndex);
-     
-	npcManager->save(global.data.npcName);
-	objectManager->save(global.data.objName);
-	effectManager->save();
-	if (index > 0)
+	std::string fileName =
+		SaveFileManager::CurrentPath() + GLOBAL_INI;
+	INIReader ini(fileName);
+
+	ScriptRuntimeTimerState timerState;
+	timerState.timerStarted = timerStarted;
+	timerState.timerHidden = timerHidden;
+	timerState.timerSeconds = timerSeconds;
+	timerState.timerAccumulatedMilliseconds = timerAccumulated;
+	timerState.timeScriptSet = timeScriptSet;
+	timerState.timeScriptSeconds = timeScriptSeconds;
+	timerState.timeScriptFileName = timeScriptFileName;
+	writeScriptRuntimeTimerState(ini, timerState);
+
+	std::vector<ParallelScriptRuntimeState> parallelScripts;
 	{
-		SaveFileManager::CopySaveFileTo(index);
+		std::lock_guard<std::mutex> lock(scriptTaskMutex);
+		for (const auto& task : scriptTaskList)
+		{
+			if (task.type != stScript || task.scriptName.empty())
+			{
+				continue;
+			}
+			ParallelScriptRuntimeState state;
+			state.scriptName = task.scriptName;
+			state.scriptMapName = task.scriptMapName;
+			state.remainingMilliseconds = task.remainingMilliseconds;
+			parallelScripts.push_back(state);
+		}
+	}
+	writeParallelScriptRuntimeStates(ini, parallelScripts);
+
+	return ini.saveToFile(fileName);
+}
+
+void GameManager::loadScriptRuntimeState()
+{
+	const std::string fileName =
+		SaveFileManager::CurrentPath() + GLOBAL_INI;
+	INIReader ini(fileName);
+
+	ScriptRuntimeTimerState timerState = readScriptRuntimeTimerState(ini);
+	timerStarted = timerState.timerStarted;
+	timerHidden = timerState.timerHidden;
+	timerSeconds = timerState.timerSeconds;
+	timerAccumulated = timerState.timerAccumulatedMilliseconds;
+	timeScriptSet = timerState.timeScriptSet;
+	timeScriptSeconds = timerState.timeScriptSeconds;
+	timeScriptFileName = timerState.timeScriptFileName;
+
+	if (menu != nullptr && menu->timerMenu != nullptr)
+	{
+		if (timerStarted)
+		{
+			menu->timerMenu->startTimer(timerSeconds);
+			if (timerHidden)
+			{
+				menu->timerMenu->hideTimer();
+			}
+		}
+		else
+		{
+			menu->timerMenu->stopTimer();
+		}
+	}
+
+	eventList.clear();
+	std::vector<ParallelScriptRuntimeState> parallelScripts = readParallelScriptRuntimeStates(ini);
+	{
+		std::lock_guard<std::mutex> lock(scriptTaskMutex);
+		scriptTaskList.clear();
+		for (const auto& parallelScript : parallelScripts)
+		{
+			ScriptTask task;
+			task.type = stScript;
+			task.scriptName = parallelScript.scriptName;
+			task.scriptMapName = parallelScript.scriptMapName;
+			task.remainingMilliseconds = parallelScript.remainingMilliseconds;
+			scriptTaskList.push_back(task);
+		}
 	}
 }
 
@@ -294,6 +1344,11 @@ void GameManager::clearMenu()
 bool GameManager::menuDisplayed()
 {
 	return menu->menuDisplayed();
+}
+
+bool GameManager::blocksWorldPointerInput() const
+{
+	return menu != nullptr && menu->blocksWorldPointerInput();
 }
 
 #define freeMenu(component); \
@@ -316,8 +1371,10 @@ bool GameManager::menuDisplayed()
 	}
 void GameManager::freeResource()
 {
+	touchControlsToggleRequested = false;
+	resetTouchControlsRecoveryGesture();
 	weather->reset();
-	camera->followNPC = nullptr;
+	camera->followNPC.reset();
 	safeFreeResource(controller);
 	safeFreeResource(menu);
 	safeFreeResource(effectManager);
@@ -349,184 +1406,168 @@ Point GameManager::getMousePoint()
 	return getMousePoint(x, y);
 }
 
-void GameManager::loadMapThread(const std::string & fileName)
+void GameManager::onWindowResize(int width, int height)
 {
-	this_->loadMap(fileName);
-	//std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver.store(true);
-}
-
-void GameManager::loadNPCThread(const std::string & fileName)
-{
-	this_->loadNPC(fileName);
-	//std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver.store(true);
-}
-
-void GameManager::loadObjectThread(const std::string & fileName)
-{
-	this_->loadObject(fileName);
-	//std::lock_guard<std::mutex> locker(this_->loadMutex);
-	this_->loadThreadOver.store(true);
-}
-
-void GameManager::runScript(const std::string & fileName, const std::string & mapName)
-{
-	clearSelected();
-	std::unique_ptr<char[]> s;
-	std::string newName = fileName;
-
-	int len = PakFile::readFile(SCRIPT_MAP_FOLDER + mapName + u8"\\" + fileName, s);
-	if (len <= 0 || s == nullptr)
+	if (controller != nullptr)
 	{
-		GameLog::write(u8"script: %s not found\n", (SCRIPT_MAP_FOLDER + mapName + u8"\\" + fileName).c_str());
-		s = nullptr;
-		int len = PakFile::readFile(SCRIPT_GOODS_FOLDER + fileName, s);
-		if (len <= 0 || s == nullptr)
-		{
-			GameLog::write(u8"script: %s not found\n", (SCRIPT_GOODS_FOLDER + fileName).c_str());
-			s = nullptr;
-			int len = PakFile::readFile(SCRIPT_COMMON_FOLDER + fileName, s);
-			if (len <= 0 || s == nullptr)
-			{
-				GameLog::write(u8"script: %s not found\n", (SCRIPT_COMMON_FOLDER + fileName).c_str());
-				return;
-			}
-			GameLog::write(u8"run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
-			script.runScript(s, len);
-			return;
-		}
-		GameLog::write(u8"run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
-		script.runScript(s, len);
-		return;
+		controller->init();
 	}
-	GameLog::write(u8"run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER , mapName.c_str(), newName.c_str());
-	script.runScript(s, len);
-	return;
-}
-
-void GameManager::runScript(const std::string & fileName)
-{
-	runScript(fileName, mapFolderName);
-}
-
-void GameManager::moveScreen(int direction, int distance)
-{
-	camera->flyTo(direction, distance);
 }
 
 void GameManager::loadMap(const std::string & fileName)
 {
-	global.data.mapName = fileName;
-	mapFolderName = convert::extractFileName(fileName);
-
-	// try read mapName from mapname.ini
-	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(std::string(INI_MAP_FOLDER)+ INI_MAP_NAME_LIST, s);
-	if (len > 0 && s != nullptr)
-	{
-		INIReader ini(s);
-		mapFolderName = ini.Get(u8"Init", mapFolderName, mapFolderName);
-	}
-
-	map->load(MAP_FOLDER + fileName);
-
-	camera->followPlayer = true;
-
-	camera->followNPC = nullptr;
-
-	effectManager->clearEffect();
-
-	npcManager->clearNPC();
-
-	objectManager->clearObj();
-
-	global.data.npcName = u8"";
-	global.data.objName = u8"";
-	map->createDataMap();
-	traps.load();
-	enableFight();
-	player->beginStand();
+	scriptAPI.loadMapAsync(fileName);
 }
 
-void GameManager::loadMapWithThread(const std::string & fileName)
+void GameManager::loadNPC(const std::string & fileName)
 {
-	loadThreadOver.store(false);
+	scriptAPI.loadNPCAsync(fileName);
+}
 
-	std::string str = u8"读取地图中";
-	std::vector<_shared_image> loadingImage;
-	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8".", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"..", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"...", 50, 0xFFFFFFFF));
+void GameManager::loadObject(const std::string & fileName)
+{
+	scriptAPI.loadObjectAsync(fileName);
+}
 
-	std::thread t(&GameManager::loadMapThread, this, fileName);
+void GameManager::runScript(const std::string & fileName)
+{
+	scriptAPI.runScript(fileName);
+}
 
-	//t.detach();
-
-	loadingDisplayThread(loadingImage);
-	t.join();
-
-	std::atomic_thread_fence(std::memory_order_acquire);
+void GameManager::runScript(const std::string & fileName, const std::string & mapName)
+{
+	scriptAPI.runScript(fileName, mapName);
 }
 
 void GameManager::playMusic(const std::string & fileName)
 {
-	global.data.bgmName = fileName;
-	if (!global.useWav)
-	{
-		auto ext = convert::extractFileExt(fileName);
-		if (ext.empty() || strcmp(ext.c_str(), u8".wav") == 0)
-		{
-			global.data.bgmName = convert::extractFileName(fileName) + u8".mp3";
-		}
-	}
-	GameLog::write(u8"play bgm %s\n", global.data.bgmName.c_str());
-	if (strcmp(global.data.bgmName.c_str(), bgmName.c_str()) == 0)
-	{
-		return;
-	}
-	engine->stopBGM();
-	bgmName = global.data.bgmName;
-	if (bgmName.empty())
-	{
-		return;
-	}
-	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(MUSIC_FOLDER + bgmName, s);
-	if (s != nullptr && len > 0)
-	{
-		engine->loadBGM(s, len);
-		engine->playBGM();
-	}
+	scriptAPI.playMusic(fileName);
 }
 
 void GameManager::stopMusic()
 {
-	engine->stopBGM();
-	global.data.bgmName = u8"";
-	bgmName = u8"";
+	scriptAPI.stopMusic();
 }
 
-void GameManager::playSound(const std::string & fileName)
+void GameManager::showMessage(const std::string& str)
 {
-	if (fileName.empty())
+	scriptAPI.showMessage(str);
+}
+
+void GameManager::requestTouchControlsToggle()
+{
+	// Preserve toggle parity until the next pre-pointer global input stage.
+	// Option callbacks run after that stage, so changing visibility here would
+	// let the rest of the current frame bypass the raw-pointer transaction.
+	touchControlsToggleRequested = !touchControlsToggleRequested;
+}
+
+void GameManager::processGlobalInputFrame(bool toggleTouchControls)
+{
+	toggleTouchControls = toggleTouchControls != touchControlsToggleRequested;
+	touchControlsToggleRequested = false;
+	std::vector<GameInput::TouchRecoveryContact> contacts;
+	for (const AEvent& finger : engine->getAllFingersPosition())
 	{
-		return;
+		if (finger.eventData != TOUCH_MOUSEID)
+		{
+			contacts.push_back(
+				{ finger.eventData, finger.eventX, finger.eventY });
+		}
 	}
-	std::string soundName = SOUND_FOLDER + fileName;
-	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(soundName, s);
-	if (len > 0 && s != nullptr)
+	processGlobalInputFrameWithContacts(
+		toggleTouchControls, std::move(contacts), getTime());
+}
+
+void GameManager::processGlobalInputFrameWithContacts(
+	bool toggleTouchControls,
+	std::vector<GameInput::TouchRecoveryContact> contacts,
+	std::uint64_t nowMilliseconds)
+{
+	if (controller != nullptr)
 	{
-		engine->playSound(s, len);
+		// This global stage runs before pointer dispatch and GameController::onEvent.
+		// Clearing lifecycle-owned touch state here prevents stale virtual input
+		// from reaching the same frame's world-action queue.
+		controller->synchronizeInputLifecycle();
 	}
+	const auto& input = engine->inputActions();
+	const std::uint64_t currentInputLifecycleRevision =
+		input.inputLifecycleRevision();
+	const bool inputLifecycleChanged = currentInputLifecycleRevision
+		!= observedTouchControlsInputLifecycleRevision;
+	observedTouchControlsInputLifecycleRevision =
+		currentInputLifecycleRevision;
+
+	const bool controlsVisibleAtFrameStart =
+		controller == nullptr || controller->areTouchControlsVisible();
+	bool controlsVisibleAfterExternalActions = toggleTouchControls
+		? !controlsVisibleAtFrameStart
+		: controlsVisibleAtFrameStart;
+	const auto visibilityDecision = touchControlsVisibilityPolicy.update(
+		input.registeredGamepadCount(),
+		input.gamepadAdditionRevision(),
+		input.activeGamepadRemovalRevision(),
+		controlsVisibleAfterExternalActions,
+		touchControlsCanRecoverAfterExternalInputLoss);
+	if (visibilityDecision.restoreTouchControls)
+	{
+		controlsVisibleAfterExternalActions = true;
+		pendingExternalInputMessage = "手柄已断开，已恢复触控操作区";
+	}
+
+	const bool recoveryTriggered = processTouchControlsRecoveryContacts(
+		std::move(contacts),
+		nowMilliseconds,
+		controlsVisibleAtFrameStart,
+		controlsVisibleAfterExternalActions,
+		inputLifecycleChanged || !input.isInputContextActive());
+	const bool finalTouchControlsVisible =
+		controlsVisibleAfterExternalActions || recoveryTriggered;
+	if (finalTouchControlsVisible)
+	{
+		touchControlsCanRecoverAfterExternalInputLoss = true;
+	}
+	if (controller != nullptr
+		&& controller->areTouchControlsVisible() != finalTouchControlsVisible)
+	{
+		controller->setTouchControlsVisible(finalTouchControlsVisible);
+	}
+	if (visibilityDecision.showGamepadConnectedMessage
+		&& !visibilityDecision.restoreTouchControls
+		&& touchControlsCanRecoverAfterExternalInputLoss)
+	{
+		pendingExternalInputMessage = finalTouchControlsVisible
+			? "检测到手柄；触控操作区保持显示，可长按 Back+Start 切换"
+			: "检测到手柄；触控操作区当前隐藏，可长按 Back+Start 恢复";
+	}
+	if (toggleTouchControls && !inThread.load() && menu != nullptr)
+	{
+		menu->showSystemNotice(finalTouchControlsVisible
+			? "已显示触控操作区"
+			: "已隐藏触控操作区");
+	}
+	if (!pendingExternalInputMessage.empty() && !inThread.load()
+		&& menu != nullptr && menu->systemNotice != nullptr)
+	{
+		menu->showSystemNotice(pendingExternalInputMessage);
+		pendingExternalInputMessage.clear();
+	}
+	if (recoveryTriggered && !inThread.load() && menu != nullptr)
+	{
+		menu->showSystemNotice("已通过三指长按恢复触控操作区");
+	}
+}
+
+bool GameManager::onHandleUIAction(UIAction action)
+{
+	return menu != nullptr && menu->visible && menu->handleUIAction(action);
 }
 
 void GameManager::returnToDesktop()
 {
 	result = erExit;
-	running = false;
+	logicRunning = false;
 }
 
 void GameManager::clearSelected()
@@ -535,39 +1576,322 @@ void GameManager::clearSelected()
 	objectManager->clearSelected();
 }
 
-void GameManager::returnToTitle()
+bool GameManager::queueObjectInteraction(std::shared_ptr<Object> obj, bool useRightScript, bool running)
 {
-	result = erOK;
-	running = false;
+	if (obj == nullptr || objectManager == nullptr || !objectManager->findObj(obj) || !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+	if (useRightScript && obj->scriptFileRight.empty())
+	{
+		return false;
+	}
+
+	NextAction act;
+	act.action = getInteractionMoveAction(player, running);
+	act.destGE = obj;
+	act.destKind = ndObj;
+	act.dest = obj->position;
+	act.useRightScript = useRightScript || obj->shouldUseRightScriptForPrimaryInteraction();
+	if (controller != nullptr)
+	{
+		controller->cancelControllerWorldInteraction();
+	}
+	player->addNextAction(act);
+	return true;
 }
 
-void GameManager::enableInput()
+bool GameManager::queueNPCInteraction(std::shared_ptr<NPC> npc, bool useRightScript, bool running)
 {
-	global.data.canInput = true;
+	if (npc == nullptr || npcManager == nullptr || !npcManager->findNPC(npc)
+		|| !npc->isVisibleForRuntime() || !npc->isInteractive() || !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+	if (useRightScript && npc->scriptFileRight.empty())
+	{
+		return false;
+	}
+
+	NextAction act;
+	act.action = getInteractionMoveAction(player, running);
+	act.destGE = npc;
+	act.dest = npc->getPosition();
+
+	bool effectiveUseRightScript = useRightScript || (npc->scriptFile.empty() && !npc->scriptFileRight.empty());
+	if (effectiveUseRightScript)
+	{
+		act.destKind = ndTalk;
+		act.useRightScript = true;
+	}
+	else if (npc->isEnemy() || npc->isNoneFighter())
+	{
+		act.destKind = ndAttack;
+	}
+	else
+	{
+		act.destKind = ndTalk;
+	}
+
+	if (controller != nullptr)
+	{
+		controller->cancelControllerWorldInteraction();
+	}
+	player->addNextAction(act);
+	return true;
 }
 
-void GameManager::disableInput()
+bool GameManager::queueNearestObjectInteraction(bool useRightScript, bool running, int radius)
 {
-	global.data.canInput = false;
+	if (objectManager == nullptr || map == nullptr || !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+	if (radius < 0)
+	{
+		radius = 0;
+	}
+
+	auto actionActor = player->getActionActor();
+	Point playerPos = actionActor != nullptr ? actionActor->getPosition() : player->getPosition();
+	auto objects = objectManager->findRadiusScriptViewObj(playerPos, radius);
+	std::shared_ptr<Object> nearestObject = nullptr;
+	int nearestDistance = INT_MAX;
+	for (auto& object : objects)
+	{
+		if (object == nullptr)
+		{
+			continue;
+		}
+		if (useRightScript && object->scriptFileRight.empty())
+		{
+			continue;
+		}
+		int distance = Map::calDistance(playerPos, object->position);
+		if (distance < nearestDistance)
+		{
+			nearestObject = object;
+			nearestDistance = distance;
+		}
+	}
+	return queueObjectInteraction(nearestObject, useRightScript, running);
 }
 
-void GameManager::runObjScript(std::shared_ptr<Object> obj)
+bool GameManager::queueNearestNPCInteraction(bool useRightScript, bool running, int radius)
 {
+	if (npcManager == nullptr || map == nullptr || !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+	if (radius < 0)
+	{
+		radius = 0;
+	}
 
-	player->nextAction = nullptr;
-	player->nextDest = ndNone;
-	player->destGE = nullptr;
-	if (inEvent)
+	auto actionActor = player->getActionActor();
+	Point playerPos = actionActor != nullptr ? actionActor->getPosition() : player->getPosition();
+	auto npcs = npcManager->findRadiusScriptViewNPC(playerPos, radius);
+	std::shared_ptr<NPC> nearestNPC = nullptr;
+	int nearestDistance = INT_MAX;
+	for (auto& npc : npcs)
+	{
+		if (npc == nullptr)
+		{
+			continue;
+		}
+		if (!npc->isVisibleForRuntime() || !npc->isInteractive())
+		{
+			continue;
+		}
+		if (useRightScript && npc->scriptFileRight.empty())
+		{
+			continue;
+		}
+		int distance = Map::calDistance(playerPos, npc->getPosition());
+		if (distance < nearestDistance)
+		{
+			nearestNPC = npc;
+			nearestDistance = distance;
+		}
+	}
+	return queueNPCInteraction(nearestNPC, useRightScript, running);
+}
+
+bool GameManager::queueObjectScriptInteraction(std::shared_ptr<Object> obj,
+	WorldInteractionScriptSide scriptSide, bool running)
+{
+	const WorldInteractionIntent intent = scriptSide == WorldInteractionScriptSide::Alternate
+		? WorldInteractionIntent::Alternate
+		: WorldInteractionIntent::Primary;
+	if (obj == nullptr || objectManager == nullptr || !objectManager->findObj(obj)
+		|| !WorldInteractionResolver::isObjectValidForIntent(obj, intent)
+		|| !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+
+	bool useRightScript = scriptSide == WorldInteractionScriptSide::Alternate
+		|| obj->shouldUseRightScriptForPrimaryInteraction();
+	if ((useRightScript && obj->scriptFileRight.empty())
+		|| (!useRightScript && obj->scriptFile.empty()))
+	{
+		return false;
+	}
+
+	NextAction action;
+	action.action = getInteractionMoveAction(player, running);
+	action.destGE = obj;
+	action.destKind = ndObj;
+	action.dest = obj->position;
+	action.useRightScript = useRightScript;
+	action.strictWorldInteraction = true;
+	player->addNextAction(action);
+	return true;
+}
+
+bool GameManager::queueNPCTalkInteraction(std::shared_ptr<NPC> npc,
+	WorldInteractionScriptSide scriptSide, bool running)
+{
+	auto actionActor = player != nullptr ? player->getActionActor() : nullptr;
+	const WorldInteractionIntent intent = scriptSide == WorldInteractionScriptSide::Alternate
+		? WorldInteractionIntent::Alternate
+		: WorldInteractionIntent::Primary;
+	if (npc == nullptr || npcManager == nullptr || !npcManager->findNPC(npc)
+		|| !WorldInteractionResolver::isNPCValidForIntent(npc, intent, actionActor)
+		|| !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+
+	bool useRightScript = scriptSide == WorldInteractionScriptSide::Alternate
+		|| (npc->scriptFile.empty() && !npc->scriptFileRight.empty());
+	if ((useRightScript && npc->scriptFileRight.empty())
+		|| (!useRightScript && npc->scriptFile.empty()))
+	{
+		return false;
+	}
+
+	NextAction action;
+	action.action = getInteractionMoveAction(player, running);
+	action.destGE = npc;
+	action.destKind = ndTalk;
+	action.dest = npc->getPosition();
+	action.useRightScript = useRightScript;
+	action.strictWorldInteraction = true;
+	player->addNextAction(action);
+	return true;
+}
+
+bool GameManager::queueNPCAttackInteraction(std::shared_ptr<NPC> npc, bool running)
+{
+	auto actionActor = player != nullptr ? player->getActionActor() : nullptr;
+	if (npc == nullptr || npcManager == nullptr || !npcManager->findNPC(npc)
+		|| !WorldInteractionResolver::isNPCValidForIntent(
+			npc, WorldInteractionIntent::Attack, actionActor)
+		|| !canQueuePlayerInteraction(player))
+	{
+		return false;
+	}
+
+	NextAction action;
+	action.action = getInteractionMoveAction(player, running);
+	action.destGE = npc;
+	action.destKind = ndAttack;
+	action.dest = npc->getPosition();
+	action.strictWorldInteraction = true;
+	player->addNextAction(action);
+	return true;
+}
+
+std::vector<WorldInteractionCandidate> GameManager::findWorldInteractionCandidates(
+	WorldInteractionIntent intent, int radius, int nearRadius,
+	std::weak_ptr<GameElement> preferredTarget)
+{
+	if (!canQueuePlayerInteraction(player) || map == nullptr)
+	{
+		return {};
+	}
+
+	auto actionActor = player->getActionActor();
+	WorldInteractionQuery query;
+	query.origin = actionActor->getPosition();
+	query.facingDirection = actionActor->direction;
+	query.radius = radius;
+	query.nearRadius = nearRadius;
+	query.preferredTarget = preferredTarget;
+	return WorldInteractionResolver::findCandidates(
+		intent, query, map.get(), npcManager.get(), objectManager.get(), actionActor);
+}
+
+bool GameManager::queueBestWorldInteraction(
+	WorldInteractionIntent intent, bool running, int radius, int nearRadius,
+	std::weak_ptr<GameElement> preferredTarget)
+{
+	auto candidates = findWorldInteractionCandidates(intent, radius, nearRadius, preferredTarget);
+	if (candidates.empty())
+	{
+		return false;
+	}
+
+	const auto& candidate = candidates.front();
+	if (candidate.targetType == WorldInteractionTargetType::Object)
+	{
+		WorldInteractionScriptSide scriptSide = intent == WorldInteractionIntent::Alternate
+			? WorldInteractionScriptSide::Alternate
+			: WorldInteractionScriptSide::Primary;
+		return queueObjectScriptInteraction(candidate.object, scriptSide, running);
+	}
+	if (candidate.targetType == WorldInteractionTargetType::NPC)
+	{
+		if (intent == WorldInteractionIntent::Attack)
+		{
+			return queueNPCAttackInteraction(candidate.npc, running);
+		}
+		WorldInteractionScriptSide scriptSide = intent == WorldInteractionIntent::Alternate
+			? WorldInteractionScriptSide::Alternate
+			: WorldInteractionScriptSide::Primary;
+		return queueNPCTalkInteraction(candidate.npc, scriptSide, running);
+	}
+	return false;
+}
+
+void GameManager::runObjScript(std::shared_ptr<Object> obj, const std::string& scriptFile, bool clearPlayerAction)
+{
+	if (clearPlayerAction)
+	{
+		player->nextAction = nullptr;
+		player->nextDest = ndNone;
+		player->nextDestUseRightScript = false;
+		player->nextDestStrictWorldInteraction = false;
+		player->nextDestRequestedRunning = false;
+		player->destGE.reset();
+	}
+	std::string scriptFileToRun = scriptFile;
+	if (scriptFileToRun.empty() && obj != nullptr)
+	{
+		scriptFileToRun = obj->scriptFile;
+	}
+	if (scriptFileToRun.empty())
 	{
 		return;
 	}
-	if (obj != nullptr)
+	if (inEvent)
+	{
+		ScriptTask task;
+		task.type = stObject;
+		task.obj = obj;
+		task.scriptName = scriptFileToRun;
+		task.clearPlayerAction = clearPlayerAction;
+		addScriptTask(task);
+		return;
+	}
+	if (obj != nullptr && objectManager->findObj(obj))
 	{
 		scriptObj = obj;
 		inEvent = true;
 		effectManager->disableAllEffect();
 		scriptType = stObject;
-		runScript(obj->scriptFile);
+		runScript(scriptFileToRun);
 		scriptType = stNone;
 		inEvent = false;
 	}
@@ -576,23 +1900,42 @@ void GameManager::runObjScript(std::shared_ptr<Object> obj)
 	runEventList();
 }
 
-void GameManager::runNPCScript(std::shared_ptr<NPC> npc)
+void GameManager::runNPCScript(std::shared_ptr<NPC> npc, const std::string& scriptFile, bool clearPlayerAction)
 {
-
-	player->nextAction = nullptr;
-	player->nextDest = ndNone;
-	player->destGE = nullptr;
+	if (clearPlayerAction)
+	{
+		player->nextAction = nullptr;
+		player->nextDest = ndNone;
+		player->nextDestUseRightScript = false;
+		player->nextDestStrictWorldInteraction = false;
+		player->nextDestRequestedRunning = false;
+		player->destGE.reset();
+	}
 	if (inEvent)
 	{
+		ScriptTask task;
+		task.type = stNPC;
+		task.npc = npc;
+		task.scriptName = scriptFile;
+		task.clearPlayerAction = clearPlayerAction;
+		addScriptTask(task);
 		return;
 	}
 	if (npc != nullptr && npcManager->findNPC(npc))
 	{
+		std::string scriptFileToRun = scriptFile.empty() ? npc->scriptFile : scriptFile;
+		if (scriptFileToRun.empty())
+		{
+			scriptNPC = nullptr;
+			camera->followPlayer = true;
+			runEventList();
+			return;
+		}
 		scriptNPC = npc;
 		inEvent = true;
 		effectManager->disableAllEffect();
 		scriptType = stNPC;
-		runScript(npc->scriptFile);
+		runScript(scriptFileToRun);
 		scriptType = stNone;
 		inEvent = false;
 	}
@@ -614,7 +1957,10 @@ void GameManager::runNPCDeathScript(std::shared_ptr<NPC> npc, const std::string 
 
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
-	player->destGE = nullptr;
+	player->nextDestUseRightScript = false;
+	player->nextDestStrictWorldInteraction = false;
+	player->nextDestRequestedRunning = false;
+	player->destGE.reset();
 	if (inEvent)
 	{
 		if (!scriptName.empty())
@@ -651,6 +1997,10 @@ void GameManager::runNPCDeathScript(std::shared_ptr<NPC> npc, const std::string 
 
 void GameManager::runEventList()
 {
+	if (runPendingPlayerDeathScript())
+	{
+		return;
+	}
 	if (eventList.size() > 0)
 	{
 		auto deathNPC = eventList[0].npc;
@@ -661,17 +2011,147 @@ void GameManager::runEventList()
 	}
 }
 
+bool GameManager::addScriptTask(const ScriptTask& task)
+{
+	std::lock_guard<std::mutex> lock(scriptTaskMutex);
+	if (task.type == stScript)
+	{
+		std::size_t parallelScriptCount = static_cast<std::size_t>(std::count_if(
+			scriptTaskList.begin(), scriptTaskList.end(), [](const ScriptTask& queuedTask)
+			{
+				return queuedTask.type == stScript;
+			}));
+		if (parallelScriptCount >= MaxParallelScriptStates)
+		{
+			return false;
+		}
+	}
+	scriptTaskList.push_back(task);
+	return true;
+}
+
+void GameManager::clearParallelScriptTasks()
+{
+	std::lock_guard<std::mutex> lock(scriptTaskMutex);
+	scriptTaskList.erase(
+		std::remove_if(
+			scriptTaskList.begin(),
+			scriptTaskList.end(),
+			[](const ScriptTask& task)
+			{
+				return task.type == stScript;
+			}),
+		scriptTaskList.end());
+}
+
+void GameManager::runScriptTaskList()
+{
+	if (runPendingPlayerDeathScript())
+	{
+		return;
+	}
+	std::vector<ScriptTask> tasks;
+	std::vector<ScriptTask> pendingTasks;
+	UTime frameTime = getFrameTime();
+	{
+		std::lock_guard<std::mutex> lock(scriptTaskMutex);
+		if (scriptTaskList.empty())
+		{
+			return;
+		}
+		tasks = std::move(scriptTaskList);
+		scriptTaskList.clear();
+	}
+
+	for (auto& task : tasks)
+	{
+		if (task.remainingMilliseconds > 0)
+		{
+			if (task.remainingMilliseconds > frameTime)
+			{
+				task.remainingMilliseconds -= frameTime;
+				pendingTasks.push_back(task);
+				continue;
+			}
+			task.remainingMilliseconds = 0;
+		}
+		switch (task.type)
+		{
+		case stScript:
+			scriptAPI.runScriptWithCapturedParent(
+				task.scriptName,
+				task.scriptMapName.empty()
+					? mapFolderName
+					: task.scriptMapName,
+				task.traceParentExecutionId,
+				task.traceParentCaptured);
+			break;
+		case stNPC:
+			runNPCScript(task.npc, task.scriptName, task.clearPlayerAction);
+			break;
+		case stNPCDeath:
+			runNPCDeathScript(task.npc, task.scriptName, task.scriptMapName);
+			break;
+		case stObject:
+			runObjScript(task.obj, task.scriptName, task.clearPlayerAction);
+			break;
+		case stTraps:
+			runTrapScript(task.trapIndex);
+			break;
+		case stGoods:
+			runGoodsScript(task.goods);
+			break;
+		default:
+			break;
+		}
+		if (runPendingPlayerDeathScript())
+		{
+			return;
+		}
+	}
+
+	if (!pendingTasks.empty())
+	{
+		std::lock_guard<std::mutex> lock(scriptTaskMutex);
+		std::size_t parallelScriptCount = static_cast<std::size_t>(std::count_if(
+			pendingTasks.begin(), pendingTasks.end(), [](const ScriptTask& task)
+			{
+				return task.type == stScript;
+			}));
+		for (const auto& task : scriptTaskList)
+		{
+			if (task.type == stScript)
+			{
+				if (parallelScriptCount >= MaxParallelScriptStates)
+				{
+					continue;
+				}
+				parallelScriptCount++;
+			}
+			pendingTasks.push_back(task);
+		}
+		scriptTaskList = std::move(pendingTasks);
+	}
+}
+
 void GameManager::runGoodsScript(std::shared_ptr<Goods> goods)
 {
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
-	player->destGE = nullptr;
-	if (!(player->isJumping() && player->jumpState == jsJumping))
+	player->nextDestUseRightScript = false;
+	player->nextDestStrictWorldInteraction = false;
+	player->nextDestRequestedRunning = false;
+	player->destGE.reset();
+	if (!(player->isJumping() && player->getJumpState() == jsJumping))
 	{
 		player->beginStand();
 	}
 	if (inEvent)
 	{
+		ScriptTask task;
+		task.type = stGoods;
+		task.goods = goods;
+		addScriptTask(task);
 		return;
 	}
 	if (goods != nullptr)
@@ -691,1315 +2171,371 @@ void GameManager::runGoodsScript(std::shared_ptr<Goods> goods)
 
 void GameManager::runTrapScript(int idx)
 {
+	if (!Traps::isValidIndex(idx))
+	{
+		GameLog::write("GameManager::runTrapScript ignored invalid trap index %d", idx);
+		return;
+	}
+
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
-	player->destGE = nullptr;
-	if (!(player->isJumping() && player->jumpState == jsJumping))
+	player->nextDestUseRightScript = false;
+	player->nextDestStrictWorldInteraction = false;
+	player->nextDestRequestedRunning = false;
+	player->destGE.reset();
+	if (!(player->isJumping() && player->getJumpState() == jsJumping))
 	{
 		player->beginStand();
 	}
 	if (inEvent)
 	{
-		return;
-	}
-	if (idx == 0)
-	{
+		ScriptTask task;
+		task.type = stTraps;
+		task.trapIndex = idx;
+		addScriptTask(task);
 		return;
 	}
 	scriptMapName = mapFolderName;
 	scriptTrapIndex = idx;
 	std::string sname = traps.get(mapFolderName, idx);
-	if (sname != u8"")
+	if (sname != "" && !traps.hasTriggered(idx))
 	{
 		inEvent = true;
 		effectManager->disableAllEffect();
-		traps.set(mapFolderName, idx, u8"");
+		traps.markTriggered(idx);
 		std::string tempMapName = mapFolderName;
 		scriptType = stTraps;
 		runScript(sname);
 		scriptType = stNone;
 		inEvent = false;
 	}
-	scriptMapName = u8"";
+	scriptMapName = "";
 	scriptTrapIndex = 0;
 	camera->followPlayer = true;
 	runEventList();
 }
 
-void GameManager::playMovie(const std::string & fileName)
+void GameManager::onUpdate()
 {
-	if (video != nullptr)
+	if (engine->consumeInputAction(GameInput::InputAction::ToggleTouchControls)
+		&& controller != nullptr)
 	{
-		video = nullptr;
+		// The normal frame-global handler consumes this edge before pointer
+		// dispatch. If an alternate update path reaches it here, defer the
+		// visibility edge to the next global transaction instead of applying it
+		// after pointer dispatch.
+		requestTouchControlsToggle();
 	}
-	stopMusic();
-	GameLog::write(u8"Play Movie %s\n", fileName.c_str());
-	video = std::make_shared<VideoPlayer>(VIDEO_FOLDER + fileName);
-	video->drawFullScreen = true;
-	video->run();
 
-	video = nullptr;
-	playMusic(global.data.bgmName);
-}
-
-void GameManager::stopMovie()
-{
-	engine->stopVideo(video->v);
-}
-
-void GameManager::loadNPC(const std::string & fileName)
-{
-	//npcManager->save(global.data.npcName);
-	global.data.npcName = fileName;
-	npcManager->load(global.data.npcName);
-	map->createDataMap();
-}
-
-void GameManager::loadNPCWithThread(const std::string & fileName)
-{
-	loadThreadOver.store(false);
-
-	std::string str = u8"读取资源中";
-	std::vector<_shared_image> loadingImage;
-	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8".", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"..", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"...", 50, 0xFFFFFFFF));
-
-	std::thread t(&GameManager::loadNPCThread, this, fileName);
-
-	//t.detach();
-	loadingDisplayThread(loadingImage);
-	t.join();
-
-	std::atomic_thread_fence(std::memory_order_acquire);
-}
-
-void GameManager::saveNPC(const std::string & fileName)
-{
-	if (fileName.empty())
+	if (postNewGameAutomationWaitPending)
 	{
-		npcManager->save(global.data.npcName);
-	}
-	else
-	{
-		global.data.npcName = fileName;
-		npcManager->save(fileName);
-	}
-}
-
-void GameManager::addNPC(const std::string & iniName, int x, int y, int dir)
-{
-	npcManager->addNPC(iniName, x, y, dir);
-}
-
-void GameManager::deleteNPC(const std::string & name)
-{
-	npcManager->deleteNPC(name);
-}
-
-void GameManager::setNPCRes(const std::string & name, const std::string & resName)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
+		postNewGameAutomationWaitElapsed += getFrameTime();
+		if (postNewGameAutomationWaitElapsed >= postNewGameAutomationWaitMilliseconds)
 		{
-			npc->npcIni = resName;
-			npc->initRes(resName);
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->npcIni = resName;
-			npc[i]->initRes(resName);
-		}
-	}
-}
-
-void GameManager::setNPCScript(const std::string & name, const std::string & scriptName)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->scriptFile = scriptName;
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->scriptFile = scriptName;
-		}
-	}
-}
-
-void GameManager::setNPCDeathScript(const std::string & name, const std::string & scriptName)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->deathScript = scriptName;
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->deathScript = scriptName;
-		}
-	}
-}
-
-void GameManager::goTo(const std::string & name, int x, int y)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->goTo({ x, y });
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->goTo({ x, y });
-		}
-	}
-}
-
-void GameManager::goToEx(const std::string & name, int x, int y)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->goToEx({ x, y });
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->goToEx({ x, y });
-		}
-	}
-}
-
-void GameManager::goToDir(const std::string & name, int dir, int distance)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->goToDir(dir, distance);
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->goToDir(dir, distance);
-		}
-	}
-}
-
-void GameManager::followNPC(const std::string & follower, const std::string & leader)
-{
-	auto npc = npcManager->findNPC(follower);
-	for (size_t i = 0; i < npc.size(); i++)
-	{
-		npc[i]->followNPC = leader;
-	}
-}
-
-void GameManager::followPlayer(const std::string & follower)
-{
-	auto npc = npcManager->findNPC(follower);
-	for (size_t i = 0; i < npc.size(); i++)
-	{
-		npc[i]->followNPC = gm->player->name;
-	}
-}
-
-void GameManager::enableNPCAI()
-{
-	global.data.NPCAI = true;
-}
-
-void GameManager::disableNPCAI()
-{
-	global.data.NPCAI = false;
-	//npcManager->standAll();
-}
-
-void GameManager::attackTo(const std::string & name, int x, int y)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->beginAttack({ x, y });
-			//npc->eventRun();
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->beginAttack({ x, y });
-			//npc[i]->eventRun();
-		}
-
-	}
-}
-
-void GameManager::setNPCPosition(const std::string & name, int x, int y)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->haveDest = false;
-			npc->beginStand();
-			npc->position = { x, y };
-			npc->offset = { 0, 0 };
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->beginStand();
-			npc[i]->haveDest = false;
-			npc[i]->position = { x, y };
-			npc[i]->offset = { 0, 0 };
-		}
-	}
-	map->createDataMap();
-}
-
-void GameManager::setNPCDir(const std::string & name, int dir)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr && npc->isStanding())
-		{
-			npc->beginStand();
-			npc->haveDest = false;
-			npc->direction = dir;
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			if (npc[i]->isStanding())
-			{
-				npc[i]->haveDest = false;
-				npc[i]->direction = dir;
-			}
-		}
-	}
-}
-
-void GameManager::setNPCKind(const std::string & name, int kind)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->kind = kind;
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->kind = kind;
-		}
-	}
-}
-
-void GameManager::setNPCLevel(const std::string & name, int level)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->level = level;
-			npc->setLevel(level);
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->level = level;
-			npc[i]->setLevel(level);
-		}
-	}
-}
-
-void GameManager::setNPCAction(const std::string & name, int action)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			if (action == acStand)
-			{
-				npc->beginStand();
-			}
-			else if (action == acDeath)
-			{
-				npc->beginDie();
-			}
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			if (action == acStand)
-			{
-				npc[i]->beginStand();
-			}
-			else if (action == acDeath)
-			{
-				npc[i]->beginDie();
-			}
-		}
-	}
-}
-
-void GameManager::setNPCRelation(const std::string & name, int relation)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->relation = relation;
-			npc->beginStand();
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->relation = relation;
-			npc[i]->beginStand();
-		}
-	}
-}
-
-void GameManager::setNPCActionType(const std::string & name, int actionType)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->action = actionType;
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->action = actionType;
-		}
-	}
-}
-
-void GameManager::setNPCActionFile(const std::string & name, int action, const std::string & fileName)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->loadActionFile(fileName, action);
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->loadActionFile(fileName, action);
-		}
-	}
-}
-
-void GameManager::npcSpecialAction(const std::string & name, const std::string & fileName)
-{
-	if (name.empty())
-	{
-		std::shared_ptr<NPC> npc = scriptNPC;
-		if (npc != nullptr)
-		{
-			npc->doSpecialAction(fileName);
-		}
-	}
-	else
-	{
-		auto npc = npcManager->findNPC(name);
-		for (size_t i = 0; i < npc.size(); i++)
-		{
-			npc[i]->doSpecialAction(fileName);
-		}
-	}
-}
-
-void GameManager::changeLife(const std::string& name, int value)
-{
-	auto npc = npcManager->findNPC(name);
-	for (size_t i = 0; i < npc.size(); i++)
-	{
-		auto maxValue = npc[i]->getLifeMax();
-		npc[i]->life = maxValue * value / 100;
-	}
-}
-
-void GameManager::changeMana(const std::string& name, int value)
-{
-	auto npc = npcManager->findNPC(name);
-	for (size_t i = 0; i < npc.size(); i++)
-	{
-		auto maxValue = npc[i]->getManaMax();
-		npc[i]->mana = maxValue * value / 100;
-	}
-}
-
-void GameManager::changeThew(const std::string& name, int value)
-{
-	auto npc = npcManager->findNPC(name);
-	for (size_t i = 0; i < npc.size(); i++)
-	{
-		auto maxValue = npc[i]->getThewMax();
-		npc[i]->thew = maxValue * value / 100;
-	}
-}
-
-void GameManager::loadPlayer(int index)
-{
-	player->load(index);
-}
-
-void GameManager::savePlayer(int index)
-{
-	player->save(index);
-}
-
-void GameManager::setPlayerPosition(int x, int y)
-{
-	player->beginStand();
-	player->position = { x, y };
-	player->offset = { 0, 0 };
-	player->haveDest = false;
-	gm->npcManager->setPartnerPos(x, y, player->direction);
-	map->createDataMap();
-}
-
-void GameManager::setPlayerDir(int dir)
-{
-	player->direction = dir;
-}
-
-void GameManager::setPlayerScn()
-{
-	camera->followPlayer = true;
-	auto npc = npcManager->findPlayerNPC();
-	if (npc != nullptr)
-	{
-		camera->followNPC = npc;
-	}
-	else
-	{
-		camera->followNPC = player;
-	}
-}
-
-void GameManager::setLevelFile(const std::string & fileName)
-{
-	player->levelIni = fileName;
-	player->loadLevel(fileName);
-}
-
-void GameManager::setMagicLevel(const std::string & magicName, int level)
-{
-	MagicInfo * m = magicManager.findMagic(magicName);
-	if (m != nullptr)
-	{
-		m->level = level;
-	}
-}
-
-void GameManager::setPlayerLevel(int level)
-{
-	player->setLevel(level);
-}
-
-void GameManager::setPlayerState(int state)
-{
-	player->setFight(state);
-}
-
-void GameManager::enableRun()
-{
-	player->canRun = true;
-}
-
-void GameManager::disableRun()
-{
-	player->canRun = false;
-}
-
-void GameManager::enableJump()
-{
-	player->canJump = true;
-}
-
-void GameManager::disableJump()
-{
-	player->canJump = false;
-}
-
-void GameManager::enableFight()
-{
-	player->canFight = true;
-}
-
-void GameManager::disableFight()
-{
-	player->canFight = false;
-}
-
-void GameManager::playerGoto(int x, int y)
-{
-	player->goTo({ x, y });
-}
-
-void GameManager::playerGotoEx(int x, int y)
-{
-	player->goToEx({ x, y });
-}
-
-void GameManager::playerRunTo(int x, int y)
-{
-	player->runTo({ x, y });
-}
-
-void GameManager::playerJumpTo(int x, int y)
-{
-	player->jumpTo({ x, y });
-}
-
-void GameManager::playerGotoDir(int dir, int distance)
-{
-	player->goToDir(dir, distance);
-}
-
-void GameManager::addLife(int value)
-{
-	player->addLife(value);
-}
-
-void GameManager::addLifeMax(int value)
-{
-	player->addLifeMax(value);
-}
-
-void GameManager::addThew(int value)
-{
-	player->addThew(value);
-}
-
-void GameManager::addThewMax(int value)
-{
-	player->addThewMax(value);
-}
-
-void GameManager::addMana(int value)
-{
-	player->addMana(value);
-}
-
-void GameManager::addManaMax(int value)
-{
-	player->addManaMax(value);
-}
-
-void GameManager::addAttack(int value)
-{
-	player->addAttack(value);
-}
-
-void GameManager::addDefend(int value)
-{
-	player->addDefend(value);
-}
-
-void GameManager::addEvade(int value)
-{
-	player->addEvade(value);
-}
-
-void GameManager::addExp(int value)
-{
-	player->addExp(value);
-}
-
-void GameManager::addMoney(int value)
-{
-	if (value == 0)
-	{
-		return;
-	}
-	player->addMoney(value);
-	if (value > 0)
-	{
-		showMessage(convert::formatString(u8"获得%d两银子！", value));
-	}
-	else
-	{
-		showMessage(convert::formatString(u8"失去%d两银子！", -value));
-	}
-}
-
-void GameManager::addRandMoney(int mMin, int mMax)
-{
-	int value = 0;
-	if (mMax == mMin)
-	{
-		value = mMin;
-	}
-	else
-	{
-		value = engine->getRand(std::abs(mMax - mMin) + (mMax > mMin ? mMin : mMax));
-	}
-	addMoney(value);
-}
-
-void GameManager::addGoods(const std::string & name)
-{
-	goodsManager.addItem(name, 1);
-}
-
-void GameManager::addRandGoods(const std::string & fileName)
-{
-	std::string str = BUYSELL_FOLDER;
-	str += fileName;
-	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(str, s);
-	if (len > 0 && s != nullptr)
-	{
-		INIReader ini(s);
-		int count = ini.GetInteger(u8"Header", u8"Count", 0);
-		if (count > 0)
-		{
-			int idx = engine->getRand(count);
-			std::string section = convert::formatString(u8"%d", idx + 1);
-			std::string name = ini.Get(section, u8"IniFile", u8"");
-			addGoods(name);
-		}
-	}
-}
-
-void GameManager::deleteGoods(const std::string & name)
-{
-	goodsManager.deleteItem(name);
-}
-
-void GameManager::addMagic(const std::string & name)
-{
-	magicManager.addMagic(name);
-}
-
-void GameManager::addOneMagic(const std::string& playerName, const std::string& magicName)
-{
-	if (player->npcName == playerName)
-	{
-		addMagic(magicName);
-		return;
-	}
-
-	for (size_t i = 0; i < 5; i++)
-	{
-		Player tempPlayer;
-		tempPlayer.load(i);
-		if (tempPlayer.npcName == playerName)
-		{
-			MagicManager tempMagicManager;
-			tempMagicManager.load(i);
-			tempMagicManager.addMagic(magicName);
-			tempMagicManager.save(i);
+			postNewGameAutomationWaitPending = false;
+			finishNewGameAutomationAndExit();
 			return;
 		}
 	}
-}
 
-void GameManager::deleteMagic(const std::string & name)
-{
-	magicManager.deleteMagic(name);
-}
-
-void GameManager::addMagicExp(const std::string & name, int addexp)
-{
-	magicManager.addMagicExp(name, addexp);
-}
-
-void GameManager::fullLife()
-{
-	player->fullLife();
-}
-
-void GameManager::fullThew()
-{
-	player->fullThew();
-}
-
-void GameManager::fullMana()
-{
-	player->fullMana();
-}
-
-void GameManager::updateState()
-{
-	menu->equipMenu->updateGoods();
-	menu->stateMenu->updateLabel();
-}
-
-void GameManager::saveGoods(int index)
-{
-	goodsManager.save(index);
-}
-
-void GameManager::loadGoods(int index)
-{
-	goodsManager.load(index);
-}
-
-void GameManager::clearGoods()
-{
-	goodsManager.clearItem();
-}
-
-void GameManager::getGoodsNum(const std::string & name)
-{
-	varList.setInteger(u8"GoodsNum", goodsManager.getItemNum(name));
-}
-
-void GameManager::getMoneyNum()
-{
-	varList.setInteger(u8"MoneyNum", player->money);
-}
-
-void GameManager::setMoneyNum(int value)
-{
-	player->money = value;
-	menu->goodsMenu->updateMoney();
-}
-
-void GameManager::loadObject(const std::string & fileName)
-{
-	//objectManager->save(global.data.objName);
-	global.data.objName = fileName;
-	objectManager->load(global.data.objName);
-	map->createDataMap();
-}
-
-void GameManager::loadObjectWithThread(const std::string & fileName)
-{
-	loadThreadOver.store(false);
-
-	std::string str = u8"读取资源中";
-	std::vector<_shared_image> loadingImage;
-	loadingImage.push_back(engine->createText(str, 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8".", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"..", 50, 0xFFFFFFFF));
-	loadingImage.push_back(engine->createText(str + u8"...", 50, 0xFFFFFFFF));
-
-	std::thread t(&GameManager::loadObjectThread, this, fileName);
-
-	//t.detach();
-
-	loadingDisplayThread(loadingImage);
-	t.join();
-
-	std::atomic_thread_fence(std::memory_order_acquire);
-}
-
-void GameManager::saveObject(const std::string & fileName)
-{
-	if (fileName.empty())
-	{
-		objectManager->save(global.data.objName);
-	}
-	else
-	{
-		global.data.objName = fileName;
-		objectManager->save(fileName);
-	}
-	
-}
-
-void GameManager::addObject(const std::string & iniName, int x, int y, int dir)
-{
-	objectManager->addObject(iniName, x, y, dir);
-}
-
-void GameManager::deleteObject(const std::string & name)
-{
-	std::string objName = name;
-	if (name.empty())
-	{
-		if (scriptObj != nullptr)
-		{
-			objName = scriptObj->name;
-		}
-		else
-		{
-			return;
-		}
-	}
-	objectManager->deleteObject(objName);
-}
-
-void GameManager::setObjectPosition(const std::string & name, int x, int y)
-{
-	std::shared_ptr<Object> obj = nullptr;
-	if (name.empty())
-	{
-		obj = scriptObj;
-	}
-	else
-	{
-		obj = objectManager->findObj(name);
-	}
-	if (obj != nullptr)
-	{
-		obj->position = { x, y };
-		map->createDataMap();
-	}
-}
-
-void GameManager::setObjectKind(const std::string & name, int kind)
-{
-	std::shared_ptr<Object> obj = nullptr;
-	if (name.empty())
-	{
-		obj = scriptObj;
-	}
-	else
-	{
-		obj = objectManager->findObj(name);
-	}
-	if (obj != nullptr)
-	{
-		obj->kind = kind;
-	}
-}
-
-void GameManager::setObjectScript(const std::string & name, const std::string & scriptFile)
-{
-	std::shared_ptr<Object> obj = nullptr;
-	if (name.empty())
-	{
-		obj = scriptObj;
-	}
-	else
-	{
-		obj = objectManager->findObj(name);
-	}
-	if (obj != nullptr)
-	{
-		obj->scriptFile = scriptFile;
-	}
-}
-
-int GameManager::getVar(const std::string & varName)
-{
-	return varList.getInteger(varName);
-}
-
-void GameManager::assign(const std::string & varName, int value)
-{
-	varList.setInteger(varName, value);
-}
-
-void GameManager::add(const std::string & varName, int value)
-{
-	assign(varName, getVar(varName) + value);
-}
-
-void GameManager::talk(const std::string & part)
-{
-	std::string fileName = SCRIPT_FOLDER;
-	fileName += u8"map\\"; 
-	fileName += mapFolderName + u8"\\" + TALK_FILE;
-	std::unique_ptr<char[]> s;
-	int len = PakFile::readFile(fileName, s);
-	if (s == nullptr || len <= 0)
+	if (gameplayPaused)
 	{
 		return;
 	}
-	INIReader ini(s);
-	std::vector<std::string> talkStr;
-	talkStr.resize(0);
-
-	int talkIndex = 0;
-	while (true)
-	{
-		std::string name = convert::formatString(u8"%d", talkIndex + 1);
-		
-		std::string str = ini.Get(part, name, u8"");
-		if (str.empty())
-		{
-			break;
-		}
-		talkStr.push_back(str);
-		talkIndex++;
-	}
-	
-	if (talkIndex <= 0)
+	if (runPendingPlayerDeathScript())
 	{
 		return;
 	}
-	//std::shared_ptr<Dialog> dialog = std::make_shared<Dialog>();
-	//addChild(dialog);
-	auto dialog = menu->dialog;
-	std::string head1 = u8"";
-	std::string head2 = u8"";
-
-	std::string headStr = u8"head";
-	for (int i = 0; i < talkIndex; i++)
+	runEventList();
+	if (runPendingPlayerDeathScript())
 	{
-		std::string tstr = convert::formatString(u8"%s%d", headStr.c_str(), i + 1);
-		std::string thstr = ini.Get(part, tstr, u8"NoHeadChange");
-		if (thstr != u8"NoHeadChange")
+		return;
+	}
+	runScriptTaskList();
+	if (runPendingPlayerDeathScript())
+	{
+		return;
+	}
+
+	if (timerStarted)
+	{
+		int previousSeconds = timerSeconds;
+		timerAccumulated += getFrameTime();
+		UTime elapsedSeconds = timerAccumulated / 1000;
+		timerAccumulated %= 1000;
+		if (elapsedSeconds > 0)
 		{
-			if (i % 2 == 1)
+			if (elapsedSeconds >= static_cast<UTime>(timerSeconds))
 			{
-				head1 = thstr;
+				timerSeconds = 0;
 			}
 			else
 			{
-				head2 = thstr;
+				timerSeconds -= static_cast<int>(elapsedSeconds);
 			}
 		}
-		if (i % 2 == 1)
+
+		if (timeScriptSet && shouldTriggerTimeScript(previousSeconds, timerSeconds, timeScriptSeconds))
 		{
-			dialog->setHead1(head1);
-		}
-		else
-		{
-			dialog->setHead2(head2);
-		}
-		dialog->setTalkStr(talkStr[i]);
-		std::string s = talkStr[i];
-		dialog->visible = true;
-		dialog->run();
-		dialog->visible = false;
-	}
-	//removeChild(dialog);
-}
-
-void GameManager::say(const std::string & str, int index)
-{
-	//auto dialog = std::make_shared<Dialog>();
-	//addChild(dialog);
-	auto dialog = menu->dialog;
-	if (index >= 0)
-	{
-		dialog->setHead1(dialog->getHeadName(index));
-	}
-	else
-	{
-		dialog->setHead1(u8"");
-	}
-	dialog->setTalkStr(str);
-	dialog->visible = true;
-	dialog->run();
-	dialog->visible = false;
-	//removeChild(dialog);
-}
-
-void GameManager::fadeIn()
-{
-	weather->fadeIn();
-}
-
-void GameManager::fadeOut()
-{
-	weather->fadeOut();
-}
-
-void GameManager::setFadeLum(int lum)
-{
-	global.data.fadeLum = lum;
-	weather->setFadeLum(lum);
-}
-
-void GameManager::setMainLum(int lum)
-{
-	global.data.mainLum = lum;
-	weather->setLum(lum);
-}
-
-void GameManager::sleep(unsigned int time)
-{
-	weather->sleep(time);
-}
-
-void GameManager::showMessage(const std::string & str)
-{
-	menu->showMessage(str);
-}
-
-void GameManager::addToMemo(const std::string & str)
-{
-	memo.add(str);
-}
-
-void GameManager::clearMemo()
-{
-	memo.clear();
-}
-
-void GameManager::buyGoods(const std::string & fileName)
-{
-	std::shared_ptr<BuySellMenu> bsMenu = std::make_shared<BuySellMenu>();
-	addChild(bsMenu);
-	bsMenu->buy(fileName);
-	removeChild(bsMenu);
-}
-
-void GameManager::sellGoods(const std::string & fileName)
-{
-	std::shared_ptr<BuySellMenu> bsMenu = std::make_shared<BuySellMenu>();
-	addChild(bsMenu);
-	bsMenu->sell(fileName);
-	removeChild(bsMenu);
-
-}
-
-void GameManager::hideInterface()
-{
-	clearMenu();
-}
-
-void GameManager::hideBottomWnd()
-{
-	menu->hideBottomWnd();
-}
-
-void GameManager::showBottomWnd()
-{
-	menu->showBottomWnd();
-}
-
-void GameManager::hideMouseCursor()
-{
-	engine->hideCursor();
-}
-
-void GameManager::showMouseCursor()
-{
-	engine->showCursor();
-}
-
-void GameManager::showSnow(int bsnow)
-{
-	if (bsnow)
-	{
-		global.data.snowShow = true;
-		global.data.rainShow = false;
-		weather->setWeather(wtSnow);
-	}
-	else
-	{
-		global.data.snowShow = false;
-		global.data.rainShow = false;
-		weather->setWeather(wtNone);
-	}
-}
-
-void GameManager::showRandomSnow()
-{
-	showSnow(engine->getRand(2));
-}
-
-void GameManager::showRain(int brain)
-{
-	global.data.rainFile = u8"";
-	if (brain)
-	{
-		global.data.rainShow = true;
-		global.data.snowShow = false;
-		weather->setWeather(wtLightning);
-	}
-	else
-	{
-		global.data.rainShow = false;
-		global.data.snowShow = false;
-		weather->setWeather(wtNone);
-	}
-}
-
-void GameManager::beginRain(const std::string& configFileName)
-{
-	global.data.rainShow = true;
-	global.data.snowShow = false;
-	global.data.rainFile = configFileName;
-	weather->setWeather(wtCustomRain, configFileName);
-}
-
-void GameManager::endRain()
-{
-	global.data.rainShow = false;
-	global.data.snowShow = false;
-	global.data.rainFile = u8"";
-	weather->setWeather(wtNone);
-}
-
-void GameManager::checkYear(const std::string& varName)
-{
-	// 获取当前系统时间点
-	auto now = std::chrono::system_clock::now();
-
-	// 转换为 time_t 类型（秒级精度）
-	std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
-
-	// 转换为本地时间的 tm 结构体
-#ifdef _WIN32
-	std::tm tlocal_tm;
-	localtime_s(&tlocal_tm, &now_time_t);
-	auto local_tm = &tlocal_tm;
-#else
-	std::tm* local_tm = localtime(&now_time_t);
-#endif
-
-	// 判断是否为 1 月 1 日
-	// tm_mon: 月份（0=1月，11=12月）
-	// tm_mday: 日期（1-31）
-	if (local_tm->tm_mon == 0 && local_tm->tm_mday == 1)
-	{
-		varList.setInteger(varName, 1);
-	}
-	else
-	{
-		varList.setInteger(varName, 0);
-	}
-}
-
-void GameManager::loadingDisplayThread(std::vector<_shared_image> loadingImage)
-{
-	int w, h;
-	engine->getWindowSize(w, h);
-
-	auto beginTime = engine->getTime();
-
-	size_t imgIndex = 0;
-
-	//loadMutex.lock();
-	while (!loadThreadOver.load())
-	{
-		//loadMutex.unlock();
-
-		engine->frameBegin();
-
-		if (engine->getTime() - beginTime > 100)
-		{
-			beginTime = engine->getTime();
-			imgIndex++;
-			if (imgIndex >= loadingImage.size())
-			{
-				imgIndex = 0;
-			}
-		}
-		engine->delay(30);
-		if (loadingImage.size() > 0)
-		{
-			engine->drawImage(loadingImage[imgIndex], w - 320, h - 70);
+			timeScriptSet = false;
+			std::string sname = timeScriptFileName;
+			timeScriptFileName = "";
+			runScript(sname);
 		}
 
-		engine->frameEnd();
-
-		//loadMutex.lock();
+		if (timerSeconds <= 0)
+		{
+			timerSeconds = 0;
+			timerStarted = false;
+			timerAccumulated = 0;
+			timeScriptSet = false;
+			timeScriptFileName = "";
+		}
 	}
-	loadingDisplaying.store(false);
-	//loadMutex.unlock();
 }
 
-void GameManager::onUpdate()
+bool GameManager::runPendingPlayerDeathScript()
 {
-	runEventList();
+	if (player == nullptr || (player->result & erRunDeathScript) == 0)
+	{
+		return false;
+	}
+
+	player->result &= ~erRunDeathScript;
+	player->cancelQueuedInteraction();
+	// A game-over script supersedes NPC deaths, traps and interactions that
+	// became ready in the same frame; keeping them would advance the story first.
+	eventList.clear();
+	{
+		std::lock_guard<std::mutex> lock(scriptTaskMutex);
+		scriptTaskList.clear();
+	}
+	runNPCDeathScript(
+		std::dynamic_pointer_cast<NPC>(player),
+		player->deathScript,
+		mapFolderName);
+	return true;
+}
+
+void GameManager::setTouchControlsRecoveryInputBlocked(bool blocked)
+{
+	if (touchControlsRecoveryInputBlocked == blocked)
+	{
+		return;
+	}
+	cancelPointerInteraction();
+	Element::setRawPointerInputBlocked(blocked);
+	touchControlsRecoveryInputBlocked = blocked;
+}
+
+void GameManager::resetTouchControlsRecoveryGesture()
+{
+	touchControlsRecoveryGesture.reset();
+	touchControlsRecoveryAwaitingRelease = false;
+	touchControlsRecoveryEmptyFrameObserved = false;
+	setTouchControlsRecoveryInputBlocked(false);
+}
+
+bool GameManager::processTouchControlsRecoveryContacts(
+	std::vector<GameInput::TouchRecoveryContact> contacts,
+	std::uint64_t nowMilliseconds,
+	bool controlsVisibleAtFrameStart,
+	bool controlsVisibleAfterExternalActions,
+	bool resetRecognitionForLifecycle)
+{
+	if (controller == nullptr)
+	{
+		resetTouchControlsRecoveryGesture();
+		return false;
+	}
+
+	if (touchControlsRecoveryInputBlocked
+		&& touchControlsRecoveryEmptyFrameObserved)
+	{
+		// The previous empty-contact frame drained every queued release. End the
+		// old transaction before evaluating this frame, which may contain a new
+		// touch or a new visibility transition that needs its own gate.
+		resetTouchControlsRecoveryGesture();
+	}
+
+	if (touchControlsRecoveryInputBlocked && contacts.empty())
+	{
+		touchControlsRecoveryGesture.reset();
+		touchControlsRecoveryAwaitingRelease = true;
+		touchControlsRecoveryEmptyFrameObserved = true;
+		return false;
+	}
+	if (touchControlsRecoveryInputBlocked)
+	{
+		touchControlsRecoveryEmptyFrameObserved = false;
+	}
+
+	const bool hasRecoveryCandidate =
+		contacts.size()
+			== GameInput::TouchControlsRecoveryGesture::RequiredContactCount;
+	const bool visibilityChanged =
+		controlsVisibleAtFrameStart != controlsVisibleAfterExternalActions;
+	if (!touchControlsRecoveryInputBlocked
+		&& (visibilityChanged
+			|| (hasRecoveryCandidate
+				&& !controlsVisibleAfterExternalActions)))
+	{
+		setTouchControlsRecoveryInputBlocked(true);
+		// An empty SDL contact snapshot can still have a complete down/up tap
+		// queued for this frame. Keep the transition frame gated, then allow the
+		// next empty frame to release it.
+		touchControlsRecoveryEmptyFrameObserved = contacts.empty();
+	}
+
+	if (resetRecognitionForLifecycle)
+	{
+		touchControlsRecoveryGesture.reset();
+		if (touchControlsRecoveryInputBlocked)
+		{
+			touchControlsRecoveryAwaitingRelease = true;
+		}
+		return false;
+	}
+
+	if (controlsVisibleAfterExternalActions)
+	{
+		touchControlsRecoveryGesture.reset();
+		if (touchControlsRecoveryInputBlocked)
+		{
+			touchControlsRecoveryAwaitingRelease = true;
+		}
+		return false;
+	}
+
+	if (touchControlsRecoveryAwaitingRelease
+		|| !touchControlsRecoveryInputBlocked)
+	{
+		touchControlsRecoveryGesture.reset();
+		return false;
+	}
+
+	if (!touchControlsRecoveryGesture.update(
+		std::move(contacts), nowMilliseconds, false))
+	{
+		return false;
+	}
+
+	touchControlsRecoveryAwaitingRelease = true;
+	return true;
 }
 
 void GameManager::onDraw()
 {
 	map->drawMap();
+	if (global.data.scriptShowMapPos && player != nullptr)
+	{
+		Point position = player->getPosition();
+		engine->drawText(convert::formatString("Map: %d, %d", position.x, position.y), 8, 8, 18, 0xD0FFFFFF);
+	}
 }
 
 bool GameManager::onInitial()
 {
-	if (Config::loadWithThread)
+	const auto& manifest = ResourceManager::instance().getActiveManifest();
+	global.useWav = manifest.useWav;
+	global.applyResourceManifestFeatures(manifest);
+	global.loadUiSettings();
+	goodsManager.configureLayout();
+	magicManager.configureLayout();
+
+	if (!SaveFileManager::RecoverInterruptedSaveOperations())
 	{
-		initMenuWithThread();
-	}
-	else
-	{
-		initMenu();
+		GameLog::write(
+			"GameManager: startup save recovery was incomplete; unaffected slots remain available\n");
 	}
 
-	if (gameIndex == 0)
+	if (!initMenu())
 	{
-		inEvent = true;
-		runScript(u8"newgame.txt");
-		inEvent = false;
+		return false;
 	}
-	else
+
+	if (editorRunMode)
 	{
-		if (Config::loadWithThread)
+		editorRunSceneApplicationResult =
+			applyEditorRunSceneTarget();
+		editorRunSceneApplicationCompleted = true;
+		if (!editorRunSceneApplicationResult.succeeded())
 		{
-			loadGameWithThread(gameIndex);
+			GameLog::write(
+				"GameManager: editor-run scene application failed "
+				"code=%s field=%s path=%s line=%u column=%u message=%s\n",
+				editorRunSceneApplicationResult.diagnosticCode.c_str(),
+				editorRunSceneApplicationResult.fieldPath.c_str(),
+				editorRunSceneApplicationResult.virtualPath.c_str(),
+				editorRunSceneApplicationResult.line,
+				editorRunSceneApplicationResult.column,
+				editorRunSceneApplicationResult.message.c_str());
+			return false;
+		}
+	}
+	else if (gameIndex == 0)
+	{
+		applyStartupIntegerVariables();
+		// 新游戏入口脚本：优先使用 Manifest NewGame.Script；为空时回退到 newgame.txt。
+		std::string newGameScript = manifest.newGameScript;
+		if (newGameScript.empty())
+		{
+			newGameScript = "newgame.txt";
+		}
+		inEvent = true;
+		scriptAPI.runScript(newGameScript);
+		inEvent = false;
+		bool hasNewGameSave = SaveFileManager::HasSaveFile(0);
+		if (map->data == nullptr && hasNewGameSave)
+		{
+			GameLog::write("GameManager: new game script did not load a map, fallback to save index 0\n");
+			bool loaded = false;
+			if (Config::loadAsync)
+			{
+				loaded = scriptAPI.loadGameAsync(0);
+			}
+			else
+			{
+				loaded = scriptAPI.loadGame(0);
+			}
+			if (!loaded)
+			{
+				return false;
+			}
+		}
+		if (exitAfterNewGameScript)
+		{
+			if (postNewGameAutomationWaitMilliseconds > 0)
+			{
+				postNewGameAutomationWaitElapsed = 0;
+				postNewGameAutomationWaitPending = true;
+				GameLog::write("GameManager: post new game automation wait %llu ms\n",
+					static_cast<unsigned long long>(postNewGameAutomationWaitMilliseconds));
+			}
+			else
+			{
+				finishNewGameAutomationAndExit();
+			}
 		}
 		else
 		{
-			loadGame(gameIndex);
+			checkExpectedIntegerVariables();
+		}
+	}
+	else
+	{
+		bool loaded = false;
+		if (Config::loadAsync)
+		{
+			loaded = scriptAPI.loadGameAsync(gameIndex);
+		}
+		else
+		{
+			loaded = scriptAPI.loadGame(gameIndex);
+		}
+		if (!loaded)
+		{
+			return false;
 		}
 		weather->fadeInEx();
 	}	
@@ -2034,66 +2570,176 @@ bool GameManager::onHandleEvent(AEvent & e)
 	}
 	if (e.eventType == ET_KEYDOWN)
 	{
-		if (e.eventData == KEY_F12 && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		const bool usesCheatShortcutModifiers =
+			(engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT))
+			&& !engine->getKeyPress(KEY_LALT)
+			&& !engine->getKeyPress(KEY_RALT)
+			&& !engine->getKeyPress(KEY_LCTRL)
+			&& !engine->getKeyPress(KEY_RCTRL);
+		if (e.eventData == KEY_F12 && usesCheatShortcutModifiers)
 		{
-			cheatMode = !cheatMode;
+			toggleCheatMode();
 		}
-		else if (e.eventData == KEY_Q && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_Q && usesCheatShortcutModifiers)
 		{
-			if (cheatMode)
-			{
-				fullMana();
-				fullLife();
-				fullThew();
-			}
+			performCheatAction(CheatAction::RestorePlayerResources);
 		}
-		else if (e.eventData == KEY_W && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_W && usesCheatShortcutModifiers)
 		{
-			if (cheatMode)
-			{
-				if (magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].magic != nullptr && magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level < 10)
-				{
-					magicManager.magicList[MAGIC_COUNT + MAGIC_TOOLBAR_COUNT].level += 1;
-					menu->practiceMenu->updateExp();
-					menu->practiceMenu->updateLevel();
-				}
-			}
+			performCheatAction(CheatAction::IncreasePracticeMagicLevel);
 		}
-		else if (e.eventData == KEY_E && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_E && usesCheatShortcutModifiers)
 		{
-			if (cheatMode)
-			{
-				player->addExp(player->levelUpExp - player->exp);
-			}
+			performCheatAction(CheatAction::IncreasePlayerLevel);
 		}
-		else if (e.eventData == KEY_R && (engine->getKeyPress(KEY_LSHIFT) || engine->getKeyPress(KEY_RSHIFT)) && !engine->getKeyPress(KEY_LALT) && !engine->getKeyPress(KEY_RALT) && !engine->getKeyPress(KEY_LCTRL) && !engine->getKeyPress(KEY_RCTRL))
+		else if (e.eventData == KEY_R && usesCheatShortcutModifiers)
 		{
-			if (cheatMode)
-			{
-				player->addMoney(100000);
-			}
+			performCheatAction(CheatAction::AddMoney);
 		}
 	}
 	return false;
 }
 
-void GameManager::clearBody()
+bool GameManager::isCheatModeEnabled() const noexcept
 {
-	objectManager->clearBody();
+	return cheatMode;
 }
 
-void GameManager::openBox()
+bool GameManager::isCheatInvincibilityEnabled() const noexcept
 {
-	if (scriptObj != nullptr)
+	return cheatInvincibilityEnabled;
+}
+
+bool GameManager::shouldProtectPlayerFromCheatDamage() const noexcept
+{
+	return cheatMode && cheatInvincibilityEnabled;
+}
+
+GameManager::CheatOperationResult GameManager::setCheatModeEnabled(bool enabled)
+{
+	cheatMode = enabled;
+	if (!enabled)
 	{
-		scriptObj->openBox();
+		cheatInvincibilityEnabled = false;
+	}
+	return completeCheatOperation(
+		true, enabled ? "作弊模式已开启" : "作弊模式已关闭");
+}
+
+GameManager::CheatOperationResult GameManager::toggleCheatMode()
+{
+	return setCheatModeEnabled(!cheatMode);
+}
+
+GameManager::CheatOperationResult GameManager::performCheatAction(
+	CheatAction action)
+{
+	if (!cheatMode)
+	{
+		return completeCheatOperation(false, "请先开启作弊模式");
+	}
+	if (player == nullptr)
+	{
+		return completeCheatOperation(false, "角色数据不可用");
+	}
+
+	switch (action)
+	{
+	case CheatAction::ToggleInvincibility:
+		cheatInvincibilityEnabled = !cheatInvincibilityEnabled;
+		return completeCheatOperation(true,
+			cheatInvincibilityEnabled ? "无敌模式已开启" : "无敌模式已关闭");
+	case CheatAction::RestorePlayerResources:
+		player->fullMana();
+		player->fullLife();
+		player->fullThew();
+		return completeCheatOperation(true, "生命、内力和体力已补满");
+	case CheatAction::IncreasePracticeMagicLevel:
+	{
+		const int practiceIndex = magicManager.practiceIndex();
+		if (!magicManager.magicListExists(practiceIndex))
+		{
+			return completeCheatOperation(false, "当前没有正在修炼的武功");
+		}
+		MagicInfo& practiceMagic = magicManager.magicList[
+			static_cast<std::size_t>(practiceIndex)];
+		if (practiceMagic.magic == nullptr)
+		{
+			return completeCheatOperation(false, "当前没有正在修炼的武功");
+		}
+		if (practiceMagic.level >= MAGIC_MAX_LEVEL)
+		{
+			return completeCheatOperation(false,
+				convert::formatString("%s已达到最高等级",
+					practiceMagic.magic->name.c_str()));
+		}
+		if (!applyCheatPracticeMagicLevelIncrease())
+		{
+			return completeCheatOperation(false,
+				"当前修炼武功无法继续提升");
+		}
+		return completeCheatOperation(true,
+			convert::formatString("%s已提升至%d级",
+				practiceMagic.magic->name.c_str(), practiceMagic.level));
+	}
+	case CheatAction::IncreasePlayerLevel:
+		if (player->level >= static_cast<int>(player->levelList.size()))
+		{
+			return completeCheatOperation(false, "角色已达到最高等级");
+		}
+		if (!applyCheatPlayerLevelIncrease())
+		{
+			return completeCheatOperation(false, "当前角色无法继续提升");
+		}
+		return completeCheatOperation(true,
+			convert::formatString("角色已提升至%d级", player->level));
+	case CheatAction::AddMoney:
+	{
+		const int previousMoney = player->money;
+		player->addMoney(100000);
+		if (player->money == previousMoney)
+		{
+			return completeCheatOperation(false, "银两已达到上限");
+		}
+		return completeCheatOperation(true, convert::formatString(
+			"已增加100000两银子，当前银两：%d", player->money));
+	}
+	default:
+		return completeCheatOperation(false, "未知作弊操作");
 	}
 }
 
-void GameManager::closeBox()
+void GameManager::showCheatNotice(const std::string& message)
 {
-	if (scriptObj != nullptr)
+	if (menu != nullptr)
 	{
-		scriptObj->closeBox();
+		menu->showSystemNotice(message);
+	}
+}
+
+GameManager::CheatOperationResult GameManager::completeCheatOperation(
+	bool succeeded,
+	const std::string& message)
+{
+	showCheatNotice(message);
+	return { succeeded, message };
+}
+
+bool GameManager::applyCheatPlayerLevelIncrease()
+{
+	return player != nullptr && player->addExperienceToNextLevel();
+}
+
+bool GameManager::applyCheatPracticeMagicLevelIncrease()
+{
+	return magicManager.addPracticeExperienceToNextLevel();
+}
+
+void GameManager::resetExclusiveLoadingInputState()
+{
+	cancelPointerInteraction();
+	if (engine != nullptr)
+	{
+		engine->releasePhysicalInputsForContextTransition();
 	}
 }

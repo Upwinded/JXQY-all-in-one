@@ -1,11 +1,14 @@
+#include <string>
 #include "BaseComponent.h"
+#include "../File/log.h"
+
 
 std::map<std::string, _shared_imp> BaseComponent::res;
 
 BaseComponent::BaseComponent() 
 { 
 	result = erNone; 
-	priority = epComponent; 
+	setPriority(epComponent); 
 }
 
 BaseComponent::~BaseComponent() 
@@ -17,10 +20,10 @@ void BaseComponent::initFromIniFileName(const std::string& fileName)
 {
 	std::unique_ptr<char[]> s;
 	int len = 0;
-	len = PakFile::readFile(fileName, s);
+	len = File::readFile(fileName, s);
 	if (s == nullptr || len == 0)
 	{
-		GameLog::write(u8"no ini file: %s\n", fileName.c_str());
+		GameLog::write("no ini file: %s\n", fileName.c_str());
 		return;
 	}
 	INIReader ini(s);

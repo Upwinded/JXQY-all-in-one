@@ -9,3 +9,4 @@ namespace CollisionDetector
 	bool detectCollisionPass(std::shared_ptr<NPC> npc, std::shared_ptr<Effect> effect, Point pos);
 };
 
+

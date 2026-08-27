@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    android:versionCode="1"
-    android:versionName="1.0"
     android:installLocation="auto">
 
     <!-- OpenGL ES 2.0 -->
@@ -46,6 +44,12 @@
     <!-- Allow downloading to the external storage on Android 5.1 and older -->
     <!-- <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="22" /> -->
 
+    <!-- Allow reading user-placed resource packs from a fixed public directory
+         (Download/jxqy/assets/). On Android 11+ this requires MANAGE_EXTERNAL_STORAGE,
+         which the app requests by opening the system "all files access" settings page. -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
     <!-- Allow access to Bluetooth devices -->
     <!-- Currently this is just for Steam Controller support and requires setting SDL_HINT_JOYSTICK_HIDAPI_STEAM -->
     <!-- <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" /> -->
@@ -54,11 +58,9 @@
     <!-- Allow access to the vibrator -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- Allow access to Internet -->
-    <!-- if you want to connect to the network or internet, uncomment this. -->
-    <!--
     <uses-permission android:name="android.permission.INTERNET" />
-    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Create a Java class extending SDLActivity and place it in a
          directory under app/src/main/java matching the package, e.g. app/src/main/java/com/gamemaker/game/MyGame.java
@@ -68,20 +70,21 @@
 
          An example Java class can be found in README-android.md
     -->
-    <application android:label="@string/app_name_cn"
+    <application android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:allowBackup="true"
         android:theme="@style/AppTheme"
-        android:hardwareAccelerated="true">
+        android:hardwareAccelerated="true"
+        android:requestLegacyExternalStorage="true">
         
 
         <!-- Example of setting SDL hints from AndroidManifest.xml:
         <meta-data android:name="SDL_ENV.SDL_ANDROID_TRAP_BACK_BUTTON" android:value="0"/>
          -->
-        <activity android:name="SDLActivity"
+        <activity android:name="com.upwinded.jxqy.JxqyActivity"
             android:alwaysRetainTaskState="true"
-            android:launchMode="singleInstance"
+            android:launchMode="singleTask"
 
             android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"
@@ -105,6 +108,9 @@
             </intent-filter>
             -->
         </activity>
+        <receiver
+            android:name="com.upwinded.jxqy.JxqyPackageInstallReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

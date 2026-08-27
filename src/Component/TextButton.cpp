@@ -1,9 +1,21 @@
 #include "TextButton.h"
+#include "../libconvert/libconvert.h"
+#include "ComponentRegistry.h"
+
+namespace
+{
+	bool registeredTextButton = []
+	{
+		ComponentRegistry::getInstance().registerType("TextButton",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<TextButton>(); });
+		return true;
+	}();
+}
 
 TextButton::TextButton()
 {
-	name = u8"textbutton";
-	priority = epButton;
+	name = "textbutton";
+	setPriority(epButton);
 	elementType = etButton;
 	result = erNone;
     stretch = true;
@@ -19,9 +31,19 @@ void TextButton::setFontSize(int fontSize)
 	label.fontSize = fontSize;
 }
 
+int TextButton::getFontSize() const
+{
+	return label.fontSize;
+}
+
 void TextButton::setStrColor(unsigned int color)
 {
 	label.color = color;
+}
+
+unsigned int TextButton::getTextColor() const
+{
+	return label.color;
 }
 
 void TextButton::setStr(const std::string& s)
@@ -47,8 +69,8 @@ void TextButton::setUTF8Str(const std::string& s)
 void TextButton::initFromIni(INIReader & ini)
 {
 	Button::initFromIni(ini);
-	label.fontSize = ini.GetInteger(u8"Init", u8"Font", label.fontSize);
-	label.color = ini.GetColor(u8"Init", u8"Color", label.color);
+	label.fontSize = ini.GetInteger("Init", "Font", label.fontSize);
+	label.color = ini.GetColor("Init", "Color", label.color);
 }
 
 void TextButton::onDraw()
@@ -63,6 +85,7 @@ void TextButton::onDraw()
 
 void TextButton::onMouseLeftDown(int x, int y)
 {
+	playSound(1);
     if (parent != nullptr && parent->canCallBack)
     {
         result = erMouseLDown;

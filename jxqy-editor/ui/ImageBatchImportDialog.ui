@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ImageBatchImportDialog</class>
+ <widget class="QDialog" name="ImageBatchImportDialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>980</width>
+    <height>620</height>
+   </rect>
+  </property>
+  <property name="minimumSize">
+   <size>
+    <width>760</width>
+    <height>480</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>批量导入图片帧</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QLabel" name="instructionLabel">
+     <property name="text">
+      <string>按队列顺序导入 PNG；确认时会重新验证全部文件，任一失败都不会修改文档。</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="positionLayout">
+     <item>
+      <widget class="QLabel" name="insertionPositionLabel">
+       <property name="text">
+        <string>插入位置：</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="insertionPositionComboBox"/>
+     </item>
+     <item>
+      <spacer name="positionSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="offsetTemplateGroupBox">
+     <property name="title">
+      <string>当次偏移模板</string>
+     </property>
+     <layout class="QHBoxLayout" name="offsetTemplateLayout">
+      <item>
+       <widget class="QComboBox" name="offsetTemplateComboBox"/>
+      </item>
+      <item>
+       <widget class="QLabel" name="fixedXOffsetLabel">
+        <property name="text">
+         <string>固定 X：</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="fixedXOffsetSpinBox"/>
+      </item>
+      <item>
+       <widget class="QLabel" name="fixedYOffsetLabel">
+        <property name="text">
+         <string>固定 Y：</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QSpinBox" name="fixedYOffsetSpinBox"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="applyTemplateButton">
+        <property name="text">
+         <string>应用到全部队列项</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="recipeLayout">
+     <item>
+      <widget class="QLabel" name="recipeLabel">
+       <property name="text">
+        <string>可复用方案：</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="loadRecipeButton">
+       <property name="text">
+        <string>加载方案…</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="saveRecipeButton">
+       <property name="text">
+        <string>保存方案…</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="recipeStatusLabel">
+       <property name="text">
+        <string>方案只保存队列顺序、PNG 相对路径和 X/Y；队列修改不会自动写回。</string>
+       </property>
+       <property name="wordWrap">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="importQueueTableWidget">
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::ExtendedSelection</enum>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <property name="columnCount">
+      <number>6</number>
+     </property>
+     <column>
+      <property name="text">
+       <string>文件名</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>完整路径</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>尺寸</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>X 偏移</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>Y 偏移</string>
+      </property>
+     </column>
+     <column>
+      <property name="text">
+       <string>验证状态</string>
+      </property>
+     </column>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="queueButtonsLayout">
+     <item>
+      <widget class="QPushButton" name="addFilesButton">
+       <property name="text">
+        <string>添加 PNG…</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="removeFilesButton">
+       <property name="text">
+        <string>移除所选</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="moveUpButton">
+       <property name="text">
+        <string>上移</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="moveDownButton">
+       <property name="text">
+        <string>下移</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="clearQueueButton">
+       <property name="text">
+        <string>清空队列</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="revalidateButton">
+       <property name="text">
+        <string>重新验证</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="queueButtonsSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="queueSummaryLabel">
+     <property name="text">
+      <string>队列为空；请添加 PNG。</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

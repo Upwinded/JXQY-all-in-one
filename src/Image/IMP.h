@@ -2,8 +2,8 @@
 #include <vector>
 #include "../Types/Types.h"
 #include "../File/File.h"
-#include "../Engine/Engine.h"
-#include "../File/PakFile.h"
+#include "../Engine/ImageTypes.h"
+#include "PicDecoder.h"
 
 
 #define Directly_Load false
@@ -18,12 +18,15 @@ struct IMPFrame
 	int frameNull[frameNullLen];
 	//char* data = nullptr;
 	std::unique_ptr<char[]> data;
+	std::vector<uint8_t> pixelData;
+	int pixelWidth = 0;
+	int pixelHeight = 0;
 	_shared_image image = nullptr;
 };
 
 #define imageNullLen 5
 #define imgHeadLen 16
-#define imgHeadString u8"IMG File Ver1.0"
+#define imgHeadString "IMG File Ver1.0"
 
 struct IMPImage
 {
@@ -31,8 +34,8 @@ private:
 	static uint32_t IMPImageCount;
 public:
 #ifdef DEBUG
-	IMPImage() { GameLog::write(u8"IMPImageCount Inc:%d", ++IMPImageCount); }
-	~IMPImage() { GameLog::write(u8"IMPImageCount Dec:%d", --IMPImageCount); }
+	IMPImage() { GameLog::write("IMPImageCount Inc:%d", ++IMPImageCount); }
+	~IMPImage() { GameLog::write("IMPImageCount Dec:%d", --IMPImageCount); }
 #endif // DEBUG
 
 	char head[imgHeadLen];
@@ -49,7 +52,7 @@ struct IMPList
 	int offset;
 };
 
-#define impHeadString u8"IMP File Ver1.0"
+#define impHeadString "IMP File Ver1.0"
 #define impHeadLen 16
 #define impNullLen 7
 
@@ -68,19 +71,19 @@ private:
 	static bool loadIMPImage(_shared_imp impImage, const std::string& fileName, bool directlyLoad = Directly_Load);
 	static bool loadIMPImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
 	static bool loadIMPImageFromFile(_shared_imp impImage, const std::string& fileName, bool directlyLoad = Directly_Load);
-	static bool loadIMPImageFromPak(_shared_imp impImage, const std::string& fileName, const std::string& pakName = u8"", bool directlyLoad = Directly_Load, bool firstReadPak = false);
 
 public:
 
 	static unsigned int getIMPImageActionTime(_shared_imp impImage);
+	// Normalize decoded legacy character frames by removing alpha == 0 outer
+	// edges and compensating offsets. Visible pixels keep the same world position.
+	static void cropTransparentEdges(_shared_imp impImage);
 
 	static void copyIMPImage(_shared_imp dst, _shared_imp src);
 	
 	static _shared_imp createIMPImage(const std::string& fileName, bool directlyLoad = Directly_Load);
-	static _shared_imp createIMPImage(unsigned int fileID, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromMem(std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromFile(const std::string& fileName, bool directlyLoad = Directly_Load);
-	static _shared_imp createIMPImageFromPak(const std::string& fileName, bool directlyLoad = Directly_Load, const std::string & pakName = u8"", bool firstReadPak = false);
 	static _shared_imp createIMPImageFromPNG(std::string pngName, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromImage(_shared_image img);
 
@@ -95,5 +98,9 @@ public:
 private:
 	static bool cmpIMGHead(_shared_imp img);
 	static void clearIMPImage(_shared_imp impImage);
+	static bool loadPicImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);
+	static bool loadCommonImageFromMem(_shared_imp impImage, std::unique_ptr<char[]>& data,
+		int size, bool directlyLoad = Directly_Load);
+	static _shared_image createImageFromPixels(const uint8_t* pixelData, int width, int height);
 
 };

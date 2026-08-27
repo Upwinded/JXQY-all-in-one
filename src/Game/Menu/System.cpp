@@ -1,11 +1,15 @@
 #include "System.h"
+#include "../../Engine/Engine.h"
 #include "SaveLoad.h"
+#include "ControllerPromptPresenter.h"
 #include "../GameManager/GameManager.h"
 
-
-System::System()
+System::System(bool focusOptionsValue)
+	: focusOptions(focusOptionsValue)
 {
-	priority = epMax;
+	name = "System";
+	setPriority(epMax);
+	focusManager.setInputAwarePresentation();
 	init();
 }
 
@@ -17,130 +21,218 @@ System::~System()
 
 void System::init()
 {
+	const std::string preferredFocusId = focusManager.getFocusedNodeId();
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\system\\window.ini");
-	title = addComponent<ImageContainer>(u8"ini\\ui\\system\\title.ini");
-	returnBtn = addComponent<Button>(u8"ini\\ui\\system\\return.ini");
-	saveloadBtn = addComponent<Button>(u8"ini\\ui\\system\\saveload.ini");
-	optionBtn = addComponent<Button>(u8"ini\\ui\\system\\option.ini");
-	quitBtn = addComponent<Button>(u8"ini\\ui\\system\\quit.ini");
+	loadMenuDefinition("ini\\ui\\system\\system.menu.ini");
+
+	title = getComponentByName<ImageContainer>("title");
+	returnBtn = getComponentByName<Button>("returnBtn");
+	saveloadBtn = getComponentByName<Button>("saveloadBtn");
+	optionBtn = getComponentByName<Button>("optionBtn");
+	quitBtn = getComponentByName<Button>("quitBtn");
 
 	setChildRectReferToParent();
+	configureFocus(preferredFocusId);
 }
 
 void System::freeResource()
 {
-	impImage = nullptr;
+	focusManager.clear();
+	title = nullptr;
+	returnBtn = nullptr;
+	saveloadBtn = nullptr;
+	optionBtn = nullptr;
+	quitBtn = nullptr;
+	ConfigDrivenPanel::freeResource();
+}
 
-	freeCom(title);
-	freeCom(returnBtn);
-	freeCom(saveloadBtn);
-	freeCom(optionBtn);
-	freeCom(quitBtn);
+void System::configureFocus(const std::string& preferredFocusId)
+{
+	focusManager.clear();
+	const std::vector<std::string> focusOrder = focusManager.addVisualLinearGroup(
+		"system-actions",
+		UIFocusLinearAxis::Vertical,
+		{
+			{ "return", returnBtn, [this]() { closeToGame(); } },
+			{ "save-load", saveloadBtn, [this]() { openSaveLoad(); } },
+			{ "options", optionBtn, [this]() { openOptions(); } },
+			{ "return-to-title", quitBtn, [this]() { returnToTitle(); } }
+		});
+	focusManager.applyConfigDrivenFocusNavigation(
+		*this,
+		{
+			{ "returnBtn", "return" },
+			{ "saveloadBtn", "save-load" },
+			{ "optionBtn", "options" },
+			{ "quitBtn", "return-to-title" },
+		});
+	if (focusOptions && optionBtn != nullptr)
+	{
+		focusManager.setDefaultFocus("options");
+	}
+	else if (returnBtn != nullptr)
+	{
+		focusManager.setDefaultFocus("return");
+	}
+	else if (!focusOrder.empty())
+	{
+		focusManager.setDefaultFocus(focusOrder.front());
+	}
+	focusManager.setCancelHandler([this]() { closeToGame(); });
+	if (preferredFocusId.empty()
+		|| !focusManager.focusNode(preferredFocusId))
+	{
+		focusManager.focusDefault();
+	}
+}
+
+void System::closeToGame()
+{
+	logicRunning = false;
+	result = erOK;
+}
+
+void System::openSaveLoad()
+{
+	auto saveLoad = std::make_shared<SaveLoad>(true, true);
+	saveLoad->setPriority(0);
+	addChild(saveLoad);
+	const unsigned int returnValue = saveLoad->run();
+	if ((returnValue & erLoad) != 0)
+	{
+		index = saveLoad->index;
+		result = erLoad;
+		logicRunning = false;
+	}
+	else if ((returnValue & erSave) != 0)
+	{
+		index = saveLoad->index;
+		result = erSave;
+		if (GameManager::getInstance()->saveGame(index + 1))
+		{
+			saveScreen();
+		}
+		else
+		{
+			handleSaveFailure();
+		}
+	}
+	removeChild(saveLoad);
+}
+
+void System::openOptions()
+{
+	auto option = std::make_shared<Option>();
+	option->setPriority(epMax);
+	addChild(option);
+	option->run();
+	removeChild(option);
+}
+
+void System::returnToTitle()
+{
+	logicRunning = false;
+	result = erReturnToTitle;
 }
 
 void System::onEvent()
 {
 	if (saveloadBtn != nullptr && saveloadBtn->getResult(erClick))
 	{
-		auto sl = std::make_shared<SaveLoad>(true, true);
-		addChild(sl);
-		sl->priority = 0;
-		unsigned int ret = sl->run();
-		if ((ret & erLoad) != 0)
-		{
-			index = sl->index;
-			result = erLoad;
-			running = false;
-			visible = false;
-
-			GameManager::getInstance()->weather->fadeOut();
-			if (Config::loadWithThread)
-			{
-				GameManager::getInstance()->loadGameWithThread(index + 1);
-			}
-			else
-			{
-				GameManager::getInstance()->loadGame(index + 1);
-			}
-			
-			GameManager::getInstance()->weather->fadeInEx();
-		}
-		else if ((ret & erSave) != 0)
-		{
-			index = sl->index;
-			result = erSave;
-			GameManager::getInstance()->saveGame(index + 1);
-			saveScreen();
-		}
-		removeChild(sl);
-		sl = nullptr;
+		openSaveLoad();
 	}
 	if (optionBtn != nullptr && optionBtn->getResult(erClick))
 	{
-		auto option = std::make_shared<Option>();
-		option->priority = epMax;
-		addChild(option);
-		option->run();
-		removeChild(option);
-		option = nullptr;
+		openOptions();
 	}
 	if (returnBtn != nullptr && returnBtn->getResult(erClick))
 	{
-		running = false;
-		result = erOK;
+		closeToGame();
 	}
 	if (quitBtn != nullptr && quitBtn->getResult(erClick))
 	{
-		running = false;
-		result = erExit;
+		returnToTitle();
 	}
+}
+
+void System::handleSaveFailure()
+{
+	gm->showMessage("存档失败");
+	result = erOK;
+	logicRunning = false;
 }
 
 bool System::onHandleEvent(AEvent & e)
 {
+	if ((e.eventType == ET_MOUSEDOWN
+			&& e.eventData == MBC_MOUSE_LEFT)
+		|| e.eventType == ET_FINGERDOWN)
+	{
+		adoptUIFocusPointerTarget(
+			e.eventType == ET_MOUSEDOWN ? TOUCH_MOUSEID : e.eventData);
+	}
 	if (e.eventType == ET_QUIT)
 	{
-		running = false;
+		logicRunning = false;
 		result = erExit;
 		return true;
 	}
-	else if (e.eventType == ET_KEYDOWN)
+	else if (dispatchKeyboardUIAction(e, *this))
 	{
-		if (e.eventData == KEY_ESCAPE)
-		{
-			running = false;
-			result = erOK;
-			return true;
-		}
+		return true;
 	}
 	return false;
 }
 
+bool System::onHandleUIAction(UIAction action)
+{
+	return focusManager.handleAction(action);
+}
+
+void System::onDrawEnd()
+{
+	if (!visible || engine == nullptr
+		|| !Element::isCurrentRunOwner(this)
+		|| !focusManager.isFocusPresented())
+	{
+		return;
+	}
+	using GameInput::InputAction;
+	const std::vector<ControllerPromptItem> items =
+	{
+		{ InputAction::NavigateUp, "选择" },
+		{ InputAction::Confirm, "确认" },
+		{ InputAction::Cancel, "返回游戏" }
+	};
+	ControllerPromptPresenter::drawBottomBar(
+		engine, engine->inputActions(), items);
+}
+
+void System::onRun()
+{
+	focusManager.focusDefault();
+}
+
 void System::saveScreen()
 {
-	std::string imageName = SHOT_FOLDER + convert::formatString(SHOT_BMP, index + 1);
+	std::string imageName = SHOT_FOLDER + convert::formatString(SHOT_PNG, index + 1);
 	int w = 260;
 	int h = 200;
-	engine->beginSaveScreen();
+	if (!engine->beginSaveScreen())
+	{
+		return;
+	}
 	gm->map->drawMap();
 	gm->weather->draw();
 	auto snap = engine->endSaveScreen();
+	if (snap == nullptr)
+	{
+		return;
+	}
 	std::unique_ptr<char[]> data;
-	int len = engine->saveImageToPixels(snap, w, h, data);
+	int len = engine->saveImageToPngMemory(snap, w, h, data);
 	if (len > 0 && data.get() != nullptr)
 	{
-		auto newData = std::make_unique<char[]>(len + SAVE_SHOT_HEAD_LEN + 12);
-		memcpy(newData.get() + SAVE_SHOT_HEAD_LEN + 12, data.get(), len);
-
-		memcpy(newData.get(), SAVE_SHOT_HEAD, SAVE_SHOT_HEAD_LEN);
-		memcpy(newData.get() + SAVE_SHOT_HEAD_LEN, &w, 4);
-		memcpy(newData.get() + SAVE_SHOT_HEAD_LEN + 4, &h, 4);
-		int nil = 0xFFFF;
-		memcpy(newData.get() + SAVE_SHOT_HEAD_LEN + 8, &nil, 4);
-		File::writeFile(imageName, newData, len + SAVE_SHOT_HEAD_LEN + 12);
-		
+		File::writeFile(imageName, data, len);
 	}
-	//engine->freeImage(snap);
-
 }

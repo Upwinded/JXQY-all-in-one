@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect width="1024" height="1024" fill="#0d1110" />
+  <g fill="none" stroke="#c8974e" opacity="0.17">
+    <circle cx="690" cy="300" r="142" stroke-width="4" />
+    <circle cx="690" cy="300" r="208" stroke-width="4" />
+    <circle cx="690" cy="300" r="282" stroke-width="3" />
+  </g>
+  <g transform="rotate(-3 512 512)">
+    <rect x="250" y="250" width="524" height="524" rx="62" fill="#111815" stroke="#b94d42" stroke-width="20" />
+    <rect x="278" y="278" width="468" height="468" rx="43" fill="none" stroke="#c8974e" stroke-width="4" opacity="0.28" />
+    <text x="512" y="643" text-anchor="middle" fill="#d25b4d" font-family="Microsoft YaHei, Noto Serif CJK SC, serif" font-size="300" font-weight="700">剑</text>
+  </g>
+</svg>

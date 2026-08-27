@@ -1,21 +1,40 @@
-﻿#include "VideoPlayer.h"
+#include "VideoPlayer.h"
+#include "../Engine/Engine.h"
+#include "ComponentRegistry.h"
+#include "../Game/Data/MediaPathResolver.h"
+#include "../Game/GameTypes.h"
+#include "../Game/Menu/UIFocusManager.h"
+
+namespace
+{
+	bool registeredVideoPlayer = []
+	{
+		ComponentRegistry::getInstance().registerType("VideoPlayer",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<VideoPlayer>(); });
+		return true;
+	}();
+
+std::string resolveVideoFileName(const std::string& fileName)
+{
+	return resolveMediaAssetPath(VIDEO_FOLDER, fileName,
+		{ ".avi", ".mp4", ".wmv", ".mpg", ".mpeg" });
+}
+}
 
 VideoPlayer::VideoPlayer()
 {
 	elementType = etVideoPlayer;
-	priority = epVideo;
+	setPriority(epVideo);
 	result = erNone;
 	rect = { 0, 0, 0, 0 };
-	name = u8"VideoPlayer";
+	name = "VideoPlayer";
 	coverMouse = true;
 	canCallBack = true;
-#ifdef __MOBILE__
 	skipLabel->rect = {30, 20, 70, 35};
 	skipLabel->fontSize = 30;
-	skipLabel->setStr(u8"跳过");
+	skipLabel->setStr("跳过");
 	skipLabel->coverMouse = true;
 	addChild(skipLabel);
-#endif
 }
 
 VideoPlayer::~VideoPlayer()
@@ -25,7 +44,7 @@ VideoPlayer::~VideoPlayer()
 
 VideoPlayer::VideoPlayer(const std::string & fileName) : VideoPlayer()
 {
-	videoFileName = fileName;
+	videoFileName = resolveVideoFileName(fileName);
 }
 
 void VideoPlayer::reopenVideo(const std::string& fileName, int vloop)
@@ -35,8 +54,8 @@ void VideoPlayer::reopenVideo(const std::string& fileName, int vloop)
 		engine->freeVideo(v);
 		v = nullptr;
 	}
-	videoFileName = fileName;	
-	v = engine->loadVideo(fileName);
+	videoFileName = resolveVideoFileName(fileName);
+	v = engine->loadVideo(videoFileName);
 	loop = vloop;
 	engine->setVideoLoop(v, vloop);
 	engine->runVideo(v);
@@ -58,7 +77,7 @@ void VideoPlayer::onChildCallBack(PElement child)
 		if (child->getResult() & erMouseLDown)
 		{
 			engine->stopVideo(v);
-			running = false;
+			logicRunning = false;
             result |= erVideoStopped;
             if (parent != nullptr && parent->canCallBack)
             {
@@ -70,15 +89,42 @@ void VideoPlayer::onChildCallBack(PElement child)
 
 bool VideoPlayer::onHandleEvent(AEvent & e)
 {
-	if (e.eventType == ET_KEYUP)
+	if (e.eventType == ET_KEYDOWN || e.eventType == ET_KEYUP)
 	{
 		if (e.eventData == KEY_ESCAPE)
 		{
 			engine->stopVideo(v);
-			running = false;
+			logicRunning = false;
+			result |= erVideoStopped;
+			if (canCallBack && parent != nullptr)
+			{
+				parent->onChildCallBack(getMySharedPtr());
+				result = erNone;
+			}
+			return true;
 		}
 	}
 	return false;
+}
+
+bool VideoPlayer::onHandleUIAction(UIAction action)
+{
+	if (action != UIAction::Cancel && action != UIAction::Confirm)
+	{
+		return false;
+	}
+	if (v != nullptr)
+	{
+		engine->stopVideo(v);
+	}
+	logicRunning = false;
+	result |= erVideoStopped;
+	if (canCallBack && parent != nullptr)
+	{
+		parent->onChildCallBack(getMySharedPtr());
+		result = erNone;
+	}
+	return true;
 }
 
 bool VideoPlayer::onInitial()
@@ -88,17 +134,37 @@ bool VideoPlayer::onInitial()
 		engine->freeVideo(v);
 		v = nullptr;
 	}
+	videoFileName = resolveVideoFileName(videoFileName);
 	v = engine->loadVideo(videoFileName);
+	if (v == nullptr)
+	{
+		result |= erVideoStopped;
+		logicRunning = false;
+		return true;
+	}
 	engine->setVideoLoop(v, loop);
 	return true;
 }
 
 void VideoPlayer::onExit()
 {
+	if (restoreHiddenCursorOnExit)
+	{
+		engine->hideCursor();
+		restoreHiddenCursorOnExit = false;
+	}
 }
 
 void VideoPlayer::onRun()
 {
+	if (v != nullptr)
+	{
+		if (!engine->getCursorVisible())
+		{
+			restoreHiddenCursorOnExit = true;
+		}
+		engine->showCursor();
+	}
 	engine->runVideo(v);
 }
 
@@ -116,9 +182,9 @@ void VideoPlayer::onUpdate()
 				result = erNone;
 			}		
 		}
-		if (running)
+		if (logicRunning)
 		{
-			running = false;
+			logicRunning = false;
 		}
 	}
 }
@@ -199,4 +265,3 @@ void VideoPlayer::onDragBegin(int * param1, int * param2)
 {
 	coverMouse = false;
 }
-

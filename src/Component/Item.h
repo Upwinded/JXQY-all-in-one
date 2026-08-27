@@ -11,21 +11,26 @@ public:
 
 	bool canShowHint = false;
 	bool showHint = false;
+	bool centerImage = false;
 	int fontSize = 18;
 
 	_shared_image strImage = nullptr;
 
 	unsigned int color = 0xFFFFFFFF;
+	_shared_imp backImage[2] = { nullptr, nullptr };
 	virtual void initFromIni(INIReader & ini);
 
 	virtual void setStr(const std::string & s);
 	
 	void resetHint();
+	void setTransferSelected(bool value) { transferSelected = value; }
+	bool isTransferSelected() const { return transferSelected; }
 	const std::string & getStr() { return str; }
 protected:
-	std::string str = u8"";
+	std::string str = "";
+	bool transferSelected = false;
 
-	virtual void freeResoure();
+	virtual void freeResource() override;
 
 	virtual void drawItemStr();
 	virtual void onDrop(PElement src, int param1, int param2);
@@ -40,4 +45,3 @@ protected:
 public:
 	virtual void onDraw();
 };
-

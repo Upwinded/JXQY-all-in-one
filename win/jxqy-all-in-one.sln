@@ -5,6 +5,8 @@ VisualStudioVersion = 17.6.33801.468
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jxqy-all-in-one", "jxqy-all-in-one\jxqy-all-in-one.vcxproj", "{7479DC1E-06B7-497A-901E-0724C6708AF5}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jxqy-program-updater", "jxqy-program-updater\jxqy-program-updater.vcxproj", "{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{7479DC1E-06B7-497A-901E-0724C6708AF5}.Release|x64.Build.0 = Release|x64
 		{7479DC1E-06B7-497A-901E-0724C6708AF5}.Release|x86.ActiveCfg = Release|Win32
 		{7479DC1E-06B7-497A-901E-0724C6708AF5}.Release|x86.Build.0 = Release|Win32
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Debug|x64.ActiveCfg = Debug|x64
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Debug|x64.Build.0 = Debug|x64
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Debug|x86.ActiveCfg = Debug|Win32
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Debug|x86.Build.0 = Debug|Win32
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Release|x64.ActiveCfg = Release|x64
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Release|x64.Build.0 = Release|x64
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Release|x86.ActiveCfg = Release|Win32
+		{B7A4C1D8-EE2C-4C93-AD3A-80940D579C01}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

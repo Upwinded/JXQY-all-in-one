@@ -1,0 +1,417 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="windowTitle">
+   <string>UPEdit-JXQY</string>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1280</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <widget class="QWidget" name="centralWidget">
+   <layout class="QVBoxLayout" name="centralLayout">
+    <property name="margin">
+     <number>0</number>
+    </property>
+    <item>
+     <widget class="QMdiArea" name="mdiArea">
+      <property name="horizontalScrollBarPolicy">
+       <enum>Qt::ScrollBarAsNeeded</enum>
+      </property>
+      <property name="verticalScrollBarPolicy">
+       <enum>Qt::ScrollBarAsNeeded</enum>
+      </property>
+      <property name="activationOrder">
+       <enum>QMdiArea::ActivationHistoryOrder</enum>
+      </property>
+      <property name="viewMode">
+       <enum>QMdiArea::TabbedView</enum>
+      </property>
+      <property name="documentMode">
+       <bool>true</bool>
+      </property>
+      <property name="tabsClosable">
+       <bool>true</bool>
+      </property>
+      <property name="tabsMovable">
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1280</width>
+     <height>25</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="fileMenu">
+    <property name="title">
+     <string>文件(&amp;F)</string>
+    </property>
+    <widget class="QMenu" name="recentFilesMenu">
+     <property name="title">
+      <string>最近打开的文件</string>
+     </property>
+     <addaction name="clearRecentAction"/>
+    </widget>
+    <addaction name="newProjectAction"/>
+    <addaction name="openProjectAction"/>
+    <addaction name="saveProjectAction"/>
+    <addaction name="projectSettingsAction"/>
+    <addaction name="runtimeConfigurationAction"/>
+    <addaction name="separator"/>
+    <addaction name="openImageEditorAction"/>
+    <addaction name="openMapEditorAction"/>
+    <addaction name="openMenuEditorAction"/>
+    <addaction name="openScriptEditorAction"/>
+    <addaction name="separator"/>
+    <addaction name="recentFilesMenu"/>
+    <addaction name="separator"/>
+    <addaction name="closeCurrentAction"/>
+    <addaction name="exitAction"/>
+   </widget>
+   <widget class="QMenu" name="toolMenu">
+    <property name="title">
+     <string>更多工具(&amp;T)</string>
+    </property>
+    <widget class="QMenu" name="advancedToolsMenu">
+     <property name="title">
+      <string>高级工具</string>
+     </property>
+     <addaction name="openNpcDataEditorAction"/>
+     <addaction name="assetReferenceSearchAction"/>
+     <addaction name="scriptProjectSearchAction"/>
+    </widget>
+    <addaction name="batchConvertAction"/>
+    <addaction name="advancedToolsMenu"/>
+    <addaction name="separator"/>
+    <addaction name="setAssetsPathAction"/>
+    <addaction name="fileAssociationAction"/>
+   </widget>
+   <widget class="QMenu" name="publishMenu">
+    <property name="title">
+     <string>发布(&amp;R)</string>
+    </property>
+    <addaction name="openResourceProfileEditorAction"/>
+    <addaction name="exportAndroidExternalResourceAction"/>
+   </widget>
+   <widget class="QMenu" name="windowMenu">
+    <property name="title">
+     <string>视图(&amp;V)</string>
+    </property>
+   </widget>
+   <widget class="QMenu" name="themeMenu">
+    <property name="title">
+     <string>主题(&amp;P)</string>
+    </property>
+    <addaction name="darkThemeAction"/>
+    <addaction name="lightThemeAction"/>
+   </widget>
+   <widget class="QMenu" name="helpMenu">
+    <property name="title">
+     <string>帮助(&amp;H)</string>
+    </property>
+    <addaction name="aboutAction"/>
+   </widget>
+   <addaction name="fileMenu"/>
+   <addaction name="toolMenu"/>
+   <addaction name="publishMenu"/>
+   <addaction name="windowMenu"/>
+   <addaction name="themeMenu"/>
+   <addaction name="helpMenu"/>
+  </widget>
+  <widget class="QToolBar" name="mainToolBar">
+   <property name="movable">
+    <bool>false</bool>
+   </property>
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonTextBesideIcon</enum>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
+   <addaction name="newProjectAction"/>
+   <addaction name="openProjectAction"/>
+   <addaction name="saveProjectAction"/>
+   <addaction name="separator"/>
+   <addaction name="undoAction"/>
+   <addaction name="redoAction"/>
+    </widget>
+  <widget class="QStatusBar" name="statusBar"/>
+  <action name="newProjectAction">
+   <property name="text">
+    <string>新建项目</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+N</string>
+   </property>
+   <property name="statusTip">
+    <string>创建新的编辑器项目文件</string>
+   </property>
+  </action>
+  <action name="openProjectAction">
+   <property name="text">
+    <string>打开项目</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+O</string>
+   </property>
+   <property name="statusTip">
+    <string>打开已有的编辑器项目文件</string>
+   </property>
+  </action>
+  <action name="saveProjectAction">
+   <property name="text">
+    <string>保存项目</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+S</string>
+   </property>
+   <property name="statusTip">
+    <string>保存当前项目配置</string>
+   </property>
+  </action>
+  <action name="undoAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>撤销</string>
+   </property>
+   <property name="statusTip">
+    <string>撤销当前文档中的上一步编辑</string>
+   </property>
+  </action>
+  <action name="redoAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>重做</string>
+   </property>
+   <property name="statusTip">
+    <string>重做当前文档中已撤销的编辑</string>
+   </property>
+  </action>
+  <action name="projectSettingsAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>项目设置</string>
+   </property>
+   <property name="statusTip">
+    <string>设置原始资源根、可编辑资源根和活动资源包</string>
+   </property>
+  </action>
+  <action name="runtimeConfigurationAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>运行配置</string>
+   </property>
+   <property name="statusTip">
+    <string>管理项目场景和默认运行场景</string>
+   </property>
+  </action>
+  <action name="batchConvertAction">
+   <property name="text">
+    <string>资源格式转换</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+B</string>
+   </property>
+   <property name="statusTip">
+    <string>把原始资源转换为当前资源包格式</string>
+   </property>
+  </action>
+  <action name="exportAndroidExternalResourceAction">
+   <property name="text">
+    <string>导出 Android 外部资源</string>
+   </property>
+   <property name="statusTip">
+    <string>把当前活动资源包导出为 Android 公共 Download 目录结构</string>
+   </property>
+  </action>
+  <action name="openImageEditorAction">
+   <property name="text">
+    <string>图片编辑器</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+I</string>
+   </property>
+   <property name="statusTip">
+    <string>编辑游戏图片和动画</string>
+   </property>
+  </action>
+  <action name="openMapEditorAction">
+   <property name="text">
+    <string>地图编辑器</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+G</string>
+   </property>
+   <property name="statusTip">
+    <string>编辑地图瓦片、障碍、陷阱、NPC和物体</string>
+   </property>
+  </action>
+  <action name="openMenuEditorAction">
+   <property name="text">
+    <string>菜单编辑器</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+M</string>
+   </property>
+   <property name="statusTip">
+    <string>编辑游戏UI菜单布局和组件属性</string>
+   </property>
+  </action>
+  <action name="openScriptEditorAction">
+   <property name="text">
+    <string>脚本编辑器</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+L</string>
+   </property>
+   <property name="statusTip">
+    <string>编辑游戏脚本，支持搜索、补全和函数导航</string>
+   </property>
+  </action>
+  <action name="openNpcDataEditorAction">
+   <property name="text">
+    <string>NPC/OBJ/资源编辑器</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+D</string>
+   </property>
+   <property name="statusTip">
+    <string>编辑 NPC/物体实例表和 ini/npcres 动作资源；保留未知字段并支持图像帧参数预览</string>
+   </property>
+  </action>
+  <action name="openResourceProfileEditorAction">
+   <property name="text">
+    <string>MOD 发布与资源设置...</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+R</string>
+   </property>
+   <property name="statusTip">
+    <string>设置 MOD 名称、版本、封面、简介和资源关系</string>
+   </property>
+  </action>
+  <action name="assetReferenceSearchAction">
+   <property name="text">
+    <string>资源引用搜索...</string>
+   </property>
+   <property name="statusTip">
+    <string>扫描当前活动内容根中的已知资源引用</string>
+   </property>
+  </action>
+  <action name="scriptProjectSearchAction">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>项目脚本搜索与替换...</string>
+   </property>
+   <property name="statusTip">
+    <string>在当前项目活动内容根中搜索脚本，预览并事务替换所选文件</string>
+   </property>
+  </action>
+  <action name="setAssetsPathAction">
+   <property name="text">
+    <string>设置资源目录</string>
+   </property>
+   <property name="statusTip">
+    <string>设置游戏资源文件夹路径，编辑器将从此目录加载图片和INI等资源</string>
+   </property>
+  </action>
+  <action name="fileAssociationAction">
+   <property name="text">
+    <string>Windows 文件关联...</string>
+   </property>
+   <property name="statusTip">
+    <string>管理当前 Windows 用户的 UPEdit-JXQY 文件关联</string>
+   </property>
+  </action>
+  <action name="exitAction">
+   <property name="text">
+    <string>退出</string>
+   </property>
+   <property name="shortcut">
+    <string>Alt+F4</string>
+   </property>
+   <property name="statusTip">
+    <string>退出程序</string>
+   </property>
+  </action>
+  <action name="closeCurrentAction">
+   <property name="text">
+    <string>关闭当前文档</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+W</string>
+   </property>
+   <property name="statusTip">
+    <string>关闭当前活动文档</string>
+   </property>
+  </action>
+  <action name="aboutAction">
+   <property name="text">
+    <string>关于</string>
+   </property>
+   <property name="statusTip">
+    <string>关于 UPEdit-JXQY</string>
+   </property>
+  </action>
+  <action name="clearRecentAction">
+   <property name="text">
+    <string>清除最近文件列表</string>
+   </property>
+  </action>
+  <action name="darkThemeAction">
+   <property name="text">
+    <string>深色主题</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="statusTip">
+    <string>切换到深色主题</string>
+   </property>
+  </action>
+  <action name="lightThemeAction">
+   <property name="text">
+    <string>浅色主题</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="statusTip">
+    <string>切换到浅色主题</string>
+   </property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

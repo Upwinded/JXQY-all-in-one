@@ -1,31 +1,21 @@
 #pragma once
-#include "../../Component/Component.h"
+#include "../../Component/ConfigDrivenPanel.h"
+
 class StateMenu :
-	public Panel
+	public ConfigDrivenPanel
 {
 public:
 	StateMenu();
 	virtual ~StateMenu();
 
 	virtual void updateLabel();
+	void updatePanelImage();
 
 	virtual void init() override;
 
-	std::shared_ptr<ImageContainer> image = nullptr;
-	std::shared_ptr<ImageContainer> title = nullptr;
-
-	std::shared_ptr<Label> labLevel = nullptr;
-	std::shared_ptr<Label> labExp = nullptr;
-	std::shared_ptr<Label> labExpUp = nullptr;
-	std::shared_ptr<Label> labAttack = nullptr;
-	std::shared_ptr<Label> labDefend = nullptr;
-	std::shared_ptr<Label> labEvade = nullptr;
-	std::shared_ptr<Label> labLife = nullptr;
-	std::shared_ptr<Label> labThew = nullptr;
-	std::shared_ptr<Label> labMana = nullptr;
-	
 private:
-	virtual void onEvent();
+	std::shared_ptr<ImageContainer> image = nullptr;
+	int loadedPanelIndex = -1;
+	virtual void onUpdate() override;
 	void freeResource();
 };
-

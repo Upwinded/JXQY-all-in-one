@@ -3,8 +3,10 @@
 
 MsgBox::MsgBox()
 {
+	name = "MsgBox";
 	visible = false;
 	coverMouse = false;
+	needEvents = false;
 	init();
 }
 
@@ -14,15 +16,25 @@ MsgBox::~MsgBox()
 	freeResource();
 }
 
-void MsgBox::showMessage(const std::string & str)
+void MsgBox::showMessage(const std::string & str, UTime duration)
 {
+	currentMessage = str;
+	showinUTime = duration;
 	if (label == nullptr)
 	{
-		label = addComponent<Label>(u8"ini\\ui\\message\\label.ini");
-		label->coverMouse = false;
-		setChildRectReferToParent();
+		label = getComponentByName<Label>("label");
+		if (label)
+		{
+			label->coverMouse = false;
+			setChildRectReferToParent();
+		}
 	}
-	label->setStr(str);
+	if (label)
+	{
+		label->visible = true;
+		label->activated = true;
+		label->setStr(str);
+	}
 	beginTime = getTime();
 	showed = true;
 	visible = true;
@@ -30,7 +42,12 @@ void MsgBox::showMessage(const std::string & str)
 
 void MsgBox::onUpdate()
 {
-	if (showed && getTime() - beginTime > showinUTime)
+	const UTime currentTime = getTime();
+	if (showed && currentTime < beginTime)
+	{
+		beginTime = currentTime;
+	}
+	if (showed && currentTime - beginTime > showinUTime)
 	{
 		visible = false;
 		showed = false;
@@ -40,17 +57,41 @@ void MsgBox::onUpdate()
 void MsgBox::init()
 {
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\message\\window.ini");
-	label = addComponent<Label>(u8"ini\\ui\\message\\label.ini");
-	label->coverMouse = false;
-	label->autoNextLine = true;
+	loadMenuDefinition("ini\\ui\\message\\msgbox.menu.ini");
+
+	label = getComponentByName<Label>("label");
+	if (label)
+	{
+		label->coverMouse = false;
+		label->autoNextLine = true;
+	}
 	setChildRectReferToParent();
 }
 
 void MsgBox::freeResource()
 {
+	label = nullptr;
+	currentMessage.clear();
+	ConfigDrivenPanel::freeResource();
+}
 
-	impImage = nullptr;
+void MsgBox::onWindowResize(int width, int height)
+{
+	std::string savedMessage = currentMessage;
+	bool savedShowed = showed;
+	UTime savedBeginTime = beginTime;
+	bool savedVisible = visible;
 
-	freeCom(label);
+	init();
+
+	currentMessage = savedMessage;
+	showed = savedShowed;
+	beginTime = savedBeginTime;
+	visible = savedVisible;
+	if (label != nullptr)
+	{
+		label->visible = savedVisible;
+		label->activated = savedVisible;
+		label->setStr(currentMessage);
+	}
 }

@@ -12,17 +12,16 @@ public:
 
 	_video v = nullptr;
 
-	std::string videoFileName = u8"";
+	std::string videoFileName = "";
 	
 	int loop = 0;
+	bool restoreHiddenCursorOnExit = false;
 
 	void reopenVideo(const std::string& fileName, int vloop = 0);
 
 	void freeResource();
 
-#ifdef __MOBILE__
 	std::shared_ptr<Label> skipLabel = std::make_shared<Label>();
-#endif
 
 public:
 	virtual void onChildCallBack(PElement child);
@@ -30,6 +29,7 @@ public:
 protected:
 
 	virtual bool onHandleEvent(AEvent & e);
+	virtual bool onHandleUIAction(UIAction action) override;
 
 	virtual bool onInitial();
 	virtual void onExit();
@@ -41,4 +41,3 @@ protected:
 	virtual void onDragEnd(PElement dst, int x, int y);
 	virtual void onDragBegin(int * param1, int * param2);
 };
-

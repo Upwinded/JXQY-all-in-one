@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MapEditorWindow</class>
+ <widget class="QWidget" name="MapEditorWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1200</width>
+    <height>800</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>地图编辑器</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QToolBar" name="mapToolBar">
+     <property name="windowTitle">
+      <string>地图工具</string>
+     </property>
+     <addaction name="actionNewMap"/>
+     <addaction name="actionOpenMap"/>
+     <addaction name="actionSaveMap"/>
+     <addaction name="actionSaveMapAs"/>
+     <addaction name="separator"/>
+     <addaction name="actionUndo"/>
+     <addaction name="actionRedo"/>
+     <addaction name="separator"/>
+     <addaction name="actionZoomIn"/>
+     <addaction name="actionZoomOut"/>
+     <addaction name="actionResetZoom"/>
+     <addaction name="actionZoomToFit"/>
+     <addaction name="separator"/>
+     <addaction name="actionExportThumbnail"/>
+     <addaction name="actionExportBmp"/>
+     <addaction name="separator"/>
+     <addaction name="actionGotoTile"/>
+     <addaction name="actionMapStatistics"/>
+    </widget>
+   </item>
+  </layout>
+  <action name="actionNewMap">
+   <property name="text">
+    <string>新建</string>
+   </property>
+   <property name="toolTip">
+    <string>新建地图</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+N</string>
+   </property>
+  </action>
+  <action name="actionOpenMap">
+   <property name="text">
+    <string>打开地图</string>
+   </property>
+   <property name="toolTip">
+    <string>打开地图文件</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+O</string>
+   </property>
+  </action>
+  <action name="actionSaveMap">
+   <property name="text">
+    <string>保存</string>
+   </property>
+   <property name="toolTip">
+    <string>保存地图文件</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="actionSaveMapAs">
+   <property name="text">
+    <string>另存为</string>
+   </property>
+   <property name="toolTip">
+    <string>地图文件另存为</string>
+   </property>
+  </action>
+  <action name="actionUndo">
+   <property name="text">
+    <string>撤销</string>
+   </property>
+   <property name="toolTip">
+    <string>撤销上一步操作</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Z</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+  </action>
+  <action name="actionRedo">
+   <property name="text">
+    <string>重做</string>
+   </property>
+   <property name="toolTip">
+    <string>重做上一步撤销的操作</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Y</string>
+   </property>
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+  </action>
+  <action name="actionToolSelect">
+   <property name="text">
+    <string>选择</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-select.png</normaloff>:/icons/map_tools/tool-select.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>选择工具 (V)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>V</string>
+   </property>
+  </action>
+  <action name="actionToolTilePaint">
+   <property name="text">
+    <string>瓦片</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-tile-paint.png</normaloff>:/icons/map_tools/tool-tile-paint.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>瓦片绘制 (B)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>B</string>
+   </property>
+  </action>
+  <action name="actionToolObstaclePaint">
+   <property name="text">
+    <string>障碍</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-obstacle.png</normaloff>:/icons/map_tools/tool-obstacle.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>障碍工具：左键拾取/右键绘制 (O)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>O</string>
+   </property>
+  </action>
+  <action name="actionToolTrapPaint">
+   <property name="text">
+    <string>陷阱</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-trap.png</normaloff>:/icons/map_tools/tool-trap.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>陷阱工具：左键拾取/右键绘制 (T)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>T</string>
+   </property>
+  </action>
+  <action name="actionToolNpcPlace">
+   <property name="text">
+    <string>NPC</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-npc.png</normaloff>:/icons/map_tools/tool-npc.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>NPC放置 (N)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>N</string>
+   </property>
+  </action>
+  <action name="actionToolObjectPlace">
+   <property name="text">
+    <string>物体</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-object.png</normaloff>:/icons/map_tools/tool-object.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>物体放置 (P)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>P</string>
+   </property>
+  </action>
+  <action name="actionZoomIn">
+   <property name="text">
+    <string>放大</string>
+   </property>
+   <property name="toolTip">
+    <string>放大 (Ctrl+=)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+=</string>
+   </property>
+  </action>
+  <action name="actionZoomOut">
+   <property name="text">
+    <string>缩小</string>
+   </property>
+   <property name="toolTip">
+    <string>缩小 (Ctrl+-)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+-</string>
+   </property>
+  </action>
+  <action name="actionResetZoom">
+   <property name="text">
+    <string>1:1</string>
+   </property>
+   <property name="toolTip">
+    <string>重置缩放 (Ctrl+0)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+0</string>
+   </property>
+  </action>
+  <action name="actionExportThumbnail">
+   <property name="text">
+    <string>缩略图</string>
+   </property>
+   <property name="toolTip">
+    <string>导出缩略图</string>
+   </property>
+  </action>
+  <action name="actionExportBmp">
+   <property name="text">
+    <string>导出图片</string>
+   </property>
+   <property name="toolTip">
+    <string>将地图导出为 BMP/PNG 图片</string>
+   </property>
+  </action>
+  <action name="actionLoadNpcList">
+   <property name="text">
+    <string>加载 NPC</string>
+   </property>
+   <property name="toolTip">
+    <string>从 INI 文件加载 NPC 列表</string>
+   </property>
+  </action>
+  <action name="actionLoadObjectList">
+   <property name="text">
+    <string>加载物体</string>
+   </property>
+   <property name="toolTip">
+    <string>从 INI 文件加载物体列表</string>
+   </property>
+  </action>
+  <action name="actionToolTilePicker">
+   <property name="text">
+    <string>吸管</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-picker.png</normaloff>:/icons/map_tools/tool-picker.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>吸管工具 - 拾取瓦片 (I)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>I</string>
+   </property>
+  </action>
+  <action name="actionToolAreaSelect">
+   <property name="text">
+    <string>区域</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-area.png</normaloff>:/icons/map_tools/tool-area.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>区域选择 - 复制粘贴 (A)</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>A</string>
+   </property>
+  </action>
+  <action name="actionToolPan">
+   <property name="text">
+    <string>拖拽</string>
+   </property>
+   <property name="icon">
+    <iconset resource="../resources.qrc">
+     <normaloff>:/icons/map_tools/tool-pan.png</normaloff>:/icons/map_tools/tool-pan.png</iconset>
+   </property>
+   <property name="toolTip">
+    <string>拖拽地图 (H)：按住左键拖动画布；中键拖拽仍可随时使用</string>
+   </property>
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="shortcut">
+    <string>H</string>
+   </property>
+  </action>
+  <action name="actionGotoTile">
+   <property name="text">
+    <string>跳转</string>
+   </property>
+   <property name="toolTip">
+    <string>跳转到坐标 (Ctrl+G)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+G</string>
+   </property>
+  </action>
+  <action name="actionZoomToFit">
+   <property name="text">
+    <string>适应窗口</string>
+   </property>
+   <property name="toolTip">
+    <string>适应窗口 (Ctrl+Shift+F)</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+F</string>
+   </property>
+  </action>
+  <action name="actionMapStatistics">
+   <property name="text">
+    <string>统计</string>
+   </property>
+   <property name="toolTip">
+    <string>地图统计信息</string>
+   </property>
+  </action>
+ </widget>
+ <resources>
+  <include location="../resources.qrc"/>
+ </resources>
+ <connections/>
+</ui>

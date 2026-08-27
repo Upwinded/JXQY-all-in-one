@@ -1,7 +1,8 @@
 #pragma once
 
 #include <vector>
-#define map2HeadString = u8"MAP File Ver2.0";
+#define map2HeadString "MAP File Ver2.0"
+#define map3HeadString "MAP File Ver3.0"
 
 struct MapV2Head
 {
@@ -48,7 +49,7 @@ struct MapV2
 	std::vector<std::vector<MapV2Tile>> tile;
 };
 
-#define MapV3HeadString = u8"Map File Ver3.0";
+#define MapV3HeadString map3HeadString
 
 struct MapV3Head
 {

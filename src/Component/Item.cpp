@@ -1,9 +1,24 @@
 #include "Item.h"
+#include "../Engine/Engine.h"
+#include "ComponentRegistry.h"
+
+#include <algorithm>
+#include <cmath>
+
+namespace
+{
+	bool registeredItem = []
+	{
+		ComponentRegistry::getInstance().registerType("Item",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<Item>(); });
+		return true;
+	}();
+}
 
 Item::Item()
 {
-	priority = epItem;
-	name = u8"Item";
+	setPriority(epItem);
+	name = "Item";
 	elementType = etItem;
 	canDrag = true;
 	coverMouse = true;
@@ -18,16 +33,27 @@ Item::~Item()
 void Item::initFromIni(INIReader & ini)
 {
 	freeResource();
+	centerImage = false;
 
-	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
-	name = ini.Get(u8"Init", u8"Name", name);
-	fontSize = ini.GetInteger(u8"Init", u8"Font", fontSize);
-	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
+	rect.x = ini.GetInteger("Init", "Left", rect.x);
+	rect.y = ini.GetInteger("Init", "Top", rect.y);
+	rect.w = ini.GetInteger("Init", "Width", rect.w);
+	rect.h = ini.GetInteger("Init", "Height", rect.h);
+	name = ini.Get("Init", "Name", name);
+	fontSize = ini.GetInteger("Init", "Font", fontSize);
+	stretch = ini.GetBoolean("Init", "Stretch", stretch);
+	keepAspect = ini.GetBoolean("Init", "KeepAspect", keepAspect);
+	centerImage = ini.GetBoolean("Init", "CenterImage", centerImage);
+	frameIndex = ini.GetInteger("Init", "Frame", frameIndex);
+	std::string impName = ini.Get("Init", "Image", "");
+	if (impName.empty())
+	{
+		impName = ini.Get("Init", "Bitmap", "");
+	}
 	impImage = loadRes(impName);
-	color = ini.GetColor(u8"Init", u8"Color", color);
+	backImage[0] = loadRes(ini.Get("Init", "BackImage1", ""));
+	backImage[1] = loadRes(ini.Get("Init", "BackImage2", ""));
+	color = ini.GetColor("Init", "Color", color);
 }
 
 void Item::setStr(const std::string & s)
@@ -50,9 +76,12 @@ void Item::resetHint()
 	moveInTime = getTime();
 }
 
-void Item::freeResoure()
-{		
+void Item::freeResource()
+{
+	transferSelected = false;
 	impImage = nullptr;
+	backImage[0] = nullptr;
+	backImage[1] = nullptr;
 
 	if (strImage != nullptr)
 	{
@@ -64,13 +93,23 @@ void Item::freeResoure()
 
 void Item::drawItemStr()
 {
-	if (str != u8"")
+	if (str != "")
 	{
 		if (strImage == nullptr)
 		{
 			strImage = engine->createText(str, fontSize, color);
 		}
-		engine->drawImage(strImage, rect.x, rect.y);
+		int textWidth = 0;
+		int textHeight = 0;
+		engine->getImageSize(strImage, textWidth, textHeight);
+		if (backImage[0] != nullptr && textWidth > 0 && textHeight > 0)
+		{
+			engine->drawImage(strImage, rect.x + rect.w - textWidth, rect.y + rect.h - textHeight);
+		}
+		else
+		{
+			engine->drawImage(strImage, rect.x, rect.y);
+		}
 	}	
 }
 
@@ -120,16 +159,103 @@ void Item::onDraw()
 	{
 		return;
 	}
-	_shared_image img = IMP::loadImageForTime(impImage, getTime());
-	if (stretch)
+
+	_shared_imp currentBackImage = nullptr;
+	if (touchingID != TOUCH_UNTOUCHEDID && backImage[1] != nullptr)
 	{
-		engine->drawImage(img, nullptr, &rect);
+		currentBackImage = backImage[1];
 	}
 	else
 	{
-		engine->drawImage(img, rect.x, rect.y);
+		currentBackImage = backImage[0];
+	}
+	if (currentBackImage != nullptr)
+	{
+		auto backgroundImage = IMP::loadImageForTime(currentBackImage, getTime());
+		engine->drawImage(backgroundImage, nullptr, &rect);
+	}
+
+	_shared_image img = frameIndex >= 0
+		? IMP::loadImage(impImage, frameIndex)
+		: IMP::loadImageForTime(impImage, getTime());
+	if (img != nullptr)
+	{
+		if (stretch)
+		{
+			engine->drawImage(img, nullptr, &rect);
+		}
+		else
+		{
+			int imageWidth = 0;
+			int imageHeight = 0;
+			engine->getImageSize(img, imageWidth, imageHeight);
+			if (imageWidth > rect.w || imageHeight > rect.h)
+			{
+				double scale = std::min(
+					static_cast<double>(rect.w) / static_cast<double>(imageWidth),
+					static_cast<double>(rect.h) / static_cast<double>(imageHeight));
+				Rect drawRect =
+				{
+					rect.x + (rect.w - std::max(1, static_cast<int>(std::round(imageWidth * scale)))) / 2,
+					rect.y + (rect.h - std::max(1, static_cast<int>(std::round(imageHeight * scale)))) / 2,
+					std::max(1, static_cast<int>(std::round(imageWidth * scale))),
+					std::max(1, static_cast<int>(std::round(imageHeight * scale)))
+				};
+				engine->drawImage(img, nullptr, &drawRect);
+			}
+			else if (backImage[0] != nullptr || centerImage)
+			{
+				engine->drawImage(img, rect.x + (rect.w - imageWidth) / 2, rect.y + (rect.h - imageHeight) / 2);
+			}
+			else
+			{
+				engine->drawImage(img, rect.x, rect.y);
+			}
+		}
 	}
 	drawItemStr();
+	if (transferSelected && rect.w >= 4 && rect.h >= 4)
+	{
+		constexpr int TransferBorderWidth = 3;
+		constexpr uint8_t TransferRed = 82;
+		constexpr uint8_t TransferGreen = 210;
+		constexpr uint8_t TransferBlue = 255;
+		constexpr uint8_t TransferAlpha = 245;
+		engine->fillRect(rect.x, rect.y, rect.w, TransferBorderWidth,
+			TransferRed, TransferGreen, TransferBlue, TransferAlpha);
+		engine->fillRect(rect.x, rect.y + rect.h - TransferBorderWidth,
+			rect.w, TransferBorderWidth,
+			TransferRed, TransferGreen, TransferBlue, TransferAlpha);
+		engine->fillRect(rect.x, rect.y, TransferBorderWidth, rect.h,
+			TransferRed, TransferGreen, TransferBlue, TransferAlpha);
+		engine->fillRect(rect.x + rect.w - TransferBorderWidth, rect.y,
+			TransferBorderWidth, rect.h,
+			TransferRed, TransferGreen, TransferBlue, TransferAlpha);
+	}
+	if (isFocused() && rect.w >= 6 && rect.h >= 6)
+	{
+		constexpr int FocusBorderWidth = 2;
+		constexpr int FocusInset = 3;
+		constexpr uint8_t FocusRed = 255;
+		constexpr uint8_t FocusGreen = 214;
+		constexpr uint8_t FocusBlue = 92;
+		constexpr uint8_t FocusAlpha = 240;
+		const int focusWidth = rect.w - FocusInset * 2;
+		const int focusHeight = rect.h - FocusInset * 2;
+		engine->fillRect(rect.x + FocusInset, rect.y + FocusInset,
+			focusWidth, FocusBorderWidth,
+			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+		engine->fillRect(rect.x + FocusInset,
+			rect.y + rect.h - FocusInset - FocusBorderWidth,
+			focusWidth, FocusBorderWidth,
+			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+		engine->fillRect(rect.x + FocusInset, rect.y + FocusInset,
+			FocusBorderWidth, focusHeight,
+			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+		engine->fillRect(rect.x + rect.w - FocusInset - FocusBorderWidth,
+			rect.y + FocusInset, FocusBorderWidth, focusHeight,
+			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+	}
 }
 
 void Item::onDrawDrag(int x, int y)

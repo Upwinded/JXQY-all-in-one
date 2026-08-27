@@ -1,0 +1,6 @@
+#pragma code_page(65001)
+
+// Reuse the exact ICO embedded by the current game executable. Keeping the
+// artwork outside the editor tree makes the game icon the single Windows
+// source of truth.
+1 ICON "@JXQY_EDITOR_WINDOWS_ICON_PATH@"

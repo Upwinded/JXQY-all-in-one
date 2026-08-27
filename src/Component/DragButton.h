@@ -12,3 +12,4 @@ protected:
 	virtual void onDragging(int x, int y);
 };
 
+

@@ -1,0 +1,19 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=UPEdit-JXQY
+Name[zh_CN]=UPEdit-JXQY
+Name[zh_TW]=UPEdit-JXQY
+GenericName=JXQY Content Editor
+GenericName[zh_CN]=剑侠情缘创作编辑器
+GenericName[zh_TW]=劍俠情緣創作編輯器
+Comment=Edit JXQY maps, scripts, images, and game content
+Comment[zh_CN]=编辑剑侠情缘地图、脚本、图片和游戏内容
+Comment[zh_TW]=編輯劍俠情緣地圖、腳本、圖片和遊戲內容
+TryExec=@JXQY_EDITOR_DESKTOP_EXECUTABLE_NAME@
+Exec=@JXQY_EDITOR_DESKTOP_EXECUTABLE_NAME@ %f
+Icon=com.jxqy.Editor
+Terminal=false
+Categories=Development;Utility;
+MimeType=@JXQY_EDITOR_LINUX_MIME_TYPES@
+StartupNotify=true

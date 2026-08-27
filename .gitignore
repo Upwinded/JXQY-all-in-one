@@ -515,10 +515,38 @@ linux/build/
 starter/*/
 starter/*.exe
 
-# Official release automation and publisher identity live only in the private repo.
+# Workspace-only inputs
 /private-build/
+/docs/
+/src/tests/
+/src/automation/
+/src/requirements.md
+/jxqy-editor/tests/
+/jxqy-editor/requirements.md
+/ThirdParty/devel/
+/ThirdParty/devel-old/
 
-ThirdParty/devel/
+# Generated build and package outputs
+/build*/
+/jxqy-editor/build*/
+/bin/win32/
+/bin/win64/
+/bin/updater/
+*.dmg
+*.ipa
+*.xcarchive
+*.dSYM/
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.dll
+*.dylib
+*.so
+*.a
+*.lib
+*.exe
+*.pdb
 
 3rd*/
 _*/

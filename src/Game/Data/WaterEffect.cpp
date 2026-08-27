@@ -2,27 +2,61 @@
 #define _USE_MATH_DEFINES 
 #endif
 #include <cmath>
+#include "../../Engine/Engine.h"
 #include <algorithm>
-#include <cassert>
 #include "WaterEffect.h"
+
+namespace
+{
+constexpr float WaterDisplacementScale = 0.70f;
+}
 
 
 void WaterEffect::setupEffectCanvas()
 {
 	auto engine = Engine::getInstance();
-	_tempRenderTarget = engine->getRenderTarget();
-	if (_waterEffectCanvas != nullptr)
+	if (_effectRenderTargetActive)
 	{
-		engine->setSharedImageAsRenderTarget(_waterEffectCanvas);
+		(void)engine->
+			restoreImageRenderTargetAfterAcceptedOperation(
+				_tempRenderTarget,
+				_waterEffectCanvas);
+		_effectRenderTargetActive = false;
+	}
+	_tempRenderTarget = engine->getRenderTarget();
+	int width = 0;
+	int height = 0;
+	engine->getWindowSize(width, height);
+	if (_waterEffectCanvas == nullptr || width != _canvasWidth || height != _canvasHeight)
+	{
+		initGrid();
+	}
+	if (_waterEffectCanvas == nullptr)
+	{
+		return;
+	}
+	_effectRenderTargetActive =
+		engine->setSharedImageAsRenderTarget(
+			_waterEffectCanvas);
+	if (!_effectRenderTargetActive)
+	{
+		return;
 	}
 	engine->renderClear();
 }
 
-void WaterEffect::renderEffect(UTime time)
+void WaterEffect::renderEffect(UTime time, PointEx cameraPos)
 {
 	auto engine = Engine::getInstance();
-	engine->setImageAsRenderTarget(_tempRenderTarget);
-	_update(time);
+	if (_effectRenderTargetActive)
+	{
+		(void)engine->
+			restoreImageRenderTargetAfterAcceptedOperation(
+				_tempRenderTarget,
+				_waterEffectCanvas);
+		_effectRenderTargetActive = false;
+	}
+	_update(time, cameraPos);
 	engine->drawGeometry(_waterEffectCanvas, _vertices, _indices);
 }
 
@@ -32,9 +66,9 @@ void WaterEffect::applyPresetParams()
 
 	setMaxClickRipple(5);
 	WaterRippleParams fixedRippleParams;
-	fixedRippleParams.amplitude = 15.0f;
+	fixedRippleParams.amplitude = 25.0f;
 	fixedRippleParams.density = 0.015f;
-	fixedRippleParams.frequency = 5.0f;
+	fixedRippleParams.frequency = 3.0f;
 	fixedRippleParams.pos = { -100.0f, 600.0f };
 	addFixedRipple(fixedRippleParams);
 
@@ -55,31 +89,28 @@ void WaterEffect::applyPresetParams()
 
 	WaterLightParams lightParams;
 	lightParams.decay = 700.0f;
-	lightParams.defaultAlpha = 0.9f;
 	lightParams.angle = 5 * M_PI / 4;
-	lightParams.minAlpha = 0.85f;
+	lightParams.minimumBrightness = 0.94f;
 	setLightParams(lightParams);
 
 	WaterClickRippleParams waterClickRippleParams;
-	waterClickRippleParams.lifeTime = 5000;
-	waterClickRippleParams.rippleParams.amplitude = 30.0f;
-	waterClickRippleParams.rippleParams.density = 0.02f;
-	waterClickRippleParams.rippleParams.frequency = 10.0f;
+	waterClickRippleParams.lifeTime =
+		AspectFitLayout::PointerRippleDurationMilliseconds;
 	setDefaultClickRippleParams(waterClickRippleParams);
 
-	setGridSize(50);
+	setGridSize(60);
 }
 
 void WaterEffect::clearParams()
 {
 	WaterEffectParams defaultParams;
 	_params = defaultParams;
+	_lastUpdateTime = 0;
 }
 
 void WaterEffect::setGridSize(int gridSize)
 {
-	assert(gridSize > 0);
-	if (gridSize <= 0)
+	if (!WaterEffectSafety::isValidGridSize(gridSize))
 	{
 		return;
 	}
@@ -121,122 +152,194 @@ void WaterEffect::addDefaultClickRipple(float x, float y, UTime startTime)
 	WaterClickRippleParams params;
 	params = _params.defaultClickRipple;
 	params.startTime = startTime;
-	params.rippleParams.pos = { x, y };
+	params.pos = { x, y };
 	addClickRipple(params);
 }
 
 void WaterEffect::setLightParams(WaterLightParams params)
 {
+	params.minimumBrightness = std::clamp(
+		params.minimumBrightness,
+		0.0f,
+		1.0f);
+	params.decay = (std::max)(params.decay, 1.0f);
 	_params.light = params;
 }
 
 void WaterEffect::setMaxClickRipple(int count)
 {
-	_params.maxClickRipple = count;
+	_params.maxClickRipple = std::clamp(count, 0, WaterEffectSafety::MaximumClickRippleCount);
+	if (_params.clickRipples.size() > static_cast<size_t>(_params.maxClickRipple))
+	{
+		_params.clickRipples.resize(static_cast<size_t>(_params.maxClickRipple));
+	}
 }
 
-void WaterEffect::_update(UTime time)
+void WaterEffect::_update(UTime time, PointEx cameraPos)
 {
-	for (size_t i = 0; i < _vertices.size(); i++)
+	if (_canvasWidth <= 0 || _canvasHeight <= 0 ||
+		_vertices.size() != _verticesOrigin.size() ||
+		_vertices.size() != _verticesLast.size())
 	{
-		float offset_x = 0.0f, offset_y = 0.0f;
+		return;
+	}
 
-		for (auto& iter : _params.waves)
-		{
-			float x = _verticesOrigin[i].position.x;
-			float y = _verticesOrigin[i].position.y;
-			float distance_to_line = (iter.A * x + iter.B * y + iter.basicParams.phi);
+	const double timeSeconds = static_cast<double>(time) / 1000.0;
+	const UTime safeLastUpdateTime = (std::min)(time, _lastUpdateTime);
+	const double lastTimeSeconds =
+		static_cast<double>(safeLastUpdateTime) / 1000.0;
+	const UTime updateIntervalMilliseconds = time - safeLastUpdateTime;
+	const float updateIntervalSeconds =
+		static_cast<float>(updateIntervalMilliseconds) / 1000.0f;
 
-			float line_offset = iter.basicParams.amplitude * std::sin(static_cast<double>(iter.basicParams.frequency) * static_cast<double>(time) / 1000.0 - iter.basicParams.density * distance_to_line);
-			offset_x += line_offset * iter.A;
-			offset_y += line_offset * iter.B;
-		}
-		for (auto& iter : _params.fixedRipples)
-		{
-			float nx = iter.pos.x, ny = iter.pos.y;
-			float dx = _verticesOrigin[i].position.x - nx;
-			float dy = _verticesOrigin[i].position.y - ny;
-			float angle = atan2(-dy, dx);
-			float distance = std::sqrt(dx * dx + dy * dy);
-			offset_x += static_cast<float>(iter.amplitude * std::cos(static_cast<double>(iter.frequency) * static_cast<double>(time) / 1000.0 - iter.density * distance) * cos(angle));
-			offset_y += static_cast<float>(iter.amplitude * std::cos(static_cast<double>(iter.frequency) * static_cast<double>(time) / 1000.0 - iter.density * distance) * -sin(angle));
-		}
-
-		auto clickRippleParamsIter = _params.clickRipples.begin();
-		while (clickRippleParamsIter != _params.clickRipples.end())
-		{
-			auto iter = clickRippleParamsIter++;
-			if (time - iter->startTime > iter->lifeTime)
+	_params.clickRipples.erase(
+		std::remove_if(
+			_params.clickRipples.begin(),
+			_params.clickRipples.end(),
+			[time](const WaterClickRippleParams& ripple)
 			{
-				clickRippleParamsIter = _params.clickRipples.erase(iter);
-				continue;
-			}
-			float dx = _verticesOrigin[i].position.x - iter->rippleParams.pos.x;
-			float dy = _verticesOrigin[i].position.y - iter->rippleParams.pos.y;
-			float angle = atan2(dy, dx);
-			float distance = std::sqrt(dx * dx + dy * dy);
-			float distance_to_ripple = abs(static_cast<float>(time - iter->startTime) / 1000.0 * iter->rippleParams.frequency - distance * iter->rippleParams.density);
+				return !WaterEffectSafety::isClickRippleActive(
+					time,
+					ripple.startTime,
+					ripple.lifeTime);
+			}),
+		_params.clickRipples.end());
 
-			offset_x += iter->rippleParams.amplitude * std::cos(distance_to_ripple) * cos(angle) * exp(-distance_to_ripple) / (static_cast<float>(time - iter->startTime) / 1000 + 1.0f);
-			offset_y += iter->rippleParams.amplitude * std::cos(distance_to_ripple) * sin(angle) * exp(-distance_to_ripple) / (static_cast<float>(time - iter->startTime) / 1000 + 1.0f);
-		}
+	std::vector<AspectFitPointerRipple> pointerRipples;
+	pointerRipples.reserve(_params.clickRipples.size());
+	for (const WaterClickRippleParams& ripple : _params.clickRipples)
+	{
+		AspectFitPointerRipple pointerRipple;
+		pointerRipple.normalizedX =
+			(ripple.pos.x - cameraPos.x) / _canvasWidth;
+		pointerRipple.normalizedY =
+			(ripple.pos.y - cameraPos.y) / _canvasHeight;
+		pointerRipple.startTimeMilliseconds = ripple.startTime;
+		pointerRipple.durationMilliseconds = ripple.lifeTime;
+		pointerRipples.push_back(pointerRipple);
+	}
 
-		_vertices[i].position.y = _verticesOrigin[i].position.y + offset_y;
-		_vertices[i].position.x = _verticesOrigin[i].position.x + offset_x;
+	for (std::size_t vertexIndex = 0;
+		vertexIndex < _vertices.size();
+		++vertexIndex)
+	{
+		float offsetX = 0.0f;
+		float offsetY = 0.0f;
+		float motionX = 0.0f;
+		float motionY = 0.0f;
+		const float vertexX =
+			_verticesOrigin[vertexIndex].position.x + cameraPos.x;
+		const float vertexY =
+			_verticesOrigin[vertexIndex].position.y + cameraPos.y;
 
-		int gridSize = _params.gridSize;
-		if (i % (gridSize + 1) == 0)
+		for (const WaterWaveCalculatedParams& wave : _params.waves)
 		{
-			if (_vertices[i].position.x > 0.0f)
-			{
-				_vertices[i].position.x = 0.0f;
-			}
-
+			const float distanceToLine =
+				wave.A * vertexX + wave.B * vertexY +
+				wave.basicParams.phi;
+			const float currentOffset = wave.basicParams.amplitude *
+				std::sin(wave.basicParams.frequency * timeSeconds -
+					wave.basicParams.density * distanceToLine);
+			const float previousOffset = wave.basicParams.amplitude *
+				std::sin(wave.basicParams.frequency * lastTimeSeconds -
+					wave.basicParams.density * distanceToLine);
+			offsetX += currentOffset * wave.A;
+			offsetY += currentOffset * wave.B;
+			motionX += (currentOffset - previousOffset) * wave.A;
+			motionY += (currentOffset - previousOffset) * wave.B;
 		}
-		else if (i % (gridSize + 1) == gridSize)
+
+		for (const WaterRippleParams& ripple : _params.fixedRipples)
 		{
-			if (_vertices[i].position.x < _verticesOrigin[i].position.x)
-			{
-				_vertices[i].position.x = _verticesOrigin[i].position.x;
-			}
+			const float deltaX = vertexX - ripple.pos.x;
+			const float deltaY = vertexY - ripple.pos.y;
+			const float distance = std::sqrt(
+				deltaX * deltaX + deltaY * deltaY);
+			const float angle = std::atan2(-deltaY, deltaX);
+			const float directionX = std::cos(angle);
+			const float directionY = -std::sin(angle);
+			const float currentOffset = ripple.amplitude * std::cos(
+				ripple.frequency * timeSeconds -
+				ripple.density * distance);
+			const float previousOffset = ripple.amplitude * std::cos(
+				ripple.frequency * lastTimeSeconds -
+				ripple.density * distance);
+			offsetX += currentOffset * directionX;
+			offsetY += currentOffset * directionY;
+			motionX += (currentOffset - previousOffset) * directionX;
+			motionY += (currentOffset - previousOffset) * directionY;
 		}
 
-		if (i <= (gridSize + 1))
+		const float normalizedX =
+			_verticesOrigin[vertexIndex].position.x / _canvasWidth;
+		const float normalizedY =
+			_verticesOrigin[vertexIndex].position.y / _canvasHeight;
+		const AspectFitPointerRippleSample pointerSample =
+			AspectFitLayout::calculateCombinedPointerRippleSample(
+				normalizedX,
+				normalizedY,
+				_canvasWidth,
+				_canvasHeight,
+				_canvasHeight,
+				time,
+				pointerRipples);
+		offsetX += pointerSample.offset.x;
+		offsetY += pointerSample.offset.y;
+
+		_vertices[vertexIndex].position =
+			_verticesOrigin[vertexIndex].position;
+		_vertices[vertexIndex].tex_coord.x = std::clamp(
+			_verticesOrigin[vertexIndex].tex_coord.x -
+				offsetX * WaterDisplacementScale / _canvasWidth,
+			0.0f,
+			1.0f);
+		_vertices[vertexIndex].tex_coord.y = std::clamp(
+			_verticesOrigin[vertexIndex].tex_coord.y -
+				offsetY * WaterDisplacementScale / _canvasHeight,
+			0.0f,
+			1.0f);
+
+		float ambientBrightness = 1.0f;
+		const float motionDistance = std::sqrt(
+			motionX * motionX + motionY * motionY);
+		if (updateIntervalMilliseconds > 0 &&
+			motionDistance > _params.light.minDistance)
 		{
-			if (_vertices[i].position.y > 0.0f)
-			{
-				_vertices[i].position.y = 0;
-			}
+			const float motionDirection = std::atan2(-motionY, motionX);
+			const float directionalVelocity = motionDistance *
+				std::cos(motionDirection - _params.light.angle) /
+				updateIntervalSeconds;
+			ambientBrightness = std::clamp(
+				1.0f + (std::min)(
+					0.0f,
+					directionalVelocity / _params.light.decay),
+				_params.light.minimumBrightness,
+				1.0f);
 		}
-		else if (i >= (gridSize + 1) * gridSize)
-		{
-			if (_vertices[i].position.y < _verticesOrigin[i].position.y)
-			{
-				_vertices[i].position.y = _verticesOrigin[i].position.y;
-			}
-		}
-
-		float dx = _vertices[i].position.x - _verticesLast[i].position.x;
-		float dy = _vertices[i].position.y - _verticesLast[i].position.y;
-
-		float distance = std::sqrt(dx * dx + dy * dy);
-
-		if (time != _lastUpdateTime)
-		{
-			if (abs(distance) > _params.light.minDistance)
-			{
-				_vertices[i].color.a = distance * cos(atan2(-dy, dx) - _params.light.angle) / (static_cast<float>(time - _lastUpdateTime) / 1000) / _params.light.decay + _params.light.defaultAlpha;
-			}
-			else
-			{
-				_vertices[i].color.a = _params.light.defaultAlpha;
-			}
-		}
-
-		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _verticesLast[i].color.a - 1.0f * static_cast<float>(time - _lastUpdateTime) / 1000, _verticesLast[i].color.a + 1.0f * static_cast<float>(time - _lastUpdateTime) / 1000);
-		_vertices[i].color.a = std::clamp(_vertices[i].color.a, _params.light.minAlpha, 1.0f);
-
-		_verticesLast[i] = _vertices[i];
+		const float targetBrightness = (std::min)(
+			ambientBrightness,
+			pointerSample.brightness);
+		const float previousBrightness =
+			_verticesLast[vertexIndex].color.r;
+		const float maximumBrightnessChange = updateIntervalSeconds;
+		const float brightness = std::clamp(
+			targetBrightness,
+			previousBrightness - maximumBrightnessChange,
+			previousBrightness + maximumBrightnessChange);
+		const float minimumAllowedBrightness = (std::min)(
+			_params.light.minimumBrightness,
+			AspectFitLayout::CombinedPointerRippleMinimumBrightness);
+		const float clampedBrightness = std::clamp(
+			brightness,
+			minimumAllowedBrightness,
+			1.0f);
+		_vertices[vertexIndex].color = {
+			clampedBrightness,
+			clampedBrightness,
+			clampedBrightness,
+			1.0f
+		};
+		_verticesLast[vertexIndex] = _vertices[vertexIndex];
 	}
 	_lastUpdateTime = time;
 }
@@ -246,11 +349,21 @@ void WaterEffect::initGrid()
 	auto engine = Engine::getInstance();
 	_verticesOrigin.clear();
 	_vertices.clear();
+	_verticesLast.clear();
 	_indices.clear();
 	int gridSize = _params.gridSize;
 	int width, height;
 	engine->getWindowSize(width, height);
+	if (!WaterEffectSafety::isValidGridSize(gridSize) || width <= 0 || height <= 0)
+	{
+		_waterEffectCanvas = nullptr;
+		_canvasWidth = 0;
+		_canvasHeight = 0;
+		return;
+	}
 	_waterEffectCanvas = engine->createCanvasImage(width, height);
+	_canvasWidth = width;
+	_canvasHeight = height;
 	float cellW = static_cast<float>(width) / gridSize;
 	float cellH = static_cast<float>(height) / gridSize;
 	float rowY = 0.0f;
@@ -273,7 +386,7 @@ void WaterEffect::initGrid()
 			SDL_Vertex v;
 			v.position = { columnX, rowY };
 			v.tex_coord = { coordX, coordY };
-			v.color = { 1.0f, 1.0f, 1.0f, _params.light.defaultAlpha };
+			v.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 			_vertices.push_back(v);
 			_verticesOrigin.push_back(v);
 			_verticesLast.push_back(v);
@@ -301,4 +414,3 @@ void WaterEffect::initGrid()
 		}
 	}
 }
-

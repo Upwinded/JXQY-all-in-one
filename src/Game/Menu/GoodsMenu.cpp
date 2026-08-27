@@ -1,10 +1,14 @@
 #include "GoodsMenu.h"
 #include "../GameManager/GameManager.h"
+#include "../../libconvert/libconvert.h"
 #include "BuySellMenu.h"
+#include "MenuResource.h"
+#include <algorithm>
+#include <utility>
 
 GoodsMenu::GoodsMenu()
 {
-	name = u8"goods menu inst";
+	name = "GoodsMenu";
 	visible = false;
 	init();
 }
@@ -16,74 +20,110 @@ GoodsMenu::~GoodsMenu()
 
 void GoodsMenu::updateMoney()
 {
-	money->setStr(convert::formatString(u8"%d", gm->player->money));
+	if (money)
+	{
+		money->setStr(convert::formatString("%d", gm->player->money));
+	}
 }
 
 void GoodsMenu::updateGoods()
 {
-	for (int i = 0; i < MENU_ITEM_COUNT; i++)
+	if (scrollbar == nullptr)
 	{
-		item[i]->dragIndex = i + scrollbar->position * scrollbar->lineSize;
-		updateGoods(i);
+		return;
 	}
+	position = scrollbar->position;
+	for (size_t i = 0; i < item.size(); i++)
+	{
+		if (item[i] == nullptr) continue;
+		item[i]->dragIndex = gm->goodsManager.storeBegin() + static_cast<int>(i) + scrollbar->position * scrollbar->lineSize;
+		updateGoods(static_cast<int>(i));
+	}
+	refreshControllerTransferHighlight();
 }
 
 void GoodsMenu::updateGoods(int index)
 {
-	if (index < 0 || index >= scrollbar->pageSize)
+	if (scrollbar == nullptr || index < 0 || index >= static_cast<int>(item.size()) || item[index] == nullptr)
 	{
+		return;
+	}
+
+	int listIndex = gm->goodsManager.storeBegin() + index + scrollbar->position * scrollbar->lineSize;
+	if (!gm->goodsManager.isStoreIndex(listIndex) || listIndex >= gm->goodsManager.listLength())
+	{
+		item[index]->impImage = nullptr;
+		item[index]->setStr("");
 		return;
 	}
 
 	item[index]->impImage = nullptr;
 
 	updateGoodsNumber(index);
-	if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr)
+	if (gm->goodsManager.goodsList[listIndex].goods != nullptr)
 	{
-		item[index]->impImage = gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods->createGoodsIcon();
+		item[index]->impImage = MenuResource::createGoodsMenuImage(gm->goodsManager.goodsList[listIndex].goods);
 	}
-	
+
 }
 
 void GoodsMenu::updateGoodsNumber(int index)
 {
-	if (index < 0 || index >= scrollbar->pageSize)
+	if (scrollbar == nullptr || index < 0 || index >= static_cast<int>(item.size()) || item[index] == nullptr)
 	{
 		return;
 	}
-	if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number > 0 && gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile != u8"")
+	int listIndex = gm->goodsManager.storeBegin() + index + scrollbar->position * scrollbar->lineSize;
+	if (!gm->goodsManager.isStoreIndex(listIndex) || listIndex >= gm->goodsManager.listLength())
 	{
-		item[index]->setStr(convert::formatString(u8"%d", gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number));
+		item[index]->setStr("");
+		return;
+	}
+	if (gm->goodsManager.goodsList[listIndex].goods != nullptr && gm->goodsManager.goodsList[listIndex].number > 0 && gm->goodsManager.goodsList[listIndex].iniFile != "")
+	{
+		item[index]->setStr(convert::formatString("%d", gm->goodsManager.goodsList[listIndex].number));
 	}
 	else
 	{
-		item[index]->setStr(u8"");
-		if (gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods != nullptr)
-		{
-			gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].goods = nullptr;
-		}
-		gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].iniFile = u8"";
-		gm->goodsManager.goodsList[index + scrollbar->position * scrollbar->lineSize].number = 0;
+		item[index]->setStr("");
+		gm->goodsManager.goodsList[listIndex].clear();
 	}
 }
 
 void GoodsMenu::onEvent()
 {
+	if (gm != nullptr && gm->menu != nullptr
+		&& gm->menu->controllerTransfers().active(ControllerSlotKind::Goods)
+		&& currentDragItem != nullptr)
+	{
+		cancelControllerInteraction();
+	}
 	if (scrollbar != nullptr && position != scrollbar->position)
 	{
+		hideControllerItemDetails();
 		position = scrollbar->position;
 		updateGoods();
 	}
-	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
+	if (scrollbar == nullptr)
 	{
+		return;
+	}
+	for (size_t i = 0; i < item.size(); i++)
+	{
+		if (item[i] == nullptr)
+		{
+			continue;
+		}
+		int listIndex = gm->goodsManager.storeBegin() + static_cast<int>(i) + scrollbar->position * scrollbar->lineSize;
 		unsigned int ret = item[i]->getResult();
 		if (ret & erShowHint)
 		{
-			if (gm->goodsManager.goodsListExists(scrollbar->position * scrollbar->lineSize + i))
+			if (gm->goodsManager.goodsListExists(listIndex))
 			{
-				gm->menu->toolTip->visible = true;
-				addChild(gm->menu->toolTip);
-				gm->menu->toolTip->setGoods(gm->goodsManager.goodsList[scrollbar->position * scrollbar->lineSize + i].goods);
+				gm->menu->showGoodsToolTip(
+					getMySharedPtr(),
+					gm->goodsManager.goodsList[listIndex].goods,
+					item[i]);
 			}
 			else
 			{
@@ -100,32 +140,14 @@ void GoodsMenu::onEvent()
 		if (ret & erMouseRDown)
 #endif
 		{
+			cancelControllerInteraction();
 			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
-			if (BuySellMenu::getInstance() != nullptr)
+			if (BuySellMenu::getInstance() != nullptr && BuySellMenu::getInstance()->visible)
 			{
-				if (BuySellMenu::getInstance()->bsKind == bsSell)
-				{
-					if (gm->goodsManager.goodsListExists(item[i]->dragIndex) && gm->goodsManager.goodsList[item[i]->dragIndex].goods->cost > 0)
-					{
-						if (BuySellMenu::getInstance()->addGoodsItem(gm->goodsManager.goodsList[item[i]->dragIndex].iniFile, 1))
-						{
-							gm->player->money += gm->goodsManager.goodsList[item[i]->dragIndex].goods->cost;
-							updateMoney();
-							gm->goodsManager.goodsList[item[i]->dragIndex].number--;
-							if (gm->goodsManager.goodsList[item[i]->dragIndex].number <= 0)
-							{
-								gm->goodsManager.goodsList[item[i]->dragIndex].number = 0;
-								gm->goodsManager.goodsList[item[i]->dragIndex].iniFile = u8"";
-								if (gm->goodsManager.goodsList[item[i]->dragIndex].goods != nullptr)
-								{
-									gm->goodsManager.goodsList[item[i]->dragIndex].goods = nullptr;
-								}
-							}
-							updateGoods(i);
-						}
-					}
-				}
+				auto buySellMenu = BuySellMenu::getInstance();
+				buySellMenu->clearControllerFocus();
+				buySellMenu->sellOneFromPlayerSlot(item[i]->dragIndex);
 			}
 			else
 			{
@@ -134,13 +156,13 @@ void GoodsMenu::onEvent()
 				{
 					if (gm->goodsManager.goodsList[item[i]->dragIndex].goods->kind == gkDrug)
 					{
-						for (size_t j = GOODS_COUNT; j < GOODS_COUNT + GOODS_TOOLBAR_COUNT; ++j)
+						for (int j = gm->goodsManager.bottomBegin(); j <= gm->goodsManager.bottomEnd(); ++j)
 						{
 							if (!gm->goodsManager.goodsListExists(j))
 							{
 								gm->goodsManager.exchange(j, item[i]->dragIndex);
 								updateGoods(i);
-								gm->menu->bottomMenu->updateGoodsItem(j - GOODS_COUNT);
+								gm->menu->bottomMenu->updateGoodsItem(gm->goodsManager.bottomSlot(j));
 								break;
 							}
 						}
@@ -157,46 +179,71 @@ void GoodsMenu::onEvent()
 		}
 		if (ret & erDropped)
 		{
+			cancelControllerInteraction();
 			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
 			if (item[i]->dropType == dtGoods)
 			{
-				if (gm->goodsManager.goodsList[item[i]->dropIndex].iniFile != u8"" && gm->goodsManager.goodsList[item[i]->dropIndex].goods != nullptr && gm->goodsManager.goodsList[item[i]->dropIndex].number > 0)
+				if (gm->goodsManager.goodsListExists(item[i]->dropIndex))
 				{
-					if (item[i]->dropIndex < GOODS_COUNT)
+					if (gm->goodsManager.isStoreIndex(item[i]->dropIndex))
 					{
 						gm->goodsManager.exchange(item[i]->dropIndex, item[i]->dragIndex);
 						updateGoods();
 					}
-					else if (item[i]->dropIndex < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
+					else if (gm->goodsManager.isBottomIndex(item[i]->dropIndex))
 					{
 						gm->goodsManager.exchange(item[i]->dropIndex, item[i]->dragIndex);
 						updateGoods(i);
 						gm->menu->bottomMenu->updateGoodsItem();
 					}
-					else
+					else if (gm->goodsManager.isEquipIndex(item[i]->dropIndex))
 					{
-						if (gm->goodsManager.goodsList[item[i]->dragIndex].goods == nullptr || gm->goodsManager.goodsList[item[i]->dragIndex].goods->part == gm->goodsManager.goodsList[item[i]->dropIndex].goods->part)
+						bool canExchange = gm->goodsManager.goodsList[item[i]->dragIndex].goods == nullptr;
+						std::string message;
+						if (!canExchange && gm->goodsManager.goodsListExists(item[i]->dragIndex))
+						{
+							canExchange = gm->goodsManager.canEquipGoodsAt(
+								item[i]->dragIndex,
+								gm->goodsManager.equipSlot(item[i]->dropIndex),
+								gm->player,
+								&message);
+						}
+						if (canExchange)
 						{
 							gm->goodsManager.exchange(item[i]->dropIndex, item[i]->dragIndex);
 							updateGoods(i);
 							gm->menu->equipMenu->updateGoods();
+						}
+						else if (!message.empty())
+						{
+							gm->showMessage(message);
 						}
 					}
 				}
 			}
 			else if (item[i]->dropType == dtBuy)
 			{
-				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != u8"")
+				auto buySellMenu = BuySellMenu::getInstance();
+				if (buySellMenu != nullptr && buySellMenu->visible && buySellMenu->goodsList[item[i]->dropIndex].iniFile != "")
 				{
-					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile.empty())
+					if (buySellMenu->numberValid && buySellMenu->goodsList[item[i]->dropIndex].number <= 0)
 					{
-						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, 1))
+						gm->showMessage("该物品已售罄");
+					}
+					else if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile.empty())
+					{
+						if (gm->goodsManager.buyItem(buySellMenu->goodsList[item[i]->dropIndex].iniFile, 1))
 						{
-							std::string iniName = BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile;
+							std::string iniName = buySellMenu->goodsList[item[i]->dropIndex].iniFile;
 							updateMoney();
+							if (buySellMenu->numberValid)
+							{
+								buySellMenu->goodsList[item[i]->dropIndex].number--;
+								buySellMenu->updateGoods();
+							}
 							int idx = 0;
-							for (size_t j = 0; j < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; j++)
+							for (int j = 0; j < gm->goodsManager.listLength(); j++)
 							{
 								if (gm->goodsManager.goodsList[j].iniFile == iniName)
 								{
@@ -204,13 +251,13 @@ void GoodsMenu::onEvent()
 									break;
 								}
 							}
-							gm->goodsManager.exchange(i + scrollbar->position * scrollbar->lineSize, idx);
+							gm->goodsManager.exchange(item[i]->dragIndex, idx);
 							updateGoods(i);
-							if (idx < GOODS_COUNT)
+							if (gm->goodsManager.isStoreIndex(idx))
 							{
 								updateGoods();
 							}
-							else if (idx < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
+							else if (gm->goodsManager.isBottomIndex(idx))
 							{
 								gm->menu->bottomMenu->updateGoodsItem();
 							}
@@ -221,10 +268,15 @@ void GoodsMenu::onEvent()
 						}
 
 					}
-					else if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile)
+					else if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile == buySellMenu->goodsList[item[i]->dropIndex].iniFile)
 					{
-						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, 1))
+						if (gm->goodsManager.buyItem(buySellMenu->goodsList[item[i]->dropIndex].iniFile, 1))
 						{
+							if (buySellMenu->numberValid)
+							{
+								buySellMenu->goodsList[item[i]->dropIndex].number--;
+								buySellMenu->updateGoods();
+							}
 							updateGoods(i);
 							updateMoney();
 						}
@@ -233,7 +285,7 @@ void GoodsMenu::onEvent()
 			}
 			else if (item[i]->dropType == dtSell)
 			{
-				if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != u8"")
+				if (BuySellMenu::getInstance() != nullptr && BuySellMenu::getInstance()->visible && BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != "")
 				{
 					if (gm->goodsManager.goodsList[item[i]->dragIndex].iniFile.empty())
 					{
@@ -241,17 +293,12 @@ void GoodsMenu::onEvent()
 						{
 							std::string iniName = BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile;
 							updateMoney();
-							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number = 0;
-							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile = u8"";
-							if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods != nullptr)
-							{
-								BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods = nullptr;
-							}
+							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].clear();
 							BuySellMenu::getInstance()->updateGoods();
 
 
 							int idx = 0;
-							for (size_t j = 0; j < GOODS_COUNT + GOODS_TOOLBAR_COUNT + GOODS_BODY_COUNT; j++)
+							for (int j = 0; j < gm->goodsManager.listLength(); j++)
 							{
 								if (gm->goodsManager.goodsList[j].iniFile == iniName)
 								{
@@ -259,13 +306,13 @@ void GoodsMenu::onEvent()
 									break;
 								}
 							}
-							gm->goodsManager.exchange(i + scrollbar->position * scrollbar->lineSize, idx);
+							gm->goodsManager.exchange(item[i]->dragIndex, idx);
 							updateGoods(i);
-							if (idx < GOODS_COUNT)
+							if (gm->goodsManager.isStoreIndex(idx))
 							{
 								updateGoods();
 							}
-							else if (idx < GOODS_COUNT + GOODS_TOOLBAR_COUNT)
+							else if (gm->goodsManager.isBottomIndex(idx))
 							{
 								gm->menu->bottomMenu->updateGoodsItem();
 							}
@@ -279,12 +326,7 @@ void GoodsMenu::onEvent()
 					{
 						if (gm->goodsManager.buyItem(BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile, BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number))
 						{
-							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].number = 0;
-							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile = u8"";
-							if (BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods != nullptr)
-							{
-								BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].goods = nullptr;
-							}
+							BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].clear();
 							BuySellMenu::getInstance()->updateGoods();
 							updateGoods(i);
 							updateMoney();
@@ -299,36 +341,234 @@ void GoodsMenu::onEvent()
 void GoodsMenu::init()
 {
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\goods\\window.ini");
-	title = addComponent<ImageContainer>(u8"ini\\ui\\goods\\title.ini");
-	image = addComponent<ImageContainer>(u8"ini\\ui\\goods\\dragbox.ini");
-	gold = addComponent<ImageContainer>(u8"ini\\ui\\goods\\gold.ini");
-	money = addComponent<Label>(u8"ini\\ui\\goods\\money.ini");
-	scrollbar = addComponent<Scrollbar>(u8"ini\\ui\\goods\\scrollbar.ini");
+	loadMenuDefinition("ini\\ui\\goods\\goods.menu.ini");
 
-	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
+	scrollbar = getComponentByName<Scrollbar>("scrollbar");
+	money = getComponentByName<Label>("money");
+
+	item.clear();
+	for (int i = 1;; i++)
 	{
-		std::string itemName = convert::formatString(u8"ini\\ui\\goods\\item%d.ini", i + 1);
-		item[i] = addComponent<Item>(itemName);
-		item[i]->dragType = dtGoods;
-		item[i]->canShowHint = true;
+		std::string itemName = convert::formatString("item%d", i);
+		auto itemComponent = getComponentByName<Item>(itemName);
+		if (!itemComponent)
+		{
+			break;
+		}
+		itemComponent->dragType = dtGoods;
+		itemComponent->canShowHint = true;
+		item.push_back(itemComponent);
+	}
+
+	if (scrollbar != nullptr)
+	{
+		scrollbar->pageSize = static_cast<int>(item.size());
+		int lineSize = std::max(1, scrollbar->lineSize);
+		int visibleCount = std::max(1, scrollbar->pageSize);
+		int scrollableCount = std::max(0, gm->global.goodsLayout.storeCount() - visibleCount);
+		scrollbar->min = 0;
+		scrollbar->max = (scrollableCount + lineSize - 1) / lineSize;
+		scrollbar->position = scrollbar->min;
 	}
 
 	setChildRectReferToParent();
+	configureControllerFocus();
 }
 
 void GoodsMenu::freeResource()
 {
-	impImage = nullptr;
+	slotController.clear();
+	scrollbar = nullptr;
+	money = nullptr;
+	item.clear();
+	ConfigDrivenPanel::freeResource();
+}
 
-	freeCom(title);
-	freeCom(image);
-	freeCom(gold);
-	freeCom(money);
-	freeCom(scrollbar);
-	for (size_t i = 0; i < MENU_ITEM_COUNT; i++)
+void GoodsMenu::configureControllerFocus()
+{
+	SlotInteractionBinding binding =
+		MenuController::makeControllerSlotInteractionBinding(
+			gm,
+			ControllerSlotKind::Goods,
+			ControllerSlotDomain::GoodsBag);
+	binding.grid.focusIdPrefix = "goods-item-";
+	binding.grid.items = item;
+	binding.grid.scrollbar = scrollbar;
+	binding.grid.resolveLogicalIndex = [this](int visibleIndex)
 	{
-		freeCom(item[i]);
+		return getControllerItemIndex(visibleIndex);
+	};
+	binding.grid.primary = [this](int, int visibleIndex)
+	{
+		activateControllerItem(visibleIndex);
+	};
+	binding.grid.details = [this](int, int visibleIndex)
+	{
+		showControllerItemDetails(visibleIndex);
+	};
+	binding.grid.hideDetails = [this]() { hideControllerItemDetails(); };
+	binding.grid.refreshAfterScroll = [this]()
+	{
+		position = scrollbar != nullptr ? scrollbar->position : -1;
+		updateGoods();
+	};
+	slotController.bind(std::move(binding));
+}
+
+bool GoodsMenu::activateControllerFocus(ControllerFocusTarget target)
+{
+	return (target == ControllerFocusTarget::Default
+		|| target == ControllerFocusTarget::GoodsBag)
+		&& focusControllerDefault();
+}
+
+bool GoodsMenu::focusControllerDefault()
+{
+	return slotController.activate();
+}
+
+bool GoodsMenu::isControllerFocusActive() const
+{
+	return slotController.isActive();
+}
+
+void GoodsMenu::deactivateControllerFocus()
+{
+	slotController.deactivate();
+}
+
+PElement GoodsMenu::controllerFocusedElement() const
+{
+	return slotController.controllerFocusedElement();
+}
+
+std::vector<PElement> GoodsMenu::controllerFocusCandidates() const
+{
+	return slotController.controllerFocusCandidates();
+}
+
+bool GoodsMenu::focusControllerElement(const PElement& element)
+{
+	return slotController.focusControllerElement(element);
+}
+
+SlotGridView GoodsMenu::controllerBagView()
+{
+	SlotGridView view;
+	if (gm == nullptr || gm->menu == nullptr
+		|| gm->menu->goodsMenu.get() != this)
+	{
+		return view;
+	}
+
+	const std::shared_ptr<GoodsMenu> owner = gm->menu->goodsMenu;
+	std::weak_ptr<GoodsMenu> weakOwner = owner;
+	view.items = item;
+	view.scrollbar = scrollbar;
+	const std::size_t visibleItemCount = view.items.size();
+	std::weak_ptr<Scrollbar> weakScrollbar = view.scrollbar;
+	view.resolveLogicalIndex =
+		[weakOwner, weakScrollbar, visibleItemCount](int visibleIndex)
+	{
+		auto currentOwner = weakOwner.lock();
+		auto currentScrollbar = weakScrollbar.lock();
+		if (currentOwner == nullptr || currentScrollbar == nullptr
+			|| gm == nullptr || visibleIndex < 0
+			|| visibleIndex >= static_cast<int>(visibleItemCount))
+		{
+			return -1;
+		}
+		const int listIndex = gm->goodsManager.storeBegin()
+			+ visibleIndex
+			+ currentScrollbar->position * currentScrollbar->lineSize;
+		return gm->goodsManager.isStoreIndex(listIndex)
+			&& listIndex < gm->goodsManager.listLength()
+			? listIndex
+			: -1;
+	};
+	view.refreshAfterScroll = [weakOwner, weakScrollbar]()
+	{
+		auto currentOwner = weakOwner.lock();
+		auto currentScrollbar = weakScrollbar.lock();
+		if (currentOwner == nullptr || currentScrollbar == nullptr
+			|| currentOwner->scrollbar != currentScrollbar)
+		{
+			return;
+		}
+		currentOwner->position = currentScrollbar->position;
+		currentOwner->updateGoods();
+	};
+	return view;
+}
+
+int GoodsMenu::getControllerItemIndex(int visibleIndex) const
+{
+	if (gm == nullptr || scrollbar == nullptr || visibleIndex < 0
+		|| visibleIndex >= static_cast<int>(item.size())
+		|| item[visibleIndex] == nullptr)
+	{
+		return -1;
+	}
+	const int listIndex = gm->goodsManager.storeBegin()
+		+ visibleIndex + scrollbar->position * scrollbar->lineSize;
+	return gm->goodsManager.isStoreIndex(listIndex)
+		&& listIndex < gm->goodsManager.listLength()
+		? listIndex
+		: -1;
+}
+
+void GoodsMenu::activateControllerItem(int visibleIndex)
+{
+	const int listIndex = getControllerItemIndex(visibleIndex);
+	if (listIndex < 0 || !gm->goodsManager.goodsListExists(listIndex))
+	{
+		return;
+	}
+	hideControllerItemDetails();
+	gm->goodsManager.useItem(listIndex);
+	updateGoods();
+}
+void GoodsMenu::showControllerItemDetails(int visibleIndex)
+{
+	const int listIndex = getControllerItemIndex(visibleIndex);
+	if (gm->menu == nullptr || gm->menu->toolTip == nullptr
+		|| gm->menu->upMenu == nullptr || listIndex < 0
+		|| !gm->goodsManager.goodsListExists(listIndex))
+	{
+		hideControllerItemDetails();
+		return;
+	}
+	gm->menu->showGoodsToolTip(
+		getMySharedPtr(),
+		gm->goodsManager.goodsList[listIndex].goods,
+		item[visibleIndex]);
+}
+
+void GoodsMenu::hideControllerItemDetails()
+{
+	if (gm != nullptr && gm->menu != nullptr)
+	{
+		gm->menu->hideToolTip();
 	}
 }
 
+void GoodsMenu::refreshControllerTransferHighlight()
+{
+	slotController.refreshTransferSelection();
+}
+
+void GoodsMenu::cancelControllerInteraction()
+{
+	if (gm != nullptr && gm->menu != nullptr
+		&& gm->menu->controllerTransfers().active(ControllerSlotKind::Goods))
+	{
+		gm->menu->controllerTransfers().cancel();
+	}
+	refreshControllerTransferHighlight();
+	hideControllerItemDetails();
+}
+
+bool GoodsMenu::onHandleUIAction(UIAction action)
+{
+	return slotController.handleAction(action);
+}

@@ -1,10 +1,13 @@
-﻿#include "SkillsPanel.h"
+#include "SkillsPanel.h"
+#include "../../Engine/Engine.h"
 #include "../GameManager/GameManager.h"
+#include "MinimapToggleButton.h"
 
 SkillsPanel::SkillsPanel()
 {
+	name = "SkillsPanel";
 	init();
-	priority = epMin;
+	setPriority(epController);
 	coverMouse = false;
 	canCallBack = true;
 }
@@ -14,15 +17,23 @@ SkillsPanel::~SkillsPanel()
 	freeResource();
 }
 
+void SkillsPanel::resetInput()
+{
+	cancelPointerInteraction();
+	clickIndex = SKILL_PANEL_NONE;
+	dragEndPosition = { 0, 0 };
+	_jumpBtnDagging = false;
+	dragBeginTime = 0;
+}
+
 void SkillsPanel::initFromIni(INIReader& ini)
 {
-	Panel::initFromIni(ini);
-	indicateImp = loadRes(ini.Get(u8"init", u8"indicate", u8""));
+	ConfigDrivenPanel::initFromIni(ini);
+	indicateImp = loadRes(ini.Get("init", "indicate", ""));
 }
 
 void SkillsPanel::onChildCallBack(PElement child)
 {
-#ifdef __MOBILE__
 	if (child == nullptr) { return; }
 	result = child->getResult();
 	if ((result & erClick) || (result & erMouseLDown) || (result & erDragEnd))
@@ -55,10 +66,14 @@ void SkillsPanel::onChildCallBack(PElement child)
 		{
 			clickIndex = SKILL_PANEL_SKILL5;
 		}
-        else if (child == rightJumpBtn)
-        {
-            clickIndex = SKILL_PANEL_JUMP;
-        }
+		else if (child == rightJumpBtn)
+		{
+			clickIndex = SKILL_PANEL_JUMP;
+		}
+		else if (child == minimapButton)
+		{
+			clickIndex = SKILL_PANEL_MINIMAP;
+		}
 		else
         {
             for (int i = 0; i < FASTBTN_COUNT; ++i)
@@ -79,8 +94,6 @@ void SkillsPanel::onChildCallBack(PElement child)
 		}
 		else if (child == skillBtn[0] || child == skillBtn[1] || child == skillBtn[2] || child == skillBtn[3] || child == skillBtn[4])
 		{
-//			Point childCenter =  {child->rect.x + child->rect.w / 2, child->rect.y + child->rect.h / 2};
-//			dragEndPosition = component->getDragRealPosition() - childCenter;
             Point childPos = { child->rect.x, child->rect.y };
 			dragEndPosition = component->getDragPosition() - childPos;
 		}
@@ -89,14 +102,12 @@ void SkillsPanel::onChildCallBack(PElement child)
 	{
 		parent->onChildCallBack(getMySharedPtr());
 	}
-#endif
-
 }
 
 void SkillsPanel::onDraw()
 {
-	Panel::onDraw();
-	if (rightJumpBtn->isDragging())
+	ConfigDrivenPanel::onDraw();
+	if (rightJumpBtn && rightJumpBtn->isDragging())
 	{
 		drawJumpIndicate(rightJumpBtn->getDragRealPosition());
 	}
@@ -104,10 +115,8 @@ void SkillsPanel::onDraw()
 	{
 		for (size_t i = 0; i < SKILL_PANEL_SKILL_COUNT; i++)
 		{
-			if (skillBtn[i]->isDragging())
+			if (skillBtn[i] && skillBtn[i]->isDragging())
 			{
-//				Point childCenter = { skillBtn[i]->rect.x + skillBtn[i]->rect.w / 2, skillBtn[i]->rect.y + skillBtn[i]->rect.h / 2 };
-//				drawIndicate(skillBtn[i]->getDragRealPosition() - childCenter);
                 Point childPos = { skillBtn[i]->rect.x, skillBtn[i]->rect.y };
 				drawIndicate(skillBtn[i]->getDragPosition() - childPos);
 				break;
@@ -119,7 +128,7 @@ void SkillsPanel::onDraw()
 
 void SkillsPanel::onUpdate()
 {
-	if (rightJumpBtn->isDragging())
+	if (rightJumpBtn && rightJumpBtn->isDragging())
 	{
 		if (!_jumpBtnDagging)
 		{
@@ -136,44 +145,52 @@ void SkillsPanel::onUpdate()
 void SkillsPanel::init()
 {
 	freeResource();
-	initFromIniFileName(u8"ini\\ui\\mobile\\skills\\window.ini");
-	attackBtn = addComponent<RoundButton>(u8"ini\\ui\\mobile\\skills\\attack.ini");
-	sitBtn = addComponent<RoundButton>(u8"ini\\ui\\mobile\\skills\\sit.ini");
+	loadMenuDefinition("ini\\ui\\mobile\\skills\\skills.menu.ini");
+
+	attackBtn = getComponentByName<RoundButton>("attackBtn");
+	sitBtn = getComponentByName<RoundButton>("sitBtn");
 	for (size_t i = 0; i < SKILL_PANEL_SKILL_COUNT; i++)
 	{
-		skillBtn[i] = addComponent<DragRoundButton>(convert::formatString(u8"ini\\ui\\mobile\\skills\\skill%d.ini", i + 1));
+		std::string skillName = convert::formatString("skillBtn%d", i + 1);
+		skillBtn[i] = getComponentByName<DragRoundButton>(skillName);
 	}
 
-	for (int i = 0; i < FASTBTN_COUNT; ++i) {
-		fastBtn[i] = addComponent<TextButton>(convert::formatString(u8"ini\\ui\\mobile\\skills\\fastbtn%d.ini", i + 1));
-		fastBtn[i]->visible = false;
+	for (int i = 0; i < FASTBTN_COUNT; ++i)
+	{
+		std::string fastName = convert::formatString("fastBtn%d", i + 1);
+		fastBtn[i] = getComponentByName<TextButton>(fastName);
+		if (fastBtn[i]) fastBtn[i]->visible = false;
 	}
-	rightJumpBtn = addComponent<DragRoundButton>(u8"ini\\ui\\mobile\\skills\\rightjump.ini");
-	rightJumpBtn->setIndicateImage(u8"mpc\\character\\jump.mpc");
+	rightJumpBtn = getComponentByName<DragRoundButton>("rightJumpBtn");
+	if (rightJumpBtn) rightJumpBtn->setIndicateImage("mpc\\character\\jump.mpc");
+
+	minimapButton = std::make_shared<MinimapToggleButton>();
+	addChild(minimapButton);
+
 	setChildRectReferToParent();
 }
 
 void SkillsPanel::freeResource()
 {
-	impImage = nullptr;
-
-	freeCom(attackBtn);
-	freeCom(sitBtn);
+	attackBtn = nullptr;
+	sitBtn = nullptr;
 	for (size_t i = 0; i < SKILL_PANEL_SKILL_COUNT; i++)
 	{
-		freeCom(skillBtn[i]);
+		skillBtn[i] = nullptr;
 	}
 	
 	for (int i = 0; i < FASTBTN_COUNT; ++i)
 	{
-		freeCom(fastBtn[i]);
+		fastBtn[i] = nullptr;
 	}
-	freeCom(rightJumpBtn);
+	rightJumpBtn = nullptr;
+	minimapButton = nullptr;
+	ConfigDrivenPanel::freeResource();
 }
 
 void SkillsPanel::drawJumpIndicate(Point pos)
 {
-	auto indicateJumpImp = gm->player->res.jump.image;
+	auto indicateJumpImp = gm->player->res.jump.imagePackage;
 	if (indicateJumpImp == nullptr)
 	{
 		return;
@@ -181,7 +198,7 @@ void SkillsPanel::drawJumpIndicate(Point pos)
 	int xOffset = 0, yOffset = 0;
 	auto actionTime = IMP::getIMPImageActionTime(indicateJumpImp);
 	auto now = (getTime() - dragBeginTime) * 2;
-	auto playerPos = gm->player->position;
+	auto playerPos = gm->player->getPosition();
 	actionTime = actionTime > 0 ? actionTime : 1;
 	now = now % actionTime;
 	auto actionSplitTime = actionTime / 3;
@@ -196,18 +213,18 @@ void SkillsPanel::drawJumpIndicate(Point pos)
 	cenScreen.y = (int)h / 2;
 	Point realPos = pos;
 
-	Point realTilePos = gm->map->getMousePosition(realPos, gm->player->position, cenScreen, gm->camera->offset);
-	dir = gm->player->calDirection(realTilePos);
+	Point realTilePos = gm->map->getMousePosition(realPos, gm->player->getPosition(), cenScreen, gm->camera->offset);
+	dir = gm->player->getDirection(realTilePos);
 	switch (state)
 	{
 	case 0:
 	{
-		realPos = gm->map->getTilePosition(gm->player->position, gm->camera->position, cenScreen, gm->camera->offset);
+		realPos = gm->map->getTilePosition(gm->player->getPosition(), gm->camera->position, cenScreen, gm->camera->offset);
 		break;
 	}
 	case 1:
 	{
-		playerPos = gm->map->getTilePosition(gm->player->position, gm->camera->position, cenScreen, gm->camera->offset);
+		playerPos = gm->map->getTilePosition(gm->player->getPosition(), gm->camera->position, cenScreen, gm->camera->offset);
 		float param = ((float)now - actionSplitTime) / actionSplitTime;
 		realPos.x = (int)round(param * (realPos.x - playerPos.x) + playerPos.x);
 		realPos.y = (int)round(param * (realPos.y - playerPos.y) + playerPos.y);
@@ -216,7 +233,6 @@ void SkillsPanel::drawJumpIndicate(Point pos)
 
 	default:
 	{
-		/*realPos = gm->map->getTilePosition(realTilePos, gm->player->position, cenScreen, gm->camera->offset);*/
 		break;
 	}
 	}
@@ -224,11 +240,6 @@ void SkillsPanel::drawJumpIndicate(Point pos)
 	engine->setImageAlpha(img, 128);
 	engine->drawImage(img, realPos.x - xOffset, realPos.y - yOffset);
 	engine->setImageAlpha(img, 255);
-	//auto tempRect = rect;
-	//rect.x = x;
-	//rect.y = y;
-	//RoundButton::onDraw();
-	//rect = tempRect;
 }
 
 
@@ -247,7 +258,7 @@ void SkillsPanel::drawIndicate(Point pos)
 	}
 	int w, h;
 	engine->getImageSize(img, w, h);
-	Point playerPos = gm->player->getPosition(gm->camera->position, gm->camera->offset);
+	Point playerPos = gm->player->getScreenPosition(gm->camera->position, gm->camera->offset);
 	playerPos.y -= TILE_HEIGHT / 2;
 	Rect dest;
 	dest.x = playerPos.x - w / 2;
@@ -257,8 +268,13 @@ void SkillsPanel::drawIndicate(Point pos)
 	auto dy = cos(angle) * h;
 
 	dest.h = (int)round(hypot(dx, dy));
+	// The source artwork has its arrowhead at the top edge. Anchor its bottom
+	// edge at the player and rotate by half a turn so the arrowhead marks the
+	// selected destination instead of pointing back toward the player.
+	dest.y = playerPos.y - dest.h;
 	Point center;
 	center.x = w / 2;
-	center.y = 0;
-	engine->drawImageEx(img, nullptr, &dest, angle, &center);
+	center.y = dest.h;
+	engine->drawImageEx(
+		img, nullptr, &dest, angle + 3.14159265358979323846, &center);
 }

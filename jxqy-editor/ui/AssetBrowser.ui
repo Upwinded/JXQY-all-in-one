@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>AssetBrowser</class>
+ <widget class="QWidget" name="AssetBrowser">
+  <property name="windowTitle">
+   <string>资源浏览器</string>
+  </property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <property name="spacing">
+    <number>4</number>
+   </property>
+   <item>
+    <widget class="QLabel" name="pathLabel">
+     <property name="text">
+      <string>资源目录: 未设置</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+     <property name="styleSheet">
+       <string>padding: 4px; font-size: 11px;</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="filterLayout">
+     <property name="spacing">
+      <number>4</number>
+     </property>
+     <item>
+      <widget class="QComboBox" name="filterCombo">
+       <property name="fixedSize">
+        <size>
+         <width>220</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <item>
+        <property name="text">
+         <string>全部文件</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>图片 (mpc/shd/asf/imp/img/pic/常用位图)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>INI文件</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>脚本 (txt/lua)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>地图 (map)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>音频 (wav/mp3/ogg)</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>视频 (avi/mp4/mkv)</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="searchEdit">
+       <property name="placeholderText">
+        <string>搜索文件名...</string>
+       </property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTreeView" name="treeView">
+     <property name="dragEnabled">
+      <bool>true</bool>
+     </property>
+     <property name="dragDropMode">
+      <enum>QAbstractItemView::DragOnly</enum>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SingleSelection</enum>
+     </property>
+     <property name="animated">
+      <bool>true</bool>
+     </property>
+     <property name="headerHidden">
+      <bool>true</bool>
+     </property>
+     <property name="indentation">
+      <number>16</number>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

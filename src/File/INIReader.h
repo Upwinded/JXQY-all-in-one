@@ -20,8 +20,8 @@
 struct iniKey
 {
 	unsigned int hash = 0;
-	std::string key = u8"";
-	std::string value = u8"";
+	std::string key = "";
+	std::string value = "";
 };
 
 struct IniSection
@@ -39,6 +39,8 @@ struct IniMap
 class INIReader
 {
 public:
+	std::string fileName = "";
+
 	INIReader();
     // Construct INIReader and parse given filename. See ini.h for more info
     // about the parsing.
@@ -53,7 +55,7 @@ public:
 	//(Added by Upwinded.)
 	std::string saveToString();
 	//(Added by Upwinded.)
-	void saveToFile(const std::string& fileName);
+	bool saveToFile(const std::string& filename);
 	//(Added by Upwinded.)
 	void Set(const std::string& section, const std::string& name, const std::string& value);
 	//(Added by Upwinded.)
@@ -66,6 +68,10 @@ public:
 	void SetBoolean(const std::string& section, const std::string& name, bool value);
 	//(Added by Upwinded.)
 	void SetColor(const std::string& section, const std::string& name, uint32_t value);
+	void Remove(const std::string& section, const std::string& name);
+	bool HasSection(const std::string& section) const;
+	std::vector<std::string> GetSectionNames() const;
+	std::vector<std::string> GetSectionKeys(const std::string& section) const;
 
 	//(Added by Upwinded.)
 	uint32_t GetColor(const std::string& section, const std::string& name, uint32_t value);
@@ -81,7 +87,7 @@ public:
 	UTime GetTime(const std::string& section, const std::string& name, UTime default_value) const;
 
     // Get an integer (long) value from INI file, returning default_value if
-    // not found or not a valid integer (decimal u8"1234", u8"-1234", or hex u8"0x4d2").
+    // not found or not a valid integer (decimal "1234", "-1234", or hex "0x4d2").
     long GetInteger(const std::string& section, const std::string& name, long default_value) const;
 
     // Get a real (floating point float) value from INI file, returning
@@ -90,8 +96,8 @@ public:
     float GetReal(const std::string& section, const std::string& name, float default_value) const;
 
     // Get a boolean value from INI file, returning default_value if not found or if
-    // not a valid true/false value. Valid true values are u8"true", u8"yes", u8"on", u8"1",
-    // and valid false values are u8"false", u8"no", u8"off", u8"0" (not case sensitive).
+    // not a valid true/false value. Valid true values are "true", "yes", "on", "1",
+    // and valid false values are "false", "no", "off", "0" (not case sensitive).
     bool GetBoolean(const std::string& section, const std::string& name, bool default_value) const;
 
 

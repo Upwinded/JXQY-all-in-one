@@ -1,28 +1,39 @@
-﻿#pragma once
+#pragma once
 #include "../../Element/Element.h"
-#include "../../Component/Component.h"
+#include "../../Component/VideoPlayer.h"
 #include "../Data/Data.h"
 #include "../../libconvert/libconvert.h"
 #include "../Script/Script.h"
+#include "../Script/ScriptAPI.h"
 #include "../../Weather/Weather.h"
 #include "GameController.h"
 #include "MenuController.h"
 #include "../Menu/Menu.h"
+#include <functional>
 #include <mutex>
+#include <cstdint>
+#include <utility>
+#include <vector>
 #include "SaveFileManager.h"
+#include "WorldInteractionResolver.h"
+#include "../../Input/TouchControlsRecoveryGesture.h"
+#include "../../Input/TouchControlsVisibilityPolicy.h"
+#include "../../Launch/EditorRunSceneApplication.h"
 
 #define gm GameManager::getInstance()
 
 struct EventInfo
 {
 	std::shared_ptr<NPC> npc = nullptr;
-	std::string scriptMapName = u8"";
-	std::string scriptName = u8"";
+	std::string scriptMapName = "";
+	std::string scriptName = "";
 };
+
 
 enum ScriptType
 {
 	stNone,
+	stScript,
 	stNPC,
 	stNPCDeath,
 	stObject,
@@ -30,48 +41,108 @@ enum ScriptType
 	stGoods,
 };
 
+struct ScriptTask
+{
+	ScriptType type = stNone;
+	std::shared_ptr<NPC> npc = nullptr;
+	std::shared_ptr<Object> obj = nullptr;
+	std::shared_ptr<Goods> goods = nullptr;
+	bool clearPlayerAction = true;
+	std::string scriptName = "";
+	std::string scriptMapName = "";
+	int trapIndex = 0;
+	UTime remainingMilliseconds = 0;
+	// Runtime-only provenance for RunParallelScript. This is deliberately not
+	// serialized by ScriptRuntimeState because trace execution IDs are scoped
+	// to one process/session.
+	bool traceParentCaptured = false;
+	std::uint64_t traceParentExecutionId = 0;
+};
+
 class GameManager :
 	public Element
 {
+	friend class ScriptAPI;
+	friend class CoreLifecycleTestAccess;
+	friend class EditorRunSceneRuntimeTestAccess;
+	friend class MobileExternalInputRuntimeTestAccess;
+	friend class ScriptEngineRuntimeTestAccess;
 public:
 	GameManager();
+	GameManager(
+		const EditorRun::SceneTarget& target,
+		const EditorRun::PreparedResourcePhase& preparedResources,
+		EditorRun::RuntimeTraceWriter* runtimeTraceWriter = nullptr);
 	virtual ~GameManager();
 
 	void init();
 
 	int gameIndex = 0;
+	void setStartupIntegerVariables(const std::vector<std::pair<std::string, int>>& variables);
+	void setExpectedIntegerVariables(const std::vector<std::pair<std::string, int>>& variables);
+	void setAutomationHooksEnabled(bool enabled);
+	bool areAutomationHooksEnabled() const noexcept;
+	void setExitAfterNewGameScript(bool enabled);
+	void setPostNewGameAutomationWaitMilliseconds(UTime milliseconds);
+	bool hasAutomationCheckFailed() const;
+	bool isEditorRunMode() const noexcept;
+	bool hasEditorRunSceneApplicationResult() const noexcept;
+	const EditorRun::SceneApplicationResult&
+		getEditorRunSceneApplicationResult() const noexcept;
 
-	void initMenuWithThread();
-	void initMenuThread();
-	void initMenu();
+	enum class CheatAction
+	{
+		ToggleInvincibility,
+		RestorePlayerResources,
+		IncreasePracticeMagicLevel,
+		IncreasePlayerLevel,
+		AddMoney
+	};
+	struct CheatOperationResult
+	{
+		bool succeeded = false;
+		std::string message;
+
+		explicit operator bool() const noexcept
+		{
+			return succeeded;
+		}
+	};
+
+	bool isCheatModeEnabled() const noexcept;
+	bool isCheatInvincibilityEnabled() const noexcept;
+	bool shouldProtectPlayerFromCheatDamage() const noexcept;
+	CheatOperationResult setCheatModeEnabled(bool enabled);
+	CheatOperationResult toggleCheatMode();
+	CheatOperationResult performCheatAction(CheatAction action);
+
+	bool initMenu();
 
 	static GameManager * this_;
 	static GameManager * getInstance();
 
-	std::string mapFolderName = u8"";
+	std::string mapFolderName = "";
 
 	std::atomic<bool> inThread;
-	std::mutex loadMutex;
-	std::atomic<bool> loadThreadOver;
 	bool loadGame(int index);
 
-	void loadGameThread(int index);
-	void saveGame(int index);
+	bool saveGame(int index);
 
 	void clearMenu();
 	bool menuDisplayed();
+	bool blocksWorldPointerInput() const;
+	void setGameplayPaused(bool paused);
+	bool isGameplayPaused() const;
+	void handleSystemResult(unsigned int systemResult, int selectedSaveIndex = -1);
 
 	void freeResource();
 
-#ifdef __MOBILE__
-	static bool actionCmp(NextAction a, NextAction b)
+	static bool actionCmp(const NextAction& a, const NextAction& b)
 	{
 		return a.distance < b.distance;
 	}
 
 	std::vector<NextAction> fastSelectingList;
-
-#endif // __MOBILE__
 
 	// Children
 	std::shared_ptr<MenuController> menu = nullptr; // = std::make_shared<MenuController>();
@@ -99,18 +170,27 @@ public:
 	GoodsManager goodsManager;
 	MagicManager magicManager;
 	PartnerManager partnerManager;
+	TalkTextList talkTextList;
 
 	VariableList varList;
 	Script script;
+	ScriptAPI scriptAPI;
+
+	void runScript(const std::string & fileName);
+	void runScript(const std::string & fileName, const std::string & mapName);
+
+	void playMusic(const std::string & fileName);
+	void stopMusic();
+	void showMessage(const std::string & str);
+	void processGlobalInputFrame(bool toggleTouchControls = false);
+	void requestTouchControlsToggle();
 
 	Point getMousePoint();
 	Point getMousePoint(int x, int y);
+	virtual void onWindowResize(int width, int height) override;
 	void loadMap(const std::string & fileName);
-	void loadMapThread(const std::string & fileName);
 	void loadNPC(const std::string & fileName);
-	void loadNPCThread(const std::string & fileName);
 	void loadObject(const std::string & fileName);
-	void loadObjectThread(const std::string & fileName);
 
 	void returnToDesktop();
 
@@ -118,183 +198,143 @@ public:
 
 	bool inEvent = false;
 	std::shared_ptr<Object> scriptObj = nullptr;
-	void runObjScript(std::shared_ptr<Object> obj);
+	void runObjScript(std::shared_ptr<Object> obj, const std::string& scriptFile = "", bool clearPlayerAction = true);
 	std::shared_ptr<NPC> scriptNPC = nullptr;
-	void runNPCScript(std::shared_ptr<NPC> npc);
+	void runNPCScript(std::shared_ptr<NPC> npc, const std::string& scriptFile = "", bool clearPlayerAction = true);
+	int lastScriptSoundHasPosition = 0;
+	int lastScriptSoundSourceType = 0; // 0 none, 1 NPC, 2 Object.
+	int lastScriptSoundMapX = 0;
+	int lastScriptSoundMapY = 0;
+	int lastScriptSoundOffsetX1000 = 0;
+	int lastScriptSoundOffsetY1000 = 0;
+	bool queueObjectInteraction(std::shared_ptr<Object> obj, bool useRightScript = false, bool running = false);
+	bool queueNPCInteraction(std::shared_ptr<NPC> npc, bool useRightScript = false, bool running = false);
+	bool queueNearestObjectInteraction(bool useRightScript = false, bool running = false, int radius = 2);
+	bool queueNearestNPCInteraction(bool useRightScript = false, bool running = false, int radius = 2);
+	bool queueObjectScriptInteraction(std::shared_ptr<Object> obj,
+		WorldInteractionScriptSide scriptSide = WorldInteractionScriptSide::Primary,
+		bool running = false);
+	bool queueNPCTalkInteraction(std::shared_ptr<NPC> npc,
+		WorldInteractionScriptSide scriptSide = WorldInteractionScriptSide::Primary,
+		bool running = false);
+	bool queueNPCAttackInteraction(std::shared_ptr<NPC> npc, bool running = false);
+	std::vector<WorldInteractionCandidate> findWorldInteractionCandidates(
+		WorldInteractionIntent intent,
+		int radius = 13,
+		int nearRadius = 2,
+		std::weak_ptr<GameElement> preferredTarget = {});
+	bool queueBestWorldInteraction(
+		WorldInteractionIntent intent,
+		bool running = false,
+		int radius = 13,
+		int nearRadius = 2,
+		std::weak_ptr<GameElement> preferredTarget = {});
 	void runNPCDeathScript(std::shared_ptr<NPC> npc, const std::string & scriptName, const std::string & scriptMapName);
 	void runEventList();
+	void runScriptTaskList();
+	bool addScriptTask(const ScriptTask& task);
+	void clearParallelScriptTasks();
+	bool saveScriptRuntimeState();
+	void loadScriptRuntimeState();
 	std::shared_ptr<Goods> scriptGoods = nullptr;
 	void runGoodsScript(std::shared_ptr<Goods> goods);
-	std::string scriptMapName = u8"";
+	std::string scriptMapName = "";
 	int scriptTrapIndex = 0;
 	void runTrapScript(int idx);
 	std::vector<EventInfo> eventList;
+	std::vector<ScriptTask> scriptTaskList;
+	std::mutex scriptTaskMutex;
 	ScriptType scriptType = stNone;
 
+	int getBindValue(const std::string& bindPath);
+
+	bool timeScriptSet = false;
+	int timeScriptSeconds = 0;
+	std::string timeScriptFileName = "";
+	int timerSeconds = 0;
+	bool timerStarted = false;
+	bool timerHidden = false;
+	UTime timerAccumulated = 0;
+
+private:
+	explicit GameManager(
+		ScriptLibraryProfile scriptLibraryProfile,
+		EditorRun::RuntimeTraceWriter* runtimeTraceWriter = nullptr);
+	bool initializeEditorRunPlayerBaseline(
+		std::string& failureMessage,
+		std::string& templateVirtualPath,
+		std::string& isolatedPlayerVirtualPath,
+		int& characterIndex,
+		bool& resourceMissing);
+	EditorRun::SceneApplicationResult applyEditorRunSceneTarget();
+
+	std::string bgmName = "";
+	std::vector<std::pair<std::string, int>> startupIntegerVariables;
+	std::vector<std::pair<std::string, int>> expectedIntegerVariables;
+	bool automationHooksEnabled = false;
+	bool exitAfterNewGameScript = false;
+	UTime postNewGameAutomationWaitMilliseconds = 0;
+	UTime postNewGameAutomationWaitElapsed = 0;
+	bool postNewGameAutomationWaitPending = false;
+	bool automationCheckFailed = false;
+	bool editorRunMode = false;
+	bool editorRunSceneApplicationCompleted = false;
+	EditorRun::SceneTarget editorRunTarget;
+	EditorRun::ResolvedSceneTarget editorRunPreparedTarget;
+	std::vector<EditorRun::SearchRoot> editorRunSearchRoots;
+	EditorRun::RuntimeTraceWriter* runtimeTraceWriter = nullptr;
+	EditorRun::SceneApplicationResult editorRunSceneApplicationResult;
+	bool gameplayPaused = false;
+	bool controllerPausedBeforeGameplayPause = false;
+	bool menuPausedBeforeGameplayPause = false;
+	bool weatherPausedBeforeGameplayPause = false;
+
+	GameInput::TouchControlsVisibilityPolicy touchControlsVisibilityPolicy;
+	GameInput::TouchControlsRecoveryGesture touchControlsRecoveryGesture;
+	std::string pendingExternalInputMessage;
+	bool touchControlsToggleRequested = false;
+	std::uint64_t observedTouchControlsInputLifecycleRevision = 0;
+	bool touchControlsRecoveryAwaitingRelease = false;
+	bool touchControlsRecoveryInputBlocked = false;
+	bool touchControlsRecoveryEmptyFrameObserved = false;
+#if defined(__MOBILE__)
+	bool touchControlsCanRecoverAfterExternalInputLoss = true;
+#else
+	bool touchControlsCanRecoverAfterExternalInputLoss = false;
+#endif
+	void processGlobalInputFrameWithContacts(
+		bool toggleTouchControls,
+		std::vector<GameInput::TouchRecoveryContact> contacts,
+		std::uint64_t nowMilliseconds);
+	bool processTouchControlsRecoveryContacts(
+		std::vector<GameInput::TouchRecoveryContact> contacts,
+		std::uint64_t nowMilliseconds,
+		bool controlsVisibleAtFrameStart,
+		bool controlsVisibleAfterExternalActions,
+		bool resetRecognitionForLifecycle);
+	void setTouchControlsRecoveryInputBlocked(bool blocked);
+	void resetTouchControlsRecoveryGesture();
+
+	void applyStartupIntegerVariables();
+	void drainImmediateScriptTasksForAutomation();
+	void checkExpectedIntegerVariables();
+	void finishNewGameAutomationAndExit();
+	bool runPendingPlayerDeathScript();
+	void showCheatNotice(const std::string& message);
+	CheatOperationResult completeCheatOperation(
+		bool succeeded,
+		const std::string& message);
+	bool applyCheatPlayerLevelIncrease();
+	bool applyCheatPracticeMagicLevelIncrease();
 	bool cheatMode = false;
-private:
-	std::string bgmName = u8"";
-
-public:
-//脚本函数实现
-
-	//流程控制
-	int getVar(const std::string & varName);
-	void assign(const std::string & varName, int value);
-	void add(const std::string & varName, int value);
-
-	//人物对话
-	void talk(const std::string & part);
-	void say(const std::string & str, int index = -1);
-
-	//工具函数
-	void fadeIn();
-	void fadeOut();
-	void setFadeLum(int lum);
-	void setMainLum(int lum);
-	void playMusic(const std::string & fileName);
-	void stopMusic();
-	void playSound(const std::string & fileName);
-	void runScript(const std::string & fileName);
-	void runScript(const std::string & fileName, const std::string & mapName);
-	void moveScreen(int direction, int distance);
-	void sleep(unsigned int time);
-	void playMovie(const std::string & fileName);
-	void stopMovie();
-	
-	//地图函数
-	void loadMapWithThread(const std::string & fileName);
-	void loadGameWithThread(int index);
-	void setMapPos(int x, int y);
-	void setMapTrap(int idx, const std::string & trapFile);
-	void saveMapTrap();
-	void setMapTime(unsigned char t);
-	void changeASFColor(uint8_t r, uint8_t g, uint8_t b);
-	void changeMapColor(uint8_t r, uint8_t g, uint8_t b);
-
-	//物品函数
-	void loadObjectWithThread(const std::string & fileName);
-	void saveObject(const std::string & fileName = u8"");
-	void addObject(const std::string & iniName, int x, int y, int dir);
-	void deleteObject(const std::string & name);
-	void setObjectPosition(const std::string & name, int x, int y);
-	void setObjectKind(const std::string & name, int kind);
-	void setObjectScript(const std::string & name, const std::string & scriptFile);
-	void clearBody();
-	void openBox();
-	void closeBox();
-
-	//人物函数
-	void loadNPCWithThread(const std::string & fileName);
-	void saveNPC(const std::string & fileName = u8"");
-	void addNPC(const std::string & iniName, int x, int y, int dir);
-	void deleteNPC(const std::string & name);
-	void setNPCRes(const std::string & name, const std::string & resName);
-	void setNPCScript(const std::string & name, const std::string & scriptName);
-	void setNPCDeathScript(const std::string & name, const std::string & scriptName);
-	void goTo(const std::string & name, int x, int y);
-	void goToEx(const std::string & name, int x, int y);
-	void goToDir(const std::string & name, int dir, int distance);
-	void followNPC(const std::string & follower, const std::string & leader);
-	void followPlayer(const std::string & follower);
-	void enableNPCAI();
-	void disableNPCAI();
-	void attackTo(const std::string & name, int x, int y);
-	void setNPCPosition(const std::string & name, int x, int y);
-	void setNPCDir(const std::string & name, int dir);
-	void setNPCKind(const std::string & name, int kind);
-	void setNPCLevel(const std::string & name, int level);
-	void setNPCAction(const std::string & name, int action); //只支持站立（0）和死亡（11）
-	void setNPCRelation(const std::string & name, int relation);
-	void setNPCActionType(const std::string & name, int actionType); //暂时不支持走动
-	void setNPCActionFile(const std::string & name, int action, const std::string & fileName);
-	void npcSpecialAction(const std::string & name, const std::string & fileName);
-	void changeLife(const std::string& name, int value);
-	void changeMana(const std::string& name, int value);
-	void changeThew(const std::string& name, int value);
-
-	//主角函数
-	void loadPlayer(int index);
-	void savePlayer(int index);
-	void setPlayerPosition(int x, int y);
-	void setPlayerDir(int dir);
-	void setPlayerScn();
-	void setPlayerLum(unsigned char lum) {};
-	void setLevelFile(const std::string & fileName);
-	void setMagicLevel(const std::string & magicName, int level);
-	void setPlayerLevel(int level);
-	void setPlayerState(int state);
-	void enableRun();
-	void disableRun();
-	void enableJump();
-	void disableJump();
-	void enableFight();
-	void disableFight();
-	void playerGoto(int x, int y);
-	void playerGotoEx(int x, int y);
-	void playerRunTo(int x, int y);
-	void playerJumpTo(int x, int y);
-	void playerGotoDir(int dir, int distance);
-
-	//改变主角属性函数
-	void addLife(int value);
-	void addLifeMax(int value);
-	void addThew(int value);
-	void addThewMax(int value);
-	void addMana(int value);
-	void addManaMax(int value);
-	void addAttack(int value);
-	void addDefend(int value);
-	void addEvade(int value);
-	void addExp(int value);
-	void addMoney(int value);
-	void addRandMoney(int mMin, int mMax);
-	void addGoods(const std::string & name);
-	void addRandGoods(const std::string & fileName);
-	void deleteGoods(const std::string & name);
-	void addMagic(const std::string & name);
-	void addOneMagic(const std::string& playerName, const std::string& magicName);
-	void deleteMagic(const std::string & name);
-	void addMagicExp(const std::string & name, int addexp);
-	void fullLife();
-	void fullThew();
-	void fullMana();
-	void updateState();
-	void saveGoods(int index);
-	void loadGoods(int index);
-	void clearGoods();
-	void getGoodsNum(const std::string & name);
-	void getMoneyNum();
-	void setMoneyNum(int value);
-
-	//界面函数
-	void showMessage(const std::string & str);
-	void addToMemo(const std::string & str);
-	void clearMemo();
-	void buyGoods(const std::string & fileName);
-	void sellGoods(const std::string & fileName = u8"");
-	void returnToTitle();
-	void enableInput();
-	void disableInput();
-	void hideInterface();
-	void hideBottomWnd();
-	void showBottomWnd();
-	void hideMouseCursor();
-	void showMouseCursor();
-
-	// 天气函数
-	void showSnow(int bsnow);
-	void showRandomSnow();
-	void showRain(int brain);
-
-	void beginRain(const std::string& configFileName);
-	void endRain();
-
-	void checkYear(const std::string& varName);
+	bool cheatInvincibilityEnabled = false;
 
 private:
-	void loadingDisplayThread(std::vector<_shared_image> loadingImage);
-	std::atomic<bool> loadingDisplaying;
+	bool writeSaveGenerationDraft(
+		const std::string& generationDirectory,
+		const SaveGenerationLimits& copyLimits,
+		const std::function<bool()>& ownerCheckpoint = {});
+	void resetExclusiveLoadingInputState();
 private:
 
 	virtual void onUpdate();
@@ -304,6 +344,7 @@ private:
 	virtual void onExit();
 	virtual void onEvent();
 	virtual bool onHandleEvent(AEvent & e);
+	virtual bool onHandleUIAction(UIAction action) override;
+	virtual bool shouldUpdateChild(PElement child) override;
 
 };
-

@@ -1,10 +1,22 @@
 #include "TransImage.h"
+#include "../Engine/Engine.h"
+#include "ComponentRegistry.h"
+
+namespace
+{
+	bool registeredTransImage = []
+	{
+		ComponentRegistry::getInstance().registerType("TransImage",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<TransImage>(); });
+		return true;
+	}();
+}
 
 
 
 TransImage::TransImage()
 {
-	name = u8"TransImage";
+	name = "TransImage";
 }
 
 

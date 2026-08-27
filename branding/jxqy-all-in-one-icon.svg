@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="backgroundGlow" cx="74%" cy="20%" r="76%">
+      <stop offset="0" stop-color="#3a2a1c" />
+      <stop offset="0.42" stop-color="#141a17" />
+      <stop offset="1" stop-color="#0d1110" />
+    </radialGradient>
+    <linearGradient id="sealStroke" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#84372f" />
+      <stop offset="1" stop-color="#d25b4d" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#backgroundGlow)" />
+
+  <g fill="none" stroke="#c8974e" opacity="0.17">
+    <circle cx="760" cy="214" r="152" stroke-width="3" />
+    <circle cx="760" cy="214" r="220" stroke-width="3" />
+    <circle cx="760" cy="214" r="306" stroke-width="2" />
+    <circle cx="834" cy="302" r="256" stroke-width="2" />
+  </g>
+
+  <g transform="rotate(-3 512 512)">
+    <rect x="205" y="205" width="614" height="614" rx="74" fill="#111815" stroke="url(#sealStroke)" stroke-width="21" />
+    <rect x="235" y="235" width="554" height="554" rx="52" fill="none" stroke="#c8974e" stroke-width="4" opacity="0.28" />
+    <text x="512" y="662" text-anchor="middle" fill="#d25b4d" font-family="Microsoft YaHei, Noto Serif CJK SC, serif" font-size="360" font-weight="700">剑</text>
+  </g>
+</svg>

@@ -3,94 +3,99 @@
 #endif
 #include <cmath>
 #include "Joystick.h"
+#include "../Engine/Engine.h"
+#include "../File/log.h"
+#include "ComponentRegistry.h"
+#include "../Game/Data/MobileTouchInteraction.h"
 
-
-float Joystick::calculateAngel(int x, int y)
+namespace
 {
-	float angle = atan2(-x, y);
-	return angle;
-}
-
-int Joystick::calculateDirection(float angle)
-{
-	if (angle < 0)
+	bool registeredJoystick = []
 	{
-		angle += 2 * M_PI;
-	}
-	angle += M_PI / 8;
-	if (angle > 2 * M_PI)
-	{
-		angle -= 2 * M_PI;
-	}
-	return (int)(angle / (M_PI / 4));
-}
-
-int Joystick::normalizeDirection(int dir)
-{
-	int result = dir % 8;
-	while (result < 0)
-	{
-		result += 8;
-	}
-	return result;
+		ComponentRegistry::getInstance().registerType("Joystick",
+			[]() -> std::shared_ptr<BaseComponent> { return std::make_shared<Joystick>(); });
+		return true;
+	}();
 }
 
 std::vector<int> Joystick::getDirectionList()
 {
-	std::vector<int> directionList = std::vector<int>(0);
-	if (touchPosition.x > OutRange && touchPosition.y > OutRange && distanceToCenter() >= roundRange * JOYSTICK_MIN_RANGE)
+	if (touchPosition.x <= OutRange || touchPosition.y <= OutRange)
 	{
-		auto angel = calculateAngel(touchPosition.x - rect.w / 2, touchPosition.y - rect.h / 2);
-		auto dir = calculateDirection(angel);
-		directionList.push_back(normalizeDirection(dir));
-		if ((angel - dir * M_PI / 4)  > (M_PI / 8))
-		{
-			directionList.push_back(normalizeDirection(dir + 1));
-			directionList.push_back(normalizeDirection(dir - 1));
-		}
-		else
-		{
-			directionList.push_back(normalizeDirection(dir - 1));
-			directionList.push_back(normalizeDirection(dir + 1));
-		}
-		
+		return std::vector<int>();
 	}
-	return directionList;
+	return getMobileJoystickDirectionCandidates(
+		touchPosition.x - rect.w / 2,
+		touchPosition.y - rect.h / 2,
+		roundRange);
 }
 
 bool Joystick::isRunning()
 {
-    auto distance = distanceToCenter();
-	return distance > roundRange * JOYSTICK_MID_RANGE && touchPosition.x > OutRange && touchPosition.y > OutRange;
+	if (touchPosition.x <= OutRange || touchPosition.y <= OutRange)
+	{
+		return false;
+	}
+	return isMobileJoystickRunning(
+		touchPosition.x - rect.w / 2,
+		touchPosition.y - rect.h / 2,
+		roundRange);
 }
 
 bool Joystick::isWalking()
 {
-	auto distance = distanceToCenter();
-	return distance > roundRange * JOYSTICK_MIN_RANGE && distance <= roundRange * JOYSTICK_MID_RANGE && touchPosition.x > OutRange && touchPosition.y > OutRange;
+	if (touchPosition.x <= OutRange || touchPosition.y <= OutRange)
+	{
+		return false;
+	}
+	return isMobileJoystickWalking(
+		touchPosition.x - rect.w / 2,
+		touchPosition.y - rect.h / 2,
+		roundRange);
 }
 
 int Joystick::distanceToCenter()
 {
-	return RoundButton::distanceToCenter(touchPosition.x, touchPosition.y);
+	return getMobileJoystickDistance(
+		touchPosition.x - rect.w / 2,
+		touchPosition.y - rect.h / 2);
+}
+
+void Joystick::resetInput()
+{
+	touchPosition = { OutRange, OutRange };
 }
 
 bool Joystick::mouseInRect(int x, int y)
 {
-	if (RoundButton::mouseInRect(x, y))
-	{
-		return true;
-	}
-	if (touchingDownID == TOUCH_UNTOUCHEDID)
+	return RoundButton::mouseInRect(x, y);
+}
+
+bool Joystick::shouldKeepTouchWhenPointerLeaves(int x, int y)
+{
+	return touchingDownID != TOUCH_UNTOUCHEDID;
+}
+
+bool Joystick::onPointerInteractionCanceled(EventTouchID pointerID)
+{
+	if (touchingID != pointerID && touchingDownID != pointerID)
 	{
 		return false;
 	}
-	return (parent == nullptr ? true : parent->rect.PointInRect(x, y));
+	resetInput();
+	return true;
+}
+
+void Joystick::onAllPointerInteractionsCanceled()
+{
+	resetInput();
 }
 
 void Joystick::onMouseMoving(int x, int y)
 {
-	if (touchingID != dragging)
+	if (touchingDownID != TOUCH_UNTOUCHEDID
+		&& touchingDownID == touchingID
+		&& touchingID != dragging)
 	{
 		touchPosition.x = x - rect.x;
 		touchPosition.y = y - rect.y;
@@ -99,7 +104,9 @@ void Joystick::onMouseMoving(int x, int y)
 
 void Joystick::onMouseMoveIn(int x, int y)
 {
-	if (touchingID != dragging)
+	if (touchingDownID != TOUCH_UNTOUCHEDID
+		&& touchingDownID == touchingID
+		&& touchingID != dragging)
 	{
 		touchPosition.x = x - rect.x;
 		touchPosition.y = y - rect.y;
@@ -108,8 +115,11 @@ void Joystick::onMouseMoveIn(int x, int y)
 
 void Joystick::onMouseMoveOut()
 {
-    touchPosition.x = OutRange;
-    touchPosition.y = OutRange;
+	if (touchingDownID == TOUCH_UNTOUCHEDID)
+	{
+		touchPosition.x = OutRange;
+		touchPosition.y = OutRange;
+	}
 }
 
 void Joystick::onMouseLeftUp(int x, int y)
@@ -133,12 +143,14 @@ void Joystick::onDraw()
 {
 
 	int xOffset = 0, yOffset = 0;
-	auto img = IMP::loadImageForTime(image[0], getTime(), &xOffset, &yOffset);
-	if (stretch)
+	auto img = useStaticImages
+		? IMP::loadImage(image[0], 0, &xOffset, &yOffset)
+		: IMP::loadImageForTime(image[0], getTime(), &xOffset, &yOffset);
+	if (img != nullptr && stretch)
 	{
 		engine->drawImage(img, nullptr, &rect);
 	}
-	else
+	else if (img != nullptr)
 	{
 		int w = 0, h = 0;
 		engine->getImageSize(img, w, h);
@@ -149,17 +161,23 @@ void Joystick::onDraw()
 
 	if (touchPosition.x > OutRange && touchPosition.y > OutRange)
 	{
-		img = IMP::loadImageForTime(image[1], getTime(), &xOffset, &yOffset);
-		int w = 0, h = 0;
-		engine->getImageSize(img, w, h);
-		int x = rect.x + touchPosition.x - (int)round(w / 2);
-		int y = rect.y + touchPosition.y - (int)round(h / 2);
-		engine->drawImage(img, x, y);
+		img = useStaticImages
+			? IMP::loadImage(image[1], 0, &xOffset, &yOffset)
+			: IMP::loadImageForTime(image[1], getTime(), &xOffset, &yOffset);
+		if (img != nullptr)
+		{
+			int w = 0, h = 0;
+			engine->getImageSize(img, w, h);
+			int x = rect.x + touchPosition.x - (int)round(w / 2);
+			int y = rect.y + touchPosition.y - (int)round(h / 2);
+			engine->drawImage(img, x, y);
+		}
 	}
 }
 
 void Joystick::freeResource()
 {
+	useStaticImages = false;
 	RoundButton::freeResource();
 }
 
@@ -169,13 +187,28 @@ void Joystick::initFromIni(INIReader & ini)
 	std::unique_ptr<char[]> s;
 	int len = 0;
 
-	rect.x = ini.GetInteger(u8"Init", u8"Left", rect.x);
-	rect.y = ini.GetInteger(u8"Init", u8"Top", rect.y);
-	rect.w = ini.GetInteger(u8"Init", u8"Width", rect.w);
-	rect.h = ini.GetInteger(u8"Init", u8"Height", rect.h);
-	roundRange = ini.GetInteger(u8"Init", u8"range", roundRange);
-	setText(u8"");
-	std::string impName = ini.Get(u8"Init", u8"Image", u8"");
+	rect.x = ini.GetInteger("Init", "Left", rect.x);
+	rect.y = ini.GetInteger("Init", "Top", rect.y);
+	rect.w = ini.GetInteger("Init", "Width", rect.w);
+	rect.h = ini.GetInteger("Init", "Height", rect.h);
+	roundRange = ini.GetInteger("Init", "range", roundRange);
+	setText("");
+	std::string baseImageName = ini.Get("Init", "BaseImage", "");
+	std::string thumbImageName = ini.Get("Init", "ThumbImage", "");
+	if (!baseImageName.empty() || !thumbImageName.empty())
+	{
+		useStaticImages = true;
+		image[0] = loadRes(baseImageName);
+		image[1] = loadRes(thumbImageName);
+		if (image[0] == nullptr || image[1] == nullptr)
+		{
+			GameLog::write("Joystick:%s base/thumb image file error:%s,%s\n",
+				ini.fileName.c_str(), baseImageName.c_str(), thumbImageName.c_str());
+		}
+		return;
+	}
+
+	std::string impName = ini.Get("Init", "Image", "");
 	auto impImage = IMP::createIMPImage(impName);
 	if (impImage != nullptr)
 	{
@@ -184,7 +217,7 @@ void Joystick::initFromIni(INIReader & ini)
 	}
 	else
 	{
-		GameLog::write(u8"%s image file error\n", impName.c_str());
+		GameLog::write("Joystick:%s,%s image file error\n", ini.fileName.c_str(), impName.c_str());
 	}
 	
 	impImage = nullptr;

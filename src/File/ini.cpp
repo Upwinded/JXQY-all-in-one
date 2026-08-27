@@ -91,8 +91,8 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
     char* new_line;
     int offset;
 #endif
-    char section[MAX_SECTION] = u8"";
-    char prev_name[MAX_NAME] = u8"";
+    char section[MAX_SECTION] = "";
+    char prev_name[MAX_NAME] = "";
 
     char* start;
     char* end;
@@ -122,7 +122,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
             max_line *= 2;
             if (max_line > INI_MAX_LINE)
                 max_line = INI_MAX_LINE;
-            new_line = realloc(line, max_line);
+            new_line = static_cast<char*>(realloc(line, max_line));
             if (!new_line) {
                 free(line);
                 return -2;
@@ -161,8 +161,8 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
         }
 #endif
         else if (*start == '[') {
-            /* A u8"[section]" line */
-            end = find_chars_or_comment(start + 1, u8"]");
+            /* A "[section]" line */
+            end = find_chars_or_comment(start + 1, "]");
             if (*end == ']') {
                 *end = '\0';
                 strncpy0(section, start + 1, sizeof(section));
@@ -175,7 +175,7 @@ int ini_parse_stream(ini_reader reader, void* stream, ini_handler handler,
         }
         else if (*start) {
             /* Not a comment, must be a name[=:]value pair */
-            end = find_chars_or_comment(start, u8"=:");
+            end = find_chars_or_comment(start, "=:");
             if (*end == '=' || *end == ':') {
                 *end = '\0';
                 name = rstrip(start);

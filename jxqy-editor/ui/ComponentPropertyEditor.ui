@@ -1,0 +1,1175 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ComponentPropertyEditor</class>
+ <widget class="QWidget" name="ComponentPropertyEditor">
+  <property name="windowTitle">
+   <string>属性编辑器</string>
+  </property>
+  <layout class="QVBoxLayout" name="outerLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
+   <item>
+    <widget class="QScrollArea" name="scrollArea">
+     <property name="widgetResizable">
+      <bool>true</bool>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAsNeeded</enum>
+     </property>
+     <widget class="QWidget" name="scrollContent">
+      <layout class="QVBoxLayout" name="mainLayout">
+       <property name="leftMargin">
+        <number>4</number>
+       </property>
+       <property name="topMargin">
+        <number>4</number>
+       </property>
+       <property name="rightMargin">
+        <number>4</number>
+       </property>
+       <property name="bottomMargin">
+        <number>4</number>
+       </property>
+       <property name="spacing">
+        <number>6</number>
+       </property>
+       <item>
+        <widget class="QGroupBox" name="menuWindowGroup">
+         <property name="title">
+          <string>窗口属性</string>
+         </property>
+         <layout class="QFormLayout" name="menuWindowFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="menuWindowFileLabel">
+            <property name="text">
+             <string>窗口资源</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="menuWindowFileEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="menuWindowWidthLabel">
+            <property name="text">
+             <string>宽度</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="menuWindowWidthSpin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="menuWindowHeightLabel">
+            <property name="text">
+             <string>高度</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="menuWindowHeightSpin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="menuWindowImageLabel">
+            <property name="text">
+             <string>图片</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="menuWindowImageEdit"/>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="menuWindowAlignLabel">
+            <property name="text">
+             <string>对齐</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QComboBox" name="menuWindowAlignCombo">
+            <item>
+             <property name="text">
+              <string>alNone</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alClient</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alLeft</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alRight</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alTop</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alBottom</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alLTCorner</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alRTCorner</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alLBCorner</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alRBCorner</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alCenter</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alLeftCenter</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alRightCenter</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alTopCenter</string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>alBottomCenter</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="menuWindowAlignXLabel">
+            <property name="text">
+             <string>对齐X</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QSpinBox" name="menuWindowAlignXSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="0">
+           <widget class="QLabel" name="menuWindowAlignYLabel">
+            <property name="text">
+             <string>对齐Y</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="1">
+           <widget class="QSpinBox" name="menuWindowAlignYSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="0">
+           <widget class="QLabel" name="menuWindowStretchLabel">
+            <property name="text">
+             <string>拉伸</string>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="1">
+           <widget class="QCheckBox" name="menuWindowStretchCheck">
+            <property name="text">
+             <string/>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="definitionGroup">
+         <property name="title">
+          <string>组件定义</string>
+         </property>
+         <layout class="QFormLayout" name="definitionFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="nameLabel">
+            <property name="text">
+             <string>名称</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="nameEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="fileLabel">
+            <property name="text">
+             <string>资源文件</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="fileEdit"/>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="bindLabel">
+            <property name="text">
+             <string>数据绑定</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="bindEdit"/>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="formatLabel">
+            <property name="text">
+             <string>格式化</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="formatEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="controllerNavigationGroup">
+         <property name="title">
+          <string>手柄方向覆盖</string>
+         </property>
+         <property name="toolTip">
+          <string>填写同一菜单内的组件名称；留空时按真实矩形自动导航</string>
+         </property>
+         <layout class="QFormLayout" name="controllerNavigationFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="controllerUpLabel">
+            <property name="text">
+             <string>上目标</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="controllerUpEdit">
+            <property name="toolTip">
+             <string>同一菜单内 component 的精确名称；留空=自动几何</string>
+            </property>
+            <property name="placeholderText">
+             <string>留空=自动几何</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="controllerDownLabel">
+            <property name="text">
+             <string>下目标</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="controllerDownEdit">
+            <property name="toolTip">
+             <string>同一菜单内 component 的精确名称；留空=自动几何</string>
+            </property>
+            <property name="placeholderText">
+             <string>留空=自动几何</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="controllerLeftLabel">
+            <property name="text">
+             <string>左目标</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="controllerLeftEdit">
+            <property name="toolTip">
+             <string>同一菜单内 component 的精确名称；留空=自动几何</string>
+            </property>
+            <property name="placeholderText">
+             <string>留空=自动几何</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="controllerRightLabel">
+            <property name="text">
+             <string>右目标</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QLineEdit" name="controllerRightEdit">
+            <property name="toolTip">
+             <string>同一菜单内 component 的精确名称；留空=自动几何</string>
+            </property>
+            <property name="placeholderText">
+             <string>留空=自动几何</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="commonGroup">
+         <property name="title">
+          <string>通用属性</string>
+         </property>
+         <layout class="QFormLayout" name="commonFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="leftLabel">
+            <property name="text">
+             <string>左</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="leftSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="topLabel">
+            <property name="text">
+             <string>上</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="topSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="widthLabel">
+            <property name="text">
+             <string>宽度</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="widthSpin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="heightLabel">
+            <property name="text">
+             <string>高度</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="heightSpin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="imageLabel">
+            <property name="text">
+             <string>图片</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QLineEdit" name="imageEdit"/>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="colorLabel">
+            <property name="text">
+             <string>颜色</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QLineEdit" name="colorEdit">
+            <property name="placeholderText">
+             <string>0xFFFFFFFF</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="0">
+           <widget class="QLabel" name="stretchLabel">
+            <property name="text">
+             <string>拉伸</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="1">
+           <widget class="QCheckBox" name="stretchCheck"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="buttonGroup">
+         <property name="title">
+          <string>按钮属性</string>
+         </property>
+         <layout class="QFormLayout" name="buttonFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="buttonKindLabel">
+            <property name="text">
+             <string>种类</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QComboBox" name="buttonKindCombo">
+            <item>
+             <property name="text">
+              <string></string>
+             </property>
+            </item>
+            <item>
+             <property name="text">
+              <string>trackbtn</string>
+             </property>
+            </item>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="buttonSoundLabel">
+            <property name="text">
+             <string>音效</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="buttonSoundEdit"/>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="upLabel">
+            <property name="text">
+             <string>抬起</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="upSpin">
+            <property name="maximum">
+             <number>999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="downLabel">
+            <property name="text">
+             <string>按下</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="downSpin">
+            <property name="maximum">
+             <number>999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="trackLabel">
+            <property name="text">
+             <string>跟踪</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QSpinBox" name="trackSpin">
+            <property name="maximum">
+             <number>999</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="itemGroup">
+         <property name="title">
+          <string>物品格属性</string>
+         </property>
+         <layout class="QFormLayout" name="itemFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="itemFontLabel">
+            <property name="text">
+             <string>字体</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="itemFontSpin">
+            <property name="maximum">
+             <number>99</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="itemColorLabel">
+            <property name="text">
+             <string>颜色</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="itemColorEdit">
+            <property name="placeholderText">
+             <string>0xFFFFFFFF</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="labelGroup">
+         <property name="title">
+          <string>标签属性</string>
+         </property>
+         <layout class="QFormLayout" name="labelFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="labelFontLabel">
+            <property name="text">
+             <string>字体</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="labelFontSpin">
+            <property name="maximum">
+             <number>99</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="labelColorLabel">
+            <property name="text">
+             <string>颜色</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="labelColorEdit">
+            <property name="placeholderText">
+             <string>0xFFFFFFFF</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="scrollbarGroup">
+         <property name="title">
+          <string>滚动条属性</string>
+         </property>
+         <layout class="QFormLayout" name="scrollbarFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="scrollbarStyleLabel">
+            <property name="text">
+             <string>样式</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="scrollbarStyleSpin">
+            <property name="maximum">
+             <number>1</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="minLabel">
+            <property name="text">
+             <string>最小值</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QSpinBox" name="minSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="maxLabel">
+            <property name="text">
+             <string>最大值</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="maxSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="lineSizeLabel">
+            <property name="text">
+             <string>行大小</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="lineSizeSpin">
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="pageSizeLabel">
+            <property name="text">
+             <string>页大小</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QSpinBox" name="pageSizeSpin">
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="slideBeginLabel">
+            <property name="text">
+             <string>滑块起点</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QSpinBox" name="slideBeginSpin">
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="0">
+           <widget class="QLabel" name="slideEndLabel">
+            <property name="text">
+             <string>滑块终点</string>
+            </property>
+           </widget>
+          </item>
+          <item row="6" column="1">
+           <widget class="QSpinBox" name="slideEndSpin">
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="0">
+           <widget class="QLabel" name="slideBtnLabel">
+            <property name="text">
+             <string>滑块按钮</string>
+            </property>
+           </widget>
+          </item>
+          <item row="7" column="1">
+           <widget class="QLineEdit" name="slideBtnEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="columnImageGroup">
+         <property name="title">
+          <string>柱状图属性</string>
+         </property>
+         <layout class="QFormLayout" name="columnImageFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="percentLabel">
+            <property name="text">
+             <string>百分比</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QDoubleSpinBox" name="percentSpin">
+            <property name="minimum">
+             <double>0.000000000000000</double>
+            </property>
+            <property name="maximum">
+             <double>1.000000000000000</double>
+            </property>
+            <property name="singleStep">
+             <double>0.100000000000000</double>
+            </property>
+            <property name="decimals">
+             <number>2</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="chooseTextButtonGroup">
+         <property name="title">
+          <string>选择文本按钮属性</string>
+         </property>
+         <layout class="QFormLayout" name="chooseTextButtonFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="normalColorLabel">
+            <property name="text">
+             <string>常态颜色</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="normalColorEdit">
+            <property name="placeholderText">
+             <string>0xFFFFFFFF</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="hoverColorLabel">
+            <property name="text">
+             <string>悬停颜色</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="hoverColorEdit">
+            <property name="placeholderText">
+             <string>0xFFFFFF00</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="pressColorLabel">
+            <property name="text">
+             <string>按下颜色</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QLineEdit" name="pressColorEdit">
+            <property name="placeholderText">
+             <string>0xFF00FF00</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="listBoxGroup">
+         <property name="title">
+          <string>列表框属性</string>
+         </property>
+         <layout class="QVBoxLayout" name="listBoxVBoxLayout">
+          <item>
+           <layout class="QFormLayout" name="listBoxFormLayout">
+            <item row="0" column="0">
+             <widget class="QLabel" name="listBoxSoundLabel">
+              <property name="text">
+               <string>音效</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLineEdit" name="listBoxSoundEdit"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="listBoxColorLabel">
+              <property name="text">
+               <string>颜色</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLineEdit" name="listBoxColorEdit">
+              <property name="placeholderText">
+               <string>0xFFFFFFFF</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="listBoxSelColorLabel">
+              <property name="text">
+               <string>选中颜色</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="1">
+             <widget class="QLineEdit" name="listBoxSelColorEdit">
+              <property name="placeholderText">
+               <string>0xFFE6C864</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="0">
+             <widget class="QLabel" name="itemHeightLabel">
+              <property name="text">
+               <string>项高度</string>
+              </property>
+             </widget>
+            </item>
+            <item row="3" column="1">
+             <widget class="QSpinBox" name="itemHeightSpin">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="itemCountLabel">
+              <property name="text">
+               <string>项数量</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="1">
+             <widget class="QSpinBox" name="itemCountSpin">
+              <property name="maximum">
+               <number>9999</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="listBoxItemsLabel">
+            <property name="text">
+             <string>列表项:</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QListWidget" name="listBoxItemsList"/>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="listBoxItemsButtonLayout">
+            <item>
+             <widget class="QPushButton" name="listBoxAddItemButton">
+              <property name="text">
+               <string>添加</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="listBoxRemoveItemButton">
+              <property name="text">
+               <string>删除</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="listBoxEditItemButton">
+              <property name="text">
+               <string>编辑</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="joystickGroup">
+        <property name="title">
+         <string>摇杆图像</string>
+        </property>
+        <layout class="QFormLayout" name="joystickFormLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="joystickBaseImageLabel">
+           <property name="text">
+            <string>底图</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="joystickBaseImageEdit"/>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="joystickThumbImageLabel">
+           <property name="text">
+            <string>滑块图</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="QLineEdit" name="joystickThumbImageEdit"/>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="roundButtonGroup">
+         <property name="title">
+          <string>圆形按钮属性</string>
+         </property>
+         <layout class="QFormLayout" name="roundButtonFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="rangeLabel">
+            <property name="text">
+             <string>范围</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="rangeSpin">
+            <property name="minimum">
+             <number>1</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="textLabel">
+            <property name="text">
+             <string>文本</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="textEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="dragRoundButtonGroup">
+         <property name="title">
+          <string>可拖拽圆形按钮属性</string>
+         </property>
+         <layout class="QFormLayout" name="dragRoundButtonFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="indicateTypeLabel">
+            <property name="text">
+             <string>指示类型</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QSpinBox" name="indicateTypeSpin">
+            <property name="maximum">
+             <number>99</number>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="indicateImageLabel">
+            <property name="text">
+             <string>指示图片</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="indicateImageEdit"/>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="subMenuGroup">
+         <property name="title">
+          <string>子菜单窗口属性</string>
+         </property>
+         <layout class="QFormLayout" name="subMenuFormLayout">
+          <item row="0" column="0">
+           <widget class="QLabel" name="subMenuWindowFileLabel">
+            <property name="text">
+             <string>窗口资源</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <widget class="QLineEdit" name="subMenuWindowFileEdit"/>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="subMenuBackgroundImageLabel">
+            <property name="text">
+             <string>背景图片</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <widget class="QLineEdit" name="subMenuBackgroundImageEdit"/>
+          </item>
+          <item row="2" column="0">
+           <widget class="QLabel" name="subMenuRectLeftLabel">
+            <property name="text">
+             <string>窗口左</string>
+            </property>
+           </widget>
+          </item>
+          <item row="2" column="1">
+           <widget class="QSpinBox" name="subMenuRectLeftSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="0">
+           <widget class="QLabel" name="subMenuRectTopLabel">
+            <property name="text">
+             <string>窗口上</string>
+            </property>
+           </widget>
+          </item>
+          <item row="3" column="1">
+           <widget class="QSpinBox" name="subMenuRectTopSpin">
+            <property name="minimum">
+             <number>-9999</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="0">
+           <widget class="QLabel" name="subMenuRectWidthLabel">
+            <property name="text">
+             <string>窗口宽度</string>
+            </property>
+           </widget>
+          </item>
+          <item row="4" column="1">
+           <widget class="QSpinBox" name="subMenuRectWidthSpin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="0">
+           <widget class="QLabel" name="subMenuRectHeightLabel">
+            <property name="text">
+             <string>窗口高度</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QSpinBox" name="subMenuRectHeightSpin">
+            <property name="minimum">
+             <number>0</number>
+            </property>
+            <property name="maximum">
+             <number>9999</number>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="verticalSpacer">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

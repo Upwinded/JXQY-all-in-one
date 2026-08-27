@@ -1,0 +1,24 @@
+# Fixed source releases used by linux/build-dependencies.sh.
+SDL3_VERSION=3.4.10
+SDL3_URL=https://github.com/libsdl-org/SDL/releases/download/release-3.4.10/SDL3-3.4.10.tar.gz
+SDL3_SHA256=12b34280415ec8418c864408b93d008a20a6530687ee613d60bfbd20411f2785
+
+SDL3_IMAGE_VERSION=3.2.4
+SDL3_IMAGE_URL=https://github.com/libsdl-org/SDL_image/releases/download/release-3.2.4/SDL3_image-3.2.4.tar.gz
+SDL3_IMAGE_SHA256=a725bd6d04261fdda0dd8d950659e1dc15a8065d025275ef460d32ae7dcfc182
+
+SDL3_TTF_VERSION=3.2.2
+SDL3_TTF_URL=https://github.com/libsdl-org/SDL_ttf/releases/download/release-3.2.2/SDL3_ttf-3.2.2.tar.gz
+SDL3_TTF_SHA256=63547d58d0185c833213885b635a2c0548201cc8f301e6587c0be1a67e1e045d
+
+SDL3_MIXER_VERSION=3.2.4
+SDL3_MIXER_URL=https://github.com/libsdl-org/SDL_mixer/releases/download/release-3.2.4/SDL3_mixer-3.2.4.tar.gz
+SDL3_MIXER_SHA256=182a07c745375e113dc740d43964ff21b0be29f29f59876c4dbc4db3d32f6901
+
+FREETYPE_VERSION=2.13.2
+FREETYPE_URL=https://download.savannah.gnu.org/releases/freetype/freetype-2.13.2.tar.xz
+FREETYPE_SHA256=12991c4e55c506dd7f9b765933e62fd2be2e06d421505d7950a132e4f1bb484d
+
+FFMPEG_VERSION=5.1.2
+FFMPEG_URL=https://ffmpeg.org/releases/ffmpeg-5.1.2.tar.xz
+FFMPEG_SHA256=619e706d662c8420859832ddc259cd4d4096a48a2ce1eefd052db9e440eef3dc

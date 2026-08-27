@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "DC3D2A9F2AA49E8000BAABFC"
-               BuildableName = "jxqy.app"
+               BuildableName = "jxqy-all-in-one.app"
                BlueprintName = "jxqy macOS"
                ReferencedContainer = "container:jxqy.xcodeproj">
             </BuildableReference>
@@ -44,7 +44,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DC3D2A9F2AA49E8000BAABFC"
-            BuildableName = "jxqy.app"
+            BuildableName = "jxqy-all-in-one.app"
             BlueprintName = "jxqy macOS"
             ReferencedContainer = "container:jxqy.xcodeproj">
          </BuildableReference>
@@ -61,7 +61,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "DC3D2A9F2AA49E8000BAABFC"
-            BuildableName = "jxqy.app"
+            BuildableName = "jxqy-all-in-one.app"
             BlueprintName = "jxqy macOS"
             ReferencedContainer = "container:jxqy.xcodeproj">
          </BuildableReference>

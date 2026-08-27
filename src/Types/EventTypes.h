@@ -13,13 +13,17 @@ enum EventType
 	ET_MOUSEMOTION = 0x400,
 	ET_MOUSEDOWN,
 	ET_MOUSEUP,
+	ET_MOUSEWHEEL,
 	ET_FINGERDOWN = 0x700,
 	ET_FINGERUP,
-	ET_FINGERMOTION
+	ET_FINGERMOTION,
+	ET_FINGERCANCEL,
+	ET_WINDOWRESIZE = 0x800,
+	ET_WINDOWCLOSE
 };
 
 typedef int64_t EventTouchID;
-//鼠标也会返回触摸消息,TouchID=-1
+//榧犳爣涔熶細杩斿洖瑙︽懜娑堟伅,TouchID=-1
 #define TOUCH_MOUSEID SDL_TOUCH_MOUSEID 
 #define TOUCH_UNTOUCHEDID -2
 
@@ -126,6 +130,9 @@ struct AEvent
 	int eventX = 0;
     int eventY = 0;
 	bool eventRepeat = true;
+	// EngineBase emits one position refresh when SDL has no real mouse motion so
+	// hover state remains current. Such refreshes must not claim UI input mode.
+	bool synthetic = false;
 
 	AEvent() {}
 
@@ -144,6 +151,17 @@ struct AEvent
 		eventX = aEventX;
 		eventY = aEventY;
 		eventRepeat = eRepeat;
+	}
+
+	AEvent(EventType aEventType, EventTouchID aEventData, int aEventX,
+		int aEventY, bool eRepeat, bool isSynthetic)
+		: eventType(aEventType),
+		eventData(aEventData),
+		eventX(aEventX),
+		eventY(aEventY),
+		eventRepeat(eRepeat),
+		synthetic(isSynthetic)
+	{
 	}
 };
 

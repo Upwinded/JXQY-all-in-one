@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>UPEdit-JXQY</string>
+  <key>CFBundleExecutable</key>
+  <string>@JXQY_EDITOR_DESKTOP_EXECUTABLE_NAME@</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.jxqy.editor</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>UPEdit-JXQY</string>
+  <key>CFBundleIconFile</key>
+  <string>jxqy-all-in-one-icon-1024.png</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>@PROJECT_VERSION@</string>
+  <key>CFBundleVersion</key>
+  <string>@PROJECT_VERSION@</string>
+  <key>NSHighResolutionCapable</key>
+  <true/>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+@JXQY_EDITOR_MAC_DOCUMENT_TYPES@  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+@JXQY_EDITOR_MAC_EXPORTED_TYPES@  </array>
+</dict>
+</plist>

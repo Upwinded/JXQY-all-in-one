@@ -24,19 +24,20 @@
     <ProjectGuid>{7479dc1e-06b7-497a-901e-0724c6708af5}</ProjectGuid>
     <RootNamespace>jxqyallinone</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <VcpkgEnabled>false</VcpkgEnabled>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
     <UseOfMfc>false</UseOfMfc>
@@ -44,13 +45,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -72,28 +73,34 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Platform)'=='Win32'">
+    <SdlRuntimeArchDir>x86</SdlRuntimeArchDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Platform)'=='x64'">
+    <SdlRuntimeArchDir>x64</SdlRuntimeArchDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\miniz;$(ProjectDir)..\..\cmake;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)../../bin/win64/</OutDir>
     <TargetName>$(ProjectName)-debug</TargetName>
-    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\miniz;$(ProjectDir)..\..\cmake;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <TargetName>$(ProjectName)-debug</TargetName>
     <OutDir>$(ProjectDir)../../bin/win32/</OutDir>
-    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86;$(VC_LibraryPath_x86);$(WindowsSDK_LibraryPath_x86)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\miniz;$(ProjectDir)..\..\cmake;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <CopyCppRuntimeToOutputDir>true</CopyCppRuntimeToOutputDir>
     <OutDir>$(ProjectDir)../../bin/win32/</OutDir>
-    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\FMOD\inc;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\miniz;$(ProjectDir)..\..\cmake;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(VC_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)../../bin/win64/</OutDir>
-    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\fmod\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <LibraryPath>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -104,14 +111,15 @@
       <Optimization>Disabled</Optimization>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>$(ProjectDir)../../bin/win32/$(ProjectName)-debug$(TargetExt)</OutputFile>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x86;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;SDL3_mixer.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -123,6 +131,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -131,24 +140,25 @@
       <GenerateDebugInformation>false</GenerateDebugInformation>
       <OutputFile>$(ProjectDir)../../bin/win32/$(TargetName)$(TargetExt)</OutputFile>
       <AdditionalOptions>/SAFESEH:NO %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x86;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x86;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x86</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x86;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x86</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;SDL3_mixer.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>$(ProjectDir)../../bin/win64/$(ProjectName)-debug$(TargetExt)</OutputFile>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x64;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;SDL3_mixer.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -157,9 +167,10 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -167,18 +178,43 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <OutputFile>$(ProjectDir)../../bin/win64/$(TargetName)$(TargetExt)</OutputFile>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\..\3rd\fmod\win\lib\x64;$(ProjectDir)..\..\3rd\ffmpeg\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_image\win\lib\x64;$(ProjectDir)..\..\3rd\SDL2_ttf\win\lib\x64</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;fmod_vc.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\x64;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\x64</AdditionalLibraryDirectories>
+      <AdditionalDependencies>SDL3.lib;SDL3_image.lib;SDL3_ttf.lib;SDL3_mixer.lib;avcodec.lib;avformat.lib;avutil.lib;swresample.lib;swscale.lib;winhttp.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <PostBuildEvent>
+      <Command>if not exist "$(OutDir)" mkdir "$(OutDir)"
+copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\SDL3*.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libavif-16.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libavif-16.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libogg-0.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libogg-0.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libopus-0.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libopus-0.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libopusfile-0.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libopusfile-0.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libtiff-6.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libtiff-6.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libwavpack-1.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libwavpack-1.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libwebp-7.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libwebp-7.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libwebpdemux-2.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libwebpdemux-2.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libxmp.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\SDL\lib\$(SdlRuntimeArchDir)\optional\libxmp.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avcodec-59.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avcodec-59.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avformat-59.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avformat-59.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avutil-57.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avutil-57.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swresample-4.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swresample-4.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swscale-6.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swscale-6.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\Component\BaseComponent.cpp" />
     <ClCompile Include="..\..\src\Component\Button.cpp" />
     <ClCompile Include="..\..\src\Component\CheckBox.cpp" />
+    <ClCompile Include="..\..\src\Component\ChooseTextButton.cpp" />
     <ClCompile Include="..\..\src\Component\ColumnImage.cpp" />
+    <ClCompile Include="..\..\src\Component\ComponentRegistry.cpp" />
+    <ClCompile Include="..\..\src\Component\ConfigDrivenPanel.cpp" />
     <ClCompile Include="..\..\src\Component\DragButton.cpp" />
     <ClCompile Include="..\..\src\Component\DragRoundButton.cpp" />
     <ClCompile Include="..\..\src\Component\FadeMask.cpp" />
+    <ClCompile Include="..\..\src\Component\FlatScrollbar.cpp" />
+    <ClCompile Include="..\..\src\Component\FlatTextButton.cpp" />
     <ClCompile Include="..\..\src\Component\ImageContainer.cpp" />
     <ClCompile Include="..\..\src\Component\Item.cpp" />
     <ClCompile Include="..\..\src\Component\Joystick.cpp" />
@@ -190,19 +226,39 @@
     <ClCompile Include="..\..\src\Component\Scrollbar.cpp" />
     <ClCompile Include="..\..\src\Component\TalkLabel.cpp" />
     <ClCompile Include="..\..\src\Component\TextButton.cpp" />
+    <ClCompile Include="..\..\src\Component\TextLayout.cpp" />
     <ClCompile Include="..\..\src\Component\TransImage.cpp" />
     <ClCompile Include="..\..\src\Component\VideoPlayer.cpp" />
     <ClCompile Include="..\..\src\Element\Element.cpp" />
+    <ClCompile Include="..\..\src\Engine\AspectFitLayout.cpp" />
     <ClCompile Include="..\..\src\Engine\Engine.cpp" />
     <ClCompile Include="..\..\src\Engine\EngineBase.cpp" />
+    <ClCompile Include="..\..\src\Engine\ImageTypes.cpp" />
+    <ClCompile Include="..\..\src\Engine\Timer.cpp" />
+    <ClCompile Include="..\..\src\Input\PhysicalInputManager.cpp" />
     <ClCompile Include="..\..\src\File\File.cpp" />
+    <ClCompile Include="..\..\src\File\RootedResourceReader.cpp" />
+    <ClCompile Include="..\..\src\File\StrictRelativeResourcePath.cpp" />
     <ClCompile Include="..\..\src\File\ini.cpp" />
     <ClCompile Include="..\..\src\File\INIReader.cpp" />
     <ClCompile Include="..\..\src\File\log.cpp" />
-    <ClCompile Include="..\..\src\File\PakFile.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunDescriptor.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunDiagnostics.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunDiagnosticsFile.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunOrchestration.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunOrchestrationProduction.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunResourceRouting.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeSession.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTrace.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceFile.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceWriter.cpp" />
+    <ClCompile Include="..\..\src\Launch\EditorRunSceneApplication.cpp" />
+    <ClCompile Include="..\..\src\Launch\GameLaunchArguments.cpp" />
     <ClCompile Include="..\..\src\Game\Config\Config.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\BuySellInventory.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Camera.cpp" />
     <ClCompile Include="..\..\src\Game\Data\CollisionDetector.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\ColorStyle.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Effect.cpp" />
     <ClCompile Include="..\..\src\Game\Data\EffectManager.cpp" />
     <ClCompile Include="..\..\src\Game\Data\GameElement.cpp" />
@@ -210,12 +266,34 @@
     <ClCompile Include="..\..\src\Game\Data\Goods.cpp" />
     <ClCompile Include="..\..\src\Game\Data\GoodsManager.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Magic.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\MagicBeginPosition.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\MagicControl.cpp" />
     <ClCompile Include="..\..\src\Game\Data\MagicManager.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\MagicRegionFile.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\MagicTransport.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Map.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\MediaPathResolver.cpp" />
     <ClCompile Include="..\..\src\Game\Data\WaterEffect.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Memo.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\MemoPersistence.cpp" />
     <ClCompile Include="..\..\src\Game\Data\NPC.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionBase.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionBounce.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionStand.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionWalk.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionRun.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionJump.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionAttack.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionMagic.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionMagicForcedMove.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionHurt.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionDeath.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionHide.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionSit.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionSpecial.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NPCAction\NPCActionManager.cpp" />
     <ClCompile Include="..\..\src\Game\Data\NPCManager.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\NewYearPeriod.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Object.cpp" />
     <ClCompile Include="..\..\src\Game\Data\ObjectManager.cpp" />
     <ClCompile Include="..\..\src\Game\Data\PartnerManager.cpp" />
@@ -226,24 +304,49 @@
     <ClCompile Include="..\..\src\Game\GameManager\GameController.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\GameManager.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\MenuController.cpp" />
+    <ClCompile Include="..\..\src\Game\GameManager\RuntimeSaveGenerationPolicy.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\SaveFileManager.cpp" />
+    <ClCompile Include="..\..\src\Game\GameManager\SaveGeneration.cpp" />
+    <ClCompile Include="..\..\src\Game\GameManager\ScriptRuntimeState.cpp" />
+    <ClCompile Include="..\..\src\Game\GameManager\WorldInteractionResolver.cpp" />
+    <ClCompile Include="..\..\src\Game\Loading\ExclusiveLoadingRunner.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\BottomMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\BuySellMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ChooseMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ChooseMenuLayout.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ChooseMultipleSelection.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\ColumnMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ControllerTransferCoordinator.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ControllerTransferPolicies.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\Dialog.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\DiceGambleState.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\EquipMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\FishGameState.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\GambleMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\GoodsMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\JoystickPanel.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\MagicMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\MapThumbnailMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\MemoMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\MinimapToggleButton.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\MsgBox.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\NpcInfoPanel.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\Option.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\PartnerEquipMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\PartnerHeadMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\PracticeMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\SaveLoad.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\SkillsPanel.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\SlotGridController.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\StateMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\System.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ControllerHelpOverlay.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\ControllerPromptPresenter.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\SystemNotice.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\TimerMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\TopMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\ToolTip.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\UIFocusManager.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\YesNo.cpp" />
     <ClCompile Include="..\..\src\Game\Scene\MainScene.cpp" />
     <ClCompile Include="..\..\src\Game\Scene\Nurturance.cpp" />
@@ -251,9 +354,27 @@
     <ClCompile Include="..\..\src\Game\Scene\TitleTeam.cpp" />
     <ClCompile Include="..\..\src\Game\Scene\VideoPage.cpp" />
     <ClCompile Include="..\..\src\Game\Script\Script.cpp" />
+    <ClCompile Include="..\..\src\Game\Script\ScriptAPI.cpp" />
     <ClCompile Include="..\..\src\Image\IMP.cpp" />
+    <ClCompile Include="..\..\src\Image\PicDecoder.cpp" />
     <ClCompile Include="..\..\src\libconvert\libconvert.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourceCatalog.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourceManager.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourceManifest.cpp" />
+    <ClCompile Include="..\..\src\Resource\ModReleaseAssets.cpp" />
+    <ClCompile Include="..\..\src\Resource\ModReleaseMetadata.cpp" />
+    <ClCompile Include="..\..\src\Resource\SemanticVersion.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourcePackCard.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourcePackList.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourceSelectScene.cpp" />
+    <ClCompile Include="..\..\src\Update\HttpsDownload.cpp" />
+    <ClCompile Include="..\..\src\Update\OnlineUpdateCatalog.cpp" />
+    <ClCompile Include="..\..\src\Update\ResourcePackageArchive.cpp" />
+    <ClCompile Include="..\..\src\Update\ResourceDownloadPlanner.cpp" />
+    <ClCompile Include="..\..\src\Update\ResourceDownloadPreparation.cpp" />
+    <ClCompile Include="..\..\src\Update\ResourceInstallTransaction.cpp" />
+    <ClCompile Include="..\..\src\Update\ArtifactChecksum.cpp" />
     <ClCompile Include="..\..\src\Weather\Weather.cpp" />
     <ClCompile Include="..\..\ThirdParty\lua\lapi.c" />
     <ClCompile Include="..\..\ThirdParty\lua\lauxlib.c" />
@@ -289,16 +410,29 @@
     <ClCompile Include="..\..\ThirdParty\lua\lvm.c" />
     <ClCompile Include="..\..\ThirdParty\lua\lzio.c" />
     <ClCompile Include="..\..\ThirdParty\minilzo\minilzo.c" />
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz.c" />
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz_zip.c" />
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz_tinfl.c" />
+    <ClCompile Include="..\..\ThirdParty\miniz\miniz_tdef.c" />
+    <ClCompile Include="..\..\src\Platform\AndroidExternalStorage.cpp" />
+    <ClCompile Include="..\..\src\Platform\AndroidProgramUpdate.cpp" />
+    <ClCompile Include="..\..\src\Platform\MobileNetwork.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\Component\BaseComponent.h" />
     <ClInclude Include="..\..\src\Component\Button.h" />
     <ClInclude Include="..\..\src\Component\CheckBox.h" />
+    <ClInclude Include="..\..\src\Component\ChooseTextButton.h" />
     <ClInclude Include="..\..\src\Component\ColumnImage.h" />
     <ClInclude Include="..\..\src\Component\Component.h" />
+    <ClInclude Include="..\..\src\Component\ComponentRegistry.h" />
+    <ClInclude Include="..\..\src\Component\ConfigDrivenPanel.h" />
     <ClInclude Include="..\..\src\Component\DragButton.h" />
     <ClInclude Include="..\..\src\Component\DragRoundButton.h" />
     <ClInclude Include="..\..\src\Component\FadeMask.h" />
+    <ClInclude Include="..\..\src\Component\FlatComponentPolicy.h" />
+    <ClInclude Include="..\..\src\Component\FlatScrollbar.h" />
+    <ClInclude Include="..\..\src\Component\FlatTextButton.h" />
     <ClInclude Include="..\..\src\Component\ImageContainer.h" />
     <ClInclude Include="..\..\src\Component\Item.h" />
     <ClInclude Include="..\..\src\Component\Joystick.h" />
@@ -313,17 +447,37 @@
     <ClInclude Include="..\..\src\Component\TransImage.h" />
     <ClInclude Include="..\..\src\Component\VideoPlayer.h" />
     <ClInclude Include="..\..\src\Element\Element.h" />
+    <ClInclude Include="..\..\src\Engine\AspectFitLayout.h" />
     <ClInclude Include="..\..\src\Engine\Engine.h" />
     <ClInclude Include="..\..\src\Engine\EngineBase.h" />
+    <ClInclude Include="..\..\src\Engine\ImageTypes.h" />
+    <ClInclude Include="..\..\src\Engine\MediaTypes.h" />
+    <ClInclude Include="..\..\src\Engine\Timer.h" />
+    <ClInclude Include="..\..\src\Engine\WindowTypes.h" />
+    <ClInclude Include="..\..\src\Input\InputAction.h" />
+    <ClInclude Include="..\..\src\Input\PhysicalInputManager.h" />
+    <ClInclude Include="..\..\src\Input\GamepadConnectionObserver.h" />
     <ClInclude Include="..\..\src\File\File.h" />
     <ClInclude Include="..\..\src\File\ini.h" />
     <ClInclude Include="..\..\src\File\INIReader.h" />
     <ClInclude Include="..\..\src\File\log.h" />
-    <ClInclude Include="..\..\src\File\PakFile.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunDescriptor.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunDiagnostics.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunDiagnosticsFile.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunOrchestration.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunResourceRouting.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeSession.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeTrace.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeTraceFile.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunRuntimeTraceWriter.h" />
+    <ClInclude Include="..\..\src\Launch\EditorRunSceneApplication.h" />
+    <ClInclude Include="..\..\src\Launch\GameLaunchArguments.h" />
     <ClInclude Include="..\..\src\Game\Config\Config.h" />
     <ClInclude Include="..\..\src\Game\Data\Camera.h" />
     <ClInclude Include="..\..\src\Game\Data\CollisionDetector.h" />
+    <ClInclude Include="..\..\src\Game\Data\ColorStyle.h" />
     <ClInclude Include="..\..\src\Game\Data\Data.h" />
+    <ClInclude Include="..\..\src\Game\Data\DefeatedNpcExperience.h" />
     <ClInclude Include="..\..\src\Game\Data\Effect.h" />
     <ClInclude Include="..\..\src\Game\Data\EffectManager.h" />
     <ClInclude Include="..\..\src\Game\Data\GameElement.h" />
@@ -333,10 +487,27 @@
     <ClInclude Include="..\..\src\Game\Data\Magic.h" />
     <ClInclude Include="..\..\src\Game\Data\MagicManager.h" />
     <ClInclude Include="..\..\src\Game\Data\Map.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionBase.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionStand.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionWalk.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionRun.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionJump.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionAttack.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionMagic.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionHurt.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionDeath.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionHide.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionSit.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionSpecial.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionType.h" />
+    <ClInclude Include="..\..\src\Game\Data\NPCAction\NPCActionManager.h" />
+    <ClInclude Include="..\..\src\Game\Data\TalkTextList.h" />
     <ClInclude Include="..\..\src\Game\Data\WaterEffect.h" />
     <ClInclude Include="..\..\src\Game\Data\Memo.h" />
+    <ClInclude Include="..\..\src\Game\Data\MemoPersistence.h" />
     <ClInclude Include="..\..\src\Game\Data\NPC.h" />
     <ClInclude Include="..\..\src\Game\Data\NPCManager.h" />
+    <ClInclude Include="..\..\src\Game\Data\NewYearPeriod.h" />
     <ClInclude Include="..\..\src\Game\Data\Object.h" />
     <ClInclude Include="..\..\src\Game\Data\ObjectManager.h" />
     <ClInclude Include="..\..\src\Game\Data\PartnerManager.h" />
@@ -348,25 +519,46 @@
     <ClInclude Include="..\..\src\Game\GameManager\GameManager.h" />
     <ClInclude Include="..\..\src\Game\GameManager\MenuController.h" />
     <ClInclude Include="..\..\src\Game\GameManager\SaveFileManager.h" />
+    <ClInclude Include="..\..\src\Game\GameManager\WorldInteractionResolver.h" />
     <ClInclude Include="..\..\src\Game\GameTypes.h" />
     <ClInclude Include="..\..\src\Game\Menu\BottomMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\BuySellMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\ChooseMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\ColumnMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\ControllerFocusParticipant.h" />
+    <ClInclude Include="..\..\src\Game\Menu\ControllerTransferCoordinator.h" />
+    <ClInclude Include="..\..\src\Game\Menu\ControllerTransferPolicies.h" />
     <ClInclude Include="..\..\src\Game\Menu\Dialog.h" />
+    <ClInclude Include="..\..\src\Game\Menu\DiceGambleState.h" />
     <ClInclude Include="..\..\src\Game\Menu\EquipMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\FishGameState.h" />
+    <ClInclude Include="..\..\src\Game\Menu\GambleMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\GoodsMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\JoystickPanel.h" />
     <ClInclude Include="..\..\src\Game\Menu\MagicMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\MapThumbnailMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\MemoMemu.h" />
     <ClInclude Include="..\..\src\Game\Menu\Menu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\MenuResource.h" />
+    <ClInclude Include="..\..\src\Game\Menu\MinimapToggleButton.h" />
     <ClInclude Include="..\..\src\Game\Menu\MsgBox.h" />
+    <ClInclude Include="..\..\src\Game\Menu\NpcInfoPanel.h" />
     <ClInclude Include="..\..\src\Game\Menu\Option.h" />
+    <ClInclude Include="..\..\src\Game\Menu\PartnerEquipMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\PartnerHeadMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\PracticeMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\SaveLoad.h" />
     <ClInclude Include="..\..\src\Game\Menu\SkillsPanel.h" />
+    <ClInclude Include="..\..\src\Game\Menu\SlotGridController.h" />
     <ClInclude Include="..\..\src\Game\Menu\StateMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\System.h" />
+    <ClInclude Include="..\..\src\Game\Menu\SystemNotice.h" />
+    <ClInclude Include="..\..\src\Game\Menu\ControllerHelpOverlay.h" />
+    <ClInclude Include="..\..\src\Game\Menu\ControllerPromptPresenter.h" />
+    <ClInclude Include="..\..\src\Game\Menu\TimerMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\TopMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\ToolTip.h" />
+    <ClInclude Include="..\..\src\Game\Menu\UIFocusManager.h" />
     <ClInclude Include="..\..\src\Game\Menu\YesNo.h" />
     <ClInclude Include="..\..\src\Game\Scene\MainScene.h" />
     <ClInclude Include="..\..\src\Game\Scene\Nurturance.h" />
@@ -374,15 +566,30 @@
     <ClInclude Include="..\..\src\Game\Scene\TitleTeam.h" />
     <ClInclude Include="..\..\src\Game\Scene\VideoPage.h" />
     <ClInclude Include="..\..\src\Game\Script\Script.h" />
+    <ClInclude Include="..\..\src\Game\Script\ScriptAPI.h" />
     <ClInclude Include="..\..\src\Image\IMP.h" />
+    <ClInclude Include="..\..\src\Image\PicDecoder.h" />
     <ClInclude Include="..\..\src\libconvert\libconvert.h" />
+    <ClInclude Include="..\..\src\Resource\ResourceCatalog.h" />
+    <ClInclude Include="..\..\src\Resource\ResourceManager.h" />
+    <ClInclude Include="..\..\src\Resource\ResourceManifest.h" />
+    <ClInclude Include="..\..\src\Resource\ResourcePackCard.h" />
+    <ClInclude Include="..\..\src\Resource\ResourcePackList.h" />
+    <ClInclude Include="..\..\src\Resource\ResourceSelectScene.h" />
+    <ClInclude Include="..\..\src\Update\HttpsDownload.h" />
+    <ClInclude Include="..\..\src\Update\OnlineUpdateCatalog.h" />
+    <ClInclude Include="..\..\src\Update\ResourcePackageArchive.h" />
+    <ClInclude Include="..\..\src\Update\ResourceDownloadPlanner.h" />
+    <ClInclude Include="..\..\src\Update\ResourceDownloadPreparation.h" />
+    <ClInclude Include="..\..\src\Update\ResourceInstallTransaction.h" />
+    <ClInclude Include="..\..\src\Update\ArtifactChecksum.h" />
     <ClInclude Include="..\..\src\Types\CommonTypes.h" />
+    <ClInclude Include="..\..\src\Types\PlatformDefinitions.h" />
     <ClInclude Include="..\..\src\Types\ComponentTypes.h" />
     <ClInclude Include="..\..\src\Types\ElementTypes.h" />
     <ClInclude Include="..\..\src\Types\EventTypes.h" />
     <ClInclude Include="..\..\src\Types\ImagePackageFile.h" />
     <ClInclude Include="..\..\src\Types\MapTypes.h" />
-    <ClInclude Include="..\..\src\Types\PakTypes.h" />
     <ClInclude Include="..\..\src\Types\Types.h" />
     <ClInclude Include="..\..\src\Types\WeatherTypes.h" />
     <ClInclude Include="..\..\src\Weather\Weather.h" />
@@ -415,12 +622,15 @@
     <ClInclude Include="..\..\ThirdParty\lua\lvm.h" />
     <ClInclude Include="..\..\ThirdParty\lua\lzio.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="..\..\src\Platform\AndroidExternalStorage.h" />
+    <ClInclude Include="..\..\src\Platform\AndroidProgramUpdate.h" />
+    <ClInclude Include="..\..\src\Platform\MobileNetwork.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="jxqy-all-in-one.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="..\..\assets\config\logo.png" />
+    <Image Include="..\..\assets\engine\config\logo.png" />
     <Image Include="jxqy.ico" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,30 +1,14 @@
 #pragma once
 #include "ImageContainer.h"
-#include "Button.h"
-#include "Scrollbar.h"
-#include "Item.h"
-#include "ListBox.h"
-#include "Label.h"
-#include "CheckBox.h"
-#include "MemoText.h"
-#include "ColumnImage.h"
-#include "TalkLabel.h"
-#include "TransImage.h"
-#include "Joystick.h"
-#include "RoundButton.h"
-#include "TextButton.h"
-#include "DragRoundButton.h"
-#include "DragButton.h"
-#include "FadeMask.h"
-#include "VideoPlayer.h"
 
 
 #define freeCom(component); \
 	removeChild(component);\
-	if (component.get() != nullptr)\
+	if (component != nullptr)\
 	{\
 		component = nullptr;\
 	}
+
 
 class Panel :
 	public ImageContainer
@@ -38,42 +22,21 @@ public:
 	Align align = alNone;
 	int alignX = 0;
 	int alignY = 0;
+	int baseWidth = 0;
+	int baseHeight = 0;
+	float scale = 1.0f;
 	void setAlign();
 public:
-	//virtual void initFromIni(const std::string& fileName) { BaseComponent::initFromIni(fileName); }
 	virtual void initFromIni(INIReader & ini);
+
+	virtual void getChildScaleFactor(float& scaleX, float& scaleY) override;
+	virtual void getChildLayoutOffset(int& offsetX, int& offsetY) override;
 protected:
 
-	template <typename T>
-	auto addComponent(const std::string& fileName)
-	{
-		std::unique_ptr<char[]> s;
-		int len = 0;
-		len = PakFile::readFile(fileName, s);
-		if (s == nullptr || len == 0)
-		{
-			GameLog::write(u8"no ini file: %s\n", fileName.c_str());
-			return std::shared_ptr<T>(nullptr);
-		}
-		INIReader ini(s);
-		auto component = std::make_shared<T>();
-
-		if (std::is_same<T, Scrollbar>::value)
-		{
-			component->initFromIniWithName(ini, fileName);
-		}
-		else
-		{
-			component->initFromIni(ini);
-		}
-		this->addChild(component);
-		return component;
-	}
-
 	virtual void freeResource() override;
+	virtual void onWindowResize(int width, int height) override;
 
 	void resetRect(PElement e, int x, int y);
 	void resetRect();
 
 };
-
