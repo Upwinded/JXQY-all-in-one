@@ -12,6 +12,25 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(JXQY_FORCE_MOBILE_UI
     "Compile mobile touch-control branches in a desktop surrogate build"
     OFF)
+option(JXQY_BUILD_AUTOMATION_TOOLS
+    "Build desktop automation helper executables"
+    OFF)
+option(JXQY_ENABLE_AUTOMATION_HOOKS
+    "Compile test-only game automation interfaces"
+    OFF)
+option(JXQY_BUILD_BENCHMARKS
+    "Build benchmark targets"
+    OFF)
+option(BUILD_TESTING
+    "Build the test targets"
+    OFF)
+
+if(BUILD_TESTING OR JXQY_ENABLE_AUTOMATION_HOOKS)
+    add_compile_definitions(JXQY_ENABLE_AUTOMATION_HOOKS)
+endif()
+if(BUILD_TESTING)
+    add_compile_definitions(JXQY_ENABLE_TEST_HOOKS)
+endif()
 
 if(MSVC)
     add_compile_options(/utf-8)
@@ -289,11 +308,12 @@ list(REMOVE_ITEM SOURCE_FILES
     ${THIRD_PARTY_DIR}/lua/lua.c
 )
 
-# Keep workspace-only sources outside the production executable even when they
-# are present in a developer checkout.
+# Tests under src/tests belong to dedicated test targets and must never be
+# compiled into the game executable.
 file(GLOB_RECURSE SRC_TEST_FILES ${SRC_DIR}/tests/*)
 list(REMOVE_ITEM SOURCE_FILES ${SRC_TEST_FILES})
 
+# Automation entry points are built as separate helper executables.
 file(GLOB_RECURSE SRC_AUTOMATION_FILES ${SRC_DIR}/automation/*)
 list(REMOVE_ITEM SOURCE_FILES ${SRC_AUTOMATION_FILES})
 
@@ -572,6 +592,15 @@ if(WIN32)
         RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${JXQY_STARTER_OUTPUT}")
 endif()
 
+if(WIN32 AND JXQY_BUILD_AUTOMATION_TOOLS)
+    add_executable(jxqy-automation-launcher WIN32
+        ${SRC_DIR}/automation/jxqy_automation_launcher.cpp
+    )
+    target_compile_definitions(jxqy-automation-launcher PRIVATE
+        JXQY_GAME_EXECUTABLE_NAME="$<TARGET_FILE_NAME:${PROJECT_NAME}>"
+    )
+    add_dependencies(jxqy-automation-launcher ${PROJECT_NAME})
+endif()
 
 if(WIN32 OR (UNIX AND NOT APPLE))
     add_executable(jxqy-program-updater
@@ -608,10 +637,992 @@ if(WIN32 OR (UNIX AND NOT APPLE))
         RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${JXQY_PROGRAM_UPDATER_OUTPUT}")
 endif()
 
+include(CTest)
+if(BUILD_TESTING)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+if(EXISTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_desktop_release.py")
+    add_test(NAME jxqy-desktop-release-package-tests
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_desktop_release.py)
+endif()
+
+if(EXISTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_android_release.py")
+    add_test(NAME jxqy-android-release-package-tests
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_android_release.py)
+endif()
+
+if(EXISTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_apple_release.py")
+    add_test(NAME jxqy-apple-release-package-tests
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_apple_release.py)
+endif()
+
+if(EXISTS
+        "${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_third_party_dependencies.py")
+    add_test(NAME jxqy-third-party-release-package-tests
+        COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/private-build/scripts/test_package_third_party_dependencies.py)
+endif()
+
+# Runtime trap-index contract test. Keep this target intentionally small so it
+# validates Traps and INI persistence without linking the full game executable.
+add_executable(jxqy-trap-tests
+    ${SRC_DIR}/tests/test_traps.cpp
+    ${SRC_DIR}/Game/Data/Traps.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-trap-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-trap-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-trap-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-trap-tests SDL3)
+endif()
+
+add_executable(jxqy-mod-release-metadata-tests
+    ${SRC_DIR}/tests/test_mod_release_metadata.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/Resource/ModReleaseAssets.cpp
+)
+add_test(NAME jxqy-mod-release-metadata-tests
+    COMMAND jxqy-mod-release-metadata-tests)
+
+add_executable(jxqy-online-update-catalog-tests
+    ${SRC_DIR}/tests/test_online_update_catalog.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ResourceDownloadPlanner.cpp
+    ${SRC_DIR}/Update/ArtifactChecksum.cpp
+    ${SRC_DIR}/Resource/SemanticVersion.cpp
+    ${SRC_DIR}/Resource/ModReleaseMetadata.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${JXQY_MINIZ_SOURCES}
+)
+add_test(NAME jxqy-online-update-catalog-tests
+    COMMAND jxqy-online-update-catalog-tests)
+
+add_executable(jxqy-desktop-program-updater-tests
+    ${SRC_DIR}/tests/test_desktop_program_updater.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/updater/DesktopProgramUpdater.cpp
+)
+target_include_directories(jxqy-desktop-program-updater-tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/updater)
+add_test(NAME jxqy-desktop-program-updater-tests
+    COMMAND jxqy-desktop-program-updater-tests)
+
+add_executable(jxqy-resource-package-archive-tests
+    ${SRC_DIR}/tests/test_resource_package_archive.cpp
+    ${SRC_DIR}/Update/ResourceDownloadPreparation.cpp
+    ${SRC_DIR}/Update/ResourceDownloadPlanner.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${SRC_DIR}/Update/ResourcePackageArchive.cpp
+    ${SRC_DIR}/Update/HttpsDownload.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ArtifactChecksum.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Resource/ModReleaseMetadata.cpp
+    ${SRC_DIR}/Resource/SemanticVersion.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${JXQY_MINIZ_SOURCES}
+)
+target_compile_definitions(jxqy-resource-package-archive-tests PRIVATE
+    JXQY_RESOURCE_MANIFEST_BUFFER_ONLY)
+if(WIN32)
+    target_link_libraries(jxqy-resource-package-archive-tests PRIVATE winhttp)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-resource-package-archive-tests PRIVATE CURL::libcurl)
+endif()
+add_test(NAME jxqy-resource-package-archive-tests
+    COMMAND jxqy-resource-package-archive-tests)
+
+add_executable(jxqy-resource-install-transaction-tests
+    ${SRC_DIR}/tests/test_resource_install_transaction.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Resource/ModReleaseMetadata.cpp
+    ${SRC_DIR}/Resource/SemanticVersion.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/ini.cpp
+)
+target_compile_definitions(jxqy-resource-install-transaction-tests PRIVATE
+    JXQY_RESOURCE_MANIFEST_BUFFER_ONLY)
+add_test(NAME jxqy-resource-install-transaction-tests
+    COMMAND jxqy-resource-install-transaction-tests)
+
+add_executable(jxqy-https-download-tests
+    ${SRC_DIR}/tests/test_https_download.cpp
+    ${SRC_DIR}/Update/HttpsDownload.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Resource/SemanticVersion.cpp
+    ${SRC_DIR}/Resource/ModReleaseMetadata.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/ini.cpp
+)
+if(WIN32)
+    target_link_libraries(jxqy-https-download-tests PRIVATE winhttp)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-https-download-tests PRIVATE CURL::libcurl)
+endif()
+add_test(NAME jxqy-https-download-tests
+    COMMAND jxqy-https-download-tests)
+
+add_executable(jxqy-editor-run-launch-tests
+    ${SRC_DIR}/tests/test_editor_run_preflight.cpp
+    ${SRC_DIR}/Launch/GameLaunchArguments.cpp
+    ${SRC_DIR}/Launch/EditorRunDescriptor.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+)
+add_test(NAME jxqy-editor-run-launch-tests
+    COMMAND jxqy-editor-run-launch-tests)
+
+add_executable(jxqy-newgame-automation-probe-tests
+    ${SRC_DIR}/tests/test_newgame_automation_process.cpp
+    ${SRC_DIR}/Launch/GameLaunchArguments.cpp
+)
+add_test(NAME jxqy-newgame-automation-process-tests
+    COMMAND ${Python3_EXECUTABLE}
+        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_newgame_automation_process.py"
+        --probe "$<TARGET_FILE:jxqy-newgame-automation-probe-tests>"
+        --game "$<TARGET_FILE:${PROJECT_NAME}>"
+        --repo "${CMAKE_CURRENT_SOURCE_DIR}"
+        --assets "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        --resource-id XJXQY_TEST_MOD
+)
+set_tests_properties(jxqy-newgame-automation-process-tests PROPERTIES
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+    RUN_SERIAL TRUE
+    SKIP_RETURN_CODE 77
+    TIMEOUT 3000
+)
+
+add_executable(jxqy-editor-run-runtime-session-tests
+    ${SRC_DIR}/tests/test_editor_run_runtime_session.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeSession.cpp
+    ${SRC_DIR}/Launch/EditorRunDescriptor.cpp
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+)
+add_test(NAME jxqy-editor-run-runtime-session-tests
+    COMMAND jxqy-editor-run-runtime-session-tests)
+
+add_executable(jxqy-editor-run-resource-routing-tests
+    ${SRC_DIR}/tests/test_editor_run_resource_routing.cpp
+    ${SRC_DIR}/Launch/EditorRunResourceRouting.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+if(WIN32)
+    target_link_libraries(jxqy-editor-run-resource-routing-tests
+        SDL3_lib)
+    add_custom_command(
+        TARGET jxqy-editor-run-resource-routing-tests
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-editor-run-resource-routing-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-editor-run-resource-routing-tests SDL3)
+endif()
+add_test(NAME jxqy-editor-run-resource-routing-tests
+    COMMAND jxqy-editor-run-resource-routing-tests)
+
+add_executable(jxqy-resource-catalog-supplemental-tests
+    ${SRC_DIR}/tests/test_resource_catalog_supplemental.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+if(WIN32)
+    target_link_libraries(jxqy-resource-catalog-supplemental-tests
+        SDL3_lib)
+    add_custom_command(
+        TARGET jxqy-resource-catalog-supplemental-tests
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-resource-catalog-supplemental-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-resource-catalog-supplemental-tests SDL3)
+endif()
+add_test(NAME jxqy-resource-catalog-supplemental-tests
+    COMMAND jxqy-resource-catalog-supplemental-tests)
+
+add_executable(jxqy-editor-run-resource-install-tests
+    ${SRC_DIR}/tests/test_editor_run_resource_install.cpp
+    ${SRC_DIR}/Platform/AndroidExternalStorage.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManager.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+if(WIN32)
+    target_link_libraries(jxqy-editor-run-resource-install-tests
+        SDL3_lib)
+    add_custom_command(
+        TARGET jxqy-editor-run-resource-install-tests
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-editor-run-resource-install-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-editor-run-resource-install-tests SDL3)
+endif()
+add_test(NAME jxqy-editor-run-resource-install-tests
+    COMMAND jxqy-editor-run-resource-install-tests)
+
+add_executable(jxqy-resource-manager-install-transaction-tests
+    ${SRC_DIR}/tests/test_resource_manager_install_transaction.cpp
+    ${SRC_DIR}/Platform/AndroidExternalStorage.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManager.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+if(WIN32)
+    target_link_libraries(jxqy-resource-manager-install-transaction-tests
+        SDL3_lib)
+    add_custom_command(
+        TARGET jxqy-resource-manager-install-transaction-tests
+        POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-resource-manager-install-transaction-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-resource-manager-install-transaction-tests SDL3)
+endif()
+add_test(NAME jxqy-resource-manager-install-transaction-tests
+    COMMAND jxqy-resource-manager-install-transaction-tests)
+
+add_executable(jxqy-editor-run-scene-application-tests
+    ${SRC_DIR}/tests/test_editor_run_scene_application.cpp
+    ${SRC_DIR}/Launch/EditorRunSceneApplication.cpp
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+)
+add_test(NAME jxqy-editor-run-scene-application-tests
+    COMMAND jxqy-editor-run-scene-application-tests)
+
+find_package(Threads REQUIRED)
+add_executable(jxqy-editor-run-diagnostics-tests
+    ${SRC_DIR}/tests/test_editor_run_diagnostics.cpp
+    ${SRC_DIR}/Launch/EditorRunDiagnostics.cpp
+)
+target_link_libraries(jxqy-editor-run-diagnostics-tests
+    Threads::Threads)
+add_test(NAME jxqy-editor-run-diagnostics-tests
+    COMMAND jxqy-editor-run-diagnostics-tests)
+
+add_executable(jxqy-editor-run-runtime-trace-tests
+    ${SRC_DIR}/tests/test_editor_run_runtime_trace.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTrace.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTraceWriter.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+)
+target_link_libraries(jxqy-editor-run-runtime-trace-tests
+    Threads::Threads)
+add_test(NAME jxqy-editor-run-runtime-trace-tests
+    COMMAND jxqy-editor-run-runtime-trace-tests)
+
+add_executable(jxqy-editor-run-orchestration-tests
+    ${SRC_DIR}/tests/test_editor_run_orchestration.cpp
+    ${SRC_DIR}/Launch/EditorRunOrchestration.cpp
+    ${SRC_DIR}/Launch/EditorRunDiagnostics.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTrace.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTraceWriter.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+)
+target_link_libraries(jxqy-editor-run-orchestration-tests
+    Threads::Threads)
+add_test(NAME jxqy-editor-run-orchestration-tests
+    COMMAND jxqy-editor-run-orchestration-tests)
+
+option(JXQY_ENABLE_PYTHON_CONTRACT_TESTS
+    "Register Python source and runtime contract tests" ON)
+if(JXQY_ENABLE_PYTHON_CONTRACT_TESTS)
+    add_test(NAME jxqy-scaffold-test-mod-contracts
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_scaffold_test_mod.py")
+    add_test(NAME jxqy-run-mod-scenario-smoke-contracts
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_run_mod_scenario_smoke.py")
+    add_test(NAME jxqy-platform-project-source-contracts
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_platform_project_sources.py")
+    add_test(NAME jxqy-menu-input-catalog-contracts
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_menu_input_catalog.py")
+    add_test(NAME jxqy-menu-input-catalog-unit-tests
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_check_menu_input_catalog.py")
+    set_tests_properties(
+        jxqy-scaffold-test-mod-contracts
+        jxqy-run-mod-scenario-smoke-contracts
+        jxqy-platform-project-source-contracts
+        jxqy-menu-input-catalog-unit-tests
+        PROPERTIES
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            RUN_SERIAL TRUE
+            TIMEOUT 120
+    )
+    set_tests_properties(jxqy-menu-input-catalog-contracts PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        RUN_SERIAL TRUE
+        TIMEOUT 1200
+    )
+endif()
+
+add_test(NAME jxqy-trap-tests COMMAND jxqy-trap-tests)
+
+add_executable(jxqy-npc-action-bounce-tests
+    ${SRC_DIR}/tests/test_npc_action_bounce.cpp
+)
+
+add_test(NAME jxqy-npc-action-bounce-tests COMMAND jxqy-npc-action-bounce-tests)
+
+add_executable(jxqy-npc-action-death-tests
+    ${SRC_DIR}/tests/test_npc_action_death.cpp
+)
+
+add_test(NAME jxqy-npc-action-death-tests COMMAND jxqy-npc-action-death-tests)
+
+add_executable(jxqy-npc-action-shadow-selection-tests
+    ${SRC_DIR}/tests/test_npc_action_shadow_selection.cpp
+)
+
+add_test(NAME jxqy-npc-action-shadow-selection-tests COMMAND jxqy-npc-action-shadow-selection-tests)
+
+add_executable(jxqy-npc-action-magic-timing-tests
+    ${SRC_DIR}/tests/test_npc_action_magic_timing.cpp
+)
+
+add_test(NAME jxqy-npc-action-magic-timing-tests COMMAND jxqy-npc-action-magic-timing-tests)
+
+add_executable(jxqy-camera-vibration-tests
+    ${SRC_DIR}/tests/test_camera_vibration.cpp
+)
+
+add_test(NAME jxqy-camera-vibration-tests COMMAND jxqy-camera-vibration-tests)
+
+add_executable(jxqy-object-runtime-tests
+    ${SRC_DIR}/tests/test_object_runtime.cpp
+)
+
+add_test(NAME jxqy-object-runtime-tests COMMAND jxqy-object-runtime-tests)
+
+add_executable(jxqy-media-path-resolver-tests
+    ${SRC_DIR}/tests/test_media_path_resolver.cpp
+    ${SRC_DIR}/Game/Data/MediaPathResolver.cpp
+    ${SRC_DIR}/Image/PicDecoder.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-media-path-resolver-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-media-path-resolver-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-media-path-resolver-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-media-path-resolver-tests SDL3)
+endif()
+
+add_test(NAME jxqy-media-path-resolver-tests COMMAND jxqy-media-path-resolver-tests)
+
+set(JXQY_NPC_TARGETING_RUNTIME_SOURCES ${SOURCE_FILES})
+list(REMOVE_ITEM JXQY_NPC_TARGETING_RUNTIME_SOURCES ${SRC_DIR}/main.cpp)
+
+add_executable(jxqy-npc-targeting-tests
+    ${SRC_DIR}/tests/test_npc_targeting.cpp
+    ${SRC_DIR}/tests/test_npc_runtime_persistence.cpp
+    ${SRC_DIR}/tests/test_effect_runtime_persistence.cpp
+    ${SRC_DIR}/tests/test_gamble_menu_runtime.cpp
+    ${SRC_DIR}/tests/test_magic_derived_runtime.cpp
+    ${SRC_DIR}/tests/test_object_animation_runtime.cpp
+    ${SRC_DIR}/tests/test_media_runtime.cpp
+    ${SRC_DIR}/tests/test_core_lifecycle.cpp
+	${SRC_DIR}/tests/test_ui_focus.cpp
+	${SRC_DIR}/tests/test_map_thumbnail_controller.cpp
+	${SRC_DIR}/tests/test_partner_equipment_transfer.cpp
+	${SRC_DIR}/tests/test_world_interaction_runtime.cpp
+	${SRC_DIR}/tests/test_gamepad_world_runtime.cpp
+	${SRC_DIR}/tests/test_gamepad_essential_ui.cpp
+	${SRC_DIR}/tests/test_gamepad_rpg_menu_actions.cpp
+	${SRC_DIR}/tests/test_gamepad_surface_contract.cpp
+	${SRC_DIR}/tests/test_mobile_external_input_runtime.cpp
+	${SRC_DIR}/tests/test_script_engine_runtime.cpp
+	${SRC_DIR}/tests/test_editor_run_scene_runtime.cpp
+	${SRC_DIR}/tests/test_map_v3_runtime.cpp
+    ${JXQY_NPC_TARGETING_RUNTIME_SOURCES}
+)
+
+if(JXQY_FORCE_MOBILE_UI)
+	target_compile_definitions(jxqy-npc-targeting-tests PRIVATE
+		JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+endif()
+
+if(WIN32)
+    target_link_libraries(jxqy-npc-targeting-tests
+        SDL3_lib
+        SDL3_image_lib
+        SDL3_ttf_lib
+        SDL3_mixer_lib
+        winhttp
+        ${FFMPEG_LIBS}
+    )
+    add_custom_command(TARGET jxqy-npc-targeting-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${_RUNTIME_DLL_DEPS}
+            "$<TARGET_FILE_DIR:jxqy-npc-targeting-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-npc-targeting-tests
+        ${JXQY_LINUX_MEDIA_LIBRARIES}
+        CURL::libcurl
+        Threads::Threads
+        ${CMAKE_DL_LIBS}
+    )
+endif()
+
+add_test(NAME jxqy-npc-targeting-tests COMMAND jxqy-npc-targeting-tests)
+add_test(NAME jxqy-npc-runtime-persistence-tests COMMAND jxqy-npc-targeting-tests --npc-persistence)
+add_test(NAME jxqy-effect-runtime-persistence-tests COMMAND jxqy-npc-targeting-tests --effect-persistence)
+add_test(NAME jxqy-gamble-menu-runtime-tests COMMAND jxqy-npc-targeting-tests --gamble-menu)
+add_test(NAME jxqy-magic-derived-runtime-tests COMMAND jxqy-npc-targeting-tests --magic-derived)
+add_test(NAME jxqy-magic-experience-tests COMMAND jxqy-npc-targeting-tests --magic-experience)
+add_test(NAME jxqy-object-animation-runtime-tests COMMAND jxqy-npc-targeting-tests --object-animation)
+add_test(NAME jxqy-media-runtime-tests COMMAND jxqy-npc-targeting-tests --media-runtime)
+add_test(NAME jxqy-core-lifecycle-tests COMMAND jxqy-npc-targeting-tests --core-lifecycle)
+set_tests_properties(jxqy-core-lifecycle-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-ui-focus-tests COMMAND jxqy-npc-targeting-tests --ui-focus)
+add_test(NAME jxqy-map-thumbnail-controller-tests
+	COMMAND jxqy-npc-targeting-tests --map-thumbnail-controller)
+add_test(NAME jxqy-partner-equipment-transfer-tests
+	COMMAND jxqy-npc-targeting-tests --partner-equipment-transfer)
+add_test(NAME jxqy-world-interaction-tests
+	COMMAND jxqy-npc-targeting-tests --world-interaction-runtime)
+add_test(NAME jxqy-gamepad-world-runtime-tests
+	COMMAND jxqy-npc-targeting-tests --gamepad-world-runtime)
+add_test(NAME jxqy-gamepad-essential-ui-tests
+	COMMAND jxqy-npc-targeting-tests --gamepad-essential-ui)
+add_test(NAME jxqy-gamepad-rpg-menu-action-tests
+	COMMAND jxqy-npc-targeting-tests --gamepad-rpg-menu-actions)
+add_test(NAME jxqy-gamepad-surface-contract-tests
+	COMMAND jxqy-npc-targeting-tests --gamepad-surface-contract)
+if(JXQY_FORCE_MOBILE_UI)
+	add_test(NAME jxqy-mobile-external-input-runtime-tests
+		COMMAND jxqy-npc-targeting-tests --mobile-external-input-runtime)
+endif()
+add_test(NAME jxqy-script-engine-runtime-tests COMMAND jxqy-npc-targeting-tests --script-engine-runtime)
+add_test(NAME jxqy-editor-run-scene-runtime-tests
+	COMMAND jxqy-npc-targeting-tests --editor-run-scene-runtime)
+add_test(NAME jxqy-map-v3-runtime-tests COMMAND jxqy-npc-targeting-tests --map-v3-load)
+
+add_executable(jxqy-npc-magic-replacement-tests
+    ${SRC_DIR}/tests/test_npc_magic_replacement.cpp
+)
+
+add_test(NAME jxqy-npc-magic-replacement-tests COMMAND jxqy-npc-magic-replacement-tests)
+
+add_executable(jxqy-magic-damage-channel-tests
+    ${SRC_DIR}/tests/test_magic_damage_channels.cpp
+)
+
+add_test(NAME jxqy-magic-damage-channel-tests COMMAND jxqy-magic-damage-channel-tests)
+
+add_executable(jxqy-magic-hit-rate-tests
+    ${SRC_DIR}/tests/test_magic_hit_rate.cpp
+)
+
+add_test(NAME jxqy-magic-hit-rate-tests COMMAND jxqy-magic-hit-rate-tests)
+
+add_executable(jxqy-magic-begin-position-tests
+    ${SRC_DIR}/tests/test_magic_begin_position.cpp
+    ${SRC_DIR}/Game/Data/MagicBeginPosition.cpp
+)
+
+add_test(NAME jxqy-magic-begin-position-tests COMMAND jxqy-magic-begin-position-tests)
+
+add_executable(jxqy-magic-region-shape-tests
+    ${SRC_DIR}/tests/test_magic_region_shape.cpp
+)
+
+add_test(NAME jxqy-magic-region-shape-tests COMMAND jxqy-magic-region-shape-tests)
+
+add_executable(jxqy-magic-transport-tests
+    ${SRC_DIR}/tests/test_magic_transport.cpp
+    ${SRC_DIR}/Game/Data/MagicTransport.cpp
+)
+
+add_test(NAME jxqy-magic-transport-tests COMMAND jxqy-magic-transport-tests)
+
+add_executable(jxqy-magic-control-tests
+    ${SRC_DIR}/tests/test_magic_control.cpp
+    ${SRC_DIR}/Game/Data/MagicControl.cpp
+)
+
+add_test(NAME jxqy-magic-control-tests COMMAND jxqy-magic-control-tests)
+
+add_executable(jxqy-time-stop-update-gate-tests
+    ${SRC_DIR}/tests/test_time_stop_update_gate.cpp
+    ${SRC_DIR}/Element/Element.cpp
+)
+
+add_test(NAME jxqy-time-stop-update-gate-tests COMMAND jxqy-time-stop-update-gate-tests)
+
+add_executable(jxqy-choose-multiple-selection-tests
+    ${SRC_DIR}/tests/test_choose_multiple_selection.cpp
+    ${SRC_DIR}/Game/Menu/ChooseMultipleSelection.cpp
+)
+
+add_test(NAME jxqy-choose-multiple-selection-tests COMMAND jxqy-choose-multiple-selection-tests)
+
+add_executable(jxqy-controller-transfer-coordinator-tests
+	${SRC_DIR}/tests/test_controller_transfer_coordinator.cpp
+	${SRC_DIR}/Game/Menu/ControllerTransferCoordinator.cpp
+)
+
+add_test(NAME jxqy-controller-transfer-coordinator-tests
+	COMMAND jxqy-controller-transfer-coordinator-tests)
+
+add_executable(jxqy-input-action-tests
+	${SRC_DIR}/tests/test_input_action.cpp
+	${SRC_DIR}/Input/PhysicalInputManager.cpp
+)
+
+add_executable(jxqy-sdl-gamepad-tests
+	${SRC_DIR}/tests/test_sdl_gamepad.cpp
+	${SRC_DIR}/Input/PhysicalInputManager.cpp
+)
+
+add_executable(jxqy-desktop-cursor-dpi-policy-tests
+	${SRC_DIR}/tests/test_desktop_cursor_dpi_policy.cpp
+)
+
+if(WIN32)
+	target_link_libraries(jxqy-input-action-tests SDL3_lib)
+	target_link_libraries(jxqy-sdl-gamepad-tests SDL3_lib)
+	target_link_libraries(jxqy-desktop-cursor-dpi-policy-tests SDL3_lib)
+	foreach(_SDL_INPUT_TEST_TARGET
+			jxqy-input-action-tests
+			jxqy-sdl-gamepad-tests
+			jxqy-desktop-cursor-dpi-policy-tests)
+		add_custom_command(TARGET ${_SDL_INPUT_TEST_TARGET} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different
+				"${SDL3_DLL}"
+				"$<TARGET_FILE_DIR:${_SDL_INPUT_TEST_TARGET}>"
+			VERBATIM)
+	endforeach()
+elseif(UNIX AND NOT APPLE)
+	target_link_libraries(jxqy-input-action-tests SDL3)
+	target_link_libraries(jxqy-sdl-gamepad-tests SDL3)
+	target_link_libraries(jxqy-desktop-cursor-dpi-policy-tests SDL3)
+endif()
+
+add_test(NAME jxqy-input-action-tests COMMAND jxqy-input-action-tests)
+add_test(NAME jxqy-sdl-gamepad-tests COMMAND jxqy-sdl-gamepad-tests)
+add_test(NAME jxqy-desktop-cursor-dpi-policy-tests
+	COMMAND jxqy-desktop-cursor-dpi-policy-tests)
+
+add_executable(jxqy-choose-menu-layout-tests
+    ${SRC_DIR}/tests/test_choose_menu_layout.cpp
+    ${SRC_DIR}/Game/Menu/ChooseMenuLayout.cpp
+    ${SRC_DIR}/Component/TextLayout.cpp
+)
+
+add_test(NAME jxqy-choose-menu-layout-tests COMMAND jxqy-choose-menu-layout-tests)
+
+add_executable(jxqy-logical-resolution-policy-tests
+    ${SRC_DIR}/tests/test_logical_resolution_policy.cpp
+)
+
+add_test(NAME jxqy-logical-resolution-policy-tests COMMAND jxqy-logical-resolution-policy-tests)
+
+add_executable(jxqy-element-pointer-click-policy-tests
+    ${SRC_DIR}/tests/test_element_pointer_click_policy.cpp
+)
+
+add_test(NAME jxqy-element-pointer-click-policy-tests COMMAND jxqy-element-pointer-click-policy-tests)
+
+add_executable(jxqy-flat-component-policy-tests
+    ${SRC_DIR}/tests/test_flat_component_policy.cpp
+)
+
+add_test(NAME jxqy-flat-component-policy-tests COMMAND jxqy-flat-component-policy-tests)
+
+add_executable(jxqy-gamble-menu-policy-tests
+    ${SRC_DIR}/tests/test_gamble_menu_policy.cpp
+)
+
+add_test(NAME jxqy-gamble-menu-policy-tests COMMAND jxqy-gamble-menu-policy-tests)
+
+add_executable(jxqy-fish-game-state-tests
+    ${SRC_DIR}/tests/test_fish_game_state.cpp
+    ${SRC_DIR}/Game/Menu/FishGameState.cpp
+)
+
+add_test(NAME jxqy-fish-game-state-tests COMMAND jxqy-fish-game-state-tests)
+
+add_executable(jxqy-dice-gamble-state-tests
+    ${SRC_DIR}/tests/test_dice_gamble_state.cpp
+    ${SRC_DIR}/Game/Menu/DiceGambleState.cpp
+)
+
+add_test(NAME jxqy-dice-gamble-state-tests COMMAND jxqy-dice-gamble-state-tests)
+
+add_executable(jxqy-mobile-touch-interaction-tests
+    ${SRC_DIR}/tests/test_mobile_touch_interaction.cpp
+)
+
+add_test(NAME jxqy-mobile-touch-interaction-tests COMMAND jxqy-mobile-touch-interaction-tests)
+
+add_executable(jxqy-script-runtime-state-tests
+    ${SRC_DIR}/tests/test_script_runtime_state.cpp
+    ${SRC_DIR}/Game/GameManager/ScriptRuntimeState.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-script-runtime-state-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-script-runtime-state-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-script-runtime-state-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-script-runtime-state-tests SDL3)
+endif()
+
+add_test(NAME jxqy-script-runtime-state-tests COMMAND jxqy-script-runtime-state-tests)
+
+add_executable(jxqy-buy-sell-inventory-tests
+    ${SRC_DIR}/tests/test_buy_sell_inventory.cpp
+    ${SRC_DIR}/Game/Data/BuySellInventory.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-buy-sell-inventory-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-buy-sell-inventory-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-buy-sell-inventory-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-buy-sell-inventory-tests SDL3)
+endif()
+
+add_test(NAME jxqy-buy-sell-inventory-tests COMMAND jxqy-buy-sell-inventory-tests)
+
+add_executable(jxqy-memo-persistence-tests
+    ${SRC_DIR}/tests/test_memo_persistence.cpp
+    ${SRC_DIR}/Game/Data/MemoPersistence.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-memo-persistence-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-memo-persistence-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-memo-persistence-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-memo-persistence-tests SDL3)
+endif()
+
+add_test(NAME jxqy-memo-persistence-tests COMMAND jxqy-memo-persistence-tests)
+
+add_executable(jxqy-goods-pricing-tests
+    ${SRC_DIR}/tests/test_goods_pricing.cpp
+    ${SRC_DIR}/Game/Data/Goods.cpp
+    ${SRC_DIR}/Game/GameManager/SaveFileManager.cpp
+    ${SRC_DIR}/Game/GameManager/SaveGeneration.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-goods-pricing-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-goods-pricing-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-goods-pricing-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-goods-pricing-tests SDL3)
+endif()
+
+add_test(NAME jxqy-goods-pricing-tests COMMAND jxqy-goods-pricing-tests)
+
+add_executable(jxqy-file-tests
+    ${SRC_DIR}/tests/test_file_resource_roots.cpp
+    ${SRC_DIR}/Launch/EditorRunDiagnostics.cpp
+    ${SRC_DIR}/Launch/EditorRunDiagnosticsFile.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTrace.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTraceFile.cpp
+    ${SRC_DIR}/Launch/EditorRunRuntimeTraceWriter.cpp
+    ${SRC_DIR}/Platform/AndroidExternalStorage.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManager.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/Game/GameManager/SaveFileManager.cpp
+    ${SRC_DIR}/Game/GameManager/SaveGeneration.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+target_link_libraries(jxqy-file-tests Threads::Threads)
+
+if(WIN32)
+    target_link_libraries(jxqy-file-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-file-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-file-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-file-tests SDL3)
+endif()
+
+add_test(NAME jxqy-file-tests COMMAND jxqy-file-tests)
+if(JXQY_FORCE_MOBILE_UI)
+    add_test(
+        NAME jxqy-mobile-resource-policy-tests
+        COMMAND jxqy-file-tests --resource-manager-policy-only
+    )
+endif()
+
+add_executable(jxqy-exclusive-loading-runner-tests
+    ${SRC_DIR}/tests/test_exclusive_loading_runner.cpp
+    ${SRC_DIR}/Game/Loading/ExclusiveLoadingRunner.cpp
+)
+target_compile_definitions(jxqy-exclusive-loading-runner-tests PRIVATE
+    JXQY_EXCLUSIVE_LOADING_RUNNER_STANDALONE=1
+)
+target_link_libraries(jxqy-exclusive-loading-runner-tests Threads::Threads)
+add_test(NAME jxqy-exclusive-loading-runner-tests
+    COMMAND jxqy-exclusive-loading-runner-tests)
+
+add_executable(jxqy-save-generation-tests
+    ${SRC_DIR}/tests/test_save_generation.cpp
+    ${SRC_DIR}/Game/GameManager/SaveGeneration.cpp
+    ${SRC_DIR}/Game/GameManager/SaveFileManager.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+target_compile_definitions(jxqy-save-generation-tests PRIVATE
+    JXQY_SAVE_GENERATION_STANDALONE=1
+)
+target_link_libraries(jxqy-save-generation-tests Threads::Threads)
+
+if(WIN32)
+    target_link_libraries(jxqy-save-generation-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-save-generation-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-save-generation-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-save-generation-tests SDL3)
+endif()
+
+add_test(NAME jxqy-save-generation-tests
+    COMMAND jxqy-save-generation-tests)
+
+add_executable(jxqy-game-feature-profile-tests
+    ${SRC_DIR}/tests/test_game_feature_profile.cpp
+    ${SRC_DIR}/Game/Data/Global.cpp
+    ${SRC_DIR}/Platform/AndroidExternalStorage.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManager.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-game-feature-profile-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-game-feature-profile-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-game-feature-profile-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-game-feature-profile-tests SDL3)
+endif()
+
+add_test(NAME jxqy-game-feature-profile-tests COMMAND jxqy-game-feature-profile-tests)
+
+add_executable(jxqy-magic-region-file-tests
+    ${SRC_DIR}/tests/test_magic_region_file.cpp
+    ${SRC_DIR}/Game/Data/MagicRegionFile.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-magic-region-file-tests SDL3_lib)
+    add_custom_command(TARGET jxqy-magic-region-file-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-magic-region-file-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-magic-region-file-tests SDL3)
+endif()
+
+add_test(NAME jxqy-magic-region-file-tests COMMAND jxqy-magic-region-file-tests)
+
+add_executable(jxqy-resource-smoke-tests
+    ${SRC_DIR}/tests/test_resource_smoke.cpp
+    ${SRC_DIR}/Game/Data/MediaPathResolver.cpp
+    ${SRC_DIR}/Platform/AndroidExternalStorage.cpp
+    ${SRC_DIR}/Resource/ResourceCatalog.cpp
+    ${SRC_DIR}/Resource/ResourceManager.cpp
+    ${SRC_DIR}/Resource/ResourceManifest.cpp
+    ${SRC_DIR}/Update/OnlineUpdateCatalog.cpp
+    ${SRC_DIR}/Update/ResourceInstallTransaction.cpp
+    ${JXQY_MOD_RELEASE_METADATA_SOURCES}
+    ${SRC_DIR}/Resource/ModReleaseAssets.cpp
+    ${SRC_DIR}/File/INIReader.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${SRC_DIR}/File/File.cpp
+    ${SRC_DIR}/File/RootedResourceReader.cpp
+    ${SRC_DIR}/File/log.cpp
+    ${SRC_DIR}/libconvert/libconvert.cpp
+)
+
+if(WIN32)
+    target_link_libraries(jxqy-resource-smoke-tests
+        SDL3_lib
+        SDL3_image_lib
+    )
+    add_custom_command(TARGET jxqy-resource-smoke-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}"
+            "${SDL3_IMAGE_DLL}"
+            "$<TARGET_FILE_DIR:jxqy-resource-smoke-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-resource-smoke-tests
+        SDL3
+        SDL3_image
+    )
+endif()
+
+add_test(NAME jxqy-resource-smoke-tests COMMAND jxqy-resource-smoke-tests)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/assets/resources.ini")
+    add_test(NAME jxqy-real-assets-gamble-resource-tests
+        COMMAND jxqy-resource-smoke-tests
+            --assets "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            --require-gamble-fallback-packs)
+    add_test(NAME jxqy-relative-assets-release-tests
+        COMMAND jxqy-resource-smoke-tests
+            --assets assets)
+    set_tests_properties(jxqy-relative-assets-release-tests PROPERTIES
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}")
+endif()
+endif()
+
+# Keep every compiled test executable inside its own target directory under the
+# current CMake build tree. Besides isolating desktop/mobile build trees, the
+# per-target directory prevents parallel POST_BUILD dependency copies from
+# racing on a shared SDL DLL.
 get_property(JXQY_DIRECTORY_TARGETS DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
 foreach(JXQY_TARGET IN LISTS JXQY_DIRECTORY_TARGETS)
+    if(JXQY_TARGET MATCHES "-tests$")
+        set_target_properties(${JXQY_TARGET} PROPERTIES
+            RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-bin/${JXQY_TARGET}"
+            PDB_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/test-bin/${JXQY_TARGET}"
+        )
+    endif()
+
     # Every executable compiled with MSVC AddressSanitizer loads the dynamic
-    # runtime before entering main(), so deploy it beside each executable.
+    # runtime before entering main(). Deploy it beside each executable instead
+    # of limiting the copy to the game and the full-runtime test target; a
+    # missing DLL otherwise becomes a blocking Windows error dialog in CTest.
     if(WIN32 AND JXQY_ADDRESS_SANITIZER_ENABLED)
         get_target_property(JXQY_TARGET_TYPE ${JXQY_TARGET} TYPE)
         if(JXQY_TARGET_TYPE STREQUAL "EXECUTABLE")

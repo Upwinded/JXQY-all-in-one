@@ -1,5 +1,8 @@
 ################################### Project Files ###################################
-assets/
+assets/*
+!assets/engine/
+!assets/engine/**
+!assets/resources.ini
 bin/*/
 3rd/*/
 !bin/linux/
@@ -515,13 +518,10 @@ linux/build/
 starter/*/
 starter/*.exe
 
-# Workspace-only inputs
+# Private and local-only inputs
 /private-build/
 /docs/
-/src/tests/
-/src/automation/
 /src/requirements.md
-/jxqy-editor/tests/
 /jxqy-editor/requirements.md
 /ThirdParty/devel/
 /ThirdParty/devel-old/

@@ -1,0 +1,77 @@
+# role	policy-key-or-exemption	source	owner	mechanism	surface-or-entry	target-or-resource	[occurrences=1]
+# Stable keys deliberately omit line numbers. The scanner derives owner names
+# from production function bodies, scans only cataloged surface types plus the
+# MenuController Panel container, and separately records resource loaders and
+# loading-overlay functions. Ordinary Button/Label/Item make_shared calls are
+# not surface candidates.
+recursive-submenu	exempt:submenu-inherits-owner	src/Component/ConfigDrivenPanel.cpp	ConfigDrivenPanel::createSubMenu	resource-load	loadMenuDefinition	subMenu:menuFile
+surface-resource	exempt:owner-policy-inherited	src/Component/ConfigDrivenPanel.cpp	ConfigDrivenPanel::init	resource-load	loadMenuDefinition	this:menuDefinitionFile
+embedded-component-factory	video.playback	src/Component/VideoPlayer.cpp	<namespace-static>	make-shared	VideoPlayer	<return>
+surface-instance	startup.resource-select	src/Game/Game.cpp	Game::run	make-shared	ResourceSelectScene	selectScene
+surface-instance	startup.title	src/Game/Game.cpp	Game::run	make-shared	Title	title
+surface-instance	global.yes-no	src/Game/Game.cpp	showApplicationCloseConfirmation	make-shared	YesNo	confirmation
+surface-instance	controller-help	src/Game/Game.cpp	showControllerHelp	make-shared	ControllerHelpOverlay	helpOverlay
+surface-instance	mobile.joystick	src/Game/GameManager/GameController.cpp	GameController::init	make-shared	JoystickPanel	joystickPanel
+surface-instance	mobile.skills	src/Game/GameManager/GameController.cpp	GameController::init	make-shared	SkillsPanel	skillPanel
+surface-rebuild	hud.bottom	src/Game/GameManager/MenuController.cpp	MenuController::applyLayoutByGameType	make-shared	BottomMenu	bottomMenu
+surface-rebuild	hud.column	src/Game/GameManager/MenuController.cpp	MenuController::applyLayoutByGameType	make-shared	ColumnMenu	columnMenu
+surface-rebuild	hud.top	src/Game/GameManager/MenuController.cpp	MenuController::applyLayoutByGameType	make-shared	TopMenu	topMenu
+surface-instance	hud.bottom	src/Game/GameManager/MenuController.cpp	MenuController::init	AddMenuChild	BottomMenu	bottomMenu
+surface-instance	hud.column	src/Game/GameManager/MenuController.cpp	MenuController::init	AddMenuChild	ColumnMenu	columnMenu
+surface-instance	dialog	src/Game/GameManager/MenuController.cpp	MenuController::init	AddMenuChild	Dialog	dialog
+surface-instance	system-notice	src/Game/GameManager/MenuController.cpp	MenuController::init	AddMenuChild	SystemNotice	systemNotice
+surface-container	exempt:surface-container	src/Game/GameManager/MenuController.cpp	MenuController::init	AddMenuChild	Panel	upMenu
+surface-instance	hud.top	src/Game/GameManager/MenuController.cpp	MenuController::init	AddMenuChild	TopMenu	topMenu
+surface-instance	buy-sell	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	BuySellMenu	buySellMenu
+surface-instance	choice	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	ChooseMenu	chooseMenu
+surface-instance	rpg.equipment	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	EquipMenu	equipMenu
+surface-instance	gamble.normal,gamble.dice,gamble.fish	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	GambleMenu	gambleMenu
+surface-instance	rpg.goods	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	GoodsMenu	goodsMenu
+surface-instance	rpg.magic	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	MagicMenu	magicMenu
+surface-instance	map-thumbnail	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	MapThumbnailMenu	mapThumbnailMenu
+surface-instance	rpg.memo	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	MemoMenu	memoMenu
+surface-instance	message	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	MsgBox	messageBox
+surface-instance	npc-info	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	NpcInfoPanel	npcInfoPanel
+surface-instance	partner-equipment	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	PartnerEquipMenu	partnerEquipMenu
+surface-instance	partner-head	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	PartnerHeadMenu	partnerHeadMenu
+surface-instance	rpg.practice	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	PracticeMenu	practiceMenu
+surface-instance	rpg.state	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	StateMenu	stateMenu
+surface-instance	timer	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	TimerMenu	timerMenu
+surface-instance	tooltip	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	ToolTip	toolTip
+surface-instance	system	src/Game/GameManager/MenuController.cpp	MenuController::openSystemMenu	make-shared	System	system
+surface-instance	hud.column	src/Game/Menu/BottomMenu.cpp	BottomMenu::init	make-shared	ColumnMenu	columnMenu
+surface-resource	hud.bottom	src/Game/Menu/BottomMenu.cpp	BottomMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\bottom\\\\bottom.menu.ini"
+surface-resource	buy-sell	src/Game/Menu/BuySellMenu.cpp	BuySellMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\buysell\\\\buysell.menu.ini"
+surface-resource	choice	src/Game/Menu/ChooseMenu.cpp	ChooseMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\choose\\\\choose.menu.ini"
+surface-resource	hud.column	src/Game/Menu/ColumnMenu.cpp	ColumnMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\column\\\\column.menu.ini"
+surface-resource	dialog	src/Game/Menu/Dialog.cpp	Dialog::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\dialog\\\\dialog.menu.ini"
+surface-resource	rpg.equipment	src/Game/Menu/EquipMenu.cpp	EquipMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\equip\\\\equip.menu.ini"
+surface-resource	rpg.goods	src/Game/Menu/GoodsMenu.cpp	GoodsMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\goods\\\\goods.menu.ini"
+surface-resource	mobile.joystick	src/Game/Menu/JoystickPanel.cpp	JoystickPanel::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\mobile\\\\joystick\\\\joystick.menu.ini"
+surface-resource	rpg.magic	src/Game/Menu/MagicMenu.cpp	MagicMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\magic\\\\magic.menu.ini"
+surface-resource	map-thumbnail	src/Game/Menu/MapThumbnailMenu.cpp	MapThumbnailMenu::init	resource-load	loadMenuDefinition	this:MenuResource::selectByMenuProfile( "ini\\\\ui\\\\mapthumbnail\\\\mapthumbnail.menu.ini", "ini\\\\ui\\\\littlemap\\\\littlemap.menu.ini", "ini\\\\ui\\\\littlemap\\\\littlemap.menu.ini")
+surface-resource	rpg.memo	src/Game/Menu/MemoMenu.cpp	MemoMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\memo\\\\memo.menu.ini"
+surface-resource	message	src/Game/Menu/MsgBox.cpp	MsgBox::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\message\\\\msgbox.menu.ini"
+surface-resource	option	src/Game/Menu/Option.cpp	Option::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\option\\\\option.menu.ini"
+surface-resource	rpg.practice	src/Game/Menu/PracticeMenu.cpp	PracticeMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\xiulian\\\\xiulian.menu.ini"
+surface-resource	save-load.title,save-load.system	src/Game/Menu/SaveLoad.cpp	SaveLoad::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\saveload\\\\saveload.menu.ini"
+surface-resource	mobile.skills	src/Game/Menu/SkillsPanel.cpp	SkillsPanel::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\mobile\\\\skills\\\\skills.menu.ini"
+surface-resource	rpg.state	src/Game/Menu/StateMenu.cpp	StateMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\state\\\\state.menu.ini"
+surface-resource	system	src/Game/Menu/System.cpp	System::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\system\\\\system.menu.ini"
+surface-instance	option	src/Game/Menu/System.cpp	System::openOptions	make-shared	Option	option
+surface-instance	save-load.system	src/Game/Menu/System.cpp	System::openSaveLoad	make-shared	SaveLoad	saveLoad
+surface-resource	timer	src/Game/Menu/TimerMenu.cpp	TimerMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\timer\\\\timer.menu.ini"
+surface-resource	tooltip	src/Game/Menu/ToolTip.cpp	ToolTip::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\tooltip\\\\tooltip.menu.ini"
+surface-resource	hud.top	src/Game/Menu/TopMenu.cpp	TopMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\top\\\\top.menu.ini"
+surface-resource	global.yes-no	src/Game/Menu/YesNo.cpp	YesNo::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\yesno\\\\yesno.menu.ini"
+surface-resource	startup.title	src/Game/Scene/Title.cpp	Title::init	resource-load	loadMenuDefinition	this:menuName
+surface-instance	video.playback	src/Game/Scene/Title.cpp	Title::onRun	make-shared	VideoPage	vp
+surface-instance	save-load.title	src/Game/Scene/Title.cpp	Title::openSavedGame	make-shared	SaveLoad	saveLoad
+surface-instance	title.team	src/Game/Scene/Title.cpp	Title::openTeamPage	make-shared	TitleTeam	titleTeam
+surface-instance	video.playback	src/Game/Scene/TitleTeam.cpp	TitleTeam::onInitial	make-shared	VideoPage	vp
+surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::loadGameAsync	function-call	ScriptAPI::runExclusiveLoadingTask	statusText, worker, successFinalizer
+surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::loadMapAsync	function-call	ScriptAPI::runExclusiveLoadingTask	statusText, worker, successFinalizer
+surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::loadNPCAsync	function-call	ScriptAPI::runExclusiveLoadingTask	statusText, worker, successFinalizer
+surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::loadObjectAsync	function-call	ScriptAPI::runExclusiveLoadingTask	statusText, worker, successFinalizer
+surface-function	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::runExclusiveLoadingTask	function-definition	ScriptAPI::runExclusiveLoadingTask	<entry>
+surface-instance	video.playback	src/Game/Script/ScriptAPI.cpp	ScriptAPI::playMovie	make-shared	VideoPlayer	gameManager->video

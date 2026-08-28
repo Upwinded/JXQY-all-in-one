@@ -694,6 +694,766 @@ target_link_libraries(${CLI_PROJECT_NAME} PRIVATE
     jxqy-editor-core
 )
 
+include(CTest)
+if(BUILD_TESTING)
+    target_compile_definitions(jxqy-editor-core PUBLIC
+        JXQY_EDITOR_ENABLE_TEST_HOOKS)
+
+    function(assert_test_target_has_no_production_sources target_name)
+        get_target_property(target_source_files ${target_name} SOURCES)
+        foreach(target_source_file IN LISTS target_source_files)
+            if(target_source_file MATCHES "^\\$<")
+                continue()
+            endif()
+            get_filename_component(target_source_path
+                "${target_source_file}" ABSOLUTE
+                BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+            file(TO_CMAKE_PATH "${target_source_path}" target_source_path)
+            string(TOLOWER "${target_source_path}" target_source_path)
+            foreach(production_directory core ui diagnostics)
+                file(TO_CMAKE_PATH
+                    "${CMAKE_CURRENT_SOURCE_DIR}/${production_directory}/"
+                    production_source_prefix)
+                string(TOLOWER "${production_source_prefix}" production_source_prefix)
+                string(FIND "${target_source_path}" "${production_source_prefix}"
+                    production_source_index)
+                if(production_source_index EQUAL 0)
+                    message(FATAL_ERROR
+                        "Test target ${target_name} compiles production source "
+                        "${target_source_file}. Link the matching story graph, "
+                        "editor core, or editor widgets production target instead.")
+                endif()
+            endforeach()
+        endforeach()
+    endfunction()
+
+    # Shared test-only fixtures used by more than one regression domain. This
+    # target must stay free of production source files; test executables link
+    # the production libraries separately.
+    add_library(jxqy-editor-test-support STATIC
+        tests/TestSupport.cpp
+        tests/TestSupport.h
+    )
+    set_target_properties(jxqy-editor-test-support PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-test-support PUBLIC
+        jxqy-editor-core
+    )
+
+    add_executable(jxqy-editor-story-graph-tests
+        tests/StoryGraphCoreTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-tests
+        PRIVATE
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-tests
+        COMMAND jxqy-editor-story-graph-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-story-graph-coordinator-tests
+        tests/StoryGraphAnalysisCoordinatorTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-coordinator-tests
+        PRIVATE
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-coordinator-tests
+        COMMAND jxqy-editor-story-graph-coordinator-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-coordinator-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-process-exit-tests
+        tests/EditorProcessExitTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-process-exit-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-process-exit-tests
+        PRIVATE
+        jxqy-editor-widgets
+        jxqy-editor-core
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-process-exit-tests
+        COMMAND jxqy-editor-process-exit-tests
+    )
+    set_tests_properties(
+        jxqy-editor-process-exit-tests
+        PROPERTIES
+        TIMEOUT 30
+    )
+    if(NOT WIN32)
+        set_tests_properties(
+            jxqy-editor-process-exit-tests
+            PROPERTIES
+            ENVIRONMENT
+                "QT_QPA_PLATFORM=offscreen"
+        )
+    endif()
+
+    add_executable(jxqy-editor-story-graph-project-tests
+        tests/StoryGraphProjectResolverTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-project-tests
+        PRIVATE
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-project-tests
+        COMMAND jxqy-editor-story-graph-project-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-project-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-story-graph-runtime-trace-tests
+        tests/StoryGraphRuntimeTraceTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-runtime-trace-tests
+        PRIVATE
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-runtime-trace-tests
+        COMMAND jxqy-editor-story-graph-runtime-trace-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-runtime-trace-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-story-graph-trace-matcher-tests
+        tests/StoryGraphTraceMatcherTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-trace-matcher-tests
+        PRIVATE
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-trace-matcher-tests
+        COMMAND jxqy-editor-story-graph-trace-matcher-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-trace-matcher-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-story-graph-resource-tests
+        tests/StoryGraphResourceContextTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-resource-tests
+        PRIVATE
+        jxqy-editor-core
+        jxqy-editor-story-graph-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-resource-tests
+        COMMAND jxqy-editor-story-graph-resource-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-resource-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-story-graph-dialect-tests
+        tests/StoryGraphDialectTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-dialect-tests
+        PRIVATE
+        jxqy-editor-story-graph-core
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-dialect-tests
+        COMMAND jxqy-editor-story-graph-dialect-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-dialect-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-story-graph-widget-tests
+        tests/StoryGraphWidgetTests.cpp
+        resources.qrc
+    )
+    target_link_libraries(
+        jxqy-editor-story-graph-widget-tests
+        PRIVATE
+        jxqy-editor-widgets
+    )
+    add_test(
+        NAME jxqy-editor-story-graph-widget-tests
+        COMMAND jxqy-editor-story-graph-widget-tests
+    )
+    set_tests_properties(
+        jxqy-editor-story-graph-widget-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 120
+    )
+    if(NOT WIN32)
+        set_tests_properties(
+            jxqy-editor-story-graph-widget-tests
+            PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        )
+    endif()
+    deploy_editor_translations(
+        jxqy-editor-story-graph-widget-tests)
+
+    add_executable(jxqy-editor-core-tests
+        tests/CoreRegressionTests.cpp
+        resources.qrc
+    )
+    target_link_libraries(jxqy-editor-core-tests PRIVATE
+        jxqy-editor-widgets
+        jxqy-editor-test-support
+    )
+    target_compile_definitions(jxqy-editor-core-tests PRIVATE
+        JXQY_SOURCE_ROOT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/.."
+        JXQY_EDITOR_DESKTOP_INTEGRATION_PATH="${JXQY_EDITOR_DESKTOP_INTEGRATION_OUTPUT_DIRECTORY}"
+    )
+    add_test(NAME jxqy-editor-core-tests COMMAND jxqy-editor-core-tests)
+    set_tests_properties(jxqy-editor-core-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 300
+    )
+    deploy_editor_translations(jxqy-editor-core-tests)
+
+    add_executable(jxqy-editor-online-resource-package-tests
+        tests/OnlineResourcePackageExporterTests.cpp
+    )
+    target_link_libraries(
+        jxqy-editor-online-resource-package-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-online-resource-package-tests
+        COMMAND jxqy-editor-online-resource-package-tests
+    )
+
+    add_executable(jxqy-editor-desktop-run-document-snapshot-tests
+        tests/DesktopRunDocumentSnapshotTests.cpp
+        resources.qrc
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-document-snapshot-tests
+        PRIVATE
+        jxqy-editor-widgets
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-document-snapshot-tests
+        COMMAND jxqy-editor-desktop-run-document-snapshot-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-document-snapshot-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 120
+    )
+    deploy_editor_translations(
+        jxqy-editor-desktop-run-document-snapshot-tests)
+
+    add_executable(jxqy-editor-magic-editor-tests
+        tests/MagicEditorTests.cpp
+        resources.qrc
+    )
+    set_target_properties(jxqy-editor-magic-editor-tests PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-magic-editor-tests PRIVATE
+        jxqy-editor-widgets
+        jxqy-editor-test-support
+    )
+    add_test(NAME jxqy-editor-magic-editor-tests
+        COMMAND jxqy-editor-magic-editor-tests)
+    set_tests_properties(jxqy-editor-magic-editor-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 120
+    )
+    deploy_editor_translations(jxqy-editor-magic-editor-tests)
+
+    add_executable(jxqy-editor-goods-shop-editor-tests
+        tests/GoodsShopEditorTests.cpp
+    )
+    set_target_properties(jxqy-editor-goods-shop-editor-tests PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-goods-shop-editor-tests PRIVATE
+        jxqy-editor-widgets
+        jxqy-editor-test-support
+    )
+    add_test(NAME jxqy-editor-goods-shop-editor-tests
+        COMMAND jxqy-editor-goods-shop-editor-tests)
+    set_tests_properties(jxqy-editor-goods-shop-editor-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 120
+    )
+    deploy_editor_translations(jxqy-editor-goods-shop-editor-tests)
+
+    add_executable(jxqy-editor-dialogue-editor-tests
+        tests/DialogueEditorTests.cpp
+    )
+    set_target_properties(jxqy-editor-dialogue-editor-tests PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-dialogue-editor-tests PRIVATE
+        jxqy-editor-widgets
+        jxqy-editor-test-support
+    )
+    add_test(NAME jxqy-editor-dialogue-editor-tests
+        COMMAND jxqy-editor-dialogue-editor-tests)
+    set_tests_properties(jxqy-editor-dialogue-editor-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 120
+    )
+    deploy_editor_translations(jxqy-editor-dialogue-editor-tests)
+
+    add_executable(jxqy-editor-asset-conversion-tests
+        tests/AssetConversionTests.cpp
+        # Runtime decoder oracle used to verify editor image-format output.
+        ${SRC_DIR}/Image/PicDecoder.cpp
+    )
+    set_target_properties(jxqy-editor-asset-conversion-tests PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-asset-conversion-tests PRIVATE
+        jxqy-editor-core
+        jxqy-editor-test-support
+    )
+    target_compile_definitions(jxqy-editor-asset-conversion-tests PRIVATE
+        JXQY_SOURCE_ROOT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/.."
+    )
+    add_test(NAME jxqy-editor-asset-conversion-tests
+        COMMAND jxqy-editor-asset-conversion-tests)
+    set_tests_properties(jxqy-editor-asset-conversion-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 300
+    )
+
+    add_executable(jxqy-editor-android-external-resource-packager-tests
+        tests/AndroidExternalResourcePackagerTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-android-external-resource-packager-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-android-external-resource-packager-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-android-external-resource-packager-tests
+        COMMAND jxqy-editor-android-external-resource-packager-tests
+    )
+    set_tests_properties(
+        jxqy-editor-android-external-resource-packager-tests
+        PROPERTIES
+        TIMEOUT 120
+    )
+
+    add_executable(jxqy-editor-map-render-tests
+        tests/MapRenderTests.cpp
+        resources.qrc
+    )
+    set_target_properties(jxqy-editor-map-render-tests PROPERTIES
+        AUTOMOC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-map-render-tests PRIVATE
+        jxqy-editor-widgets
+        jxqy-editor-test-support
+    )
+    add_test(NAME jxqy-editor-map-render-tests
+        COMMAND jxqy-editor-map-render-tests)
+    set_tests_properties(jxqy-editor-map-render-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    deploy_editor_translations(jxqy-editor-map-render-tests)
+
+    add_executable(jxqy-editor-durable-transaction-tests
+        tests/DurableFileTransactionTests.cpp
+    )
+    target_link_libraries(jxqy-editor-durable-transaction-tests PRIVATE
+        jxqy-editor-core
+    )
+    add_test(NAME jxqy-editor-durable-transaction-tests
+        COMMAND jxqy-editor-durable-transaction-tests)
+    set_tests_properties(jxqy-editor-durable-transaction-tests PROPERTIES
+        TIMEOUT 60
+    )
+    add_executable(jxqy-editor-desktop-run-tests
+        tests/DesktopRunTests.cpp
+    )
+    set_target_properties(jxqy-editor-desktop-run-tests PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(jxqy-editor-desktop-run-tests PRIVATE
+        jxqy-editor-core
+    )
+    add_test(NAME jxqy-editor-desktop-run-tests
+        COMMAND jxqy-editor-desktop-run-tests)
+    set_tests_properties(jxqy-editor-desktop-run-tests PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    add_executable(jxqy-editor-desktop-run-session-workspace-tests
+        tests/DesktopRunSessionWorkspaceTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-session-workspace-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-session-workspace-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-session-workspace-tests
+        COMMAND jxqy-editor-desktop-run-session-workspace-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-session-workspace-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    add_executable(jxqy-editor-authoring-mutation-gate-tests
+        tests/AuthoringMutationGateTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-authoring-mutation-gate-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-authoring-mutation-gate-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-authoring-mutation-gate-tests
+        COMMAND jxqy-editor-authoring-mutation-gate-tests
+    )
+    set_tests_properties(
+        jxqy-editor-authoring-mutation-gate-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 60
+    )
+    add_executable(jxqy-editor-desktop-run-session-base-tests
+        tests/DesktopRunSessionBaseTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-session-base-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-session-base-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-session-base-tests
+        COMMAND jxqy-editor-desktop-run-session-base-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-session-base-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 60
+    )
+    add_executable(jxqy-editor-desktop-run-session-cleanup-tests
+        tests/DesktopRunSessionCleanupTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-session-cleanup-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-session-cleanup-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-session-cleanup-tests
+        COMMAND jxqy-editor-desktop-run-session-cleanup-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-session-cleanup-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    add_executable(jxqy-editor-project-local-state-tests
+        tests/ProjectLocalStateTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-project-local-state-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-project-local-state-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-project-local-state-tests
+        COMMAND jxqy-editor-project-local-state-tests
+    )
+    set_tests_properties(
+        jxqy-editor-project-local-state-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    add_executable(jxqy-editor-settings-migration-tests
+        tests/EditorSettingsMigrationTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-settings-migration-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-settings-migration-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-settings-migration-tests
+        COMMAND jxqy-editor-settings-migration-tests
+    )
+    set_tests_properties(
+        jxqy-editor-settings-migration-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    add_executable(jxqy-editor-desktop-run-session-coordinator-tests
+        tests/DesktopRunSessionCoordinatorTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-session-coordinator-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-session-coordinator-tests
+        PRIVATE
+        jxqy-editor-core
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-session-coordinator-tests
+        COMMAND jxqy-editor-desktop-run-session-coordinator-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-session-coordinator-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 180
+    )
+    add_executable(jxqy-editor-desktop-run-diagnostics-model-tests
+        tests/DesktopRunDiagnosticsModelTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-diagnostics-model-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-diagnostics-model-tests
+        PRIVATE
+        jxqy-editor-widgets
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-diagnostics-model-tests
+        COMMAND jxqy-editor-desktop-run-diagnostics-model-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-diagnostics-model-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 60
+    )
+    add_executable(jxqy-editor-desktop-run-panel-tests
+        tests/DesktopRunPanelTests.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-panel-tests
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    target_link_libraries(
+        jxqy-editor-desktop-run-panel-tests
+        PRIVATE
+        jxqy-editor-widgets
+    )
+    add_test(
+        NAME jxqy-editor-desktop-run-panel-tests
+        COMMAND jxqy-editor-desktop-run-panel-tests
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-panel-tests
+        PROPERTIES
+        RUN_SERIAL TRUE
+        TIMEOUT 60
+    )
+    if(NOT WIN32)
+        set_tests_properties(
+            jxqy-editor-desktop-run-panel-tests
+            PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        )
+    endif()
+    add_executable(jxqy-editor-desktop-run-process-fixture
+        tests/DesktopRunProcessFixture.cpp
+    )
+    set_target_properties(
+        jxqy-editor-desktop-run-process-fixture
+        PROPERTIES
+        AUTOMOC OFF
+        AUTORCC OFF
+        AUTOUIC OFF
+    )
+    if(MINGW)
+        target_link_options(
+            jxqy-editor-desktop-run-process-fixture
+            PRIVATE
+            -municode
+        )
+    endif()
+    add_dependencies(
+        jxqy-editor-desktop-run-tests
+        jxqy-editor-desktop-run-process-fixture)
+    add_dependencies(
+        jxqy-editor-desktop-run-session-coordinator-tests
+        jxqy-editor-desktop-run-process-fixture)
+    set_tests_properties(jxqy-editor-desktop-run-tests PROPERTIES
+        ENVIRONMENT
+            "JXQY_EDITOR_DESKTOP_RUN_FIXTURE=$<TARGET_FILE:jxqy-editor-desktop-run-process-fixture>"
+    )
+    set_tests_properties(
+        jxqy-editor-desktop-run-session-coordinator-tests
+        PROPERTIES
+        ENVIRONMENT
+            "JXQY_EDITOR_DESKTOP_RUN_FIXTURE=$<TARGET_FILE:jxqy-editor-desktop-run-process-fixture>"
+    )
+    assert_test_target_has_no_production_sources(jxqy-editor-test-support)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-coordinator-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-process-exit-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-project-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-runtime-trace-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-trace-matcher-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-resource-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-dialect-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-story-graph-widget-tests)
+    assert_test_target_has_no_production_sources(jxqy-editor-core-tests)
+    assert_test_target_has_no_production_sources(jxqy-editor-asset-conversion-tests)
+    assert_test_target_has_no_production_sources(jxqy-editor-map-render-tests)
+    assert_test_target_has_no_production_sources(jxqy-editor-durable-transaction-tests)
+    assert_test_target_has_no_production_sources(jxqy-editor-desktop-run-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-desktop-run-session-workspace-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-authoring-mutation-gate-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-desktop-run-session-base-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-desktop-run-session-cleanup-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-project-local-state-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-settings-migration-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-desktop-run-session-coordinator-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-desktop-run-diagnostics-model-tests)
+    assert_test_target_has_no_production_sources(
+        jxqy-editor-desktop-run-panel-tests)
+    assert_test_target_has_no_production_sources(jxqy-editor-desktop-run-process-fixture)
+endif()
+
 if(WIN32)
     find_program(WINDEPLOYQT_EXECUTABLE windeployqt HINTS "${Qt6_DIR}/../../../bin")
     if(WINDEPLOYQT_EXECUTABLE)
@@ -711,5 +1471,32 @@ if(WIN32)
                 ${WINDEPLOYQT_CONFIG_ARG}
             COMMENT "Deploying Qt dependencies..."
         )
+        foreach(deploy_target
+                jxqy-editor-core-tests
+                jxqy-editor-asset-conversion-tests
+                jxqy-editor-map-render-tests
+                jxqy-editor-durable-transaction-tests
+                jxqy-editor-desktop-run-tests
+                jxqy-editor-desktop-run-session-workspace-tests
+                jxqy-editor-desktop-run-session-base-tests
+                jxqy-editor-desktop-run-session-cleanup-tests
+                jxqy-editor-project-local-state-tests
+                jxqy-editor-settings-migration-tests
+                jxqy-editor-desktop-run-session-coordinator-tests
+                jxqy-editor-desktop-run-diagnostics-model-tests
+                jxqy-editor-desktop-run-panel-tests)
+            if(NOT TARGET ${deploy_target})
+                continue()
+            endif()
+            add_custom_command(TARGET ${deploy_target} POST_BUILD
+                COMMAND ${WINDEPLOYQT_EXECUTABLE}
+                    "$<TARGET_FILE:${deploy_target}>"
+                    --dir "$<TARGET_FILE_DIR:${deploy_target}>"
+                    --libdir "$<TARGET_FILE_DIR:${deploy_target}>"
+                    --plugindir "$<TARGET_FILE_DIR:${deploy_target}>"
+                    ${WINDEPLOYQT_CONFIG_ARG}
+                COMMENT "Deploying Qt dependencies for ${deploy_target}..."
+            )
+        endforeach()
     endif()
 endif()
