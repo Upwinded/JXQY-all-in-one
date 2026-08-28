@@ -74,14 +74,18 @@ bool updateArtifact(
     INIFileEditor& ini,
     const QString& artifactRoot,
     const std::string& section,
+    const std::string& artifactField,
+    const std::string& sizeField,
+    const std::string& crc32Field,
     OnlineUpdateCatalogPublisher::Result& result)
 {
-    const std::string artifact = ini.get(section, "Artifact", "");
+    const std::string artifact = ini.get(section, artifactField, "");
     if (!OnlineUpdate::isSafeArtifactPath(artifact))
     {
         result.status = OnlineUpdateCatalogPublisher::Status::
             UnsafeArtifactPath;
-        result.detail = QString::fromStdString(section + ".Artifact=" + artifact);
+        result.detail = QString::fromStdString(
+            section + "." + artifactField + "=" + artifact);
         return false;
     }
     QString absolutePath;
@@ -109,8 +113,8 @@ bool updateArtifact(
         result.detail = absolutePath;
         return false;
     }
-    ini.set(section, "Size", std::to_string(size));
-    ini.set(section, "Crc32", OnlineUpdate::crc32ToLowerHex(checksum));
+    ini.set(section, sizeField, std::to_string(size));
+    ini.set(section, crc32Field, OnlineUpdate::crc32ToLowerHex(checksum));
     result.artifactCount++;
     return true;
 }
@@ -191,7 +195,33 @@ OnlineUpdateCatalogPublisher::Result OnlineUpdateCatalogPublisher::publish(
     }
     for (const std::string& section : sections)
     {
-        if (!updateArtifact(ini, artifactRoot, section, result))
+        if (!updateArtifact(
+                ini,
+                artifactRoot,
+                section,
+                "Artifact",
+                "Size",
+                "Crc32",
+                result))
+        {
+            return result;
+        }
+        const QString sectionName = QString::fromStdString(section);
+        const bool resourceSection = sectionName.startsWith(
+            QStringLiteral("Resource."), Qt::CaseInsensitive);
+        const bool incrementalDeclared = resourceSection &&
+            (ini.hasKey(section, "IncrementalArtifact") ||
+             ini.hasKey(section, "IncrementalSize") ||
+             ini.hasKey(section, "IncrementalCrc32"));
+        if (incrementalDeclared &&
+            !updateArtifact(
+                ini,
+                artifactRoot,
+                section,
+                "IncrementalArtifact",
+                "IncrementalSize",
+                "IncrementalCrc32",
+                result))
         {
             return result;
         }

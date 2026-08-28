@@ -392,6 +392,18 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 				"Release",
 				"DescriptionFile",
 				""));
+	releaseMetadata.installedArtifactCrc32 =
+		trimAscii(
+			ini.get(
+				"Release",
+				"InstalledArtifactCrc32",
+				""));
+	releaseMetadata.installedIncrementalArtifactCrc32 =
+		trimAscii(
+			ini.get(
+				"Release",
+				"InstalledIncrementalArtifactCrc32",
+				""));
 
 	std::string videos =
 		ini.get("Startup", "Videos", "");

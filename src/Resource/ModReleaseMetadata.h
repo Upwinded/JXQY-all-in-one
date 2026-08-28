@@ -16,6 +16,12 @@ struct ModReleaseMetadata
 	std::string minimumEngineVersion;
 	std::string coverPath;
 	std::string descriptionFilePath;
+	// Local updater receipt for the last successfully installed online ZIP.
+	// It is not release identity and is removed again when a package is published.
+	std::string installedArtifactCrc32;
+	// Local receipt for the optional incremental overlay corresponding to the
+	// installed full package. Publication removes this field as well.
+	std::string installedIncrementalArtifactCrc32;
 };
 
 enum class MetadataField

@@ -210,17 +210,15 @@ void Camera::clampToMapBounds()
 	}
 	else
 	{
-		// JxqyHD and NewSword define the horizontal world span as
-		// (columnCount - 1) * TILE_WIDTH, then clamp the viewport's left edge
-		// between zero and worldWidth - viewportWidth. Express the same rule
-		// with this camera's center coordinate so edge objects remain visible.
+		// Odd map rows start half a tile to the right. Move the viewport far
+		// enough into the map that the inward-shifted edge row is also hidden
+		// by half a tile, preventing the staggered row boundary from appearing.
 		const float halfViewportWidth = (float)w / 2.0f;
 		const float mapPixelWidth = (float)(mapw - 1) * (float)TILE_WIDTH;
-		// Keep the left camera boundary half a tile inside the logical map. The
-		// right boundary intentionally retains the existing reference behavior.
+		const float halfTileWidth = static_cast<float>(TILE_WIDTH) / 2.0f;
 		float minWorldX = halfViewportWidth +
-			static_cast<float>(TILE_WIDTH) / 2.0f;
-		float maxWorldX = mapPixelWidth - halfViewportWidth;
+			static_cast<float>(TILE_WIDTH);
+		float maxWorldX = mapPixelWidth - halfViewportWidth - halfTileWidth;
 		if (maxWorldX < minWorldX)
 		{
 			cameraWorldPosition.x = (minWorldX + maxWorldX) / 2.0f;

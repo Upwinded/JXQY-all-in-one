@@ -3,6 +3,41 @@
 #include "../../libconvert/libconvert.h"
 #include "../Data/Global.h"
 
+#include <algorithm>
+#include <array>
+
+namespace
+{
+void compactStatusLabels(StateMenu& menu)
+{
+	constexpr int MaximumFontSize = 16;
+	constexpr int MinimumFontSize = 12;
+	constexpr int RightPadding = 4;
+	constexpr std::array<const char*, 10> LabelNames = {
+		"labLevel", "labExp", "labExpUp", "labAttack", "labDefend",
+		"labEvade", "labLife", "labThew", "labMana", "labRage"
+	};
+
+	const int contentRight = std::max(0, menu.rect.w - RightPadding);
+	for (const char* labelName : LabelNames)
+	{
+		auto label = menu.getComponentByName<Label>(labelName);
+		if (label == nullptr)
+		{
+			continue;
+		}
+		label->fontSize = std::min(label->fontSize, MaximumFontSize);
+		label->minimumFontSize = std::min(label->fontSize, MinimumFontSize);
+		label->autoShrink = true;
+		label->rect.w = std::min(
+			label->rect.w,
+			std::max(0, contentRight - label->rect.x));
+		label->rect.h = std::max(label->rect.h, label->fontSize);
+		label->invalidateTextLayout();
+	}
+}
+}
+
 StateMenu::StateMenu()
 {
 	name = "StateMenu";
@@ -78,6 +113,11 @@ void StateMenu::init()
 	freeResource();
 	loadMenuDefinition("ini\\ui\\state\\state.menu.ini");
 	image = getComponentByName<ImageContainer>("image");
+	if (gm != nullptr &&
+		gm->global.feature.menuResourceProfile == mrpDefault)
+	{
+		compactStatusLabels(*this);
+	}
 	updatePanelImage();
 	setChildRectReferToParent();
 }

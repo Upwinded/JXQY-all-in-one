@@ -326,6 +326,25 @@ void ToolTip::init()
 	if (intro1) intro1->autoNextLine = layoutProfile == LayoutProfile::Xjxqy;
 	if (intro2) intro2->autoNextLine = true;
 	if (magicIntro) magicIntro->autoNextLine = true;
+	if (layoutProfile == LayoutProfile::Jxqy2)
+	{
+		auto setCompactFont = [](const std::shared_ptr<Label>& label,
+			int maximumFontSize)
+		{
+			if (label == nullptr)
+			{
+				return;
+			}
+			label->fontSize = std::min(label->fontSize, maximumFontSize);
+			label->minimumFontSize = std::min(label->fontSize, 12);
+			label->invalidateTextLayout();
+		};
+		setCompactFont(name, 18);
+		setCompactFont(cost, 18);
+		setCompactFont(intro1, 16);
+		setCompactFont(intro2, 16);
+		setCompactFont(magicIntro, 16);
+	}
 	if (layoutProfile == LayoutProfile::Xjxqy)
 	{
 		if (name) name->horizontalAlignment = TextHorizontalAlignment::Center;

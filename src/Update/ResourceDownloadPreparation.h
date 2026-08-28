@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -56,9 +57,14 @@ using ResourceArtifactDownloadFunction = std::function<HttpsDownloadResult(
 	std::uint64_t expectedBytes,
 	const HttpsDownloadProgress& progress)>;
 
+using InstalledResourceRootMap =
+	std::map<std::string, std::filesystem::path>;
+
 struct PreparedResourceDownload
 {
 	ResourcePackage package;
+	ResourceDownloadPlan::ArtifactKind artifactKind =
+		ResourceDownloadPlan::ArtifactKind::Full;
 	std::filesystem::path archivePath;
 	std::filesystem::path preparedResourcePath;
 };
@@ -114,15 +120,19 @@ struct ProgramDownloadPreparationResult
 	}
 };
 
-// Downloads and validates one complete online dependency closure into a new
-// private workspace. The workspace must not exist. Any failure removes only
-// the workspace created by this call; installed resources are never modified.
+// Downloads and validates the needed members of one online dependency closure
+// into a new private workspace. The workspace must not exist. Any failure
+// removes only the workspace created by this call; installed resources are
+// never modified.
 ResourceDownloadPreparationResult prepareResourceDownload(
 	const Catalog& catalog,
 	const std::string& requestedGameId,
 	const std::string& currentEngineVersion,
 	const std::string& catalogUrl,
 	const std::filesystem::path& workspacePath,
+	const InstalledResourceArtifactMap& installedArtifacts,
+	const InstalledResourceRootMap& installedResourceRoots,
+	RequestedResourceDownloadMode requestedMode,
 	const ResourceDownloadPreparationProgressCallback& progress = {},
 	const ResourceArtifactDownloadFunction& artifactDownloader = {});
 

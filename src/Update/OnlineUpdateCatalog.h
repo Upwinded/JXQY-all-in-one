@@ -18,6 +18,13 @@ constexpr std::size_t MaximumProgramPackageCount = 128;
 constexpr std::size_t MaximumDependencyCountPerPackage = 64;
 constexpr std::size_t MaximumCommonVersionFileBytes = 4 * 1024;
 
+struct IncrementalResourcePackage
+{
+	std::string artifactPath;
+	std::uint64_t artifactSize = 0;
+	std::string crc32Hex;
+};
+
 struct ResourcePackage
 {
 	std::string gameId;
@@ -29,6 +36,10 @@ struct ResourcePackage
 	std::string artifactPath;
 	std::uint64_t artifactSize = 0;
 	std::string crc32Hex;
+	// Optional overlay package applied after a changed full package, or by itself
+	// when the full-package receipt already matches. Absence is the Schema 1
+	// default.
+	std::optional<IncrementalResourcePackage> incrementalPackage;
 	std::vector<std::string> dependencyGameIds;
 	bool resourceOnly = false;
 	std::string releaseNotes;
@@ -52,6 +63,12 @@ struct CommonPackage
 	std::uint64_t artifactSize = 0;
 	std::string crc32Hex;
 	std::string releaseNotes;
+};
+
+struct CommonPackageInstallation
+{
+	std::string versionText;
+	std::string installedArtifactCrc32;
 };
 
 struct Catalog
@@ -145,9 +162,15 @@ bool isValidCrc32Hex(std::string_view text) noexcept;
 bool parseCommonPackageVersion(
 	std::string_view utf8Text,
 	std::string& versionText);
+// Parses the usable common version and its optional local installation receipt.
+// A missing or malformed receipt is returned as an empty string so the caller
+// can download common again without making the installed content unusable.
+bool parseCommonPackageInstallation(
+	std::string_view utf8Text,
+	CommonPackageInstallation& installation);
 bool commonPackageNeedsDownload(
 	const Catalog& catalog,
-	std::string_view installedVersion) noexcept;
+	std::string_view installedArtifactCrc32) noexcept;
 
 // The public semantic Version describes whether the sole online package is
 // newer than the running program. It does not select between multiple online

@@ -29,6 +29,7 @@
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <map>
 #include <new>
 #include <set>
 #include <sstream>
@@ -61,23 +62,25 @@ namespace
 constexpr int HeaderTitleTopOffset = 8;
 constexpr int HeaderSubtitleTopOffset = 41;
 constexpr int HeaderActionTopOffset = 66;
-constexpr int HeaderSeparatorOffset = 119;
-constexpr int HeaderStatusTopOffset = 130;
-constexpr int ProgramActionTopOffset = 123;
-constexpr int ProgramActionButtonHeight = 36;
-constexpr int PanelListTopOffset = 160;
-constexpr int CompactMobileHeaderActionTopOffset = 45;
-constexpr int CompactMobileHeaderSeparatorOffset = 86;
-constexpr int CompactMobileHeaderStatusTopOffset = 92;
-constexpr int CompactMobilePanelListTopOffset = 111;
-constexpr int CompactMobileExternalFooterHeight = 61;
-constexpr int CompactMobileCreditsFooterHeight = 28;
-constexpr int CompactMobileCreditsHeight = 20;
+constexpr int HeaderSeparatorOffset = 111;
+constexpr int HeaderStatusTopOffset = 122;
+constexpr int ProgramActionTopOffset = 115;
+constexpr int ActionButtonHeight = 36;
+constexpr int PanelListTopOffset = 152;
+constexpr int CompactMobileHeaderActionTopOffset = 39;
+constexpr int CompactMobileHeaderSeparatorOffset = 79;
+constexpr int CompactMobileHeaderStatusTopOffset = 85;
+constexpr int CompactMobilePanelListTopOffset = 101;
+constexpr int CompactMobileExternalFooterHeight = 112;
+constexpr int CompactMobileCreditsFooterHeight = 75;
+constexpr int CompactMobileCreditsHeight = 30;
+constexpr int CompactMobileExternalButtonBottomOffset = 76;
+constexpr int CompactMobileExternalLinkBottomOffset = 39;
 constexpr int CompactMobileItemGap = 6;
 // 底部 footer 预留高度：桌面端包含制作组信息和一行外部链接按钮；
 // 移动端在这些内容上方再增加外部资源开关及固定目录提示。
-constexpr int DesktopPanelListAndFooterHeight = 306;
-constexpr int MobilePanelListAndFooterHeight = 354;
+constexpr int DesktopPanelListAndFooterHeight = 298;
+constexpr int MobilePanelListAndFooterHeight = 346;
 constexpr int DetailGap = 12;
 constexpr int MinimumListHeight = 104;
 constexpr int NarrowDetailHeight = 96;
@@ -87,10 +90,7 @@ constexpr int HeaderActionCompactPanelWidth = 664;
 constexpr int HeaderActionButtonWidth = 108;
 constexpr int HeaderCheckUpdatesButtonWidth = 128;
 constexpr int ProgramActionButtonWidth = 200;
-constexpr int HeaderActionButtonHeight = 44;
 constexpr int HeaderActionCompactButtonWidth = 88;
-constexpr int HeaderActionCompactButtonHeight = 40;
-constexpr int CompactMobileHeaderActionButtonHeight = 36;
 constexpr int HeaderActionFontSize = 17;
 constexpr int HeaderActionCompactFontSize = 12;
 constexpr int DisplaySettingsRowCount = 4;
@@ -132,17 +132,19 @@ constexpr const char* CheatHelpText =
 	u8"Shift+R：增加 100000 两银子\n"
 	u8"再次按 Shift+F12 可关闭作弊模式。";
 
-std::string parseInstalledCommonVersion(
+bool isPlainDirectory(const std::filesystem::path& path);
+
+std::string parseInstalledCommonArtifactCrc32(
 	const char* data,
 	std::size_t length)
 {
-	std::string version;
-	return OnlineUpdate::parseCommonPackageVersion(
-		std::string_view(data, length), version)
-		? version : std::string();
+	OnlineUpdate::CommonPackageInstallation installation;
+	return OnlineUpdate::parseCommonPackageInstallation(
+		std::string_view(data, length), installation)
+		? installation.installedArtifactCrc32 : std::string();
 }
 
-std::string installedCommonVersion(
+std::string installedCommonArtifactCrc32(
 	const std::filesystem::path& writableCollectionRoot)
 {
 	const std::filesystem::path writableCommonRoot =
@@ -181,7 +183,8 @@ std::string installedCommonVersion(
 		{
 			return {};
 		}
-		return parseInstalledCommonVersion(text.data(), text.size());
+		return parseInstalledCommonArtifactCrc32(
+			text.data(), text.size());
 	}
 
 	// If no writable override exists, the bundled common package is the
@@ -198,8 +201,59 @@ std::string installedCommonVersion(
 	{
 		return {};
 	}
-	return parseInstalledCommonVersion(
+	return parseInstalledCommonArtifactCrc32(
 		bytes.get(), static_cast<std::size_t>(length));
+}
+
+struct InstalledResourceState
+{
+	OnlineUpdate::InstalledResourceArtifactMap artifacts;
+	OnlineUpdate::InstalledResourceRootMap roots;
+};
+
+InstalledResourceState installedResourceState()
+{
+	const auto& packs = ResourceManager::instance().getDiscoveredPacks();
+	std::map<std::string, std::size_t> ownerCounts;
+	for (const ResourceManager::ResourcePack& pack : packs)
+	{
+		const std::string gameId = OnlineUpdate::foldGameId(pack.manifest.id);
+		if (!gameId.empty())
+		{
+			ownerCounts[gameId]++;
+		}
+	}
+
+	InstalledResourceState state;
+	for (const ResourceManager::ResourcePack& pack : packs)
+	{
+		const std::string gameId = OnlineUpdate::foldGameId(pack.manifest.id);
+		if (!gameId.empty() && ownerCounts[gameId] == 1)
+		{
+			OnlineUpdate::InstalledResourceArtifacts artifacts;
+			artifacts.fullArtifactCrc32 =
+				pack.manifest.releaseMetadata.installedArtifactCrc32;
+			artifacts.incrementalArtifactCrc32 =
+				pack.manifest.releaseMetadata.
+					installedIncrementalArtifactCrc32;
+			try
+			{
+				std::error_code canonicalError;
+				const std::filesystem::path root = std::filesystem::canonical(
+					std::filesystem::u8path(pack.rootPath), canonicalError);
+				if (!canonicalError && isPlainDirectory(root))
+				{
+					artifacts.supportsIncrementalUpdate = true;
+					state.roots.emplace(gameId, root);
+				}
+			}
+			catch (const std::exception&)
+			{
+			}
+			state.artifacts.emplace(pack.manifest.id, std::move(artifacts));
+		}
+	}
+	return state;
 }
 
 const std::string& resourceSelectVersionSubtitle(bool compact)
@@ -220,15 +274,16 @@ const std::string& resourceSelectVersionSubtitle(bool compact)
 struct ExternalLink
 {
 	const char* label;
+	const char* compactLabel;
 	const char* url;
 };
 
 constexpr std::array<ExternalLink, 4> ExternalLinks =
 {{
-	{ "访问作者主页", "https://www.upwinded.com" },
-	{ "访问铁血丹心论坛", "https://tiexuedanxin.net/" },
-	{ "访问剑侠情缘贴吧", "https://tieba.baidu.com/f?kw=%E5%89%91%E4%BE%A0%E6%83%85%E7%BC%98&ie=utf-8" },
-	{ "访问GitHub仓库", "https://github.com/Upwinded/JXQY-all-in-one" }
+	{ "访问作者主页", "作者主页", "https://www.upwinded.com" },
+	{ "访问铁血丹心论坛", "铁血丹心", "https://tiexuedanxin.net/" },
+	{ "访问剑侠情缘贴吧", "剑侠贴吧", "https://tieba.baidu.com/f?kw=%E5%89%91%E4%BE%A0%E6%83%85%E7%BC%98&ie=utf-8" },
+	{ "访问GitHub仓库", "GitHub", "https://github.com/Upwinded/JXQY-all-in-one" }
 }};
 
 bool mobileResourceSelectUiEnabled()
@@ -2174,12 +2229,32 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		errorText = u8"所选资源没有线上条目";
 		return false;
 	}
-
-	const OnlineUpdate::ResourceDownloadPlan plan =
+	const bool requestedResourceInstalled = !selectedEntry.isOnlineOnly();
+	const bool requestedVersionMatches =
+		requestedResourceInstalled && !selectedEntry.localVersion.empty() &&
+		selectedEntry.localVersion == selectedEntry.onlineVersion;
+	const InstalledResourceState installedState = installedResourceState();
+	OnlineUpdate::RequestedResourceDownloadMode requestedDownloadMode =
+		OnlineUpdate::RequestedResourceDownloadMode::IfNeeded;
+	OnlineUpdate::ResourceDownloadPlan plan =
 		OnlineUpdate::planResourceDownload(
 			onlineCatalog,
 			selectedEntry.gameId,
-			JxqyBuildVersion::EngineVersion);
+			JxqyBuildVersion::EngineVersion,
+			installedState.artifacts,
+			requestedDownloadMode);
+	if (requestedVersionMatches && plan.succeeded() &&
+		plan.downloadOrder.empty())
+	{
+		requestedDownloadMode =
+			OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage;
+		plan = OnlineUpdate::planResourceDownload(
+			onlineCatalog,
+			selectedEntry.gameId,
+			JxqyBuildVersion::EngineVersion,
+			installedState.artifacts,
+			requestedDownloadMode);
+	}
 	if (!plan.succeeded())
 	{
 		errorText = resourcePlanFailureText(
@@ -2218,7 +2293,7 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		return false;
 	}
 	const bool includeCommon = OnlineUpdate::commonPackageNeedsDownload(
-		onlineCatalog, installedCommonVersion(collectionRoot));
+		onlineCatalog, installedCommonArtifactCrc32(collectionRoot));
 	std::uint64_t totalDownloadBytes = plan.totalDownloadBytes;
 	if (includeCommon)
 	{
@@ -2349,18 +2424,20 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 	confirmation.requestedGameId = selectedEntry.gameId;
 	confirmation.collectionRoot = collectionRoot.generic_u8string();
 	confirmation.totalDownloadBytes = totalDownloadBytes;
-	confirmation.requestedResourceInstalled = !selectedEntry.isOnlineOnly();
-	confirmation.requestedVersionMatches =
-		confirmation.requestedResourceInstalled &&
-		!selectedEntry.localVersion.empty() &&
-		selectedEntry.localVersion == selectedEntry.onlineVersion;
+	confirmation.installedArtifacts = installedState.artifacts;
+	confirmation.installedResourceRoots = installedState.roots;
+	confirmation.requestedResourceInstalled = requestedResourceInstalled;
+	confirmation.requestedVersionMatches = requestedVersionMatches;
+	confirmation.requestedDownloadMode = requestedDownloadMode;
 	confirmation.includesCommon = includeCommon;
 	confirmation.targets.reserve(
 		plan.downloadOrder.size() + (includeCommon ? 1U : 0U));
 	confirmation.items.reserve(
 		plan.downloadOrder.size() + (includeCommon ? 1U : 0U));
-	for (const OnlineUpdate::ResourcePackage* package : plan.downloadOrder)
+	for (const OnlineUpdate::ResourceDownloadPlan::Item& download :
+		plan.downloadOrder)
 	{
+		const OnlineUpdate::ResourcePackage* package = download.package;
 		if (package == nullptr)
 		{
 			errorText = u8"线上依赖计划包含无效资源";
@@ -2370,6 +2447,7 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		item.title = package->displayName.empty()
 			? package->gameId : package->displayName;
 		item.version = package->versionText;
+		item.artifactKind = download.artifactKind;
 		OnlineUpdate::ResourceInstallTarget target;
 		target.gameId = package->gameId;
 		if (!findWritableTargetName(
@@ -2435,7 +2513,12 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		item.replacing = replacing;
 		confirmation.items.push_back(std::move(item));
 	}
-	return !confirmation.targets.empty();
+	if (confirmation.targets.empty())
+	{
+		errorText = u8"所选游戏、依赖和运行文件均已是当前线上制品";
+		return false;
+	}
+	return true;
 }
 
 void ResourceSelectScene::beginResourceDownloadConfirmation()
@@ -3362,6 +3445,12 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		ResourceManager::instance().getResourceCatalogUrl();
 	const std::vector<OnlineUpdate::ResourceInstallTarget> targets =
 		pendingResourceInstall.targets;
+	const OnlineUpdate::InstalledResourceArtifactMap installedArtifacts =
+		pendingResourceInstall.installedArtifacts;
+	const OnlineUpdate::InstalledResourceRootMap installedResourceRoots =
+		pendingResourceInstall.installedResourceRoots;
+	const OnlineUpdate::RequestedResourceDownloadMode requestedDownloadMode =
+		pendingResourceInstall.requestedDownloadMode;
 	const bool includesCommon = pendingResourceInstall.includesCommon;
 	resourceInstallDialogState = ResourceInstallDialogState::Downloading;
 	resourceInstallDialogMessage = u8"正在下载游戏资源…";
@@ -3376,6 +3465,9 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 			collectionRoot,
 			workspacePath,
 			targets,
+			installedArtifacts,
+			installedResourceRoots,
+			requestedDownloadMode,
 			includesCommon,
 			workerResult](
 				const GameLoading::LoadingCancellationToken& cancellationToken)
@@ -3387,6 +3479,9 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 					JxqyBuildVersion::EngineVersion,
 					catalogUrl,
 					workspacePath,
+					installedArtifacts,
+					installedResourceRoots,
+					requestedDownloadMode,
 					[workerResult, cancellationToken](
 						const OnlineUpdate::ResourceDownloadPreparationProgress&
 							progress)
@@ -4564,9 +4659,7 @@ void ResourceSelectScene::configureFocus()
 				}
 				if (direction == UIFocusDirection::Down)
 				{
-					return compactMobileLayout
-						? focusManager.focusNode("resource-list")
-						: focusManager.focusNode("external-link-0");
+					return focusManager.focusNode("external-link-0");
 				}
 				if (direction == UIFocusDirection::Right)
 				{
@@ -4856,8 +4949,8 @@ void ResourceSelectScene::setMainControlsAvailable(bool available)
 	{
 		if (button != nullptr)
 		{
-			button->visible = available && !compactMobileLayout;
-			button->activated = available && !compactMobileLayout;
+			button->visible = available;
+			button->activated = available;
 			if (!button->visible)
 			{
 				button->cancelPointerInteraction();
@@ -5439,6 +5532,12 @@ void ResourceSelectScene::updateLayout(int width, int height)
 		: compactVerticalLayout ? 64 : MinimumListHeight;
 	narrowDetailHeight = compactVerticalLayout ? 64 : NarrowDetailHeight;
 	detailGap = compactVerticalLayout ? 8 : DetailGap;
+	if (compactMobileLayout && !wideDetailLayout && height < 400)
+	{
+		// 极矮的窄屏仍保留一张完整资源卡；详情区只显示两行摘要。
+		narrowDetailHeight = 48;
+		detailGap = 5;
+	}
 	const int desiredContentHeight = wideDetailLayout
 		? std::max(desiredListHeight, 220)
 		: desiredListHeight + narrowDetailHeight + detailGap;
@@ -5622,11 +5721,16 @@ void ResourceSelectScene::updateControlLayout()
 	for (int linkIndex = 0; linkIndex < static_cast<int>(externalLinkButtons.size()); linkIndex++)
 	{
 		const auto& button = externalLinkButtons[linkIndex];
+		const bool compactLinkLabel = panelWidth < 460;
+		button->setFontSize(compactLinkLabel ? 14 : 18);
+		button->setUTF8Str(compactLinkLabel
+			? ExternalLinks[linkIndex].compactLabel
+			: ExternalLinks[linkIndex].label);
 		button->rect = getExternalLinkRect(linkIndex);
 		const bool mainControlsVisible = resourceList != nullptr &&
 			resourceList->visible;
-		button->visible = mainControlsVisible && !compactMobileLayout;
-		button->activated = mainControlsVisible && !compactMobileLayout;
+		button->visible = mainControlsVisible;
+		button->activated = mainControlsVisible;
 		if (!button->visible)
 		{
 			button->cancelPointerInteraction();
@@ -5637,13 +5741,9 @@ void ResourceSelectScene::updateControlLayout()
 Rect ResourceSelectScene::getExitButtonRect() const
 {
 	int buttonWidth = HeaderActionButtonWidth;
-	int buttonHeight = HeaderActionButtonHeight;
 	if (panelWidth < HeaderActionCompactPanelWidth)
 	{
 		buttonWidth = HeaderActionCompactButtonWidth;
-		buttonHeight = compactMobileLayout
-			? CompactMobileHeaderActionButtonHeight
-			: HeaderActionCompactButtonHeight;
 		constexpr int buttonCount = 5;
 		const int gap = 6;
 		const int availableWidth = std::max(
@@ -5657,7 +5757,7 @@ Rect ResourceSelectScene::getExitButtonRect() const
 		panelY + (compactMobileLayout
 			? CompactMobileHeaderActionTopOffset : HeaderActionTopOffset),
 		buttonWidth,
-		buttonHeight
+		ActionButtonHeight
 	};
 }
 
@@ -5706,7 +5806,7 @@ Rect ResourceSelectScene::getProgramActionButtonRect() const
 		panelX + panelWidth - panelPadding - buttonWidth,
 		panelY + ProgramActionTopOffset,
 		buttonWidth,
-		ProgramActionButtonHeight
+		ActionButtonHeight
 	};
 }
 
@@ -6014,7 +6114,8 @@ Rect ResourceSelectScene::getEnableExternalButtonRect() const
 		return
 		{
 			std::max(panelX + panelPadding, x),
-			panelY + panelHeight - 39,
+			panelY + panelHeight -
+				CompactMobileExternalButtonBottomOffset,
 			std::max(1, buttonWidth),
 			34
 		};
@@ -6055,7 +6156,7 @@ Rect ResourceSelectScene::getCreditsTextAreaRect() const
 		return
 		{
 			startX,
-			panelY + panelHeight - footerHeight + 2,
+			panelY + panelHeight - footerHeight + 4,
 			std::max(1, contentWidth),
 			CompactMobileCreditsHeight
 		};
@@ -6080,11 +6181,6 @@ Rect ResourceSelectScene::getExternalLinkRect(int index) const
 	{
 		return { 0, 0, 0, 0 };
 	}
-	if (compactMobileLayout)
-	{
-		return { 0, 0, 0, 0 };
-	}
-
 	const int gap = panelWidth < 460 ? 5 : 9;
 	const int linkCount = static_cast<int>(ExternalLinks.size());
 	const int totalGap = gap * (linkCount - 1);
@@ -6093,12 +6189,13 @@ Rect ResourceSelectScene::getExternalLinkRect(int index) const
 	const int remainder = availableWidth % linkCount;
 	const int linkWidth = baseWidth + (index < remainder ? 1 : 0);
 	const int linkX = startX + index * baseWidth + std::min(index, remainder) + index * gap;
-	// 桌面和移动端的外部链接都固定在底部；移动端的开关、路径和鸣谢
-	// 已在其上方各自预留独立区域。
-	const int compactShift =
-		enableExternalButton != nullptr && compactVerticalLayout ? 8 : 0;
-	const int linkY = panelY + panelHeight - (48 - compactShift);
-	return { linkX, linkY, linkWidth, 36 };
+	// 四个外部入口始终固定在主界面底部；窄屏只缩短标签，不隐藏入口。
+	const int linkY = compactMobileLayout
+		? panelY + panelHeight - CompactMobileExternalLinkBottomOffset
+		: panelY + panelHeight -
+			(48 - (enableExternalButton != nullptr && compactVerticalLayout
+				? 8 : 0));
+	return { linkX, linkY, linkWidth, ActionButtonHeight };
 }
 
 void ResourceSelectScene::openExternalLink(int index)
@@ -6433,7 +6530,7 @@ void ResourceSelectScene::drawPanel()
 			10);
 		const Rect creditsRect = getCreditsTextAreaRect();
 		drawCenteredText(
-			u8"引擎作者：Upwinded　感谢：偶像、Weyl、BT、scarsty、SB500",
+			u8"引擎作者：Upwinded",
 			centerX,
 			creditsRect.y,
 			11,
@@ -6441,9 +6538,17 @@ void ResourceSelectScene::drawPanel()
 			creditsRect.w,
 			10);
 		drawCenteredText(
-			u8"小试刀剑、铁血丹心论坛、剑侠情缘贴吧",
+			u8"感谢：偶像（Weyl、BT、scarsty、SB500）、小试刀剑",
 			centerX,
 			creditsRect.y + 10,
+			11,
+			0xFFB9AA87,
+			creditsRect.w,
+			10);
+		drawCenteredText(
+			u8"铁血丹心论坛、剑侠情缘贴吧",
+			centerX,
+			creditsRect.y + 20,
 			11,
 			0xFFB9AA87,
 			creditsRect.w,
@@ -6795,7 +6900,9 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		{
 			title = u8"确认下载此游戏";
 		}
-		else if (pendingResourceInstall.requestedVersionMatches)
+		else if (pendingResourceInstall.requestedVersionMatches &&
+			pendingResourceInstall.requestedDownloadMode ==
+				OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage)
 		{
 			title = u8"确认重新下载此游戏";
 		}
@@ -7014,9 +7121,14 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		{
 			actionDescription = u8"将下载此游戏及缺失依赖";
 		}
-		else if (pendingResourceInstall.requestedVersionMatches)
+		else if (pendingResourceInstall.requestedDownloadMode ==
+			OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage)
 		{
 			actionDescription = u8"将重新下载此游戏的当前线上版本";
+		}
+		else if (pendingResourceInstall.requestedVersionMatches)
+		{
+			actionDescription = u8"将补齐此游戏及依赖所需的线上制品";
 		}
 		else
 		{
@@ -7060,8 +7172,22 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		{
 			const ResourceInstallConfirmationItem& item =
 				pendingResourceInstall.items[itemIndex];
-			const std::string firstLine =
-				(item.replacing ? std::string(u8"替换：") : std::string(u8"新增：")) +
+			std::string operationPrefix;
+			if (item.artifactKind == OnlineUpdate::ResourceDownloadPlan::
+				ArtifactKind::Incremental)
+			{
+				operationPrefix = u8"增量：";
+			}
+			else if (item.artifactKind == OnlineUpdate::ResourceDownloadPlan::
+				ArtifactKind::FullAndIncremental)
+			{
+				operationPrefix = u8"完整+增量：";
+			}
+			else
+			{
+				operationPrefix = item.replacing ? u8"替换：" : u8"新增：";
+			}
+			const std::string firstLine = operationPrefix +
 				item.title + u8"    版本：" + valueOrUndeclared(item.version);
 			drawTextLine(firstLine,
 				dialog.x + 26, lineY, 15,
@@ -7296,6 +7422,12 @@ void ResourceSelectScene::drawResourceDetails()
 			u8"简介：" + singleLineText(selectedDetails.description),
 			textX, lineY, 15, 0xFFFFF2C8, titleTextWidth, 14);
 		lineY += 20;
+		if (detailArea.h < 60)
+		{
+			drawTextLine(statusMetadata,
+				textX, lineY, 14, 0xFFAAA28E, metadataTextWidth, 14);
+			return;
+		}
 		drawTextLine(releaseMetadata,
 			textX, lineY, 14, 0xFFC4B48E, titleTextWidth, 14);
 		lineY += 19;

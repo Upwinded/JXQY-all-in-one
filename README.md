@@ -15,6 +15,7 @@ JXQY All-in-One 是面向《剑侠情缘》系列的跨平台 C++ 运行时与�
 | `macos_ios/` | macOS 与 iOS Xcode 工程 |
 | `linux/` | Linux 依赖准备与构建入口 |
 | `win/` | Visual Studio 工程 |
+| `starter/` | Windows 便携包图形化启动入口 |
 | `updater/` | 桌面程序更新辅助程序 |
 | `ThirdParty/` | 源码依赖、依赖清单及本地预编译依赖目录 |
 | `licenses/` | 第三方许可证和使用清单 |
@@ -78,6 +79,8 @@ win/jxqy-all-in-one.sln
 ```
 
 选择 `x86` 或 `x64` 配置后构建 `jxqy-all-in-one`。对应架构的 SDL3 与 FFmpeg 头文件、导入库和运行库必须完整。
+
+解决方案还包含 `jxqy-starter`，用于生成带项目图标的便携包根启动器。输出位于 `bin/starter/win32/` 或 `bin/starter/win64/`；放到程序包根目录后会启动 `bin/win32/` 或 `bin/win64/` 中的游戏主程序。
 
 ### Android
 

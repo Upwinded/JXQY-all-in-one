@@ -312,6 +312,8 @@ bool inspectWrittenArchive(
     return manifest.loadFromBuffer(
                manifestBytes.constData(),
                static_cast<int>(manifestBytes.size())) &&
+        !manifest.hasKey("Release", "InstalledArtifactCrc32") &&
+        !manifest.hasKey("Release", "InstalledIncrementalArtifactCrc32") &&
         QString::fromStdString(manifest.get("Game", "Id", "")).compare(
             expectedGameId, Qt::CaseInsensitive) == 0;
 }
@@ -566,6 +568,44 @@ exportDirectoryPackage(
         result.errorPath = commonDisplayVersion;
         return result;
     }
+    QByteArray publishedManifestBytes;
+    if (kind == PublishedDirectoryKind::Resource)
+    {
+        QFile manifestInput(manifestPath);
+        if (!manifestInput.open(QIODevice::ReadOnly))
+        {
+            result.status = Status::SourceReadFailed;
+            result.errorPath = manifestPath;
+            return result;
+        }
+        const QByteArray sourceManifestBytes = manifestInput.readAll();
+        INIFileEditor publishedManifest;
+        if (sourceManifestBytes.size() > std::numeric_limits<int>::max() ||
+            !publishedManifest.loadFromBuffer(
+                sourceManifestBytes.constData(),
+                static_cast<int>(sourceManifestBytes.size()),
+                INIFileEditor::UnrecognizedLinePolicy::Preserve))
+        {
+            result.status = Status::InvalidManifest;
+            result.errorPath = manifestPath;
+            return result;
+        }
+        const bool hasLocalReceipt =
+            publishedManifest.hasKey("Release", "InstalledArtifactCrc32") ||
+            publishedManifest.hasKey(
+                "Release", "InstalledIncrementalArtifactCrc32");
+        if (hasLocalReceipt)
+        {
+            publishedManifest.removeKey(
+                "Release", "InstalledArtifactCrc32");
+            publishedManifest.removeKey(
+                "Release", "InstalledIncrementalArtifactCrc32");
+            const std::string publishedText = publishedManifest.saveToString();
+            publishedManifestBytes = QByteArray(
+                publishedText.data(),
+                static_cast<qsizetype>(publishedText.size()));
+        }
+    }
     std::vector<SourceEntry> entries;
     QSet<QString> portableKeys;
     QDirIterator iterator(
@@ -634,7 +674,15 @@ exportDirectoryPackage(
             result.status = Status::TooManyFiles;
             return result;
         }
-        const qint64 signedSize = info.size();
+        const QByteArray inlineBytes =
+            kind == PublishedDirectoryKind::Resource &&
+                relativePath == QStringLiteral("game_profile.ini") &&
+                !publishedManifestBytes.isNull()
+            ? publishedManifestBytes
+            : QByteArray();
+        const qint64 signedSize = inlineBytes.isNull()
+            ? info.size()
+            : inlineBytes.size();
         if (signedSize < 0 ||
             result.uncompressedSize >
                 OnlineResourcePackageExporter::MaximumUncompressedBytes -
@@ -650,7 +698,7 @@ exportDirectoryPackage(
             relativePath,
             archivePath,
             static_cast<quint64>(signedSize),
-            {} });
+            inlineBytes });
     }
 
     if (kind == PublishedDirectoryKind::Common)

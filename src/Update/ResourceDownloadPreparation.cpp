@@ -3,6 +3,7 @@
 #include "ArtifactChecksum.h"
 
 #include <algorithm>
+#include <set>
 #include <system_error>
 #include <utility>
 
@@ -62,6 +63,9 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 	const std::string& currentEngineVersion,
 	const std::string& catalogUrl,
 	const std::filesystem::path& workspacePath,
+	const InstalledResourceArtifactMap& installedArtifacts,
+	const InstalledResourceRootMap& installedResourceRoots,
+	RequestedResourceDownloadMode requestedMode,
 	const ResourceDownloadPreparationProgressCallback& progress,
 	const ResourceArtifactDownloadFunction& artifactDownloader)
 {
@@ -75,7 +79,11 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 	}
 
 	const ResourceDownloadPlan plan = planResourceDownload(
-		catalog, requestedGameId, currentEngineVersion);
+		catalog,
+		requestedGameId,
+		currentEngineVersion,
+		installedArtifacts,
+		requestedMode);
 	result.planStatus = plan.status;
 	result.failedGameId = plan.blockingGameId;
 	result.totalDownloadBytes = plan.totalDownloadBytes;
@@ -84,29 +92,72 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 		result.status = ResourceDownloadPreparationStatus::PlanFailed;
 		return result;
 	}
-
-	std::vector<std::string> artifactUrls;
-	artifactUrls.reserve(plan.downloadOrder.size());
-	for (const ResourcePackage* package : plan.downloadOrder)
+	InstalledResourceRootMap normalizedInstalledRoots;
+	std::set<std::string> conflictedInstalledRoots;
+	for (const auto& installedRoot : installedResourceRoots)
 	{
-		std::string artifactUrl;
-		if (package == nullptr || !isValidOnlineGameId(package->gameId))
+		const std::string gameId = foldGameId(installedRoot.first);
+		if (gameId.empty() || installedRoot.second.empty() ||
+			conflictedInstalledRoots.find(gameId) !=
+				conflictedInstalledRoots.end())
+		{
+			continue;
+		}
+		const auto existing = normalizedInstalledRoots.find(gameId);
+		if (existing == normalizedInstalledRoots.end())
+		{
+			normalizedInstalledRoots.emplace(gameId, installedRoot.second);
+		}
+		else if (existing->second != installedRoot.second)
+		{
+			normalizedInstalledRoots.erase(existing);
+			conflictedInstalledRoots.insert(gameId);
+		}
+	}
+
+	struct ArtifactUrls
+	{
+		std::string full;
+		std::string incremental;
+	};
+	std::vector<ArtifactUrls> artifactUrls;
+	artifactUrls.reserve(plan.downloadOrder.size());
+	for (const ResourceDownloadPlan::Item& item : plan.downloadOrder)
+	{
+		if (item.package == nullptr ||
+			!isValidOnlineGameId(item.package->gameId))
 		{
 			result.status = ResourceDownloadPreparationStatus::InvalidInput;
-			result.failedGameId = package == nullptr
-				? std::string() : package->gameId;
+			result.failedGameId = item.package == nullptr
+				? std::string() : item.package->gameId;
 			return result;
 		}
-		if (!buildHttpsArtifactUrl(
-				catalogUrl, package->artifactPath, artifactUrl))
+		ArtifactUrls urls;
+		if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Incremental &&
+			!buildHttpsArtifactUrl(
+				catalogUrl, item.package->artifactPath, urls.full))
 		{
 			result.status =
 				ResourceDownloadPreparationStatus::InvalidArtifactUrl;
-			result.failedGameId = package == nullptr
-				? std::string() : package->gameId;
+			result.failedGameId = item.package->gameId;
 			return result;
 		}
-		artifactUrls.push_back(std::move(artifactUrl));
+		if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Full)
+		{
+			if (!item.package->incrementalPackage.has_value() ||
+				!buildHttpsArtifactUrl(
+					catalogUrl,
+					item.package->incrementalPackage->artifactPath,
+					urls.incremental))
+			{
+				result.status = item.package->incrementalPackage.has_value()
+					? ResourceDownloadPreparationStatus::InvalidArtifactUrl
+					: ResourceDownloadPreparationStatus::InvalidInput;
+				result.failedGameId = item.package->gameId;
+				return result;
+			}
+		}
+		artifactUrls.push_back(std::move(urls));
 	}
 
 	std::error_code error;
@@ -154,7 +205,9 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 	for (std::size_t packageIndex = 0;
 		packageIndex < plan.downloadOrder.size(); packageIndex++)
 	{
-		const ResourcePackage& package = *plan.downloadOrder[packageIndex];
+		const ResourceDownloadPlan::Item& item =
+			plan.downloadOrder[packageIndex];
+		const ResourcePackage& package = *item.package;
 		result.failedGameId = package.gameId;
 		ResourceDownloadPreparationProgress currentProgress;
 		currentProgress.packageIndex = packageIndex;
@@ -179,65 +232,122 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 
 		const std::string fileStem =
 			"package-" + std::to_string(packageIndex);
-		const std::filesystem::path archivePath =
-			archivesPath / (fileStem + ".zip");
+		const std::filesystem::path fullArchivePath =
+			archivesPath / (fileStem + "-full.zip");
+		const std::filesystem::path incrementalArchivePath =
+			archivesPath / (fileStem + "-incremental.zip");
 		const std::filesystem::path packagePreparedPath =
 			preparedPath / fileStem;
-		try
+		const std::filesystem::path fullPreparedPath =
+			preparedPath / (fileStem + "-full");
+		const std::filesystem::path incrementalOverlayPath =
+			preparedPath / (fileStem + "-overlay");
+		const auto downloadArtifact =
+			[&download,
+				&progress,
+				&result,
+				packageIndex,
+				packageCount = plan.downloadOrder.size(),
+				gameId = package.gameId,
+				completedBytes,
+				totalBytes = plan.totalDownloadBytes,
+				packageDownloadBytes = item.downloadSize](
+					const std::string& url,
+					const std::filesystem::path& destination,
+					std::uint64_t artifactSize,
+					std::uint64_t artifactOffset) -> bool
 		{
-			result.downloadResult = download(
-				artifactUrls[packageIndex],
-				archivePath,
-				package.artifactSize,
-				package.artifactSize,
-				[&progress,
-					packageIndex,
-					packageCount = plan.downloadOrder.size(),
-					gameId = package.gameId,
-					completedBytes,
-					totalBytes = plan.totalDownloadBytes](
-						std::uint64_t transferredBytes,
-						std::uint64_t)
-				{
-					if (!progress)
+			try
+			{
+				result.downloadResult = download(
+					url,
+					destination,
+					artifactSize,
+					artifactSize,
+					[&progress,
+						packageIndex,
+						packageCount,
+						gameId,
+						completedBytes,
+						totalBytes,
+						packageDownloadBytes,
+						artifactSize,
+						artifactOffset](
+							std::uint64_t transferredBytes,
+							std::uint64_t)
 					{
-						return true;
-					}
-					ResourceDownloadPreparationProgress update;
-					update.packageIndex = packageIndex;
-					update.packageCount = packageCount;
-					update.gameId = gameId;
-					update.packageTransferredBytes = transferredBytes;
-					update.completedBytes = completedBytes + std::min(
-						transferredBytes,
-						totalBytes - completedBytes);
-					update.totalBytes = totalBytes;
-					try
-					{
-						return progress(update);
-					}
-					catch (...)
-					{
-						return false;
-					}
-				});
-		}
-		catch (...)
-		{
-			result.downloadResult.status =
-				HttpsDownloadStatus::NetworkError;
-		}
-		if (!result.downloadResult.succeeded())
-		{
+						if (!progress)
+						{
+							return true;
+						}
+						const std::uint64_t packageTransferred = std::min(
+							packageDownloadBytes,
+							artifactOffset + std::min(
+								transferredBytes, artifactSize));
+						ResourceDownloadPreparationProgress update;
+						update.packageIndex = packageIndex;
+						update.packageCount = packageCount;
+						update.gameId = gameId;
+						update.packageTransferredBytes = packageTransferred;
+						update.completedBytes = completedBytes +
+							packageTransferred;
+						update.totalBytes = totalBytes;
+						try
+						{
+							return progress(update);
+						}
+						catch (...)
+						{
+							return false;
+						}
+					});
+			}
+			catch (...)
+			{
+				result.downloadResult.status =
+					HttpsDownloadStatus::NetworkError;
+			}
+			if (result.downloadResult.succeeded())
+			{
+				return true;
+			}
 			result.status = result.downloadResult.status ==
 				HttpsDownloadStatus::Cancelled
 				? ResourceDownloadPreparationStatus::Cancelled
 				: ResourceDownloadPreparationStatus::DownloadFailed;
-			return cleanupFailure(std::move(result));
+			return false;
+		};
+
+		std::uint64_t artifactOffset = 0;
+		if (item.artifactKind !=
+				ResourceDownloadPlan::ArtifactKind::Incremental)
+		{
+			if (!downloadArtifact(
+					artifactUrls[packageIndex].full,
+					fullArchivePath,
+					package.artifactSize,
+					artifactOffset))
+			{
+				return cleanupFailure(std::move(result));
+			}
+			artifactOffset = package.artifactSize;
+		}
+		if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Full)
+		{
+			const IncrementalResourcePackage& incremental =
+				*package.incrementalPackage;
+			if (!downloadArtifact(
+					artifactUrls[packageIndex].incremental,
+					incrementalArchivePath,
+					incremental.artifactSize,
+					artifactOffset))
+			{
+				return cleanupFailure(std::move(result));
+			}
 		}
 
-		currentProgress.packageTransferredBytes = package.artifactSize;
-		currentProgress.completedBytes = completedBytes + package.artifactSize;
+		currentProgress.packageTransferredBytes = item.downloadSize;
+		currentProgress.completedBytes = completedBytes + item.downloadSize;
 		currentProgress.stage =
 			ResourceDownloadPreparationProgress::Stage::
 				ValidatingAndExtracting;
@@ -255,8 +365,80 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 			return cleanupFailure(std::move(result));
 		}
 
-		result.packageResult = prepareResourcePackageArchive(
-			package, archivePath, packagePreparedPath);
+		if (item.artifactKind ==
+			ResourceDownloadPlan::ArtifactKind::Incremental)
+		{
+			const auto installedRoot = normalizedInstalledRoots.find(
+				foldGameId(package.gameId));
+			if (installedRoot == normalizedInstalledRoots.end())
+			{
+				result.status =
+					ResourceDownloadPreparationStatus::InvalidInput;
+				return cleanupFailure(std::move(result));
+			}
+			result.packageResult = prepareIncrementalResourcePackageArchive(
+				package, incrementalArchivePath, incrementalOverlayPath);
+			if (result.packageResult.succeeded())
+			{
+				result.packageResult = materializeIncrementalResourcePackage(
+					package,
+					installedRoot->second,
+					incrementalOverlayPath,
+					packagePreparedPath);
+			}
+			if (result.packageResult.succeeded())
+			{
+				std::error_code cleanupError;
+				std::filesystem::remove_all(
+					incrementalOverlayPath, cleanupError);
+				if (cleanupError)
+				{
+					result.status =
+						ResourceDownloadPreparationStatus::CleanupFailed;
+					return cleanupFailure(std::move(result));
+				}
+			}
+		}
+		else if (item.artifactKind ==
+			ResourceDownloadPlan::ArtifactKind::FullAndIncremental)
+		{
+			result.packageResult = prepareResourcePackageArchive(
+				package, fullArchivePath, fullPreparedPath);
+			if (result.packageResult.succeeded())
+			{
+				result.packageResult = prepareIncrementalResourcePackageArchive(
+					package, incrementalArchivePath, incrementalOverlayPath);
+			}
+			if (result.packageResult.succeeded())
+			{
+				result.packageResult = materializeIncrementalResourcePackage(
+					package,
+					fullPreparedPath,
+					incrementalOverlayPath,
+					packagePreparedPath);
+			}
+			if (result.packageResult.succeeded())
+			{
+				std::error_code cleanupError;
+				std::filesystem::remove_all(fullPreparedPath, cleanupError);
+				if (!cleanupError)
+				{
+					std::filesystem::remove_all(
+						incrementalOverlayPath, cleanupError);
+				}
+				if (cleanupError)
+				{
+					result.status =
+						ResourceDownloadPreparationStatus::CleanupFailed;
+					return cleanupFailure(std::move(result));
+				}
+			}
+		}
+		else
+		{
+			result.packageResult = prepareResourcePackageArchive(
+				package, fullArchivePath, packagePreparedPath);
+		}
 		if (!result.packageResult.succeeded())
 		{
 			result.status =
@@ -266,10 +448,13 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 
 		PreparedResourceDownload prepared;
 		prepared.package = package;
-		prepared.archivePath = archivePath;
+		prepared.artifactKind = item.artifactKind;
+		prepared.archivePath = item.artifactKind ==
+			ResourceDownloadPlan::ArtifactKind::Incremental
+			? incrementalArchivePath : fullArchivePath;
 		prepared.preparedResourcePath = packagePreparedPath;
 		result.preparedResources.push_back(std::move(prepared));
-		completedBytes += package.artifactSize;
+		completedBytes += item.downloadSize;
 	}
 
 	result.failedGameId.clear();

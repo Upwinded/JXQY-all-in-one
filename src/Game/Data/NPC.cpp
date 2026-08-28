@@ -5950,7 +5950,8 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect)
 		gm->player->level,
 		level,
 		exp,
-		expBonus);
+		expBonus,
+		kind == nkBattle && relation == nrHostile);
 	const double scaledExperience = scaleAutomaticExperience(
 		baseExperience,
 		manifest.resolvedExperienceMultiplier());

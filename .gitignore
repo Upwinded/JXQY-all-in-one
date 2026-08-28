@@ -41,6 +41,7 @@ win/[Aa][Rr][Mm]64/
 win/bld/
 win/[Bb]in/
 win/[Oo]bj/
+win/**/[Oo]bj/
 win/[Ll]og/
 win/[Ll]ogs/
 

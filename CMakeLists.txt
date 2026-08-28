@@ -17,6 +17,12 @@ if(MSVC)
     add_compile_options(/utf-8)
     add_compile_options($<$<CONFIG:Release>:/O2>)
     add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
+
+    function(jxqy_use_static_msvc_runtime TARGET_NAME)
+        set_property(TARGET ${TARGET_NAME} PROPERTY
+            MSVC_RUNTIME_LIBRARY
+            "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endfunction()
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wno-multichar)
     add_compile_options($<$<CONFIG:Release>:-O2>)
@@ -375,6 +381,9 @@ if(WIN32)
     add_executable(${PROJECT_NAME} WIN32
         ${SOURCE_FILES}
         ${CMAKE_CURRENT_SOURCE_DIR}/win/jxqy-all-in-one/jxqy-all-in-one.rc)
+    if(MSVC AND NOT JXQY_ADDRESS_SANITIZER_ENABLED)
+        jxqy_use_static_msvc_runtime(${PROJECT_NAME})
+    endif()
 
     # Windows 下 SDL3 为 SHARED IMPORTED 目标：IMPORTED_IMPLIB 指向导入库（.lib），
     # 链接器据此解析符号；IMPORTED_LOCATION 指向运行时 DLL，标识目标运行时位置，
@@ -462,7 +471,29 @@ if(WIN32)
         endif()
         list(APPEND _FFMPEG_RUNTIME_DLLS "${_FFMPEG_RUNTIME_FOUND}")
     endforeach()
-    set(_RUNTIME_DLL_DEPS ${_SDL_RUNTIME_DLLS} ${_FFMPEG_RUNTIME_DLLS})
+    set(_MSVC_REQUIRED_RUNTIME_DLLS)
+    if(MSVC)
+        set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+        include(InstallRequiredSystemLibraries)
+        foreach(_MSVC_RUNTIME_DLL IN LISTS CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+            get_filename_component(
+                _MSVC_RUNTIME_NAME "${_MSVC_RUNTIME_DLL}" NAME)
+            string(TOLOWER
+                "${_MSVC_RUNTIME_NAME}" _MSVC_RUNTIME_NAME_LOWER)
+            if(_MSVC_RUNTIME_NAME_LOWER STREQUAL "vcruntime140.dll")
+                list(APPEND _MSVC_REQUIRED_RUNTIME_DLLS
+                    "${_MSVC_RUNTIME_DLL}")
+            endif()
+        endforeach()
+        if(NOT _MSVC_REQUIRED_RUNTIME_DLLS)
+            message(FATAL_ERROR
+                "Required MSVC redistributable vcruntime140.dll was not found")
+        endif()
+    endif()
+    set(_RUNTIME_DLL_DEPS
+        ${_SDL_RUNTIME_DLLS}
+        ${_FFMPEG_RUNTIME_DLLS}
+        ${_MSVC_REQUIRED_RUNTIME_DLLS})
     if(JXQY_ADDRESS_SANITIZER_ENABLED)
         get_filename_component(_MSVC_LINKER_DIR "${CMAKE_LINKER}" DIRECTORY)
         if(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -518,12 +549,38 @@ endif()
 
 set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME_DEBUG "${PROJECT_NAME}-debug")
 
+if(WIN32)
+    add_executable(jxqy-starter WIN32
+        ${CMAKE_CURRENT_SOURCE_DIR}/starter/main.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/win/jxqy-starter/jxqy-starter.rc)
+    if(MSVC)
+        jxqy_use_static_msvc_runtime(jxqy-starter)
+    endif()
+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+        set(JXQY_STARTER_OUTPUT
+            "${CMAKE_CURRENT_SOURCE_DIR}/bin/starter/win64")
+    else()
+        set(JXQY_STARTER_OUTPUT
+            "${CMAKE_CURRENT_SOURCE_DIR}/bin/starter/win32")
+    endif()
+    set_target_properties(jxqy-starter PROPERTIES
+        OUTPUT_NAME "jxqy-all-in-one"
+        RUNTIME_OUTPUT_DIRECTORY "${JXQY_STARTER_OUTPUT}"
+        RUNTIME_OUTPUT_DIRECTORY_DEBUG "${JXQY_STARTER_OUTPUT}"
+        RUNTIME_OUTPUT_DIRECTORY_RELEASE "${JXQY_STARTER_OUTPUT}"
+        RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${JXQY_STARTER_OUTPUT}"
+        RUNTIME_OUTPUT_DIRECTORY_MINSIZEREL "${JXQY_STARTER_OUTPUT}")
+endif()
+
 
 if(WIN32 OR (UNIX AND NOT APPLE))
     add_executable(jxqy-program-updater
         ${CMAKE_CURRENT_SOURCE_DIR}/updater/main.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/updater/DesktopProgramUpdater.cpp
     )
+    if(MSVC)
+        jxqy_use_static_msvc_runtime(jxqy-program-updater)
+    endif()
     target_include_directories(jxqy-program-updater PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/updater)
     if(WIN32)

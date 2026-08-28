@@ -244,6 +244,59 @@ void parseArtifactFields(
 	}
 }
 
+void parseIncrementalArtifactFields(
+	OnlineUpdate::CatalogParseResult& result,
+	const ResourceIniReader& ini,
+	const std::string& section,
+	std::optional<OnlineUpdate::IncrementalResourcePackage>& incrementalPackage)
+{
+	incrementalPackage.reset();
+	const bool declared =
+		ini.hasKey(section, "IncrementalArtifact") ||
+		ini.hasKey(section, "IncrementalSize") ||
+		ini.hasKey(section, "IncrementalCrc32");
+	if (!declared)
+	{
+		return;
+	}
+
+	OnlineUpdate::IncrementalResourcePackage package;
+	package.artifactPath = trimAscii(
+		ini.get(section, "IncrementalArtifact", ""));
+	if (package.artifactPath.empty())
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::MissingField,
+			section, "IncrementalArtifact");
+	}
+	else if (!OnlineUpdate::isSafeArtifactPath(package.artifactPath))
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::UnsafeArtifactPath,
+			section, "IncrementalArtifact", package.artifactPath);
+	}
+
+	const std::string sizeText = trimAscii(
+		ini.get(section, "IncrementalSize", ""));
+	if (!parseUnsignedDecimal(sizeText, package.artifactSize) ||
+		package.artifactSize == 0)
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::InvalidArtifactSize,
+			section, "IncrementalSize", sizeText);
+	}
+
+	package.crc32Hex = trimAscii(
+		ini.get(section, "IncrementalCrc32", ""));
+	if (!OnlineUpdate::isValidCrc32Hex(package.crc32Hex))
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::InvalidCrc32,
+			section, "IncrementalCrc32", package.crc32Hex);
+	}
+	else
+	{
+		package.crc32Hex = foldAscii(package.crc32Hex);
+	}
+	incrementalPackage = std::move(package);
+}
+
 bool validateDependencyGraph(OnlineUpdate::CatalogParseResult& result)
 {
 	enum class VisitState
@@ -534,6 +587,8 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 			package.minimumEngineVersion);
 		parseArtifactFields(result, ini, section, package.artifactPath,
 			package.artifactSize, package.crc32Hex);
+		parseIncrementalArtifactFields(
+			result, ini, section, package.incrementalPackage);
 		package.releaseNotes = ini.get(section, "ReleaseNotes", "");
 		package.resourceOnly = ini.getBoolean(
 			section, "ResourceOnly", false);
@@ -650,7 +705,18 @@ bool parseCommonPackageVersion(
 	std::string_view utf8Text,
 	std::string& versionText)
 {
-	versionText.clear();
+	CommonPackageInstallation installation;
+	const bool succeeded = parseCommonPackageInstallation(
+		utf8Text, installation);
+	versionText = succeeded ? installation.versionText : std::string();
+	return succeeded;
+}
+
+bool parseCommonPackageInstallation(
+	std::string_view utf8Text,
+	CommonPackageInstallation& installation)
+{
+	installation = {};
 	if (utf8Text.empty() ||
 		utf8Text.size() > MaximumCommonVersionFileBytes)
 	{
@@ -667,21 +733,37 @@ bool parseCommonPackageVersion(
 	{
 		return false;
 	}
-	versionText = trimAscii(ini.get("Common", "Version", ""));
-	if (!isValidDisplayVersion(versionText))
+	installation.versionText = trimAscii(ini.get("Common", "Version", ""));
+	if (!isValidDisplayVersion(installation.versionText))
 	{
-		versionText.clear();
+		installation = {};
 		return false;
+	}
+	installation.installedArtifactCrc32 = trimAscii(
+		ini.get("Common", "InstalledArtifactCrc32", ""));
+	if (isValidCrc32Hex(installation.installedArtifactCrc32))
+	{
+		installation.installedArtifactCrc32 = foldAscii(
+			installation.installedArtifactCrc32);
+	}
+	else
+	{
+		installation.installedArtifactCrc32.clear();
 	}
 	return true;
 }
 
 bool commonPackageNeedsDownload(
 	const Catalog& catalog,
-	std::string_view installedVersion) noexcept
+	std::string_view installedArtifactCrc32) noexcept
 {
-	return catalog.commonPackage.has_value() &&
-		catalog.commonPackage->versionText != installedVersion;
+	if (!catalog.commonPackage.has_value())
+	{
+		return false;
+	}
+	return !isValidCrc32Hex(installedArtifactCrc32) ||
+		foldAscii(installedArtifactCrc32) !=
+			catalog.commonPackage->crc32Hex;
 }
 
 ProgramUpdateCheck checkProgramUpdate(

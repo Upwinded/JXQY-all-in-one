@@ -11,12 +11,17 @@ inline int calculateDefeatedNpcBaseExperience(
 	int recipientLevel,
 	int defeatedNpcLevel,
 	int defeatedNpcStoredExperience,
-	int defeatedNpcExperienceBonus)
+	int defeatedNpcExperienceBonus,
+	bool defeatedNpcIsHostileBattleNpc = false)
 {
 	if (manifest.resolvedDefeatedNpcExperienceMode() ==
 		DefeatedNpcExperienceMode::StoredExperience)
 	{
-		return std::max(0, defeatedNpcStoredExperience);
+		if (defeatedNpcStoredExperience != 0 ||
+			!defeatedNpcIsHostileBattleNpc)
+		{
+			return std::max(0, defeatedNpcStoredExperience);
+		}
 	}
 
 	const long long levelProduct =

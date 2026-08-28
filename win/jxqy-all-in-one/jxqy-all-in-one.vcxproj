@@ -79,6 +79,9 @@
   <PropertyGroup Condition="'$(Platform)'=='x64'">
     <SdlRuntimeArchDir>x64</SdlRuntimeArchDir>
   </PropertyGroup>
+  <PropertyGroup>
+    <IntDir>$(ProjectDir)obj\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(ProjectDir);$(ProjectDir)..\..\ThirdParty\miniLZO;$(ProjectDir)..\..\ThirdParty\lua;$(ProjectDir)..\..\ThirdParty\miniz;$(ProjectDir)..\..\cmake;$(ProjectDir)..\..\ThirdParty\devel\win\SDL\include;$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\include;$(IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
     <OutDir>$(ProjectDir)../../bin/win64/</OutDir>
@@ -111,6 +114,7 @@
       <Optimization>Disabled</Optimization>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -131,6 +135,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -151,6 +156,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -170,6 +176,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -199,7 +206,8 @@ if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir
 if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avformat-59.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avformat-59.dll" "$(OutDir)"
 if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avutil-57.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\avutil-57.dll" "$(OutDir)"
 if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swresample-4.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swresample-4.dll" "$(OutDir)"
-if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swscale-6.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swscale-6.dll" "$(OutDir)"</Command>
+if exist "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swscale-6.dll" copy /Y "$(ProjectDir)..\..\ThirdParty\devel\win\ffmpeg\lib\$(SdlRuntimeArchDir)\bin\swscale-6.dll" "$(OutDir)"
+if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime140.dll" copy /Y "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime140.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

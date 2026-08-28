@@ -43,6 +43,8 @@ private:
 		std::string version;
 		std::string targetDirectoryName;
 		bool replacing = false;
+		OnlineUpdate::ResourceDownloadPlan::ArtifactKind artifactKind =
+			OnlineUpdate::ResourceDownloadPlan::ArtifactKind::Full;
 	};
 
 	struct ResourceInstallConfirmation
@@ -52,7 +54,11 @@ private:
 		std::uint64_t totalDownloadBytes = 0;
 		bool requestedResourceInstalled = false;
 		bool requestedVersionMatches = false;
+		OnlineUpdate::RequestedResourceDownloadMode requestedDownloadMode =
+			OnlineUpdate::RequestedResourceDownloadMode::IfNeeded;
 		bool includesCommon = false;
+		OnlineUpdate::InstalledResourceArtifactMap installedArtifacts;
+		OnlineUpdate::InstalledResourceRootMap installedResourceRoots;
 		std::vector<OnlineUpdate::ResourceInstallTarget> targets;
 		std::vector<ResourceInstallConfirmationItem> items;
 	};

@@ -287,6 +287,427 @@ bool readManifest(
 		static_cast<std::streamsize>(bytes.size());
 }
 
+std::string_view trimAsciiView(std::string_view value)
+{
+	while (!value.empty() &&
+		(value.front() == ' ' || value.front() == '\t' ||
+		 value.front() == '\r' || value.front() == '\n'))
+	{
+		value.remove_prefix(1);
+	}
+	while (!value.empty() &&
+		(value.back() == ' ' || value.back() == '\t' ||
+		 value.back() == '\r' || value.back() == '\n'))
+	{
+		value.remove_suffix(1);
+	}
+	return value;
+}
+
+bool equalsAsciiCaseInsensitive(
+	std::string_view left,
+	std::string_view right)
+{
+	if (left.size() != right.size())
+	{
+		return false;
+	}
+	for (std::size_t index = 0; index < left.size(); index++)
+	{
+		char leftCharacter = left[index];
+		char rightCharacter = right[index];
+		if (leftCharacter >= 'A' && leftCharacter <= 'Z')
+		{
+			leftCharacter = static_cast<char>(
+				leftCharacter + ('a' - 'A'));
+		}
+		if (rightCharacter >= 'A' && rightCharacter <= 'Z')
+		{
+			rightCharacter = static_cast<char>(
+				rightCharacter + ('a' - 'A'));
+		}
+		if (leftCharacter != rightCharacter)
+		{
+			return false;
+		}
+	}
+	return true;
+}
+
+bool parseIniSectionLine(
+	std::string_view line,
+	std::string_view& sectionName)
+{
+	sectionName = {};
+	if (line.size() >= 3 &&
+		static_cast<unsigned char>(line[0]) == 0xEF &&
+		static_cast<unsigned char>(line[1]) == 0xBB &&
+		static_cast<unsigned char>(line[2]) == 0xBF)
+	{
+		line.remove_prefix(3);
+	}
+	line = trimAsciiView(line);
+	if (line.size() < 3 || line.front() != '[')
+	{
+		return false;
+	}
+	const std::size_t close = line.find(']');
+	if (close == std::string_view::npos)
+	{
+		return false;
+	}
+	const std::string_view suffix = trimAsciiView(line.substr(close + 1));
+	if (!suffix.empty() && suffix.front() != ';' && suffix.front() != '#')
+	{
+		return false;
+	}
+	sectionName = trimAsciiView(line.substr(1, close - 1));
+	return !sectionName.empty();
+}
+
+bool parseIniKeyLine(std::string_view line, std::string_view& keyName)
+{
+	keyName = {};
+	line = trimAsciiView(line);
+	if (line.empty() || line.front() == ';' || line.front() == '#' ||
+		line.front() == '[')
+	{
+		return false;
+	}
+	const std::size_t equals = line.find('=');
+	const std::size_t colon = line.find(':');
+	const std::size_t separator = equals == std::string_view::npos
+		? colon
+		: colon == std::string_view::npos
+			? equals : std::min(equals, colon);
+	if (separator == std::string_view::npos)
+	{
+		return false;
+	}
+	keyName = trimAsciiView(line.substr(0, separator));
+	return !keyName.empty();
+}
+
+bool iniTextContainsKey(
+	std::string_view text,
+	std::string_view requestedSection,
+	std::string_view requestedKey)
+{
+	bool inRequestedSection = false;
+	std::size_t lineStart = 0;
+	while (lineStart < text.size())
+	{
+		const std::size_t newline = text.find('\n', lineStart);
+		std::size_t contentEnd = newline == std::string_view::npos
+			? text.size() : newline;
+		if (contentEnd > lineStart && text[contentEnd - 1] == '\r')
+		{
+			contentEnd--;
+		}
+		const std::string_view line = text.substr(
+			lineStart, contentEnd - lineStart);
+		std::string_view sectionName;
+		if (parseIniSectionLine(line, sectionName))
+		{
+			inRequestedSection = equalsAsciiCaseInsensitive(
+				sectionName, requestedSection);
+		}
+		else if (inRequestedSection)
+		{
+			std::string_view keyName;
+			if (parseIniKeyLine(line, keyName) &&
+				equalsAsciiCaseInsensitive(keyName, requestedKey))
+			{
+				return true;
+			}
+		}
+		if (newline == std::string_view::npos)
+		{
+			break;
+		}
+		lineStart = newline + 1;
+	}
+	return false;
+}
+
+std::string upsertIniValue(
+	std::string_view text,
+	std::string_view requestedSection,
+	std::string_view requestedKey,
+	std::string_view value)
+{
+	const std::string newline = text.find("\r\n") != std::string_view::npos
+		? "\r\n" : "\n";
+	const std::string valueLine = std::string(requestedKey) + "=" +
+		std::string(value) + newline;
+	const bool existingKey = iniTextContainsKey(
+		text, requestedSection, requestedKey);
+	bool requestedSectionFound = false;
+	bool inRequestedSection = false;
+	bool inserted = false;
+	std::string output;
+	output.reserve(text.size() + valueLine.size() + requestedSection.size() + 4);
+
+	std::size_t lineStart = 0;
+	while (lineStart < text.size())
+	{
+		const std::size_t newlineOffset = text.find('\n', lineStart);
+		const std::size_t lineEnd = newlineOffset == std::string_view::npos
+			? text.size() : newlineOffset + 1;
+		std::size_t contentEnd = newlineOffset == std::string_view::npos
+			? text.size() : newlineOffset;
+		if (contentEnd > lineStart && text[contentEnd - 1] == '\r')
+		{
+			contentEnd--;
+		}
+		const std::string_view line = text.substr(
+			lineStart, contentEnd - lineStart);
+		std::string_view sectionName;
+		const bool sectionLine = parseIniSectionLine(line, sectionName);
+		if (sectionLine)
+		{
+			if (inRequestedSection && !existingKey && !inserted)
+			{
+				output += valueLine;
+				inserted = true;
+			}
+			inRequestedSection = equalsAsciiCaseInsensitive(
+				sectionName, requestedSection);
+			requestedSectionFound = requestedSectionFound || inRequestedSection;
+		}
+
+		std::string_view keyName;
+		if (inRequestedSection &&
+			parseIniKeyLine(line, keyName) &&
+			equalsAsciiCaseInsensitive(keyName, requestedKey))
+		{
+			output.append(requestedKey.data(), requestedKey.size());
+			output.push_back('=');
+			output.append(value.data(), value.size());
+			output.append(
+				text.data() + contentEnd,
+				lineEnd - contentEnd);
+			inserted = true;
+		}
+		else
+		{
+			output.append(text.data() + lineStart, lineEnd - lineStart);
+		}
+		lineStart = lineEnd;
+	}
+
+	if (requestedSectionFound && !inserted)
+	{
+		if (!output.empty() && output.back() != '\n')
+		{
+			output += newline;
+		}
+		output += valueLine;
+	}
+	else if (!requestedSectionFound)
+	{
+		if (!output.empty() && output.back() != '\n')
+		{
+			output += newline;
+		}
+		if (!output.empty())
+		{
+			output += newline;
+		}
+		output.push_back('[');
+		output.append(requestedSection.data(), requestedSection.size());
+		output.push_back(']');
+		output += newline;
+		output += valueLine;
+	}
+	return output;
+}
+
+std::string eraseIniKey(
+	std::string_view text,
+	std::string_view requestedSection,
+	std::string_view requestedKey)
+{
+	bool inRequestedSection = false;
+	std::string output;
+	output.reserve(text.size());
+	std::size_t lineStart = 0;
+	while (lineStart < text.size())
+	{
+		const std::size_t newlineOffset = text.find('\n', lineStart);
+		const std::size_t lineEnd = newlineOffset == std::string_view::npos
+			? text.size() : newlineOffset + 1;
+		std::size_t contentEnd = newlineOffset == std::string_view::npos
+			? text.size() : newlineOffset;
+		if (contentEnd > lineStart && text[contentEnd - 1] == '\r')
+		{
+			contentEnd--;
+		}
+		const std::string_view line = text.substr(
+			lineStart, contentEnd - lineStart);
+		std::string_view sectionName;
+		if (parseIniSectionLine(line, sectionName))
+		{
+			inRequestedSection = equalsAsciiCaseInsensitive(
+				sectionName, requestedSection);
+		}
+		std::string_view keyName;
+		const bool removeLine = inRequestedSection &&
+			parseIniKeyLine(line, keyName) &&
+			equalsAsciiCaseInsensitive(keyName, requestedKey);
+		if (!removeLine)
+		{
+			output.append(text.data() + lineStart, lineEnd - lineStart);
+		}
+		lineStart = lineEnd;
+	}
+	return output;
+}
+
+bool writeIniText(
+	const std::filesystem::path& path,
+	const std::string& updated,
+	std::size_t maximumBytes)
+{
+	if (updated.empty() || updated.size() > maximumBytes ||
+		updated.size() > static_cast<std::size_t>(
+			std::numeric_limits<std::streamsize>::max()))
+	{
+		return false;
+	}
+	std::ofstream output(
+		path, std::ios::binary | std::ios::out | std::ios::trunc);
+	if (!output)
+	{
+		return false;
+	}
+	output.write(updated.data(), static_cast<std::streamsize>(updated.size()));
+	output.flush();
+	return static_cast<bool>(output);
+}
+
+bool writeIniValue(
+	const std::filesystem::path& path,
+	const std::vector<char>& originalBytes,
+	std::size_t maximumBytes,
+	std::string_view section,
+	std::string_view key,
+	std::string_view value)
+{
+	const std::string original(
+		originalBytes.data(), originalBytes.size());
+	const std::string updated = upsertIniValue(
+		original, section, key, value);
+	return writeIniText(path, updated, maximumBytes);
+}
+
+bool removeIniValue(
+	const std::filesystem::path& path,
+	const std::vector<char>& originalBytes,
+	std::size_t maximumBytes,
+	std::string_view section,
+	std::string_view key)
+{
+	const std::string original(
+		originalBytes.data(), originalBytes.size());
+	return writeIniText(
+		path, eraseIniKey(original, section, key), maximumBytes);
+}
+
+bool copyPlainTree(
+	const std::filesystem::path& sourceRoot,
+	const std::filesystem::path& destinationRoot,
+	bool overwriteFiles,
+	std::filesystem::path& failedPath)
+{
+	failedPath.clear();
+	if (!isSafeExistingDirectory(sourceRoot) ||
+		!isSafeExistingDirectory(destinationRoot))
+	{
+		failedPath = !isSafeExistingDirectory(sourceRoot)
+			? sourceRoot : destinationRoot;
+		return false;
+	}
+	std::error_code iteratorError;
+	for (std::filesystem::recursive_directory_iterator iterator(
+			sourceRoot,
+			std::filesystem::directory_options::none,
+			iteratorError), end;
+		!iteratorError && iterator != end;
+		iterator.increment(iteratorError))
+	{
+		const std::filesystem::path sourcePath = iterator->path();
+		const std::filesystem::path relativePath =
+			sourcePath.lexically_relative(sourceRoot);
+		const std::string relativeText = relativePath.generic_u8string();
+		const ResourcePathSafety::StrictRelativePathResult normalized =
+			ResourcePathSafety::normalizeStrictRelativeResourcePath(
+				relativeText);
+		std::error_code statusError;
+		const std::filesystem::file_status sourceStatus =
+			std::filesystem::symlink_status(sourcePath, statusError);
+		if (statusError || !normalized.succeeded() ||
+			normalized.normalizedPath != relativeText ||
+			std::filesystem::is_symlink(sourceStatus) ||
+			isReparsePoint(sourcePath))
+		{
+			failedPath = sourcePath;
+			return false;
+		}
+		const std::filesystem::path destinationPath =
+			destinationRoot / relativePath;
+		if (std::filesystem::is_directory(sourceStatus))
+		{
+			if (!ensureDirectoryTree(destinationRoot, relativePath))
+			{
+				failedPath = destinationPath;
+				return false;
+			}
+			continue;
+		}
+		if (!std::filesystem::is_regular_file(sourceStatus) ||
+			!ensureDirectoryTree(destinationRoot, relativePath.parent_path()))
+		{
+			failedPath = sourcePath;
+			return false;
+		}
+		const std::filesystem::file_status destinationStatus =
+			std::filesystem::symlink_status(destinationPath, statusError);
+		const bool destinationExists =
+			!statusError && std::filesystem::exists(destinationStatus);
+		if ((statusError &&
+				statusError != std::errc::no_such_file_or_directory) ||
+			(destinationExists &&
+				(!overwriteFiles ||
+					!std::filesystem::is_regular_file(destinationStatus) ||
+					std::filesystem::is_symlink(destinationStatus) ||
+					isReparsePoint(destinationPath))))
+		{
+			failedPath = destinationPath;
+			return false;
+		}
+		statusError.clear();
+		std::filesystem::copy_file(
+			sourcePath,
+			destinationPath,
+			destinationExists
+				? std::filesystem::copy_options::overwrite_existing
+				: std::filesystem::copy_options::none,
+			statusError);
+		if (statusError)
+		{
+			failedPath = destinationPath;
+			return false;
+		}
+	}
+	if (iteratorError)
+	{
+		failedPath = sourceRoot;
+		return false;
+	}
+	return true;
+}
+
 OnlineUpdate::ResourcePackageArchiveResult cleanupFailure(
 	OnlineUpdate::ResourcePackageArchiveResult result,
 	const std::filesystem::path& destinationPath,
@@ -322,6 +743,8 @@ enum class PackageArchiveKind
 static ResourcePackageArchiveResult preparePackageArchive(
 	std::uint64_t expectedArtifactSize,
 	const std::string& expectedCrc32Hex,
+	const std::string& installedFullArtifactCrc32,
+	const std::string& installedIncrementalArtifactCrc32,
 	const ResourcePackage* expectedResourcePackage,
 	const CommonPackage* expectedCommonPackage,
 	PackageArchiveKind archiveKind,
@@ -332,12 +755,17 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	const ResourcePackageArchiveLimits& limits)
 {
 	ResourcePackageArchiveResult result;
+	const bool invalidInstalledReceipts = expectedResourcePackage != nullptr &&
+		(!isValidCrc32Hex(installedFullArtifactCrc32) ||
+			(!installedIncrementalArtifactCrc32.empty() &&
+				!isValidCrc32Hex(installedIncrementalArtifactCrc32)));
 	if (archivePath.empty() || destinationPath.empty() ||
 		limits.maximumEntryCount == 0 ||
 		limits.maximumUncompressedBytes == 0 ||
 		limits.maximumManifestBytes == 0 ||
 		expectedArtifactSize == 0 ||
-		!isValidCrc32Hex(expectedCrc32Hex))
+		!isValidCrc32Hex(expectedCrc32Hex) ||
+		invalidInstalledReceipts)
 	{
 		result.status = ResourcePackageArchiveStatus::InvalidInput;
 		return result;
@@ -770,6 +1198,35 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			return cleanupFailure(
 				result, destinationPath, destinationCreated);
 		}
+		if (!writeIniValue(
+				versionPath,
+				versionBytes,
+				MaximumCommonVersionFileBytes,
+				"Common",
+				"InstalledArtifactCrc32",
+				expectedCrc32Hex))
+		{
+			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+			result.filesystemPath = versionPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
+		CommonPackageInstallation installation;
+		if (!readManifest(
+				versionPath,
+				MaximumCommonVersionFileBytes,
+				versionBytes) ||
+			!parseCommonPackageInstallation(
+				std::string_view(versionBytes.data(), versionBytes.size()),
+				installation) ||
+			installation.versionText != expectedCommonPackage->versionText ||
+			installation.installedArtifactCrc32 != expectedCrc32Hex)
+		{
+			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+			result.filesystemPath = versionPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
 		result.status = ResourcePackageArchiveStatus::Success;
 		result.filesystemPath = destinationPath;
 		return result;
@@ -907,6 +1364,47 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		result.filesystemPath = manifestPath;
 		return cleanupFailure(result, destinationPath, destinationCreated);
 	}
+	if (!writeIniValue(
+			manifestPath,
+			manifestBytes,
+			limits.maximumManifestBytes,
+			"Release",
+			"InstalledArtifactCrc32",
+			installedFullArtifactCrc32))
+	{
+		result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+		result.filesystemPath = manifestPath;
+		return cleanupFailure(result, destinationPath, destinationCreated);
+	}
+	if (!readManifest(
+			manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+		(installedIncrementalArtifactCrc32.empty()
+			? !removeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledIncrementalArtifactCrc32")
+			: !writeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledIncrementalArtifactCrc32",
+				installedIncrementalArtifactCrc32)) ||
+		!readManifest(
+			manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+		!manifest.loadFromBuffer(
+			manifestBytes.data(), static_cast<int>(manifestBytes.size())) ||
+		manifest.releaseMetadata.installedArtifactCrc32 !=
+			installedFullArtifactCrc32 ||
+		manifest.releaseMetadata.installedIncrementalArtifactCrc32 !=
+			installedIncrementalArtifactCrc32)
+	{
+		result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+		result.filesystemPath = manifestPath;
+		return cleanupFailure(result, destinationPath, destinationCreated);
+	}
 
 	result.status = ResourcePackageArchiveStatus::Success;
 	result.filesystemPath = destinationPath;
@@ -931,6 +1429,8 @@ ResourcePackageArchiveResult prepareResourcePackageArchive(
 	return preparePackageArchive(
 		expectedPackage.artifactSize,
 		expectedPackage.crc32Hex,
+		expectedPackage.crc32Hex,
+		{},
 		&expectedPackage,
 		nullptr,
 		PackageArchiveKind::Resource,
@@ -939,6 +1439,146 @@ ResourcePackageArchiveResult prepareResourcePackageArchive(
 		archivePath,
 		destinationPath,
 		limits);
+}
+
+ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
+	const ResourcePackage& expectedPackage,
+	const std::filesystem::path& archivePath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits)
+{
+	if (!isValidOnlineGameId(expectedPackage.gameId) ||
+		expectedPackage.versionText.empty() ||
+		expectedPackage.minimumEngineVersionText.empty() ||
+		!expectedPackage.incrementalPackage.has_value() ||
+		!isSafeArtifactPath(
+			expectedPackage.incrementalPackage->artifactPath))
+	{
+		ResourcePackageArchiveResult result;
+		result.status = ResourcePackageArchiveStatus::InvalidInput;
+		return result;
+	}
+	return preparePackageArchive(
+		expectedPackage.incrementalPackage->artifactSize,
+		expectedPackage.incrementalPackage->crc32Hex,
+		expectedPackage.crc32Hex,
+		expectedPackage.incrementalPackage->crc32Hex,
+		&expectedPackage,
+		nullptr,
+		PackageArchiveKind::Resource,
+		{},
+		{},
+		archivePath,
+		destinationPath,
+		limits);
+}
+
+ResourcePackageArchiveResult materializeIncrementalResourcePackage(
+	const ResourcePackage& expectedPackage,
+	const std::filesystem::path& installedResourcePath,
+	const std::filesystem::path& preparedOverlayPath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits)
+{
+	ResourcePackageArchiveResult result;
+	if (!expectedPackage.incrementalPackage.has_value() ||
+		installedResourcePath.empty() || preparedOverlayPath.empty() ||
+		destinationPath.empty() || limits.maximumManifestBytes == 0 ||
+		!isSafeExistingDirectory(installedResourcePath) ||
+		!isSafeExistingDirectory(preparedOverlayPath))
+	{
+		result.status = ResourcePackageArchiveStatus::InvalidInput;
+		return result;
+	}
+
+	const auto loadManifest = [&limits](
+		const std::filesystem::path& root,
+		ResourceManifest& manifest) -> bool
+	{
+		std::vector<char> bytes;
+		return readManifest(
+			root / "game_profile.ini",
+			limits.maximumManifestBytes,
+			bytes) &&
+			manifest.loadFromBuffer(
+				bytes.data(), static_cast<int>(bytes.size())) &&
+			manifest.isValid();
+	};
+	ResourceManifest installedManifest;
+	if (!loadManifest(installedResourcePath, installedManifest) ||
+		!sameIdentifier(installedManifest.id, expectedPackage.gameId) ||
+		foldAscii(installedManifest.releaseMetadata.installedArtifactCrc32) !=
+			expectedPackage.crc32Hex)
+	{
+		result.status = ResourcePackageArchiveStatus::ArtifactMismatch;
+		result.filesystemPath = installedResourcePath / "game_profile.ini";
+		return result;
+	}
+	ResourceManifest overlayManifest;
+	if (!loadManifest(preparedOverlayPath, overlayManifest) ||
+		!sameIdentifier(overlayManifest.id, expectedPackage.gameId) ||
+		overlayManifest.releaseMetadata.installedArtifactCrc32 !=
+			expectedPackage.crc32Hex ||
+		overlayManifest.releaseMetadata.installedIncrementalArtifactCrc32 !=
+			expectedPackage.incrementalPackage->crc32Hex)
+	{
+		result.status = ResourcePackageArchiveStatus::InvalidManifest;
+		result.filesystemPath = preparedOverlayPath / "game_profile.ini";
+		return result;
+	}
+
+	std::error_code statusError;
+	const std::filesystem::file_status destinationStatus =
+		std::filesystem::symlink_status(destinationPath, statusError);
+	if ((!statusError && std::filesystem::exists(destinationStatus)) ||
+		(statusError &&
+			statusError != std::errc::no_such_file_or_directory))
+	{
+		result.status = ResourcePackageArchiveStatus::DestinationAlreadyExists;
+		result.filesystemPath = destinationPath;
+		return result;
+	}
+	if (destinationPath.parent_path().empty() ||
+		!isSafeExistingDirectory(destinationPath.parent_path()))
+	{
+		result.status = ResourcePackageArchiveStatus::UnsafeDestination;
+		result.filesystemPath = destinationPath.parent_path();
+		return result;
+	}
+	statusError.clear();
+	if (!std::filesystem::create_directory(destinationPath, statusError) ||
+		statusError || !isSafeExistingDirectory(destinationPath))
+	{
+		result.status = ResourcePackageArchiveStatus::DestinationCreateFailed;
+		result.filesystemPath = destinationPath;
+		return cleanupFailure(result, destinationPath, true);
+	}
+	std::filesystem::path failedPath;
+	if (!copyPlainTree(
+			installedResourcePath, destinationPath, false, failedPath) ||
+		!copyPlainTree(
+			preparedOverlayPath, destinationPath, true, failedPath))
+	{
+		result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+		result.filesystemPath = failedPath;
+		return cleanupFailure(result, destinationPath, true);
+	}
+	ResourceManifest materializedManifest;
+	if (!loadManifest(destinationPath, materializedManifest) ||
+		!sameIdentifier(materializedManifest.id, expectedPackage.gameId) ||
+		materializedManifest.releaseMetadata.installedArtifactCrc32 !=
+			expectedPackage.crc32Hex ||
+		materializedManifest.releaseMetadata.
+			installedIncrementalArtifactCrc32 !=
+			expectedPackage.incrementalPackage->crc32Hex)
+	{
+		result.status = ResourcePackageArchiveStatus::InvalidManifest;
+		result.filesystemPath = destinationPath / "game_profile.ini";
+		return cleanupFailure(result, destinationPath, true);
+	}
+	result.status = ResourcePackageArchiveStatus::Success;
+	result.filesystemPath = destinationPath;
+	return result;
 }
 
 ResourcePackageArchiveResult prepareCommonPackageArchive(
@@ -960,6 +1600,8 @@ ResourcePackageArchiveResult prepareCommonPackageArchive(
 	return preparePackageArchive(
 		expectedPackage.artifactSize,
 		expectedPackage.crc32Hex,
+		{},
+		{},
 		nullptr,
 		&expectedPackage,
 		PackageArchiveKind::Common,
@@ -1007,6 +1649,8 @@ ResourcePackageArchiveResult prepareDesktopProgramPackageArchive(
 	return preparePackageArchive(
 		expectedPackage.artifactSize,
 		expectedPackage.crc32Hex,
+		{},
+		{},
 		nullptr,
 		nullptr,
 		PackageArchiveKind::DesktopProgram,
