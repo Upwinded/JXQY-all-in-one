@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import configparser
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -86,16 +88,38 @@ APPLE_ONLY_REFERENCE_NAMES = (
 )
 
 
+def git_ignored_paths(root: Path, relative_paths: list[str]) -> set[str]:
+    if not relative_paths:
+        return set()
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-z", "--stdin"],
+            input=("\0".join(relative_paths) + "\0").encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return set()
+    if result.returncode not in {0, 1}:
+        return set()
+    return {
+        path.decode("utf-8")
+        for path in result.stdout.split(b"\0")
+        if path
+    }
+
+
 def production_sources(root: Path) -> list[str]:
-    result: list[str] = []
+    candidates: list[str] = []
     for path in (root / "src").rglob("*"):
         if not path.is_file() or path.suffix.lower() not in SOURCE_SUFFIXES:
             continue
         relative = path.relative_to(root)
         if len(relative.parts) >= 2 and relative.parts[1] in {"tests", "automation"}:
             continue
-        result.append(relative.as_posix())
-    return sorted(result)
+        candidates.append(relative.as_posix())
+    ignored = git_ignored_paths(root, candidates)
+    return sorted(path for path in candidates if path not in ignored)
 
 
 def normalize_visual_studio_path(value: str) -> str:
@@ -462,14 +486,9 @@ def check_engine_version_contract(root: Path, errors: list[str]) -> None:
     android_gradle_text = (root / "android/app/build.gradle").read_text(
         encoding="utf-8"
     )
-    android_version_match = re.search(
-        r'^def appVersion = "([^"]+)"$',
-        android_gradle_text,
-        re.MULTILINE,
-    )
     if (
-        android_version_match is None
-        or android_version_match.group(1) != engine_version
+        'file("../../cmake/JxqyEngineVersion.inc")' not in android_gradle_text
+        or "def appVersion = appVersionMatch.group(1)" not in android_gradle_text
     ):
         errors.append("Android appVersion does not match the shared engine version")
     if "versionCode appVersionCode" not in android_gradle_text or \
@@ -481,11 +500,23 @@ def check_engine_version_contract(root: Path, errors: list[str]) -> None:
 
     private_build_root = root / "private-build"
     if private_build_root.is_dir():
-        application_catalog_text = (
-            private_build_root / "application/catalog.ini"
-        ).read_text(encoding="utf-8")
+        application_catalog_path = private_build_root / "application/catalog.ini"
+        application_catalog_text = application_catalog_path.read_text(encoding="utf-8")
         if "SchemaVersion=1" not in application_catalog_text:
             errors.append("application catalog does not use the current schema 1")
+        application_catalog = configparser.ConfigParser(interpolation=None)
+        application_catalog.read(application_catalog_path, encoding="utf-8")
+        program_targets = {
+            target.strip()
+            for target in application_catalog.get(
+                "Catalog", "ProgramTargets", fallback=""
+            ).split(",")
+            if target.strip()
+        }
+        if "ios" not in program_targets or not application_catalog.has_section(
+            "Program.ios"
+        ):
+            errors.append("application catalog does not publish the iOS program target")
     android_manifest_text = (
         root / "android/app/src/main/AndroidManifest.xml"
     ).read_text(encoding="utf-8")
@@ -1005,7 +1036,7 @@ def main() -> int:
             '"linux": "linux"',
             '"windows": "x86"',
             '"linux": "x86_64"',
-            'return f"jxqy-program-{platform}-{architecture}-{version}.zip"',
+            'return f"jxqy-all-in-one-{platform}-{architecture}-{version}.zip"',
         ):
             if expected not in desktop_packaging:
                 errors.append(

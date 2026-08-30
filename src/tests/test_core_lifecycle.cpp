@@ -659,11 +659,16 @@ bool runMemoGenerationCompatibilityTests()
 		ok;
 	gameManager.memo.memo = { "preserved memo" };
 	ok = check(
-		!gameManager.memo.load(true) &&
+		!gameManager.memo.load(false) &&
 			gameManager.memo.memo.size() == 1 &&
 			gameManager.memo.memo.front() ==
 				"preserved memo",
-		"invalid canonical memo fails without clearing the live memo") &&
+		"strict invalid canonical memo load fails without clearing the live memo") &&
+		ok;
+	ok = check(
+		gameManager.memo.load(true) &&
+			gameManager.memo.memo.empty(),
+		"compatible invalid canonical memo loads an empty optional memo") &&
 		ok;
 
 	ok = check(

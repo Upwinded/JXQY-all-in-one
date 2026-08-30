@@ -102,6 +102,11 @@ bool Memo::load(bool allowMissing)
 		GameLog::write(
 			"Memo: invalid memo alias in %s\n",
 			currentPath.c_str());
+		if (allowMissing)
+		{
+			memo.clear();
+			return true;
+		}
 		return false;
 	}
 	if (canonical.exists)

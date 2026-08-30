@@ -41,6 +41,7 @@ private:
 	{
 		std::string title;
 		std::string version;
+		std::string releaseNotes;
 		std::string targetDirectoryName;
 		bool replacing = false;
 		OnlineUpdate::ResourceDownloadPlan::ArtifactKind artifactKind =
@@ -129,13 +130,14 @@ private:
 	void pollOnlineCatalogCheck();
 	void finishOnlineCatalogCheck(
 		const GameLoading::ExclusiveLoadingCompletion& completion);
+	void presentPendingProgramUpdateDialog();
 	void refreshCheckUpdatesButton();
 	void refreshProgramActionButton();
 	void activateCheckUpdatesButton();
 	void activateProgramActionButton();
 	void refreshOnlineActionButton();
 	void refreshResourceManagementButtons();
-	void beginResourceDownloadConfirmation();
+	bool beginResourceDownloadConfirmation(bool promptedByEntry = false);
 	void beginProgramDownloadConfirmation();
 	void beginResourceRemovalConfirmation();
 	void beginSaveManagement();
@@ -146,7 +148,8 @@ private:
 	bool buildResourceInstallConfirmation(
 		int selectedIndex,
 		ResourceInstallConfirmation& confirmation,
-		std::string& errorText) const;
+		std::string& errorText,
+		bool forceReinstallIfCurrent = true) const;
 	void startConfirmedResourceDownload();
 	void startPreparedProgramUpdate();
 	void pollResourceInstall();
@@ -160,6 +163,7 @@ private:
 	bool navigateResourceSelection(UIFocusDirection direction);
 	void moveSelection(int offset);
 	void confirmSelection();
+	void enterSelectedResource(int selectedIndex);
 	void hideSemanticFocus();
 	bool restoreSemanticFocus();
 	void updateFocusPresentation();
@@ -382,6 +386,7 @@ private:
 	std::shared_ptr<CatalogCheckWorkerResult> catalogCheckWorkerResult;
 	CatalogCheckState catalogCheckState = CatalogCheckState::NotChecked;
 	std::string catalogStatusText;
+	bool programUpdateDialogPending = false;
 	ResourceInstallDialogState resourceInstallDialogState =
 		ResourceInstallDialogState::Hidden;
 	ResourceInstallOperation resourceInstallOperation =
@@ -401,6 +406,7 @@ private:
 	int resourceInstallConfirmationPage = 0;
 	bool pendingDownloadUsesMeteredNetwork = false;
 	bool pendingMeteredDownloadConfirmed = false;
+	bool resourceUpdatePromptedByEntry = false;
 	enum class ExternalResourcePresentationState
 	{
 		Disabled,

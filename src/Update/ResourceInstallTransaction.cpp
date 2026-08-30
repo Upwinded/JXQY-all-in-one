@@ -458,7 +458,6 @@ OnlineUpdate::ResourceInstallTransactionResult readRecord(
 	}
 	std::set<std::string> gameIds;
 	std::set<std::string> targetNames;
-	bool requestedTargetFound = false;
 	result.targets.reserve(static_cast<std::size_t>(packageCount));
 	const std::filesystem::path workspacePath =
 		OnlineUpdate::resourceUpdateWorkspacePath(collectionRoot);
@@ -492,15 +491,7 @@ OnlineUpdate::ResourceInstallTransactionResult readRecord(
 			result.failedGameId = target.gameId;
 			return result;
 		}
-		requestedTargetFound = requestedTargetFound ||
-			foldedGameId == foldAscii(result.requestedGameId);
 		result.targets.push_back(std::move(target));
-	}
-	if (!requestedTargetFound)
-	{
-		result.status =
-			OnlineUpdate::ResourceInstallTransactionStatus::RecordInvalid;
-		return result;
 	}
 	result.status = OnlineUpdate::ResourceInstallTransactionStatus::Success;
 	return result;
@@ -758,7 +749,6 @@ ResourceInstallTransactionResult stageResourceInstallTransaction(
 
 	std::set<std::string> gameIds;
 	std::set<std::string> targetNames;
-	bool requestedTargetFound = false;
 	for (std::size_t index = 0; index < result.targets.size(); index++)
 	{
 		ResourceInstallTarget& target = result.targets[index];
@@ -779,8 +769,6 @@ ResourceInstallTransactionResult stageResourceInstallTransaction(
 			result.filesystemPath = expectedPreparedPath;
 			return result;
 		}
-		requestedTargetFound = requestedTargetFound ||
-			foldedGameId == foldAscii(requestedGameId);
 		const std::filesystem::path livePath =
 			collectionRoot / std::filesystem::u8path(target.targetDirectoryName);
 		target.hadExistingTarget = pathEntryExists(livePath, pathAccessible);
@@ -791,12 +779,6 @@ ResourceInstallTransactionResult stageResourceInstallTransaction(
 			result.filesystemPath = livePath;
 			return result;
 		}
-	}
-	if (!requestedTargetFound)
-	{
-		result.status = ResourceInstallTransactionStatus::InvalidInput;
-		result.failedGameId = requestedGameId;
-		return result;
 	}
 	result.failedGameId.clear();
 	if (!writeRecord(

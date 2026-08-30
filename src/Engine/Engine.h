@@ -42,6 +42,7 @@ private:
 	std::atomic<bool> applicationQuitRequested = false;
 	std::atomic<bool> applicationBackgrounded = false;
 	std::atomic<bool> applicationMediaPaused = false;
+	bool engineBaseActive = false;
 	_channel applicationPausedBGMChannel = nullptr;
 	_channel applicationPausedTalkChannel = nullptr;
 public:

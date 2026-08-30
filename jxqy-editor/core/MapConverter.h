@@ -20,7 +20,7 @@ public:
     ~MapConverter();
 
     bool convertFile(const std::string& inputFileName, const std::string& outputFileName, bool toUtf8 = true,
-        bool clearMapPath = false, bool forceSourceEncoding = false);
+        bool forceSourceEncoding = false);
     bool convertFileInPlace(const std::string& fileName, bool toUtf8 = true);
 
     // Production migration contract: convert Ver2.0 to Ver3.0 while keeping
@@ -36,7 +36,7 @@ public:
     static std::string checkConversionWarnings(const std::string& fileName, bool toUtf8);
 
 private:
-    bool convertMapData(std::vector<uint8_t>& data, bool toUtf8, bool clearMapPath, bool forceSourceEncoding);
+    bool convertMapData(std::vector<uint8_t>& data, bool toUtf8, bool forceSourceEncoding);
     std::string convertNullTerminatedString(const std::string& str, bool toUtf8, bool forceSourceEncoding);
 
     std::string lastMessage;

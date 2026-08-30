@@ -231,6 +231,9 @@ private:
     bool processMapFile(const QString& sourcePath, const QString& outputPath, const QString& relativePath,
         const AssetMigrationOptions& options, AssetMigrationReport& report);
     bool processRawCopyFile(const QString& sourcePath, const QString& outputPath, AssetMigrationReport& report);
+    bool processRuntimeJpegFile(const QString& sourcePath,
+        const QString& outputPath, const QString& relativePath,
+        AssetMigrationReport& report);
     bool processImageFile(const QString& sourcePath, const QString& outputPath,
         const QString& relativePath, LegacyImageCategory category,
         const AssetMigrationOptions& options, AssetMigrationReport& report);

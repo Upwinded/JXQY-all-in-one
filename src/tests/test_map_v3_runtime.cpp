@@ -14,6 +14,9 @@
 
 namespace
 {
+constexpr char MixedCaseMpcPath[] = "MPC/Map/Shared-Scene/";
+constexpr char MixedCaseMpcName[] = "Shared-Tile.MPC";
+
 std::vector<uint8_t> buildVersion2Map(bool utf8Strings)
 {
 	constexpr size_t headerLength = 192;
@@ -111,13 +114,21 @@ bool check(bool condition, const char* message)
 bool runMapV3RuntimeTests()
 {
 	std::vector<uint8_t> buffer = MapV3ContractFixture::build();
+	std::memcpy(
+		buffer.data() + MapV3ContractFixture::BaseHeaderLength,
+		MixedCaseMpcPath,
+		sizeof(MixedCaseMpcPath) - 1);
+	std::memcpy(
+		buffer.data() + MapV3ContractFixture::HeaderLength,
+		MixedCaseMpcName,
+		sizeof(MixedCaseMpcName) - 1);
 	const size_t duplicateMpcOffset =
 		static_cast<size_t>(MapV3ContractFixture::HeaderLength) +
 		static_cast<size_t>(MapV3ContractFixture::InfoLength);
 	std::memcpy(
 		buffer.data() + duplicateMpcOffset,
-		MapV3ContractFixture::MpcName,
-		sizeof(MapV3ContractFixture::MpcName) - 1);
+		MixedCaseMpcName,
+		sizeof(MixedCaseMpcName) - 1);
 
 	auto resourceRoot = makeUniqueTestDirectory("jxqy_map_v3_runtime_test");
 	std::error_code errorCode;
@@ -161,14 +172,14 @@ bool runMapV3RuntimeTests()
 		ok = check(map.data->head.width == 1 && map.data->head.height == 1,
 			"runtime preserves MAP File Ver3.0 dimensions") && ok;
 		ok = check(map.data->mpcPath == MapV3ContractFixture::MpcPath,
-			"runtime reads the MAP File Ver3.0 extended MPC path") && ok;
+			"runtime canonicalizes ASCII case in the MAP File Ver3.0 MPC path") && ok;
 		ok = check(mpc.name != nullptr &&
 			std::string(mpc.name.get()) == MapV3ContractFixture::MpcName &&
 			mpc.index == MapV3ContractFixture::MpcIndex &&
 			mpc.dynamic == MapV3ContractFixture::MpcDynamic &&
 			mpc.obstacle == MapV3ContractFixture::MpcObstacle &&
 			mpc.nil == MapV3ContractFixture::MpcNil,
-			"runtime reads MAP File Ver3.0 MPC metadata") && ok;
+			"runtime canonicalizes ASCII case and reads MAP File Ver3.0 MPC metadata") && ok;
 		ok = check(tile.layer[0].frame == MapV3ContractFixture::LayerFrames[0] &&
 			tile.layer[0].mpc == MapV3ContractFixture::LayerMpcs[0] &&
 			tile.layer[1].frame == MapV3ContractFixture::LayerFrames[1] &&

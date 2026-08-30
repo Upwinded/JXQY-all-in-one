@@ -251,11 +251,35 @@ def test_magic_change_attributes_special_kind_is_supported() -> None:
         )
 
 
+def test_magic_critical_bonus_fields_are_supported() -> None:
+    with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        write_text(
+            root / "pack" / "ini" / "magic" / "critical_bonus.ini",
+            "[Level1]\nCritChanceAddValue=30\nCritDamageAddPercent=50\n",
+        )
+
+        report = build_report(
+            Namespace(
+                paths=[str(root)],
+                repo_root=str(root),
+                max_examples=5,
+                top=10,
+            )
+        )
+        assert_equal(
+            report["categories"]["magic"]["unknownFields"],
+            [],
+            "critical bonus magic fields",
+        )
+
+
 def main() -> int:
     test_ini_npc_classification_boundaries()
     test_player_snapshot_report_is_separate_from_npc()
     test_object_animation_fields_are_supported()
     test_magic_change_attributes_special_kind_is_supported()
+    test_magic_critical_bonus_fields_are_supported()
     return 0
 
 

@@ -906,6 +906,71 @@ bool runStatusDurationInputSafety()
 	return ok;
 }
 
+bool runLegacyNpcObjectDefaults()
+{
+	INIReader missingRadiusIni;
+	missingRadiusIni.SetInteger("NPC000", "Kind", nkBattle);
+	NPC missingRadiusNpc;
+	missingRadiusNpc.initFromIni(&missingRadiusIni, "NPC000");
+	bool ok = check(
+		missingRadiusNpc.visionRadius == 9
+			&& missingRadiusNpc.dialogRadius == 1
+			&& missingRadiusNpc.attackRadius == 1
+			&& missingRadiusNpc.walkSpeed == 1
+			&& missingRadiusNpc.lifeLowPercent == 20
+			&& missingRadiusNpc.hurtPlayerRadius == 1
+			&& missingRadiusNpc.timerScriptInterval == DEFAULT_NPC_OBJ_TIME_SCRIPT_INTERVAL,
+		"missing NPC fields use the legacy trilogy-compatible defaults");
+
+	INIReader zeroRadiusIni;
+	zeroRadiusIni.SetInteger("NPC000", "Kind", nkBattle);
+	zeroRadiusIni.SetInteger("NPC000", "VisionRadius", 0);
+	zeroRadiusIni.SetInteger("NPC000", "DialogRadius", 0);
+	zeroRadiusIni.SetInteger("NPC000", "AttackRadius", 0);
+	zeroRadiusIni.SetInteger("NPC000", "WalkSpeed", 0);
+	NPC zeroRadiusNpc;
+	zeroRadiusNpc.initFromIni(&zeroRadiusIni, "NPC000");
+	ok = check(
+		zeroRadiusNpc.visionRadius == 9
+			&& zeroRadiusNpc.dialogRadius == 1
+			&& zeroRadiusNpc.attackRadius == 1
+			&& zeroRadiusNpc.walkSpeed == 1,
+		"zero NPC fields retain the version-validated property sentinel semantics") && ok;
+
+	INIReader negativeRadiusIni;
+	negativeRadiusIni.SetInteger("NPC000", "VisionRadius", -9);
+	negativeRadiusIni.SetInteger("NPC000", "DialogRadius", -2);
+	negativeRadiusIni.SetInteger("NPC000", "AttackRadius", -1);
+	negativeRadiusIni.SetInteger("NPC000", "WalkSpeed", -3);
+	NPC negativeRadiusNpc;
+	negativeRadiusNpc.initFromIni(&negativeRadiusIni, "NPC000");
+	ok = check(
+		negativeRadiusNpc.visionRadius == -9
+			&& negativeRadiusNpc.dialogRadius == -2
+			&& negativeRadiusNpc.attackRadius == -1
+			&& negativeRadiusNpc.walkSpeed == 1,
+		"NPC radius getters preserve nonzero values while WalkSpeed clamps values below one") && ok;
+
+	INIReader missingObjectFieldsIni;
+	Object missingObjectFields;
+	missingObjectFields.initFromIni(&missingObjectFieldsIni, "OBJ000");
+	ok = check(
+		missingObjectFields.kind == okOrnament
+			&& missingObjectFields.direction == 0
+			&& missingObjectFields.damage == 0
+			&& missingObjectFields.timerScriptInterval == DEFAULT_NPC_OBJ_TIME_SCRIPT_INTERVAL,
+		"missing Object Kind uses the legacy map-entry default") && ok;
+
+	INIReader explicitBodyIni;
+	explicitBodyIni.SetInteger("OBJ000", "Kind", okBody);
+	Object explicitBody;
+	explicitBody.initFromIni(&explicitBodyIni, "OBJ000");
+	ok = check(
+		explicitBody.kind == okBody,
+		"explicit Object Kind remains unchanged") && ok;
+	return ok;
+}
+
 bool runZeroLifeStoryNpcRoundTrip(GameManager& gameManager)
 {
 	resetRuntime(gameManager);
@@ -1165,6 +1230,7 @@ bool runNpcRuntimePersistenceTests()
 		"runtime NPC population validation rejects combined NPC and partner overflow");
 	ok = runNpcCollectionLoadSafety(gameManager, root) && ok;
 	ok = runStatusDurationInputSafety() && ok;
+	ok = runLegacyNpcObjectDefaults() && ok;
 	ok = runPlayerChangePersistenceAndPartnerContinuity(
 		gameManager,
 		root) && ok;

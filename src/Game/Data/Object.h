@@ -149,7 +149,7 @@ public:
 	std::string timerScriptFile = "";
 	std::string reviveNpcIni = "";
 	std::string wavFile = "";
-	int kind = okBody;
+	int kind = okOrnament;
 	int objectType = 0;
 	int canInteractDirectly = 0;
 	int scriptFileJustTouch = 0;

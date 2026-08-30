@@ -7136,7 +7136,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	//int mapY = 0; //position.y
 	strollIntent = ini->GetInteger(section, "Action", nsiNone);
 	walkSpeed = ini->GetInteger(section, "WalkSpeed", 1);
-	if (walkSpeed == 0)
+	if (walkSpeed < 1)
 	{
 		walkSpeed = 1;
 	}
@@ -7160,7 +7160,11 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	stopFindingTarget = ini->GetInteger(section, "StopFindingTarget", 0);
 	pathFinder = ini->GetInteger(section, "PathFinder", pfSingle);
 	isAIDisabled = readBooleanAlias(ini, section, "IsAIDisabled", "AIDisabled", false);
-	dialogRadius = ini->GetInteger(section, "DialogRadius", 1);
+	dialogRadius = ini->GetInteger(section, "DialogRadius", 0);
+	if (dialogRadius == 0)
+	{
+		dialogRadius = 1;
+	}
 	scriptFile = ini->Get(section, "ScriptFile", "");
 	scriptFileRight = ini->Get(section, "ScriptFileRight", "");
 	timerScriptFile = ini->Get(section, "TimerScriptFile", "");
@@ -7308,7 +7312,15 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	if (displayLifePercent < 0.0f) displayLifePercent = 0.0f;
 	lum = ini->GetInteger(section, "Lum", nlNone);
 	visionRadius = ini->GetInteger(section, "VisionRadius", 0);
+	if (visionRadius == 0)
+	{
+		visionRadius = 9;
+	}
 	attackRadius = ini->GetInteger(section, "AttackRadius", 0);
+	if (attackRadius == 0)
+	{
+		attackRadius = 1;
+	}
 	bodyIni = ini->Get(section, "BodyIni", "");
 	flyIni = ini->Get(section, "FlyIni", "");
 	flyIni2 = ini->Get(section, "FlyIni2", "");

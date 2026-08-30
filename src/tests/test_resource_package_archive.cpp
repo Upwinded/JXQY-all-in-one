@@ -577,6 +577,7 @@ void testDesktopProgramPackage(const TemporaryTree& tree)
 			{ "jxqy-all-in-one.exe", "root-launcher" },
 			{ "bin/win32/jxqy-all-in-one.exe", "program" },
 			{ "bin/win32/SDL3.dll", "library" },
+			{ "bin/updater/win32/jxqy-program-updater.exe", "updater" },
 			{ "bin/win64/other.exe", "other-platform" },
 			{ "assets/engine/font/font.ttf", "font-data" },
 			{ "assets/common/version.ini", "[Common]\nVersion=1.1.0\n" },
@@ -591,19 +592,52 @@ void testDesktopProgramPackage(const TemporaryTree& tree)
 			destination / "bin/win32/jxqy-all-in-one.exe") &&
 		std::filesystem::is_regular_file(
 			destination / "bin/win32/SDL3.dll") &&
+		std::filesystem::is_regular_file(destination /
+			"bin/updater/win32/jxqy-program-updater.exe") &&
 		std::filesystem::is_regular_file(
 			destination / "assets/engine/font/font.ttf") &&
 		std::filesystem::is_regular_file(
 			destination / "assets/common/version.ini") &&
 		!std::filesystem::exists(destination / "jxqy-all-in-one.exe") &&
 		!std::filesystem::exists(destination / "bin/win64"),
-		"complete desktop package stages mutable binaries, engine, and common only");
+		"complete desktop package stages the updater, mutable binaries, engine, and common only");
+
+	const std::filesystem::path linuxArchive =
+		nextPath(tree, "linux-desktop-program", ".zip");
+	expect(writeZip(linuxArchive,
+		{
+			{ "jxqy-all-in-one", "root-launcher" },
+			{ "bin/linux/jxqy-all-in-one", "linux-program" },
+			{ "bin/linux/libSDL3.so.0", "linux-library" },
+			{ "bin/updater/linux/jxqy-program-updater", "linux-updater" },
+			{ "bin/win32/jxqy-all-in-one.exe", "other-platform" },
+			{ "assets/engine/font/font.ttf", "font-data" },
+			{ "assets/common/version.ini", "[Common]\nVersion=1.1.0\n" }
+		}), "Linux desktop program ZIP is created");
+	const std::filesystem::path linuxDestination =
+		nextPath(tree, "linux-desktop-program-staging");
+	const auto linuxResult =
+		OnlineUpdate::prepareDesktopProgramPackageArchive(
+			expectedDesktopProgramPackage(linuxArchive, "linux"),
+			linuxArchive,
+			linuxDestination);
+	expect(linuxResult.succeeded() &&
+		std::filesystem::is_regular_file(
+			linuxDestination / "bin/linux/jxqy-all-in-one") &&
+		std::filesystem::is_regular_file(
+			linuxDestination / "bin/linux/libSDL3.so.0") &&
+		std::filesystem::is_regular_file(linuxDestination /
+			"bin/updater/linux/jxqy-program-updater") &&
+		!std::filesystem::exists(linuxDestination / "jxqy-all-in-one") &&
+		!std::filesystem::exists(linuxDestination / "bin/win32"),
+		"Linux package stages its program and updater without other platforms");
 
 	const std::filesystem::path missingArchive =
 		nextPath(tree, "desktop-program-missing", ".zip");
 	expect(writeZip(missingArchive,
 		{
 			{ "bin/win32/SDL3.dll", "library" },
+			{ "bin/updater/win32/jxqy-program-updater.exe", "updater" },
 			{ "assets/engine/font/font.ttf", "font-data" },
 			{ "assets/common/version.ini", "[Common]\nVersion=1.1.0\n" }
 		}),
@@ -619,11 +653,32 @@ void testDesktopProgramPackage(const TemporaryTree& tree)
 		!std::filesystem::exists(missingDestination),
 		"desktop program package must contain the target executable");
 
+	const std::filesystem::path missingUpdaterArchive =
+		nextPath(tree, "desktop-program-missing-updater", ".zip");
+	expect(writeZip(missingUpdaterArchive,
+		{
+			{ "bin/win32/jxqy-all-in-one.exe", "program" },
+			{ "assets/engine/font/font.ttf", "font-data" },
+			{ "assets/common/version.ini", "[Common]\nVersion=1.1.0\n" }
+		}), "missing-updater program ZIP is created");
+	const std::filesystem::path missingUpdaterDestination =
+		nextPath(tree, "desktop-program-missing-updater-staging");
+	const auto missingUpdater =
+		OnlineUpdate::prepareDesktopProgramPackageArchive(
+			expectedDesktopProgramPackage(missingUpdaterArchive),
+			missingUpdaterArchive,
+			missingUpdaterDestination);
+	expect(missingUpdater.status == OnlineUpdate::
+			ResourcePackageArchiveStatus::MissingProgramUpdater &&
+		!std::filesystem::exists(missingUpdaterDestination),
+		"desktop program package must contain the independent updater");
+
 	const std::filesystem::path missingEngineArchive =
 		nextPath(tree, "desktop-program-missing-engine", ".zip");
 	expect(writeZip(missingEngineArchive,
 		{
 			{ "bin/win32/jxqy-all-in-one.exe", "program" },
+			{ "bin/updater/win32/jxqy-program-updater.exe", "updater" },
 			{ "assets/common/version.ini", "[Common]\nVersion=1.1.0\n" }
 		}), "missing-engine program ZIP is created");
 	const std::filesystem::path missingEngineDestination =
@@ -643,6 +698,7 @@ void testDesktopProgramPackage(const TemporaryTree& tree)
 	expect(writeZip(missingCommonArchive,
 		{
 			{ "bin/win32/jxqy-all-in-one.exe", "program" },
+			{ "bin/updater/win32/jxqy-program-updater.exe", "updater" },
 			{ "assets/engine/font/font.ttf", "font-data" }
 		}), "missing-common program ZIP is created");
 	const std::filesystem::path missingCommonDestination =
@@ -662,6 +718,7 @@ void testDesktopProgramPackage(const TemporaryTree& tree)
 	expect(writeZip(manifestArchive,
 		{
 			{ "bin/win32/jxqy-all-in-one.exe", "program" },
+			{ "bin/updater/win32/jxqy-program-updater.exe", "updater" },
 			{ "assets/engine/font/font.ttf", "font-data" },
 			{ "assets/common/version.ini", "[Common]\nVersion=1.1.0\n" },
 			{ "game_profile.ini", validManifest() }

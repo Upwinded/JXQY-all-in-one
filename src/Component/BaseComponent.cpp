@@ -41,14 +41,22 @@ _shared_imp BaseComponent::loadRes(const std::string& impName)
 	{
 		return nullptr;
 	}
-	auto iter = res.find(impName);
+	std::string cacheKey = File::getAssetsName(impName);
+	if (cacheKey.empty())
+	{
+		cacheKey = File::getActiveResourceRoot() + "\n" + impName;
+	}
+	auto iter = res.find(cacheKey);
 	if (iter != res.end())
 	{
 		return iter->second;
 	}
 
 	auto imp = IMP::createIMPImage(impName);
-	res[impName] = imp;
+	if (imp != nullptr)
+	{
+		res[cacheKey] = imp;
+	}
 	return imp;
 }
 

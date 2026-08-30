@@ -527,7 +527,7 @@ bool testMapConverterWritesVersion3()
     MapConverter converter;
     if (!check(converter.convertFile(inputPath.toUtf8().toStdString(),
                                      outputPath.toUtf8().toStdString(),
-                                     true, false, false),
+                                     true, false),
                "convert map fixture to MAP 3.0"))
     {
         return false;
@@ -6769,6 +6769,92 @@ bool testMigrationAddsUiWindowDefaults()
     return ok;
 }
 
+bool testMigrationNormalizesRuntimeEntryJpegs()
+{
+    QTemporaryDir sourceDir;
+    QTemporaryDir outputDir;
+    if (!check(sourceDir.isValid() && outputDir.isValid(),
+            "create runtime-entry JPEG migration temp dirs"))
+    {
+        return false;
+    }
+
+    QDir source(sourceDir.path());
+    bool ok = check(
+        source.mkpath("asf/ui/title") &&
+            source.mkpath("ini/ui/title") &&
+            source.mkpath("img"),
+        "create runtime-entry JPEG migration layout");
+    QImage titleImage(640, 480, QImage::Format_RGB32);
+    titleImage.fill(qRgb(18, 52, 86));
+    QImage coverImage(96, 72, QImage::Format_RGB32);
+    coverImage.fill(qRgb(90, 45, 15));
+    QImage storyImage(20, 12, QImage::Format_RGB32);
+    storyImage.fill(qRgb(12, 90, 45));
+    ok = check(
+        titleImage.save(source.filePath("asf/ui/title/title.jpg"), "JPG") &&
+            coverImage.save(source.filePath("cover.jpg"), "JPG") &&
+            storyImage.save(source.filePath("img/story.jpg"), "JPG") &&
+            writeUtf8TextFile(
+                source.filePath("ini/ui/title/window.ini"),
+                "[Init]\nBitmap=\\asf\\ui\\title\\title.jpg\n") &&
+            writeUtf8TextFile(
+                source.filePath("game_profile.ini"),
+                "[Game]\nId=JPEG_TITLE_FIXTURE\nType=1\n\n"
+                "[Release]\nCover=cover.jpg\n"),
+        "write runtime-entry JPEG migration fixtures") && ok;
+    if (!ok)
+        return false;
+
+    AssetMigrationOptions options;
+    options.convertScript = false;
+    options.writeModProfile = false;
+    options.sourceEncoding = QStringLiteral("utf8");
+    AssetMigrationReport report;
+    JxAssetMigrator migrator;
+    const MigrationResult result = migrator.migrate(
+        sourceDir.path(), outputDir.path(), options, report);
+    QDir output(outputDir.path());
+    const QString titleWindow = readUtf8TextFile(
+        output.filePath("ini/ui/title/window.ini"));
+    const QString profile = readUtf8TextFile(
+        output.filePath("game_profile.ini"));
+    const QImage convertedTitle(output.filePath("asf/ui/title/title.png"));
+    const QImage convertedCover(output.filePath("cover.png"));
+    QFile sourceStory(source.filePath("img/story.jpg"));
+    QFile outputStory(output.filePath("img/story.jpg"));
+    const bool storyOpened = sourceStory.open(QIODevice::ReadOnly) &&
+        outputStory.open(QIODevice::ReadOnly);
+
+    ok = check(result == MigrationResult::Success,
+        "runtime-entry JPEG migration succeeds") && ok;
+    ok = check(
+        !convertedTitle.isNull() && convertedTitle.size() == QSize(640, 480) &&
+            !convertedCover.isNull() && convertedCover.size() == QSize(96, 72) &&
+            !QFileInfo::exists(output.filePath("asf/ui/title/title.jpg")) &&
+            !QFileInfo::exists(output.filePath("cover.jpg")),
+        "title and release-cover JPEGs are published as PNG files") && ok;
+    ok = check(
+        titleWindow.contains(
+            QStringLiteral("Bitmap=\\asf\\ui\\title\\title.png")) &&
+            profile.contains(QStringLiteral("Cover=cover.png")),
+        "runtime-entry JPEG references follow the converted PNG files") && ok;
+    ok = check(
+        storyOpened && sourceStory.readAll() == outputStory.readAll(),
+        "ordinary story JPEGs remain byte-preserved") && ok;
+    ok = check(
+        std::count_if(report.fileOutcomes.cbegin(),
+            report.fileOutcomes.cend(),
+            [](const AssetMigrationFileOutcome& outcome)
+            {
+                return outcome.action == AssetMigrationFileAction::Convert &&
+                    outcome.reason ==
+                        QStringLiteral("runtime-entry-jpeg-normalized");
+            }) == 2,
+        "migration report identifies both normalized runtime-entry JPEGs") && ok;
+    return ok;
+}
+
 bool testMigrationNormalizesObjectAnimationResource()
 {
     QTemporaryDir sourceDir;
@@ -9246,6 +9332,7 @@ int main(int argc, char* argv[])
     ok = testMigrationPublishFaultMatrix() && ok;
     ok = testMigrationRejectsInheritedProfileWithoutDependency() && ok;
     ok = testMigrationAddsUiWindowDefaults() && ok;
+    ok = testMigrationNormalizesRuntimeEntryJpegs() && ok;
     ok = testMigrationNormalizesObjectAnimationResource() && ok;
     ok = testMigrationLowercasesResourceNamesAndReferences() && ok;
     ok = testMigrationHandlesKnownMoonShadowMoveScreenAnomalies() && ok;

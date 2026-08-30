@@ -470,7 +470,7 @@ void Object::initFromIni(INIReader * ini, const std::string & section)
 	timerScriptFile = ini->Get(section, "TimerScriptFile", "");
 	reviveNpcIni = ini->Get(section, "ReviveNpcIni", "");
 	wavFile = ini->Get(section, "WavFile", "");
-	int loadedKind = ini->GetInteger(section, "Kind", okBody);
+	int loadedKind = ini->GetInteger(section, "Kind", okOrnament);
 	objectType = ini->GetInteger(section, "Type", 0);
 	direction = ini->GetInteger(section, "Dir", 0);
 	position.x = ini->GetInteger(section, "MapX", 0);

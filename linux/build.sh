@@ -65,8 +65,9 @@ if [[ "${build_tests}" == true ]]; then
             --parallel "${build_jobs}"
     )
 else
-    cmake --build "${build_directory}" \
-        --target jxqy-all-in-one jxqy-program-updater \
+	rm -f "${repository_root}/bin/linux/jxqy-all-in-one-debug"
+	cmake --build "${build_directory}" \
+		--target jxqy-all-in-one jxqy-program-updater \
         --parallel "${build_jobs}"
     strip --strip-unneeded \
         "${repository_root}/bin/linux/jxqy-all-in-one" \

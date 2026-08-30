@@ -750,6 +750,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	PackageArchiveKind archiveKind,
 	const std::string& desktopProgramBinPrefix,
 	const std::string& requiredProgramExecutable,
+	const std::string& requiredProgramUpdaterPath,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits)
@@ -853,6 +854,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	std::size_t manifestCount = 0;
 	std::size_t commonVersionCount = 0;
 	bool desktopProgramExecutableFound = false;
+	bool desktopProgramUpdaterFound = false;
 	bool desktopEngineBootstrapFound = false;
 	bool desktopCommonVersionFound = false;
 	const std::string desktopProgramExecutablePath =
@@ -977,6 +979,9 @@ static ResourcePackageArchiveResult preparePackageArchive(
 				desktopProgramExecutableFound =
 					desktopProgramExecutableFound ||
 					archivePathText == desktopProgramExecutablePath;
+				desktopProgramUpdaterFound =
+					desktopProgramUpdaterFound ||
+					archivePathText == requiredProgramUpdaterPath;
 				desktopEngineBootstrapFound =
 					desktopEngineBootstrapFound ||
 					archivePathText == "assets/engine/font/font.ttf";
@@ -1000,7 +1005,8 @@ static ResourcePackageArchiveResult preparePackageArchive(
 						0, CommonPrefix.size(), CommonPrefix) == 0) ||
 				(archivePathText.size() > EnginePrefix.size() &&
 					archivePathText.compare(
-						0, EnginePrefix.size(), EnginePrefix) == 0);
+						0, EnginePrefix.size(), EnginePrefix) == 0) ||
+				archivePathText == requiredProgramUpdaterPath;
 		}
 		entries.push_back({
 			index,
@@ -1030,6 +1036,13 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	{
 		result.status = ResourcePackageArchiveStatus::MissingProgramExecutable;
 		result.archiveEntryPath = desktopProgramExecutablePath;
+		return result;
+	}
+	if (archiveKind == PackageArchiveKind::DesktopProgram &&
+		!desktopProgramUpdaterFound)
+	{
+		result.status = ResourcePackageArchiveStatus::MissingProgramUpdater;
+		result.archiveEntryPath = requiredProgramUpdaterPath;
 		return result;
 	}
 	if (archiveKind == PackageArchiveKind::DesktopProgram &&
@@ -1250,6 +1263,22 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			return cleanupFailure(
 				result, destinationPath, destinationCreated);
 		}
+		const std::filesystem::path updaterPath =
+			destinationPath /
+			std::filesystem::u8path(requiredProgramUpdaterPath);
+		std::error_code updaterError;
+		const std::filesystem::file_status updaterStatus =
+			std::filesystem::symlink_status(updaterPath, updaterError);
+		if (updaterError ||
+			!std::filesystem::is_regular_file(updaterStatus) ||
+			std::filesystem::is_symlink(updaterStatus))
+		{
+			result.status =
+				ResourcePackageArchiveStatus::MissingProgramUpdater;
+			result.filesystemPath = updaterPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
 		const std::filesystem::path engineFontPath =
 			destinationPath / "assets" / "engine" / "font" / "font.ttf";
 		std::error_code engineFontError;
@@ -1298,6 +1327,23 @@ static ResourcePackageArchiveResult preparePackageArchive(
 				result.status =
 					ResourcePackageArchiveStatus::ExtractionFailed;
 				result.filesystemPath = executablePath;
+				return cleanupFailure(
+					result, destinationPath, destinationCreated);
+			}
+			std::filesystem::permissions(
+				updaterPath,
+				std::filesystem::perms::owner_all |
+					std::filesystem::perms::group_read |
+					std::filesystem::perms::group_exec |
+					std::filesystem::perms::others_read |
+					std::filesystem::perms::others_exec,
+				std::filesystem::perm_options::replace,
+				updaterError);
+			if (updaterError)
+			{
+				result.status =
+					ResourcePackageArchiveStatus::ExtractionFailed;
+				result.filesystemPath = updaterPath;
 				return cleanupFailure(
 					result, destinationPath, destinationCreated);
 			}
@@ -1436,6 +1482,7 @@ ResourcePackageArchiveResult prepareResourcePackageArchive(
 		PackageArchiveKind::Resource,
 		{},
 		{},
+		{},
 		archivePath,
 		destinationPath,
 		limits);
@@ -1466,6 +1513,7 @@ ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
 		&expectedPackage,
 		nullptr,
 		PackageArchiveKind::Resource,
+		{},
 		{},
 		{},
 		archivePath,
@@ -1607,6 +1655,7 @@ ResourcePackageArchiveResult prepareCommonPackageArchive(
 		PackageArchiveKind::Common,
 		{},
 		{},
+		{},
 		archivePath,
 		destinationPath,
 		limits);
@@ -1620,15 +1669,18 @@ ResourcePackageArchiveResult prepareDesktopProgramPackageArchive(
 {
 	std::string executableName;
 	std::string binPrefix;
+	std::string updaterPath;
 	if (expectedPackage.target == "windows")
 	{
 		executableName = "jxqy-all-in-one.exe";
 		binPrefix = "bin/win32";
+		updaterPath = "bin/updater/win32/jxqy-program-updater.exe";
 	}
 	else if (expectedPackage.target == "linux")
 	{
 		executableName = "jxqy-all-in-one";
 		binPrefix = "bin/linux";
+		updaterPath = "bin/updater/linux/jxqy-program-updater";
 	}
 	else
 	{
@@ -1656,6 +1708,7 @@ ResourcePackageArchiveResult prepareDesktopProgramPackageArchive(
 		PackageArchiveKind::DesktopProgram,
 		binPrefix,
 		executableName,
+		updaterPath,
 		archivePath,
 		destinationPath,
 		limits);

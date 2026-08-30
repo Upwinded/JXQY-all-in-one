@@ -11692,10 +11692,9 @@ bool ScriptAPI::loadCurrentGame(
 	gameManager->effectManager->freeResource();
 
 	gameManager->varList.load();
-	// Older compatible saves may omit memo data and intentionally load an empty
-	// memo. If either alias exists, Memo::load validates and commits it
-	// atomically; failure must abort so the outer save-load transaction restores
-	// the captured live generation.
+	// Older compatible saves may omit memo data or contain an invalid optional
+	// memo payload. Memo::load keeps those saves usable with an empty memo, while
+	// filesystem inspection failures still abort the outer save-load transaction.
 	if (!gameManager->memo.load(true))
 	{
 		return false;

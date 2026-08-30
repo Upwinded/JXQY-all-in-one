@@ -259,6 +259,7 @@ Game::Game()
 
 Game::~Game()
 {
+	Engine::getInstance()->destroyEngine();
 }
 
 void Game::setAssetsArg(const std::string& arg)

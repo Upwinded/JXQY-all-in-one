@@ -192,6 +192,8 @@ MAGIC_LEVEL_KEYS = {
     "manacost",
     "thewcost",
     "ragecost",
+    "critchanceaddvalue",
+    "critdamageaddpercent",
     "count",
     "movekind",
     "specialkind",

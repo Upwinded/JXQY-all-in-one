@@ -136,7 +136,7 @@ std::string MapConverter::convertNullTerminatedString(const std::string& str, bo
     return Util::gbkToUtf8(str);
 }
 
-bool MapConverter::convertMapData(std::vector<uint8_t>& data, bool toUtf8, bool clearMapPath, bool forceSourceEncoding)
+bool MapConverter::convertMapData(std::vector<uint8_t>& data, bool toUtf8, bool forceSourceEncoding)
 {
     if (!toUtf8)
     {
@@ -150,8 +150,6 @@ bool MapConverter::convertMapData(std::vector<uint8_t>& data, bool toUtf8, bool 
         lastMessage = editor.getLastError();
         return false;
     }
-    if (clearMapPath)
-        editor.setMpcPath("");
     normalizeMapResourceReferences(editor);
 
     std::vector<uint8_t> convertedData = editor.saveToBuffer();
@@ -165,7 +163,7 @@ bool MapConverter::convertMapData(std::vector<uint8_t>& data, bool toUtf8, bool 
 }
 
 bool MapConverter::convertFile(const std::string& inputFileName, const std::string& outputFileName, bool toUtf8,
-    bool clearMapPath, bool forceSourceEncoding)
+    bool forceSourceEncoding)
 {
     std::vector<uint8_t> fileData = Util::readFileToBuffer(inputFileName);
     if (fileData.empty())
@@ -180,7 +178,7 @@ bool MapConverter::convertFile(const std::string& inputFileName, const std::stri
         return false;
     }
 
-    if (!convertMapData(fileData, toUtf8, clearMapPath, forceSourceEncoding))
+    if (!convertMapData(fileData, toUtf8, forceSourceEncoding))
     {
         return false;
     }
@@ -228,7 +226,7 @@ bool MapConverter::migrateFile(const std::string& inputFileName, const std::stri
         }
         normalizeVersion3MapResourceReferences(fileData);
     }
-    else if (!convertMapData(fileData, true, false, forceSourceEncoding))
+    else if (!convertMapData(fileData, true, forceSourceEncoding))
     {
         lastMessage = "Invalid MAP File Ver2.0 structure: " + lastMessage;
         return false;
@@ -254,7 +252,7 @@ bool MapConverter::convertFileInPlace(const std::string& fileName, bool toUtf8)
         lastMessage = "Cannot open file: " + fileName;
         return false;
     }
-    if (!convertMapData(fileData, toUtf8, false, false))
+    if (!convertMapData(fileData, toUtf8, false))
         return false;
     if (!Util::writeFileFromBuffer(fileName, fileData.data(), fileData.size()))
     {

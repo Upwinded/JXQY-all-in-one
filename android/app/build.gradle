@@ -9,7 +9,14 @@ def buildWithCMake = true; //project.hasProperty('BUILD_WITH_CMAKE');
 def artifactName = "jxqy-all-in-one";
 def displayName = "剑侠情缘 All-in-One";
 def applicationIdentifier = "com.upwinded.jxqy_all_in_one";
-def appVersion = "1.0.0"
+def appVersionFile = file("../../cmake/JxqyEngineVersion.inc")
+def appVersionMatch = appVersionFile.getText("UTF-8").trim() =~
+    /^"([0-9]+\.[0-9]+\.[0-9]+)"$/
+if (!appVersionMatch.matches()) {
+    throw new GradleException(
+        'cmake/JxqyEngineVersion.inc must contain one quoted major.minor.patch version')
+}
+def appVersion = appVersionMatch.group(1)
 def appVersionParts = appVersion.tokenize('.').collect {
     Integer.parseInt(it)
 }

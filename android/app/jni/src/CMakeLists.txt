@@ -98,6 +98,9 @@ list( REMOVE_ITEM source_files
 		${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/minilzo/testmini.c
 		${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/onelua.c
 		${CMAKE_CURRENT_SOURCE_DIR}/../../../../ThirdParty/lua/lua.c
+		${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/File/PakFile.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/Game/Data/NPC_old.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/../../../../src/Game/Data/Player_old.cpp
 )
 
 # Tests under src/tests belong to dedicated test targets and must never be

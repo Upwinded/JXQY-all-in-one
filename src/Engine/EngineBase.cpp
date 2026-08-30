@@ -1444,6 +1444,17 @@ _shared_image EngineBase::createImageFromSurface(Surface_t* surface)
 	{
 		return nullptr;
 	}
+	_shared_surface convertedSurface;
+	if (SDL_BYTESPERPIXEL(surface->format) != 4)
+	{
+		convertedSurface = make_shared_surface(
+			SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32));
+		if (convertedSurface == nullptr)
+		{
+			return nullptr;
+		}
+		surface = convertedSurface.get();
+	}
 	SDL_Texture* image = SDL_CreateTextureFromSurface(
 		renderer.load(), surface);
 	if (!isTextureWithinImageBudget(image))

@@ -373,6 +373,13 @@ public:
 		return scene.onInitial();
 	}
 
+	static bool automaticCatalogCheckStarted(
+		const ResourceSelectScene& scene)
+	{
+		return scene.catalogCheckState !=
+			ResourceSelectScene::CatalogCheckState::NotChecked;
+	}
+
 	static int selectedResourceIndex(const ResourceSelectScene& scene)
 	{
 		return scene.resourceList != nullptr
@@ -540,6 +547,78 @@ public:
 			scene.programActionButton != nullptr &&
 			scene.programActionButton->visible &&
 			scene.programActionButton->activated;
+	}
+
+	static bool completeAutomaticProgramUpdateCheck(
+		ResourceSelectScene& scene,
+		const std::string& onlineVersion,
+		bool expectDialog)
+	{
+		OnlineUpdate::ProgramPackage package;
+		package.target = JxqyBuildVersion::ProgramUpdateTarget;
+		package.versionText = onlineVersion;
+		package.version = ModRelease::parseSemanticVersion(
+			package.versionText).version;
+		package.artifactPath = "program/test.zip";
+		package.artifactSize = 1024;
+		package.crc32Hex = "00000000";
+		package.releaseNotes = "Current-platform program update fixture";
+		const std::string expectedReleaseNotes = package.releaseNotes;
+		OnlineUpdate::ProgramPackage otherPlatformPackage = package;
+		otherPlatformPackage.target = package.target == "windows"
+			? "linux" : "windows";
+		otherPlatformPackage.releaseNotes =
+			"Other-platform program update fixture";
+
+		scene.catalogCheckWorkerResult =
+			std::make_shared<ResourceSelectScene::CatalogCheckWorkerResult>();
+		auto& application = scene.catalogCheckWorkerResult->application;
+		application.configured = true;
+		application.downloadAttempted = true;
+		application.download.status =
+			OnlineUpdate::HttpsDownloadStatus::Success;
+		application.parse.catalog.programPackages.emplace(
+			package.target, std::move(package));
+		application.parse.catalog.programPackages.emplace(
+			otherPlatformPackage.target, std::move(otherPlatformPackage));
+		GameLoading::ExclusiveLoadingCompletion completion;
+		completion.taskResult = GameLoading::LoadingTaskResult::success();
+		scene.finishOnlineCatalogCheck(completion);
+
+		const bool manualActionRemainsAvailable =
+			scene.programActionButton != nullptr &&
+			scene.programActionButton->visible &&
+			scene.programActionButton->activated;
+		const bool waitingForPresentation =
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			scene.programUpdateDialogPending == expectDialog;
+		scene.presentPendingProgramUpdateDialog();
+		if (!expectDialog)
+		{
+			return manualActionRemainsAvailable && waitingForPresentation &&
+				!scene.programUpdateDialogPending &&
+				scene.resourceInstallDialogState ==
+					ResourceSelectScene::ResourceInstallDialogState::Hidden;
+		}
+		return manualActionRemainsAvailable && waitingForPresentation &&
+			!scene.programUpdateDialogPending &&
+			scene.resourceInstallOperation ==
+				ResourceSelectScene::ResourceInstallOperation::ProgramDownload &&
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Confirming &&
+			scene.resourceInstallPrimaryButton != nullptr &&
+			scene.resourceInstallPrimaryButton->visible &&
+			scene.resourceInstallPrimaryButton->activated &&
+			scene.resourceInstallSecondaryButton != nullptr &&
+			scene.resourceInstallSecondaryButton->visible &&
+			scene.resourceInstallSecondaryButton->activated &&
+			scene.pendingResourceInstall.requestedGameId ==
+				JxqyBuildVersion::ProgramUpdateTarget &&
+			scene.pendingResourceInstall.items.size() == 1 &&
+			scene.pendingResourceInstall.items.front().releaseNotes ==
+				expectedReleaseNotes &&
+			focusedResourceControl(scene) == "install-secondary";
 	}
 
 	static bool presentCurrentOnlineProgramDownload(ResourceSelectScene& scene)
@@ -893,6 +972,11 @@ public:
 				std::string::npos;
 	}
 
+	static void confirmSelectedResource(ResourceSelectScene& scene)
+	{
+		scene.confirmSelection();
+	}
+
 	static bool selectedResourceHasOnlineVersion(
 		const ResourceSelectScene& scene,
 		const std::string& version,
@@ -1035,6 +1119,40 @@ public:
 		return static_cast<int>(scene.pendingResourceInstall.items.size());
 	}
 
+	static bool resourceInstallConfirmationContainsReleaseNotes(
+		const ResourceSelectScene& scene,
+		const std::string& gameId,
+		const std::string& releaseNotes)
+	{
+		for (std::size_t index = 0;
+			index < scene.pendingResourceInstall.targets.size() &&
+				index < scene.pendingResourceInstall.items.size(); index++)
+		{
+			if (scene.pendingResourceInstall.targets[index].gameId == gameId &&
+				scene.pendingResourceInstall.items[index].releaseNotes ==
+					releaseNotes)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	static bool resourceInstallConfirmationUsesOnePagePerItem(
+		ResourceSelectScene& scene)
+	{
+		if (scene.pendingResourceInstall.items.size() < 2)
+		{
+			return false;
+		}
+		scene.resourceInstallConfirmationPage = 0;
+		scene.moveResourceInstallConfirmationPage(1);
+		const bool advancedOneItem =
+			scene.resourceInstallConfirmationPage == 1;
+		scene.moveResourceInstallConfirmationPage(-1);
+		return advancedOneItem && scene.resourceInstallConfirmationPage == 0;
+	}
+
 	static bool resourceInstallConfirmationKind(
 		const ResourceSelectScene& scene,
 		bool installed,
@@ -1045,6 +1163,63 @@ public:
 				installed &&
 			scene.pendingResourceInstall.requestedVersionMatches == sameVersion &&
 			scene.pendingResourceInstall.includesCommon == includesCommon;
+	}
+
+	static bool resourceInstallConfirmationUsesIncrementalOnly(
+		const ResourceSelectScene& scene)
+	{
+		return scene.pendingResourceInstall.items.size() == 1 &&
+			scene.pendingResourceInstall.items.front().artifactKind ==
+				OnlineUpdate::ResourceDownloadPlan::ArtifactKind::Incremental;
+	}
+
+	static bool localEntryUpdatePromptIsVisible(
+		const ResourceSelectScene& scene)
+	{
+		return scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Confirming &&
+			scene.resourceInstallOperation ==
+				ResourceSelectScene::ResourceInstallOperation::OnlineDownload &&
+			scene.resourceUpdatePromptedByEntry &&
+			scene.resourceInstallPrimaryButton != nullptr &&
+			scene.resourceInstallPrimaryButton->visible &&
+			scene.resourceInstallPrimaryButton->activated &&
+			scene.resourceInstallSecondaryButton != nullptr &&
+			scene.resourceInstallSecondaryButton->visible &&
+			scene.resourceInstallSecondaryButton->activated;
+	}
+
+	static bool cancelLocalEntryUpdatePromptWithKeyboard(
+		ResourceSelectScene& scene)
+	{
+		return dispatchResourceKeyboardFrame(scene, KEY_ESCAPE) &&
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			scene.logicRunning;
+	}
+
+	static bool activateLocalEntryUpdateWithKeyboardAcrossFrames(
+		ResourceSelectScene& scene)
+	{
+		if (!dispatchResourceKeyboardFrame(scene, KEY_LEFT) ||
+			focusedResourceControl(scene) != "install-primary")
+		{
+			return false;
+		}
+		scene.pendingResourceInstall.collectionRoot.clear();
+		return dispatchResourceKeyboardFrame(scene, KEY_RETURN) &&
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Failed;
+	}
+
+	static bool enterWithoutLocalUpdateWithTouchAcrossFrames(
+		ResourceSelectScene& scene)
+	{
+		return dispatchResourceControlClickAcrossLayout(
+				scene, scene.resourceInstallSecondaryButton, true) &&
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			!scene.logicRunning;
 	}
 
 	static bool cancelResourceInstallConfirmation(
@@ -1525,6 +1700,33 @@ public:
 			false));
 		scene.allHandleEvents();
 		return engine->getEventCount() == 0;
+	}
+
+	static bool confirmAutomaticProgramUpdateAcrossKeyboardFrames(
+		ResourceSelectScene& scene)
+	{
+		scene.pendingResourceInstall.collectionRoot.clear();
+		if (!dispatchResourceKeyboardFrame(scene, KEY_LEFT) ||
+			scene.resourceInstallDialogState !=
+				ResourceSelectScene::ResourceInstallDialogState::Confirming ||
+			focusedResourceControl(scene) != "install-primary")
+		{
+			return false;
+		}
+		return dispatchResourceKeyboardFrame(scene, KEY_RETURN) &&
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Failed;
+	}
+
+	static bool confirmAutomaticProgramUpdateWithTouchAcrossFrames(
+		ResourceSelectScene& scene)
+	{
+		scene.pendingResourceInstall.collectionRoot.clear();
+		scene.updateLayout(scene.rect.w, scene.rect.h);
+		return dispatchResourceControlClickAcrossLayout(
+				scene, scene.resourceInstallPrimaryButton, true) &&
+			scene.resourceInstallDialogState ==
+				ResourceSelectScene::ResourceInstallDialogState::Failed;
 	}
 
 	static bool cancelResourceInstallWithTouchAcrossLayout(
@@ -2116,6 +2318,19 @@ public:
 	{
 		AEvent event(ET_KEYDOWN, key, 0, 0, false);
 		return scene.onHandleEvent(event);
+	}
+
+	static bool dispatchResourceKeyboardFrame(
+		ResourceSelectScene& scene, int key)
+	{
+		Engine* engine = Engine::getInstance();
+		if (engine == nullptr || engine->getEventCount() != 0)
+		{
+			return false;
+		}
+		engine->pushEvent(AEvent(ET_KEYDOWN, key, 0, 0, false));
+		scene.allHandleEvents();
+		return engine->getEventCount() == 0;
 	}
 
 	static bool dispatchResourceKeyboardFrameWithSyntheticMouseRefresh(
@@ -2825,6 +3040,39 @@ bool testResourceSelectionController(
 			currentProgramScene),
 		"the program action downloads the sole online package at the current"
 		" Version") && ok;
+	ResourceSelectScene automaticProgramKeyboardScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		automaticProgramKeyboardScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::completeAutomaticProgramUpdateCheck(
+			automaticProgramKeyboardScene, "9.9.0-test", true) &&
+		GamepadEssentialUITestAccess::
+			confirmAutomaticProgramUpdateAcrossKeyboardFrames(
+				automaticProgramKeyboardScene),
+		"a newer program version opens a separate confirmation while retaining"
+		" the manual action, and keyboard selection and activation work in"
+		" separate engine frames") && ok;
+	ResourceSelectScene automaticProgramTouchScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		automaticProgramTouchScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::completeAutomaticProgramUpdateCheck(
+			automaticProgramTouchScene, "9.9.0-test", true) &&
+		GamepadEssentialUITestAccess::
+			confirmAutomaticProgramUpdateWithTouchAcrossFrames(
+				automaticProgramTouchScene),
+		"the automatic program confirmation accepts touch down and touch up in"
+		" separate engine frames with a layout pass between them") && ok;
+	ResourceSelectScene currentAutomaticProgramScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		currentAutomaticProgramScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::completeAutomaticProgramUpdateCheck(
+			currentAutomaticProgramScene,
+			JxqyBuildVersion::EngineVersion,
+			false),
+		"an equal online program version keeps the manual reinstall action but"
+		" does not open the automatic update confirmation") && ok;
 #endif
 #if defined(__ANDROID__) || \
 	defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
@@ -3027,9 +3275,12 @@ bool testResourceSelectionController(
 		ResourceSelectScene frameScene;
 		ok = check(
 			GamepadEssentialUITestAccess::prepareProductionResourceSelection(
+				frameScene) &&
+			GamepadEssentialUITestAccess::automaticCatalogCheckStarted(
 				frameScene),
-			"resource selection production initialization creates the"
-			" keyboard synthetic-refresh fixture") && ok;
+			"resource selection production initialization starts one automatic"
+			" catalog check and creates the keyboard synthetic-refresh fixture")
+			&& ok;
 		ok = check(
 			GamepadEssentialUITestAccess::
 				dispatchResourceKeyboardFrameWithSyntheticMouseRefresh(
@@ -3462,6 +3713,13 @@ bool testResourceSelectionController(
 		packs[sameVersionLocalPackIndex].manifest.releaseMetadata.displayVersion;
 	sameVersionPackage.artifactPath = "resources/same-version.zip";
 	sameVersionPackage.artifactSize = 1024;
+	sameVersionPackage.crc32Hex = "11111111";
+	OnlineUpdate::IncrementalResourcePackage sameVersionIncremental;
+	sameVersionIncremental.artifactPath =
+		"resources/same-version-incremental.zip";
+	sameVersionIncremental.artifactSize = 256;
+	sameVersionIncremental.crc32Hex = "22222222";
+	sameVersionPackage.incrementalPackage = sameVersionIncremental;
 	sameVersionCatalog.resourcePackages.emplace(
 		OnlineUpdate::foldGameId(sameVersionPackage.gameId),
 		sameVersionPackage);
@@ -3480,12 +3738,69 @@ bool testResourceSelectionController(
 			sameVersionScene),
 		"matching local and online versions are labelled as current while"
 		" keeping the explicit re-download action") && ok;
+	auto& mutablePacks = const_cast<std::vector<ResourceManager::ResourcePack>&>(
+		resourceManager.getDiscoveredPacks());
+	const std::string previousFullReceipt =
+		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+			installedArtifactCrc32;
+	const std::string previousIncrementalReceipt =
+		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+			installedIncrementalArtifactCrc32;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedArtifactCrc32 = sameVersionPackage.crc32Hex;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32 = "33333333";
+	sameVersionScene.setRunning(true);
+	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
+	ok = check(
+		GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			sameVersionScene) &&
+		GamepadEssentialUITestAccess::
+			resourceInstallConfirmationUsesIncrementalOnly(sameVersionScene) &&
+		GamepadEssentialUITestAccess::
+			cancelLocalEntryUpdatePromptWithKeyboard(sameVersionScene),
+		"entering an installed resource detects a changed incremental receipt"
+		" even when its display version is unchanged, and Back dismisses the"
+		" prompt without entering") && ok;
+	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
+	ok = check(
+		GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			sameVersionScene) &&
+		GamepadEssentialUITestAccess::
+			activateLocalEntryUpdateWithKeyboardAcrossFrames(sameVersionScene),
+		"the entry update prompt activates its update action only after keyboard"
+		" focus movement and confirmation occur in separate engine frames") && ok;
+	sameVersionScene.handleUIAction(UIAction::Cancel);
+	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
+	ok = check(
+		GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			sameVersionScene) &&
+		GamepadEssentialUITestAccess::
+			enterWithoutLocalUpdateWithTouchAcrossFrames(sameVersionScene),
+		"the entry update prompt allows explicitly entering the installed copy"
+		" through touch down and up frames separated by a layout pass") && ok;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32 =
+			sameVersionIncremental.crc32Hex;
+	sameVersionScene.setRunning(true);
+	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
+	ok = check(
+		!GamepadEssentialUITestAccess::resourceSceneRunning(sameVersionScene) &&
+		!GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			sameVersionScene),
+		"entering a resource whose full and incremental receipts already match"
+		" does not show a redundant update prompt") && ok;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedArtifactCrc32 = previousFullReceipt;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32 = previousIncrementalReceipt;
 	OnlineUpdate::Catalog testCatalog;
 	OnlineUpdate::CommonPackage commonPackage;
 	commonPackage.versionText = "1.0-test";
 	commonPackage.artifactPath = "resources/common.zip";
 	commonPackage.artifactSize = 4096;
 	commonPackage.crc32Hex = "00000000";
+	commonPackage.releaseNotes = "Common runtime fixture";
 	testCatalog.commonPackage = commonPackage;
 	OnlineUpdate::ResourcePackage localOnlinePackage;
 	localOnlinePackage.gameId = packs.front().manifest.id;
@@ -3495,6 +3810,7 @@ bool testResourceSelectionController(
 	localOnlinePackage.artifactPath = "resources/local-match.zip";
 	localOnlinePackage.artifactSize = 1024;
 	localOnlinePackage.crc32Hex = "01010101";
+	localOnlinePackage.releaseNotes = "Local resource update fixture";
 	testCatalog.resourcePackages.emplace(
 		OnlineUpdate::foldGameId(localOnlinePackage.gameId),
 		localOnlinePackage);
@@ -3505,6 +3821,7 @@ bool testResourceSelectionController(
 	resourceOnlyPackage.artifactPath = "resources/online-shared-only.zip";
 	resourceOnlyPackage.artifactSize = 512;
 	resourceOnlyPackage.crc32Hex = "02020202";
+	resourceOnlyPackage.releaseNotes = "Dependency resource update fixture";
 	resourceOnlyPackage.resourceOnly = true;
 	resourceOnlyPackage.dependencyGameIds.push_back(
 		localOnlinePackage.gameId);
@@ -3576,7 +3893,17 @@ bool testResourceSelectionController(
 			expectedLocalTargetName,
 			true)
 		&& GamepadEssentialUITestAccess::resourceInstallConfirmationContains(
-			onlineCatalogScene, "common", "common", true);
+			onlineCatalogScene, "common", "common", true)
+		&& GamepadEssentialUITestAccess::
+			resourceInstallConfirmationContainsReleaseNotes(
+				onlineCatalogScene,
+				localOnlinePackage.gameId,
+				localOnlinePackage.releaseNotes)
+		&& GamepadEssentialUITestAccess::
+			resourceInstallConfirmationContainsReleaseNotes(
+				onlineCatalogScene, "common", commonPackage.releaseNotes)
+		&& GamepadEssentialUITestAccess::
+			resourceInstallConfirmationUsesOnePagePerItem(onlineCatalogScene);
 	ok = check(localDownloadConfirmationReady,
 		"a local replacement records its exact target and required common package") && ok;
 	const bool localDownloadCancelled = localDownloadConfirmationReady
@@ -3624,7 +3951,17 @@ bool testResourceSelectionController(
 				"online-test-only",
 				false)
 			&& GamepadEssentialUITestAccess::resourceInstallConfirmationContains(
-				onlineCatalogScene, "common", "common", true),
+				onlineCatalogScene, "common", "common", true)
+			&& GamepadEssentialUITestAccess::
+				resourceInstallConfirmationContainsReleaseNotes(
+					onlineCatalogScene,
+					resourceOnlyPackage.gameId,
+					resourceOnlyPackage.releaseNotes)
+			&& GamepadEssentialUITestAccess::
+				resourceInstallConfirmationContainsReleaseNotes(
+					onlineCatalogScene,
+					onlineOnlyPackage.gameId,
+					onlineOnlyPackage.releaseNotes),
 		"confirming an online-only resource presents its complete dependency"
 		" closure and required runtime files without leaving the"
 		" resource-selection scene") && ok;
@@ -3957,6 +4294,45 @@ bool testTitleController(const ResourcePackExpectation& resourcePack)
 		"title confirms exit without entering a scene run loop") && ok;
 	engine->setWindowSize(800, 600);
 	return ok;
+}
+
+bool testPublishedModTitleResources(ResourceManager& resourceManager)
+{
+	const char* packIds[] = {
+		"JXQY2",
+		"YYCS",
+		"JIAN_ER_GAI_CHENGHE_1_041",
+		"JIANGHU_YUCHEN_1_03",
+		"JIANGHU_YUCHEN_2",
+		"XIAOXIANGXING_1_022",
+		"XINYUE_WUHEN_3_0",
+		"YUEMEIER_WAIZHUAN_1_053",
+	};
+	std::map<std::string, _shared_imp> titleImages;
+	bool ok = true;
+	for (const char* packId : packIds)
+	{
+		if (!resourceManager.setActiveResourcePackById(packId))
+		{
+			ok = check(false,
+				std::string(packId) + " published title pack is available") && ok;
+			continue;
+		}
+		Title title(true);
+		title.init();
+		titleImages[packId] = title.impImage;
+		ok = check(title.impImage != nullptr && !title.impImage->frame.empty(),
+			std::string(packId) + " loads a non-empty title background package") && ok;
+	}
+
+	ok = check(
+		titleImages["JIANGHU_YUCHEN_1_03"] != nullptr &&
+			titleImages["JIANGHU_YUCHEN_1_03"] != titleImages["YYCS"] &&
+			titleImages["JIANGHU_YUCHEN_2"] != titleImages["JIANGHU_YUCHEN_1_03"] &&
+			titleImages["XIAOXIANGXING_1_022"] != titleImages["YYCS"],
+		"local MOD title backgrounds do not reuse another resource pack's cache entry") && ok;
+	return check(resourceManager.setActiveResourcePackById("JXQY2"),
+		"published title resource test restores JXQY2") && ok;
 }
 
 bool testRunningModalSubtreeSurvivesConfigDrivenResize(
@@ -5458,6 +5834,7 @@ bool runGamepadEssentialUITests()
 		return false;
 	}
 	ok = testResourceSelectionController(resourceManager) && ok;
+	ok = testPublishedModTitleResources(resourceManager) && ok;
 	ok = testResourceSelectionPhysicalFirstAction() && ok;
 	ok = testTitlePhysicalExitLink() && ok;
 	ok = testActionOnlyModalSurfaces() && ok;

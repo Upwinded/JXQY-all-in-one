@@ -37,6 +37,7 @@ enum class ResourcePackageArchiveStatus
 	MissingEngineBootstrap,
 	CommonVersionMismatch,
 	MissingProgramExecutable,
+	MissingProgramUpdater,
 	DestinationCreateFailed,
 	ExtractionFailed,
 	ManifestReadFailed,

@@ -158,6 +158,35 @@ bool testSuccessfulGroupSwitch()
 	return ok;
 }
 
+bool testDependencyOnlySwitch()
+{
+	TemporaryTree tree("jxqy-resource-install-dependency-only");
+	const std::filesystem::path assets = tree.root / "assets";
+	std::filesystem::create_directories(assets);
+	bool ok = writeResource(assets / "dependency", "YYCS", "old dependency") &&
+		writeResource(assets / "requested", "JIANGHU_YUCHEN_1_03", "unchanged mod") &&
+		prepareWorkspace(assets, {{"YYCS", "new dependency"}});
+	if (!ok)
+	{
+		return false;
+	}
+
+	const auto staged = OnlineUpdate::stageResourceInstallTransaction(
+		assets, "JIANGHU_YUCHEN_1_03", {{"YYCS", "dependency"}});
+	const auto switched =
+		OnlineUpdate::beginResourceInstallTransaction(assets);
+	const auto committed =
+		OnlineUpdate::completeResourceInstallTransaction(assets, true);
+	ok = expect(staged.succeeded() && switched.needsValidation &&
+			committed.succeeded(),
+			"dependency-only switch: unchanged requested resource need not be a target") && ok;
+	ok = expect(readText(assets / "dependency" / "payload.txt") ==
+			"new dependency" &&
+			readText(assets / "requested" / "payload.txt") == "unchanged mod",
+			"dependency-only switch: dependency changes without replacing requested resource") && ok;
+	return ok;
+}
+
 bool testValidationFailureRollsBackGroup()
 {
 	TemporaryTree tree("jxqy-resource-install-rollback");
@@ -495,6 +524,7 @@ int main()
 {
 	bool ok = true;
 	ok = testSuccessfulGroupSwitch() && ok;
+	ok = testDependencyOnlySwitch() && ok;
 	ok = testValidationFailureRollsBackGroup() && ok;
 	ok = testCommonSwitchAndRollback() && ok;
 	ok = testInterruptedSwitchRestoresOldGroup() && ok;

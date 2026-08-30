@@ -306,6 +306,9 @@ list(REMOVE_ITEM SOURCE_FILES
     ${THIRD_PARTY_DIR}/minilzo/testmini.c
     ${THIRD_PARTY_DIR}/lua/onelua.c
     ${THIRD_PARTY_DIR}/lua/lua.c
+    ${SRC_DIR}/File/PakFile.cpp
+    ${SRC_DIR}/Game/Data/NPC_old.cpp
+    ${SRC_DIR}/Game/Data/Player_old.cpp
 )
 
 # Tests under src/tests belong to dedicated test targets and must never be
@@ -318,7 +321,9 @@ file(GLOB_RECURSE SRC_AUTOMATION_FILES ${SRC_DIR}/automation/*)
 list(REMOVE_ITEM SOURCE_FILES ${SRC_AUTOMATION_FILES})
 
 file(GLOB_RECURSE EXCLUDE_TESTES_FILES "${THIRD_PARTY_DIR}/lua/testes/*")
-list(REMOVE_ITEM SOURCE_FILES ${EXCLUDE_TESTES_FILES})
+if(EXCLUDE_TESTES_FILES)
+    list(REMOVE_ITEM SOURCE_FILES ${EXCLUDE_TESTES_FILES})
+endif()
 
 if(WIN32)
     if(CMAKE_SIZEOF_VOID_P EQUAL 8)

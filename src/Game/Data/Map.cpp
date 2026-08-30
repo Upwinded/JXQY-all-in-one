@@ -537,6 +537,7 @@ bool Map::parsePreparedLoadCandidate(
 			return false;
 		}
 	}
+	parsedData->mpcPath = toLowerAsciiPath(std::move(parsedData->mpcPath));
 
 	const int64_t tileCount = static_cast<int64_t>(parsedData->head.width) * parsedData->head.height;
 	int64_t tileBytes = (int64_t)sizeof(MapTile) * tileCount;
@@ -565,6 +566,7 @@ bool Map::parsePreparedLoadCandidate(
 		{
 			return false;
 		}
+		utf8Name = toLowerAsciiPath(std::move(utf8Name));
 		parsedData->mpc.mpc[i].name = std::make_unique<char[]>(utf8Name.size() + 1);
 		std::memset(parsedData->mpc.mpc[i].name.get(), 0, utf8Name.size() + 1);
 		if (!utf8Name.empty())

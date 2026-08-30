@@ -960,6 +960,47 @@ bool runXiaoxiangNpcLifecycleResourceSmoke(ResourceManager& manager)
 	return ok;
 }
 
+bool runJianghuOpeningInteractionResourceSmoke(ResourceManager& manager)
+{
+	const std::string packId = "JIANGHU_YUCHEN_1_03";
+	if (!manager.setActiveResourcePackById(packId))
+	{
+		return check(false, packId + " opening-scene production pack is available");
+	}
+
+	bool ok = true;
+	std::unique_ptr<char[]> npcContent;
+	int npcLength = File::readFile("ini\\save\\map020.npc", npcContent);
+	ok = check(npcContent != nullptr && npcLength > 0,
+		packId + " loads the opening-scene NPC map") && ok;
+	if (npcContent != nullptr && npcLength > 0)
+	{
+		INIReader npcIni(npcContent);
+		const std::string missing = "__missing__";
+		ok = check(npcIni.Get("NPC009", "Name", "") == u8"九头蛟"
+			&& npcIni.GetInteger("NPC009", "Relation", 0) == 2
+			&& npcIni.Get("NPC009", "Kind", missing) == missing
+			&& npcIni.Get("NPC009", "VisionRadius", missing) == missing
+			&& npcIni.Get("NPC009", "AttackRadius", missing) == missing,
+			packId + " opening Nine-Headed Jiao relies on legacy NPC defaults") && ok;
+	}
+
+	std::unique_ptr<char[]> objectContent;
+	int objectLength = File::readFile("ini\\save\\map020_obj.obj", objectContent);
+	ok = check(objectContent != nullptr && objectLength > 0,
+		packId + " loads the opening-scene object map") && ok;
+	if (objectContent != nullptr && objectLength > 0)
+	{
+		INIReader objectIni(objectContent);
+		const std::string missing = "__missing__";
+		ok = check(objectIni.Get("OBJ003", "ObjName", "") == u8"丝帕1"
+			&& objectIni.Get("OBJ003", "ObjFile", "") == u8"obj-丝帕1.ini"
+			&& objectIni.Get("OBJ003", "Kind", missing) == missing,
+			packId + " opening Silk Handkerchief relies on the map-object Kind default") && ok;
+	}
+	return ok;
+}
+
 bool runXjxqyLegacyStoryNpcResourceSmoke(ResourceManager& manager)
 {
 	const std::string packId = "XJXQY";
@@ -1729,6 +1770,7 @@ int main(int argc, char** argv)
 		ok = runTitleLayoutResourceSmoke(ResourceManager::instance()) && ok;
 		ok = runXinyueLifeExchangeResourceSmoke(ResourceManager::instance()) && ok;
 		ok = runXiaoxiangNpcLifecycleResourceSmoke(ResourceManager::instance()) && ok;
+		ok = runJianghuOpeningInteractionResourceSmoke(ResourceManager::instance()) && ok;
 		ok = runXjxqyLegacyStoryNpcResourceSmoke(ResourceManager::instance()) && ok;
 		ok = runTestModEquipmentTriggerSmoke(ResourceManager::instance()) && ok;
 		ok = runTestModMagicCollisionSmoke(ResourceManager::instance()) && ok;

@@ -119,6 +119,32 @@ QString canonicalMigrationPathKey(
             QString::NormalizationForm_C).
         toCaseFolded();
 }
+
+bool isRuntimeEntryJpeg(QString relativePath)
+{
+    relativePath.replace(QLatin1Char('\\'), QLatin1Char('/'));
+    while (relativePath.startsWith(QLatin1Char('/')))
+        relativePath.remove(0, 1);
+    relativePath = QDir::cleanPath(relativePath).toLower();
+    if (!relativePath.endsWith(QStringLiteral(".jpg")) &&
+        !relativePath.endsWith(QStringLiteral(".jpeg")))
+    {
+        return false;
+    }
+    return relativePath == QStringLiteral("cover.jpg") ||
+        relativePath == QStringLiteral("cover.jpeg") ||
+        relativePath.startsWith(QStringLiteral("asf/ui/title/")) ||
+        relativePath.startsWith(QStringLiteral("mpc/ui/title/"));
+}
+
+QString replaceJpegExtensionWithPng(QString path)
+{
+    static const QRegularExpression jpegExtension(
+        QStringLiteral("\\.jpe?g$"),
+        QRegularExpression::CaseInsensitiveOption);
+    path.replace(jpegExtension, QStringLiteral(".png"));
+    return path;
+}
 }
 
 QStringList assetMigrationOutputPathCollisionSources(
@@ -5542,6 +5568,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         const std::optional<LegacyImageCategory> legacyImageCategory =
             LegacyImageMigrationPolicy::classifyRelativePath(relativePath);
         const bool topLevelImg = isTopLevelImgPath(relativePath);
+        const bool normalizeRuntimeJpeg = isRuntimeEntryJpeg(relativePath);
 
         if (!options.includePrefix.isEmpty() &&
             !relativePathMatchesPrefix(relativePath, options.includePrefix))
@@ -5575,7 +5602,14 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             AssetMigrationFileAction::Copy;
         QString successReason =
             QStringLiteral("raw-byte-copy");
-        if (legacyImageCategory.has_value())
+        if (normalizeRuntimeJpeg)
+        {
+            successfulAction = AssetMigrationFileAction::Convert;
+            successReason = QStringLiteral("runtime-entry-jpeg-normalized");
+            ok = processRuntimeJpegFile(
+                filePath, outputPath, relativePath, report);
+        }
+        else if (legacyImageCategory.has_value())
         {
             const LegacyImageCategoryDefinition& definition =
                 LegacyImageMigrationPolicy::definition(
@@ -6518,7 +6552,10 @@ QString JxAssetMigrator::mapOutputRelativePath(const QString& relativePath) cons
         parts.last() = "newgame.txt";
     }
 
-    return lowercaseAsciiPath(joinRelativePath(parts));
+    QString outputPath = lowercaseAsciiPath(joinRelativePath(parts));
+    if (isRuntimeEntryJpeg(outputPath))
+        outputPath = replaceJpegExtensionWithPng(outputPath);
+    return outputPath;
 }
 
 bool JxAssetMigrator::copyFileReplacing(const QString& sourcePath, const QString& outputPath, AssetMigrationReport& report)
@@ -6721,6 +6758,37 @@ bool JxAssetMigrator::processRawCopyFile(const QString& sourcePath, const QStrin
     return copyFileReplacing(sourcePath, outputPath, report);
 }
 
+bool JxAssetMigrator::processRuntimeJpegFile(const QString& sourcePath,
+    const QString& outputPath, const QString& relativePath,
+    AssetMigrationReport& report)
+{
+    QImage image(sourcePath);
+    if (image.isNull() || !ensureParentDirectory(outputPath))
+    {
+        appendReportLog(report, LogCallback(),
+            QString::fromUtf8("运行时入口 JPEG 转换失败: %1")
+                .arg(relativePath));
+        return false;
+    }
+
+    QSaveFile output(outputPath);
+    output.setDirectWriteFallback(false);
+    if (!output.open(QIODevice::WriteOnly) ||
+        !image.convertToFormat(QImage::Format_RGBA8888).save(&output, "PNG") ||
+        !output.commit())
+    {
+        output.cancelWriting();
+        appendReportLog(report, LogCallback(),
+            QString::fromUtf8("运行时入口 JPEG 写入 PNG 失败: %1")
+                .arg(relativePath));
+        return false;
+    }
+
+    report.writtenFiles++;
+    report.convertedWithoutCrop++;
+    return true;
+}
+
 bool JxAssetMigrator::processImageFile(const QString& sourcePath,
     const QString& outputPath, const QString& relativePath,
     LegacyImageCategory category, const AssetMigrationOptions& options,
@@ -6801,8 +6869,23 @@ std::string JxAssetMigrator::rewriteLegacyJxReferences(const std::string& conten
             Qt::CaseInsensitive);
     }
 
-    // Image file extensions are preserved during conversion (runtime detects
-    // format from file headers), so no extension rewriting is needed here.
+    const bool isTitleConfiguration =
+        normalizedPath.startsWith(QStringLiteral("ini/ui/title/"));
+    const bool isGameProfile =
+        normalizedPath == QStringLiteral("game_profile.ini");
+    if (isTitleConfiguration || isGameProfile)
+    {
+        const QString keys = isTitleConfiguration
+            ? QStringLiteral("Bitmap|Image")
+            : QStringLiteral("Cover");
+        const QRegularExpression jpegReference(
+            QStringLiteral(
+                "^(\\s*(?:%1)\\s*=\\s*[^\\r\\n]*?)\\.jpe?g(\\s*)$")
+                .arg(keys),
+            QRegularExpression::CaseInsensitiveOption |
+                QRegularExpression::MultilineOption);
+        text.replace(jpegReference, QStringLiteral("\\1.png\\2"));
+    }
 
     return text.toUtf8().toStdString();
 }

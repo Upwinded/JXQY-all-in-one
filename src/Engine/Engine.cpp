@@ -139,6 +139,7 @@ Engine* Engine::getInstance()
 
 int Engine::init(std::string & windowCaption, int windowWidth, int windowHeight, FullScreenMode fullScreenMode, FullScreenSolutionMode fullScreenSolutionMode, int display)
 {
+	engineBaseActive = true;
 	resetApplicationQuitRequest();
 	applicationBackgrounded.store(false);
 	applicationMediaPaused.store(false);
@@ -172,7 +173,11 @@ void Engine::destroyEngine()
 		channelTalk = nullptr;
 		applicationPausedTalkChannel = nullptr;
 	}
-    //EngineBase::destroyEngineBase();
+	if (engineBaseActive)
+	{
+		engineBaseActive = false;
+		EngineBase::destroyEngineBase();
+	}
 }
 
 void Engine::getWindowSize(int& w, int& h)

@@ -17,6 +17,7 @@
 #include "../Update/ArtifactChecksum.h"
 #include "../Update/HttpsDownload.h"
 #include "../Update/ResourceDownloadPlanner.h"
+#include "../../updater/DesktopProgramUpdater.h"
 
 #include <algorithm>
 #include <array>
@@ -111,7 +112,7 @@ constexpr std::array<DesktopDisplayResolution, 7>
 };
 constexpr std::uint64_t ResourceDownloadDiskHeadroom =
 	64ULL * 1024ULL * 1024ULL;
-constexpr int ResourceInstallItemsPerPage = 6;
+constexpr int ResourceInstallItemsPerPage = 1;
 constexpr const char* BackgroundImagePath =
 	"engine/image/ui/resource_select/background.png";
 constexpr const char* ItemFrameImagePath =
@@ -366,6 +367,31 @@ std::string valueOrUndeclared(const std::string& value)
 	return value.empty() ? u8"未声明" : value;
 }
 
+std::string programTargetDisplayName(const std::string& target)
+{
+	if (target == "windows")
+	{
+		return "Windows";
+	}
+	if (target == "android")
+	{
+		return "Android";
+	}
+	if (target == "macos")
+	{
+		return "macOS";
+	}
+	if (target == "ios")
+	{
+		return "iOS";
+	}
+	if (target == "linux")
+	{
+		return "Linux";
+	}
+	return valueOrUndeclared(target);
+}
+
 std::string resourcePackTitle(
 	const ResourceManager::ResourcePack& pack)
 {
@@ -611,6 +637,7 @@ struct DesktopProgramUpdatePaths
 	std::filesystem::path releaseRoot;
 	std::filesystem::path binRoot;
 	std::filesystem::path helperPath;
+	std::filesystem::path stagingHelperPath;
 	std::filesystem::path workspacePath;
 	std::filesystem::path stagingPath;
 	std::filesystem::path stagingProgramPath;
@@ -652,7 +679,8 @@ bool resolveDesktopProgramUpdatePaths(DesktopProgramUpdatePaths& paths)
 	{
 		return false;
 	}
-	paths.releaseRoot = writableAssetsRoot.parent_path();
+	paths.releaseRoot =
+		ProgramUpdate::desktopProgramReleaseRoot(writableAssetsRoot);
 	paths.binRoot = paths.releaseRoot / "bin";
 	paths.workspacePath = paths.binRoot / ".jxqy-program-update";
 	paths.stagingPath = paths.workspacePath / "staging";
@@ -671,6 +699,8 @@ bool resolveDesktopProgramUpdatePaths(DesktopProgramUpdatePaths& paths)
 		(paths.helperTarget == "linux"
 			? std::filesystem::path("jxqy-program-updater")
 			: std::filesystem::path("jxqy-program-updater.exe"));
+	paths.stagingHelperPath = paths.stagingPath /
+		paths.helperPath.lexically_relative(paths.releaseRoot);
 	return true;
 }
 
@@ -682,6 +712,7 @@ bool isPreparedDesktopProgramUpdate(
 		isPlainDirectory(paths.stagingProgramPath) &&
 		isPlainRegularFile(
 			paths.stagingProgramPath / paths.executableName) &&
+		isPlainRegularFile(paths.stagingHelperPath) &&
 		isPlainDirectory(paths.stagingEnginePath) &&
 		isPlainRegularFile(
 			paths.stagingEnginePath / "font" / "font.ttf") &&
@@ -690,10 +721,125 @@ bool isPreparedDesktopProgramUpdate(
 			paths.stagingCommonPath / "version.ini");
 }
 
+bool ensurePlainUpdaterDirectory(
+	const std::filesystem::path& parent,
+	const std::filesystem::path& directory)
+{
+	if (!isPlainDirectory(parent))
+	{
+		return false;
+	}
+	std::error_code error;
+	const std::filesystem::file_status status =
+		std::filesystem::symlink_status(directory, error);
+	if (!error && std::filesystem::exists(status))
+	{
+		return isPlainDirectory(directory);
+	}
+	if (error && error != std::errc::no_such_file_or_directory)
+	{
+		return false;
+	}
+	error.clear();
+	return std::filesystem::create_directory(directory, error) &&
+		!error && isPlainDirectory(directory);
+}
+
+bool refreshDesktopProgramUpdater(
+	const DesktopProgramUpdatePaths& paths)
+{
+	if (!isPlainRegularFile(paths.stagingHelperPath))
+	{
+		return false;
+	}
+	const std::filesystem::path updaterRoot = paths.binRoot / "updater";
+	if (!ensurePlainUpdaterDirectory(paths.binRoot, updaterRoot) ||
+		!ensurePlainUpdaterDirectory(
+			updaterRoot, paths.helperPath.parent_path()))
+	{
+		return false;
+	}
+	std::error_code error;
+	const std::filesystem::file_status helperStatus =
+		std::filesystem::symlink_status(paths.helperPath, error);
+	if ((!error && std::filesystem::exists(helperStatus) &&
+			!isPlainRegularFile(paths.helperPath)) ||
+		(error && error != std::errc::no_such_file_or_directory))
+	{
+		return false;
+	}
+
+	std::filesystem::path temporaryPath = paths.helperPath;
+	temporaryPath += ".next";
+	error.clear();
+	const std::filesystem::file_status temporaryStatus =
+		std::filesystem::symlink_status(temporaryPath, error);
+	if (!error && std::filesystem::exists(temporaryStatus))
+	{
+		if (!isPlainRegularFile(temporaryPath) ||
+			!std::filesystem::remove(temporaryPath, error) || error)
+		{
+			return false;
+		}
+	}
+	else if (error && error != std::errc::no_such_file_or_directory)
+	{
+		return false;
+	}
+	error.clear();
+	if (!std::filesystem::copy_file(
+			paths.stagingHelperPath, temporaryPath,
+			std::filesystem::copy_options::none, error) || error)
+	{
+		return false;
+	}
+#if defined(__linux__)
+	std::filesystem::permissions(
+		temporaryPath,
+		std::filesystem::perms::owner_all |
+			std::filesystem::perms::group_read |
+			std::filesystem::perms::group_exec |
+			std::filesystem::perms::others_read |
+			std::filesystem::perms::others_exec,
+		std::filesystem::perm_options::replace,
+		error);
+	if (error)
+	{
+		std::error_code cleanupError;
+		std::filesystem::remove(temporaryPath, cleanupError);
+		return false;
+	}
+#endif
+#if defined(_WIN32)
+	if (!MoveFileExW(
+			temporaryPath.c_str(),
+			paths.helperPath.c_str(),
+			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+	{
+		const DWORD replaceError = GetLastError();
+		GameLog::write(
+			"ResourceSelectScene: updater replacement failed: %lu\n",
+			static_cast<unsigned long>(replaceError));
+		std::error_code cleanupError;
+		std::filesystem::remove(temporaryPath, cleanupError);
+		return false;
+	}
+#else
+	std::filesystem::rename(temporaryPath, paths.helperPath, error);
+	if (error)
+	{
+		std::error_code cleanupError;
+		std::filesystem::remove(temporaryPath, cleanupError);
+		return false;
+	}
+#endif
+	return isPlainRegularFile(paths.helperPath);
+}
+
 bool startDesktopProgramUpdater(
 	const DesktopProgramUpdatePaths& paths)
 {
-	if (!isPlainRegularFile(paths.helperPath))
+	if (!refreshDesktopProgramUpdater(paths))
 	{
 		return false;
 	}
@@ -723,6 +869,9 @@ bool startDesktopProgramUpdater(
 		&process);
 	if (!started)
 	{
+		GameLog::write(
+			"ResourceSelectScene: updater launch failed: %lu\n",
+			static_cast<unsigned long>(GetLastError()));
 		return false;
 	}
 	CloseHandle(process.hThread);
@@ -914,6 +1063,8 @@ std::string programPackageFailureText(
 		return u8"程序安装包 CRC32 校验不一致";
 	case Status::MissingProgramExecutable:
 		return u8"程序安装包缺少主程序文件";
+	case Status::MissingProgramUpdater:
+		return u8"程序安装包缺少独立更新助手";
 	case Status::MissingEngineBootstrap:
 		return u8"程序安装包缺少引擎启动资源";
 	case Status::MissingCommonBootstrap:
@@ -1051,6 +1202,7 @@ void ResourceSelectScene::freeResource()
 	onlineApplicationCatalog = {};
 	catalogCheckState = CatalogCheckState::NotChecked;
 	catalogStatusText.clear();
+	programUpdateDialogPending = false;
 	resourceInstallDialogState = ResourceInstallDialogState::Hidden;
 	resourceInstallOperation = ResourceInstallOperation::OnlineDownload;
 	pendingResourceInstall = {};
@@ -1070,6 +1222,7 @@ void ResourceSelectScene::freeResource()
 	resourceInstallConfirmationPage = 0;
 	pendingDownloadUsesMeteredNetwork = false;
 	pendingMeteredDownloadConfirmed = false;
+	resourceUpdatePromptedByEntry = false;
 	pendingExternalRescan = false;
 	externalResourcePresentationState =
 		ExternalResourcePresentationState::Disabled;
@@ -1769,6 +1922,7 @@ void ResourceSelectScene::beginOnlineCatalogCheck()
 
 	catalogCheckState = CatalogCheckState::Checking;
 	catalogStatusText = u8"正在检查游戏资源和主程序更新…";
+	programUpdateDialogPending = false;
 	refreshCheckUpdatesButton();
 	refreshOnlineActionButton();
 	catalogCheckWorkerResult =
@@ -1963,6 +2117,8 @@ void ResourceSelectScene::finishOnlineCatalogCheck(
 				}
 			}
 		}
+		programUpdateDialogPending = applicationSucceeded &&
+			programUpdatePlatformAvailable() && programUpdate.hasUpdate();
 		GameLog::write(
 			"ResourceSelectScene: online catalogs ready"
 			" (resource-ready=%d, application-ready=%d, resources=%zu,"
@@ -1978,6 +2134,7 @@ void ResourceSelectScene::finishOnlineCatalogCheck(
 		onlineCatalog = {};
 		onlineApplicationCatalog = {};
 		catalogCheckState = CatalogCheckState::Failed;
+		programUpdateDialogPending = false;
 		const CatalogCheckWorkerResult::Endpoint* failedEndpoint =
 			catalogCheckWorkerResult->resource.configured
 			? &catalogCheckWorkerResult->resource
@@ -2029,6 +2186,38 @@ void ResourceSelectScene::finishOnlineCatalogCheck(
 	}
 	refreshCheckUpdatesButton();
 	refreshOnlineActionButton();
+}
+
+void ResourceSelectScene::presentPendingProgramUpdateDialog()
+{
+	if (!programUpdateDialogPending)
+	{
+		return;
+	}
+	if (catalogCheckState != CatalogCheckState::Ready ||
+		!programUpdatePlatformAvailable())
+	{
+		programUpdateDialogPending = false;
+		return;
+	}
+	if (catalogCheckRunner != nullptr || resourceInstallRunner != nullptr ||
+		displaySettingsVisible || cheatHelpVisible ||
+		externalResourceDialogVisible || resourceInstallDialogState !=
+			ResourceInstallDialogState::Hidden)
+	{
+		return;
+	}
+
+	const OnlineUpdate::ProgramUpdateCheck update =
+		OnlineUpdate::checkProgramUpdate(
+			onlineApplicationCatalog,
+			JxqyBuildVersion::ProgramUpdateTarget,
+			JxqyBuildVersion::EngineVersion);
+	programUpdateDialogPending = false;
+	if (update.hasUpdate() && canUseOnlineProgramPackage(update))
+	{
+		beginProgramDownloadConfirmation();
+	}
 }
 
 void ResourceSelectScene::refreshCheckUpdatesButton()
@@ -2212,7 +2401,8 @@ void ResourceSelectScene::refreshResourceManagementButtons()
 bool ResourceSelectScene::buildResourceInstallConfirmation(
 	int selectedIndex,
 	ResourceInstallConfirmation& confirmation,
-	std::string& errorText) const
+	std::string& errorText,
+	bool forceReinstallIfCurrent) const
 {
 	confirmation = {};
 	errorText.clear();
@@ -2243,7 +2433,7 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 			JxqyBuildVersion::EngineVersion,
 			installedState.artifacts,
 			requestedDownloadMode);
-	if (requestedVersionMatches && plan.succeeded() &&
+	if (forceReinstallIfCurrent && requestedVersionMatches && plan.succeeded() &&
 		plan.downloadOrder.empty())
 	{
 		requestedDownloadMode =
@@ -2447,6 +2637,7 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		item.title = package->displayName.empty()
 			? package->gameId : package->displayName;
 		item.version = package->versionText;
+		item.releaseNotes = package->releaseNotes;
 		item.artifactKind = download.artifactKind;
 		OnlineUpdate::ResourceInstallTarget target;
 		target.gameId = package->gameId;
@@ -2509,41 +2700,52 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		ResourceInstallConfirmationItem item;
 		item.title = u8"游戏运行文件（自动）";
 		item.version = onlineCatalog.commonPackage->versionText;
+		item.releaseNotes = onlineCatalog.commonPackage->releaseNotes;
 		item.targetDirectoryName = "common";
 		item.replacing = replacing;
 		confirmation.items.push_back(std::move(item));
 	}
 	if (confirmation.targets.empty())
 	{
-		errorText = u8"所选游戏、依赖和运行文件均已是当前线上制品";
+		if (forceReinstallIfCurrent)
+		{
+			errorText = u8"所选游戏、依赖和运行文件均已是当前线上制品";
+		}
 		return false;
 	}
 	return true;
 }
 
-void ResourceSelectScene::beginResourceDownloadConfirmation()
+bool ResourceSelectScene::beginResourceDownloadConfirmation(
+	bool promptedByEntry)
 {
 	if (resourceInstallDialogState != ResourceInstallDialogState::Hidden ||
 		resourceInstallRunner != nullptr || resourceList == nullptr)
 	{
-		return;
+		return false;
 	}
 	ResourceInstallConfirmation confirmation;
 	std::string errorText;
 	if (!buildResourceInstallConfirmation(
-			resourceList->getSelectedIndex(), confirmation, errorText))
-	{
-		catalogStatusText = errorText.empty()
-			? std::string(u8"无法准备资源下载") : errorText;
-		GameLog::write(
-			"ResourceSelectScene: resource download confirmation failed"
-			" (entry=%d, reason=%s)\n",
 			resourceList->getSelectedIndex(),
-			catalogStatusText.c_str());
-		return;
+			confirmation,
+			errorText,
+			!promptedByEntry))
+	{
+		if (!errorText.empty())
+		{
+			catalogStatusText = errorText;
+			GameLog::write(
+				"ResourceSelectScene: resource download confirmation failed"
+				" (entry=%d, reason=%s)\n",
+				resourceList->getSelectedIndex(),
+				catalogStatusText.c_str());
+		}
+		return false;
 	}
 	cancelPointerInteraction();
 	resourceInstallOperation = ResourceInstallOperation::OnlineDownload;
+	resourceUpdatePromptedByEntry = promptedByEntry;
 	pendingResourceInstall = std::move(confirmation);
 	pendingDownloadUsesMeteredNetwork =
 		pendingResourceInstall.totalDownloadBytes > 0 &&
@@ -2557,6 +2759,7 @@ void ResourceSelectScene::beginResourceDownloadConfirmation()
 	refreshResourceInstallDialogControls();
 	semanticFocusVisible = focusManager.focusNode("install-secondary");
 	updateFocusPresentation();
+	return true;
 }
 
 void ResourceSelectScene::beginResourceRemovalConfirmation()
@@ -2730,6 +2933,14 @@ void ResourceSelectScene::activateResourceDialogPrimary()
 				updateFocusPresentation();
 				return;
 			}
+#if defined(__APPLE__) && TARGET_OS_IOS
+			if (resourceInstallOperation ==
+				ResourceInstallOperation::ProgramDownload)
+			{
+				startPreparedProgramUpdate();
+				return;
+			}
+#endif
 			startConfirmedResourceDownload();
 		}
 	}
@@ -2778,6 +2989,18 @@ void ResourceSelectScene::activateResourceDialogSecondary()
 		refreshResourceInstallDialogControls();
 		semanticFocusVisible = focusManager.focusNode("install-primary");
 		updateFocusPresentation();
+		return;
+	}
+	if (resourceInstallDialogState == ResourceInstallDialogState::Confirming &&
+		resourceInstallOperation == ResourceInstallOperation::OnlineDownload &&
+		resourceUpdatePromptedByEntry &&
+		!(pendingDownloadUsesMeteredNetwork &&
+			pendingMeteredDownloadConfirmed))
+	{
+		const int selectedIndex = resourceList != nullptr
+			? resourceList->getSelectedIndex() : -1;
+		dismissResourceInstallDialog();
+		enterSelectedResource(selectedIndex);
 		return;
 	}
 	cancelResourceInstall();
@@ -2906,6 +3129,7 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 	ResourceInstallConfirmationItem item;
 	item.title = u8"剑侠情缘 All-in-One Android 程序";
 	item.version = update.package->versionText;
+	item.releaseNotes = update.package->releaseNotes;
 	item.targetDirectoryName = "Downloads/updates/jxqy-update.apk";
 	item.replacing = true;
 	confirmation.items.push_back(std::move(item));
@@ -2965,7 +3189,7 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 	{
 		catalogStatusText =
 #if TARGET_OS_IOS
-			u8"iOS 主程序更新页面地址无效";
+			u8"iOS 主程序下载页面地址无效";
 #else
 			u8"macOS Sparkle 更新目录地址无效";
 #endif
@@ -2975,7 +3199,12 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 	ResourceInstallConfirmation confirmation;
 	confirmation.requestedGameId = JxqyBuildVersion::ProgramUpdateTarget;
 	confirmation.collectionRoot = installPageUrl;
-	confirmation.totalDownloadBytes = 0;
+	confirmation.totalDownloadBytes =
+#if TARGET_OS_IOS
+		update.package->artifactSize;
+#else
+		0;
+#endif
 	ResourceInstallConfirmationItem item;
 	item.title =
 #if TARGET_OS_IOS
@@ -2984,9 +3213,10 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 		u8"剑侠情缘 All-in-One macOS 程序";
 #endif
 	item.version = update.package->versionText;
+	item.releaseNotes = update.package->releaseNotes;
 	item.targetDirectoryName =
 #if TARGET_OS_IOS
-		u8"系统安装页面";
+		u8"程序下载页面";
 #else
 		u8"Sparkle appcast";
 #endif
@@ -3000,14 +3230,18 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 	pendingDownloadUsesMeteredNetwork = false;
 	resourceInstallDialogMessage =
 #if TARGET_OS_IOS
-		u8"iOS 不允许游戏静默替换自身。选择“打开更新页面”后，"
-		u8"由系统和发布页面继续处理；当前游戏仍可直接进入。";
+		u8"确认版本和更新内容后，可选择“打开下载页面”交给系统浏览器继续处理。";
 #else
 		u8"选择“检查并安装”后由 Sparkle 显示标准更新界面，"
 		u8"当前资源和存档不会改变，也可以继续当前游戏。";
 #endif
 	resourceInstallConfirmationPage = 0;
-	resourceInstallDialogState = ResourceInstallDialogState::ReadyToRestart;
+	resourceInstallDialogState =
+#if TARGET_OS_IOS
+		ResourceInstallDialogState::Confirming;
+#else
+		ResourceInstallDialogState::ReadyToRestart;
+#endif
 	setMainControlsAvailable(false);
 	refreshResourceInstallDialogControls();
 	semanticFocusVisible = focusManager.focusNode("install-secondary");
@@ -3028,6 +3262,7 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 	ResourceInstallConfirmationItem item;
 	item.title = u8"剑侠情缘 All-in-One 主程序";
 	item.version = update.package->versionText;
+	item.releaseNotes = update.package->releaseNotes;
 	item.targetDirectoryName = "bin/" + paths.helperTarget;
 	item.replacing = true;
 	confirmation.items.push_back(std::move(item));
@@ -3823,8 +4058,14 @@ void ResourceSelectScene::finishResourceInstall(
 
 void ResourceSelectScene::startPreparedProgramUpdate()
 {
-	if (resourceInstallDialogState !=
-			ResourceInstallDialogState::ReadyToRestart ||
+	const bool readyToStart =
+#if defined(__APPLE__) && TARGET_OS_IOS
+		resourceInstallDialogState == ResourceInstallDialogState::Confirming ||
+		resourceInstallDialogState == ResourceInstallDialogState::ReadyToRestart;
+#else
+		resourceInstallDialogState == ResourceInstallDialogState::ReadyToRestart;
+#endif
+	if (!readyToStart ||
 		resourceInstallOperation != ResourceInstallOperation::ProgramDownload ||
 		resourceInstallRunner != nullptr)
 	{
@@ -3893,7 +4134,7 @@ void ResourceSelectScene::startPreparedProgramUpdate()
 		resourceInstallDialogState = ResourceInstallDialogState::Failed;
 		resourceInstallDialogMessage =
 #if TARGET_OS_IOS
-			u8"iOS 主程序更新页面已改变，请重新检查更新";
+			u8"iOS 主程序下载页面已改变，请重新检查更新";
 #else
 			u8"macOS Sparkle 更新目录已改变，请重新检查更新";
 #endif
@@ -3907,20 +4148,20 @@ void ResourceSelectScene::startPreparedProgramUpdate()
 	{
 		resourceInstallDialogState = ResourceInstallDialogState::Failed;
 		resourceInstallDialogMessage =
-			u8"无法打开 iOS 主程序更新页面，当前程序没有改变";
+			u8"无法打开 iOS 主程序下载页面，当前程序没有改变";
 		refreshResourceInstallDialogControls();
 		semanticFocusVisible = focusManager.focusNode("install-primary");
 		updateFocusPresentation();
 		GameLog::write(
-			"ResourceSelectScene: failed to open iOS program update page: %s\n",
+			"ResourceSelectScene: failed to open iOS program download page: %s\n",
 			SDL_GetError());
 		return;
 	}
 	GameLog::write(
-		"ResourceSelectScene: opened iOS program update page (%s)\n",
+		"ResourceSelectScene: opened iOS program download page (%s)\n",
 		expectedInstallPageUrl.c_str());
 	catalogStatusText =
-		u8"已打开 iOS 主程序更新页面，当前游戏仍可继续";
+		u8"已打开 iOS 主程序下载页面，当前游戏仍可继续";
 #else
 	if (!MacProgramUpdate::requestUpdateCheck(expectedInstallPageUrl))
 	{
@@ -4019,6 +4260,7 @@ void ResourceSelectScene::dismissResourceInstallDialog()
 	resourceInstallConfirmationPage = 0;
 	pendingDownloadUsesMeteredNetwork = false;
 	pendingMeteredDownloadConfirmed = false;
+	resourceUpdatePromptedByEntry = false;
 	resourceInstallWorkerResult.reset();
 	refreshResourceInstallDialogControls();
 	setMainControlsAvailable(true);
@@ -4099,6 +4341,9 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 			else if (resourceInstallOperation ==
 				ResourceInstallOperation::ProgramDownload)
 			{
+#if defined(__APPLE__) && TARGET_OS_IOS
+				resourceInstallPrimaryButton->setUTF8Str(u8"打开下载页面");
+#else
 				const OnlineUpdate::ProgramUpdateCheck update =
 					OnlineUpdate::checkProgramUpdate(
 						onlineApplicationCatalog,
@@ -4106,10 +4351,13 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 						JxqyBuildVersion::EngineVersion);
 				resourceInstallPrimaryButton->setUTF8Str(
 					update.hasUpdate() ? u8"下载并更新" : u8"确认重装");
+#endif
 			}
 			else
 			{
-				resourceInstallPrimaryButton->setUTF8Str(u8"开始下载");
+				resourceInstallPrimaryButton->setUTF8Str(
+					resourceUpdatePromptedByEntry
+						? u8"更新此游戏" : u8"开始下载");
 			}
 			resourceInstallPreviousPageButton->setUTF8Str(u8"上一页");
 			resourceInstallNextPageButton->setUTF8Str(u8"下一页");
@@ -4128,7 +4376,13 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 		resourceInstallSecondaryButton->setUTF8Str(
 			pendingDownloadUsesMeteredNetwork &&
 					pendingMeteredDownloadConfirmed
-				? u8"返回" : u8"取消");
+				? u8"返回"
+				: resourceInstallOperation ==
+						ResourceInstallOperation::ProgramDownload &&
+					iosProgramUpdatePageAvailable()
+					? u8"继续游戏"
+				: resourceUpdatePromptedByEntry
+					? u8"仍然进入" : u8"取消");
 		primaryVisible = true;
 		secondaryVisible = true;
 		secondaryActivated = true;
@@ -4185,7 +4439,7 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 			}
 			else if (iosProgramUpdatePageAvailable())
 			{
-				resourceInstallPrimaryButton->setUTF8Str(u8"打开安装页面");
+				resourceInstallPrimaryButton->setUTF8Str(u8"打开下载页面");
 			}
 			else if (macProgramUpdateAvailable())
 			{
@@ -4289,10 +4543,7 @@ bool ResourceSelectScene::onInitial()
 	createControls();
 	buildResourceList();
 	configureFocus();
-	if (resourceEntries.empty())
-	{
-		beginOnlineCatalogCheck();
-	}
+	beginOnlineCatalogCheck();
 
 	initTime();
 	return true;
@@ -4998,6 +5249,25 @@ void ResourceSelectScene::confirmSelection()
 	if (entry.isOnlineOnly())
 	{
 		beginResourceDownloadConfirmation();
+		return;
+	}
+	if (entry.onlineAvailable && beginResourceDownloadConfirmation(true))
+	{
+		return;
+	}
+	enterSelectedResource(selectedIndex);
+}
+
+void ResourceSelectScene::enterSelectedResource(int selectedIndex)
+{
+	if (selectedIndex < 0 ||
+		selectedIndex >= static_cast<int>(resourceEntries.size()))
+	{
+		return;
+	}
+	const ResourceSelectionEntry& entry = resourceEntries[selectedIndex];
+	if (entry.configurationError || entry.localPackIndex < 0)
+	{
 		return;
 	}
 	if (!ResourceManager::instance().setActiveResourcePack(
@@ -6345,6 +6615,7 @@ void ResourceSelectScene::performExternalRescan()
 void ResourceSelectScene::onDraw()
 {
 	pollOnlineCatalogCheck();
+	presentPendingProgramUpdateDialog();
 	pollResourceInstall();
 	// 权限设置页返回后只检查一次；只有实际授权成功才提交“已开启”。
 	if (pendingExternalRescan &&
@@ -6908,7 +7179,8 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		}
 		else
 		{
-			title = u8"确认更新此游戏";
+			title = resourceUpdatePromptedByEntry
+				? u8"发现游戏资源更新" : u8"确认更新此游戏";
 		}
 		break;
 	case ResourceInstallDialogState::BrowsingSaves:
@@ -7084,7 +7356,8 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 					std::max(1, dialog.w - 52), 14);
 				lineY += 22;
 				drawTextLine(
-					u8"目标：" + item->targetDirectoryName + "/",
+					u8"平台：" + programTargetDisplayName(
+						pendingResourceInstall.requestedGameId),
 					dialog.x + 26, lineY, 14, 0xFFB9AA87,
 					std::max(1, dialog.w - 52), 14);
 				lineY += 22;
@@ -7094,7 +7367,7 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 					pendingResourceInstall.totalDownloadBytes),
 				dialog.x + 26, lineY, 14, 0xFFB9AA87,
 				std::max(1, dialog.w - 52), 14);
-			lineY += 26;
+			lineY += 24;
 			if (pendingDownloadUsesMeteredNetwork)
 			{
 				drawTextLine(
@@ -7104,16 +7377,32 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 						u8" 移动数据。",
 					dialog.x + 26, lineY, 14, 0xFFFFB080,
 					std::max(1, dialog.w - 52), 14);
-				lineY += 24;
+				lineY += 22;
 			}
+			drawTextLine(u8"主要更新：",
+				dialog.x + 26, lineY, 14, 0xFFFFD39A,
+				std::max(1, dialog.w - 52), 14);
+			lineY += 20;
+			const int footerY = getResourceInstallPrimaryButtonRect().y - 28;
+			drawWrappedDescription(
+				item == nullptr || item->releaseNotes.empty()
+					? std::string(u8"未提供当前平台的更新说明。")
+					: item->releaseNotes,
+				{ dialog.x + 38, lineY,
+					std::max(1, dialog.w - 64),
+					std::max(1, footerY - lineY - 8) },
+				14, 0xFFFFFFFF);
 			drawTextLine(
-				androidProgramPackageInstallAvailable()
+				iosProgramUpdatePageAvailable()
+					? std::string(
+						u8"确认后打开系统浏览器下载页面；游戏不会自行下载或替换主程序。")
+					: androidProgramPackageInstallAvailable()
 					? std::string(
 						u8"下载完成后由 Android 系统确认是否允许安装；当前游戏仍可继续。")
 					: std::string(
 						u8"下载完成后仍由你决定是否安装；assets 和 save 不会改变。"),
-				dialog.x + 26, lineY, 14, 0xFFBFE2B4,
-				std::max(1, dialog.w - 52), 14);
+				dialog.x + 26, footerY, 13, 0xFFBFE2B4,
+				std::max(1, dialog.w - 52), 12);
 			return;
 		}
 		std::string actionDescription;
@@ -7198,7 +7487,22 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				u8"目录：assets/" + item.targetDirectoryName + "/",
 				dialog.x + 38, lineY, 14, 0xFFB9AA87,
 				std::max(1, dialog.w - 64), 14);
-			lineY += 22;
+			lineY += 24;
+			drawTextLine(u8"本项主要更新：",
+				dialog.x + 38, lineY, 14, 0xFFFFD39A,
+				std::max(1, dialog.w - 64), 14);
+			lineY += 20;
+			const int notesBottom = pageCount > 1
+				? getResourceInstallPreviousPageButtonRect().y - 30
+				: getResourceInstallPrimaryButtonRect().y - 16;
+			drawWrappedDescription(
+				item.releaseNotes.empty()
+					? std::string(u8"未提供本项更新说明。")
+					: item.releaseNotes,
+				{ dialog.x + 38, lineY,
+					std::max(1, dialog.w - 64),
+					std::max(1, notesBottom - lineY) },
+				14, 0xFFFFFFFF);
 		}
 		if (pageCount > 1)
 		{
@@ -7910,6 +8214,17 @@ bool ResourceSelectScene::onHandleUIAction(UIAction action)
 		}
 		if (action == UIAction::Cancel)
 		{
+			if (resourceInstallDialogState ==
+					ResourceInstallDialogState::Confirming &&
+				resourceInstallOperation ==
+					ResourceInstallOperation::OnlineDownload &&
+				resourceUpdatePromptedByEntry &&
+				!(pendingDownloadUsesMeteredNetwork &&
+					pendingMeteredDownloadConfirmed))
+			{
+				dismissResourceInstallDialog();
+				return true;
+			}
 			activateResourceDialogSecondary();
 			return true;
 		}

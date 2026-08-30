@@ -142,6 +142,20 @@ void testSuccessfulSwitch(const TemporaryTree& tree)
 		"successful update switches bin/win64, engine, and common together");
 }
 
+void testReleaseRootFromResourceCollection(const TemporaryTree& tree)
+{
+	const std::filesystem::path releaseRoot = tree.root / "release-root";
+	const std::filesystem::path assetsRoot = releaseRoot / "assets";
+	const std::filesystem::path assetsRootWithSeparator =
+		std::filesystem::u8path(assetsRoot.generic_u8string() + "/");
+	expect(
+		ProgramUpdate::desktopProgramReleaseRoot(assetsRoot) == releaseRoot &&
+		ProgramUpdate::desktopProgramReleaseRoot(assetsRootWithSeparator) ==
+			releaseRoot,
+		"resource collection trailing separator does not move the program "
+		"workspace under assets");
+}
+
 void testLaunchRollback(const TemporaryTree& tree)
 {
 	Fixture fixture(tree, "launch-failure");
@@ -378,6 +392,7 @@ int main()
 		return 1;
 	}
 	testSuccessfulSwitch(tree);
+	testReleaseRootFromResourceCollection(tree);
 	testLaunchRollback(tree);
 	testInterruptedSwitchRecovery(tree);
 	testInterruptedAfterMovingProgramRecovery(tree);
