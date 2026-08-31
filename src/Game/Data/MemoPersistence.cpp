@@ -11,6 +11,21 @@
 
 namespace
 {
+std::string sanitizeLine(const std::string& line)
+{
+	std::string sanitized = line;
+	std::replace_if(
+		sanitized.begin(),
+		sanitized.end(),
+		[](char character)
+		{
+			return character == '\r' || character == '\n' ||
+				character == '\0';
+		},
+		' ');
+	return sanitized;
+}
+
 std::string trimAscii(const std::string& value)
 {
 	size_t begin = 0;
@@ -124,7 +139,7 @@ std::string serializeText(const std::deque<std::string>& lines)
 	output << "Count=" << count << "\r\n";
 	for (size_t index = 0; index < count; index++)
 	{
-		output << index << "=" << lines[index] << "\r\n";
+		output << index << "=" << sanitizeLine(lines[index]) << "\r\n";
 	}
 	return output.str();
 }

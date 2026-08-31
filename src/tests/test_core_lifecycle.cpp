@@ -2,6 +2,7 @@
 #include "../Element/Element.h"
 #include "../Engine/Engine.h"
 #include "../File/File.h"
+#include "../File/INIReader.h"
 #include "../Game/Game.h"
 #include "../Game/Data/MemoPersistence.h"
 #include "../Game/GameManager/RuntimeSaveGenerationPolicy.h"
@@ -12,6 +13,7 @@
 #include "../Game/Menu/System.h"
 #include "../Game/Scene/MainScene.h"
 #include "HeadlessPhysicalInputTestHarness.h"
+#include "MapV3ContractFixture.h"
 
 #include <algorithm>
 #include <atomic>
@@ -196,6 +198,14 @@ public:
 		gameManager.onUpdate();
 	}
 
+	static void setLastLoadFailureMessage(
+		GameManager& gameManager,
+		std::string message)
+	{
+		gameManager.setLastLoadFailureMessage(
+			std::move(message));
+	}
+
 	static bool shouldUpdateGameManagerChild(GameManager& gameManager, const PElement& child)
 	{
 		return gameManager.shouldUpdateChild(child);
@@ -283,15 +293,16 @@ public:
 			const SaveGenerationPreflightPolicy& policy,
 			const std::function<bool(
 				const std::string& generationDirectory,
-				const std::function<bool()>&
-					ownerCheckpoint)>&
-						generationLoadOverride)
+					const std::function<bool()>&
+						ownerCheckpoint)>&
+							generationLoadOverride,
+			const std::function<bool()>& ownerCheckpoint = {})
 	{
 		return gameManager.scriptAPI.
 			commitPreparedSaveGeneration(
 				preparedDirectory,
 				policy,
-				{},
+				ownerCheckpoint,
 				generationLoadOverride);
 	}
 
@@ -627,6 +638,25 @@ bool runMemoGenerationCompatibilityTests()
 			generationDirectory) &&
 			writeVirtualFile(
 				generationDirectory + "\\memo.ini",
+				invalidMemo) &&
+			writeVirtualFile(
+				generationDirectory + "\\memo.txt",
+				validMemo),
+		"valid canonical memo and invalid legacy alias fixture is created") &&
+		ok;
+	gameManager.memo.memo = { "before canonical priority" };
+	ok = check(
+		gameManager.memo.load(true) &&
+			gameManager.memo.memo.size() == 1 &&
+			gameManager.memo.memo.front() == "loaded memo",
+		"valid canonical memo wins over an invalid legacy alias") &&
+		ok;
+
+	ok = check(
+		File::clearDirectoryFiles(
+			generationDirectory) &&
+			writeVirtualFile(
+				generationDirectory + "\\memo.ini",
 				validMemo),
 		"semantic memo.ini-only compatibility fixture is created") &&
 		ok;
@@ -669,6 +699,37 @@ bool runMemoGenerationCompatibilityTests()
 		gameManager.memo.load(true) &&
 			gameManager.memo.memo.empty(),
 		"compatible invalid canonical memo loads an empty optional memo") &&
+		ok;
+	gameManager.memo.memo = { "repaired memo" };
+	ok = check(
+		gameManager.memo.save() &&
+			gameManager.memo.load(false) &&
+			gameManager.memo.memo.size() == 1 &&
+			gameManager.memo.memo.front() == "repaired memo",
+		"a compatible invalid memo can be repaired by the next save") &&
+		ok;
+
+	ok = check(
+		File::clearDirectoryFiles(generationDirectory) &&
+			writeVirtualFile(
+				generationDirectory + "\\memo.txt",
+				{}),
+		"zero-byte canonical memo fixture is created") &&
+		ok;
+	gameManager.memo.memo = { "before empty memo" };
+	ok = check(
+		gameManager.memo.load(true) &&
+			gameManager.memo.memo.empty(),
+		"a zero-byte optional memo is treated like other compatible invalid memo data") &&
+		ok;
+	gameManager.memo.memo = { "line one\nline two\r\nline three" };
+	ok = check(
+		gameManager.memo.save() &&
+			gameManager.memo.load(false) &&
+			gameManager.memo.memo.size() == 1 &&
+			gameManager.memo.memo.front() ==
+				"line one line two  line three",
+		"memo serialization prevents embedded line breaks from producing an unreadable save") &&
 		ok;
 
 	ok = check(
@@ -923,6 +984,71 @@ bool runSaveLoadFailureRecoveryTests()
 			writeVirtualFile(
 				preparedDirectory + "/game.ini",
 				"[State]\nMap=candidate.map\n"),
+		"save-load cancellation fixture is created") &&
+		ok;
+	{
+		GameManager gameManager;
+		CoreLifecycleTestAccess::setLogicRunning(
+			gameManager,
+			true);
+		gameManager.map->data =
+			std::make_shared<MapData>();
+		gameManager.player->visible = true;
+		gameManager.varList.ensureInitialized();
+		gameManager.varList.setInteger(
+			"partial_load_value",
+			1);
+		gameManager.memo.add("partial load memo");
+		gameManager.traps.beginMapVisit();
+		gameManager.traps.markTriggered(7);
+		bool checkpointActive = true;
+		const GameLoading::LoadingTaskResult result =
+			CoreLifecycleTestAccess::
+				commitPreparedSaveGeneration(
+					gameManager,
+					preparedDirectory,
+					policy,
+					[&checkpointActive,
+					 &gameManager](
+						const std::string&,
+						const std::function<bool()>&)
+					{
+						gameManager.map->data =
+							std::make_shared<MapData>();
+						checkpointActive = false;
+						return false;
+					},
+					[&checkpointActive]()
+					{
+						return checkpointActive;
+					});
+		ok = check(
+			result.status ==
+				GameLoading::LoadingTaskStatus::Cancelled &&
+				!CoreLifecycleTestAccess::logicRunning(
+					gameManager) &&
+				gameManager.map->data == nullptr &&
+				!gameManager.player->visible &&
+				gameManager.varList.getInteger(
+					"partial_load_value") == 0 &&
+				gameManager.memo.memo.empty() &&
+				!gameManager.traps.hasTriggered(7) &&
+				gameManager.getLastLoadFailureMessage().empty() &&
+				readVirtualFile("save/game/game.ini") ==
+					"[State]\nMap=previous.map\n",
+			"cancelling after world mutation discards the partial world without reporting content corruption") &&
+			ok;
+	}
+
+	ok = check(
+		File::clearDirectoryFiles("save/game") &&
+			File::clearDirectoryFiles(preparedDirectory) &&
+			writeVirtualFile(
+				"save/game/game.ini",
+				"[State]\nMap=previous.map\n") &&
+			writeVirtualFile(
+				preparedDirectory + "/game.ini",
+				"[State]\nMap=candidate.map\n"),
 		"save-load partial failure fixture is created") &&
 		ok;
 	{
@@ -984,6 +1110,15 @@ bool runSaveLoadFailureRecoveryTests()
 		ok;
 	{
 		GameManager gameManager;
+		CoreLifecycleTestAccess::setLogicRunning(
+			gameManager,
+			true);
+		gameManager.map->data =
+			std::make_shared<MapData>();
+		gameManager.npcManager->npcList.push_back(
+			std::make_shared<NPC>());
+		gameManager.objectManager->objectList.push_back(
+			std::make_shared<Object>());
 		const GameLoading::LoadingTaskResult result =
 			CoreLifecycleTestAccess::
 				commitPreparedSaveGeneration(
@@ -997,12 +1132,714 @@ bool runSaveLoadFailureRecoveryTests()
 						return true;
 					});
 		ok = check(
-			result.succeeded() &&
+			result.status ==
+				GameLoading::LoadingTaskStatus::Failed &&
 				!engine->isApplicationQuitRequested() &&
+				!CoreLifecycleTestAccess::logicRunning(
+					gameManager) &&
+				gameManager.map->data == nullptr &&
+				gameManager.npcManager->npcList.empty() &&
+				gameManager.objectManager->objectList.empty() &&
+				gameManager.getLastLoadFailureMessage().find(
+					u8"无法刷新当前存档目录") !=
+					std::string::npos &&
 				readVirtualFile("save/game/game.ini") ==
 					"[State]\nMap=previous.map\n",
-			"a loaded world remains usable when the auxiliary save/game refresh fails") &&
+			"a current-save refresh failure discards the mismatched world, preserves the old current generation, and reports the reason") &&
 			ok;
+	}
+	engine->resetApplicationQuitRequest();
+	return ok;
+}
+
+bool runEmptyEntityListSaveLoadRoundTripTests()
+{
+	ScopedActiveResourceRoot resourceRoot;
+	if (!check(
+			resourceRoot.valid(),
+			"empty entity-list round-trip test created an isolated resource root"))
+	{
+		return false;
+	}
+
+	std::vector<std::uint8_t> mapBytes =
+		MapV3ContractFixture::build();
+	std::fill(
+		mapBytes.begin() + MapV3ContractFixture::BaseHeaderLength,
+		mapBytes.begin() + MapV3ContractFixture::HeaderLength,
+		std::uint8_t{ 0 });
+	std::fill(
+		mapBytes.begin() + MapV3ContractFixture::HeaderLength,
+		mapBytes.begin() + MapV3ContractFixture::HeaderLength +
+			MapV3ContractFixture::NameLength,
+		std::uint8_t{ 0 });
+	const std::string mapName = "empty-list-roundtrip.map";
+	if (!check(
+			writeVirtualFile(
+				"map/" + mapName,
+				std::string(
+					reinterpret_cast<const char*>(mapBytes.data()),
+					mapBytes.size())),
+			"empty entity-list round-trip map fixture is created"))
+	{
+		return false;
+	}
+
+	struct EntityListCase
+	{
+		const char* npcName;
+		const char* objectName;
+		const char* description;
+	};
+	const EntityListCase cases[] =
+	{
+		{ "", "roundtrip.obj", "empty NPC list" },
+		{ "roundtrip.npc", "", "empty object list" },
+		{ "", "", "empty NPC and object lists" },
+		{ "roundtrip.npc", "roundtrip.obj", "empty named entity lists" },
+	};
+
+	Engine* engine = Engine::getInstance();
+	engine->resetApplicationQuitRequest();
+	bool ok = true;
+	for (const EntityListCase& entityCase : cases)
+	{
+		const std::string fixtureMessage =
+			std::string(entityCase.description) +
+			" fixture is created";
+		const bool fixtureReady =
+			File::clearDirectoryFiles("save/game") &&
+			File::clearDirectoryFiles("save/game_build") &&
+			File::clearDirectoryFiles("save/load_candidate") &&
+			File::clearDirectoryFiles("save/rpg1") &&
+			writeVirtualFile(
+				"save/game/game.ini",
+				"[State]\nMap=seed.map\nNpc=\nObj=\n");
+		ok = check(fixtureReady, fixtureMessage.c_str()) && ok;
+		if (!fixtureReady)
+		{
+			continue;
+		}
+
+		GameManager gameManager;
+		gameManager.global.data.mapName = mapName;
+		gameManager.global.data.npcName = entityCase.npcName;
+		gameManager.global.data.objName = entityCase.objectName;
+		gameManager.varList.ensureInitialized();
+		gameManager.traps.beginMapVisit();
+		const bool saved = gameManager.saveGame(1);
+		INIReader savedGlobal("save/rpg1/game.ini");
+		auto savedEntityListIsEmpty = [](const char* fileName)
+		{
+			if (fileName[0] == '\0')
+			{
+				return true;
+			}
+			INIReader savedList(
+				std::string("save/rpg1/") + fileName);
+			return savedList.ParseError() == 0 &&
+				savedList.GetInteger("Head", "Count", -1) == 0;
+		};
+		const std::string saveMessage =
+			std::string(entityCase.description) +
+			" is saved with the original empty names";
+		ok = check(
+			saved && savedGlobal.ParseError() == 0 &&
+				savedGlobal.Get("State", "Npc", "missing") ==
+					entityCase.npcName &&
+				savedGlobal.Get("State", "Obj", "missing") ==
+					entityCase.objectName &&
+				savedEntityListIsEmpty(entityCase.npcName) &&
+				savedEntityListIsEmpty(entityCase.objectName),
+			saveMessage.c_str()) && ok;
+
+		gameManager.global.data.npcName = "stale.npc";
+		gameManager.global.data.objName = "stale.obj";
+		auto staleNpc = std::make_shared<NPC>();
+		staleNpc->kind = nkNormal;
+		gameManager.npcManager->npcList.push_back(staleNpc);
+		gameManager.objectManager->objectList.push_back(
+			std::make_shared<Object>());
+		const bool loaded = gameManager.loadGame(1);
+		const std::string loadMessage =
+			std::string(entityCase.description) +
+			" save reloads as empty runtime lists without leaking a source label";
+		const std::vector<std::string> loadedFiles =
+			File::listFiles("save/game");
+		ok = check(
+			loaded &&
+				gameManager.global.data.npcName ==
+					entityCase.npcName &&
+				gameManager.global.data.objName ==
+					entityCase.objectName &&
+				gameManager.npcManager->npcList.empty() &&
+				gameManager.objectManager->objectList.empty() &&
+				std::none_of(
+					loadedFiles.cbegin(),
+					loadedFiles.cend(),
+					[](const std::string& fileName)
+					{
+						return fileName.find(
+							"__compatible_empty_") !=
+							std::string::npos;
+					}),
+			loadMessage.c_str()) && ok;
+	}
+
+	struct CorruptEntityListCase
+	{
+		const char* fileName;
+		bool npcList;
+		const char* description;
+	};
+	const CorruptEntityListCase corruptEntityCases[] =
+	{
+		{ "roundtrip.npc", true, "malformed NPC list" },
+		{ "roundtrip.obj", false, "malformed object list" },
+	};
+	for (const CorruptEntityListCase& corruptCase :
+		corruptEntityCases)
+	{
+		const std::string slotPath =
+			"save/rpg1/" + std::string(corruptCase.fileName);
+		const std::string originalBytes =
+			readVirtualFile(slotPath);
+		const bool fixtureReady =
+			!originalBytes.empty() &&
+			writeVirtualFile(slotPath, "[Broken\n");
+		ok = check(
+			fixtureReady,
+			(std::string(corruptCase.description) +
+				" fixture is created").c_str()) && ok;
+		if (!fixtureReady)
+		{
+			continue;
+		}
+
+		GameManager tolerantLoader;
+		const bool loaded = tolerantLoader.loadGame(1);
+		INIReader repairedList(
+			"save/game/" + std::string(corruptCase.fileName));
+		const bool runtimeListEmpty = corruptCase.npcList
+			? tolerantLoader.npcManager->npcList.empty()
+			: tolerantLoader.objectManager->objectList.empty();
+		ok = check(
+			loaded &&
+				tolerantLoader.getLastLoadFailureMessage().empty() &&
+				runtimeListEmpty &&
+				readVirtualFile(slotPath) == "[Broken\n" &&
+				repairedList.ParseError() == 0 &&
+				repairedList.GetInteger("Head", "Count", -1) == 0,
+			(std::string(corruptCase.description) +
+				" is replaced with an empty current list without rejecting the save").c_str()) &&
+			ok;
+		ok = check(
+			writeVirtualFile(slotPath, originalBytes),
+			(std::string(corruptCase.description) +
+				" fixture restores the selected slot").c_str()) && ok;
+	}
+
+	INIReader reloadGlobal("save/rpg1/game.ini");
+	const int characterIndex = static_cast<int>(
+		reloadGlobal.GetInteger("State", "Chr", -1));
+	const std::string globalVirtualPath =
+		"save/rpg1/game.ini";
+	const std::string validGlobalBytes =
+		readVirtualFile(globalVirtualPath);
+	struct UnsafeEntityStateCase
+	{
+		const char* npcName;
+		const char* objectName;
+		const char* description;
+	};
+	const UnsafeEntityStateCase unsafeEntityCases[] =
+	{
+		{ "../escape.npc", "roundtrip.obj", "unsafe NPC path" },
+		{ "game.ini", "roundtrip.obj", "reserved NPC file name" },
+		{ "shared.npc", "SHARED.NPC", "case-colliding entity file names" },
+	};
+	for (const UnsafeEntityStateCase& unsafeCase :
+		unsafeEntityCases)
+	{
+		const bool fixtureReady = writeVirtualFile(
+			globalVirtualPath,
+			"[State]\nMap=" + mapName +
+			"\nNpc=" + unsafeCase.npcName +
+			"\nObj=" + unsafeCase.objectName +
+			"\nChr=" + std::to_string(characterIndex) +
+			"\n");
+		ok = check(
+			fixtureReady,
+			(std::string(unsafeCase.description) +
+				" load fixture is created").c_str()) && ok;
+		if (!fixtureReady)
+		{
+			continue;
+		}
+		GameManager rejectedLoader;
+		const bool loaded = rejectedLoader.loadGame(1);
+		ok = check(
+			!loaded &&
+				rejectedLoader.map->data == nullptr &&
+				!rejectedLoader.getLastLoadFailureMessage().empty(),
+			(std::string(unsafeCase.description) +
+				" is rejected before world mutation").c_str()) && ok;
+		ok = check(
+			writeVirtualFile(
+				globalVirtualPath,
+				validGlobalBytes),
+			(std::string(unsafeCase.description) +
+				" fixture restores the selected slot").c_str()) && ok;
+	}
+	const std::string playerFileName = characterIndex < 0
+		? std::string("player.ini")
+		: "player" + std::to_string(characterIndex) + ".ini";
+	const std::string playerVirtualPath =
+		"save/rpg1/" + playerFileName;
+	const std::string validPlayerBytes =
+		readVirtualFile(playerVirtualPath);
+	const bool emptyPlayerFixtureReady =
+		reloadGlobal.ParseError() == 0 &&
+		!validPlayerBytes.empty() &&
+		writeVirtualFile(
+			"ini/save/" + playerFileName,
+			validPlayerBytes) &&
+		writeVirtualFile(playerVirtualPath, {});
+	ok = check(
+		emptyPlayerFixtureReady,
+		"zero-byte player fixture is created from a complete save") && ok;
+	if (emptyPlayerFixtureReady)
+	{
+		{
+			GameManager tolerantLoader;
+			tolerantLoader.player->npcName = "FallbackPlayer";
+			tolerantLoader.player->money = 731;
+			const bool loaded = tolerantLoader.loadGame(1);
+			INIReader repairedPlayer(
+				"save/game/" + playerFileName);
+			ok = check(
+				loaded &&
+					tolerantLoader.player->npcName !=
+						"FallbackPlayer" &&
+					tolerantLoader.player->money != 731 &&
+					tolerantLoader.map->isInMap(
+						tolerantLoader.player->getPosition()) &&
+					repairedPlayer.ParseError() == 0 &&
+					repairedPlayer.HasSection("Init") &&
+					File::fileExist(playerVirtualPath) &&
+					readVirtualFile(playerVirtualPath).empty() &&
+					tolerantLoader.getLastLoadFailureMessage().empty(),
+				"a zero-byte player file falls back to the initial template and repairs the current save") &&
+				ok;
+		}
+		{
+			GameManager asyncTolerantLoader;
+			asyncTolerantLoader.player->npcName =
+				"AsyncFallbackPlayer";
+			const bool asyncLoaded =
+				asyncTolerantLoader.scriptAPI.loadGameAsync(1);
+			ok = check(
+				asyncLoaded &&
+					asyncTolerantLoader.player->npcName !=
+						"AsyncFallbackPlayer" &&
+					asyncTolerantLoader.map->isInMap(
+						asyncTolerantLoader.player->getPosition()) &&
+					asyncTolerantLoader.
+						getLastLoadFailureMessage().empty(),
+				"the asynchronous path also uses the initial player template") &&
+				ok;
+		}
+		ok = check(
+			writeVirtualFile(
+				playerVirtualPath,
+				validPlayerBytes),
+			"zero-byte player fixture restores the valid source file") &&
+			ok;
+	}
+
+	const std::string missingMapName =
+		"missing-load-failure.map";
+	const bool fatalMapFixtureReady =
+		!validGlobalBytes.empty() &&
+		writeVirtualFile(
+			globalVirtualPath,
+			"[State]\nMap=" + missingMapName +
+			"\nNpc=\nObj=\nChr=" +
+			std::to_string(characterIndex) + "\n");
+	ok = check(
+		fatalMapFixtureReady,
+		"missing-map fatal load fixture is created") && ok;
+	if (fatalMapFixtureReady)
+	{
+		{
+			GameManager failedLoader;
+			const bool loaded = failedLoader.loadGame(1);
+			ok = check(
+				!loaded &&
+					failedLoader.getLastLoadFailureMessage().find(
+						missingMapName) != std::string::npos,
+				"a missing map remains a fatal load error with a concrete reason") &&
+				ok;
+		}
+		{
+			GameManager asyncFailedLoader;
+			const bool loaded =
+				asyncFailedLoader.scriptAPI.loadGameAsync(1);
+			ok = check(
+				!loaded &&
+					asyncFailedLoader.getLastLoadFailureMessage().find(
+						missingMapName) != std::string::npos,
+				"the asynchronous path reports the same fatal map reason") &&
+				ok;
+		}
+		{
+			GameManager scriptFailureLoader;
+			scriptFailureLoader.varList.ensureInitialized();
+			const std::string loadFailureScript =
+				"loadgame(1); assign('continued_after_failed_load', 1)";
+			auto loadFailureScriptBytes = std::make_unique<char[]>(
+				loadFailureScript.size());
+			std::copy(
+				loadFailureScript.cbegin(),
+				loadFailureScript.cend(),
+				loadFailureScriptBytes.get());
+			const int scriptResult =
+				scriptFailureLoader.script.runScript(
+					loadFailureScriptBytes,
+					static_cast<int>(loadFailureScript.size()));
+			ok = check(
+				scriptResult != 0 &&
+					scriptFailureLoader.varList.getInteger(
+						"continued_after_failed_load") == 0 &&
+					!scriptFailureLoader.getLastLoadFailureMessage().empty(),
+				"a failed Lua loadgame call aborts the current script instead of running opening events against an unavailable world") &&
+				ok;
+		}
+		{
+			const std::string childScriptPath =
+				"script/common/load-failure-child.txt";
+			const bool childScriptReady = writeVirtualFile(
+				childScriptPath,
+				"loadgame(1)");
+			GameManager nestedScriptFailureLoader;
+			nestedScriptFailureLoader.varList.ensureInitialized();
+			const std::string parentScript =
+				"runscript('load-failure-child.txt'); "
+				"assign('continued_after_child_failed_load', 1)";
+			auto parentScriptBytes = std::make_unique<char[]>(
+				parentScript.size());
+			std::copy(
+				parentScript.cbegin(),
+				parentScript.cend(),
+				parentScriptBytes.get());
+			const int scriptResult = childScriptReady
+				? nestedScriptFailureLoader.script.runScript(
+					parentScriptBytes,
+					static_cast<int>(parentScript.size()))
+				: -1;
+			ok = check(
+				childScriptReady &&
+					scriptResult != 0 &&
+					nestedScriptFailureLoader.varList.getInteger(
+						"continued_after_child_failed_load") == 0 &&
+					!nestedScriptFailureLoader.
+						getLastLoadFailureMessage().empty(),
+				"a failed loadgame in a nested runscript aborts the parent script") &&
+				ok;
+		}
+		{
+			GameManager missingChildLoader;
+			missingChildLoader.varList.ensureInitialized();
+			CoreLifecycleTestAccess::setLastLoadFailureMessage(
+				missingChildLoader,
+				"stale load failure");
+			const std::string parentScript =
+				"runscript('missing-child.txt'); "
+				"assign('continued_after_missing_child', 1)";
+			auto parentScriptBytes = std::make_unique<char[]>(
+				parentScript.size());
+			std::copy(
+				parentScript.cbegin(),
+				parentScript.cend(),
+				parentScriptBytes.get());
+			const int scriptResult =
+				missingChildLoader.script.runScript(
+					parentScriptBytes,
+					static_cast<int>(parentScript.size()));
+			ok = check(
+				scriptResult == 0 &&
+					missingChildLoader.varList.getInteger(
+						"continued_after_missing_child") == 1 &&
+					missingChildLoader.
+						getLastLoadFailureMessage().empty(),
+				"a missing child script does not reuse a stale load failure") &&
+				ok;
+		}
+		ok = check(
+			writeVirtualFile(
+				globalVirtualPath,
+				validGlobalBytes),
+			"missing-map fatal fixture restores the valid game.ini") &&
+			ok;
+	}
+
+	struct AuxiliaryLoadFailureCase
+	{
+		std::string fileName;
+		const char* description;
+		const char* corruptBytes;
+	};
+	const std::string characterSuffix = characterIndex < 0
+		? std::string()
+		: std::to_string(characterIndex);
+	const AuxiliaryLoadFailureCase auxiliaryFailureCases[] =
+	{
+		{ "traps.ini", "malformed trap definitions", "[Broken\n" },
+		{ "trapindexignore.ini", "malformed triggered trap indices", "[Broken\n" },
+		{ "variable.ini", "malformed script variables", "[Broken\n" },
+		{ "memo.txt", "malformed memo data", "[Broken\n" },
+		{ "magic" + characterSuffix + ".ini", "malformed magic data", "[Broken\n" },
+		{ "goods" + characterSuffix + ".ini", "malformed goods data", "[Broken\n" },
+		{ "partner" + characterSuffix + ".ini", "malformed partner data", "[Broken\n" },
+		{ "proj.ini", "malformed effect data", "[Broken\n" },
+		{ "proj.ini", "effect data without a Head section", "[Broken]\nX=1\n" }
+	};
+	for (const AuxiliaryLoadFailureCase& failureCase :
+		auxiliaryFailureCases)
+	{
+		const bool trapFailure =
+			failureCase.fileName == "traps.ini" ||
+			failureCase.fileName == "trapindexignore.ini";
+		const std::string initialTrapTemplate =
+			"[template_map]\n1=template_trap.txt\n";
+		const std::string virtualPath =
+			"save/rpg1/" + failureCase.fileName;
+		const bool originalFileExists =
+			File::fileExist(virtualPath);
+		const std::string originalBytes =
+			readVirtualFile(virtualPath);
+		const bool corrupted = originalFileExists &&
+			writeVirtualFile(
+				virtualPath,
+				failureCase.corruptBytes) &&
+			(!trapFailure ||
+				writeVirtualFile(
+					"ini/save/traps.ini",
+					initialTrapTemplate));
+		const std::string fixtureMessage =
+			std::string(failureCase.description) +
+			" fixture is created from a complete save";
+		ok = check(corrupted, fixtureMessage.c_str()) && ok;
+		if (!corrupted)
+		{
+			continue;
+		}
+
+		GameManager tolerantLoader;
+		tolerantLoader.player->npcName =
+			"AuxiliaryStalePlayer";
+		tolerantLoader.varList.ensureInitialized();
+		tolerantLoader.varList.setInteger(
+			"auxiliary_stale_value",
+			1);
+		tolerantLoader.memo.add("auxiliary stale memo");
+		tolerantLoader.traps.beginMapVisit();
+		tolerantLoader.traps.markTriggered(7);
+		if (tolerantLoader.magicManager.magicList.empty())
+		{
+			tolerantLoader.magicManager.magicList.resize(1);
+		}
+		tolerantLoader.magicManager.magicList[0].iniFile =
+			"stale-magic.ini";
+		if (tolerantLoader.goodsManager.goodsList.empty())
+		{
+			tolerantLoader.goodsManager.goodsList.resize(1);
+		}
+		tolerantLoader.goodsManager.goodsList[0].iniFile =
+			"stale-goods.ini";
+		tolerantLoader.goodsManager.goodsList[0].number = 1;
+		const bool loaded = tolerantLoader.loadGame(1);
+		const std::string repairedBytes =
+			readVirtualFile("save/game/" + failureCase.fileName);
+		INIReader repairedTrapDefinitions("save/game/traps.ini");
+		const std::string assertionMessage =
+			std::string(failureCase.description) +
+			(trapFailure
+				? " falls back to the initial trap template"
+				: " is replaced with a usable empty current state");
+		ok = check(
+			loaded &&
+				tolerantLoader.getLastLoadFailureMessage().empty() &&
+				tolerantLoader.player->npcName !=
+					"AuxiliaryStalePlayer" &&
+				tolerantLoader.varList.getInteger(
+					"auxiliary_stale_value") == 0 &&
+				tolerantLoader.memo.memo.empty() &&
+				!tolerantLoader.traps.hasTriggered(7) &&
+				(!trapFailure ||
+					tolerantLoader.traps.get(
+						"template_map",
+						1) == "template_trap.txt") &&
+				std::none_of(
+					tolerantLoader.magicManager.magicList.cbegin(),
+					tolerantLoader.magicManager.magicList.cend(),
+					[](const MagicInfo& info)
+					{
+						return info.iniFile == "stale-magic.ini";
+					}) &&
+				std::none_of(
+					tolerantLoader.goodsManager.goodsList.cbegin(),
+					tolerantLoader.goodsManager.goodsList.cend(),
+					[](const GoodsInfo& info)
+					{
+						return info.iniFile == "stale-goods.ini";
+					}) &&
+				readVirtualFile(virtualPath) ==
+					failureCase.corruptBytes &&
+				repairedBytes != failureCase.corruptBytes &&
+				(!trapFailure ||
+					repairedTrapDefinitions.Get(
+						"template_map",
+						"1",
+						"") == "template_trap.txt"),
+			assertionMessage.c_str()) && ok;
+		const std::string restoreMessage =
+			std::string(failureCase.description) +
+			" fixture restores the valid source file";
+		ok = check(
+			writeVirtualFile(virtualPath, originalBytes),
+			restoreMessage.c_str()) && ok;
+	}
+
+	const std::string retainedSlot =
+		"[State]\n"
+		"Map=retained.map\n";
+	struct MapSaveGuardCase
+	{
+		const char* mapName;
+		const char* description;
+	};
+	const MapSaveGuardCase mapGuardCases[] =
+	{
+		{ "", "an empty map name" },
+		{ "../outside.map", "an unsafe map path" },
+		{ "missing.map", "a missing map resource" }
+	};
+	for (const MapSaveGuardCase& mapGuardCase : mapGuardCases)
+	{
+		const bool fixtureReady =
+			File::clearDirectoryFiles("save/rpg1") &&
+			writeVirtualFile(
+				"save/rpg1/game.ini",
+				retainedSlot);
+		const std::string fixtureMessage =
+			std::string(mapGuardCase.description) +
+			" save rejection fixture is created";
+		ok = check(fixtureReady, fixtureMessage.c_str()) && ok;
+		if (!fixtureReady)
+		{
+			continue;
+		}
+		GameManager gameManager;
+		gameManager.global.data.mapName = mapGuardCase.mapName;
+		gameManager.varList.ensureInitialized();
+		gameManager.traps.beginMapVisit();
+		const std::string rejectionMessage =
+			std::string(mapGuardCase.description) +
+			" is rejected without replacing the old slot";
+		ok = check(
+			!gameManager.saveGame(1) &&
+				readVirtualFile("save/rpg1/game.ini") == retainedSlot,
+			rejectionMessage.c_str()) && ok;
+	}
+
+	struct EntityListGuardCase
+	{
+		int slotIndex;
+		const char* npcName;
+		const char* objectName;
+		const char* description;
+	};
+	const EntityListGuardCase guardCases[] =
+	{
+		{
+			2,
+			"game.ini",
+			"ordinary.obj",
+			"a reserved entity-list name"
+		},
+		{
+			3,
+			"Shared.ini",
+			"shared.INI",
+			"case-colliding NPC and object list names"
+		}
+	};
+	for (const EntityListGuardCase& guardCase : guardCases)
+	{
+		const std::string slotDirectory =
+			"save/rpg" + std::to_string(guardCase.slotIndex);
+		const std::string slotGlobal =
+			slotDirectory + "/game.ini";
+		const bool fixtureReady =
+			File::clearDirectoryFiles(slotDirectory) &&
+			writeVirtualFile(slotGlobal, retainedSlot);
+		const std::string fixtureMessage =
+			std::string(guardCase.description) +
+			" rejection fixture is created";
+		ok = check(
+			fixtureReady,
+			fixtureMessage.c_str()) && ok;
+		if (!fixtureReady)
+		{
+			continue;
+		}
+
+		GameManager gameManager;
+		gameManager.global.data.mapName = mapName;
+		gameManager.global.data.npcName = guardCase.npcName;
+		gameManager.global.data.objName = guardCase.objectName;
+		gameManager.varList.ensureInitialized();
+		gameManager.traps.beginMapVisit();
+		const std::string rejectionMessage =
+			std::string(guardCase.description) +
+			" is rejected without replacing the old slot";
+		ok = check(
+			!gameManager.saveGame(guardCase.slotIndex) &&
+			readVirtualFile(slotGlobal) == retainedSlot,
+			rejectionMessage.c_str()) && ok;
+	}
+
+	const std::string blockedSlotPath = "save/rpg7";
+	const std::string blockedSlotMarker = "blocked-slot-destination";
+	const bool publicationFailureFixtureReady =
+		File::clearDirectoryFiles("save/game") &&
+		File::clearDirectoryFiles("save/game_build") &&
+		writeVirtualFile(
+			"save/game/game.ini",
+			"[State]\nMap=old-current.map\n") &&
+		writeVirtualFile(
+			blockedSlotPath,
+			blockedSlotMarker);
+	ok = check(
+		publicationFailureFixtureReady,
+		"current-first publication failure fixture is created") && ok;
+	if (publicationFailureFixtureReady)
+	{
+		GameManager gameManager;
+		gameManager.global.data.mapName = mapName;
+		gameManager.global.data.npcName.clear();
+		gameManager.global.data.objName.clear();
+		gameManager.varList.ensureInitialized();
+		gameManager.traps.beginMapVisit();
+		const bool saved = gameManager.saveGame(7);
+		INIReader currentGlobal("save/game/game.ini");
+		ok = check(
+			!saved &&
+				currentGlobal.ParseError() == 0 &&
+				currentGlobal.Get("State", "Map", "") == mapName &&
+				readVirtualFile(blockedSlotPath) == blockedSlotMarker,
+			"a slot publication failure reports failure after refreshing current state while preserving the blocked old slot") && ok;
 	}
 	engine->resetApplicationQuitRequest();
 	return ok;
@@ -3000,6 +3837,7 @@ bool runCoreLifecycleTests()
 	ok = runMemoGenerationCompatibilityTests() && ok;
 	ok = runOwnerWorldCommitPhaseTests() && ok;
 	ok = runMapActorResetModeTests() && ok;
+	ok = runEmptyEntityListSaveLoadRoundTripTests() && ok;
 	ok = runSaveLoadFailureRecoveryTests() && ok;
 	GameManager gameManager;
 	ok = runNewYearPeriodTests(gameManager) && ok;

@@ -2287,7 +2287,11 @@ void Map::drawMap()
 	}
 	else if (Config::playerAlpha)
 	{
-		gm->player->drawAlpha(cenTile, cenScreen, offset);
+		gm->player->drawAlpha(
+			cenTile,
+			cenScreen,
+			offset,
+			actorColorStyle);
 	}
 
 	if (gm->global.data.waterEffect)

@@ -26,5 +26,6 @@ namespace ColorStyle
 		_shared_image image,
 		int x,
 		int y,
-		std::uint32_t colorStyle);
+		std::uint32_t colorStyle,
+		std::uint8_t alpha = 255);
 }

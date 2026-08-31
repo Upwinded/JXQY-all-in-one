@@ -150,8 +150,8 @@ int main()
                "trap persistence test wrote definitions without a triggered-index file") && ok;
 
     Traps loadedTraps;
-    loadedTraps.load();
-    ok = check(loadedTraps.get("scene01", 1) == "trap01.txt" &&
+    ok = check(loadedTraps.load() &&
+                   loadedTraps.get("scene01", 1) == "trap01.txt" &&
                    !loadedTraps.hasTriggered(1),
                "an older save without triggered indices loads with every trap active") && ok;
     loadedTraps.markTriggered(2);
@@ -160,12 +160,22 @@ int main()
                        std::string(SAVE_CURRENT_FOLDER) +
                        TRAP_TRIGGERED_INDICES_INI),
                "SaveMapTrap-style persistence writes definitions without prematurely saving visit state") && ok;
+    ok = check(File::writeFileChecked(
+                   std::string(SAVE_CURRENT_FOLDER) +
+                       TRAP_TRIGGERED_INDICES_INI,
+                   "",
+                   0) &&
+                   loadedTraps.load() &&
+                   !loadedTraps.hasTriggered(2) &&
+                   loadedTraps.get("scene01", 1) == "trap01.txt",
+               "a zero-byte triggered-index file remains a compatible empty state") && ok;
+    loadedTraps.markTriggered(2);
     ok = check(loadedTraps.save(),
                "saving writes trap definitions and the triggered-index list") && ok;
 
     Traps restoredTraps;
-    restoredTraps.load();
-    ok = check(restoredTraps.hasTriggered(2) &&
+    ok = check(restoredTraps.load() &&
+                   restoredTraps.hasTriggered(2) &&
                    restoredTraps.get("scene01", 2) == "trap02.txt",
                "loading the same map restores triggered indices without deleting definitions") && ok;
     restoredTraps.beginMapVisit();
@@ -180,11 +190,63 @@ int main()
                    malformedTriggeredIndices.data(),
                    static_cast<int>(malformedTriggeredIndices.size())),
                "trap persistence test wrote a malformed optional triggered-index file") && ok;
-    Traps malformedStateTraps;
-    malformedStateTraps.load();
-    ok = check(!malformedStateTraps.hasTriggered(2) &&
-                   malformedStateTraps.get("scene01", 2) == "trap02.txt",
-               "malformed optional triggered indices degrade to an empty list without losing definitions") && ok;
+    restoredTraps.markTriggered(1);
+    std::string triggeredFailureReason;
+    ok = check(!restoredTraps.load(&triggeredFailureReason) &&
+                   restoredTraps.hasTriggered(1) &&
+                   restoredTraps.get("scene01", 2) == "trap02.txt" &&
+                   triggeredFailureReason.find("trapindexignore.ini") !=
+                       std::string::npos,
+               "an existing malformed triggered-index file fails without mutating trap state") && ok;
+
+	const std::string invalidTriggeredIndex =
+		"[init]\n"
+		"0=invalid\n"
+		"1=2\n"
+		"2=70000\n";
+	ok = check(File::writeFileChecked(
+			   std::string(SAVE_CURRENT_FOLDER) +
+				   TRAP_TRIGGERED_INDICES_INI,
+			   invalidTriggeredIndex.data(),
+			   static_cast<int>(invalidTriggeredIndex.size())) &&
+			   restoredTraps.load(&triggeredFailureReason) &&
+			   !restoredTraps.hasTriggered(1) &&
+			   restoredTraps.hasTriggered(2) &&
+			   triggeredFailureReason.empty(),
+		   "invalid persisted triggered indices are skipped while valid legacy entries load") && ok;
+
+    const std::string validTriggeredIndices = "[init]\n0=2\n";
+    ok = check(File::writeFileChecked(
+                   std::string(SAVE_CURRENT_FOLDER) +
+                       TRAP_TRIGGERED_INDICES_INI,
+                   validTriggeredIndices.data(),
+                   static_cast<int>(validTriggeredIndices.size())),
+               "trap persistence test restored valid triggered indices") && ok;
+    const std::string malformedDefinitions = "[scene01\n1=broken.txt\n";
+    ok = check(File::writeFileChecked(
+                   std::string(SAVE_CURRENT_FOLDER) + TRAPS_INI,
+                   malformedDefinitions.data(),
+                   static_cast<int>(malformedDefinitions.size())),
+               "trap persistence test wrote malformed definitions") && ok;
+    std::string definitionsFailureReason;
+    ok = check(!restoredTraps.load(&definitionsFailureReason) &&
+                   !restoredTraps.hasTriggered(1) &&
+                   restoredTraps.hasTriggered(2) &&
+                   restoredTraps.get("scene01", 2) == "trap02.txt" &&
+                   definitionsFailureReason.find("traps.ini") !=
+                       std::string::npos,
+               "malformed trap definitions fail without mutating the live definitions") && ok;
+
+    ok = check(File::writeFileChecked(
+                   std::string(SAVE_CURRENT_FOLDER) + TRAPS_INI,
+                   "",
+                   0),
+               "trap persistence test wrote a canonical empty definition file") && ok;
+    Traps emptyDefinitionTraps;
+    ok = check(emptyDefinitionTraps.load() &&
+                   emptyDefinitionTraps.get("scene01", 1).empty() &&
+                   emptyDefinitionTraps.hasTriggered(2),
+               "a zero-byte trap definition file remains a valid empty state") && ok;
 
     return ok ? 0 : 1;
 }

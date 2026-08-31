@@ -5770,6 +5770,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         convertTalkDatToTalkIndex(outputRoot, outputRoot, effectiveOptions,
             report, logCallback);
         ensureMoneyDropScripts(outputRoot, report);
+        ensureKnownScriptLocations(outputRoot, report);
         addDomainWrittenFiles(report, AssetResourceType::Scripts,
             previousWrittenFiles);
     }
@@ -7325,6 +7326,120 @@ void JxAssetMigrator::ensureMoneyDropScripts(
             false);
         report.logLines.append(QString::fromUtf8(
             "错误: 无法生成钱袋脚本 %1").arg(relativePath));
+    }
+}
+
+void JxAssetMigrator::ensureKnownScriptLocations(
+    const QString& outputDir,
+    AssetMigrationReport& report)
+{
+    const std::array<std::pair<QString, QString>, 3> locations = {{
+        {
+            QString::fromUtf8("script/未找到的/1f66fded.txt"),
+            QString::fromUtf8("script/map/map101_天王帮大殿/杨瑛对话.txt")
+        },
+        {
+            QString::fromUtf8("script/未找到的/6da90a79.txt"),
+            QString::fromUtf8(
+                "script/map/map_033_落叶谷(破坏后)/孟知秋临终对话.txt")
+        },
+        {
+            QString::fromUtf8(
+                "script/map/map_002_凌绝峰峰顶/月眉儿之死.txt"),
+            QString::fromUtf8(
+                "script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt")
+        }
+    }};
+
+    for (const auto& [orphanRelativePath, runtimeRelativePath] : locations)
+    {
+        const QString sourcePath = appendPath(outputDir, orphanRelativePath);
+        if (!QFileInfo(sourcePath).isFile())
+            continue;
+
+        const QString outputPath = appendPath(outputDir, runtimeRelativePath);
+        const QFileInfo outputInfo(outputPath);
+        if (outputInfo.isFile())
+            continue;
+
+        if (outputInfo.exists() ||
+            !copyFileReplacing(sourcePath, outputPath, report))
+        {
+            report.errorCount++;
+            domainReportFor(report, AssetResourceType::Scripts).
+                failedFiles++;
+            appendFileOutcome(
+                report,
+                orphanRelativePath,
+                runtimeRelativePath,
+                AssetResourceType::Scripts,
+                AssetMigrationFileAction::Fail,
+                QStringLiteral("known-script-location-restore-failed"),
+                QString::fromUtf8(
+                    "已知剧情脚本的运行时目标路径不可用"),
+                false);
+            report.logLines.append(QString::fromUtf8(
+                "错误: 无法恢复已知剧情脚本 %1 -> %2")
+                .arg(orphanRelativePath, runtimeRelativePath));
+            continue;
+        }
+
+        appendFileOutcome(
+            report,
+            orphanRelativePath,
+            runtimeRelativePath,
+            AssetResourceType::Scripts,
+            AssetMigrationFileAction::Convert,
+            QStringLiteral("restored-known-script-location"),
+            QString::fromUtf8(
+                "将已确认来源的散落剧情脚本恢复到运行时地图目录"),
+            false);
+    }
+
+    const std::array<QString, 3> endingScripts = {{
+        QString::fromUtf8(
+            "script/map/map_002_凌绝峰峰顶/月眉儿之死.txt"),
+        QString::fromUtf8(
+            "script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt"),
+        QString::fromUtf8(
+            "script/map/map_026_摘星楼地下/纳兰潜凛死亡.txt")
+    }};
+    for (const QString& relativePath : endingScripts)
+    {
+        const QString path = appendPath(outputDir, relativePath);
+        QFile input(path);
+        if (!input.open(QIODevice::ReadOnly))
+            continue;
+
+        QByteArray content = input.readAll();
+        input.close();
+        if (!content.contains("logo.avi"))
+            continue;
+
+        content.replace("logo.avi", "logo.wmv");
+        if (writeTextFileUtf8(
+                path,
+                std::string(content.constData(), content.size()),
+                false,
+                report))
+        {
+            continue;
+        }
+
+        report.errorCount++;
+        domainReportFor(report, AssetResourceType::Scripts).failedFiles++;
+        appendFileOutcome(
+            report,
+            relativePath,
+            relativePath,
+            AssetResourceType::Scripts,
+            AssetMigrationFileAction::Fail,
+            QStringLiteral("known-movie-reference-rewrite-failed"),
+            QString::fromUtf8("无法修正月影结局影片资源名"),
+            false);
+        report.logLines.append(QString::fromUtf8(
+            "错误: 无法修正月影结局影片资源名 %1")
+            .arg(relativePath));
     }
 }
 

@@ -17,7 +17,7 @@ public:
 	VariableList();
 	virtual ~VariableList();
 
-	void load();
+	bool load(std::string* failureReason = nullptr);
 	void ensureInitialized();
 	bool save();
 	void clearExcept(const std::vector<std::string>& keepNames);

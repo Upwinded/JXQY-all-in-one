@@ -1484,6 +1484,96 @@ bool testMigrationPreservesLegacyScriptDocumentation()
               "legacy script documentation is transcoded but not rewritten as Lua");
 }
 
+bool testMigrationRestoresKnownScriptLocations()
+{
+    QTemporaryDir sourceDir;
+    QTemporaryDir outputDir;
+    if (!check(sourceDir.isValid() && outputDir.isValid(),
+            "create known orphan script migration temp dirs"))
+    {
+        return false;
+    }
+
+    QDir source(sourceDir.path());
+    const QString orphanFolder = QString::fromUtf8("script/未找到的");
+    const QString endingFolder = QString::fromUtf8(
+        "script/map/map_002_凌绝峰峰顶");
+    const QString secondEndingFolder = QString::fromUtf8(
+        "script/map/map_026_摘星楼地下");
+    if (!check(source.mkpath(orphanFolder) &&
+            source.mkpath(endingFolder) &&
+            source.mkpath(secondEndingFolder) &&
+            writeUtf8TextFile(
+                source.filePath(orphanFolder + "/1f66fded.txt"),
+                "Say(\"xjxqy restored\");\n") &&
+            writeUtf8TextFile(
+                source.filePath(orphanFolder + "/6DA90A79.txt"),
+                "Say(\"yycs restored\");\n") &&
+            writeUtf8TextFile(
+                source.filePath(endingFolder + "/月眉儿之死.txt"),
+                "Say(\"ending restored\");\n"
+                "PlayMovie(\"logo.avi\");\n") &&
+            writeUtf8TextFile(
+                source.filePath(
+                    secondEndingFolder + "/纳兰潜凛死亡.txt"),
+                "PlayMovie(\"logo.avi\");\n"),
+            "write known orphan script migration fixtures"))
+    {
+        return false;
+    }
+
+    AssetMigrationOptions options;
+    options.resourceTypes = {AssetResourceType::Scripts};
+    options.convertScript = true;
+    options.sourceEncoding = "utf8";
+    AssetMigrationReport report;
+    JxAssetMigrator migrator;
+    const MigrationResult result = migrator.migrate(
+        sourceDir.path(), outputDir.path(), options, report);
+    QDir output(outputDir.path());
+    const QString xjxqyScript = readUtf8TextFile(output.filePath(
+        QString::fromUtf8(
+            "script/map/map101_天王帮大殿/杨瑛对话.txt")));
+    const QString yycsScript = readUtf8TextFile(output.filePath(
+        QString::fromUtf8(
+            "script/map/map_033_落叶谷(破坏后)/孟知秋临终对话.txt")));
+    const QString endingScript = readUtf8TextFile(output.filePath(
+        QString::fromUtf8(
+            "script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt")));
+    const QString originalEndingScript = readUtf8TextFile(output.filePath(
+        QString::fromUtf8(
+            "script/map/map_002_凌绝峰峰顶/月眉儿之死.txt")));
+    const QString secondEndingScript = readUtf8TextFile(output.filePath(
+        QString::fromUtf8(
+            "script/map/map_026_摘星楼地下/纳兰潜凛死亡.txt")));
+    const int restoredOutcomeCount = static_cast<int>(std::count_if(
+        report.fileOutcomes.cbegin(),
+        report.fileOutcomes.cend(),
+        [](const AssetMigrationFileOutcome& outcome)
+        {
+            return outcome.action == AssetMigrationFileAction::Convert &&
+                outcome.reason ==
+                    QStringLiteral("restored-known-script-location");
+        }));
+
+    return check(result == MigrationResult::Success,
+                 "known orphan script migration succeeds") &&
+        check(xjxqyScript.contains("say(\"xjxqy restored\");"),
+              "migration restores the XJXQY Yang Ying script") &&
+        check(yycsScript.contains("say(\"yycs restored\");"),
+              "migration restores the YYCS Meng Zhiqiu script") &&
+        check(endingScript.contains("say(\"ending restored\");"),
+              "migration restores the YYCS third-ending death-script alias") &&
+        check(endingScript.contains("playmovie(\"logo.wmv\");") &&
+                  originalEndingScript.contains(
+                      "playmovie(\"logo.wmv\");") &&
+                  secondEndingScript.contains(
+                      "playmovie(\"logo.wmv\");"),
+              "migration keeps YYCS ending scripts on the packaged logo movie") &&
+        check(restoredOutcomeCount == 3,
+              "migration reports all restored known script locations");
+}
+
 bool testMigrationSkipsLegacySourceControlMetadata()
 {
     QTemporaryDir sourceDir;
@@ -9316,6 +9406,7 @@ int main(int argc, char* argv[])
     ok = testLuaScriptSyntaxValidator() && ok;
     ok = testLuaScriptSyntaxValidatorSkipsLegacyDialogueAndDocs() && ok;
     ok = testMigrationPreservesLegacyScriptDocumentation() && ok;
+    ok = testMigrationRestoresKnownScriptLocations() && ok;
     ok = testMigrationSkipsLegacySourceControlMetadata() && ok;
     ok = testMigrationSkipsLegacyNonRuntimeFiles() && ok;
     ok = testMigrationMapsLegacyNewGameSaveTemplate() && ok;

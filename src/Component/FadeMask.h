@@ -9,6 +9,7 @@ public:
 	virtual ~FadeMask();
 
 	void sleep(UTime t);
+	void setFadeTime(UTime t);
 	void fadeIn();
 	void fadeOut();
 
@@ -18,6 +19,7 @@ private:
 	bool isFadeIn = false;
 	UTime sleepTime = 0;
 	bool isSleep = false;
+	bool fadeCompleted = false;
 	UTime fadeBeginTime = 0;
 	_shared_image mask = nullptr;
 
@@ -31,5 +33,4 @@ protected:
 
 
 };
-
 

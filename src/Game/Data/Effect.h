@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
+inline constexpr int MaximumPersistedEffectCollectionCount = 4096;
+
 class NPC;
 class EffectTestAccess;
 class RageSystemTestAccess;

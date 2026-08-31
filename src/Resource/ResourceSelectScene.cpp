@@ -551,6 +551,33 @@ bool isPlainDirectory(const std::filesystem::path& path)
 #endif
 }
 
+bool removePlainOwnedDirectoryIfPresent(
+	const std::filesystem::path& path)
+{
+	std::error_code error;
+	const std::filesystem::file_status status =
+		std::filesystem::symlink_status(path, error);
+	if (error == std::errc::no_such_file_or_directory)
+	{
+		return true;
+	}
+	if (!error && !std::filesystem::exists(status))
+	{
+		return true;
+	}
+	if (error || !isPlainDirectory(path))
+	{
+		return false;
+	}
+	std::filesystem::remove_all(path, error);
+	if (error)
+	{
+		return false;
+	}
+	const bool remains = std::filesystem::exists(path, error);
+	return !error && !remains;
+}
+
 bool isPlainRegularFile(const std::filesystem::path& path)
 {
 	std::error_code error;
@@ -568,6 +595,25 @@ bool isPlainRegularFile(const std::filesystem::path& path)
 #else
 	return true;
 #endif
+}
+
+bool removePlainOwnedFileIfPresent(
+	const std::filesystem::path& path)
+{
+	std::error_code error;
+	const std::filesystem::file_status status =
+		std::filesystem::symlink_status(path, error);
+	if (error == std::errc::no_such_file_or_directory ||
+		(!error && !std::filesystem::exists(status)))
+	{
+		return true;
+	}
+	if (error || !isPlainRegularFile(path))
+	{
+		return false;
+	}
+	const bool removed = std::filesystem::remove(path, error);
+	return removed && !error;
 }
 
 const char* desktopProgramHelperTarget()
@@ -2264,7 +2310,8 @@ void ResourceSelectScene::refreshProgramActionButton()
 		return;
 	}
 	bool available = false;
-	if (!displaySettingsVisible &&
+	if (!displaySettingsVisible && !cheatHelpVisible &&
+		!externalResourceDialogVisible &&
 		catalogCheckState == CatalogCheckState::Ready &&
 		programUpdatePlatformAvailable() && catalogCheckRunner == nullptr &&
 		resourceInstallRunner == nullptr && resourceInstallDialogState ==
@@ -2341,7 +2388,8 @@ void ResourceSelectScene::refreshOnlineActionButton()
 	{
 		return;
 	}
-	const bool available = !displaySettingsVisible &&
+	const bool available = !displaySettingsVisible && !cheatHelpVisible &&
+		!externalResourceDialogVisible &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden &&
 		selectedDetails.packIndex >= 0 && selectedDetails.onlineAvailable &&
 		catalogCheckState == CatalogCheckState::Ready;
@@ -2365,7 +2413,8 @@ void ResourceSelectScene::refreshOnlineActionButton()
 
 void ResourceSelectScene::refreshResourceManagementButtons()
 {
-	const bool dialogHidden = !displaySettingsVisible &&
+	const bool dialogHidden = !displaySettingsVisible && !cheatHelpVisible &&
+		!externalResourceDialogVisible &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden;
 	if (resourceRemoveButton != nullptr)
 	{
@@ -3373,12 +3422,19 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 			updateDirectory / "jxqy-update.apk";
 		const std::filesystem::path downloadWorkspace =
 			updateDirectory / "download";
-		if (std::filesystem::exists(apkPath, error) || error ||
-			std::filesystem::exists(downloadWorkspace, error) || error)
+		if (!removePlainOwnedFileIfPresent(apkPath))
 		{
 			resourceInstallDialogState = ResourceInstallDialogState::Failed;
 			resourceInstallDialogMessage =
-				u8"Android 主程序更新目录存在未清理的文件";
+				u8"无法安全清理上次遗留的 Android 安装包";
+			refreshResourceInstallDialogControls();
+			return;
+		}
+		if (!removePlainOwnedDirectoryIfPresent(downloadWorkspace))
+		{
+			resourceInstallDialogState = ResourceInstallDialogState::Failed;
+			resourceInstallDialogMessage =
+				u8"无法安全清理上次中断的 Android 下载";
 			refreshResourceInstallDialogControls();
 			return;
 		}
@@ -3490,22 +3546,45 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		if (error || (!workspaceExists &&
 			(!std::filesystem::create_directories(
 				paths.workspacePath, error) || error)) ||
-			!isPlainDirectory(paths.workspacePath) ||
-			std::filesystem::exists(paths.stagingPath, error) || error ||
-			std::filesystem::exists(paths.previousPath, error) || error)
+			!isPlainDirectory(paths.workspacePath))
 		{
 			resourceInstallDialogState = ResourceInstallDialogState::Failed;
 			resourceInstallDialogMessage = u8"主程序更新暂存目录存在冲突";
 			refreshResourceInstallDialogControls();
 			return;
 		}
-		const std::filesystem::path downloadWorkspace =
-			paths.workspacePath / "download";
-		if (std::filesystem::exists(downloadWorkspace, error) || error)
+		const bool previousExists =
+			std::filesystem::exists(paths.previousPath, error);
+		if (error || previousExists)
 		{
 			resourceInstallDialogState = ResourceInstallDialogState::Failed;
 			resourceInstallDialogMessage =
-				u8"已有未清理的主程序下载，请重新启动后再试";
+				u8"主程序更新存在待恢复的旧版本，请重新运行更新助手";
+			refreshResourceInstallDialogControls();
+			return;
+		}
+		const bool stagingExists =
+			std::filesystem::exists(paths.stagingPath, error);
+		const bool stagingPrepared = stagingExists &&
+			isPreparedDesktopProgramUpdate(paths);
+		if (error || (stagingExists &&
+			(stagingPrepared ||
+				!removePlainOwnedDirectoryIfPresent(paths.stagingPath))))
+		{
+			resourceInstallDialogState = ResourceInstallDialogState::Failed;
+			resourceInstallDialogMessage = stagingPrepared
+				? std::string(u8"主程序已经准备完成，请重新打开更新确认")
+				: std::string(u8"无法安全清理未完成的主程序解压目录");
+			refreshResourceInstallDialogControls();
+			return;
+		}
+		const std::filesystem::path downloadWorkspace =
+			paths.workspacePath / "download";
+		if (!removePlainOwnedDirectoryIfPresent(downloadWorkspace))
+		{
+			resourceInstallDialogState = ResourceInstallDialogState::Failed;
+			resourceInstallDialogMessage =
+				u8"无法安全清理上次中断的主程序下载";
 			refreshResourceInstallDialogControls();
 			return;
 		}
@@ -3763,6 +3842,14 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 			if (workerResult->preparation.preparedResources.size() !=
 				resourcePackageCount)
 			{
+				if (!removePlainOwnedDirectoryIfPresent(workspacePath))
+				{
+					workerResult->preparation.status =
+						OnlineUpdate::ResourceDownloadPreparationStatus::
+							CleanupFailed;
+					return GameLoading::LoadingTaskResult::failure(
+						"Prepared resource count cleanup failed.");
+				}
 				return GameLoading::LoadingTaskResult::failure(
 					"Prepared resource count does not match install targets.");
 			}
@@ -3817,8 +3904,12 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 				}
 				if (!workerResult->commonPreparation.succeeded())
 				{
-					std::error_code cleanupError;
-					std::filesystem::remove_all(workspacePath, cleanupError);
+					if (!removePlainOwnedDirectoryIfPresent(workspacePath))
+					{
+						workerResult->commonPreparation.status =
+							OnlineUpdate::ResourceDownloadPreparationStatus::
+								CleanupFailed;
+					}
 					return GameLoading::LoadingTaskResult::failure(
 						"Common download preparation failed.");
 				}
@@ -3865,6 +3956,14 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 			if (workerResult->transaction.status !=
 				OnlineUpdate::ResourceInstallTransactionStatus::Success)
 			{
+				if (!removePlainOwnedDirectoryIfPresent(workspacePath))
+				{
+					workerResult->transaction.status =
+						OnlineUpdate::ResourceInstallTransactionStatus::
+							CleanupFailed;
+					return GameLoading::LoadingTaskResult::failure(
+						"Resource install staging cleanup failed.");
+				}
 				return GameLoading::LoadingTaskResult::failure(
 					"Resource install transaction staging failed.");
 			}

@@ -1559,6 +1559,7 @@ bool runProductionRuntimeTraceTest(
 	EditorRun::SceneApplicationResult result;
 	bool storedVariableSemanticsPreserved = false;
 	bool missingOverlayOriginStillRuns = false;
+	bool variableLoadContractPreserved = false;
 	{
 		GameManager gameManager(
 			target,
@@ -1636,7 +1637,32 @@ bool runProductionRuntimeTraceTest(
 				"LoadedMixed=9\n"),
 			"runtime trace variable load fixture is written") &&
 			ok;
-		gameManager.varList.load();
+		const bool validVariablesLoaded =
+			gameManager.varList.load();
+		const bool emptyVariablesWritten =
+			writeTextFile(
+				fixture.isolatedSaveRoot /
+					"game" / "variable.ini",
+				"");
+		const bool emptyVariablesLoaded =
+			emptyVariablesWritten &&
+			gameManager.varList.load() &&
+			gameManager.varList.getInteger("LoadedMixed") == 0;
+		gameManager.varList.setInteger("RetainedAfterFailure", 37);
+		const bool malformedVariablesWritten =
+			writeTextFile(
+				fixture.isolatedSaveRoot /
+					"game" / "variable.ini",
+				"[Variable\nBroken=1\n");
+		std::string variableFailureReason;
+		variableLoadContractPreserved =
+			validVariablesLoaded &&
+			emptyVariablesLoaded &&
+			malformedVariablesWritten &&
+			!gameManager.varList.load(&variableFailureReason) &&
+			gameManager.varList.getInteger("RetainedAfterFailure") == 37 &&
+			variableFailureReason.find("variable.ini") !=
+				std::string::npos;
 	}
 	ok = check(
 		result.succeeded(),
@@ -1649,6 +1675,10 @@ bool runProductionRuntimeTraceTest(
 	ok = check(
 		storedVariableSemanticsPreserved,
 		"trace observation preserves existing case-insensitive variable storage semantics") &&
+		ok;
+	ok = check(
+		variableLoadContractPreserved,
+		"variable loading accepts an empty state and rejects malformed data without mutation") &&
 		ok;
 	ok = check(
 		writer->finish(

@@ -38,7 +38,7 @@ public:
 		UTime delayMilliseconds,
 		std::shared_ptr<MagicDispatchContext> dispatchContext = nullptr);
 
-	void load();
+	bool load();
 	bool save();
 	void loadFromIni(INIReader& ini);
 	void saveToIni(INIReader& ini);

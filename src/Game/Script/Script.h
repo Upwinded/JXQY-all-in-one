@@ -22,6 +22,7 @@ extern "C" {
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace EditorRun
@@ -133,7 +134,7 @@ private:
 		lua_State* luaState,
 		lua_Debug* debug);
 	void enqueueSourceLine(std::uint64_t line);
-	void enqueueApiCall(const std::string& apiName);
+	void enqueueApiCall(std::string_view apiName);
 
 	std::string name = "script";
 	EditorRun::RuntimeTraceWriter* runtimeTraceWriter = nullptr;

@@ -1078,6 +1078,22 @@ bool runScriptEngineRuntimeTests()
 	ok = check(gameManager.varList.getInteger("GoodsNum") == 3,
 		"GetGoodsNumByName preserves the YYCS/XJXQY case-insensitive display-name lookup") && ok;
 	gameManager.goodsManager.goodsList[goodsQueryIndex] = savedGoodsQueryInfo;
+	const int secondGoodsQueryIndex = goodsQueryIndex + 1;
+	const GoodsInfo savedSecondGoodsQueryInfo =
+		gameManager.goodsManager.goodsList[secondGoodsQueryIndex];
+	gameManager.goodsManager.goodsList[goodsQueryIndex].iniFile =
+		u8"goods-e12-银丝草.ini";
+	gameManager.goodsManager.goodsList[goodsQueryIndex].number = 5;
+	gameManager.goodsManager.goodsList[secondGoodsQueryIndex].iniFile =
+		u8"GOODS-E12-银丝草.INI";
+	gameManager.goodsManager.goodsList[secondGoodsQueryIndex].number = 7;
+	ScriptEngineRuntimeTestAccess::execute(
+		script, u8"getgoodsnum('goods-e12-银丝草.ini')");
+	ok = check(gameManager.varList.getInteger("GoodsNum") == 12,
+		"GetGoodsNum aggregates a YYCS quest item across separate inventory slots") && ok;
+	gameManager.goodsManager.goodsList[goodsQueryIndex] = savedGoodsQueryInfo;
+	gameManager.goodsManager.goodsList[secondGoodsQueryIndex] =
+		savedSecondGoodsQueryInfo;
 	ScriptEngineRuntimeTestAccess::execute(
 		script, "memo('123'); delmemo('123')");
 	ok = check(gameManager.memo.memo.empty(),
@@ -1144,9 +1160,14 @@ bool runScriptEngineRuntimeTests()
 	gameManager.global.data.mpcStyle = ColorStyle::Grayscale;
 	ScriptEngineRuntimeTestAccess::execute(script,
 		"changeasfcolor(0, 0, 0); changemapcolor(0, 0, 0)");
-	ok = check(gameManager.global.data.asfStyle == 0
-		&& gameManager.global.data.mpcStyle == 0,
-		"ChangeASFColor and ChangeMapColor preserve explicit black instead of converting it to grayscale") && ok;
+	ok = check(gameManager.global.data.asfStyle == ColorStyle::Grayscale
+		&& gameManager.global.data.mpcStyle == ColorStyle::Grayscale,
+		"ChangeASFColor and ChangeMapColor preserve the legacy zero-color grayscale scene contract") && ok;
+	ScriptEngineRuntimeTestAccess::execute(script,
+		"changeasfcolor(12, 34, 56); changemapcolor(65, 43, 21)");
+	ok = check(gameManager.global.data.asfStyle == 0x000C2238
+		&& gameManager.global.data.mpcStyle == 0x00412B15,
+		"ChangeASFColor and ChangeMapColor preserve nonzero RGB colors") && ok;
 
 	const int savedAttack = gameManager.player->attack;
 	const int savedAttack2 = gameManager.player->attack2;

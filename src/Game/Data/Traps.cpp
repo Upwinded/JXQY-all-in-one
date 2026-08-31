@@ -1,4 +1,5 @@
 #include "Traps.h"
+#include "SaveIniPersistence.h"
 #include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
 #include "../GameManager/SaveFileManager.h"
@@ -22,11 +23,74 @@ Traps::~Traps()
 	freeResource();
 }
 
-void Traps::load()
+bool Traps::load(std::string* failureReason)
 {
-	freeResource();
-	loadDefinitions();
-	loadTriggeredIndices();
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
+
+	const std::string definitionsFileName =
+		SaveFileManager::CurrentPath() + TRAPS_INI;
+	std::shared_ptr<INIReader> loadedDefinitions;
+	const SaveIniPersistence::ReadStatus definitionsStatus =
+		SaveIniPersistence::read(
+			definitionsFileName,
+			loadedDefinitions);
+	if (definitionsStatus == SaveIniPersistence::ReadStatus::Unreadable ||
+		definitionsStatus == SaveIniPersistence::ReadStatus::Malformed)
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"陷阱定义文件 traps.ini 无法读取或格式错误";
+		}
+		return false;
+	}
+	if (loadedDefinitions == nullptr)
+	{
+		loadedDefinitions = std::make_shared<INIReader>();
+	}
+
+	std::set<int> loadedTriggeredIndices;
+	if (!loadTriggeredIndices(
+		loadedTriggeredIndices,
+		failureReason))
+	{
+		return false;
+	}
+
+	ini = std::move(loadedDefinitions);
+	triggeredIndices = std::move(loadedTriggeredIndices);
+	removeInvalidZeroKeys();
+	return true;
+}
+
+bool Traps::loadInitialTemplate(std::string* failureReason)
+{
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
+
+	std::shared_ptr<INIReader> loadedDefinitions;
+	const SaveIniPersistence::ReadStatus definitionsStatus =
+		SaveIniPersistence::read(
+			std::string(INI_SAVE_FOLDER) + TRAPS_INI,
+			loadedDefinitions);
+	if (definitionsStatus != SaveIniPersistence::ReadStatus::Loaded ||
+		loadedDefinitions == nullptr)
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"初始机关模板 ini/save/traps.ini 不存在、为空或格式错误";
+		}
+		return false;
+	}
+
+	ini = std::move(loadedDefinitions);
+	triggeredIndices.clear();
+	removeInvalidZeroKeys();
+	return true;
 }
 
 void Traps::loadDefinitions()
@@ -40,6 +104,12 @@ void Traps::loadDefinitions()
 bool Traps::save()
 {
 	return saveDefinitions() && saveTriggeredIndices();
+}
+
+void Traps::resetToEmpty()
+{
+	ini = std::make_shared<INIReader>();
+	triggeredIndices.clear();
 }
 
 bool Traps::saveDefinitions()
@@ -154,48 +224,63 @@ void Traps::removeInvalidZeroKeys()
 	}
 }
 
-void Traps::loadTriggeredIndices()
+bool Traps::loadTriggeredIndices(
+	std::set<int>& loadedIndices,
+	std::string* failureReason)
 {
-	triggeredIndices.clear();
+	loadedIndices.clear();
 	std::string fileName = TRAP_TRIGGERED_INDICES_INI;
 	fileName = SaveFileManager::CurrentPath() + fileName;
-	std::unique_ptr<char[]> fileData;
-	int fileLength = 0;
-	if (!File::readFile(
+	std::shared_ptr<INIReader> triggeredReader;
+	const SaveIniPersistence::ReadStatus status =
+		SaveIniPersistence::read(
 			fileName,
-			fileData,
-			fileLength,
-			MaximumTriggeredIndicesFileBytes) ||
-		fileData == nullptr || fileLength <= 0)
+			triggeredReader,
+			MaximumTriggeredIndicesFileBytes);
+	if (status == SaveIniPersistence::ReadStatus::Missing ||
+		status == SaveIniPersistence::ReadStatus::Empty)
 	{
-		return;
+		return true;
 	}
-	auto terminatedData = std::make_unique<char[]>(
-		static_cast<std::size_t>(fileLength) + 1);
-	std::memcpy(
-		terminatedData.get(),
-		fileData.get(),
-		static_cast<std::size_t>(fileLength));
-	terminatedData[static_cast<std::size_t>(fileLength)] = '\0';
-	INIReader triggeredReader(terminatedData);
-	if (triggeredReader.ParseError() != 0)
+	if (status == SaveIniPersistence::ReadStatus::Loaded &&
+		triggeredReader != nullptr &&
+		triggeredReader->GetSectionNames().empty())
 	{
-		return;
+		// The canonical writer emits an empty [init] section when no trap has
+		// fired. INIReader stores sections only after seeing a key, so that
+		// valid file is represented as an empty parsed document.
+		return true;
+	}
+	if (status != SaveIniPersistence::ReadStatus::Loaded ||
+		triggeredReader == nullptr ||
+		!triggeredReader->HasSection("init"))
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason =
+				u8"陷阱触发状态文件 trapindexignore.ini 无法读取或格式错误";
+		}
+		return false;
 	}
 
 	for (const std::string& key :
-		triggeredReader.GetSectionKeys("init"))
+		triggeredReader->GetSectionKeys("init"))
 	{
-		const std::string value = triggeredReader.Get("init", key, "");
+		const std::string value = triggeredReader->Get("init", key, "");
 		char* end = nullptr;
 		const long index = std::strtol(value.c_str(), &end, 10);
-		if (end != value.c_str() && *end == '\0' &&
-			index >= MinimumScriptIndex &&
-			index <= MaximumScriptIndex)
+		if (end == value.c_str() || *end != '\0' ||
+			index < MinimumScriptIndex ||
+			index > MaximumScriptIndex)
 		{
-			triggeredIndices.insert(static_cast<int>(index));
+			GameLog::write(
+				"Traps: ignored invalid persisted triggered index %s\n",
+				value.c_str());
+			continue;
 		}
+		loadedIndices.insert(static_cast<int>(index));
 	}
+	return true;
 }
 
 bool Traps::saveTriggeredIndices() const

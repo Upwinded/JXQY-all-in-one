@@ -9,6 +9,14 @@
 #include <string_view>
 #include <vector>
 
+#if defined(_MSC_VER)
+#define JXQY_SCRIPT_NOINLINE __declspec(noinline)
+#elif defined(__GNUC__) || defined(__clang__)
+#define JXQY_SCRIPT_NOINLINE __attribute__((noinline))
+#else
+#define JXQY_SCRIPT_NOINLINE
+#endif
+
 namespace
 {
 int ApplicationQuitScriptAbortToken = 0;
@@ -88,6 +96,27 @@ std::string getLuaString(lua_State* l, int index)
 {
 	const char* value = lua_tolstring(l, index, nullptr);
 	return value == nullptr ? "" : value;
+}
+
+// Child scripts may report an error through Lua's long jump. Keep the owned
+// file name in a frame that has returned before lua_RunScript propagates it.
+JXQY_SCRIPT_NOINLINE int runLuaChildScript(
+	lua_State* luaState,
+	GameManager* gameManager)
+{
+	if (luaState == nullptr || gameManager == nullptr)
+	{
+		return -1;
+	}
+	std::size_t length = 0;
+	const char* value = lua_tolstring(luaState, 1, &length);
+	if (value == nullptr)
+	{
+		return -1;
+	}
+	const std::string fileName(value, length);
+	GameLog::write("lua_RunScript: %s\n", fileName.c_str());
+	return gameManager->scriptAPI.runScriptForLua(fileName);
 }
 
 std::string getLuaSpeakerDialogText(lua_State* l, int speakerIndex, int textIndex)
@@ -1057,7 +1086,7 @@ int Script::callRegisteredLuaFunction(lua_State* luaState)
 	if (script != nullptr && apiName != nullptr)
 	{
 		script->enqueueApiCall(
-			std::string(apiName, apiNameLength));
+			std::string_view(apiName, apiNameLength));
 	}
 	const int argumentCount = lua_gettop(luaState);
 	lua_pushvalue(luaState, lua_upvalueindex(1));
@@ -1119,7 +1148,10 @@ void Script::enqueueSourceLine(std::uint64_t line)
 	(void)runtimeTraceWriter->enqueue(std::move(event));
 }
 
-void Script::enqueueApiCall(const std::string& apiName)
+// Lua reports errors with a long jump. Keep all trace-owned strings and
+// variants outside the C++ callback frame that invokes lua_call.
+JXQY_SCRIPT_NOINLINE void Script::enqueueApiCall(
+	std::string_view apiName)
 {
 	const std::uint64_t executionId =
 		currentExecutionId();
@@ -1131,11 +1163,13 @@ void Script::enqueueApiCall(const std::string& apiName)
 	}
 	EditorRun::RuntimeTraceApiCallEvent apiCall;
 	apiCall.executionId = executionId;
-	apiCall.apiName = apiName;
+	apiCall.apiName.assign(apiName.data(), apiName.size());
 	EditorRun::RuntimeTraceEvent event;
 	event.payload = std::move(apiCall);
 	(void)runtimeTraceWriter->enqueue(std::move(event));
 }
+
+#undef JXQY_SCRIPT_NOINLINE
 
 int Script::lua_printf(lua_State * l)
 {
@@ -1153,12 +1187,25 @@ int Script::lua_printf(lua_State * l)
 
 int Script::lua_RunScript(lua_State * l)
 {
-	int argc = lua_gettop(l);
-	if (argc >= 1)
+	const int argc = lua_gettop(l);
+	GameManager* const gameManager = gm;
+	if (argc >= 1 && gameManager != nullptr)
 	{
-		std::string n = getLuaString(l, 1);
-		GameLog::write("lua_RunScript: %s\n", n.c_str());
-		gm->runScript(n);
+		const int childResult =
+			runLuaChildScript(l, gameManager);
+		if (childResult != 0 &&
+			!gameManager->getLastLoadFailureMessage().empty())
+		{
+			const std::string& reason =
+				gameManager->getLastLoadFailureMessage();
+			lua_pushliteral(l, "runscript failed: ");
+			lua_pushlstring(
+				l,
+				reason.data(),
+				reason.size());
+			lua_concat(l, 2);
+			return lua_error(l);
+		}
 	}
 	return 0;
 }
@@ -1247,14 +1294,45 @@ int Script::lua_LoadGame(lua_State * l)
 	int argc = lua_gettop(l);
 	if (argc >= 1)
 	{
+		GameManager* const gameManager = gm;
+		if (gameManager == nullptr)
+		{
+			lua_pushliteral(
+				l,
+				"loadgame failed: game manager is unavailable");
+			return lua_error(l);
+		}
+		bool loaded = false;
 		if (Config::loadAsync)
 		{
-			gm->scriptAPI.loadGameAsync((int)lua_tointeger(l, 1));
+			loaded = gameManager->scriptAPI.loadGameAsync(
+				(int)lua_tointeger(l, 1));
 		}
 		else
 		{
-			gm->scriptAPI.loadGame((int)lua_tointeger(l, 1));
+			loaded = gameManager->scriptAPI.loadGame(
+				(int)lua_tointeger(l, 1));
 		}
+		if (!loaded)
+		{
+			const std::string& reason =
+				gameManager->getLastLoadFailureMessage();
+			lua_pushliteral(l, "loadgame failed: ");
+			if (reason.empty())
+			{
+				lua_pushliteral(l, "unknown reason");
+			}
+			else
+			{
+				lua_pushlstring(
+					l,
+					reason.data(),
+					reason.size());
+			}
+			lua_concat(l, 2);
+			return lua_error(l);
+		}
+		return 0;
 	}
 	return 0;
 }

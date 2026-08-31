@@ -4,6 +4,7 @@
 #include "../Component/Panel.h"
 #include "../Component/VideoPlayer.h"
 #include "../File/File.h"
+#include "../Game/Data/ColorStyle.h"
 #include "../Game/Script/ScriptAPI.h"
 #include "../Image/IMP.h"
 #include "../Image/PngImageEncoder.h"
@@ -1168,6 +1169,98 @@ bool runMediaRuntimeTests()
 					originalRenderTarget.get()),
 			"render session fixture binds an explicit original target") &&
 			ok;
+
+		EngineBase* grayscaleEngineBase =
+			static_cast<EngineBase*>(engine);
+		const std::uint32_t redPixel = 0xFFFF0000;
+		auto redImage = grayscaleEngineBase->createImageFromPixelData(
+			reinterpret_cast<const std::uint8_t*>(&redPixel),
+			1,
+			1);
+		auto grayscaleTarget = make_shared_image(
+			SDL_CreateTexture(
+				talkRenderer,
+				SDL_PIXELFORMAT_ARGB8888,
+				SDL_TEXTUREACCESS_TARGET,
+				1,
+				1));
+		bool grayscaleTargetReady = redImage != nullptr &&
+			grayscaleTarget != nullptr &&
+			SDL_SetRenderTarget(
+				talkRenderer,
+				grayscaleTarget.get()) &&
+			SDL_SetRenderDrawColor(talkRenderer, 0, 0, 0, 0) &&
+			SDL_RenderClear(talkRenderer);
+		if (grayscaleTargetReady)
+		{
+			ColorStyle::drawImage(
+				engine,
+				redImage,
+				0,
+				0,
+				ColorStyle::Grayscale,
+				128);
+		}
+		auto grayscaleSurface = make_shared_surface(
+			grayscaleTargetReady
+				? SDL_RenderReadPixels(talkRenderer, nullptr)
+				: nullptr);
+		std::uint8_t grayscaleRed = 0;
+		std::uint8_t grayscaleGreen = 0;
+		std::uint8_t grayscaleBlue = 0;
+		std::uint8_t grayscaleAlpha = 0;
+		const bool grayscalePixelRead = grayscaleSurface != nullptr &&
+			SDL_ReadSurfacePixel(
+				grayscaleSurface.get(),
+				0,
+				0,
+				&grayscaleRed,
+				&grayscaleGreen,
+				&grayscaleBlue,
+				&grayscaleAlpha);
+		ok = check(
+			grayscalePixelRead &&
+				grayscaleRed == grayscaleGreen &&
+				grayscaleGreen == grayscaleBlue &&
+				grayscaleAlpha >= 127 &&
+				grayscaleAlpha <= 128,
+			"grayscale rendering removes hue while preserving the translucent player overlay alpha") &&
+			ok;
+		auto cachedGrayscaleImage =
+			engine->getGrayscaleImage(redImage);
+		std::uint8_t cachedAlpha = 0;
+		std::uint8_t cachedRed = 0;
+		std::uint8_t cachedGreen = 0;
+		std::uint8_t cachedBlue = 0;
+		const bool cachedModulationRestored =
+			cachedGrayscaleImage != nullptr &&
+			SDL_GetTextureAlphaMod(
+				cachedGrayscaleImage.get(),
+				&cachedAlpha) &&
+			SDL_GetTextureColorMod(
+				cachedGrayscaleImage.get(),
+				&cachedRed,
+				&cachedGreen,
+				&cachedBlue);
+		ok = check(
+			cachedModulationRestored &&
+				cachedAlpha == 255 &&
+				cachedRed == 255 &&
+				cachedGreen == 255 &&
+				cachedBlue == 255,
+			"grayscale rendering restores cached texture modulation after the translucent overlay") &&
+			ok;
+		ok = check(
+			SDL_SetRenderTarget(
+				talkRenderer,
+				originalRenderTarget.get()),
+			"grayscale fixture restores the original render target") &&
+			ok;
+		cachedGrayscaleImage.reset();
+		grayscaleSurface.reset();
+		grayscaleEngineBase->clearGrayscaleImageCache();
+		redImage.reset();
+		grayscaleTarget.reset();
 
 		EngineBase::multiThreadedMode.store(true);
 		bool beganLockedTalk = engine->beginDrawTalk(8, 8);

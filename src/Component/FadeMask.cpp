@@ -30,6 +30,11 @@ void FadeMask::sleep(UTime t)
 	run();
 }
 
+void FadeMask::setFadeTime(UTime t)
+{
+	fadeTime = t > 0 ? t : 1;
+}
+
 void FadeMask::fadeIn()
 {
 	isFadeIn = true;
@@ -56,9 +61,14 @@ void FadeMask::onUpdate()
 	}
 	else
 	{
-		if (t > fadeTime)
+		if (fadeCompleted)
 		{
 			logicRunning = false;
+		}
+		else if (t >= fadeTime)
+		{
+			alpha = isFadeIn ? 0 : 255;
+			fadeCompleted = true;
 		}
 		else
 		{
@@ -83,7 +93,12 @@ void FadeMask::onDraw()
 
 void FadeMask::onRun()
 {
+	fadeCompleted = false;
 	fadeBeginTime = getTime();
+	if (!isSleep)
+	{
+		alpha = isFadeIn ? 255 : 0;
+	}
 }
 
 void FadeMask::freeResource()

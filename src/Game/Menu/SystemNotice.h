@@ -15,6 +15,7 @@ public:
 	void showMessage(
 		const std::string& message,
 		UTime duration = 7000);
+	void dismiss();
 	bool hasFont() const;
 
 	std::string currentMessage;

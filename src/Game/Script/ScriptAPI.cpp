@@ -47,6 +47,10 @@ constexpr std::size_t MaximumEditorRunNpcListBytes =
 	16 * 1024 * 1024;
 constexpr const char* LoadCandidateGeneration =
 	"save\\load_candidate\\";
+constexpr const char* CompatibleEmptyNpcListSourcePath =
+	"__compatible_empty_npc_list__.npc";
+constexpr const char* CompatibleEmptyObjectListSourcePath =
+	"__compatible_empty_object_list__.obj";
 constexpr UTime LoadingPresentationFrameIntervalMilliseconds = 16;
 
 std::string resolveLegacyMapFolderName(
@@ -78,6 +82,8 @@ struct PreparedSaveResources
 	NPCManager::PreparedLoad npc;
 	PreparedObjectLoad object;
 	std::string mapFolderName;
+	bool npcFallbackUsed = false;
+	bool objectFallbackUsed = false;
 
 	bool isValid() const noexcept
 	{
@@ -90,26 +96,31 @@ bool prepareSaveResources(
 	GameManager* gameManager,
 	const std::string& preparedDirectory,
 	PreparedSaveResources& preparedResources,
-	const std::function<bool()>& preparationCheckpoint)
+	const std::function<bool()>& preparationCheckpoint,
+	std::string& failureMessage)
 {
 	preparedResources = PreparedSaveResources{};
+	failureMessage.clear();
 	if (gameManager == nullptr ||
 		gameManager->map == nullptr ||
 		gameManager->npcManager == nullptr ||
 		gameManager->objectManager == nullptr)
 	{
+		failureMessage = u8"存档加载组件不可用";
 		return false;
 	}
 	SaveFileManager::CurrentPathScope generationPath(
 		preparedDirectory);
 	if (!generationPath.valid())
 	{
+		failureMessage = u8"存档临时目录无效";
 		return false;
 	}
 	INIReader globalIni(
 		SaveFileManager::CurrentPath() + GLOBAL_INI);
 	if (globalIni.ParseError() != 0)
 	{
+		failureMessage = u8"存档状态文件 game.ini 无法解析";
 		return false;
 	}
 
@@ -119,8 +130,27 @@ bool prepareSaveResources(
 		globalIni.Get("State", "Npc", "");
 	const std::string objectName =
 		globalIni.Get("State", "Obj", "");
-	if (mapName.empty() ||
-		(preparationCheckpoint && !preparationCheckpoint()))
+	if (mapName.empty())
+	{
+		failureMessage = u8"存档状态未记录地图文件（State.Map 为空）";
+		return false;
+	}
+	if ((!npcName.empty() &&
+			!SaveFileManager::IsSafeEntityListFileName(npcName)) ||
+		(!objectName.empty() &&
+			!SaveFileManager::IsSafeEntityListFileName(objectName)))
+	{
+		failureMessage = u8"存档包含不安全的 NPC 或物件清单路径";
+		return false;
+	}
+	if (!SaveFileManager::AreEntityListFileNamesDistinct(
+			npcName,
+			objectName))
+	{
+		failureMessage = u8"存档的 NPC 与物件清单使用了同一文件名";
+		return false;
+	}
+	if (preparationCheckpoint && !preparationCheckpoint())
 	{
 		return false;
 	}
@@ -137,6 +167,7 @@ bool prepareSaveResources(
 			preparationCheckpoint,
 			fallbackMpcFolder))
 	{
+		failureMessage = std::string(u8"地图文件无法读取：") + mapName;
 		return false;
 	}
 
@@ -148,19 +179,44 @@ bool prepareSaveResources(
 			"ScriptAPI: compatible save is missing NPC list %s; preparing an empty list\n",
 			npcName.c_str());
 	}
-	if ((preparationCheckpoint && !preparationCheckpoint()) ||
-		!(missingNpcList
+	if (preparationCheckpoint && !preparationCheckpoint())
+	{
+		return false;
+	}
+	bool npcPrepared = missingNpcList
 			? gameManager->npcManager->
 				prepareExactResourceBytes(
-					npcName,
+					npcName.empty()
+						? CompatibleEmptyNpcListSourcePath
+						: npcName,
 					compatibleEmptyEntityListBytes(),
 					preparedResources.npc)
 			: gameManager->npcManager->prepareLoad(
 				npcName,
 				preparedResources.npc,
-				true)))
+				true);
+	preparedResources.npcFallbackUsed =
+		missingNpcList && !npcName.empty() && npcPrepared;
+	if (!npcPrepared)
 	{
-		return false;
+		if (preparationCheckpoint && !preparationCheckpoint())
+		{
+			return false;
+		}
+		GameLog::write(
+			"ScriptAPI: ignored unreadable NPC list %s; preparing an empty list\n",
+			npcName.c_str());
+		npcPrepared = gameManager->npcManager->
+			prepareExactResourceBytes(
+				CompatibleEmptyNpcListSourcePath,
+				compatibleEmptyEntityListBytes(),
+				preparedResources.npc);
+		preparedResources.npcFallbackUsed = npcPrepared;
+		if (!npcPrepared)
+		{
+			failureMessage = u8"无法建立兼容的空 NPC 清单";
+			return false;
+		}
 	}
 
 	const bool missingObjectList =
@@ -171,22 +227,55 @@ bool prepareSaveResources(
 			"ScriptAPI: compatible save is missing object list %s; preparing an empty list\n",
 			objectName.c_str());
 	}
-	if ((preparationCheckpoint && !preparationCheckpoint()) ||
-		!(missingObjectList
+	if (preparationCheckpoint && !preparationCheckpoint())
+	{
+		return false;
+	}
+	bool objectPrepared = missingObjectList
 			? gameManager->objectManager->
 				prepareExactResourceBytes(
-					objectName,
+					objectName.empty()
+						? CompatibleEmptyObjectListSourcePath
+						: objectName,
 					compatibleEmptyEntityListBytes(),
 					preparedResources.object)
 			: gameManager->objectManager->prepareLoad(
 				objectName,
 				preparedResources.object,
-				true)))
+				true);
+	preparedResources.objectFallbackUsed =
+		missingObjectList && !objectName.empty() && objectPrepared;
+	if (!objectPrepared)
+	{
+		if (preparationCheckpoint && !preparationCheckpoint())
+		{
+			return false;
+		}
+		GameLog::write(
+			"ScriptAPI: ignored unreadable object list %s; preparing an empty list\n",
+			objectName.c_str());
+		objectPrepared = gameManager->objectManager->
+			prepareExactResourceBytes(
+				CompatibleEmptyObjectListSourcePath,
+				compatibleEmptyEntityListBytes(),
+				preparedResources.object);
+		preparedResources.objectFallbackUsed = objectPrepared;
+		if (!objectPrepared)
+		{
+			failureMessage = u8"无法建立兼容的空物件清单";
+			return false;
+		}
+	}
+	if (preparationCheckpoint && !preparationCheckpoint())
 	{
 		return false;
 	}
-	return (!preparationCheckpoint || preparationCheckpoint()) &&
-		preparedResources.isValid();
+	if (!preparedResources.isValid())
+	{
+		failureMessage = u8"存档地图或实体资源准备不完整";
+		return false;
+	}
+	return true;
 }
 
 bool saveGenerationCancellationRequested(
@@ -325,6 +414,32 @@ std::string lowerAscii(std::string value)
 		}
 	}
 	return value;
+}
+
+bool canSaveEntityList(
+	const std::string& fileName,
+	const std::string& otherEntityListFileName,
+	const char* entityKind)
+{
+	if (!SaveFileManager::IsSafeEntityListFileName(fileName))
+	{
+		GameLog::write(
+			"ScriptAPI: refusing unsafe or reserved %s save file %s\n",
+			entityKind,
+			fileName.c_str());
+		return false;
+	}
+	if (!SaveFileManager::AreEntityListFileNamesDistinct(
+			fileName,
+			otherEntityListFileName))
+	{
+		GameLog::write(
+			"ScriptAPI: refusing colliding %s save file %s\n",
+			entityKind,
+			fileName.c_str());
+		return false;
+	}
+	return true;
 }
 
 std::optional<std::string> normalizedTraceVirtualPath(
@@ -6157,19 +6272,33 @@ void ScriptAPI::stopSound()
 
 void ScriptAPI::runScript(const std::string& fileName)
 {
-	runScript(fileName, gameManager->mapFolderName);
+	(void)runScriptWithCapturedParent(
+		fileName,
+		gameManager->mapFolderName,
+		0,
+		false);
 }
 
 void ScriptAPI::runScript(const std::string& fileName, const std::string& mapName)
 {
-	runScriptWithCapturedParent(
+	(void)runScriptWithCapturedParent(
 		fileName,
 		mapName,
 		0,
 		false);
 }
 
-void ScriptAPI::runScriptWithCapturedParent(
+int ScriptAPI::runScriptForLua(const std::string& fileName)
+{
+	gameManager->clearLastLoadFailureMessage();
+	return runScriptWithCapturedParent(
+		fileName,
+		gameManager->mapFolderName,
+		0,
+		false);
+}
+
+int ScriptAPI::runScriptWithCapturedParent(
 	const std::string& fileName,
 	const std::string& mapName,
 	std::uint64_t capturedParentExecutionId,
@@ -6201,7 +6330,7 @@ void ScriptAPI::runScriptWithCapturedParent(
 				GameLog::write(
 					"ScriptAPI: unsafe editor-run script path %s\n",
 					candidate.c_str());
-				return;
+				return -1;
 			}
 			for (const EditorRun::SearchRoot& root :
 				gameManager->editorRunSearchRoots)
@@ -6223,7 +6352,7 @@ void ScriptAPI::runScriptWithCapturedParent(
 						"ScriptAPI: editor-run script read failed %s status=%d\n",
 						normalizedPath->c_str(),
 						static_cast<int>(read.status));
-					return;
+					return -1;
 				}
 
 				ResolvedTraceScriptSource source;
@@ -6236,23 +6365,23 @@ void ScriptAPI::runScriptWithCapturedParent(
 					GameLog::write(
 						"ScriptAPI: editor-run script source is unavailable %s\n",
 						normalizedPath->c_str());
-					return;
+					return -1;
 				}
 				GameLog::write(
 					"run script: %s\n",
 					normalizedPath->c_str());
-				(void)gameManager->script.
-					runResolvedTraceScriptSource(
+				const ExactScriptExecutionResult result =
+					gameManager->script.runResolvedTraceScriptSource(
 						std::move(source),
 						capturedParentExecutionId,
 						parentWasCaptured);
-				return;
+				return result.succeeded() ? 0 : -1;
 			}
 		}
 		GameLog::write(
 			"script: %s not found in editor-run roots\n",
 			fileName.c_str());
-		return;
+		return -1;
 	}
 
 	std::unique_ptr<char[]> s;
@@ -6272,18 +6401,16 @@ void ScriptAPI::runScriptWithCapturedParent(
 			if (len <= 0 || s == nullptr)
 			{
 				GameLog::write("script: %s not found\n", (SCRIPT_COMMON_FOLDER + fileName).c_str());
-				return;
+				return -1;
 			}
 			GameLog::write("run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
-			gameManager->script.runScript(s, len);
-			return;
+			return gameManager->script.runScript(s, len);
 		}
 		GameLog::write("run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
-		gameManager->script.runScript(s, len);
-		return;
+		return gameManager->script.runScript(s, len);
 	}
 	GameLog::write("run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER, mapName.c_str(), newName.c_str());
-	gameManager->script.runScript(s, len);
+	return gameManager->script.runScript(s, len);
 }
 
 ExactScriptExecutionResult ScriptAPI::runScriptFromExactRoot(
@@ -6569,6 +6696,20 @@ void ScriptAPI::recoverFromPartialWorldFailure(
 {
 	try
 	{
+		if (gameManager != nullptr &&
+			gameManager->getLastLoadFailureMessage().empty())
+		{
+			gameManager->setLastLoadFailureMessage(
+				std::string(u8"加载过程中发生部分提交失败：") +
+					(operationName != nullptr
+						? operationName : "world"));
+		}
+	}
+	catch (...)
+	{
+	}
+	try
+	{
 		GameLog::write(
 			"ScriptAPI: %s commit may have partially changed the live world; discarding it and returning to title\n",
 			operationName != nullptr
@@ -6618,6 +6759,41 @@ void ScriptAPI::discardPartialWorldAfterFailedCommit() noexcept
 		if (gameManager->effectManager != nullptr)
 		{
 			gameManager->effectManager->freeResource();
+		}
+	}
+	catch (...)
+	{
+	}
+	try
+	{
+		gameManager->partnerManager.clearCurrentPartners();
+	}
+	catch (...)
+	{
+	}
+	try
+	{
+		gameManager->magicManager.clearMagicList();
+		gameManager->goodsManager.clearItem(false);
+	}
+	catch (...)
+	{
+	}
+	try
+	{
+		gameManager->memo.clear();
+		gameManager->varList.clearExcept({});
+		gameManager->traps.resetToEmpty();
+	}
+	catch (...)
+	{
+	}
+	try
+	{
+		if (gameManager->player != nullptr)
+		{
+			gameManager->player->freeResource();
+			gameManager->player->visible = false;
 		}
 	}
 	catch (...)
@@ -7247,8 +7423,14 @@ void ScriptAPI::loadMapAsync(const std::string& fileName)
 
 bool ScriptAPI::loadGameAsync(int index)
 {
-	if (engine == nullptr ||
-		engine->isApplicationQuitRequested())
+	gameManager->clearLastLoadFailureMessage();
+	if (engine == nullptr)
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"游戏引擎尚未初始化，无法读档");
+		return false;
+	}
+	if (engine->isApplicationQuitRequested())
 	{
 		return false;
 	}
@@ -7262,6 +7444,8 @@ bool ScriptAPI::loadGameAsync(int index)
 		LoadCandidateGeneration);
 	if (!candidateCleanup.valid())
 	{
+		gameManager->setLastLoadFailureMessage(
+			u8"无法创建安全的读档临时目录");
 		GameLog::write(
 			"ScriptAPI: invalid load candidate cleanup path\n");
 		return false;
@@ -7273,6 +7457,7 @@ bool ScriptAPI::loadGameAsync(int index)
 	std::string preparedDirectory;
 	SaveGenerationResult preparationResult;
 	PreparedSaveResources preparedResources;
+	std::string resourcePreparationFailure;
 	const std::string statusText = u8"读取游戏中";
 	GameLoading::ExclusiveLoadingRunner::Worker worker =
 		[this,
@@ -7280,7 +7465,8 @@ bool ScriptAPI::loadGameAsync(int index)
 		 &policy,
 		 &preparedDirectory,
 		 &preparationResult,
-		 &preparedResources](
+		 &preparedResources,
+		 &resourcePreparationFailure](
 			const GameLoading::LoadingCancellationToken& cancellationToken)
 		{
 			if (cancellationToken.isCancellationRequested())
@@ -7307,7 +7493,7 @@ bool ScriptAPI::loadGameAsync(int index)
 			if (!preparationResult.succeeded())
 			{
 				return loadingFailure(
-					"Save preparation failed",
+					u8"存档复制失败",
 					preparationResult);
 			}
 			const std::function<bool()> preparationCheckpoint =
@@ -7320,13 +7506,16 @@ bool ScriptAPI::loadGameAsync(int index)
 					gameManager,
 					preparedDirectory,
 					preparedResources,
-					preparationCheckpoint)
+					preparationCheckpoint,
+					resourcePreparationFailure)
 				? GameLoading::LoadingTaskResult::success()
 				: (cancellationToken.isCancellationRequested()
 					? GameLoading::LoadingTaskResult::cancellation(
 						"Save resource preparation was cancelled.")
 					: GameLoading::LoadingTaskResult::failure(
-						"Save resource preparation failed."));
+						resourcePreparationFailure.empty()
+							? std::string(u8"存档资源准备失败")
+							: resourcePreparationFailure));
 		};
 	std::function<GameLoading::LoadingTaskResult(
 		const std::function<bool()>&)> successFinalizer =
@@ -7336,9 +7525,13 @@ bool ScriptAPI::loadGameAsync(int index)
 		 &preparedResources](
 			const std::function<bool()>& ownerCheckpoint)
 		{
-			PreparedSaveLoadCallbacks preparedCallbacks;
+			PreparedSaveLoadCallbacks preparedCallbacks{};
 			preparedCallbacks.mapFolderName =
 				preparedResources.mapFolderName;
+			preparedCallbacks.npcFallbackUsed =
+				preparedResources.npcFallbackUsed;
+			preparedCallbacks.objectFallbackUsed =
+				preparedResources.objectFallbackUsed;
 			preparedCallbacks.commitMap =
 				[this, &preparedResources](
 					const std::function<void()>& beforeMutation,
@@ -7402,6 +7595,17 @@ bool ScriptAPI::loadGameAsync(int index)
 		GameLog::write(
 			"ScriptAPI: async save load failed: %s\n",
 			result.message.c_str());
+		if (result.status == GameLoading::LoadingTaskStatus::Failed)
+		{
+			gameManager->setLastLoadFailureMessage(
+				result.message.empty()
+					? std::string(u8"读档失败，未提供详细原因")
+					: result.message);
+		}
+	}
+	else
+	{
+		gameManager->clearLastLoadFailureMessage();
 	}
 	return result.succeeded();
 }
@@ -7446,11 +7650,21 @@ void ScriptAPI::setMapTime(int time)
 
 void ScriptAPI::changeASFColor(uint8_t r, uint8_t g, uint8_t b)
 {
+	if (r == 0 && g == 0 && b == 0)
+	{
+		gameManager->global.data.asfStyle = ColorStyle::Grayscale;
+		return;
+	}
 	gameManager->global.data.asfStyle = (r << 16) | (g << 8) | b;
 }
 
 void ScriptAPI::changeMapColor(uint8_t r, uint8_t g, uint8_t b)
 {
+	if (r == 0 && g == 0 && b == 0)
+	{
+		gameManager->global.data.mpcStyle = ColorStyle::Grayscale;
+		return;
+	}
 	gameManager->global.data.mpcStyle = (r << 16) | (g << 8) | b;
 }
 
@@ -7527,14 +7741,30 @@ void ScriptAPI::loadObjectAsync(const std::string& fileName)
 
 void ScriptAPI::saveObject(const std::string& fileName)
 {
-	if (fileName.empty())
+	const std::string targetFileName = fileName.empty()
+		? gameManager->global.data.objName
+		: fileName;
+	if (targetFileName.empty())
 	{
-		gameManager->objectManager->save(gameManager->global.data.objName);
+		return;
 	}
-	else
+	if (!canSaveEntityList(
+			targetFileName,
+			gameManager->global.data.npcName,
+			"object"))
 	{
-		gameManager->global.data.objName = fileName;
-		gameManager->objectManager->save(fileName);
+		return;
+	}
+	if (!gameManager->objectManager->save(targetFileName))
+	{
+		GameLog::write(
+			"ScriptAPI: object save failed %s\n",
+			targetFileName.c_str());
+		return;
+	}
+	if (!fileName.empty())
+	{
+		gameManager->global.data.objName = targetFileName;
 	}
 }
 
@@ -7738,14 +7968,30 @@ void ScriptAPI::loadNPCAsync(const std::string& fileName)
 
 void ScriptAPI::saveNPC(const std::string& fileName)
 {
-	if (fileName.empty())
+	const std::string targetFileName = fileName.empty()
+		? gameManager->global.data.npcName
+		: fileName;
+	if (targetFileName.empty())
 	{
-		gameManager->npcManager->save(gameManager->global.data.npcName);
+		return;
 	}
-	else
+	if (!canSaveEntityList(
+			targetFileName,
+			gameManager->global.data.objName,
+			"NPC"))
 	{
-		gameManager->global.data.npcName = fileName;
-		gameManager->npcManager->save(fileName);
+		return;
+	}
+	if (!gameManager->npcManager->save(targetFileName))
+	{
+		GameLog::write(
+			"ScriptAPI: NPC save failed %s\n",
+			targetFileName.c_str());
+		return;
+	}
+	if (!fileName.empty())
+	{
+		gameManager->global.data.npcName = targetFileName;
 	}
 }
 
@@ -8673,7 +8919,21 @@ void ScriptAPI::setSignalTipHidden(const std::string& name)
 
 void ScriptAPI::loadPlayer(int index)
 {
-	gameManager->player->load(index);
+	std::string failureReason;
+	if (!gameManager->player->load(index, &failureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: player snapshot load failed index=%d reason=%s\n",
+			index,
+			failureReason.c_str());
+		if (gameManager->menu != nullptr)
+		{
+			gameManager->menu->showSystemNotice(
+				failureReason.empty()
+					? std::string(u8"玩家数据读取失败")
+					: failureReason);
+		}
+	}
 }
 
 void ScriptAPI::loadPlayer(const std::string& snapshotKey)
@@ -9376,13 +9636,24 @@ void ScriptAPI::addOneMagic(const std::string& playerName, const std::string& ma
 	for (size_t i = 0; i < 5; i++)
 	{
 		Player tempPlayer;
-		tempPlayer.load(i);
+		if (!tempPlayer.load(static_cast<int>(i)))
+		{
+			continue;
+		}
 		if (tempPlayer.npcName == playerName)
 		{
 			MagicManager tempMagicManager;
-			tempMagicManager.load(i);
+			if (!tempMagicManager.load(static_cast<int>(i)))
+			{
+				continue;
+			}
 			tempMagicManager.addMagic(magicName);
-			tempMagicManager.save(i);
+			if (!tempMagicManager.save(static_cast<int>(i)))
+			{
+				GameLog::write(
+					"ScriptAPI: failed to save magic snapshot index=%d\n",
+					static_cast<int>(i));
+			}
 			return;
 		}
 	}
@@ -9431,7 +9702,21 @@ void ScriptAPI::saveGoods(const std::string& snapshotKey)
 
 void ScriptAPI::loadGoods(int index)
 {
-	gameManager->goodsManager.load(index);
+	std::string failureReason;
+	if (!gameManager->goodsManager.load(index, &failureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: goods snapshot load failed index=%d reason=%s\n",
+			index,
+			failureReason.c_str());
+		if (gameManager->menu != nullptr)
+		{
+			gameManager->menu->showSystemNotice(
+				failureReason.empty()
+					? std::string(u8"物品数据读取失败")
+					: failureReason);
+		}
+	}
 }
 
 void ScriptAPI::loadGoods(const std::string& snapshotKey)
@@ -10631,16 +10916,77 @@ void ScriptAPI::select(int messageIdx, int optionAIdx, int optionBIdx, const std
 
 void ScriptAPI::playerChange(int index)
 {
-	gameManager->player->save(gameManager->global.data.characterIndex);
-	gameManager->magicManager.save(gameManager->global.data.characterIndex);
-	gameManager->goodsManager.save(gameManager->global.data.characterIndex);
-	gameManager->memo.save();
+	const int previousIndex =
+		gameManager->global.data.characterIndex;
+	bool previousStateSaved =
+		gameManager->player->save(previousIndex);
+	previousStateSaved =
+		gameManager->magicManager.save(previousIndex) &&
+		previousStateSaved;
+	previousStateSaved =
+		gameManager->goodsManager.save(previousIndex) &&
+		previousStateSaved;
+	previousStateSaved =
+		gameManager->memo.save() && previousStateSaved;
+	if (!previousStateSaved)
+	{
+		GameLog::write(
+			"ScriptAPI: player change rejected because the current character snapshot could not be saved\n");
+		if (gameManager->menu != nullptr)
+		{
+			gameManager->menu->showSystemNotice(
+				u8"切换角色失败：当前角色数据无法安全保存");
+		}
+		return;
+	}
+
+	std::string failureReason;
+	bool loaded = gameManager->player->load(
+		index,
+		&failureReason);
+	if (loaded)
+	{
+		loaded = gameManager->magicManager.load(
+			index,
+			&failureReason);
+	}
+	if (loaded)
+	{
+		loaded = gameManager->goodsManager.load(
+			index,
+			&failureReason);
+	}
+	if (!loaded)
+	{
+		std::string ignoredRollbackReason;
+		bool rollbackSucceeded = gameManager->player->load(
+			previousIndex,
+			&ignoredRollbackReason);
+		rollbackSucceeded = gameManager->magicManager.load(
+			previousIndex,
+			&ignoredRollbackReason) && rollbackSucceeded;
+		rollbackSucceeded = gameManager->goodsManager.load(
+			previousIndex,
+			&ignoredRollbackReason) && rollbackSucceeded;
+		GameLog::write(
+			"ScriptAPI: player change rejected index=%d reason=%s rollback=%d\n",
+			index,
+			failureReason.c_str(),
+			rollbackSucceeded ? 1 : 0);
+		if (gameManager->menu != nullptr)
+		{
+			gameManager->menu->showSystemNotice(
+				!rollbackSucceeded
+					? std::string(u8"切换角色失败，且恢复原角色数据失败；请保留日志")
+					: failureReason.empty()
+					? std::string(u8"切换角色失败：玩家数据无法读取")
+					: std::string(u8"切换角色失败：") +
+						failureReason);
+		}
+		return;
+	}
 
 	gameManager->global.data.characterIndex = index;
-
-	gameManager->player->load(index);
-	gameManager->magicManager.load(index);
-	gameManager->goodsManager.load(index);
 
 	gameManager->player->reloadAction();
 	if (gameManager->menu != nullptr)
@@ -11415,15 +11761,24 @@ bool ScriptAPI::loadGameFromGeneration(
 		if (!File::recoverDirectoryCopy(
 				generationDirectory))
 		{
+			gameManager->setLastLoadFailureMessage(
+				std::string(u8"无法恢复读档临时目录：") +
+					generationDirectory);
 			return false;
 		}
 		SaveFileManager::CurrentPathScope generationPath(
 			generationDirectory);
-		if (!generationPath.valid() ||
-			!File::fileExist(
-				SaveFileManager::CurrentPath() +
-				GLOBAL_INI))
+		if (!generationPath.valid())
 		{
+			gameManager->setLastLoadFailureMessage(
+				u8"读档临时目录无效");
+			return false;
+		}
+		if (!File::fileExist(
+				SaveFileManager::CurrentPath() + GLOBAL_INI))
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"读档临时目录缺少 game.ini");
 			return false;
 		}
 		return loadCurrentGame(
@@ -11437,6 +11792,8 @@ bool ScriptAPI::loadGameFromGeneration(
 		GameLog::write(
 			"ScriptAPI: exception while loading generation %s\n",
 			generationDirectory.c_str());
+		gameManager->setLastLoadFailureMessage(
+			u8"读档过程中发生未处理异常");
 		return false;
 	}
 }
@@ -11457,6 +11814,10 @@ ScriptAPI::commitPreparedSaveGeneration(
 		{
 			return GameLoading::LoadingTaskResult::cancellation();
 		}
+		const auto previousMapData =
+			gameManager != nullptr && gameManager->map != nullptr
+				? gameManager->map->data
+				: nullptr;
 		const bool loaded = generationLoadOverride
 			? generationLoadOverride(
 				preparedDirectory,
@@ -11470,15 +11831,32 @@ ScriptAPI::commitPreparedSaveGeneration(
 		{
 			if (!ownerCheckpointCanContinue(ownerCheckpoint))
 			{
+				gameManager->clearLastLoadFailureMessage();
+				if (gameManager != nullptr &&
+					gameManager->map != nullptr &&
+					gameManager->map->data != previousMapData)
+				{
+					discardPartialWorldAfterFailedCommit();
+					if (engine == nullptr ||
+						!engine->isApplicationQuitRequested())
+					{
+						returnToTitle();
+					}
+				}
 				return GameLoading::LoadingTaskResult::cancellation(
 					"Save load was cancelled.");
 			}
 			GameLog::write(
 				"ScriptAPI: save load failed; discarding the partial world and returning to title\n");
+			const std::string failureMessage =
+				gameManager->getLastLoadFailureMessage().empty()
+					? std::string(u8"存档内容加载失败")
+					: gameManager->getLastLoadFailureMessage();
+			gameManager->setLastLoadFailureMessage(failureMessage);
 			discardPartialWorldAfterFailedCommit();
 			returnToTitle();
 			return GameLoading::LoadingTaskResult::failure(
-				"Save load failed; returned to title.");
+				failureMessage);
 		}
 
 		const SaveGenerationResult publication =
@@ -11492,6 +11870,29 @@ ScriptAPI::commitPreparedSaveGeneration(
 				SaveFileManager::DescribeSaveGenerationError(
 					publication.error),
 				publication.errorPath.c_str());
+			if (publication.error == SaveGenerationError::Cancelled)
+			{
+				discardPartialWorldAfterFailedCommit();
+				if (engine == nullptr ||
+					!engine->isApplicationQuitRequested())
+				{
+					returnToTitle();
+				}
+				return GameLoading::LoadingTaskResult::cancellation(
+					"Current save refresh was cancelled.");
+			}
+			const std::string failureMessage =
+				std::string(u8"存档内容已载入，但无法刷新当前存档目录：") +
+				SaveFileManager::DescribeSaveGenerationError(
+					publication.error) +
+				(publication.errorPath.empty()
+					? std::string()
+					: std::string(" (") + publication.errorPath + ")");
+			gameManager->setLastLoadFailureMessage(failureMessage);
+			discardPartialWorldAfterFailedCommit();
+			returnToTitle();
+			return GameLoading::LoadingTaskResult::failure(
+				failureMessage);
 		}
 		return GameLoading::LoadingTaskResult::success();
 	}
@@ -11499,18 +11900,29 @@ ScriptAPI::commitPreparedSaveGeneration(
 	{
 		GameLog::write(
 			"ScriptAPI: save load threw; discarding the partial world and returning to title\n");
+		gameManager->setLastLoadFailureMessage(
+			u8"读档提交时发生未处理异常");
 		discardPartialWorldAfterFailedCommit();
 		returnToTitle();
 		return GameLoading::LoadingTaskResult::failure(
-			"Save load failed with an exception; returned to title.",
+			gameManager->getLastLoadFailureMessage(),
 			std::current_exception());
 	}
 }
 
 bool ScriptAPI::loadGame(int index)
 {
-	if (engine == nullptr || !engine->isMainThread())
+	gameManager->clearLastLoadFailureMessage();
+	if (engine == nullptr)
 	{
+		gameManager->setLastLoadFailureMessage(
+			u8"游戏引擎尚未初始化，无法读档");
+		return false;
+	}
+	if (!engine->isMainThread())
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"读档必须在游戏主线程执行");
 		GameLog::write(
 			"ScriptAPI: save commit must run on the SDL main thread\n");
 		return false;
@@ -11530,6 +11942,8 @@ bool ScriptAPI::loadGame(int index)
 		LoadCandidateGeneration);
 	if (!candidateCleanup.valid())
 	{
+		gameManager->setLastLoadFailureMessage(
+			u8"无法创建安全的读档临时目录");
 		GameLog::write(
 			"ScriptAPI: invalid load candidate cleanup path\n");
 		return false;
@@ -11552,23 +11966,40 @@ bool ScriptAPI::loadGame(int index)
 			SaveFileManager::DescribeSaveGenerationError(
 				preparation.error),
 			preparation.errorPath.c_str());
+		gameManager->setLastLoadFailureMessage(
+			std::string(u8"存档复制失败：") +
+				SaveFileManager::DescribeSaveGenerationError(
+					preparation.error) +
+				(preparation.errorPath.empty()
+					? std::string()
+					: std::string(" (") + preparation.errorPath + ")"));
 		return false;
 	}
 	PreparedSaveResources preparedResources;
+	std::string resourcePreparationFailure;
 	if (!prepareSaveResources(
 			gameManager,
 			preparedDirectory,
 			preparedResources,
-			{}))
+			{},
+			resourcePreparationFailure))
 	{
 		GameLog::write(
 			"ScriptAPI: save resource preparation failed index=%d\n",
 			index);
+		gameManager->setLastLoadFailureMessage(
+			resourcePreparationFailure.empty()
+				? std::string(u8"存档资源准备失败")
+				: resourcePreparationFailure);
 		return false;
 	}
-	PreparedSaveLoadCallbacks preparedCallbacks;
+	PreparedSaveLoadCallbacks preparedCallbacks{};
 	preparedCallbacks.mapFolderName =
 		preparedResources.mapFolderName;
+	preparedCallbacks.npcFallbackUsed =
+		preparedResources.npcFallbackUsed;
+	preparedCallbacks.objectFallbackUsed =
+		preparedResources.objectFallbackUsed;
 	preparedCallbacks.commitMap =
 		[this, &preparedResources](
 			const std::function<void()>& beforeMutation,
@@ -11628,8 +12059,16 @@ bool ScriptAPI::loadGame(int index)
 			"ScriptAPI: save commit failed index=%d message=%s\n",
 			index,
 			commitResult.message.c_str());
+		if (gameManager->getLastLoadFailureMessage().empty())
+		{
+			gameManager->setLastLoadFailureMessage(
+				commitResult.message.empty()
+					? std::string(u8"存档提交失败")
+					: commitResult.message);
+		}
 		return false;
 	}
+	gameManager->clearLastLoadFailureMessage();
 	return true;
 }
 
@@ -11656,6 +12095,8 @@ bool ScriptAPI::loadCurrentGame(
 
 	if (!gameManager->global.load())
 	{
+		gameManager->setLastLoadFailureMessage(
+			u8"存档状态文件 game.ini 无法读取或格式错误");
 		return false;
 	}
 	gameManager->global.loadUiSettings();
@@ -11668,6 +12109,23 @@ bool ScriptAPI::loadCurrentGame(
 	}
 	std::string tempNpcName = gameManager->global.data.npcName;
 	std::string tempObjName = gameManager->global.data.objName;
+	if ((!tempNpcName.empty() &&
+			!SaveFileManager::IsSafeEntityListFileName(tempNpcName)) ||
+		(!tempObjName.empty() &&
+			!SaveFileManager::IsSafeEntityListFileName(tempObjName)))
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"存档包含不安全的 NPC 或物件清单路径");
+		return false;
+	}
+	if (!SaveFileManager::AreEntityListFileNamesDistinct(
+			tempNpcName,
+			tempObjName))
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"存档的 NPC 与物件清单使用了同一文件名");
+		return false;
+	}
 	if (!loadMapWithFailurePolicy(
 			gameManager->global.data.mapName,
 			false,
@@ -11678,6 +12136,13 @@ bool ScriptAPI::loadCurrentGame(
 			preparedCallbacks.mapFolderName,
 			MapActorResetMode::ReplaceAllForSaveLoad))
 	{
+		if (!ownerCheckpointCanContinue(ownerCheckpoint))
+		{
+			return false;
+		}
+		gameManager->setLastLoadFailureMessage(
+			std::string(u8"地图加载失败：") +
+				gameManager->global.data.mapName);
 		return false;
 	}
 	if (!ownerCheckpointCanContinue(
@@ -11687,64 +12152,217 @@ bool ScriptAPI::loadCurrentGame(
 	}
 	gameManager->global.data.npcName = tempNpcName;
 	gameManager->global.data.objName = tempObjName;
-	gameManager->traps.load();
+	std::string auxiliaryFailureReason;
+	if (!gameManager->traps.load(&auxiliaryFailureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible trap data: %s\n",
+			auxiliaryFailureReason.c_str());
+		std::string templateFailureReason;
+		if (!gameManager->traps.loadInitialTemplate(
+				&templateFailureReason))
+		{
+			GameLog::write(
+				"ScriptAPI: initial trap template unavailable; using an empty trap table: %s\n",
+				templateFailureReason.c_str());
+			gameManager->traps.resetToEmpty();
+		}
+		if (!gameManager->traps.save())
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"无法修复损坏的机关数据");
+			return false;
+		}
+	}
 
 	gameManager->effectManager->freeResource();
 
-	gameManager->varList.load();
-	// Older compatible saves may omit memo data or contain an invalid optional
-	// memo payload. Memo::load keeps those saves usable with an empty memo, while
-	// filesystem inspection failures still abort the outer save-load transaction.
+	if (!gameManager->varList.load(&auxiliaryFailureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible variable data: %s\n",
+			auxiliaryFailureReason.c_str());
+		gameManager->varList.clearExcept({});
+		if (!gameManager->varList.save())
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"无法修复损坏的变量数据");
+			return false;
+		}
+	}
+	// Memo data is optional. Normalize the scratch generation after loading so
+	// the published current save matches the in-memory memo state.
 	if (!gameManager->memo.load(true))
 	{
+		GameLog::write(
+			"ScriptAPI: ignored unreadable optional memo data\n");
+		gameManager->memo.clear();
+	}
+	if (!gameManager->memo.save())
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"无法修复可选的事件记录数据");
 		return false;
 	}
 
-	gameManager->player->load(gameManager->global.data.characterIndex);
+	std::string playerFailureReason;
+	if (!gameManager->player->load(
+			gameManager->global.data.characterIndex,
+			&playerFailureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: incompatible player data; loading the initial template: %s\n",
+			playerFailureReason.c_str());
+		std::string templateFailureReason;
+		if (!gameManager->player->loadInitialTemplate(
+				gameManager->global.data.characterIndex,
+				&templateFailureReason))
+		{
+			gameManager->setLastLoadFailureMessage(
+				std::string(u8"玩家数据损坏，初始模板也无法读取：") +
+					templateFailureReason);
+			return false;
+		}
+		const Point fallbackPosition =
+			gameManager->map->clampToWalkable(
+				gameManager->player->getPosition());
+		gameManager->player->forceBeginStand();
+		gameManager->player->setPosition(
+			fallbackPosition,
+			false);
+		gameManager->player->setOffset({ 0, 0 });
+		gameManager->player->visible = true;
+		if (!gameManager->player->save(
+				gameManager->global.data.characterIndex))
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"无法修复损坏的玩家数据");
+			return false;
+		}
+	}
 	if (!ownerCheckpointCanContinue(
 			ownerCheckpoint))
 	{
 		return false;
 	}
 
-	gameManager->magicManager.load(gameManager->global.data.characterIndex);
+	if (!gameManager->magicManager.load(
+			gameManager->global.data.characterIndex,
+			&auxiliaryFailureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible magic data: %s\n",
+			auxiliaryFailureReason.c_str());
+		gameManager->magicManager.clearMagicList();
+		if (!gameManager->magicManager.save(
+				gameManager->global.data.characterIndex))
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"无法修复损坏的武功数据");
+			return false;
+		}
+	}
 
-	gameManager->goodsManager.load(gameManager->global.data.characterIndex);
+	if (!gameManager->goodsManager.load(
+			gameManager->global.data.characterIndex,
+			&auxiliaryFailureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible goods data: %s\n",
+			auxiliaryFailureReason.c_str());
+		gameManager->goodsManager.clearItem(false);
+		if (!gameManager->goodsManager.save(
+				gameManager->global.data.characterIndex))
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"无法修复损坏的物品数据");
+			return false;
+		}
+	}
 	if (!ownerCheckpointCanContinue(
 			ownerCheckpoint))
 	{
 		return false;
 	}
 
-	gameManager->partnerManager.load(gameManager->global.data.characterIndex);
+	if (!gameManager->partnerManager.load(
+			gameManager->global.data.characterIndex,
+			&auxiliaryFailureReason))
+	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible partner data: %s\n",
+			auxiliaryFailureReason.c_str());
+		gameManager->partnerManager.clearCurrentPartners();
+		if (!gameManager->partnerManager.save(
+				gameManager->global.data.characterIndex))
+		{
+			gameManager->setLastLoadFailureMessage(
+				u8"无法修复损坏的伙伴数据");
+			return false;
+		}
+	}
 
 	const std::string& npcListName =
 		gameManager->global.data.npcName;
 	const bool missingNpcList =
 		allowMissingNpcList &&
 		!npcOrObjectListExists(npcListName);
+	bool npcFallbackUsed =
+		preparedCallbacks.npcFallbackUsed ||
+		(missingNpcList && !npcListName.empty());
 	if (missingNpcList && !preparedCallbacks.commitNpc)
 	{
 		GameLog::write(
 			"ScriptAPI: compatible save is missing NPC list %s; loading an empty list\n",
 			npcListName.c_str());
 	}
-	if (!(preparedCallbacks.commitNpc
-			? preparedCallbacks.commitNpc(ownerCheckpoint)
-			: (missingNpcList
-				? gameManager->npcManager->
-					loadExactResourceBytes(
-						npcListName,
-						compatibleEmptyEntityListBytes(),
-						true,
-						{},
-						ownerCheckpoint)
-				: gameManager->npcManager->load(
-					npcListName,
+	bool npcLoaded = preparedCallbacks.commitNpc
+		? preparedCallbacks.commitNpc(ownerCheckpoint)
+		: (missingNpcList
+			? gameManager->npcManager->
+				loadExactResourceBytes(
+					npcListName.empty()
+						? CompatibleEmptyNpcListSourcePath
+						: npcListName,
+					compatibleEmptyEntityListBytes(),
 					true,
 					{},
-					ownerCheckpoint))))
+					ownerCheckpoint)
+			: gameManager->npcManager->load(
+				npcListName,
+				true,
+				{},
+				ownerCheckpoint));
+	if (!npcLoaded && !preparedCallbacks.commitNpc &&
+		ownerCheckpointCanContinue(ownerCheckpoint))
 	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible NPC list %s; loading an empty list\n",
+			npcListName.c_str());
+		npcLoaded = gameManager->npcManager->
+			loadExactResourceBytes(
+				CompatibleEmptyNpcListSourcePath,
+				compatibleEmptyEntityListBytes(),
+				true,
+				{},
+				ownerCheckpoint);
+		npcFallbackUsed = npcLoaded && !npcListName.empty();
+	}
+	if (!npcLoaded)
+	{
+		if (!ownerCheckpointCanContinue(ownerCheckpoint))
+		{
+			return false;
+		}
+		gameManager->setLastLoadFailureMessage(
+			u8"兼容的空 NPC 清单提交失败");
+		return false;
+	}
+	if (npcFallbackUsed &&
+		!gameManager->npcManager->save(npcListName))
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"无法修复损坏的 NPC 清单");
 		return false;
 	}
 
@@ -11753,26 +12371,60 @@ bool ScriptAPI::loadCurrentGame(
 	const bool missingObjectList =
 		allowMissingObjectList &&
 		!npcOrObjectListExists(objectListName);
+	bool objectFallbackUsed =
+		preparedCallbacks.objectFallbackUsed ||
+		(missingObjectList && !objectListName.empty());
 	if (missingObjectList && !preparedCallbacks.commitObject)
 	{
 		GameLog::write(
 			"ScriptAPI: compatible save is missing object list %s; loading an empty list\n",
 			objectListName.c_str());
 	}
-	if (!(preparedCallbacks.commitObject
-			? preparedCallbacks.commitObject(ownerCheckpoint)
-			: (missingObjectList
-				? gameManager->objectManager->
-					loadExactResourceBytes(
-						objectListName,
-						compatibleEmptyEntityListBytes(),
-						{},
-						ownerCheckpoint)
-				: gameManager->objectManager->load(
-					objectListName,
+	bool objectLoaded = preparedCallbacks.commitObject
+		? preparedCallbacks.commitObject(ownerCheckpoint)
+		: (missingObjectList
+			? gameManager->objectManager->
+				loadExactResourceBytes(
+					objectListName.empty()
+						? CompatibleEmptyObjectListSourcePath
+						: objectListName,
+					compatibleEmptyEntityListBytes(),
 					{},
-					ownerCheckpoint))))
+					ownerCheckpoint)
+			: gameManager->objectManager->load(
+				objectListName,
+				{},
+				ownerCheckpoint));
+	if (!objectLoaded && !preparedCallbacks.commitObject &&
+		ownerCheckpointCanContinue(ownerCheckpoint))
 	{
+		GameLog::write(
+			"ScriptAPI: ignored incompatible object list %s; loading an empty list\n",
+			objectListName.c_str());
+		objectLoaded = gameManager->objectManager->
+			loadExactResourceBytes(
+				CompatibleEmptyObjectListSourcePath,
+				compatibleEmptyEntityListBytes(),
+				{},
+				ownerCheckpoint);
+		objectFallbackUsed =
+			objectLoaded && !objectListName.empty();
+	}
+	if (!objectLoaded)
+	{
+		if (!ownerCheckpointCanContinue(ownerCheckpoint))
+		{
+			return false;
+		}
+		gameManager->setLastLoadFailureMessage(
+			u8"兼容的空物件清单提交失败");
+		return false;
+	}
+	if (objectFallbackUsed &&
+		!gameManager->objectManager->save(objectListName))
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"无法修复损坏的物件清单");
 		return false;
 	}
 	if (!ownerCheckpointCanContinue(
@@ -11781,7 +12433,13 @@ bool ScriptAPI::loadCurrentGame(
 		return false;
 	}
 
-	gameManager->effectManager->load();
+	if (!gameManager->effectManager->load() &&
+		!gameManager->effectManager->save())
+	{
+		gameManager->setLastLoadFailureMessage(
+			u8"无法修复损坏的特效数据");
+		return false;
+	}
 
 	if (gameManager->map->data != nullptr)
 	{
@@ -11841,7 +12499,12 @@ bool ScriptAPI::loadCurrentGame(
 			ownerCheckpoint,
 			8))
 	{
-		return false;
+		if (!ownerCheckpointCanContinue(ownerCheckpoint))
+		{
+			return false;
+		}
+		GameLog::write(
+			"ScriptAPI: visible map texture warm-up was incomplete; continuing load\n");
 	}
 
 	return true;

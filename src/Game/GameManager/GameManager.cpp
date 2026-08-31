@@ -6,9 +6,11 @@
 #include "../../File/File.h"
 #include "../../File/INIReader.h"
 #include "../../File/RootedResourceReader.h"
+#include "../../File/StrictRelativeResourcePath.h"
 #include "../../File/log.h"
 #include "../../Input/PhysicalInputManager.h"
 #include "../../Resource/ResourceManager.h"
+#include "../Menu/SystemNotice.h"
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -400,7 +402,16 @@ bool GameManager::initializeEditorRunPlayerBaseline(
 	}
 
 	global.data.characterIndex = characterIndex;
-	player->load(characterIndex);
+	std::string playerFailureReason;
+	if (!player->load(
+			characterIndex,
+			&playerFailureReason))
+	{
+		failureMessage = playerFailureReason.empty()
+			? "Editor-run player template could not be loaded"
+			: playerFailureReason;
+		return false;
+	}
 	player->calInfo();
 	if (player->npcIni != expectedNpcIni ||
 		player->level < 1 ||
@@ -1027,6 +1038,10 @@ void GameManager::handleSystemResult(unsigned int systemResult, int selectedSave
 	setGameplayPaused(false);
 	if ((systemResult & erLoad) != 0 && selectedSaveIndex >= 0)
 	{
+		if (menu != nullptr && menu->systemNotice != nullptr)
+		{
+			menu->systemNotice->dismiss();
+		}
 		if (weather != nullptr)
 		{
 			weather->fadeOut();
@@ -1044,6 +1059,23 @@ void GameManager::handleSystemResult(unsigned int systemResult, int selectedSave
 		{
 			GameLog::write(
 				"GameManager: in-game save load failed; restoring the current world presentation\n");
+			const bool returningToTitle =
+				(result & (erOK | erReturnToTitle)) != 0;
+			if (!returningToTitle)
+			{
+				if (!engine->isApplicationQuitRequested() &&
+					menu != nullptr)
+				{
+					menu->showSystemNotice(
+						std::string(u8"读档失败：") +
+							(lastLoadFailureMessage.empty()
+								? std::string(u8"未提供详细原因")
+								: lastLoadFailureMessage) +
+							u8"。请保留日志以便进一步排查。",
+						15000);
+				}
+				clearLastLoadFailureMessage();
+			}
 		}
 		if (weather != nullptr && !engine->isApplicationQuitRequested())
 		{
@@ -1084,11 +1116,54 @@ bool GameManager::loadGame(int index)
 	return scriptAPI.loadGame(index);
 }
 
+const std::string& GameManager::getLastLoadFailureMessage() const noexcept
+{
+	return lastLoadFailureMessage;
+}
+
+void GameManager::clearLastLoadFailureMessage()
+{
+	lastLoadFailureMessage.clear();
+}
+
+void GameManager::setLastLoadFailureMessage(std::string message)
+{
+	lastLoadFailureMessage = std::move(message);
+}
+
 bool GameManager::writeSaveGenerationDraft(
 	const std::string& generationDirectory,
 	const SaveGenerationLimits& copyLimits,
 	const std::function<bool()>& ownerCheckpoint)
 {
+	const ResourcePathSafety::StrictRelativePathResult mapPath =
+		ResourcePathSafety::normalizeStrictRelativeResourcePath(
+			global.data.mapName);
+	if (!mapPath.succeeded() ||
+		!File::fileExist(
+			std::string(MAP_FOLDER) + global.data.mapName))
+	{
+		GameLog::write(
+			"GameManager: refusing to publish a save with an unavailable map %s\n",
+			global.data.mapName.c_str());
+		return false;
+	}
+	if ((!global.data.npcName.empty() &&
+			!SaveFileManager::IsSafeEntityListFileName(
+				global.data.npcName)) ||
+		(!global.data.objName.empty() &&
+			!SaveFileManager::IsSafeEntityListFileName(
+				global.data.objName)) ||
+		!SaveFileManager::AreEntityListFileNamesDistinct(
+			global.data.npcName,
+			global.data.objName))
+	{
+		GameLog::write(
+			"GameManager: refusing to publish unsafe or colliding entity list names npc=%s object=%s\n",
+			global.data.npcName.c_str(),
+			global.data.objName.c_str());
+		return false;
+	}
 	if (!File::recoverDirectoryCopy(SAVE_CURRENT_FOLDER))
 	{
 		GameLog::write(
@@ -1209,6 +1284,26 @@ bool GameManager::saveGame(int index)
 		return false;
 	}
 
+	// Keep save/game aligned with the live world before attempting the optional
+	// manual or auto slot. The two directory publications are independently
+	// atomic; publishing the slot first could leave a new slot paired with an
+	// old current generation when the second publication fails.
+	const SaveGenerationResult currentPublication =
+		SaveFileManager::PublishPreparedSaveGeneration(
+			draftDirectory,
+			SAVE_CURRENT_FOLDER,
+			policy.limits,
+			{ SAVE_LIST_FILE });
+	if (!currentPublication.succeeded())
+	{
+		GameLog::write(
+			"GameManager: current save publication failed error=%s path=%s\n",
+			SaveFileManager::DescribeSaveGenerationError(
+				currentPublication.error),
+			currentPublication.errorPath.c_str());
+		return false;
+	}
+
 	if (index != 0)
 	{
 		const std::string secondaryDirectory =
@@ -1231,22 +1326,6 @@ bool GameManager::saveGame(int index)
 				slotPublication.errorPath.c_str());
 			return false;
 		}
-	}
-
-	const SaveGenerationResult currentPublication =
-		SaveFileManager::PublishPreparedSaveGeneration(
-			draftDirectory,
-			SAVE_CURRENT_FOLDER,
-			policy.limits,
-			{ SAVE_LIST_FILE });
-	if (!currentPublication.succeeded())
-	{
-		GameLog::write(
-			"GameManager: current save publication failed error=%s path=%s\n",
-			SaveFileManager::DescribeSaveGenerationError(
-				currentPublication.error),
-			currentPublication.errorPath.c_str());
-		return false;
 	}
 	return true;
 }
@@ -2436,6 +2515,7 @@ void GameManager::onDraw()
 
 bool GameManager::onInitial()
 {
+	clearLastLoadFailureMessage();
 	const auto& manifest = ResourceManager::instance().getActiveManifest();
 	global.useWav = manifest.useWav;
 	global.applyResourceManifestFeatures(manifest);
@@ -2451,6 +2531,7 @@ bool GameManager::onInitial()
 
 	if (!initMenu())
 	{
+		setLastLoadFailureMessage(u8"游戏界面初始化失败");
 		return false;
 	}
 
@@ -2485,6 +2566,16 @@ bool GameManager::onInitial()
 		inEvent = true;
 		scriptAPI.runScript(newGameScript);
 		inEvent = false;
+		if (!lastLoadFailureMessage.empty())
+		{
+			return false;
+		}
+		const unsigned int sceneCompletion =
+			result & (erOK | erReturnToTitle);
+		if (sceneCompletion != 0)
+		{
+			return lastLoadFailureMessage.empty();
+		}
 		bool hasNewGameSave = SaveFileManager::HasSaveFile(0);
 		if (map->data == nullptr && hasNewGameSave)
 		{
@@ -2502,6 +2593,14 @@ bool GameManager::onInitial()
 			{
 				return false;
 			}
+		}
+		if (map == nullptr || map->data == nullptr)
+		{
+			setLastLoadFailureMessage(
+				hasNewGameSave
+					? std::string(u8"新游戏基础存档没有载入地图")
+					: std::string(u8"新游戏脚本没有载入地图，且基础存档不存在"));
+			return false;
 		}
 		if (exitAfterNewGameScript)
 		{

@@ -1,4 +1,6 @@
 #include "EffectManager.h"
+#include "../../File/File.h"
+#include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
 #include "../GameManager/GameManager.h"
 #include "../GameManager/SaveFileManager.h"
@@ -35,8 +37,6 @@ int getEvadeForMagicUser(std::shared_ptr<GameElement> user)
 	}
 	return caster->getEvade();
 }
-
-constexpr int MaxPersistedEffectReferences = 4096;
 
 std::string getDetachedCasterSection(int index)
 {
@@ -78,7 +78,7 @@ void loadMagicEffectBonusMap(
 	int count = std::clamp(
 		static_cast<int>(ini.GetInteger(section, prefix + "Count", 0)),
 		0,
-		MaxPersistedEffectReferences);
+		MaximumPersistedEffectCollectionCount);
 	for (int i = 0; i < count; i++)
 	{
 		std::string itemPrefix = prefix + std::to_string(i + 1);
@@ -185,7 +185,7 @@ std::shared_ptr<NPC> loadDetachedEffectCaster(INIReader& source, const std::stri
 	int changeCount = std::clamp(
 		static_cast<int>(source.GetInteger(section, "ChangeMagicHitCountCount", 0)),
 		0,
-		MaxPersistedEffectReferences);
+		MaximumPersistedEffectCollectionCount);
 	for (int i = 0; i < changeCount; i++)
 	{
 		std::string prefix = "ChangeMagicHitCount" + std::to_string(i + 1);
@@ -202,6 +202,53 @@ std::shared_ptr<NPC> loadDetachedEffectCaster(INIReader& source, const std::stri
 	caster->selecting = false;
 	caster->clearCombatTargetMemory();
 	return caster;
+}
+
+bool hasValidPersistedCollectionCount(
+	const INIReader& ini,
+	const std::string& section,
+	const std::string& key)
+{
+	const long count = ini.GetInteger(section, key, -1);
+	return count >= 0 && count <= MaximumPersistedEffectCollectionCount;
+}
+
+bool hasValidPersistenceBounds(const INIReader& ini)
+{
+	if (!hasValidPersistedCollectionCount(ini, "Head", "Count")
+		|| !hasValidPersistedCollectionCount(ini, "Head", "TrailCount")
+		|| !hasValidPersistedCollectionCount(ini, "Head", "DelayedCount")
+		|| !hasValidPersistedCollectionCount(ini, "Head", "DetachedCasterCount"))
+	{
+		return false;
+	}
+
+	const int effectCount = static_cast<int>(ini.GetInteger("Head", "Count", 0));
+	for (int i = 0; i < effectCount; i++)
+	{
+		const std::string section = convert::formatString("PRO%d", i + 1);
+		if (!hasValidPersistedCollectionCount(ini, section, "LeapHitTargetCount")
+			|| !hasValidPersistedCollectionCount(ini, section, "PassThroughHitTargetCount")
+			|| !hasValidPersistedCollectionCount(ini, section, "MeteorPathCount")
+			|| !hasValidPersistedCollectionCount(ini, section, "AttachedNPCCount"))
+		{
+			return false;
+		}
+	}
+
+	const int detachedCasterCount = static_cast<int>(
+		ini.GetInteger("Head", "DetachedCasterCount", 0));
+	for (int i = 0; i < detachedCasterCount; i++)
+	{
+		const std::string section = getDetachedCasterSection(i);
+		if (!hasValidPersistedCollectionCount(ini, section, "MagicEffectNameBonusCount")
+			|| !hasValidPersistedCollectionCount(ini, section, "MagicEffectTypeBonusCount")
+			|| !hasValidPersistedCollectionCount(ini, section, "ChangeMagicHitCountCount"))
+		{
+			return false;
+		}
+	}
+	return true;
 }
 }
 
@@ -508,12 +555,26 @@ void EffectManager::updateDelayedMagic()
 	}
 }
 
-void EffectManager::load()
+bool EffectManager::load()
 {
 	const std::string iniName =
 		SaveFileManager::CurrentPath() + EFFECT_INI;
+	if (!File::fileExist(iniName))
+	{
+		freeResource();
+		return true;
+	}
 	INIReader ini(iniName);
+	if (ini.ParseError() != 0 || !ini.HasSection("Head"))
+	{
+		GameLog::write(
+			"EffectManager: ignored malformed or incomplete effect data %s\n",
+			iniName.c_str());
+		freeResource();
+		return false;
+	}
 	loadFromIni(ini);
+	return true;
 }
 
 void EffectManager::loadFromIni(INIReader& ini)
@@ -523,7 +584,7 @@ void EffectManager::loadFromIni(INIReader& ini)
 	int detachedCasterCount = std::clamp(
 		static_cast<int>(ini.GetInteger("Head", "DetachedCasterCount", 0)),
 		0,
-		MaxPersistedEffectReferences);
+		MaximumPersistedEffectCollectionCount);
 	referenceContext.resizeDetachedCasters(static_cast<size_t>(detachedCasterCount));
 	for (int i = 0; i < detachedCasterCount; i++)
 	{
@@ -536,7 +597,7 @@ void EffectManager::loadFromIni(INIReader& ini)
 	int count = std::clamp(
 		static_cast<int>(ini.GetInteger(section, "Count", 0)),
 		0,
-		MaxPersistedEffectReferences);
+		MaximumPersistedEffectCollectionCount);
 	for (int i = 0; i < count; i++)
 	{
 		section = convert::formatString("PRO%d", i + 1);
@@ -589,7 +650,7 @@ void EffectManager::loadFromIni(INIReader& ini)
 	int trailCount = std::clamp(
 		static_cast<int>(ini.GetInteger("Head", "TrailCount", 0)),
 		0,
-		MaxPersistedEffectReferences);
+		MaximumPersistedEffectCollectionCount);
 	for (int i = 0; i < trailCount; i++)
 	{
 		section = convert::formatString("Trail%d", i + 1);
@@ -622,7 +683,7 @@ void EffectManager::loadFromIni(INIReader& ini)
 	int delayedCount = std::clamp(
 		static_cast<int>(ini.GetInteger("Head", "DelayedCount", 0)),
 		0,
-		MaxPersistedEffectReferences);
+		MaximumPersistedEffectCollectionCount);
 	for (int i = 0; i < delayedCount; i++)
 	{
 		section = convert::formatString("Delayed%d", i + 1);
@@ -658,11 +719,17 @@ bool EffectManager::save()
 {
 	INIReader ini;
 	saveToIni(ini);
+	if (!hasValidPersistenceBounds(ini))
+	{
+		return false;
+	}
 	
 	std::string iniName = EFFECT_INI;
 	const bool saved = ini.saveToFile(SaveFileManager::CurrentPath() + iniName);
-    
-    SaveFileManager::AppendFile(iniName);
+	if (saved)
+	{
+		SaveFileManager::AppendFile(iniName);
+	}
 	return saved;
 }
 

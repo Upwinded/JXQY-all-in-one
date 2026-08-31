@@ -107,6 +107,11 @@ public:
 	static bool CopySaveFileFromAuto();
 	static bool HasSaveFile(int index);
 	static bool ClearAllSaveData();
+	static bool IsSafeEntityListFileName(
+		const std::string& fileName);
+	static bool AreEntityListFileNamesDistinct(
+		const std::string& npcFileName,
+		const std::string& objectFileName);
 	static std::string CurrentPath()
 	{
 		std::lock_guard<std::recursive_mutex> lock(

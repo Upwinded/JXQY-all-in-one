@@ -2,6 +2,7 @@
 #include "../../File/File.h"
 #include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
+#include <algorithm>
 #include <array>
 
 namespace
@@ -90,6 +91,103 @@ bool copySaveDirectory(
 	GameLog::write("SaveFileManager: copy %s -> %s %s\n", src.c_str(), dst.c_str(), ok ? "ok" : "failed");
 	return ok;
 }
+
+std::string lowercaseAscii(std::string value)
+{
+	for (char& character : value)
+	{
+		if (character >= 'A' && character <= 'Z')
+		{
+			character = static_cast<char>(
+				character + ('a' - 'A'));
+		}
+	}
+	return value;
+}
+
+bool isIndexedCoreSaveFileName(
+	const std::string& lowerFileName,
+	const char* prefix)
+{
+	const std::string prefixText(prefix);
+	if (lowerFileName.rfind(prefixText, 0) != 0 ||
+		lowerFileName.size() <= prefixText.size())
+	{
+		return false;
+	}
+	const std::string suffix =
+		lowerFileName.substr(prefixText.size());
+	if (suffix == ".ini")
+	{
+		return true;
+	}
+	if (suffix.size() <= 4 ||
+		suffix.substr(suffix.size() - 4) != ".ini")
+	{
+		return false;
+	}
+	return std::all_of(
+		suffix.begin(),
+		suffix.end() - 4,
+		[](char character)
+		{
+			return character >= '0' && character <= '9';
+		});
+}
+
+bool isCoreSaveFileName(const std::string& lowerFileName)
+{
+	static const std::array<const char*, 8> FixedCoreSaveFileNames = {
+		GLOBAL_INI,
+		SAVE_LIST_FILE,
+		MEMO_INI,
+		VARIABLE_INI,
+		TRAPS_INI,
+		TRAP_TRIGGERED_INDICES_INI,
+		EFFECT_INI,
+		PARTNER_IDX_INI
+	};
+	if (std::any_of(
+			FixedCoreSaveFileNames.begin(),
+			FixedCoreSaveFileNames.end(),
+			[&lowerFileName](const char* fileName)
+			{
+				return lowerFileName == lowercaseAscii(fileName);
+			}))
+	{
+		return true;
+	}
+	return isIndexedCoreSaveFileName(
+			lowerFileName, PLAYER_INI_NAME) ||
+		isIndexedCoreSaveFileName(
+			lowerFileName, PARTNER_INI_NAME) ||
+		isIndexedCoreSaveFileName(
+			lowerFileName, MAGIC_INI_NAME) ||
+		isIndexedCoreSaveFileName(
+			lowerFileName, GOODS_INI_NAME);
+}
+}
+
+bool SaveFileManager::IsSafeEntityListFileName(
+	const std::string& fileName)
+{
+	if (fileName.empty() ||
+		fileName.find('/') != std::string::npos ||
+		fileName.find('\\') != std::string::npos ||
+		!File::isSafeResourcePath(fileName))
+	{
+		return false;
+	}
+	return !isCoreSaveFileName(lowercaseAscii(fileName));
+}
+
+bool SaveFileManager::AreEntityListFileNamesDistinct(
+	const std::string& npcFileName,
+	const std::string& objectFileName)
+{
+	return npcFileName.empty() || objectFileName.empty() ||
+		lowercaseAscii(npcFileName) !=
+			lowercaseAscii(objectFileName);
 }
 
 SaveFileManager::CurrentPathScope::CurrentPathScope(

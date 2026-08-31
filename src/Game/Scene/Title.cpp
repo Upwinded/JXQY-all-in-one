@@ -21,6 +21,8 @@ namespace
 {
 constexpr int MaxTeamInfoBytes = 64 * 1024;
 constexpr std::size_t MaximumPointerRippleCount = 4;
+constexpr UTime LoadingFadeTime = 500;
+constexpr UTime FailureNoticeTime = 15000;
 
 bool shouldPlayStartupVideo(std::string& videoName)
 {
@@ -180,10 +182,21 @@ void Title::init()
 	teamBtn = getComponentByName<Button>("teamBtn");
 
 	weather = std::make_shared<Weather>();
-	weather->setPriority(epMax);
+	weather->setPriority(epMax + 3);
 	addChild(weather);
+	loadingFadeMask = std::make_shared<FadeMask>();
+	loadingFadeMask->name = "TitleLoadingFadeMask";
+	loadingFadeMask->setFadeTime(LoadingFadeTime);
+	loadingFadeMask->setPriority(epMax + 1);
+	loadingFadeMask->visible = false;
+	addChild(loadingFadeMask);
 
 	setChildRectReferToParent();
+	// SystemNotice already lays itself out in viewport coordinates. Attach it
+	// after the title's aspect-fit transform so it is not scaled a second time.
+	systemNotice = std::make_shared<SystemNotice>();
+	systemNotice->setPriority(epMax);
+	addChild(systemNotice);
 	configureFocus();
 }
 
@@ -195,6 +208,8 @@ void Title::freeResource()
 	loadBtn = nullptr;
 	teamBtn = nullptr;
 	weather = nullptr;
+	loadingFadeMask = nullptr;
+	systemNotice = nullptr;
 	titleCompositionCanvas = nullptr;
 	titleCompositionOriginalTarget = nullptr;
 	titleCompositionCanvasWidth = 0;
@@ -279,10 +294,21 @@ void Title::openTeamPage()
 
 void Title::startNewGame()
 {
+	if (systemNotice != nullptr)
+	{
+		systemNotice->dismiss();
+	}
 	weather->fadeOut();
 	engine->stopBGM();
 	auto mainScene = std::make_shared<MainScene>(0);
 	const unsigned int returnValue = mainScene->run();
+	std::string failureMessage = mainScene->game != nullptr
+		? mainScene->game->getLastLoadFailureMessage()
+		: std::string();
+	if (failureMessage.empty() && (returnValue & erInitError) != 0)
+	{
+		failureMessage = u8"游戏场景初始化失败";
+	}
 	if ((returnValue & erExit) != 0)
 	{
 		result |= erExit;
@@ -292,14 +318,20 @@ void Title::startNewGame()
 	tryCleanRes();
 	playTitleBGM();
 	weather->fadeInEx();
+	showSceneFailureNotice(
+		failureMessage,
+		0,
+		true,
+		(returnValue & erInitError) != 0);
 }
 
 void Title::openSavedGame()
 {
 	auto saveLoad = std::make_shared<SaveLoad>(false, true);
-	saveLoad->setPriority(0);
+	saveLoad->setPriority(epMax + 2);
 	addChild(saveLoad);
 	unsigned int returnValue = saveLoad->run();
+	const int selectedSaveIndex = saveLoad->index;
 	if ((returnValue & erExit) != 0)
 	{
 		result |= erExit;
@@ -307,10 +339,27 @@ void Title::openSavedGame()
 	}
 	else if ((returnValue & erLoad) != 0)
 	{
-		weather->fadeOut();
+		if (systemNotice != nullptr)
+		{
+			systemNotice->dismiss();
+		}
+		if (loadingFadeMask != nullptr)
+		{
+			loadingFadeMask->visible = true;
+			loadingFadeMask->fadeOut();
+		}
+		removeChild(saveLoad);
+		saveLoad = nullptr;
 		engine->stopBGM();
-		auto mainScene = std::make_shared<MainScene>(saveLoad->index + 1);
+		auto mainScene = std::make_shared<MainScene>(selectedSaveIndex + 1);
 		returnValue = mainScene->run();
+		std::string failureMessage = mainScene->game != nullptr
+			? mainScene->game->getLastLoadFailureMessage()
+			: std::string();
+		if (failureMessage.empty() && (returnValue & erInitError) != 0)
+		{
+			failureMessage = u8"游戏场景初始化失败";
+		}
 		if ((returnValue & erExit) != 0)
 		{
 			result |= erExit;
@@ -320,10 +369,49 @@ void Title::openSavedGame()
 		{
 			tryCleanRes();
 			playTitleBGM();
-			weather->fadeInEx();
+			if (loadingFadeMask != nullptr)
+			{
+				loadingFadeMask->fadeIn();
+				loadingFadeMask->visible = false;
+			}
+			showSceneFailureNotice(
+				failureMessage,
+				selectedSaveIndex + 1,
+				false,
+				(returnValue & erInitError) != 0);
 		}
 	}
 	removeChild(saveLoad);
+}
+
+void Title::showSceneFailureNotice(
+	const std::string& failureMessage,
+	int saveIndex,
+	bool newGame,
+	bool initializationFailure)
+{
+	if (failureMessage.empty() || systemNotice == nullptr)
+	{
+		return;
+	}
+	std::string message;
+	if (!initializationFailure)
+	{
+		message = u8"系统：游戏运行失败：";
+	}
+	else if (newGame)
+	{
+		message = u8"系统：新游戏初始化失败：";
+	}
+	else
+	{
+		message = std::string(u8"系统：读档失败（存档槽 ") +
+			std::to_string(saveIndex) + u8"）：";
+	}
+	message += failureMessage;
+	message += u8"。请保留日志以便进一步排查。";
+	GameLog::write("Title: %s\n", message.c_str());
+	systemNotice->showMessage(message, FailureNoticeTime);
 }
 
 void Title::onEvent()
@@ -557,7 +645,9 @@ bool Title::onBeginDrawComposition()
 
 bool Title::shouldDrawChildAfterComposition(const PElement& child) const
 {
-	return std::dynamic_pointer_cast<SaveLoad>(child) != nullptr;
+	return child == loadingFadeMask ||
+		child == systemNotice ||
+		std::dynamic_pointer_cast<SaveLoad>(child) != nullptr;
 }
 
 void Title::onEndDrawComposition(bool completed)

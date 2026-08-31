@@ -473,7 +473,8 @@ bool runNpcCollectionLoadSafety(GameManager& gameManager, const std::filesystem:
 		"MapY=6\n";
 	ok = check(writeTextFile(saveGameFixturePath(root, "partner2.ini"), validPartnerList),
 		"write valid partner fixture") && ok;
-	gameManager.partnerManager.load(2);
+	ok = check(gameManager.partnerManager.load(2),
+		"load valid partner fixture") && ok;
 	ok = check(gameManager.npcManager->npcList.size() == 3
 		&& countNpcKind(gameManager, nkPartner) == 1
 		&& containsNpc(gameManager, normalNpc)
@@ -484,10 +485,60 @@ bool runNpcCollectionLoadSafety(GameManager& gameManager, const std::filesystem:
 		&& !observer->fightState.get()
 		&& gameManager.player->getControlledCharacter() == nullptr,
 		"removing a replaced partner clears combat and player-control references") && ok;
-	gameManager.partnerManager.load(2);
-	ok = check(gameManager.npcManager->npcList.size() == 3
+	ok = check(gameManager.partnerManager.load(2)
+		&& gameManager.npcManager->npcList.size() == 3
 		&& countNpcKind(gameManager, nkPartner) == 1,
 		"reloading the same partner file does not duplicate partners") && ok;
+
+	const std::string legacyNpcPartnerList =
+		"[Head]\n"
+		"Count=1\n"
+		"[NPC000]\n"
+		"Name=LegacyNpcPartner\n"
+		"Kind=3\n"
+		"Relation=0\n"
+		"Life=10\n"
+		"LifeMax=10\n"
+		"MapX=7\n"
+		"MapY=7\n";
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "partner2.ini"),
+			legacyNpcPartnerList),
+		"write legacy NPC-section partner fixture") && ok;
+	ok = check(gameManager.partnerManager.load(2),
+		"load legacy NPC-section partner fixture") && ok;
+	auto legacyNpcPartners =
+		gameManager.partnerManager.findPartnersFromNPCManager();
+	ok = check(
+		legacyNpcPartners.size() == 1 &&
+			legacyNpcPartners.front()->npcName == "LegacyNpcPartner",
+		"legacy NPC000 partner sections remain loadable") && ok;
+
+	const std::string legacyNumericPartnerList =
+		"[Head]\n"
+		"Count=1\n"
+		"[1]\n"
+		"Name=LegacyNumericPartner\n"
+		"Kind=3\n"
+		"Relation=0\n"
+		"Life=10\n"
+		"LifeMax=10\n"
+		"MapX=8\n"
+		"MapY=8\n";
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "partner2.ini"),
+			legacyNumericPartnerList),
+		"write legacy numeric-section partner fixture") && ok;
+	ok = check(gameManager.partnerManager.load(2),
+		"load legacy numeric-section partner fixture") && ok;
+	auto legacyNumericPartners =
+		gameManager.partnerManager.findPartnersFromNPCManager();
+	ok = check(
+		legacyNumericPartners.size() == 1 &&
+			legacyNumericPartners.front()->npcName == "LegacyNumericPartner",
+		"legacy one-based numeric partner sections remain loadable") && ok;
 
 	auto loadedPartners = gameManager.partnerManager.findPartnersFromNPCManager();
 	auto loadedPartner = loadedPartners.empty() ? nullptr : loadedPartners.front();
@@ -496,18 +547,84 @@ bool runNpcCollectionLoadSafety(GameManager& gameManager, const std::filesystem:
 		"Count=999999999999999999999\n";
 	ok = check(writeTextFile(saveGameFixturePath(root, "partner2.ini"), invalidPartnerList),
 		"write invalid partner count fixture") && ok;
-	gameManager.partnerManager.load(2);
-	ok = check(loadedPartner != nullptr && !containsNpc(gameManager, loadedPartner)
+	std::string invalidPartnerFailureReason;
+	ok = check(!gameManager.partnerManager.load(
+			2,
+			&invalidPartnerFailureReason)
+		&& loadedPartner != nullptr && containsNpc(gameManager, loadedPartner)
+		&& countNpcKind(gameManager, nkPartner) == 1
+		&& containsNpc(gameManager, normalNpc)
+		&& containsNpc(gameManager, observer)
+		&& invalidPartnerFailureReason.find(u8"数量") !=
+			std::string::npos,
+		"invalid target-character partner data fails without replacing the live partners") && ok;
+
+	const std::string legacyPartnerNpcTemplate =
+		"[Init]\n"
+		"Name=LegacyCharacterTemplate\n"
+		"Kind=3\n";
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "partner2.ini"),
+			legacyPartnerNpcTemplate) &&
+			gameManager.partnerManager.load(2) &&
+			countNpcKind(gameManager, nkPartner) == 0 &&
+			containsNpc(gameManager, normalNpc) &&
+			containsNpc(gameManager, observer),
+		"a legacy first-party NPC template named partnerN.ini remains an empty partner list") && ok;
+	const std::string legacyPartnerBodyTemplate =
+		"[Common]\n"
+		"Image=npc080_body.asf\n";
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "partner2.ini"),
+			legacyPartnerBodyTemplate) &&
+			gameManager.partnerManager.load(2) &&
+			countNpcKind(gameManager, nkPartner) == 0,
+		"a legacy first-party body template named partnerN.ini remains an empty partner list") && ok;
+
+	ok = check(gameManager.partnerManager.load(3)
 		&& countNpcKind(gameManager, nkPartner) == 0
 		&& containsNpc(gameManager, normalNpc)
 		&& containsNpc(gameManager, observer),
-		"invalid target-character partner data clears stale partners without removing normal NPCs") && ok;
-
-	gameManager.partnerManager.load(3);
-	ok = check(countNpcKind(gameManager, nkPartner) == 0
-		&& containsNpc(gameManager, normalNpc)
-		&& containsNpc(gameManager, observer),
 		"missing character partner file clears stale partners and preserves normal NPCs") && ok;
+
+	gameManager.player->npcName = "RetainedPlayer";
+	gameManager.player->rage = 73;
+	ok = check(
+		!gameManager.player->load(4) &&
+			gameManager.player->npcName == "RetainedPlayer" &&
+			gameManager.player->rage == 73,
+		"missing player data is rejected before clearing the live player") && ok;
+	std::string emptyPlayerFailureReason;
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "player4.ini"),
+			"") &&
+			!gameManager.player->load(
+				4,
+				&emptyPlayerFailureReason) &&
+			gameManager.player->npcName == "RetainedPlayer" &&
+			gameManager.player->rage == 73 &&
+			emptyPlayerFailureReason.find(u8"为空") !=
+				std::string::npos,
+		"zero-byte player data is rejected with a concrete reason before clearing the live player") && ok;
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "player4.ini"),
+			"[Init\nName=Broken\n") &&
+			!gameManager.player->load(4) &&
+			gameManager.player->npcName == "RetainedPlayer" &&
+			gameManager.player->rage == 73,
+		"malformed player data is rejected before clearing the live player") && ok;
+	ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "player4.ini"),
+			"[Other]\nName=WrongSection\n") &&
+			!gameManager.player->load(4) &&
+			gameManager.player->npcName == "RetainedPlayer" &&
+			gameManager.player->rage == 73,
+		"player data without Init is rejected before clearing the live player") && ok;
 
 	resetRuntime(gameManager);
 	gameManager.npcManager->addNPC("missing.ini", 1, 1, 0);
@@ -817,6 +934,142 @@ bool runPlayerChangePersistenceAndPartnerContinuity(
 				std::deque<std::string>{
 					"memo saved before player change" },
 		"player change persists the shared memo before switching characters") && ok;
+
+	return ok;
+}
+
+bool runEntityListScriptSavePolicy(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	resetRuntime(gameManager);
+	const auto readVirtualText = [](const std::string& fileName)
+	{
+		std::unique_ptr<char[]> data;
+		int length = 0;
+		if (!File::readFile(fileName, data, length) ||
+			length < 0)
+		{
+			return std::string();
+		}
+		return std::string(
+			data == nullptr ? "" : data.get(),
+			static_cast<std::size_t>(length));
+	};
+
+	const std::string retainedGlobal =
+		"[State]\n"
+		"Map=retained.map\n";
+	bool ok = check(
+		writeTextFile(
+			saveGameFixturePath(root, "game.ini"),
+			retainedGlobal),
+		"write entity-list script save guard fixture");
+	gameManager.global.data.npcName = "retained.npc";
+	gameManager.global.data.objName = "retained.obj";
+	gameManager.scriptAPI.saveNPC("game.ini");
+	ok = check(
+		gameManager.global.data.npcName == "retained.npc" &&
+			readVirtualText("save\\game\\game.ini") ==
+				retainedGlobal,
+		"SaveNPC rejects a core save name without updating the global NPC label or overwriting game.ini") &&
+		ok;
+
+	gameManager.global.data.objName = "Shared.INI";
+	gameManager.scriptAPI.saveNPC("shared.ini");
+	ok = check(
+		gameManager.global.data.npcName == "retained.npc" &&
+			!File::fileExist("save\\game\\shared.ini"),
+		"SaveNPC rejects a case-insensitive collision with the object list before writing or updating state") &&
+		ok;
+
+	std::error_code errorCode;
+	const std::filesystem::path blockedNpcPath =
+		saveGameFixturePath(root, "blocked.npc");
+	std::filesystem::create_directories(
+		blockedNpcPath,
+		errorCode);
+	const bool blockedNpcReady = !errorCode;
+	ok = check(
+		blockedNpcReady,
+		"create a safe-name NPC write-failure fixture") && ok;
+	if (blockedNpcReady)
+	{
+		gameManager.global.data.objName = "retained.obj";
+		gameManager.scriptAPI.saveNPC("blocked.npc");
+		errorCode.clear();
+		ok = check(
+			gameManager.global.data.npcName == "retained.npc" &&
+				std::filesystem::is_directory(
+					blockedNpcPath,
+					errorCode) &&
+				!errorCode,
+			"SaveNPC updates the global NPC label only after the entity list write succeeds") &&
+			ok;
+	}
+
+	errorCode.clear();
+	const std::filesystem::path blockedObjectPath =
+		saveGameFixturePath(root, "blocked.obj");
+	std::filesystem::create_directories(
+		blockedObjectPath,
+		errorCode);
+	const bool blockedObjectReady = !errorCode;
+	ok = check(
+		blockedObjectReady,
+		"create a safe-name object write-failure fixture") && ok;
+	if (blockedObjectReady)
+	{
+		gameManager.global.data.objName = "retained.obj";
+		gameManager.scriptAPI.saveObject("blocked.obj");
+		errorCode.clear();
+		ok = check(
+			gameManager.global.data.objName == "retained.obj" &&
+				std::filesystem::is_directory(
+					blockedObjectPath,
+					errorCode) &&
+				!errorCode,
+			"SaveObj updates the global object label only after the entity list write succeeds") &&
+			ok;
+	}
+
+	gameManager.scriptAPI.saveNPC("accepted.npc");
+	INIReader savedNpc("save\\game\\accepted.npc");
+	ok = check(
+		gameManager.global.data.npcName == "accepted.npc" &&
+			savedNpc.ParseError() == 0 &&
+			savedNpc.GetInteger("Head", "Count", -1) == 0,
+		"SaveNPC publishes an ordinary list and updates its global label after the successful write") &&
+		ok;
+
+	gameManager.scriptAPI.saveObject("memo.ini");
+	INIReader savedLegacyObject(
+		"save\\game\\memo.ini");
+	ok = check(
+		gameManager.global.data.objName == "memo.ini" &&
+			savedLegacyObject.ParseError() == 0 &&
+			savedLegacyObject.GetInteger(
+				"Head", "Count", -1) == 0,
+		"SaveObj keeps memo.ini available as a legacy object-list name") &&
+		ok;
+
+	gameManager.global.data.npcName.clear();
+	std::vector<std::string> filesBeforeEmptySave =
+		File::listFiles("save\\game");
+	std::sort(
+		filesBeforeEmptySave.begin(),
+		filesBeforeEmptySave.end());
+	gameManager.scriptAPI.saveNPC("");
+	std::vector<std::string> filesAfterEmptySave =
+		File::listFiles("save\\game");
+	std::sort(
+		filesAfterEmptySave.begin(),
+		filesAfterEmptySave.end());
+	ok = check(
+		gameManager.global.data.npcName.empty() &&
+			filesAfterEmptySave == filesBeforeEmptySave,
+		"SaveNPC keeps an explicit empty current list as a no-op") &&
+		ok;
 	return ok;
 }
 
@@ -1232,6 +1485,9 @@ bool runNpcRuntimePersistenceTests()
 	ok = runStatusDurationInputSafety() && ok;
 	ok = runLegacyNpcObjectDefaults() && ok;
 	ok = runPlayerChangePersistenceAndPartnerContinuity(
+		gameManager,
+		root) && ok;
+	ok = runEntityListScriptSavePolicy(
 		gameManager,
 		root) && ok;
 	ok = runLiveNpcRoundTrip(gameManager) && ok;

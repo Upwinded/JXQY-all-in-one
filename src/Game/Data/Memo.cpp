@@ -38,9 +38,16 @@ bool readMemoAlias(
 			virtualPath,
 			data,
 			length,
-			MemoPersistence::MaximumFileBytes) ||
-		data == nullptr ||
-		length <= 0)
+			MemoPersistence::MaximumFileBytes))
+	{
+		return false;
+	}
+	if (length <= 0)
+	{
+		content.kind = MemoPersistence::ContentKind::Invalid;
+		return true;
+	}
+	if (data == nullptr)
 	{
 		return false;
 	}
@@ -92,9 +99,21 @@ bool Memo::load(bool allowMissing)
 	{
 		return false;
 	}
+	if (canonical.exists &&
+		canonical.kind == MemoPersistence::ContentKind::Memo)
+	{
+		memo = std::move(canonical.lines);
+		return true;
+	}
+	if (standard.exists &&
+		standard.kind == MemoPersistence::ContentKind::Memo)
+	{
+		memo = std::move(standard.lines);
+		return true;
+	}
 	if ((canonical.exists &&
-			canonical.kind !=
-				MemoPersistence::ContentKind::Memo) ||
+			canonical.kind ==
+				MemoPersistence::ContentKind::Invalid) ||
 		(standard.exists &&
 			standard.kind ==
 				MemoPersistence::ContentKind::Invalid))
@@ -108,18 +127,6 @@ bool Memo::load(bool allowMissing)
 			return true;
 		}
 		return false;
-	}
-	if (canonical.exists)
-	{
-		memo = std::move(canonical.lines);
-		return true;
-	}
-	if (standard.exists &&
-		standard.kind ==
-			MemoPersistence::ContentKind::Memo)
-	{
-		memo = std::move(standard.lines);
-		return true;
 	}
 	if (allowMissing)
 	{
@@ -136,25 +143,10 @@ bool Memo::save()
 {
 	const std::string currentPath =
 		SaveFileManager::CurrentPath();
-	MemoAliasContent standard;
-	MemoAliasContent canonical;
-	if (!inspectMemoAliases(
-			currentPath,
-			standard,
-			canonical) ||
-		(canonical.exists &&
-			canonical.kind !=
-				MemoPersistence::ContentKind::Memo) ||
-		(standard.exists &&
-			standard.kind ==
-				MemoPersistence::ContentKind::Invalid))
-	{
-		return false;
-	}
-
 	// memo.txt is the only canonical runtime spelling. When importing a
-	// semantic memo.ini, leave it untouched because that name is also used by
-	// valid legacy object lists.
+	// semantic or damaged legacy alias, leave memo.ini untouched because that
+	// name is also used by valid legacy object lists. Overwriting memo.txt also
+	// repairs an optional payload accepted by compatible loading.
 	const std::string outputFileName =
 		MemoPersistence::CanonicalFileName;
 	const std::string serialized =

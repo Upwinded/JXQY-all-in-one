@@ -1538,6 +1538,64 @@ bool runCurrentPathScopeTests()
 	return ok;
 }
 
+bool runEntityListNamePolicyTests()
+{
+	const std::vector<std::string> reservedNames = {
+		"GAME.INI",
+		"list.ini",
+		"memo.txt",
+		"variable.ini",
+		"traps.ini",
+		"trapindexignore.ini",
+		"proj.ini",
+		"partneridx.ini",
+		"player.ini",
+		"PLAYER7.INI",
+		"partner0.ini",
+		"partner42.ini",
+		"magic.ini",
+		"magic12.ini",
+		"goods.ini",
+		"goods999.ini"
+	};
+	bool ok = check(
+		SaveFileManager::IsSafeEntityListFileName(
+			"runtime-state.npc") &&
+		SaveFileManager::IsSafeEntityListFileName(
+			"runtime-state.obj") &&
+		SaveFileManager::IsSafeEntityListFileName(
+			"memo.ini"),
+		"entity list names allow ordinary files and the legacy memo.ini object alias");
+	ok = check(
+		!SaveFileManager::IsSafeEntityListFileName("") &&
+		!SaveFileManager::IsSafeEntityListFileName(
+			"nested/runtime.npc") &&
+		!SaveFileManager::IsSafeEntityListFileName(
+			"nested\\runtime.obj") &&
+		std::all_of(
+			reservedNames.cbegin(),
+			reservedNames.cend(),
+			[](const std::string& fileName)
+			{
+				return !SaveFileManager::
+					IsSafeEntityListFileName(fileName);
+			}),
+		"entity list names cannot escape the flat generation or overwrite core save files") &&
+		ok;
+	ok = check(
+		SaveFileManager::AreEntityListFileNamesDistinct(
+			"actors.npc", "objects.obj") &&
+		SaveFileManager::AreEntityListFileNamesDistinct(
+			"", "") &&
+		SaveFileManager::AreEntityListFileNamesDistinct(
+			"", "shared.ini") &&
+		!SaveFileManager::AreEntityListFileNamesDistinct(
+			"Shared.ini", "shared.INI"),
+		"NPC and object list names cannot collide on case-insensitive save roots") &&
+		ok;
+	return ok;
+}
+
 bool runEmptyNamespaceStartupRecoveryTest(
 	SaveGenerationFixture& fixture)
 {
@@ -1601,6 +1659,7 @@ bool runSaveGenerationTests()
 		fixture) && ok;
 	ok = runScratchGenerationCleanupTests(fixture) && ok;
 	ok = runCurrentPathScopeTests() && ok;
+	ok = runEntityListNamePolicyTests() && ok;
 	return ok;
 }
 

@@ -34,6 +34,23 @@ int main()
 	ok = check(MemoPersistence::parseText(serialized, reparsed) && reparsed == lines,
 		"memo serialization roundtrips") && ok;
 
+	const std::deque<std::string> unsafeLines =
+	{
+		"first\nsecond",
+		std::string("third\0fourth", 12)
+	};
+	const std::deque<std::string> sanitizedLines =
+	{
+		"first second",
+		"third fourth"
+	};
+	ok = check(
+		MemoPersistence::parseText(
+			MemoPersistence::serializeText(unsafeLines),
+			reparsed) &&
+			reparsed == sanitizedLines,
+		"memo serialization replaces line breaks and embedded NUL bytes") && ok;
+
 	for (const std::string& invalidCount : {
 		"-1", "4097", "2147483647", "2junk", ""})
 	{

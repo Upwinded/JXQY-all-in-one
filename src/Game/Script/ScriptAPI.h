@@ -51,6 +51,7 @@ public:
 	void stopSound();
 	void runScript(const std::string& fileName);
 	void runScript(const std::string& fileName, const std::string& mapName);
+	int runScriptForLua(const std::string& fileName);
 	ExactScriptExecutionResult runScriptFromExactRoot(
 		const EditorRun::SearchRoot& root,
 		const std::string& virtualPath);
@@ -347,6 +348,8 @@ private:
 	struct PreparedSaveLoadCallbacks
 	{
 		std::string mapFolderName;
+		bool npcFallbackUsed;
+		bool objectFallbackUsed;
 		std::function<bool(
 			const std::function<void()>& beforeMutation,
 			const std::function<bool()>& preparationCheckpoint)>
@@ -366,7 +369,7 @@ private:
 	GameManager* gameManager = nullptr;
 	Engine* engine = nullptr;
 
-	void runScriptWithCapturedParent(
+	int runScriptWithCapturedParent(
 		const std::string& fileName,
 		const std::string& mapName,
 		std::uint64_t capturedParentExecutionId,

@@ -39,8 +39,9 @@ public:
 		int targetSlotIndex,
 		std::string* message = nullptr);
 
-	virtual void load(int index);
+	virtual bool load(int index, std::string* failureReason = nullptr);
 	virtual bool save(int index);
+	void clearCurrentPartners();
 	void freeResource();
 
 private:

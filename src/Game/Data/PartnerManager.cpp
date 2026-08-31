@@ -1,5 +1,6 @@
 #include "PartnerManager.h"
 #include "NPCPersistence.h"
+#include "SaveIniPersistence.h"
 #include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
 #include "../GameManager/GameManager.h"
@@ -534,42 +535,91 @@ bool PartnerManager::exchangePartnerEquipmentSlots(
 	return true;
 }
 
-void PartnerManager::load(int index)
+bool PartnerManager::load(int index, std::string* failureReason)
 {
-	freeResource();
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
 	std::string fName =
 		SaveFileManager::CurrentPath() + PARTNER_INI_NAME;
+	std::string displayName = PARTNER_INI_NAME;
 	if (index >= 0)
 	{
 		fName += convert::formatString("%d", index);
+		displayName += convert::formatString("%d", index);
 	}
 	fName += PARTNER_INI_EXT;
-	if (!File::fileExist(fName))
-	{
-		removeCurrentPartners();
-		return;
-	}
+	displayName += PARTNER_INI_EXT;
 
-	INIReader ini(fName);
-	if (ini.ParseError() != 0)
+	std::shared_ptr<INIReader> loadedIni;
+	const SaveIniPersistence::ReadStatus status =
+		SaveIniPersistence::read(fName, loadedIni);
+	if (status == SaveIniPersistence::ReadStatus::Missing)
+	{
+		freeResource();
+		removeCurrentPartners();
+		return true;
+	}
+	if (status != SaveIniPersistence::ReadStatus::Loaded ||
+		loadedIni == nullptr)
 	{
 		GameLog::write("PartnerManager: invalid partner file %s\n", fName.c_str());
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"同伴数据文件无法读取或格式错误：" +
+				displayName;
+		}
+		return false;
+	}
+	INIReader& ini = *loadedIni;
+	if (!ini.HasSection("Head") &&
+		(ini.HasSection("Init") || ini.HasSection("Common")))
+	{
+		GameLog::write(
+			"PartnerManager: compatible NPC template %s is not a partner list; loading an empty list\n",
+			fName.c_str());
+		freeResource();
 		removeCurrentPartners();
-		return;
+		return true;
 	}
 
 	int count = 0;
 	if (!NPCPersistence::readCount(ini, NPCPersistence::MaximumPartnerCount, count))
 	{
 		GameLog::write("PartnerManager: invalid partner count in %s\n", fName.c_str());
-		removeCurrentPartners();
-		return;
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"同伴数据数量无效：" + displayName;
+		}
+		return false;
 	}
+	std::string sectionPrefix = "Partner";
+	int sectionIndexOffset = 0;
+	if (count > 0 && !ini.HasSection("Partner000"))
+	{
+		if (ini.HasSection("NPC000"))
+		{
+			sectionPrefix = "NPC";
+		}
+		else if (ini.HasSection("1"))
+		{
+			sectionPrefix.clear();
+			sectionIndexOffset = 1;
+		}
+	}
+	const auto partnerSection =
+		[&sectionPrefix, sectionIndexOffset](int index)
+		{
+			return sectionPrefix.empty()
+				? std::to_string(index + sectionIndexOffset)
+				: convert::formatString(
+					"%s%03d", sectionPrefix.c_str(), index);
+		};
 	int loadCount = 0;
 	for (int index = 0; index < count; ++index)
 	{
-		const std::string section =
-			convert::formatString("Partner%03d", index);
+		const std::string section = partnerSection(index);
 		if (!ini.HasSection(section))
 		{
 			GameLog::write(
@@ -592,25 +642,30 @@ void PartnerManager::load(int index)
 		> static_cast<size_t>(NPCPersistence::MaximumRuntimeNpcCount))
 	{
 		GameLog::write("PartnerManager: partner list exceeds runtime capacity in %s\n", fName.c_str());
-		removeCurrentPartners();
-		return;
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"同伴数量超过运行上限：" + displayName;
+		}
+		return false;
 	}
 
 	std::vector<std::shared_ptr<NPC>> loadedPartnerList;
 	loadedPartnerList.reserve(static_cast<size_t>(loadCount));
 	for (int i = 0; i < loadCount; ++i)
 	{
-		std::string section = convert::formatString("Partner%03d", i);
+		const std::string section = partnerSection(i);
 		auto partner = std::make_shared<NPC>();
 		partner->initFromIni(&ini, section);
 		loadedPartnerList.push_back(partner);
 	}
 
+	freeResource();
 	removeCurrentPartners();
 	for (const auto& partner : loadedPartnerList)
 	{
 		gm->npcManager->addNPC(partner);
 	}
+	return true;
 }
 
 bool PartnerManager::save(int index)
@@ -644,6 +699,12 @@ bool PartnerManager::save(int index)
     
     SaveFileManager::AppendFile(fName);
 	return saved;
+}
+
+void PartnerManager::clearCurrentPartners()
+{
+	freeResource();
+	removeCurrentPartners();
 }
 
 void PartnerManager::freeResource()

@@ -4,6 +4,7 @@
 #include "../../Engine/AspectFitLayout.h"
 #include "../../Weather/Weather.h"
 #include "../Menu/UIFocusManager.h"
+#include "../Menu/SystemNotice.h"
 
 class GamepadEssentialUITestAccess;
 
@@ -25,6 +26,8 @@ private:
 	std::shared_ptr<Button> loadBtn = nullptr;
 	std::shared_ptr<Button> teamBtn = nullptr;
 	std::shared_ptr<Weather> weather = nullptr;
+	std::shared_ptr<FadeMask> loadingFadeMask = nullptr;
+	std::shared_ptr<SystemNotice> systemNotice = nullptr;
 	_shared_image titleCompositionCanvas = nullptr;
 	_image titleCompositionOriginalTarget = nullptr;
 	int titleCompositionCanvasWidth = 0;
@@ -41,6 +44,11 @@ private:
 	void openSavedGame();
 	void openTeamPage();
 	void exitApplication();
+	void showSceneFailureNotice(
+		const std::string& failureMessage,
+		int saveIndex,
+		bool newGame,
+		bool initializationFailure);
 
 	virtual void onEvent() override;
 	virtual bool onInitial();

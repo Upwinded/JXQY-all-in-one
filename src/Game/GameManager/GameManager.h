@@ -125,6 +125,7 @@ public:
 
 	std::atomic<bool> inThread;
 	bool loadGame(int index);
+	const std::string& getLastLoadFailureMessage() const noexcept;
 
 	bool saveGame(int index);
 
@@ -279,6 +280,7 @@ private:
 	bool automationCheckFailed = false;
 	bool editorRunMode = false;
 	bool editorRunSceneApplicationCompleted = false;
+	std::string lastLoadFailureMessage;
 	EditorRun::SceneTarget editorRunTarget;
 	EditorRun::ResolvedSceneTarget editorRunPreparedTarget;
 	std::vector<EditorRun::SearchRoot> editorRunSearchRoots;
@@ -334,6 +336,8 @@ private:
 		const std::string& generationDirectory,
 		const SaveGenerationLimits& copyLimits,
 		const std::function<bool()>& ownerCheckpoint = {});
+	void clearLastLoadFailureMessage();
+	void setLastLoadFailureMessage(std::string message);
 	void resetExclusiveLoadingInputState();
 private:
 

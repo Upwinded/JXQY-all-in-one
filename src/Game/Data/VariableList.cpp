@@ -1,4 +1,5 @@
 #include "VariableList.h"
+#include "SaveIniPersistence.h"
 #include "../../Launch/EditorRunRuntimeTraceWriter.h"
 #include "../GameManager/SaveFileManager.h"
 
@@ -158,14 +159,38 @@ VariableList::~VariableList()
 	freeResource();
 }
 
-void VariableList::load()
+bool VariableList::load(std::string* failureReason)
 {
-	const std::map<std::string, std::string> before =
-		variableSnapshot(ini);
-	freeResource();
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
 	const std::string fileName =
 		SaveFileManager::CurrentPath() + VARIABLE_INI;
-	ini = std::make_shared<INIReader>(fileName);
+	std::shared_ptr<INIReader> loadedIni;
+	const SaveIniPersistence::ReadStatus status =
+		SaveIniPersistence::read(fileName, loadedIni);
+	if (status == SaveIniPersistence::ReadStatus::Unreadable ||
+		status == SaveIniPersistence::ReadStatus::Malformed ||
+		(status == SaveIniPersistence::ReadStatus::Loaded &&
+			(loadedIni == nullptr ||
+				!loadedIni->HasSection(VARIABLE_SECTION))))
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason =
+				u8"变量文件 variable.ini 无法读取或格式错误";
+		}
+		return false;
+	}
+	if (loadedIni == nullptr)
+	{
+		loadedIni = std::make_shared<INIReader>();
+	}
+
+	const std::map<std::string, std::string> before =
+		variableSnapshot(ini);
+	ini = std::move(loadedIni);
 	const std::map<std::string, std::string> after =
 		variableSnapshot(ini);
 	std::map<std::string, std::string> names = before;
@@ -190,6 +215,7 @@ void VariableList::load()
 			(beforeValue == before.cend()) !=
 				(afterValue == after.cend()));
 	}
+	return true;
 }
 
 void VariableList::ensureInitialized()

@@ -142,6 +142,52 @@ void testSuccessfulSwitch(const TemporaryTree& tree)
 		"successful update switches bin/win64, engine, and common together");
 }
 
+void testSuccessfulSwitchCleansOrphanDownload(const TemporaryTree& tree)
+{
+	Fixture fixture(tree, "success-with-orphan-download");
+	const std::filesystem::path downloadRoot =
+		fixture.workspace / "download";
+	std::filesystem::create_directory(downloadRoot);
+	writeText(downloadRoot / "program-update.download", "download-archive");
+	const auto result = ProgramUpdate::applyDesktopProgramUpdate(
+		fixture.request(),
+		[](const std::filesystem::path&, const std::filesystem::path&)
+		{
+			return true;
+		});
+	expect(result.succeeded() &&
+		!std::filesystem::exists(fixture.workspace) &&
+		readText(fixture.liveProgram / "jxqy-all-in-one.exe") ==
+			"new-program" && fixture.unrelatedDataIsUnchanged(),
+		"successful update removes an orphaned program download workspace");
+}
+
+void testUnexpectedDownloadEntryIsNotDeleted(const TemporaryTree& tree)
+{
+	Fixture fixture(tree, "unsafe-download-entry");
+	const std::filesystem::path downloadRoot =
+		fixture.workspace / "download";
+	writeText(downloadRoot, "not-a-directory");
+	bool launchAttempted = false;
+	const auto result = ProgramUpdate::applyDesktopProgramUpdate(
+		fixture.request(),
+		[&launchAttempted](
+			const std::filesystem::path&, const std::filesystem::path&)
+		{
+			launchAttempted = true;
+			return true;
+		});
+	expect(result.status ==
+			ProgramUpdate::DesktopProgramUpdateStatus::CleanupFailed &&
+		!launchAttempted && std::filesystem::is_regular_file(downloadRoot) &&
+		readText(downloadRoot) == "not-a-directory" &&
+		readText(fixture.liveProgram / "jxqy-all-in-one.exe") ==
+			"old-program" &&
+		readText(fixture.stagingProgram / "jxqy-all-in-one.exe") ==
+			"new-program" && fixture.unrelatedDataIsUnchanged(),
+		"an unexpected download entry is reported without deleting or switching");
+}
+
 void testReleaseRootFromResourceCollection(const TemporaryTree& tree)
 {
 	const std::filesystem::path releaseRoot = tree.root / "release-root";
@@ -187,6 +233,10 @@ void testLaunchRollback(const TemporaryTree& tree)
 void testInterruptedSwitchRecovery(const TemporaryTree& tree)
 {
 	Fixture fixture(tree, "recovery");
+	const std::filesystem::path downloadRoot =
+		fixture.workspace / "download";
+	std::filesystem::create_directory(downloadRoot);
+	writeText(downloadRoot / "program-update.download", "download-archive");
 	std::filesystem::create_directories(
 		fixture.previousProgram.parent_path());
 	std::filesystem::create_directories(
@@ -217,6 +267,7 @@ void testInterruptedSwitchRecovery(const TemporaryTree& tree)
 			"new-engine" &&
 		readText(fixture.stagingCommon / "version.ini") ==
 			"new-common" &&
+		!std::filesystem::exists(downloadRoot) &&
 		fixture.unrelatedDataIsUnchanged(),
 		"an interrupted switch restores program, engine, and common together");
 }
@@ -340,6 +391,12 @@ void testInterruptedAfterSwitchingEngineRecovery(const TemporaryTree& tree)
 void testMissingStagedCommon(const TemporaryTree& tree)
 {
 	Fixture fixture(tree, "missing-staged-common");
+	const std::filesystem::path downloadRoot =
+		fixture.workspace / "download";
+	std::filesystem::create_directory(downloadRoot);
+	writeText(
+		downloadRoot / "program-update.download",
+		"incomplete-download");
 	std::filesystem::remove_all(fixture.stagingCommon);
 	const auto result = ProgramUpdate::applyDesktopProgramUpdate(
 		fixture.request(),
@@ -355,8 +412,9 @@ void testMissingStagedCommon(const TemporaryTree& tree)
 			"old-engine" &&
 		readText(fixture.liveCommon / "version.ini") ==
 			"old-common" &&
+		!std::filesystem::exists(downloadRoot) &&
 		fixture.unrelatedDataIsUnchanged(),
-		"missing staged common leaves current program assets unchanged");
+		"missing staged common removes the orphan download and leaves current program assets unchanged");
 }
 
 void testInvalidTarget(const TemporaryTree& tree)
@@ -392,6 +450,8 @@ int main()
 		return 1;
 	}
 	testSuccessfulSwitch(tree);
+	testSuccessfulSwitchCleansOrphanDownload(tree);
+	testUnexpectedDownloadEntryIsNotDeleted(tree);
 	testReleaseRootFromResourceCollection(tree);
 	testLaunchRollback(tree);
 	testInterruptedSwitchRecovery(tree);

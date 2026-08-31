@@ -1,5 +1,6 @@
 ﻿#include "MagicManager.h"
 #include "../../File/INIReader.h"
+#include "SaveIniPersistence.h"
 #include "DefeatedNpcExperience.h"
 #include "../../libconvert/libconvert.h"
 #include "../../File/log.h"
@@ -238,49 +239,121 @@ MagicInfo* MagicManager::findPrimaryMagic(const std::string& iniName)
 	return nullptr;
 }
 
-void MagicManager::load(int index)
+bool MagicManager::load(int index, std::string* failureReason)
 {
-	configureLayout();
-	freeResource();
-    std::string fName =
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
+	std::string fName =
 		SaveFileManager::CurrentPath() + MAGIC_INI_NAME;
-    if (index >= 0)
-    {
-        fName += convert::formatString("%d", index);
-    }
+	std::string displayName = MAGIC_INI_NAME;
+	if (index >= 0)
+	{
+		fName += convert::formatString("%d", index);
+		displayName += convert::formatString("%d", index);
+	}
 	fName += MAGIC_INI_EXT;
-	INIReader ini(fName);
-	currentUseMagicFile = ini.Get("Head", "CurrentUseMagicFile", "");
+	displayName += MAGIC_INI_EXT;
 
-	for (const auto& section : ini.GetSectionNames())
+	std::shared_ptr<INIReader> loadedIni;
+	const SaveIniPersistence::ReadStatus status =
+		SaveIniPersistence::read(fName, loadedIni);
+	if (status == SaveIniPersistence::ReadStatus::Empty ||
+		status == SaveIniPersistence::ReadStatus::Unreadable ||
+		status == SaveIniPersistence::ReadStatus::Malformed)
 	{
-		int sectionIndex = 0;
-		if (!parsePositiveSectionIndex(section, sectionIndex))
+		if (failureReason != nullptr)
 		{
-			continue;
+			*failureReason = u8"武功数据文件无法读取或格式错误：" +
+				displayName;
 		}
-		if (sectionIndex >= hideStartIndex())
+		return false;
+	}
+
+	MagicManager loadedManager;
+	if (status == SaveIniPersistence::ReadStatus::Loaded)
+	{
+		if (loadedIni == nullptr || !loadedIni->HasSection("Head"))
 		{
-			int hiddenIndex = sectionIndex == hideStartIndex() ? 0 : sectionIndex - hideStartIndex() - 1;
-			if (hiddenIndex >= 0 && hiddenIndex < static_cast<int>(hiddenMagicList.size()))
+			if (failureReason != nullptr)
 			{
-				loadMagicInfoFromIni(ini, section, hiddenMagicList[hiddenIndex], 0);
+				*failureReason = u8"武功数据缺少 [Head]：" + displayName;
 			}
-			continue;
+			return false;
+		}
+		const long count = loadedIni->GetInteger("Head", "Count", -1);
+		if (count < 0)
+		{
+			if (failureReason != nullptr)
+			{
+				*failureReason = u8"武功数据数量无效：" + displayName;
+			}
+			return false;
 		}
 
-		int listIndex = sectionIndex - 1;
-		if (listIndex >= 0 && listIndex < static_cast<int>(magicList.size()))
+		loadedManager.currentUseMagicFile =
+			loadedIni->Get("Head", "CurrentUseMagicFile", "");
+		for (const auto& section : loadedIni->GetSectionNames())
 		{
-			loadMagicInfoFromIni(ini, section, magicList[listIndex], 1);
+			int sectionIndex = 0;
+			if (!parsePositiveSectionIndex(section, sectionIndex))
+			{
+				continue;
+			}
+			if (sectionIndex >= loadedManager.hideStartIndex())
+			{
+				const int hiddenIndex =
+					sectionIndex == loadedManager.hideStartIndex()
+					? 0
+					: sectionIndex - loadedManager.hideStartIndex() - 1;
+				if (hiddenIndex >= 0 &&
+					hiddenIndex < static_cast<int>(
+						loadedManager.hiddenMagicList.size()))
+				{
+					loadMagicInfoFromIni(
+						*loadedIni,
+						section,
+						loadedManager.hiddenMagicList[hiddenIndex],
+						0);
+				}
+				continue;
+			}
+
+			const int listIndex = sectionIndex - 1;
+			if (listIndex >= 0 &&
+				listIndex < static_cast<int>(loadedManager.magicList.size()))
+			{
+				loadMagicInfoFromIni(
+					*loadedIni,
+					section,
+					loadedManager.magicList[listIndex],
+					1);
+			}
+		}
+		const int currentUseIndex = findMagicIndexInList(
+			loadedManager.magicList,
+			loadedManager.currentUseMagicFile);
+		if (currentUseIndex < 0 ||
+			!loadedManager.isBottomIndex(currentUseIndex))
+		{
+			loadedManager.currentUseMagicFile.clear();
 		}
 	}
-	int currentUseIndex = findMagicIndexInList(magicList, currentUseMagicFile);
-	if (currentUseIndex < 0 || !isBottomIndex(currentUseIndex))
-	{
-		currentUseMagicFile.clear();
-	}
+
+	freeResource();
+	magicList = std::move(loadedManager.magicList);
+	hiddenMagicList = std::move(loadedManager.hiddenMagicList);
+	currentUseMagicFile = std::move(loadedManager.currentUseMagicFile);
+	hitExperienceLevelFactor = loadedManager.hitExperienceLevelFactor;
+	practiceKillExperienceFraction =
+		loadedManager.practiceKillExperienceFraction;
+	currentUseKillExperienceFraction =
+		loadedManager.currentUseKillExperienceFraction;
+	usesConfiguredExperienceRules =
+		loadedManager.usesConfiguredExperienceRules;
 	refreshPlayerMagicAttributes();
+	return true;
 }
 
 bool MagicManager::save(int index)

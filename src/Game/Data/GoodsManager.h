@@ -45,10 +45,10 @@ public:
 
 	void freeResource();
 
-	void load(int index);
+	bool load(int index, std::string* failureReason = nullptr);
 	bool save(int index);
 	GoodsInfo * findGoods(const std::string & itemName);
-	void clearItem();
+	void clearItem(bool adjustCurrentValues = true);
 	int getItemNum(const std::string & itemName);
 	int getItemNumByDisplayName(const std::string& name);
 	void setItemNum(const std::string & itemName, int num);

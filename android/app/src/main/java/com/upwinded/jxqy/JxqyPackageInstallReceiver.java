@@ -50,11 +50,17 @@ public final class JxqyPackageInstallReceiver extends BroadcastReceiver
 				Environment.DIRECTORY_DOWNLOADS);
 			if (downloads != null)
 			{
-				File apkFile = new File(
-					new File(downloads, "updates"), "jxqy-update.apk");
-				if (apkFile.isFile())
+				File updateDirectory = new File(downloads, "updates");
+				File apkFile = new File(updateDirectory, "jxqy-update.apk");
+				if (apkFile.isFile() && !apkFile.delete())
 				{
-					apkFile.delete();
+					showMessage(context, "安装完成，但旧安装包清理失败");
+					return;
+				}
+				String[] remainingFiles = updateDirectory.list();
+				if (remainingFiles != null && remainingFiles.length == 0)
+				{
+					updateDirectory.delete();
 				}
 			}
 		}

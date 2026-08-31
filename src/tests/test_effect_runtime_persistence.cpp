@@ -7,6 +7,7 @@
 #include "../Game/Data/ObjectManager.h"
 #include "../Game/Data/PartnerManager.h"
 #include "../Game/GameManager/GameManager.h"
+#include "../Game/GameManager/SaveFileManager.h"
 #include "../Image/IMP.h"
 #include "TestTemporaryDirectory.h"
 
@@ -397,9 +398,11 @@ bool runMagicManagerLoadCompatibilityTest(
 		return false;
 	}
 
-	gameManager.magicManager.load(-1);
-	bool ok = true;
+	bool ok = check(
+		gameManager.magicManager.load(-1),
+		"valid tolerant Magic save data loads");
 	const MagicInfo& loaded = gameManager.magicManager.magicList[0];
+	const std::string retainedMagicName = loaded.iniFile;
 	ok = check(
 		gameManager.magicManager.magicListExists(0)
 			&& loaded.level == 1
@@ -459,7 +462,161 @@ bool runMagicManagerLoadCompatibilityTest(
 			&& restoredHidden->hideCount == 1
 			&& restoredHidden->lastIndexWhenHide == 0,
 		"hidden Magic load clamps level and hidden bookkeeping without discarding progress") && ok;
+
+	std::string magicFailureReason;
+	const std::string mismatchedMagicCount =
+		"[Head]\n"
+		"Count=999\n"
+		"[1]\n"
+		"IniFile=persistence.ini\n"
+		"Level=1\n";
+	ok = check(
+		writeTextFile(savePath, mismatchedMagicCount) &&
+			gameManager.magicManager.load(-1) &&
+			gameManager.magicManager.magicListExists(0),
+		"legacy Magic Count metadata does not have to match the actual section count") && ok;
+	ok = check(
+		writeTextFile(savePath, "[Head\nCount=1\n") &&
+			!gameManager.magicManager.load(
+				-1,
+				&magicFailureReason) &&
+			gameManager.magicManager.findPrimaryMagic(retainedMagicName) !=
+				nullptr &&
+			magicFailureReason.find("magic.ini") != std::string::npos,
+		"malformed Magic save data fails without clearing the live Magic list") && ok;
+	std::error_code errorCode;
+	std::filesystem::remove(savePath, errorCode);
+	ok = check(
+		!errorCode && gameManager.magicManager.load(-1) &&
+			gameManager.magicManager.findPrimaryMagic(retainedMagicName) ==
+				nullptr,
+		"a missing historical Magic file remains a compatible empty list") && ok;
+	return ok;
+}
+
+bool runGoodsManagerLoadContractTest(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	const int slot = gameManager.goodsManager.storeBegin();
+	const std::string saveContent =
+		"[Head]\n"
+		"Count=1\n"
+		"[" + std::to_string(slot + 1) + "]\n"
+		"IniFile=detached_equipment.ini\n"
+		"Number=2\n";
+	const std::filesystem::path savePath =
+		root / "save" / EffectPersistenceSaveNamespace /
+		"game" / "goods.ini";
+	bool ok = check(
+		writeTextFile(savePath, saveContent) &&
+			gameManager.goodsManager.load(-1) &&
+			gameManager.goodsManager.goodsListExists(slot) &&
+			gameManager.goodsManager.goodsList[slot].number == 2,
+		"valid Goods save data loads into the configured inventory layout");
+	const std::string mismatchedGoodsCount =
+		"[Head]\n"
+		"Count=999\n"
+		"[" + std::to_string(slot + 1) + "]\n"
+		"IniFile=detached_equipment.ini\n"
+		"Number=2\n";
+	ok = check(
+		writeTextFile(savePath, mismatchedGoodsCount) &&
+			gameManager.goodsManager.load(-1) &&
+			gameManager.goodsManager.goodsListExists(slot),
+		"legacy Goods Count metadata does not have to match the actual section count") && ok;
+
+	std::string goodsFailureReason;
+	ok = check(
+		writeTextFile(savePath, "") &&
+			!gameManager.goodsManager.load(
+				-1,
+				&goodsFailureReason) &&
+			gameManager.goodsManager.goodsListExists(slot) &&
+			gameManager.goodsManager.goodsList[slot].number == 2 &&
+			goodsFailureReason.find("goods.ini") != std::string::npos,
+		"an existing empty Goods file fails without clearing the live inventory") && ok;
+
+	std::error_code errorCode;
+	std::filesystem::remove(savePath, errorCode);
+	ok = check(
+		!errorCode && gameManager.goodsManager.load(-1) &&
+			!gameManager.goodsManager.goodsListExists(slot),
+		"a missing historical Goods file remains a compatible empty inventory") && ok;
+	return ok;
+}
+
+bool runPlayerChangeCorruptTargetRollbackTest(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
 	gameManager.magicManager.clearMagicList();
+	gameManager.goodsManager.freeResource();
+	gameManager.global.data.characterIndex = 0;
+	gameManager.player->npcName = "RejectedCharacter";
+	gameManager.player->money = 222;
+	bool ok = check(
+		gameManager.player->save(1) &&
+			gameManager.magicManager.save(1) &&
+			gameManager.goodsManager.save(1),
+		"write target-character player-change fixtures");
+
+	gameManager.player->npcName = "SourceCharacter";
+	gameManager.player->money = 111;
+	const int sourceGoodsIndex =
+		gameManager.goodsManager.storeBegin();
+	auto sourceGoods = std::make_shared<Goods>();
+	sourceGoods->initFromIni("detached_equipment.ini");
+	GoodsInfo& sourceGoodsInfo =
+		gameManager.goodsManager.goodsList[sourceGoodsIndex];
+	sourceGoodsInfo.iniFile = "detached_equipment.ini";
+	sourceGoodsInfo.number = 2;
+	sourceGoodsInfo.goods = sourceGoods;
+	ok = check(
+		gameManager.magicManager.addPrimaryMagic(
+			"persistence.ini",
+			false,
+			false) != nullptr &&
+			sourceGoods->loadSucceeded,
+		"prepare source-character state for player-change rollback") && ok;
+
+	const std::filesystem::path saveDirectory =
+		root / "save" / EffectPersistenceSaveNamespace / "game";
+	ok = check(
+		writeTextFile(
+			saveDirectory / "magic1.ini",
+			"[Head\nCount=1\n"),
+		"corrupt target-character Magic data") && ok;
+	gameManager.scriptAPI.playerChange(1);
+	ok = check(
+		gameManager.global.data.characterIndex == 0 &&
+			gameManager.player->npcName == "SourceCharacter" &&
+			gameManager.player->money == 111 &&
+			gameManager.magicManager.findPrimaryMagic(
+				"persistence.ini") != nullptr &&
+			gameManager.goodsManager.getItemNum(
+				"detached_equipment.ini") == 2,
+		"player change rolls back after malformed target Magic data") && ok;
+
+	ok = check(
+		writeTextFile(
+			saveDirectory / "magic1.ini",
+			"[Head]\nCount=0\nCurrentUseMagicFile=\n") &&
+			writeTextFile(saveDirectory / "goods1.ini", ""),
+		"prepare target Goods failure after a successful empty Magic load") && ok;
+	gameManager.scriptAPI.playerChange(1);
+	ok = check(
+		gameManager.global.data.characterIndex == 0 &&
+			gameManager.player->npcName == "SourceCharacter" &&
+			gameManager.player->money == 111 &&
+			gameManager.magicManager.findPrimaryMagic(
+				"persistence.ini") != nullptr &&
+			gameManager.goodsManager.getItemNum(
+				"detached_equipment.ini") == 2,
+		"player change restores source Magic and Goods after a later target Goods failure") && ok;
+
+	gameManager.magicManager.clearMagicList();
+	gameManager.goodsManager.freeResource();
 	return ok;
 }
 
@@ -708,6 +865,100 @@ bool runDetachedCasterPersistenceTest(GameManager& gameManager)
 
 	gameManager.effectManager->freeResource();
 	gameManager.npcManager->npcList.clear();
+	return ok;
+}
+
+bool runPersistenceCollectionBoundsTest(GameManager& gameManager)
+{
+	gameManager.effectManager->freeResource();
+	gameManager.npcManager->npcList.clear();
+	auto magic = std::make_shared<Magic>();
+	magic->initFromIni("detached_parent.ini");
+	if (!check(magic->loadSucceeded, "effect bounds fixture loads"))
+	{
+		return false;
+	}
+
+	auto caster = std::make_shared<NPC>();
+	caster->npcName = "BoundsOwner";
+	caster->kind = nkBattle;
+	for (int i = 0; i < MaximumPersistedEffectCollectionCount; i++)
+	{
+		caster->changeMagicHitCounts["bounds_" + std::to_string(i)] = i;
+	}
+	auto effect = std::make_shared<Effect>();
+	effect->level = 1;
+	effect->user = caster;
+	effect->initFromMagic(magic);
+	gameManager.effectManager->addEffect(effect);
+
+	const std::string generationDirectory = "save/effect_persistence_bounds";
+	SaveFileManager::CurrentPathScope currentPath(generationDirectory);
+	if (!check(currentPath.valid(), "effect bounds generation path is valid"))
+	{
+		return false;
+	}
+	File::clearDirectoryFiles(generationDirectory);
+
+	bool ok = check(gameManager.effectManager->save(),
+		"4096 persisted Effect entries save successfully");
+	INIReader saved(SaveFileManager::CurrentPath() + EFFECT_INI);
+	ok = check(saved.ParseError() == 0
+		&& saved.GetInteger(
+			"DetachedCaster001",
+			"ChangeMagicHitCountCount",
+			-1) == MaximumPersistedEffectCollectionCount,
+		"4096 persisted Effect entries remain readable") && ok;
+	const std::string validEffectFile = saved.saveToString();
+
+	gameManager.effectManager->loadFromIni(saved);
+	auto loadedCaster = gameManager.effectManager->effectList.empty()
+		? nullptr
+		: std::dynamic_pointer_cast<NPC>(
+			gameManager.effectManager->effectList.front()->user.lock());
+	ok = check(loadedCaster != nullptr
+		&& loadedCaster->changeMagicHitCounts.size()
+			== static_cast<size_t>(MaximumPersistedEffectCollectionCount),
+		"reader preserves the 4096-entry boundary") && ok;
+	if (loadedCaster != nullptr)
+	{
+		loadedCaster->changeMagicHitCounts["bounds_overflow"] = 1;
+		ok = check(!gameManager.effectManager->save(),
+			"4097 persisted Effect entries reject the save") && ok;
+	}
+
+	INIReader preserved(SaveFileManager::CurrentPath() + EFFECT_INI);
+	ok = check(preserved.ParseError() == 0
+		&& preserved.GetInteger(
+			"DetachedCaster001",
+			"ChangeMagicHitCountCount",
+			-1) == MaximumPersistedEffectCollectionCount
+		&& preserved.saveToString() == validEffectFile,
+		"rejected 4097-entry save does not replace the last valid file") && ok;
+
+	gameManager.effectManager->freeResource();
+	auto repeatedEffect = std::make_shared<Effect>();
+	repeatedEffect->level = 1;
+	repeatedEffect->initFromMagic(magic);
+	gameManager.effectManager->effectList.assign(
+		static_cast<size_t>(MaximumPersistedEffectCollectionCount) + 1,
+		repeatedEffect);
+	ok = check(!gameManager.effectManager->save(),
+		"4097 top-level Effects reject the save") && ok;
+	INIReader preservedAfterTopLevelOverflow(
+		SaveFileManager::CurrentPath() + EFFECT_INI);
+	ok = check(preservedAfterTopLevelOverflow.ParseError() == 0
+		&& preservedAfterTopLevelOverflow.GetInteger(
+			"DetachedCaster001",
+			"ChangeMagicHitCountCount",
+			-1) == MaximumPersistedEffectCollectionCount
+		&& preservedAfterTopLevelOverflow.saveToString() == validEffectFile,
+		"top-level overflow also preserves the last valid file") && ok;
+	gameManager.effectManager->effectList.clear();
+
+	gameManager.effectManager->freeResource();
+	gameManager.npcManager->npcList.clear();
+	File::clearDirectoryFiles(generationDirectory);
 	return ok;
 }
 
@@ -1886,6 +2137,12 @@ bool runEffectRuntimePersistenceTests()
 	ok = runMagicManagerLoadCompatibilityTest(
 		gameManager,
 		root) && ok;
+	ok = runGoodsManagerLoadContractTest(
+		gameManager,
+		root) && ok;
+	ok = runPlayerChangeCorruptTargetRollbackTest(
+		gameManager,
+		root) && ok;
 	ok = runSummonTransientPersistenceTest(gameManager) && ok;
 	ok = runMeteorPathRoundTripTest(gameManager) && ok;
 	ok = runExclusiveMeteorMovementTest(gameManager) && ok;
@@ -1901,6 +2158,7 @@ bool runEffectRuntimePersistenceTests()
 	ok = runPendingMagicManagerRoundTripTest(gameManager) && ok;
 	ok = runDetachedCasterLifetimeTest(gameManager) && ok;
 	ok = runDetachedCasterPersistenceTest(gameManager) && ok;
+	ok = runPersistenceCollectionBoundsTest(gameManager) && ok;
 	ok = runDetachedCasterLiveGateTest(gameManager) && ok;
 	ok = runDetachedCasterTransitionGateTest(gameManager) && ok;
 	std::filesystem::remove_all(root, errorCode);

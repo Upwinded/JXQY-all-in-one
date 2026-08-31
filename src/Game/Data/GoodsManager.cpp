@@ -1,5 +1,6 @@
 ﻿#include "GoodsManager.h"
 #include "Player.h"
+#include "SaveIniPersistence.h"
 #include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
 #include "../GameManager/GameManager.h"
@@ -243,51 +244,91 @@ void GoodsManager::freeResource()
 	}
 }
 
-void GoodsManager::load(int index)
+bool GoodsManager::load(int index, std::string* failureReason)
 {
-	configureLayout();
-	freeResource();
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
 	std::string fName =
 		SaveFileManager::CurrentPath() + GOODS_INI_NAME;
-    if (index >= 0)
-    {
-        fName += convert::formatString("%d", index);
-    }
-    fName += GOODS_INI_EXT;
-	INIReader ini(fName);
-
-	for (size_t i = 0; i < goodsList.size(); i++)
+	std::string displayName = GOODS_INI_NAME;
+	if (index >= 0)
 	{
-		std::string section = convert::formatString("%d", i + 1);
-		goodsList[i].iniFile = ini.Get(section, "IniFile", "");
-		goodsList[i].number = ini.GetInteger(section, "Number", 0);
-		if (goodsList[i].iniFile.empty())
+		fName += convert::formatString("%d", index);
+		displayName += convert::formatString("%d", index);
+	}
+	fName += GOODS_INI_EXT;
+	displayName += GOODS_INI_EXT;
+
+	std::shared_ptr<INIReader> loadedIni;
+	const SaveIniPersistence::ReadStatus status =
+		SaveIniPersistence::read(fName, loadedIni);
+	if (status == SaveIniPersistence::ReadStatus::Empty ||
+		status == SaveIniPersistence::ReadStatus::Unreadable ||
+		status == SaveIniPersistence::ReadStatus::Malformed)
+	{
+		if (failureReason != nullptr)
 		{
-			goodsList[i].clear();
+			*failureReason = u8"物品数据文件无法读取或格式错误：" +
+				displayName;
 		}
-		else
+		return false;
+	}
+
+	GoodsManager loadedManager;
+	if (status == SaveIniPersistence::ReadStatus::Loaded)
+	{
+		if (loadedIni == nullptr || !loadedIni->HasSection("Head"))
 		{
-			if (goodsList[i].number <= 0)
+			if (failureReason != nullptr)
 			{
-				goodsList[i].clear();
+				*failureReason = u8"物品数据缺少 [Head]：" + displayName;
+			}
+			return false;
+		}
+		const long count = loadedIni->GetInteger("Head", "Count", -1);
+		if (count < 0)
+		{
+			if (failureReason != nullptr)
+			{
+				*failureReason = u8"物品数据数量无效：" + displayName;
+			}
+			return false;
+		}
+
+		for (size_t i = 0; i < loadedManager.goodsList.size(); i++)
+		{
+			const std::string section =
+				convert::formatString("%d", i + 1);
+			GoodsInfo& loadedGoods = loadedManager.goodsList[i];
+			loadedGoods.iniFile =
+				loadedIni->Get(section, "IniFile", "");
+			loadedGoods.number = static_cast<int>(
+				loadedIni->GetInteger(section, "Number", 0));
+			if (loadedGoods.iniFile.empty() || loadedGoods.number <= 0)
+			{
+				loadedGoods.clear();
 			}
 			else
 			{
-				goodsList[i].goods = std::make_shared<Goods>();
-				goodsList[i].goods->initFromIni(goodsList[i].iniFile);
-				if (!goodsList[i].goods->loadSucceeded)
+				loadedGoods.goods = std::make_shared<Goods>();
+				loadedGoods.goods->initFromIni(loadedGoods.iniFile);
+				if (!loadedGoods.goods->loadSucceeded)
 				{
 					GameLog::write("GoodsManager: ignored invalid saved goods %s\n",
-						goodsList[i].iniFile.c_str());
-					goodsList[i].clear();
+						loadedGoods.iniFile.c_str());
+					loadedGoods.clear();
 				}
 				else
 				{
-					goodsList[i].remainColdMilliseconds = 0;
+					loadedGoods.remainColdMilliseconds = 0;
 				}
 			}
 		}
 	}
+
+	goodsList = std::move(loadedManager.goodsList);
 	if (gm != nullptr && gm->player != nullptr)
 	{
 		gm->player->resetEquipmentGrantedMagicSync();
@@ -295,6 +336,7 @@ void GoodsManager::load(int index)
 	// The player file already contains the saved current values. Rebuilding
 	// equipment maxima during load must not apply their bonuses a second time.
 	refreshEquipmentEffects(false);
+	return true;
 }
 
 bool GoodsManager::save(int index)
@@ -339,13 +381,17 @@ GoodsInfo * GoodsManager::findGoods(const std::string & itemName)
 	return nullptr;
 }
 
-void GoodsManager::clearItem()
+void GoodsManager::clearItem(bool adjustCurrentValues)
 {
 	for (size_t i = 0; i < goodsList.size(); i++)
 	{
 		goodsList[i].clear();
 	}
-	refreshEquipmentEffects();
+	if (gm != nullptr && gm->player != nullptr)
+	{
+		gm->player->resetEquipmentGrantedMagicSync();
+	}
+	refreshEquipmentEffects(adjustCurrentValues);
 	updateMenu();
 }
 
@@ -934,25 +980,51 @@ bool GoodsManager::unequipToFirstStoreSlot(
 
 void GoodsManager::updateMenu(int idx)
 {
+	if (gm == nullptr || gm->menu == nullptr)
+	{
+		return;
+	}
 	if (isStoreIndex(idx))
 	{
-		gm->menu->goodsMenu->updateGoods();
+		if (gm->menu->goodsMenu != nullptr)
+		{
+			gm->menu->goodsMenu->updateGoods();
+		}
 	}
 	else if (isBottomIndex(idx))
 	{
-		gm->menu->bottomMenu->updateGoodsItem();
+		if (gm->menu->bottomMenu != nullptr)
+		{
+			gm->menu->bottomMenu->updateGoodsItem();
+		}
 	}
 	else
 	{
-		gm->menu->equipMenu->updateGoods();
+		if (gm->menu->equipMenu != nullptr)
+		{
+			gm->menu->equipMenu->updateGoods();
+		}
 	}
 }
 
 void GoodsManager::updateMenu()
 {
-	gm->menu->goodsMenu->updateGoods();
-	gm->menu->bottomMenu->updateGoodsItem();
-	gm->menu->equipMenu->updateGoods();
+	if (gm == nullptr || gm->menu == nullptr)
+	{
+		return;
+	}
+	if (gm->menu->goodsMenu != nullptr)
+	{
+		gm->menu->goodsMenu->updateGoods();
+	}
+	if (gm->menu->bottomMenu != nullptr)
+	{
+		gm->menu->bottomMenu->updateGoodsItem();
+	}
+	if (gm->menu->equipMenu != nullptr)
+	{
+		gm->menu->equipMenu->updateGoods();
+	}
 }
 
 bool GoodsManager::goodsListExists(int index)

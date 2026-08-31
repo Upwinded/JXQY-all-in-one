@@ -2802,16 +2802,24 @@ bool Player::releasePreparedSpecialAttackMagic(Point dest, std::shared_ptr<GameE
 	return true;
 }
 
-void Player::drawAlpha(Point cenTile, Point cenScreen, PointEx coffset)
+void Player::drawAlpha(
+	Point cenTile,
+	Point cenScreen,
+	PointEx coffset,
+	uint32_t colorStyle)
 {
 	Point tile = position;
 	Point pos = Map::getTilePosition(tile, cenTile, cenScreen, coffset);
 	PointEx drawOffset = getDrawOffset();
 	int offsetX, offsetY;
 	_shared_image image = getActionImage(&offsetX, &offsetY);
-	engine->setImageAlpha(image, 128);
-	engine->drawImage(image, pos.x + (int)round(drawOffset.x) - offsetX, pos.y + (int)round(drawOffset.y) - offsetY);
-	engine->setImageAlpha(image, 255);
+	ColorStyle::drawImage(
+		engine,
+		image,
+		pos.x + (int)round(drawOffset.x) - offsetX,
+		pos.y + (int)round(drawOffset.y) - offsetY,
+		colorStyle,
+		128);
 }
 
 void Player::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle)
@@ -2877,25 +2885,88 @@ void Player::beginDie()
 	actionManager->changeAction(acDeath);
 }
 
-void Player::load(int index)
+bool Player::load(int index, std::string* failureReason)
 {
-	freeResource();
 	std::string fName =
 		SaveFileManager::CurrentPath() + PLAYER_INI_NAME;
-    if (index >= 0)
-    {
-        fName += convert::formatString("%d", index);
-    }
-    fName += PLAYER_INI_EXT;
-
-	std::unique_ptr<char[]> s;
-	int len = File::readFile(fName, s);
-
-	if (len <= 0 || s == nullptr)
+	std::string displayName = PLAYER_INI_NAME;
+	if (index >= 0)
 	{
-		return;
+		fName += convert::formatString("%d", index);
+		displayName += convert::formatString("%d", index);
 	}
-	INIReader ini(s);
+	fName += PLAYER_INI_EXT;
+	displayName += PLAYER_INI_EXT;
+	return loadFromFile(fName, displayName, failureReason);
+}
+
+bool Player::loadInitialTemplate(
+	int index,
+	std::string* failureReason)
+{
+	std::string fileName = PLAYER_INI_NAME;
+	if (index >= 0)
+	{
+		fileName += convert::formatString("%d", index);
+	}
+	fileName += PLAYER_INI_EXT;
+	return loadFromFile(
+		std::string(INI_SAVE_FOLDER) + fileName,
+		fileName,
+		failureReason);
+}
+
+bool Player::loadFromFile(
+	const std::string& fileName,
+	const std::string& displayName,
+	std::string* failureReason)
+{
+	if (failureReason != nullptr)
+	{
+		failureReason->clear();
+	}
+
+	std::unique_ptr<char[]> data;
+	int length = 0;
+	if (!File::readFile(fileName, data, length))
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"玩家数据文件不存在或无法读取：" + displayName;
+		}
+		GameLog::write("Player: player save is missing or unreadable %s\n", fileName.c_str());
+		return false;
+	}
+	if (length <= 0 || data == nullptr)
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"玩家数据文件为空：" + displayName;
+		}
+		GameLog::write("Player: player save is empty %s\n", fileName.c_str());
+		return false;
+	}
+	INIReader ini(data);
+	if (ini.ParseError() != 0)
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"玩家数据格式错误：" + displayName;
+		}
+		GameLog::write("Player: invalid player save %s\n", fileName.c_str());
+		return false;
+	}
+	if (!ini.HasSection("Init"))
+	{
+		if (failureReason != nullptr)
+		{
+			*failureReason = u8"玩家数据缺少 [Init]：" + displayName;
+		}
+		GameLog::write("Player: player save has no Init section %s\n", fileName.c_str());
+		return false;
+	}
+
+	freeResource();
 
 	std::string section = "Init";
 	initFromIni(&ini, section);
@@ -2943,6 +3014,7 @@ void Player::load(int index)
 	// begin time and unsigned elapsed-time calculations could jump through idle
 	// frames until the player moved. A load commit always starts a fresh stand.
 	actionManager->restartActionIgnoringTransitions(acStand);
+	return true;
 }
 
 bool Player::save(int index)

@@ -3,6 +3,13 @@
 #include <array>
 #include <system_error>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
+
 namespace
 {
 bool isAllowedTarget(const std::string& target)
@@ -15,8 +22,18 @@ bool isSafeDirectory(const std::filesystem::path& path)
 	std::error_code error;
 	const std::filesystem::file_status status =
 		std::filesystem::symlink_status(path, error);
-	return !error && std::filesystem::is_directory(status) &&
-		!std::filesystem::is_symlink(status);
+	if (error || !std::filesystem::is_directory(status) ||
+		std::filesystem::is_symlink(status))
+	{
+		return false;
+	}
+#if defined(_WIN32)
+	const DWORD attributes = GetFileAttributesW(path.c_str());
+	return attributes != INVALID_FILE_ATTRIBUTES &&
+		(attributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
+#else
+	return true;
+#endif
 }
 
 bool isSafeRegularFile(const std::filesystem::path& path)
@@ -24,8 +41,18 @@ bool isSafeRegularFile(const std::filesystem::path& path)
 	std::error_code error;
 	const std::filesystem::file_status status =
 		std::filesystem::symlink_status(path, error);
-	return !error && std::filesystem::is_regular_file(status) &&
-		!std::filesystem::is_symlink(status);
+	if (error || !std::filesystem::is_regular_file(status) ||
+		std::filesystem::is_symlink(status))
+	{
+		return false;
+	}
+#if defined(_WIN32)
+	const DWORD attributes = GetFileAttributesW(path.c_str());
+	return attributes != INVALID_FILE_ATTRIBUTES &&
+		(attributes & FILE_ATTRIBUTE_REPARSE_POINT) == 0;
+#else
+	return true;
+#endif
 }
 
 bool pathExists(const std::filesystem::path& path, bool& failed)
@@ -34,6 +61,24 @@ bool pathExists(const std::filesystem::path& path, bool& failed)
 	const bool exists = std::filesystem::exists(path, error);
 	failed = static_cast<bool>(error);
 	return exists;
+}
+
+bool removeSafeDirectoryIfPresent(const std::filesystem::path& path)
+{
+	std::error_code error;
+	const std::filesystem::file_status status =
+		std::filesystem::symlink_status(path, error);
+	if (error == std::errc::no_such_file_or_directory ||
+		(!error && !std::filesystem::exists(status)))
+	{
+		return true;
+	}
+	if (error || !isSafeDirectory(path))
+	{
+		return false;
+	}
+	std::filesystem::remove_all(path, error);
+	return !error;
 }
 }
 
@@ -69,6 +114,7 @@ DesktopProgramUpdateResult applyDesktopProgramUpdate(
 	const std::filesystem::path workspacePath =
 		binRoot / ".jxqy-program-update";
 	const std::filesystem::path stagingRoot = workspacePath / "staging";
+	const std::filesystem::path downloadRoot = workspacePath / "download";
 	const std::filesystem::path stagingProgramPath =
 		stagingRoot / "bin" / request.target;
 	const std::filesystem::path stagingEnginePath =
@@ -216,6 +262,12 @@ DesktopProgramUpdateResult applyDesktopProgramUpdate(
 			result.status = DesktopProgramUpdateStatus::RollbackFailed;
 			return result;
 		}
+		if (!removeSafeDirectoryIfPresent(downloadRoot))
+		{
+			result.status = DesktopProgramUpdateStatus::CleanupFailed;
+			result.filesystemPath = downloadRoot;
+			return result;
+		}
 		result.status = DesktopProgramUpdateStatus::RecoveredPreviousVersion;
 		result.filesystemPath = liveProgramPath;
 		return result;
@@ -233,6 +285,12 @@ DesktopProgramUpdateResult applyDesktopProgramUpdate(
 	}
 	if (!isSafeDirectory(stagingRoot))
 	{
+		if (!removeSafeDirectoryIfPresent(downloadRoot))
+		{
+			result.status = DesktopProgramUpdateStatus::CleanupFailed;
+			result.filesystemPath = downloadRoot;
+			return result;
+		}
 		result.status = DesktopProgramUpdateStatus::StagingMissing;
 		result.filesystemPath = stagingRoot;
 		return result;
@@ -241,11 +299,23 @@ DesktopProgramUpdateResult applyDesktopProgramUpdate(
 	{
 		if (!componentIsReady(component, component.stagingPath))
 		{
+			if (!removeSafeDirectoryIfPresent(downloadRoot))
+			{
+				result.status = DesktopProgramUpdateStatus::CleanupFailed;
+				result.filesystemPath = downloadRoot;
+				return result;
+			}
 			result.status = DesktopProgramUpdateStatus::StagingMissing;
 			result.filesystemPath =
 				component.stagingPath / component.requiredFile;
 			return result;
 		}
+	}
+	if (!removeSafeDirectoryIfPresent(downloadRoot))
+	{
+		result.status = DesktopProgramUpdateStatus::CleanupFailed;
+		result.filesystemPath = downloadRoot;
+		return result;
 	}
 
 	std::filesystem::create_directories(

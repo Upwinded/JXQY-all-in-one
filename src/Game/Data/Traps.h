@@ -23,14 +23,18 @@ public:
 	void markTriggered(int index);
 	void reactivate(int index);
 	void beginMapVisit();
-	void load();
+	bool load(std::string* failureReason = nullptr);
+	bool loadInitialTemplate(std::string* failureReason = nullptr);
 	bool saveDefinitions();
 	bool save();
+	void resetToEmpty();
 	void freeResource();
 
 private:
 	void loadDefinitions();
-	void loadTriggeredIndices();
+	bool loadTriggeredIndices(
+		std::set<int>& loadedIndices,
+		std::string* failureReason);
 	bool saveTriggeredIndices() const;
 	void removeInvalidZeroKeys();
 	std::shared_ptr<INIReader> ini = nullptr;

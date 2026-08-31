@@ -24,7 +24,7 @@ public:
 	MagicInfo* findMagic(const std::string & iniName);
 	MagicInfo* findPrimaryMagic(const std::string& iniName);
 
-	void load(int index);
+	bool load(int index, std::string* failureReason = nullptr);
 	bool save(int index);
 
 	void freeResource();

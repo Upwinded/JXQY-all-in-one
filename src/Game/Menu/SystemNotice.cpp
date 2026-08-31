@@ -67,6 +67,14 @@ void SystemNotice::showMessage(
 	refreshTextImage();
 }
 
+void SystemNotice::dismiss()
+{
+	showing = false;
+	visible = false;
+	currentMessage.clear();
+	textImage = nullptr;
+}
+
 bool SystemNotice::hasFont() const
 {
 	return fontData != nullptr && fontLength > 0;

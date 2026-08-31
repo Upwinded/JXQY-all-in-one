@@ -42,7 +42,6 @@ int clampDrawCoordinate(int base, double offset, int imageOffset, int heightOffs
 
 int EffectReferenceSaveContext::registerDetachedCaster(const std::shared_ptr<NPC>& caster)
 {
-	constexpr size_t MaxDetachedCasterCount = 4096;
 	if (caster == nullptr)
 	{
 		return -1;
@@ -52,7 +51,9 @@ int EffectReferenceSaveContext::registerDetachedCaster(const std::shared_ptr<NPC
 	{
 		return existing->second;
 	}
-	if (detachedCasters.size() >= MaxDetachedCasterCount)
+	// Retain one overflow entry so EffectManager rejects the whole save.
+	if (detachedCasters.size()
+		> static_cast<size_t>(MaximumPersistedEffectCollectionCount))
 	{
 		return -1;
 	}
@@ -230,7 +231,7 @@ std::vector<std::weak_ptr<NPC>> readEffectNPCReferenceList(
 	const std::string& prefix)
 {
 	int count = static_cast<int>(ini.GetInteger(section, prefix + "Count", 0));
-	count = std::clamp(count, 0, 4096);
+	count = std::clamp(count, 0, MaximumPersistedEffectCollectionCount);
 	std::vector<std::weak_ptr<NPC>> references;
 	references.reserve(count);
 	for (int i = 0; i < count; i++)
@@ -2954,7 +2955,7 @@ void Effect::initFromIni(
 	int savedMeteorPathCount = std::clamp(
 		static_cast<int>(ini->GetInteger(section, "MeteorPathCount", 0)),
 		0,
-		4096);
+		MaximumPersistedEffectCollectionCount);
 	for (int i = 0; i < savedMeteorPathCount; i++)
 	{
 		std::string prefix = "MeteorPath" + std::to_string(i + 1);
@@ -3099,7 +3100,7 @@ void Effect::initFromIni(
 		int attachedCount = std::clamp(
 			static_cast<int>(ini->GetInteger(section, "AttachedNPCCount", 0)),
 			0,
-			4096);
+			MaximumPersistedEffectCollectionCount);
 		for (int i = 0; i < attachedCount; i++)
 		{
 			std::string prefix = "AttachedNPC" + std::to_string(i + 1);

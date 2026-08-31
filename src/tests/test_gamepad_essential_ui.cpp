@@ -140,6 +140,35 @@ public:
 		return title.shouldDrawChildAfterComposition(child);
 	}
 
+	static std::shared_ptr<FadeMask> titleLoadingFadeMask(const Title& title)
+	{
+		return title.loadingFadeMask;
+	}
+
+	static std::shared_ptr<SystemNotice> titleSystemNotice(const Title& title)
+	{
+		return title.systemNotice;
+	}
+
+	static void showTitleSceneFailureNotice(
+		Title& title,
+		const std::string& failureMessage,
+		int saveIndex,
+		bool newGame,
+		bool initializationFailure)
+	{
+		title.showSceneFailureNotice(
+			failureMessage,
+			saveIndex,
+			newGame,
+			initializationFailure);
+	}
+
+	static std::shared_ptr<Weather> titleWeather(const Title& title)
+	{
+		return title.weather;
+	}
+
 	static bool prepareVideoTitleTeam(TitleTeam& titleTeam)
 	{
 		return titleTeam.onInitial();
@@ -545,6 +574,35 @@ public:
 			scene.checkUpdatesButton->visible &&
 			scene.checkUpdatesButton->activated &&
 			scene.programActionButton != nullptr &&
+			scene.programActionButton->visible &&
+			scene.programActionButton->activated;
+	}
+
+	static bool programActionStaysHiddenDuringModalRefresh(
+		ResourceSelectScene& scene)
+	{
+		if (!presentProgramUpdateAction(scene))
+		{
+			return false;
+		}
+		scene.showCheatHelp(false);
+		scene.refreshCheckUpdatesButton();
+		const bool hiddenDuringModal = scene.cheatHelpVisible &&
+			scene.programActionButton != nullptr &&
+			!scene.programActionButton->visible &&
+			!scene.programActionButton->activated;
+		scene.hideCheatHelp(false);
+		bool hiddenDuringExternalDialog = true;
+#if defined(__ANDROID__) || \
+	defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+		scene.showExternalResourceDialog(false);
+		scene.refreshCheckUpdatesButton();
+		hiddenDuringExternalDialog = scene.externalResourceDialogVisible &&
+			!scene.programActionButton->visible &&
+			!scene.programActionButton->activated;
+		scene.hideExternalResourceDialog(false);
+#endif
+		return hiddenDuringModal && hiddenDuringExternalDialog &&
 			scene.programActionButton->visible &&
 			scene.programActionButton->activated;
 	}
@@ -3032,6 +3090,14 @@ bool testResourceSelectionController(
 		"the separate contained program action opens the update confirmation"
 		" and its download button accepts a real pointer click across layout")
 		&& ok;
+	ResourceSelectScene modalProgramActionScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		modalProgramActionScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::
+			programActionStaysHiddenDuringModalRefresh(modalProgramActionScene),
+		"program actions stay hidden when catalog-driven controls refresh behind"
+		" a modal dialog and return after dismissal") && ok;
 	ResourceSelectScene currentProgramScene;
 	GamepadEssentialUITestAccess::prepareResourceSelection(
 		currentProgramScene, 800, 480);
@@ -4191,8 +4257,10 @@ bool testTitleController(const ResourcePackExpectation& resourcePack)
 	const auto loadGame = title.getComponentByName<Button>("loadBtn");
 	const auto team = title.getComponentByName<Button>("teamBtn");
 	const auto exit = title.getComponentByName<Button>("exitBtn");
+	const auto systemNotice =
+		GamepadEssentialUITestAccess::titleSystemNotice(title);
 	const bool complete = newGame != nullptr && loadGame != nullptr
-		&& team != nullptr && exit != nullptr;
+		&& team != nullptr && exit != nullptr && systemNotice != nullptr;
 	if (!checkPack(complete, resourcePack,
 		"title loads all four production actions"))
 	{
@@ -4287,6 +4355,49 @@ bool testTitleController(const ResourcePackExpectation& resourcePack)
 		&& GamepadEssentialUITestAccess::focusedTitleControl(title) == exit,
 		resourcePack,
 		"title leaves cancel unhandled") && ok;
+
+	GamepadEssentialUITestAccess::showTitleSceneFailureNotice(
+		title,
+		{},
+		3,
+		false,
+		true);
+	ok = checkPack(
+		!systemNotice->visible && systemNotice->currentMessage.empty(),
+		resourcePack,
+		"title does not report an ordinary return without a failure reason") && ok;
+
+	GamepadEssentialUITestAccess::showTitleSceneFailureNotice(
+		title,
+		u8"玩家存档 player3.ini 缺少 Init 段",
+		3,
+		false,
+		true);
+	ok = checkPack(
+		systemNotice->visible &&
+			systemNotice->currentMessage ==
+				u8"系统：读档失败（存档槽 3）：玩家存档 player3.ini 缺少 Init 段。请保留日志以便进一步排查。",
+		resourcePack,
+		"title reports the selected save slot and concrete load failure") && ok;
+	systemNotice->dismiss();
+	GamepadEssentialUITestAccess::showTitleSceneFailureNotice(
+		title,
+		u8"地图切换提交失败",
+		3,
+		false,
+		false);
+	ok = checkPack(
+		systemNotice->visible &&
+			systemNotice->currentMessage ==
+				u8"系统：游戏运行失败：地图切换提交失败。请保留日志以便进一步排查。",
+		resourcePack,
+		"title does not mislabel a later runtime failure as a save-slot load failure") && ok;
+	systemNotice->dismiss();
+	ok = checkPack(
+		!systemNotice->visible && systemNotice->currentMessage.empty(),
+		resourcePack,
+		"title failure notices can be dismissed before the next loading transition") && ok;
+
 	title.setRunning(true);
 	ok = checkPack(title.handleUIAction(UIAction::Confirm)
 		&& (title.result & erExit) != 0,
@@ -4390,17 +4501,37 @@ bool testRunningModalSubtreeSurvivesConfigDrivenResize(
 		auto title = std::make_shared<Title>(true);
 		title->init();
 		auto saveLoad = std::make_shared<SaveLoad>(false, true);
-		saveLoad->setPriority(0);
+		saveLoad->setPriority(epMax + 2);
 		verifyResize(*title, saveLoad, "title to save-load");
 		const auto newGame = title->getComponentByName<Button>("initBtn");
+		const auto loadingFadeMask =
+			GamepadEssentialUITestAccess::titleLoadingFadeMask(*title);
+		const auto systemNotice =
+			GamepadEssentialUITestAccess::titleSystemNotice(*title);
+		const auto weather = GamepadEssentialUITestAccess::titleWeather(*title);
 		ok = checkPack(
+			loadingFadeMask != nullptr && systemNotice != nullptr &&
+			weather != nullptr &&
 			GamepadEssentialUITestAccess::titleDrawsChildAfterComposition(
 				*title, saveLoad) &&
+			GamepadEssentialUITestAccess::titleDrawsChildAfterComposition(
+				*title, loadingFadeMask) &&
+			GamepadEssentialUITestAccess::titleDrawsChildAfterComposition(
+				*title, systemNotice) &&
 			!GamepadEssentialUITestAccess::titleDrawsChildAfterComposition(
-				*title, newGame),
+				*title, weather) &&
+			!GamepadEssentialUITestAccess::titleDrawsChildAfterComposition(
+				*title, newGame) &&
+			systemNotice->getPriority() <
+				loadingFadeMask->getPriority() &&
+			loadingFadeMask->getPriority() <
+				saveLoad->getPriority() &&
+			saveLoad->getPriority() < weather->getPriority() &&
+			!loadingFadeMask->visible && !systemNotice->visible,
 			resourcePack,
-			"title draws save-load above pointer ripples while keeping its"
-			" ordinary controls inside the mirrored composition") && ok;
+			"title defers save-load, loading fade, and the hidden system notice"
+			" in ascending overlay order without lifting weather or ordinary"
+			" controls out of the mirrored composition") && ok;
 	}
 
 	engine->setWindowSize(800, 600);

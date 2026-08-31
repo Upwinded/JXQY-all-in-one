@@ -250,6 +250,9 @@ private:
     void ensureMoneyDropScripts(
         const QString& outputDir,
         AssetMigrationReport& report);
+    void ensureKnownScriptLocations(
+        const QString& outputDir,
+        AssetMigrationReport& report);
     void ensureChooseMenuFiles(const QString& outputDir, const QString& uiBaseRoot,
         const AssetMigrationOptions& options, AssetMigrationReport& report);
     bool alignUiPresentationWithBase(const QString& outputDir, const QString& uiBaseRoot,

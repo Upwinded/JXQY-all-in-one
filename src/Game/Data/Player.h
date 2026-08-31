@@ -217,15 +217,28 @@ public:
 	virtual void beginDie();
 
 	// ---- 绘制 ----
-	virtual void drawAlpha(Point cenTile, Point cenScreen, PointEx coffset);
+	virtual void drawAlpha(
+		Point cenTile,
+		Point cenScreen,
+		PointEx coffset,
+		uint32_t colorStyle);
 	virtual void draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle);
 
 	// ---- 存档 ----
-	virtual void load(int index = -1);
+	virtual bool load(
+		int index = -1,
+		std::string* failureReason = nullptr);
+	bool loadInitialTemplate(
+		int index,
+		std::string* failureReason = nullptr);
 	virtual bool save(int index = -1);
 	void freeResource();
 
 private:
+	bool loadFromFile(
+		const std::string& fileName,
+		const std::string& displayName,
+		std::string* failureReason);
 	bool usesStrictLevelUpThreshold() const;
 	void recordActualDamageForRage(int damage);
 	void clearControlledNextAction();
