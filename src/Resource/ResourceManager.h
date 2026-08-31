@@ -118,8 +118,9 @@ public:
 	const std::vector<RuntimeResource::CatalogDiagnostic>&
 		getResourceCatalogDiagnostics() const;
 
-	// 集合级资源与主程序在线目录地址。两者独立配置，缺失其中一个
-	// 不影响另一个目录的检查和下载。
+	// 集合级更新入口以及旧版资源/主程序在线目录地址。新版优先通过
+	// updateSourceUrl 解析有序目录列表，入口不可用时回退到旧版地址。
+	const std::string& getUpdateSourceUrl() const;
 	const std::string& getResourceCatalogUrl() const;
 	const std::string& getApplicationCatalogUrl() const;
 
@@ -224,6 +225,7 @@ private:
 	std::string writableResourceCollectionRoot;
 	std::string commonResourceRoot;
 	std::string writableCommonResourceRoot;
+	std::string updateSourceUrl;
 	std::string resourceCatalogUrl;
 	std::string applicationCatalogUrl;
 	std::string activeResourceRoot;

@@ -13,6 +13,8 @@
 namespace OnlineUpdate
 {
 constexpr std::size_t MaximumCatalogBytes = 1 * 1024 * 1024;
+constexpr std::size_t MaximumUpdateSourceBytes = 64 * 1024;
+constexpr std::size_t MaximumCatalogUrlsPerType = 16;
 constexpr std::size_t MaximumResourcePackageCount = 512;
 constexpr std::size_t MaximumProgramPackageCount = 128;
 constexpr std::size_t MaximumDependencyCountPerPackage = 64;
@@ -124,6 +126,13 @@ struct CatalogParseResult
 	}
 };
 
+struct UpdateSources
+{
+	int schemaVersion = 0;
+	std::vector<std::string> resourceCatalogUrls;
+	std::vector<std::string> applicationCatalogUrls;
+};
+
 enum class ProgramUpdateStatus
 {
 	UpdateAvailable,
@@ -154,6 +163,12 @@ struct ProgramUpdateCheck
 
 CatalogParseResult parseCatalog(const char* data, std::size_t length);
 CatalogParseResult parseCatalog(std::string_view utf8Text);
+
+// Parses download.upwinded.com's small source.ini entry file. Catalog files
+// and their relative artifacts remain hosted by the listed distribution sites.
+bool parseUpdateSources(
+	std::string_view utf8Text,
+	UpdateSources& sources);
 
 std::string foldGameId(std::string_view gameId);
 bool isValidOnlineGameId(std::string_view gameId);

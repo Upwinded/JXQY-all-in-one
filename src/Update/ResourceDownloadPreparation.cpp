@@ -53,26 +53,206 @@ OnlineUpdate::ProgramDownloadPreparationResult cleanupFailure(
 	}
 	return result;
 }
+
+bool mirrorRetryable(OnlineUpdate::HttpsDownloadStatus status)
+{
+	using Status = OnlineUpdate::HttpsDownloadStatus;
+	return status == Status::NetworkError || status == Status::HttpError ||
+		status == Status::SizeLimitExceeded || status == Status::SizeMismatch;
+}
+
+OnlineUpdate::HttpsBufferDownloadResult downloadCatalog(
+	const OnlineUpdate::CatalogDownloadFunction& catalogDownloader,
+	const std::string& url,
+	const OnlineUpdate::HttpsDownloadProgress& progress)
+{
+	if (catalogDownloader)
+	{
+		return catalogDownloader(
+			url, OnlineUpdate::MaximumCatalogBytes, progress);
+	}
+	return OnlineUpdate::downloadHttpsToMemory(
+		url, OnlineUpdate::MaximumCatalogBytes, progress);
+}
+
+OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
+	const OnlineUpdate::CatalogMirrorSources& catalogSources,
+	const std::string& artifactPath,
+	const std::filesystem::path& destinationPath,
+	std::uint64_t artifactSize,
+	const std::string& expectedCrc32,
+	const OnlineUpdate::ResourceArtifactDownloadFunction& download,
+	const OnlineUpdate::CatalogDownloadFunction& catalogDownloader,
+	const OnlineUpdate::HttpsDownloadProgress& progress,
+	OnlineUpdate::HttpsDownloadResult& downloadResult)
+{
+	using PreparationStatus =
+		OnlineUpdate::ResourceDownloadPreparationStatus;
+	using DownloadStatus = OnlineUpdate::HttpsDownloadStatus;
+	if (catalogSources.catalogUrls.empty())
+	{
+		return PreparationStatus::InvalidInput;
+	}
+	PreparationStatus failure = PreparationStatus::DownloadFailed;
+	for (std::size_t mirrorIndex = 0;
+		mirrorIndex < catalogSources.catalogUrls.size(); mirrorIndex++)
+	{
+		if (mirrorIndex != 0)
+		{
+			if (catalogSources.catalogBytes.empty())
+			{
+				continue;
+			}
+			OnlineUpdate::HttpsBufferDownloadResult candidateCatalog;
+			try
+			{
+				candidateCatalog = downloadCatalog(
+					catalogDownloader,
+					catalogSources.catalogUrls[mirrorIndex],
+					[&progress, artifactSize](std::uint64_t, std::uint64_t)
+					{
+						return !progress || progress(0, artifactSize);
+					});
+			}
+			catch (...)
+			{
+				downloadResult = {};
+				downloadResult.status = DownloadStatus::UnexpectedError;
+				return PreparationStatus::DownloadFailed;
+			}
+			if (candidateCatalog.status == DownloadStatus::Cancelled)
+			{
+				return PreparationStatus::Cancelled;
+			}
+			if (!candidateCatalog.succeeded() ||
+				candidateCatalog.bytes != catalogSources.catalogBytes)
+			{
+				continue;
+			}
+		}
+		std::string artifactUrl;
+		if (!OnlineUpdate::buildHttpsArtifactUrl(
+				catalogSources.catalogUrls[mirrorIndex], artifactPath, artifactUrl))
+		{
+			return PreparationStatus::InvalidArtifactUrl;
+		}
+		try
+		{
+			downloadResult = download(
+				artifactUrl,
+				destinationPath,
+				artifactSize,
+				artifactSize,
+				progress);
+		}
+		catch (...)
+		{
+			downloadResult = {};
+			downloadResult.status = DownloadStatus::UnexpectedError;
+			return PreparationStatus::DownloadFailed;
+		}
+		if (downloadResult.status == DownloadStatus::Cancelled)
+		{
+			return PreparationStatus::Cancelled;
+		}
+		if (downloadResult.succeeded())
+		{
+			std::uint32_t checksum = 0;
+			std::uint64_t fileSize = 0;
+			if (OnlineUpdate::calculateFileCrc32(
+					destinationPath, checksum, fileSize) &&
+				fileSize == artifactSize &&
+				OnlineUpdate::crc32ToLowerHex(checksum) == expectedCrc32)
+			{
+				return PreparationStatus::Success;
+			}
+			failure = PreparationStatus::ArtifactValidationFailed;
+		}
+		else if (!mirrorRetryable(downloadResult.status))
+		{
+			return PreparationStatus::DownloadFailed;
+		}
+		else
+		{
+			failure = PreparationStatus::DownloadFailed;
+		}
+		if (mirrorIndex + 1 < catalogSources.catalogUrls.size())
+		{
+			std::error_code removeError;
+			std::filesystem::remove(destinationPath, removeError);
+			if (removeError)
+			{
+				return PreparationStatus::CleanupFailed;
+			}
+		}
+	}
+	return failure;
+}
 }
 
 namespace OnlineUpdate
 {
+CatalogMirrorSelectionResult selectCatalogMirrorSources(
+	const std::vector<std::string>& catalogUrls,
+	const HttpsDownloadProgress& progress,
+	const CatalogDownloadFunction& catalogDownloader)
+{
+	CatalogMirrorSelectionResult result;
+	result.configured = !catalogUrls.empty();
+	for (std::size_t index = 0; index < catalogUrls.size(); index++)
+	{
+		result.downloadAttempted = true;
+		try
+		{
+			result.download = downloadCatalog(
+				catalogDownloader, catalogUrls[index], progress);
+		}
+		catch (...)
+		{
+			result.download = {};
+			result.download.status = HttpsDownloadStatus::UnexpectedError;
+			return result;
+		}
+		if (result.download.status == HttpsDownloadStatus::Cancelled)
+		{
+			return result;
+		}
+		if (!result.download.succeeded())
+		{
+			result.parse = {};
+			continue;
+		}
+		result.parse = parseCatalog(
+			result.download.bytes.data(), result.download.bytes.size());
+		if (!result.parse.succeeded())
+		{
+			continue;
+		}
+		result.sources.catalogUrls.assign(
+			catalogUrls.begin() + index, catalogUrls.end());
+		result.sources.catalogBytes = std::move(result.download.bytes);
+		return result;
+	}
+	return result;
+}
+
 ResourceDownloadPreparationResult prepareResourceDownload(
 	const Catalog& catalog,
 	const std::string& requestedGameId,
 	const std::string& currentEngineVersion,
-	const std::string& catalogUrl,
+	const CatalogMirrorSources& catalogSources,
 	const std::filesystem::path& workspacePath,
 	const InstalledResourceArtifactMap& installedArtifacts,
 	const InstalledResourceRootMap& installedResourceRoots,
 	RequestedResourceDownloadMode requestedMode,
 	const ResourceDownloadPreparationProgressCallback& progress,
-	const ResourceArtifactDownloadFunction& artifactDownloader)
+	const ResourceArtifactDownloadFunction& artifactDownloader,
+	const CatalogDownloadFunction& catalogDownloader)
 {
 	ResourceDownloadPreparationResult result;
 	result.workspacePath = workspacePath;
 	if (requestedGameId.empty() || currentEngineVersion.empty() ||
-		catalogUrl.empty() || workspacePath.empty())
+		catalogSources.catalogUrls.empty() || workspacePath.empty())
 	{
 		result.status = ResourceDownloadPreparationStatus::InvalidInput;
 		return result;
@@ -115,13 +295,6 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 		}
 	}
 
-	struct ArtifactUrls
-	{
-		std::string full;
-		std::string incremental;
-	};
-	std::vector<ArtifactUrls> artifactUrls;
-	artifactUrls.reserve(plan.downloadOrder.size());
 	for (const ResourceDownloadPlan::Item& item : plan.downloadOrder)
 	{
 		if (item.package == nullptr ||
@@ -132,32 +305,16 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 				? std::string() : item.package->gameId;
 			return result;
 		}
-		ArtifactUrls urls;
-		if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Incremental &&
-			!buildHttpsArtifactUrl(
-				catalogUrl, item.package->artifactPath, urls.full))
-		{
-			result.status =
-				ResourceDownloadPreparationStatus::InvalidArtifactUrl;
-			result.failedGameId = item.package->gameId;
-			return result;
-		}
 		if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Full)
 		{
-			if (!item.package->incrementalPackage.has_value() ||
-				!buildHttpsArtifactUrl(
-					catalogUrl,
-					item.package->incrementalPackage->artifactPath,
-					urls.incremental))
+			if (!item.package->incrementalPackage.has_value())
 			{
-				result.status = item.package->incrementalPackage.has_value()
-					? ResourceDownloadPreparationStatus::InvalidArtifactUrl
-					: ResourceDownloadPreparationStatus::InvalidInput;
+				result.status =
+					ResourceDownloadPreparationStatus::InvalidInput;
 				result.failedGameId = item.package->gameId;
 				return result;
 			}
 		}
-		artifactUrls.push_back(std::move(urls));
 	}
 
 	std::error_code error;
@@ -243,7 +400,9 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 		const std::filesystem::path incrementalOverlayPath =
 			preparedPath / (fileStem + "-overlay");
 		const auto downloadArtifact =
-			[&download,
+			[&catalogSources,
+				&catalogDownloader,
+				&download,
 				&progress,
 				&result,
 				packageIndex,
@@ -252,18 +411,20 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 				completedBytes,
 				totalBytes = plan.totalDownloadBytes,
 				packageDownloadBytes = item.downloadSize](
-					const std::string& url,
+					const std::string& artifactPath,
 					const std::filesystem::path& destination,
 					std::uint64_t artifactSize,
+					const std::string& expectedCrc32,
 					std::uint64_t artifactOffset) -> bool
 		{
-			try
-			{
-				result.downloadResult = download(
-					url,
-					destination,
-					artifactSize,
-					artifactSize,
+			result.status = downloadArtifactFromMirrors(
+				catalogSources,
+				artifactPath,
+				destination,
+				artifactSize,
+				expectedCrc32,
+				download,
+				catalogDownloader,
 					[&progress,
 						packageIndex,
 						packageCount,
@@ -300,22 +461,10 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 						{
 							return false;
 						}
-					});
-			}
-			catch (...)
-			{
-				result.downloadResult.status =
-					HttpsDownloadStatus::NetworkError;
-			}
-			if (result.downloadResult.succeeded())
-			{
-				return true;
-			}
-			result.status = result.downloadResult.status ==
-				HttpsDownloadStatus::Cancelled
-				? ResourceDownloadPreparationStatus::Cancelled
-				: ResourceDownloadPreparationStatus::DownloadFailed;
-			return false;
+					},
+				result.downloadResult);
+			return result.status ==
+				ResourceDownloadPreparationStatus::Success;
 		};
 
 		std::uint64_t artifactOffset = 0;
@@ -323,9 +472,10 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 				ResourceDownloadPlan::ArtifactKind::Incremental)
 		{
 			if (!downloadArtifact(
-					artifactUrls[packageIndex].full,
+					package.artifactPath,
 					fullArchivePath,
 					package.artifactSize,
+					package.crc32Hex,
 					artifactOffset))
 			{
 				return cleanupFailure(std::move(result));
@@ -337,9 +487,10 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 			const IncrementalResourcePackage& incremental =
 				*package.incrementalPackage;
 			if (!downloadArtifact(
-					artifactUrls[packageIndex].incremental,
+					incremental.artifactPath,
 					incrementalArchivePath,
 					incremental.artifactSize,
+					incremental.crc32Hex,
 					artifactOffset))
 			{
 				return cleanupFailure(std::move(result));
@@ -464,29 +615,22 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 
 CommonDownloadPreparationResult prepareCommonDownload(
 	const Catalog& catalog,
-	const std::string& catalogUrl,
+	const CatalogMirrorSources& catalogSources,
 	const std::filesystem::path& workspacePath,
 	const ResourceDownloadPreparationProgressCallback& progress,
-	const ResourceArtifactDownloadFunction& artifactDownloader)
+	const ResourceArtifactDownloadFunction& artifactDownloader,
+	const CatalogDownloadFunction& catalogDownloader)
 {
 	CommonDownloadPreparationResult result;
 	result.workspacePath = workspacePath;
-	if (!catalog.commonPackage.has_value() || catalogUrl.empty() ||
+	if (!catalog.commonPackage.has_value() ||
+		catalogSources.catalogUrls.empty() ||
 		workspacePath.empty())
 	{
 		result.status = ResourceDownloadPreparationStatus::InvalidInput;
 		return result;
 	}
 	result.package = *catalog.commonPackage;
-	std::string artifactUrl;
-	if (!buildHttpsArtifactUrl(
-			catalogUrl, result.package.artifactPath, artifactUrl))
-	{
-		result.status =
-			ResourceDownloadPreparationStatus::InvalidArtifactUrl;
-		return result;
-	}
-
 	std::error_code error;
 	if (std::filesystem::exists(workspacePath, error))
 	{
@@ -545,13 +689,14 @@ CommonDownloadPreparationResult prepareCommonDownload(
 					url, destinationPath, maximumBytes,
 					expectedBytes, downloadProgress);
 			});
-	try
-	{
-		result.downloadResult = download(
-			artifactUrl,
-			result.archivePath,
-			result.package.artifactSize,
-			result.package.artifactSize,
+	result.status = downloadArtifactFromMirrors(
+		catalogSources,
+		result.package.artifactPath,
+		result.archivePath,
+		result.package.artifactSize,
+		result.package.crc32Hex,
+		download,
+		catalogDownloader,
 			[&progress, totalBytes = result.package.artifactSize](
 				std::uint64_t transferredBytes, std::uint64_t)
 			{
@@ -574,18 +719,10 @@ CommonDownloadPreparationResult prepareCommonDownload(
 				{
 					return false;
 				}
-			});
-	}
-	catch (...)
+			},
+		result.downloadResult);
+	if (result.status != ResourceDownloadPreparationStatus::Success)
 	{
-		result.downloadResult.status = HttpsDownloadStatus::NetworkError;
-	}
-	if (!result.downloadResult.succeeded())
-	{
-		result.status = result.downloadResult.status ==
-			HttpsDownloadStatus::Cancelled
-			? ResourceDownloadPreparationStatus::Cancelled
-			: ResourceDownloadPreparationStatus::DownloadFailed;
 		return cleanupFailure(std::move(result));
 	}
 
@@ -628,14 +765,16 @@ ProgramDownloadPreparationResult prepareProgramDownload(
 	const Catalog& catalog,
 	const std::string& target,
 	const std::string& currentVersion,
-	const std::string& catalogUrl,
+	const CatalogMirrorSources& catalogSources,
 	const std::filesystem::path& workspacePath,
 	const HttpsDownloadProgress& progress,
-	const ResourceArtifactDownloadFunction& artifactDownloader)
+	const ResourceArtifactDownloadFunction& artifactDownloader,
+	const CatalogDownloadFunction& catalogDownloader)
 {
 	ProgramDownloadPreparationResult result;
 	result.workspacePath = workspacePath;
-	if (target.empty() || currentVersion.empty() || catalogUrl.empty() ||
+	if (target.empty() || currentVersion.empty() ||
+		catalogSources.catalogUrls.empty() ||
 		workspacePath.empty())
 	{
 		return result;
@@ -651,15 +790,6 @@ ProgramDownloadPreparationResult prepareProgramDownload(
 		return result;
 	}
 	result.package = *update.package;
-
-	std::string artifactUrl;
-	if (!buildHttpsArtifactUrl(
-			catalogUrl, result.package.artifactPath, artifactUrl))
-	{
-		result.status =
-			ResourceDownloadPreparationStatus::InvalidArtifactUrl;
-		return result;
-	}
 
 	std::error_code error;
 	if (std::filesystem::exists(workspacePath, error))
@@ -690,37 +820,18 @@ ProgramDownloadPreparationResult prepareProgramDownload(
 					url, destinationPath, maximumBytes,
 					expectedBytes, downloadProgress);
 			});
-	try
+	result.status = downloadArtifactFromMirrors(
+		catalogSources,
+		result.package.artifactPath,
+		result.artifactPath,
+		result.package.artifactSize,
+		result.package.crc32Hex,
+		download,
+		catalogDownloader,
+		progress,
+		result.downloadResult);
+	if (result.status != ResourceDownloadPreparationStatus::Success)
 	{
-		result.downloadResult = download(
-			artifactUrl,
-			result.artifactPath,
-			result.package.artifactSize,
-			result.package.artifactSize,
-			progress);
-	}
-	catch (...)
-	{
-		result.downloadResult.status = HttpsDownloadStatus::NetworkError;
-	}
-	if (!result.downloadResult.succeeded())
-	{
-		result.status = result.downloadResult.status ==
-			HttpsDownloadStatus::Cancelled
-			? ResourceDownloadPreparationStatus::Cancelled
-			: ResourceDownloadPreparationStatus::DownloadFailed;
-		return cleanupFailure(std::move(result));
-	}
-
-	std::uint32_t checksum = 0;
-	std::uint64_t fileSize = 0;
-	if (!calculateFileCrc32(
-			result.artifactPath, checksum, fileSize) ||
-		fileSize != result.package.artifactSize ||
-		crc32ToLowerHex(checksum) != result.package.crc32Hex)
-	{
-		result.status =
-			ResourceDownloadPreparationStatus::ArtifactValidationFailed;
 		return cleanupFailure(std::move(result));
 	}
 

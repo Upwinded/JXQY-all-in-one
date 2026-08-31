@@ -22,6 +22,7 @@ enum class HttpsDownloadStatus
 	SizeLimitExceeded,
 	SizeMismatch,
 	WriteFailed,
+	UnexpectedError,
 	Cancelled,
 	CleanupFailed
 };

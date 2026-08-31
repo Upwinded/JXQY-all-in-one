@@ -182,6 +182,7 @@ struct ResourceCatalogSnapshot
 {
 	std::filesystem::path collectionRoot;
 	std::filesystem::path commonResourceRoot;
+	std::string updateSourceUrl;
 	std::string resourceCatalogUrl;
 	std::string applicationCatalogUrl;
 	std::vector<ResourceCatalogEntry> entries;

@@ -270,6 +270,50 @@ void testCatalogParsing()
 		"the optional Common section is unique ignoring ASCII case");
 }
 
+void testUpdateSourceParsing()
+{
+	using namespace OnlineUpdate;
+	const std::string sourceText =
+		"[Sources]\n"
+		"SchemaVersion=1\n"
+		"ResourceCatalogUrls="
+		"https://github.example/releases/resources/catalog.ini,"
+		"https://cnb.example/releases/resources/catalog.ini\n"
+		"ApplicationCatalogUrls="
+		"https://github.example/releases/application/catalog.ini,"
+		"https://cnb.example/releases/application/catalog.ini\n";
+	UpdateSources sources;
+	expect(parseUpdateSources(sourceText, sources) &&
+		sources.schemaVersion == 1 &&
+		sources.resourceCatalogUrls.size() == 2 &&
+		sources.applicationCatalogUrls.size() == 2 &&
+		sources.resourceCatalogUrls.front().find("github.example") !=
+			std::string::npos &&
+		sources.resourceCatalogUrls.back().find("cnb.example") !=
+			std::string::npos,
+		"source.ini preserves independent resource and application order");
+
+	expect(!parseUpdateSources(
+		"[Sources]\nSchemaVersion=2\n"
+		"ResourceCatalogUrls=https://updates.example/catalog.ini\n",
+		sources) && sources.resourceCatalogUrls.empty(),
+		"source.ini rejects unsupported schemas without retaining stale URLs");
+	expect(!parseUpdateSources(
+		"[Sources]\nSchemaVersion=1\n"
+		"ResourceCatalogUrls=http://updates.example/catalog.ini\n",
+		sources),
+		"source.ini rejects non-HTTPS catalog URLs");
+	expect(!parseUpdateSources(
+		"[Sources]\nSchemaVersion=1\n"
+		"ApplicationCatalogUrls=https://user@updates.example/catalog.ini\n",
+		sources),
+		"source.ini rejects credentials embedded in catalog URLs");
+	expect(!parseUpdateSources(
+		"[Sources]\nSchemaVersion=1\n",
+		sources),
+		"source.ini requires at least one usable catalog URL");
+}
+
 void testCommonVersionMarker()
 {
 	using namespace OnlineUpdate;
@@ -526,6 +570,7 @@ void testArtifactHashing()
 int main()
 {
 	testCatalogParsing();
+	testUpdateSourceParsing();
 	testCommonVersionMarker();
 	testCatalogLimits();
 	testResourcePlanning();

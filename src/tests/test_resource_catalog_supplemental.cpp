@@ -171,6 +171,7 @@ bool createFixture(const fs::path& root)
 		root / "primary/resources.ini",
 		"[Collection]\n"
 		"CommonPath=common\n"
+		"UpdateSourceUrl=https://download.example.test/source.ini\n"
 		"ResourceCatalogUrl=https://updates.example.test/resources/catalog.ini\n"
 		"ApplicationCatalogUrl=https://updates.example.test/application/catalog.ini\n"
 		"\n"
@@ -279,11 +280,13 @@ bool testSnapshotAggregation(const fs::path& root)
 			resolvedPath(root / "primary/common"),
 		"snapshot common root remains owned by the primary collection") && ok;
 	ok = check(
+		result.snapshot.updateSourceUrl ==
+			"https://download.example.test/source.ini" &&
 		result.snapshot.resourceCatalogUrl ==
 			"https://updates.example.test/resources/catalog.ini" &&
 		result.snapshot.applicationCatalogUrl ==
 			"https://updates.example.test/application/catalog.ini",
-		"snapshot exposes the resource and application catalog URLs") && ok;
+		"snapshot exposes the source, resource and application catalog URLs") && ok;
 
 	const RuntimeResource::ResourceCatalogEntry* primary =
 		findEntry(result.snapshot, "pack.base");

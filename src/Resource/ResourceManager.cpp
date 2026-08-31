@@ -1436,6 +1436,7 @@ void ResourceManager::scanCollectionRoot(const std::string& collectionRoot)
 	resourceCatalogDiagnostics.clear();
 	commonResourceRoot.clear();
 	writableCommonResourceRoot.clear();
+	updateSourceUrl.clear();
 	resourceCatalogUrl.clear();
 	applicationCatalogUrl.clear();
 
@@ -1453,6 +1454,7 @@ void ResourceManager::scanCollectionRoot(const std::string& collectionRoot)
 		const RuntimeResource::ResourceCatalogSnapshot& snapshot =
 			catalogResult.snapshot;
 		resourceCatalogDiagnostics = snapshot.diagnostics;
+		updateSourceUrl = snapshot.updateSourceUrl;
 		resourceCatalogUrl = snapshot.resourceCatalogUrl;
 		applicationCatalogUrl = snapshot.applicationCatalogUrl;
 		if (!snapshot.commonResourceRoot.empty())
@@ -1561,6 +1563,7 @@ bool ResourceManager::initialize(const std::string& assetsArg)
 		writableResourceCollectionRoot.clear();
 		commonResourceRoot.clear();
 		writableCommonResourceRoot.clear();
+		updateSourceUrl.clear();
 		resourceCatalogUrl.clear();
 		applicationCatalogUrl.clear();
 		activeResourceRoot.clear();
@@ -2039,6 +2042,7 @@ bool ResourceManager::installEditorRunSelection(
 	writableResourceCollectionRoot = collectionRoot;
 	commonResourceRoot = selectedCommonRoot;
 	writableCommonResourceRoot = selectedCommonRoot;
+	updateSourceUrl.clear();
 	resourceCatalogUrl.clear();
 	applicationCatalogUrl.clear();
 	activeResourceRoot = selectedActiveRoot;
@@ -2080,6 +2084,11 @@ const std::vector<RuntimeResource::CatalogDiagnostic>&
 ResourceManager::getResourceCatalogDiagnostics() const
 {
 	return resourceCatalogDiagnostics;
+}
+
+const std::string& ResourceManager::getUpdateSourceUrl() const
+{
+	return updateSourceUrl;
 }
 
 const std::string& ResourceManager::getResourceCatalogUrl() const

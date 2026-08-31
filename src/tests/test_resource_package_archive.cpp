@@ -18,6 +18,7 @@ extern "C"
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1074,7 +1075,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			catalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			workspace,
 			{},
 			{},
@@ -1129,7 +1130,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			catalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			reusedDependencyWorkspace,
 			reusableBase,
 			{},
@@ -1246,7 +1247,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			incrementalCatalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			incrementalWorkspace,
 			incrementalReceipts,
 			incrementalRoots,
@@ -1344,7 +1345,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			incrementalCatalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			fullAndIncrementalWorkspace,
 			fullAndIncrementalReceipts,
 			{},
@@ -1385,7 +1386,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			catalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			cancelledWorkspace,
 			{},
 			{},
@@ -1410,7 +1411,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			mismatchedCatalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			invalidWorkspace,
 			{},
 			{},
@@ -1418,11 +1419,11 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			{},
 			downloader);
 	expect(invalid.status ==
-		OnlineUpdate::ResourceDownloadPreparationStatus::PackageValidationFailed &&
-		invalid.packageResult.status ==
-			OnlineUpdate::ResourcePackageArchiveStatus::ArtifactMismatch &&
+		OnlineUpdate::ResourceDownloadPreparationStatus::
+			ArtifactValidationFailed &&
 		!std::filesystem::exists(invalidWorkspace),
-		"one invalid dependency cancels the group before installed resources change");
+		"one invalid dependency checksum cancels the group before installed"
+		" resources change");
 
 	const std::filesystem::path existingWorkspace =
 		nextPath(tree, "download-existing");
@@ -1433,7 +1434,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 			catalog,
 			"YYCS",
 			"2.0.0",
-			"https://updates.example/catalog.ini",
+			{ { "https://updates.example/catalog.ini" }, {} },
 			existingWorkspace,
 			{},
 			{},
@@ -1486,7 +1487,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 		nextPath(tree, "download-common-workspace");
 	const auto common = OnlineUpdate::prepareCommonDownload(
 		catalog,
-		"https://updates.example/catalog.ini",
+		{ { "https://updates.example/catalog.ini" }, {} },
 		commonWorkspace,
 		{},
 		commonDownloader);
@@ -1564,7 +1565,7 @@ void testProgramDownloadPreparation(const TemporaryTree& tree)
 		catalog,
 		"windows",
 		"2.0.9",
-		"https://updates.example/catalog.ini",
+		{ { "https://updates.example/catalog.ini" }, {} },
 		workspace,
 		{},
 		downloader);
@@ -1573,13 +1574,269 @@ void testProgramDownloadPreparation(const TemporaryTree& tree)
 		readBytes(prepared.artifactPath) == sourceBytes,
 		"newer program artifact downloads and validates without installation");
 
+	const std::string catalogText =
+		"[Catalog]\n"
+		"SchemaVersion=1\n"
+		"ProgramTargets=windows\n"
+		"\n"
+		"[Program.windows]\n"
+		"Version=" + package.versionText + "\n"
+		"Artifact=" + package.artifactPath + "\n"
+		"Size=" + std::to_string(package.artifactSize) + "\n"
+		"Crc32=" + package.crc32Hex + "\n";
+	const auto catalogResponse = [](const std::string& text)
+	{
+		OnlineUpdate::HttpsBufferDownloadResult result;
+		result.status = OnlineUpdate::HttpsDownloadStatus::Success;
+		result.bytes.assign(text.begin(), text.end());
+		result.transferredBytes = result.bytes.size();
+		return result;
+	};
+	std::vector<std::string> initialCatalogRequests;
+	const auto selectedCatalog = OnlineUpdate::selectCatalogMirrorSources(
+		{
+			"https://first.example/application/catalog.ini",
+			"https://second.example/application/catalog.ini",
+		},
+		{},
+		[&initialCatalogRequests, &catalogText, &catalogResponse](
+			const std::string& url,
+			std::size_t,
+			const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			initialCatalogRequests.push_back(url);
+			return catalogResponse(catalogText);
+		});
+	expect(selectedCatalog.succeeded() && initialCatalogRequests.size() == 1 &&
+		selectedCatalog.sources.catalogUrls.size() == 2,
+		"catalog selection stops at the first valid catalog and retains later"
+		" fallback candidates");
+
+	const std::vector<std::pair<OnlineUpdate::HttpsDownloadStatus, std::string>>
+		retryableFailures = {
+			{ OnlineUpdate::HttpsDownloadStatus::NetworkError, "network" },
+			{ OnlineUpdate::HttpsDownloadStatus::HttpError, "http" },
+			{ OnlineUpdate::HttpsDownloadStatus::SizeLimitExceeded, "size-limit" },
+			{ OnlineUpdate::HttpsDownloadStatus::SizeMismatch, "size-mismatch" },
+		};
+	for (const auto& failure : retryableFailures)
+	{
+		std::vector<std::string> attemptedUrls;
+		std::vector<std::string> fallbackCatalogRequests;
+		const auto mirrorDownloader =
+			[&attemptedUrls, &downloader, failureStatus = failure.first](
+				const std::string& url,
+				const std::filesystem::path& destinationPath,
+				std::uint64_t maximumBytes,
+				std::uint64_t expectedBytes,
+				const OnlineUpdate::HttpsDownloadProgress& progress)
+			{
+				attemptedUrls.push_back(url);
+				if (attemptedUrls.size() == 1)
+				{
+					OnlineUpdate::HttpsDownloadResult result;
+					result.status = failureStatus;
+					return result;
+				}
+				return downloader(
+					url, destinationPath, maximumBytes, expectedBytes, progress);
+			};
+		const auto fallback = OnlineUpdate::prepareProgramDownload(
+			selectedCatalog.parse.catalog,
+			"windows",
+			"2.0.9",
+			selectedCatalog.sources,
+			nextPath(tree, "program-mirror-" + failure.second),
+			{},
+			mirrorDownloader,
+			[&fallbackCatalogRequests, &catalogText, &catalogResponse](
+				const std::string& url,
+				std::size_t,
+				const OnlineUpdate::HttpsDownloadProgress&)
+			{
+				fallbackCatalogRequests.push_back(url);
+				return catalogResponse(catalogText);
+			});
+		expect(fallback.succeeded() && attemptedUrls.size() == 2 &&
+			fallbackCatalogRequests.size() == 1 &&
+			fallbackCatalogRequests.front().find("second.example") !=
+				std::string::npos &&
+			attemptedUrls[0].find("first.example") != std::string::npos &&
+			attemptedUrls[1].find("second.example") != std::string::npos,
+			"program download retries the next mirror after " + failure.second);
+	}
+
+	std::size_t differentCatalogArtifactAttempts = 0;
+	const auto differentCatalog = OnlineUpdate::prepareProgramDownload(
+		selectedCatalog.parse.catalog,
+		"windows",
+		"2.0.9",
+		selectedCatalog.sources,
+		nextPath(tree, "program-mirror-different-catalog"),
+		{},
+		[&differentCatalogArtifactAttempts](
+			const std::string&,
+			const std::filesystem::path&,
+			std::uint64_t,
+			std::uint64_t,
+			const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			differentCatalogArtifactAttempts++;
+			OnlineUpdate::HttpsDownloadResult result;
+			result.status = OnlineUpdate::HttpsDownloadStatus::NetworkError;
+			return result;
+		},
+		[&catalogText, &catalogResponse](
+			const std::string&,
+			std::size_t,
+			const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			return catalogResponse(catalogText + "\n");
+		});
+	expect(differentCatalog.status == OnlineUpdate::
+			ResourceDownloadPreparationStatus::DownloadFailed &&
+		differentCatalogArtifactAttempts == 1,
+		"a byte-different catalog cannot supply fallback artifacts");
+
+	std::size_t writeFailureArtifactAttempts = 0;
+	std::size_t writeFailureCatalogAttempts = 0;
+	const auto writeFailure = OnlineUpdate::prepareProgramDownload(
+		selectedCatalog.parse.catalog,
+		"windows",
+		"2.0.9",
+		selectedCatalog.sources,
+		nextPath(tree, "program-mirror-write-failure"),
+		{},
+		[&writeFailureArtifactAttempts](
+			const std::string&,
+			const std::filesystem::path&,
+			std::uint64_t,
+			std::uint64_t,
+			const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			writeFailureArtifactAttempts++;
+			OnlineUpdate::HttpsDownloadResult result;
+			result.status = OnlineUpdate::HttpsDownloadStatus::WriteFailed;
+			return result;
+		},
+		[&writeFailureCatalogAttempts](
+			const std::string&,
+			std::size_t,
+			const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			writeFailureCatalogAttempts++;
+			return OnlineUpdate::HttpsBufferDownloadResult();
+		});
+	expect(writeFailure.status == OnlineUpdate::
+			ResourceDownloadPreparationStatus::DownloadFailed &&
+		writeFailureArtifactAttempts == 1 && writeFailureCatalogAttempts == 0,
+		"a local write failure stops without checking another mirror");
+
+	std::size_t exceptionAttempts = 0;
+	const auto unexpectedFailure = OnlineUpdate::prepareProgramDownload(
+		selectedCatalog.parse.catalog,
+		"windows",
+		"2.0.9",
+		selectedCatalog.sources,
+		nextPath(tree, "program-mirror-exception"),
+		{},
+		[&exceptionAttempts](
+			const std::string&,
+			const std::filesystem::path&,
+			std::uint64_t,
+			std::uint64_t,
+			const OnlineUpdate::HttpsDownloadProgress&) ->
+				OnlineUpdate::HttpsDownloadResult
+		{
+			exceptionAttempts++;
+			throw std::runtime_error("local download failure");
+		});
+	expect(unexpectedFailure.status == OnlineUpdate::
+			ResourceDownloadPreparationStatus::DownloadFailed &&
+		unexpectedFailure.downloadResult.status ==
+			OnlineUpdate::HttpsDownloadStatus::UnexpectedError &&
+		exceptionAttempts == 1,
+		"an unexpected local exception stops without trying another mirror");
+
+	std::vector<std::string> checksumAttemptedUrls;
+	const auto checksumFallbackDownloader =
+		[&checksumAttemptedUrls, &downloader, &sourceBytes](
+			const std::string& url,
+			const std::filesystem::path& destinationPath,
+			std::uint64_t maximumBytes,
+			std::uint64_t expectedBytes,
+			const OnlineUpdate::HttpsDownloadProgress& progress)
+		{
+			checksumAttemptedUrls.push_back(url);
+			if (checksumAttemptedUrls.size() == 1)
+			{
+				std::vector<std::uint8_t> wrongBytes = sourceBytes;
+				wrongBytes.front() ^= 0xFF;
+				OnlineUpdate::HttpsDownloadResult result;
+				result.status = writeBytes(destinationPath, wrongBytes)
+					? OnlineUpdate::HttpsDownloadStatus::Success
+					: OnlineUpdate::HttpsDownloadStatus::WriteFailed;
+				result.transferredBytes = expectedBytes;
+				return result;
+			}
+			return downloader(
+				url, destinationPath, maximumBytes, expectedBytes, progress);
+		};
+	const auto checksumFallback = OnlineUpdate::prepareProgramDownload(
+		selectedCatalog.parse.catalog,
+		"windows",
+		"2.0.9",
+		selectedCatalog.sources,
+		nextPath(tree, "program-mirror-checksum"),
+		{},
+		checksumFallbackDownloader,
+		[&catalogText, &catalogResponse](
+			const std::string&,
+			std::size_t,
+			const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			return catalogResponse(catalogText);
+		});
+	expect(checksumFallback.succeeded() && checksumAttemptedUrls.size() == 2 &&
+		readBytes(checksumFallback.artifactPath) == sourceBytes,
+		"program download retries the next mirror after CRC32 validation fails");
+
+	std::size_t cancelledAttemptCount = 0;
+	const auto cancelledDownloader = [&cancelledAttemptCount](
+		const std::string&,
+		const std::filesystem::path&,
+		std::uint64_t,
+		std::uint64_t,
+		const OnlineUpdate::HttpsDownloadProgress&)
+	{
+		cancelledAttemptCount++;
+		OnlineUpdate::HttpsDownloadResult result;
+		result.status = OnlineUpdate::HttpsDownloadStatus::Cancelled;
+		return result;
+	};
+	const std::filesystem::path cancelledMirrorWorkspace =
+		nextPath(tree, "program-mirror-cancelled");
+	const auto cancelledMirror = OnlineUpdate::prepareProgramDownload(
+		selectedCatalog.parse.catalog,
+		"windows",
+		"2.0.9",
+		selectedCatalog.sources,
+		cancelledMirrorWorkspace,
+		{},
+		cancelledDownloader);
+	expect(cancelledMirror.status == OnlineUpdate::
+			ResourceDownloadPreparationStatus::Cancelled &&
+		cancelledAttemptCount == 1 &&
+		!std::filesystem::exists(cancelledMirrorWorkspace),
+		"cancelled program download does not try another mirror");
+
 	const std::filesystem::path currentWorkspace =
 		nextPath(tree, "program-current");
 	const auto current = OnlineUpdate::prepareProgramDownload(
 		catalog,
 		"windows",
 		"2.1.0",
-		"https://updates.example/catalog.ini",
+		{ { "https://updates.example/catalog.ini" }, {} },
 		currentWorkspace,
 		{},
 		downloader);
@@ -1595,7 +1852,7 @@ void testProgramDownloadPreparation(const TemporaryTree& tree)
 		catalog,
 		"windows",
 		"2.2.0",
-		"https://updates.example/catalog.ini",
+		{ { "https://updates.example/catalog.ini" }, {} },
 		olderWorkspace,
 		{},
 		downloader);
@@ -1613,7 +1870,7 @@ void testProgramDownloadPreparation(const TemporaryTree& tree)
 		invalidCatalog,
 		"windows",
 		"2.0.9",
-		"https://updates.example/catalog.ini",
+		{ { "https://updates.example/catalog.ini" }, {} },
 		invalidWorkspace,
 		{},
 		downloader);
@@ -1707,7 +1964,7 @@ void testOptionalLiveResourceUpdate(const TemporaryTree& tree)
 
 	const OnlineUpdate::CommonDownloadPreparationResult common =
 		OnlineUpdate::prepareCommonDownload(
-			parsed.catalog, catalogUrl, workspace, reportProgress);
+			parsed.catalog, { { catalogUrl }, {} }, workspace, reportProgress);
 	expect(common.succeeded() && std::filesystem::is_regular_file(
 			common.preparedCommonPath / "version.ini"),
 		"live common package downloads, validates and extracts");
@@ -1749,7 +2006,7 @@ void testOptionalLiveResourceUpdate(const TemporaryTree& tree)
 			parsed.catalog,
 			requestedGameId,
 			engineVersion,
-			catalogUrl,
+			{ { catalogUrl }, {} },
 			workspace,
 			{},
 			{},

@@ -57,6 +57,42 @@ using ResourceArtifactDownloadFunction = std::function<HttpsDownloadResult(
 	std::uint64_t expectedBytes,
 	const HttpsDownloadProgress& progress)>;
 
+using CatalogDownloadFunction = std::function<HttpsBufferDownloadResult(
+	const std::string& url,
+	std::size_t maximumBytes,
+	const HttpsDownloadProgress& progress)>;
+
+struct CatalogMirrorSources
+{
+	// The first URL supplied the selected catalog. Later candidates must return
+	// catalogBytes exactly before their relative artifacts may be used.
+	std::vector<std::string> catalogUrls;
+	std::vector<char> catalogBytes;
+};
+
+struct CatalogMirrorSelectionResult
+{
+	bool configured = false;
+	bool downloadAttempted = false;
+	CatalogMirrorSources sources;
+	HttpsBufferDownloadResult download;
+	CatalogParseResult parse;
+
+	bool succeeded() const noexcept
+	{
+		return configured && !sources.catalogUrls.empty() &&
+			download.succeeded() && parse.succeeded();
+	}
+};
+
+// Stops after the first valid catalog. Remaining URLs are checked lazily only
+// if an artifact needs a fallback, so a healthy primary does not wait for a
+// failed secondary catalog.
+CatalogMirrorSelectionResult selectCatalogMirrorSources(
+	const std::vector<std::string>& catalogUrls,
+	const HttpsDownloadProgress& progress = {},
+	const CatalogDownloadFunction& catalogDownloader = {});
+
 using InstalledResourceRootMap =
 	std::map<std::string, std::filesystem::path>;
 
@@ -123,27 +159,30 @@ struct ProgramDownloadPreparationResult
 // Downloads and validates the needed members of one online dependency closure
 // into a new private workspace. The workspace must not exist. Any failure
 // removes only the workspace created by this call; installed resources are
-// never modified.
+// never modified. A fallback catalog must match the selected catalog bytes;
+// retryable transfer or artifact-validation failures advance to the next URL.
 ResourceDownloadPreparationResult prepareResourceDownload(
 	const Catalog& catalog,
 	const std::string& requestedGameId,
 	const std::string& currentEngineVersion,
-	const std::string& catalogUrl,
+	const CatalogMirrorSources& catalogSources,
 	const std::filesystem::path& workspacePath,
 	const InstalledResourceArtifactMap& installedArtifacts,
 	const InstalledResourceRootMap& installedResourceRoots,
 	RequestedResourceDownloadMode requestedMode,
 	const ResourceDownloadPreparationProgressCallback& progress = {},
-	const ResourceArtifactDownloadFunction& artifactDownloader = {});
+	const ResourceArtifactDownloadFunction& artifactDownloader = {},
+	const CatalogDownloadFunction& catalogDownloader = {});
 
 // Downloads and validates the optional catalog [Common] package into a new
 // private workspace. It never replaces the installed assets/common directory.
 CommonDownloadPreparationResult prepareCommonDownload(
 	const Catalog& catalog,
-	const std::string& catalogUrl,
+	const CatalogMirrorSources& catalogSources,
 	const std::filesystem::path& workspacePath,
 	const ResourceDownloadPreparationProgressCallback& progress = {},
-	const ResourceArtifactDownloadFunction& artifactDownloader = {});
+	const ResourceArtifactDownloadFunction& artifactDownloader = {},
+	const CatalogDownloadFunction& catalogDownloader = {});
 
 // Downloads the selected platform's sole online program artifact into a new
 // private workspace. The public semantic Version is comparison information
@@ -154,8 +193,9 @@ ProgramDownloadPreparationResult prepareProgramDownload(
 	const Catalog& catalog,
 	const std::string& target,
 	const std::string& currentVersion,
-	const std::string& catalogUrl,
+	const CatalogMirrorSources& catalogSources,
 	const std::filesystem::path& workspacePath,
 	const HttpsDownloadProgress& progress = {},
-	const ResourceArtifactDownloadFunction& artifactDownloader = {});
+	const ResourceArtifactDownloadFunction& artifactDownloader = {},
+	const CatalogDownloadFunction& catalogDownloader = {});
 }

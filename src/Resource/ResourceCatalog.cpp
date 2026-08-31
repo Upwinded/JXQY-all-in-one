@@ -43,6 +43,7 @@ struct Catalog
 	const RuntimeResource::ResourceCatalogFileAccess* fileAccess =
 		nullptr;
 	std::string collectionCommonPath;
+	std::string collectionUpdateSourceUrl;
 	std::string collectionResourceCatalogUrl;
 	std::string collectionApplicationCatalogUrl;
 	std::size_t iniBytesRead = 0;
@@ -932,6 +933,8 @@ bool loadPrimaryCatalog(
 	}
 	catalog.collectionCommonPath = trimAscii(
 		collectionConfig.get("Collection", "CommonPath", ""));
+	catalog.collectionUpdateSourceUrl = trimAscii(
+		collectionConfig.get("Collection", "UpdateSourceUrl", ""));
 	catalog.collectionResourceCatalogUrl = trimAscii(
 		collectionConfig.get("Collection", "ResourceCatalogUrl", ""));
 	catalog.collectionApplicationCatalogUrl = trimAscii(
@@ -2493,6 +2496,8 @@ ResourceCatalogSnapshotResult loadResourceCatalogSnapshotImpl(
 		snapshot.collectionRoot = catalog.collectionRoot;
 		snapshot.rootManifestDeclared =
 			catalog.rootManifestDeclared;
+		snapshot.updateSourceUrl =
+			catalog.collectionUpdateSourceUrl;
 		snapshot.resourceCatalogUrl =
 			catalog.collectionResourceCatalogUrl;
 		snapshot.applicationCatalogUrl =

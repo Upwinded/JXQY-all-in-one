@@ -294,18 +294,7 @@ private:
 
 	struct CatalogCheckWorkerResult
 	{
-		struct Endpoint
-		{
-			bool configured = false;
-			bool downloadAttempted = false;
-			OnlineUpdate::HttpsBufferDownloadResult download;
-			OnlineUpdate::CatalogParseResult parse;
-
-			bool succeeded() const noexcept
-			{
-				return configured && download.succeeded() && parse.succeeded();
-			}
-		};
+		using Endpoint = OnlineUpdate::CatalogMirrorSelectionResult;
 
 		Endpoint resource;
 		Endpoint application;
@@ -382,6 +371,8 @@ private:
 	std::vector<ResourceSelectionEntry> resourceEntries;
 	OnlineUpdate::Catalog onlineCatalog;
 	OnlineUpdate::Catalog onlineApplicationCatalog;
+	OnlineUpdate::CatalogMirrorSources onlineResourceCatalogSources;
+	OnlineUpdate::CatalogMirrorSources onlineApplicationCatalogSources;
 	std::unique_ptr<GameLoading::ExclusiveLoadingRunner> catalogCheckRunner;
 	std::shared_ptr<CatalogCheckWorkerResult> catalogCheckWorkerResult;
 	CatalogCheckState catalogCheckState = CatalogCheckState::NotChecked;

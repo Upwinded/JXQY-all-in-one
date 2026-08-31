@@ -355,6 +355,65 @@ bool validateDependencyGraph(OnlineUpdate::CatalogParseResult& result)
 	}
 	return true;
 }
+
+bool isPlainHttpsCatalogUrl(std::string_view url)
+{
+	constexpr std::string_view Scheme = "https://";
+	if (url.size() <= Scheme.size() || url.size() > 4096 ||
+		foldAscii(url.substr(0, Scheme.size())) != Scheme ||
+		url.find('?') != std::string_view::npos ||
+		url.find('#') != std::string_view::npos ||
+		url.find('\\') != std::string_view::npos ||
+		!ResourcePathSafety::isValidUtf8(std::string(url)))
+	{
+		return false;
+	}
+	const std::size_t pathStart = url.find('/', Scheme.size());
+	if (pathStart == std::string_view::npos || pathStart + 1 >= url.size())
+	{
+		return false;
+	}
+	const std::string_view authority =
+		url.substr(Scheme.size(), pathStart - Scheme.size());
+	if (authority.empty() || authority.find('@') != std::string_view::npos)
+	{
+		return false;
+	}
+	return std::none_of(url.begin(), url.end(), [](char character)
+	{
+		const unsigned char byte = static_cast<unsigned char>(character);
+		return byte <= 0x20 || byte == 0x7F;
+	});
+}
+
+bool parseCatalogUrlList(
+	const std::string& text,
+	std::vector<std::string>& urls)
+{
+	urls.clear();
+	if (trimAscii(text).empty())
+	{
+		return true;
+	}
+	for (std::string url : splitCommaList(text))
+	{
+		if (!isPlainHttpsCatalogUrl(url))
+		{
+			urls.clear();
+			return false;
+		}
+		if (std::find(urls.begin(), urls.end(), url) == urls.end())
+		{
+			urls.push_back(std::move(url));
+			if (urls.size() > OnlineUpdate::MaximumCatalogUrlsPerType)
+			{
+				urls.clear();
+				return false;
+			}
+		}
+	}
+	return true;
+}
 }
 
 namespace OnlineUpdate
@@ -699,6 +758,44 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 		result.catalog = {};
 	}
 	return result;
+}
+
+bool parseUpdateSources(
+	std::string_view utf8Text,
+	UpdateSources& sources)
+{
+	sources = {};
+	if (utf8Text.empty() || utf8Text.size() > MaximumUpdateSourceBytes)
+	{
+		return false;
+	}
+	const std::string text(utf8Text);
+	if (!ResourcePathSafety::isValidUtf8(text) ||
+		text.find('\0') != std::string::npos)
+	{
+		return false;
+	}
+	const ResourceIniReader ini(text.data(), text.size());
+	if (ini.parseError() != 0)
+	{
+		return false;
+	}
+	sources.schemaVersion = static_cast<int>(
+		ini.getInteger("Sources", "SchemaVersion", 0));
+	if (sources.schemaVersion != 1 ||
+		!parseCatalogUrlList(
+			ini.get("Sources", "ResourceCatalogUrls", ""),
+			sources.resourceCatalogUrls) ||
+		!parseCatalogUrlList(
+			ini.get("Sources", "ApplicationCatalogUrls", ""),
+			sources.applicationCatalogUrls) ||
+		(sources.resourceCatalogUrls.empty() &&
+			sources.applicationCatalogUrls.empty()))
+	{
+		sources = {};
+		return false;
+	}
+	return true;
 }
 
 bool parseCommonPackageVersion(

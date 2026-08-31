@@ -113,6 +113,7 @@ constexpr std::array<DesktopDisplayResolution, 7>
 constexpr std::uint64_t ResourceDownloadDiskHeadroom =
 	64ULL * 1024ULL * 1024ULL;
 constexpr int ResourceInstallItemsPerPage = 1;
+constexpr const char* UpdateSourceCachePath = "update/source.ini";
 constexpr const char* BackgroundImagePath =
 	"engine/image/ui/resource_select/background.png";
 constexpr const char* ItemFrameImagePath =
@@ -134,6 +135,36 @@ constexpr const char* CheatHelpText =
 	u8"再次按 Shift+F12 可关闭作弊模式。";
 
 bool isPlainDirectory(const std::filesystem::path& path);
+
+bool loadCachedUpdateSources(OnlineUpdate::UpdateSources& sources)
+{
+	std::unique_ptr<char[]> bytes;
+	int length = 0;
+	if (!File::readSharedApplicationFile(
+			UpdateSourceCachePath,
+			bytes,
+			length,
+			static_cast<int>(OnlineUpdate::MaximumUpdateSourceBytes)) ||
+		bytes == nullptr || length <= 0)
+	{
+		return false;
+	}
+	return OnlineUpdate::parseUpdateSources(
+		std::string_view(bytes.get(), static_cast<std::size_t>(length)),
+		sources);
+}
+
+void cacheUpdateSources(std::string_view sourceText)
+{
+	if (!sourceText.empty() &&
+		sourceText.size() <= OnlineUpdate::MaximumUpdateSourceBytes)
+	{
+		(void)File::writeSharedApplicationFile(
+			UpdateSourceCachePath,
+			sourceText.data(),
+			static_cast<int>(sourceText.size()));
+	}
+}
 
 std::string parseInstalledCommonArtifactCrc32(
 	const char* data,
@@ -459,6 +490,8 @@ const char* catalogDownloadFailureText(
 	case OnlineUpdate::HttpsDownloadStatus::WriteFailed:
 	case OnlineUpdate::HttpsDownloadStatus::CleanupFailed:
 		return u8"在线目录读取失败";
+	case OnlineUpdate::HttpsDownloadStatus::UnexpectedError:
+		return u8"下载过程发生未分类错误";
 	case OnlineUpdate::HttpsDownloadStatus::Success:
 		break;
 	}
@@ -1086,7 +1119,7 @@ std::string resourcePreparationFailureText(
 	case Status::ProgramNotAvailable:
 		return u8"当前平台没有可用的新程序版本";
 	case Status::ArtifactValidationFailed:
-		return u8"下载的程序安装包大小或 CRC32 校验失败";
+		return u8"下载文件的大小或 CRC32 校验失败";
 	case Status::PackageValidationFailed:
 		return u8"下载的资源包校验或解压失败";
 	case Status::CleanupFailed:
@@ -1246,6 +1279,8 @@ void ResourceSelectScene::freeResource()
 	resourceEntries.clear();
 	onlineCatalog = {};
 	onlineApplicationCatalog = {};
+	onlineResourceCatalogSources = {};
+	onlineApplicationCatalogSources = {};
 	catalogCheckState = CatalogCheckState::NotChecked;
 	catalogStatusText.clear();
 	programUpdateDialogPending = false;
@@ -1952,11 +1987,14 @@ void ResourceSelectScene::beginOnlineCatalogCheck()
 	{
 		return;
 	}
+	const std::string updateSourceUrl =
+		ResourceManager::instance().getUpdateSourceUrl();
 	const std::string resourceCatalogUrl =
 		ResourceManager::instance().getResourceCatalogUrl();
 	const std::string applicationCatalogUrl =
 		ResourceManager::instance().getApplicationCatalogUrl();
-	if (resourceCatalogUrl.empty() && applicationCatalogUrl.empty())
+	if (updateSourceUrl.empty() && resourceCatalogUrl.empty() &&
+		applicationCatalogUrl.empty())
 	{
 		catalogCheckState = CatalogCheckState::Failed;
 		catalogStatusText =
@@ -1968,6 +2006,8 @@ void ResourceSelectScene::beginOnlineCatalogCheck()
 
 	catalogCheckState = CatalogCheckState::Checking;
 	catalogStatusText = u8"正在检查游戏资源和主程序更新…";
+	onlineResourceCatalogSources = {};
+	onlineApplicationCatalogSources = {};
 	programUpdateDialogPending = false;
 	refreshCheckUpdatesButton();
 	refreshOnlineActionButton();
@@ -1977,46 +2017,82 @@ void ResourceSelectScene::beginOnlineCatalogCheck()
 		catalogCheckWorkerResult;
 	catalogCheckRunner =
 		std::make_unique<GameLoading::ExclusiveLoadingRunner>(
-		[resourceCatalogUrl, applicationCatalogUrl, workerResult](
+		[updateSourceUrl,
+			resourceCatalogUrl,
+			applicationCatalogUrl,
+			workerResult](
 			const GameLoading::LoadingCancellationToken& cancellationToken)
 		{
-			auto checkEndpoint =
-				[&cancellationToken](
-					const std::string& catalogUrl,
-					CatalogCheckWorkerResult::Endpoint& endpoint)
+			std::vector<std::string> resourceCatalogUrls;
+			std::vector<std::string> applicationCatalogUrls;
+			auto appendCatalogUrl = [](std::vector<std::string>& urls,
+				const std::string& url)
 			{
-				if (catalogUrl.empty())
+				if (!url.empty() &&
+					std::find(urls.begin(), urls.end(), url) == urls.end())
 				{
-					return false;
+					urls.push_back(url);
 				}
-				endpoint.configured = true;
-				endpoint.downloadAttempted = true;
-				endpoint.download = OnlineUpdate::downloadHttpsToMemory(
-					catalogUrl,
-					OnlineUpdate::MaximumCatalogBytes,
-					[cancellationToken](std::uint64_t, std::uint64_t)
-					{
-						return !cancellationToken.isCancellationRequested();
-					});
-				if (!endpoint.download.succeeded() ||
-					cancellationToken.isCancellationRequested())
-				{
-					return false;
-				}
-				endpoint.parse = OnlineUpdate::parseCatalog(
-					endpoint.download.bytes.data(),
-					endpoint.download.bytes.size());
-				return endpoint.parse.succeeded();
 			};
+			if (!updateSourceUrl.empty())
+			{
+				bool onlineSourcesLoaded = false;
+				const OnlineUpdate::HttpsBufferDownloadResult sourceDownload =
+					OnlineUpdate::downloadHttpsToMemory(
+						updateSourceUrl,
+						OnlineUpdate::MaximumUpdateSourceBytes,
+						[cancellationToken](std::uint64_t, std::uint64_t)
+						{
+							return !cancellationToken.
+								isCancellationRequested();
+						});
+				if (cancellationToken.isCancellationRequested())
+				{
+					return GameLoading::LoadingTaskResult::cancellation();
+				}
+				OnlineUpdate::UpdateSources sources;
+				const std::string sourceText(
+					sourceDownload.bytes.begin(), sourceDownload.bytes.end());
+				if (sourceDownload.succeeded() &&
+					OnlineUpdate::parseUpdateSources(
+						sourceText, sources))
+				{
+					cacheUpdateSources(sourceText);
+					resourceCatalogUrls =
+						std::move(sources.resourceCatalogUrls);
+					applicationCatalogUrls =
+						std::move(sources.applicationCatalogUrls);
+					onlineSourcesLoaded = true;
+				}
+				if (!onlineSourcesLoaded && loadCachedUpdateSources(sources))
+				{
+					resourceCatalogUrls =
+						std::move(sources.resourceCatalogUrls);
+					applicationCatalogUrls =
+						std::move(sources.applicationCatalogUrls);
+				}
+			}
+			appendCatalogUrl(resourceCatalogUrls, resourceCatalogUrl);
+			appendCatalogUrl(applicationCatalogUrls, applicationCatalogUrl);
 
-			const bool resourceSucceeded = checkEndpoint(
-				resourceCatalogUrl, workerResult->resource);
+			const OnlineUpdate::HttpsDownloadProgress catalogProgress =
+				[cancellationToken](std::uint64_t, std::uint64_t)
+				{
+					return !cancellationToken.isCancellationRequested();
+				};
+			workerResult->resource =
+				OnlineUpdate::selectCatalogMirrorSources(
+					resourceCatalogUrls, catalogProgress);
+			const bool resourceSucceeded = workerResult->resource.succeeded();
 			if (cancellationToken.isCancellationRequested())
 			{
 				return GameLoading::LoadingTaskResult::cancellation();
 			}
-			const bool applicationSucceeded = checkEndpoint(
-				applicationCatalogUrl, workerResult->application);
+			workerResult->application =
+				OnlineUpdate::selectCatalogMirrorSources(
+					applicationCatalogUrls, catalogProgress);
+			const bool applicationSucceeded =
+				workerResult->application.succeeded();
 			if (cancellationToken.isCancellationRequested())
 			{
 				return GameLoading::LoadingTaskResult::cancellation();
@@ -2076,6 +2152,12 @@ void ResourceSelectScene::finishOnlineCatalogCheck(
 		onlineApplicationCatalog = applicationSucceeded
 			? std::move(catalogCheckWorkerResult->application.parse.catalog)
 			: OnlineUpdate::Catalog();
+		onlineResourceCatalogSources = resourceSucceeded
+			? std::move(catalogCheckWorkerResult->resource.sources)
+			: OnlineUpdate::CatalogMirrorSources();
+		onlineApplicationCatalogSources = applicationSucceeded
+			? std::move(catalogCheckWorkerResult->application.sources)
+			: OnlineUpdate::CatalogMirrorSources();
 		catalogCheckState = CatalogCheckState::Ready;
 		buildResourceList();
 		configureFocus();
@@ -2179,6 +2261,8 @@ void ResourceSelectScene::finishOnlineCatalogCheck(
 	{
 		onlineCatalog = {};
 		onlineApplicationCatalog = {};
+		onlineResourceCatalogSources = {};
+		onlineApplicationCatalogSources = {};
 		catalogCheckState = CatalogCheckState::Failed;
 		programUpdateDialogPending = false;
 		const CatalogCheckWorkerResult::Endpoint* failedEndpoint =
@@ -3231,8 +3315,9 @@ void ResourceSelectScene::beginProgramDownloadConfirmation()
 	updateFocusPresentation();
 #elif defined(__APPLE__)
 	std::string installPageUrl;
-	if (!OnlineUpdate::buildHttpsArtifactUrl(
-			ResourceManager::instance().getApplicationCatalogUrl(),
+	if (onlineApplicationCatalogSources.catalogUrls.empty() ||
+		!OnlineUpdate::buildHttpsArtifactUrl(
+			onlineApplicationCatalogSources.catalogUrls.front(),
 			update.package->artifactPath,
 			installPageUrl))
 	{
@@ -3448,8 +3533,8 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		const std::shared_ptr<ResourceInstallWorkerResult> workerResult =
 			resourceInstallWorkerResult;
 		const OnlineUpdate::Catalog catalog = onlineApplicationCatalog;
-		const std::string catalogUrl =
-			ResourceManager::instance().getApplicationCatalogUrl();
+		const OnlineUpdate::CatalogMirrorSources catalogSources =
+			onlineApplicationCatalogSources;
 		resourceInstallDialogState = ResourceInstallDialogState::Downloading;
 		resourceInstallDialogMessage = u8"正在下载并校验 Android 安装包…";
 		refreshResourceInstallDialogControls();
@@ -3457,7 +3542,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		resourceInstallRunner =
 			std::make_unique<GameLoading::ExclusiveLoadingRunner>(
 				[catalog,
-					catalogUrl,
+					catalogSources,
 					downloadWorkspace,
 					apkPath,
 					workerResult](
@@ -3469,7 +3554,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 							catalog,
 							JxqyBuildVersion::ProgramUpdateTarget,
 							JxqyBuildVersion::EngineVersion,
-							catalogUrl,
+							catalogSources,
 							downloadWorkspace,
 							[workerResult, cancellationToken](
 								std::uint64_t transferredBytes,
@@ -3598,8 +3683,8 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		const std::shared_ptr<ResourceInstallWorkerResult> workerResult =
 			resourceInstallWorkerResult;
 		const OnlineUpdate::Catalog catalog = onlineApplicationCatalog;
-		const std::string catalogUrl =
-			ResourceManager::instance().getApplicationCatalogUrl();
+		const OnlineUpdate::CatalogMirrorSources catalogSources =
+			onlineApplicationCatalogSources;
 		resourceInstallDialogState = ResourceInstallDialogState::Downloading;
 		resourceInstallDialogMessage = u8"正在下载并校验主程序…";
 		refreshResourceInstallDialogControls();
@@ -3607,7 +3692,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		resourceInstallRunner =
 			std::make_unique<GameLoading::ExclusiveLoadingRunner>(
 				[catalog,
-					catalogUrl,
+					catalogSources,
 					downloadWorkspace,
 					stagingPath = paths.stagingPath,
 					workerResult](
@@ -3619,7 +3704,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 							catalog,
 							JxqyBuildVersion::ProgramUpdateTarget,
 							JxqyBuildVersion::EngineVersion,
-							catalogUrl,
+							catalogSources,
 							downloadWorkspace,
 							[workerResult, cancellationToken](
 								std::uint64_t transferredBytes,
@@ -3755,8 +3840,8 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 	const OnlineUpdate::Catalog catalog = onlineCatalog;
 	const std::string requestedGameId =
 		pendingResourceInstall.requestedGameId;
-	const std::string catalogUrl =
-		ResourceManager::instance().getResourceCatalogUrl();
+	const OnlineUpdate::CatalogMirrorSources catalogSources =
+		onlineResourceCatalogSources;
 	const std::vector<OnlineUpdate::ResourceInstallTarget> targets =
 		pendingResourceInstall.targets;
 	const OnlineUpdate::InstalledResourceArtifactMap installedArtifacts =
@@ -3775,7 +3860,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		std::make_unique<GameLoading::ExclusiveLoadingRunner>(
 		[catalog,
 			requestedGameId,
-			catalogUrl,
+			catalogSources,
 			collectionRoot,
 			workspacePath,
 			targets,
@@ -3791,7 +3876,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 					catalog,
 					requestedGameId,
 					JxqyBuildVersion::EngineVersion,
-					catalogUrl,
+					catalogSources,
 					workspacePath,
 					installedArtifacts,
 					installedResourceRoots,
@@ -3862,7 +3947,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 				workerResult->commonPreparation =
 					OnlineUpdate::prepareCommonDownload(
 						catalog,
-						catalogUrl,
+						catalogSources,
 						commonWorkspace,
 						[workerResult, cancellationToken, resourceBytes](
 							const OnlineUpdate::
@@ -4223,8 +4308,9 @@ void ResourceSelectScene::startPreparedProgramUpdate()
 			JxqyBuildVersion::EngineVersion);
 	std::string expectedInstallPageUrl;
 	if (!canUseOnlineProgramPackage(update) ||
+		onlineApplicationCatalogSources.catalogUrls.empty() ||
 		!OnlineUpdate::buildHttpsArtifactUrl(
-			ResourceManager::instance().getApplicationCatalogUrl(),
+			onlineApplicationCatalogSources.catalogUrls.front(),
 			update.package->artifactPath,
 			expectedInstallPageUrl) ||
 		expectedInstallPageUrl != pendingProgramPackagePath ||
