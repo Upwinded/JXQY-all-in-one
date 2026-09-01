@@ -9635,27 +9635,39 @@ void ScriptAPI::addOneMagic(const std::string& playerName, const std::string& ma
 
 	for (size_t i = 0; i < 5; i++)
 	{
-		Player tempPlayer;
-		if (!tempPlayer.load(static_cast<int>(i)))
+		const std::string playerFileName =
+			PLAYER_INI_NAME + std::to_string(i) + PLAYER_INI_EXT;
+		std::unique_ptr<char[]> playerData;
+		int playerDataLength = 0;
+		if (!File::readFile(
+				SaveFileManager::CurrentPath() + playerFileName,
+				playerData,
+				playerDataLength) ||
+			playerData == nullptr || playerDataLength <= 0)
 		{
 			continue;
 		}
-		if (tempPlayer.npcName == playerName)
+		INIReader playerIni(playerData);
+		if (playerIni.ParseError() != 0 ||
+			!playerIni.HasSection("Init") ||
+			playerIni.Get("Init", "Name", "") != playerName)
 		{
-			MagicManager tempMagicManager;
-			if (!tempMagicManager.load(static_cast<int>(i)))
-			{
-				continue;
-			}
-			tempMagicManager.addMagic(magicName);
-			if (!tempMagicManager.save(static_cast<int>(i)))
-			{
-				GameLog::write(
-					"ScriptAPI: failed to save magic snapshot index=%d\n",
-					static_cast<int>(i));
-			}
-			return;
+			continue;
 		}
+
+		MagicManager tempMagicManager;
+		if (!tempMagicManager.load(static_cast<int>(i)))
+		{
+			continue;
+		}
+		tempMagicManager.addMagic(magicName);
+		if (!tempMagicManager.save(static_cast<int>(i)))
+		{
+			GameLog::write(
+				"ScriptAPI: failed to save magic snapshot index=%d\n",
+				static_cast<int>(i));
+		}
+		return;
 	}
 }
 

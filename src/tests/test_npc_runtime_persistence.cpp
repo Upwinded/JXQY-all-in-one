@@ -59,6 +59,16 @@ bool writeTextFile(const std::filesystem::path& path, const std::string& content
 	return true;
 }
 
+void resetRuntime(GameManager& gameManager, bool clearObjects = true)
+{
+	gameManager.npcManager->freeResource();
+	if (clearObjects)
+	{
+		gameManager.objectManager->freeResource();
+	}
+	gameManager.eventList.clear();
+}
+
 bool prepareNpcPersistenceFixtures(const std::filesystem::path& root)
 {
 	const std::string body =
@@ -114,6 +124,56 @@ bool prepareNpcPersistenceFixtures(const std::filesystem::path& root)
 		&& writeTextFile(root / "ini" / "obj" / "invalid_drop_table.ini", invalidDropTable);
 }
 
+bool runOfflinePartnerMagicPersistence(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	resetRuntime(gameManager, true);
+	gameManager.player->npcName = "ActiveCharacter";
+	gameManager.magicManager.clearMagicList();
+	const std::string offlinePlayer =
+		"[Init]\n"
+		"Name=OfflinePartner\n";
+	const std::string offlineMagic =
+		"[Init]\n"
+		"Name=OFFLINE_PARTNER_MAGIC\n"
+		"MoveKind=2\n"
+		"[Level1]\n"
+		"MoveKind=2\n"
+		"Speed=20\n";
+	const std::string emptyMagicList =
+		"[Head]\n"
+		"Count=0\n";
+	bool ok = check(
+		writeTextFile(
+			root / "ini" / "magic" / "offline_partner_magic.ini",
+			offlineMagic) &&
+		writeTextFile(
+			saveGameFixturePath(root, "player1.ini"),
+			offlinePlayer) &&
+		writeTextFile(
+			saveGameFixturePath(root, "magic1.ini"),
+			emptyMagicList),
+		"write offline partner magic fixtures");
+
+	gameManager.scriptAPI.addOneMagic(
+		"OfflinePartner",
+		"offline_partner_magic.ini");
+
+	MagicManager loadedMagic;
+	ok = check(
+		loadedMagic.load(1) &&
+		loadedMagic.findPrimaryMagic(
+			"offline_partner_magic.ini") != nullptr,
+		"addOneMagic updates the matching offline character snapshot") && ok;
+	ok = check(
+		gameManager.player->npcName == "ActiveCharacter" &&
+		gameManager.magicManager.findPrimaryMagic(
+			"offline_partner_magic.ini") == nullptr,
+		"addOneMagic leaves the active character state unchanged") && ok;
+	return ok;
+}
+
 void prepareMap(GameManager& gameManager)
 {
 	gameManager.map->data = std::make_shared<MapData>();
@@ -121,16 +181,6 @@ void prepareMap(GameManager& gameManager)
 	gameManager.map->data->head.height = 16;
 	gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
 	gameManager.map->createDataMap();
-}
-
-void resetRuntime(GameManager& gameManager, bool clearObjects = true)
-{
-	gameManager.npcManager->freeResource();
-	if (clearObjects)
-	{
-		gameManager.objectManager->freeResource();
-	}
-	gameManager.eventList.clear();
 }
 
 std::shared_ptr<NPC> makeDyingNpc(
@@ -1485,6 +1535,9 @@ bool runNpcRuntimePersistenceTests()
 	ok = runStatusDurationInputSafety() && ok;
 	ok = runLegacyNpcObjectDefaults() && ok;
 	ok = runPlayerChangePersistenceAndPartnerContinuity(
+		gameManager,
+		root) && ok;
+	ok = runOfflinePartnerMagicPersistence(
 		gameManager,
 		root) && ok;
 	ok = runEntityListScriptSavePolicy(
