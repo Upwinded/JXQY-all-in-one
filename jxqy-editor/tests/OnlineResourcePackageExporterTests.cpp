@@ -7,6 +7,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QProcess>
 #include <QTemporaryDir>
 
 #include <iostream>
@@ -37,6 +38,45 @@ QByteArray readAll(const QString& path)
 {
     QFile file(path);
     return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
+
+bool createDirectoryJunction(
+    const QString& targetPath,
+    const QString& junctionPath)
+{
+#ifdef Q_OS_WIN
+    return QProcess::execute(
+        QStringLiteral("cmd.exe"),
+        {
+            QStringLiteral("/d"),
+            QStringLiteral("/c"),
+            QStringLiteral("mklink"),
+            QStringLiteral("/J"),
+            QDir::toNativeSeparators(junctionPath),
+            QDir::toNativeSeparators(targetPath)
+        }) == 0 && QFileInfo(junctionPath).isJunction();
+#else
+    Q_UNUSED(targetPath);
+    Q_UNUSED(junctionPath);
+    return false;
+#endif
+}
+
+bool removeDirectoryJunction(const QString& junctionPath)
+{
+#ifdef Q_OS_WIN
+    return QProcess::execute(
+        QStringLiteral("cmd.exe"),
+        {
+            QStringLiteral("/d"),
+            QStringLiteral("/c"),
+            QStringLiteral("rmdir"),
+            QDir::toNativeSeparators(junctionPath)
+        }) == 0 && !QFileInfo::exists(junctionPath);
+#else
+    Q_UNUSED(junctionPath);
+    return false;
+#endif
 }
 
 void testDeterministicFullPackage()
@@ -198,6 +238,65 @@ void testInvalidSources()
         OnlineResourcePackageExporter::exportPackage(root, nestedOutput).status ==
             OnlineResourcePackageExporter::Status::InvalidInput,
         "export rejects an output archive inside its source root");
+}
+
+void testWindowsJunctionSourceRoot()
+{
+#ifdef Q_OS_WIN
+    QTemporaryDir temporary;
+    expect(temporary.isValid(),
+        "junction source-root temporary directory is available");
+    const QString targetRoot =
+        QDir(temporary.path()).filePath("pack-target");
+    const QString junctionRoot =
+        QDir(temporary.path()).filePath("pack-junction");
+    expect(writeFile(
+        QDir(targetRoot).filePath("game_profile.ini"),
+        "[Game]\nId=JUNCTION_TEST\nName=Junction Test\nVersion=1.0\n\n"
+        "[Release]\nMinimumEngineVersion=2.0.0\n"),
+        "junction source-root manifest fixture writes");
+    expect(writeFile(
+        QDir(targetRoot).filePath("script/start.txt"),
+        "return\n"),
+        "junction source-root content fixture writes");
+    if (!createDirectoryJunction(targetRoot, junctionRoot))
+    {
+        std::cout << "SKIPPED: Windows junction fixture unavailable"
+                  << std::endl;
+        return;
+    }
+
+    const auto published = OnlineResourcePackageExporter::exportPackage(
+        junctionRoot,
+        QDir(temporary.path()).filePath("junction-source.zip"));
+    expect(published.succeeded() && published.fileCount == 2,
+        "export accepts a Windows junction as the source root");
+    expect(
+        OnlineResourcePackageExporter::exportPackage(
+            junctionRoot,
+            QDir(junctionRoot).filePath("inside-source.zip")).status ==
+            OnlineResourcePackageExporter::Status::InvalidInput,
+        "junction source roots still reject an output inside the source tree");
+
+    const QString nestedTarget =
+        QDir(temporary.path()).filePath("nested-target");
+    const QString nestedJunction =
+        QDir(targetRoot).filePath("nested-junction");
+    QDir().mkpath(nestedTarget);
+    if (createDirectoryJunction(nestedTarget, nestedJunction))
+    {
+        expect(
+            OnlineResourcePackageExporter::exportPackage(
+                junctionRoot,
+                QDir(temporary.path()).filePath("nested-junction.zip")).status ==
+                OnlineResourcePackageExporter::Status::UnsafeSourceEntry,
+            "export still rejects a junction inside the source tree");
+        expect(removeDirectoryJunction(nestedJunction),
+            "nested junction fixture is removed without touching its target");
+    }
+    expect(removeDirectoryJunction(junctionRoot),
+        "source-root junction fixture is removed without touching its target");
+#endif
 }
 
 void testDependencyCatalogFragment()
@@ -456,6 +555,7 @@ int main(int argc, char** argv)
     testDeterministicFullPackage();
     testResourcePackageCli();
     testInvalidSources();
+    testWindowsJunctionSourceRoot();
     testDependencyCatalogFragment();
     testCommonPackagePublishing();
     testCatalogPublishing();

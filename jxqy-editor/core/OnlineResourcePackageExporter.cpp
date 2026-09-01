@@ -502,11 +502,7 @@ exportDirectoryPackage(
     }
 
     const QFileInfo rootInfo(sourceRoot);
-    if (!rootInfo.exists() || !rootInfo.isDir() || rootInfo.isSymLink()
-#if defined(Q_OS_WIN)
-        || rootInfo.isJunction()
-#endif
-    )
+    if (!rootInfo.exists() || !rootInfo.isDir() || rootInfo.isSymLink())
     {
         result.status = Status::InvalidInput;
         result.errorPath = sourceRoot;
