@@ -79,24 +79,111 @@ public:
 			installed->second.fullArtifactCrc32 == package.crc32Hex;
 		OnlineUpdate::ResourceDownloadPlan::Item item;
 		item.package = &package;
-		if (forceFullPackage || !fullArtifactMatches)
+		const auto addArtifactSize =
+			[this, &item, &package](std::uint64_t artifactSize) -> bool
 		{
-			item.downloadSize = package.artifactSize;
-			if (package.incrementalPackage.has_value())
+			if (item.downloadSize >
+				std::numeric_limits<std::uint64_t>::max() - artifactSize)
 			{
-				if (item.downloadSize >
-					std::numeric_limits<std::uint64_t>::max() -
-						package.incrementalPackage->artifactSize)
+				output.status = OnlineUpdate::ResourcePlanStatus::
+					TotalSizeOverflow;
+				output.blockingGameId = package.gameId;
+				return false;
+			}
+			item.downloadSize += artifactSize;
+			return true;
+		};
+
+		if (!package.incrementalChain.empty())
+		{
+			std::size_t chainStartIndex = 0;
+			if (installed != installedArtifacts.end())
+			{
+				const auto& receipts =
+					installed->second.incrementalChainCrc32s;
+				const std::size_t comparable = std::min(
+					receipts.size(), package.incrementalChain.size());
+				while (chainStartIndex < comparable &&
+					receipts[chainStartIndex] ==
+						package.incrementalChain[chainStartIndex].crc32Hex)
 				{
-					output.status = OnlineUpdate::ResourcePlanStatus::
-						TotalSizeOverflow;
-					output.blockingGameId = package.gameId;
-					return false;
+					chainStartIndex++;
 				}
+				if (receipts.size() > package.incrementalChain.size())
+				{
+					chainStartIndex = 0;
+				}
+			}
+			const bool chainMatches = installed != installedArtifacts.end() &&
+				chainStartIndex == package.incrementalChain.size() &&
+				installed->second.incrementalChainCrc32s.size() ==
+					package.incrementalChain.size();
+			const bool legacyReceiptMatches =
+				installed != installedArtifacts.end() &&
+				installed->second.incrementalArtifactCrc32 ==
+					package.incrementalChain.back().crc32Hex;
+			if (chainMatches && !legacyReceiptMatches)
+			{
+				chainStartIndex = package.incrementalChain.size() - 1;
+			}
+			if (forceFullPackage || !fullArtifactMatches)
+			{
 				item.artifactKind = OnlineUpdate::ResourceDownloadPlan::
 					ArtifactKind::FullAndIncremental;
-				item.downloadSize +=
-					package.incrementalPackage->artifactSize;
+				item.incrementalChainStartIndex = 0;
+				if (!addArtifactSize(package.artifactSize))
+				{
+					return false;
+				}
+			}
+			else if (!chainMatches || !legacyReceiptMatches)
+			{
+				if (installed->second.supportsIncrementalUpdate)
+				{
+					item.artifactKind = OnlineUpdate::ResourceDownloadPlan::
+						ArtifactKind::Incremental;
+					item.incrementalChainStartIndex = chainStartIndex;
+				}
+				else
+				{
+					item.artifactKind = OnlineUpdate::ResourceDownloadPlan::
+						ArtifactKind::FullAndIncremental;
+					item.incrementalChainStartIndex = 0;
+					if (!addArtifactSize(package.artifactSize))
+					{
+						return false;
+					}
+				}
+			}
+			else
+			{
+				return true;
+			}
+			for (std::size_t index = item.incrementalChainStartIndex;
+				index < package.incrementalChain.size(); index++)
+			{
+				if (!addArtifactSize(
+						package.incrementalChain[index].artifactSize))
+				{
+					return false;
+				}
+			}
+		}
+		else if (forceFullPackage || !fullArtifactMatches)
+		{
+			if (!addArtifactSize(package.artifactSize))
+			{
+				return false;
+			}
+			if (package.incrementalPackage.has_value())
+			{
+				item.artifactKind = OnlineUpdate::ResourceDownloadPlan::
+					ArtifactKind::FullAndIncremental;
+				if (!addArtifactSize(
+						package.incrementalPackage->artifactSize))
+				{
+					return false;
+				}
 			}
 		}
 		else if (package.incrementalPackage.has_value() &&
@@ -107,26 +194,19 @@ public:
 			{
 				item.artifactKind = OnlineUpdate::ResourceDownloadPlan::
 					ArtifactKind::Incremental;
-				item.downloadSize =
-					package.incrementalPackage->artifactSize;
 			}
 			else
 			{
-				// A packaged/non-filesystem installation cannot be cloned for
-				// an overlay, so rebuild from full and then apply incremental.
-				if (package.artifactSize >
-					std::numeric_limits<std::uint64_t>::max() -
-						package.incrementalPackage->artifactSize)
-				{
-					output.status = OnlineUpdate::ResourcePlanStatus::
-						TotalSizeOverflow;
-					output.blockingGameId = package.gameId;
-					return false;
-				}
 				item.artifactKind = OnlineUpdate::ResourceDownloadPlan::
 					ArtifactKind::FullAndIncremental;
-				item.downloadSize = package.artifactSize +
-					package.incrementalPackage->artifactSize;
+				if (!addArtifactSize(package.artifactSize))
+				{
+					return false;
+				}
+			}
+			if (!addArtifactSize(package.incrementalPackage->artifactSize))
+			{
+				return false;
 			}
 		}
 		else
@@ -217,6 +297,21 @@ ResourceDownloadPlan planResourceDownload(
 		{
 			normalized.incrementalArtifactCrc32.clear();
 		}
+		bool validChainReceipts = true;
+		for (std::string& receipt : normalized.incrementalChainCrc32s)
+		{
+			if (!isValidCrc32Hex(receipt))
+			{
+				validChainReceipts = false;
+				break;
+			}
+			receipt = foldGameId(receipt);
+		}
+		if (!validChainReceipts || normalized.incrementalChainCrc32s.size() >
+			MaximumIncrementalChainPackageCount)
+		{
+			normalized.incrementalChainCrc32s.clear();
+		}
 		const auto existing = normalizedInstalledArtifacts.find(gameId);
 		if (existing == normalizedInstalledArtifacts.end())
 		{
@@ -227,6 +322,8 @@ ResourceDownloadPlan planResourceDownload(
 				normalized.fullArtifactCrc32 ||
 			existing->second.incrementalArtifactCrc32 !=
 				normalized.incrementalArtifactCrc32 ||
+			existing->second.incrementalChainCrc32s !=
+				normalized.incrementalChainCrc32s ||
 			existing->second.supportsIncrementalUpdate !=
 				normalized.supportsIncrementalUpdate)
 		{

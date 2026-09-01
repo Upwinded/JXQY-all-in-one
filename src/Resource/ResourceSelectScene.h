@@ -267,6 +267,8 @@ private:
 		bool onlineAvailable = false;
 		bool onlineOnly = false;
 		bool onlineVersionMatches = false;
+		bool hasPendingOnlineArtifacts = false;
+		bool requiresNewerEngine = false;
 		bool wasRecentlySelected = false;
 		bool descriptionLoadedFromPack = false;
 		bool coverLoadedFromPack = false;
@@ -283,6 +285,8 @@ private:
 		std::string releaseNotes;
 		std::string configurationErrorText;
 		bool onlineAvailable = false;
+		bool hasPendingOnlineArtifacts = false;
+		bool requiresNewerEngine = false;
 		bool wasRecentlySelected = false;
 		bool configurationError = false;
 

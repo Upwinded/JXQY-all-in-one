@@ -314,6 +314,15 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 				result.failedGameId = item.package->gameId;
 				return result;
 			}
+			if (!item.package->incrementalChain.empty() &&
+				item.incrementalChainStartIndex >=
+					item.package->incrementalChain.size())
+			{
+				result.status =
+					ResourceDownloadPreparationStatus::InvalidInput;
+				result.failedGameId = item.package->gameId;
+				return result;
+			}
 		}
 	}
 
@@ -399,6 +408,21 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 			preparedPath / (fileStem + "-full");
 		const std::filesystem::path incrementalOverlayPath =
 			preparedPath / (fileStem + "-overlay");
+		std::vector<std::filesystem::path> chainArchivePaths;
+		std::vector<std::filesystem::path> chainOverlayPaths;
+		if (!package.incrementalChain.empty())
+		{
+			for (std::size_t chainIndex = item.incrementalChainStartIndex;
+				chainIndex < package.incrementalChain.size(); chainIndex++)
+			{
+				const std::string suffix =
+					"-chain-" + std::to_string(chainIndex + 1);
+				chainArchivePaths.push_back(
+					archivesPath / (fileStem + suffix + ".zip"));
+				chainOverlayPaths.push_back(
+					preparedPath / (fileStem + suffix));
+			}
+		}
 		const auto downloadArtifact =
 			[&catalogSources,
 				&catalogDownloader,
@@ -482,7 +506,28 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 			}
 			artifactOffset = package.artifactSize;
 		}
-		if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Full)
+		if (!package.incrementalChain.empty())
+		{
+			for (std::size_t offset = 0; offset < chainArchivePaths.size();
+				offset++)
+			{
+				const std::size_t chainIndex =
+					item.incrementalChainStartIndex + offset;
+				const IncrementalResourcePackage& incremental =
+					package.incrementalChain[chainIndex];
+				if (!downloadArtifact(
+						incremental.artifactPath,
+						chainArchivePaths[offset],
+						incremental.artifactSize,
+						incremental.crc32Hex,
+						artifactOffset))
+				{
+					return cleanupFailure(std::move(result));
+				}
+				artifactOffset += incremental.artifactSize;
+			}
+		}
+		else if (item.artifactKind != ResourceDownloadPlan::ArtifactKind::Full)
 		{
 			const IncrementalResourcePackage& incremental =
 				*package.incrementalPackage;
@@ -516,7 +561,81 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 			return cleanupFailure(std::move(result));
 		}
 
-		if (item.artifactKind ==
+		if (!package.incrementalChain.empty())
+		{
+			std::filesystem::path baseResourcePath;
+			if (item.artifactKind ==
+				ResourceDownloadPlan::ArtifactKind::Incremental)
+			{
+				const auto installedRoot = normalizedInstalledRoots.find(
+					foldGameId(package.gameId));
+				if (installedRoot == normalizedInstalledRoots.end())
+				{
+					result.status =
+						ResourceDownloadPreparationStatus::InvalidInput;
+					return cleanupFailure(std::move(result));
+				}
+				baseResourcePath = installedRoot->second;
+				result.packageResult.status =
+					ResourcePackageArchiveStatus::Success;
+			}
+			else
+			{
+				result.packageResult = prepareResourcePackageArchive(
+					package, fullArchivePath, fullPreparedPath);
+				if (result.packageResult.succeeded())
+				{
+					baseResourcePath = fullPreparedPath;
+				}
+			}
+
+			for (std::size_t offset = 0;
+				result.packageResult.succeeded() &&
+					offset < chainArchivePaths.size();
+				offset++)
+			{
+				result.packageResult = prepareIncrementalChainPackageArchive(
+					package,
+					item.incrementalChainStartIndex + offset,
+					chainArchivePaths[offset],
+					chainOverlayPaths[offset]);
+			}
+			if (result.packageResult.succeeded())
+			{
+				result.packageResult =
+					materializeIncrementalResourcePackageChain(
+						package,
+						baseResourcePath,
+						chainOverlayPaths,
+						packagePreparedPath);
+			}
+			if (result.packageResult.succeeded())
+			{
+				std::error_code cleanupError;
+				if (item.artifactKind !=
+					ResourceDownloadPlan::ArtifactKind::Incremental)
+				{
+					std::filesystem::remove_all(
+						fullPreparedPath, cleanupError);
+				}
+				for (const std::filesystem::path& overlayPath :
+					chainOverlayPaths)
+				{
+					if (cleanupError)
+					{
+						break;
+					}
+					std::filesystem::remove_all(overlayPath, cleanupError);
+				}
+				if (cleanupError)
+				{
+					result.status =
+						ResourceDownloadPreparationStatus::CleanupFailed;
+					return cleanupFailure(std::move(result));
+				}
+			}
+		}
+		else if (item.artifactKind ==
 			ResourceDownloadPlan::ArtifactKind::Incremental)
 		{
 			const auto installedRoot = normalizedInstalledRoots.find(
@@ -602,7 +721,9 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 		prepared.artifactKind = item.artifactKind;
 		prepared.archivePath = item.artifactKind ==
 			ResourceDownloadPlan::ArtifactKind::Incremental
-			? incrementalArchivePath : fullArchivePath;
+			? (package.incrementalChain.empty()
+				? incrementalArchivePath : chainArchivePaths.front())
+			: fullArchivePath;
 		prepared.preparedResourcePath = packagePreparedPath;
 		result.preparedResources.push_back(std::move(prepared));
 		completedBytes += item.downloadSize;

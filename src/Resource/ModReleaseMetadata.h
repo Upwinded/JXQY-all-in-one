@@ -22,6 +22,9 @@ struct ModReleaseMetadata
 	// Local receipt for the optional incremental overlay corresponding to the
 	// installed full package. Publication removes this field as well.
 	std::string installedIncrementalArtifactCrc32;
+	// Ordered local receipts for a successfully installed incremental chain.
+	// This is local updater state and is removed from published packages.
+	std::string installedIncrementalChainCrc32s;
 };
 
 enum class MetadataField

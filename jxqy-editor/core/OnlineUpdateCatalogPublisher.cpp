@@ -13,6 +13,7 @@
 
 #include <filesystem>
 #include <limits>
+#include <map>
 #include <set>
 
 namespace
@@ -77,6 +78,7 @@ bool updateArtifact(
     const std::string& artifactField,
     const std::string& sizeField,
     const std::string& crc32Field,
+    std::map<QString, std::pair<std::uint64_t, std::uint32_t>>& artifactMetadata,
     OnlineUpdateCatalogPublisher::Result& result)
 {
     const std::string artifact = ini.get(section, artifactField, "");
@@ -97,25 +99,35 @@ bool updateArtifact(
     }
     std::uint32_t checksum = 0;
     std::uint64_t size = 0;
-    const std::filesystem::path nativeArtifactPath =
-#if defined(Q_OS_WIN)
-        std::filesystem::path(absolutePath.toStdWString());
-#else
-        std::filesystem::u8path(absolutePath.toUtf8().constData());
-#endif
-    if (!OnlineUpdate::calculateFileCrc32(
-            nativeArtifactPath,
-            checksum,
-            size))
+    const auto cached = artifactMetadata.find(absolutePath);
+    if (cached != artifactMetadata.end())
     {
-        result.status = OnlineUpdateCatalogPublisher::Status::
-            ArtifactChecksumFailed;
-        result.detail = absolutePath;
-        return false;
+        size = cached->second.first;
+        checksum = cached->second.second;
+    }
+    else
+    {
+        const std::filesystem::path nativeArtifactPath =
+#if defined(Q_OS_WIN)
+            std::filesystem::path(absolutePath.toStdWString());
+#else
+            std::filesystem::u8path(absolutePath.toUtf8().constData());
+#endif
+        if (!OnlineUpdate::calculateFileCrc32(
+                nativeArtifactPath,
+                checksum,
+                size))
+        {
+            result.status = OnlineUpdateCatalogPublisher::Status::
+                ArtifactChecksumFailed;
+            result.detail = absolutePath;
+            return false;
+        }
+        artifactMetadata.emplace(absolutePath, std::make_pair(size, checksum));
+        result.artifactCount++;
     }
     ini.set(section, sizeField, std::to_string(size));
     ini.set(section, crc32Field, OnlineUpdate::crc32ToLowerHex(checksum));
-    result.artifactCount++;
     return true;
 }
 }
@@ -193,6 +205,8 @@ OnlineUpdateCatalogPublisher::Result OnlineUpdateCatalogPublisher::publish(
         result.detail = QStringLiteral("Catalog has no artifacts");
         return result;
     }
+    std::map<QString, std::pair<std::uint64_t, std::uint32_t>>
+        artifactMetadata;
     for (const std::string& section : sections)
     {
         if (!updateArtifact(
@@ -202,6 +216,7 @@ OnlineUpdateCatalogPublisher::Result OnlineUpdateCatalogPublisher::publish(
                 "Artifact",
                 "Size",
                 "Crc32",
+                artifactMetadata,
                 result))
         {
             return result;
@@ -221,9 +236,54 @@ OnlineUpdateCatalogPublisher::Result OnlineUpdateCatalogPublisher::publish(
                 "IncrementalArtifact",
                 "IncrementalSize",
                 "IncrementalCrc32",
+                artifactMetadata,
                 result))
         {
             return result;
+        }
+        if (resourceSection && ini.hasKey(section, "IncrementalChainCount"))
+        {
+            const ModRelease::SemanticVersionParseResult minimumEngineVersion =
+                ModRelease::parseSemanticVersion(
+                    ini.get(section, "MinimumEngineVersion", ""));
+            const ModRelease::SemanticVersion firstSupportedVersion{1, 0, 4};
+            if (!minimumEngineVersion.succeeded() ||
+                ModRelease::compareSemanticVersionPrecedence(
+                    minimumEngineVersion.version,
+                    firstSupportedVersion) < 0)
+            {
+                result.status = Status::InvalidTemplate;
+                result.detail = QString::fromStdString(
+                    section + ".MinimumEngineVersion");
+                return result;
+            }
+            std::int64_t count = 0;
+            if (!ini.tryGetInt64(section, "IncrementalChainCount", count) ||
+                count < 1 || count > static_cast<std::int64_t>(
+                    OnlineUpdate::MaximumIncrementalChainPackageCount))
+            {
+                result.status = Status::InvalidTemplate;
+                result.detail = QString::fromStdString(
+                    section + ".IncrementalChainCount");
+                return result;
+            }
+            for (std::int64_t index = 1; index <= count; index++)
+            {
+                const std::string prefix =
+                    "IncrementalChain" + std::to_string(index);
+                if (!updateArtifact(
+                        ini,
+                        artifactRoot,
+                        section,
+                        prefix + "Artifact",
+                        prefix + "Size",
+                        prefix + "Crc32",
+                        artifactMetadata,
+                        result))
+                {
+                    return result;
+                }
+            }
         }
     }
 

@@ -635,6 +635,8 @@ public:
 		application.downloadAttempted = true;
 		application.download.status =
 			OnlineUpdate::HttpsDownloadStatus::Success;
+		application.sources.catalogUrls = {
+			"https://updates.example.test/application/catalog.ini" };
 		application.parse.catalog.programPackages.emplace(
 			package.target, std::move(package));
 		application.parse.catalog.programPackages.emplace(
@@ -1073,6 +1075,15 @@ public:
 		return scene.onlineActionButton != nullptr &&
 			scene.onlineActionButton->visible &&
 			 scene.onlineActionButton->activated;
+	}
+
+	static bool selectedResourceNeedsContinueUpdate(
+		const ResourceSelectScene& scene)
+	{
+		return scene.selectedDetails.hasPendingOnlineArtifacts &&
+			scene.selectedDetails.runStatus.find(
+				u8"资源内容仍需更新") != std::string::npos &&
+			resourceOnlineActionIsAvailable(scene);
 	}
 
 	static bool resourceRemovalRequiresExplicitSaveChoice(
@@ -3786,14 +3797,40 @@ bool testResourceSelectionController(
 	sameVersionIncremental.artifactSize = 256;
 	sameVersionIncremental.crc32Hex = "22222222";
 	sameVersionPackage.incrementalPackage = sameVersionIncremental;
+	OnlineUpdate::IncrementalResourcePackage sameVersionFirstIncremental;
+	sameVersionFirstIncremental.artifactPath =
+		"resources/same-version-incremental-001.zip";
+	sameVersionFirstIncremental.artifactSize = 128;
+	sameVersionFirstIncremental.crc32Hex = "12121212";
+	sameVersionPackage.incrementalChain = {
+		sameVersionFirstIncremental, sameVersionIncremental };
 	sameVersionCatalog.resourcePackages.emplace(
 		OnlineUpdate::foldGameId(sameVersionPackage.gameId),
 		sameVersionPackage);
+	auto& mutablePacks = const_cast<std::vector<ResourceManager::ResourcePack>&>(
+		resourceManager.getDiscoveredPacks());
+	const std::string previousFullReceipt =
+		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+			installedArtifactCrc32;
+	const std::string previousIncrementalReceipt =
+		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+			installedIncrementalArtifactCrc32;
+	const std::string previousIncrementalChainReceipt =
+		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+			installedIncrementalChainCrc32s;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedArtifactCrc32 = sameVersionPackage.crc32Hex;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32 = sameVersionIncremental.crc32Hex;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalChainCrc32s =
+			sameVersionFirstIncremental.crc32Hex + "," +
+			sameVersionIncremental.crc32Hex;
 	ok = check(
 		sameVersionLocalPackIndex >= 0 &&
 		!sameVersionPackage.versionText.empty() &&
 		GamepadEssentialUITestAccess::applyOnlineCatalog(
-			sameVersionScene, std::move(sameVersionCatalog)) &&
+			sameVersionScene, sameVersionCatalog) &&
 		GamepadEssentialUITestAccess::selectResourceEntry(
 			sameVersionScene,
 			GamepadEssentialUITestAccess::resourceEntryIndexByGameId(
@@ -3804,18 +3841,20 @@ bool testResourceSelectionController(
 			sameVersionScene),
 		"matching local and online versions are labelled as current while"
 		" keeping the explicit re-download action") && ok;
-	auto& mutablePacks = const_cast<std::vector<ResourceManager::ResourcePack>&>(
-		resourceManager.getDiscoveredPacks());
-	const std::string previousFullReceipt =
-		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
-			installedArtifactCrc32;
-	const std::string previousIncrementalReceipt =
-		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
-			installedIncrementalArtifactCrc32;
 	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
-		installedArtifactCrc32 = sameVersionPackage.crc32Hex;
-	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
-		installedIncrementalArtifactCrc32 = "33333333";
+		installedIncrementalChainCrc32s =
+			sameVersionFirstIncremental.crc32Hex;
+	ok = check(
+		GamepadEssentialUITestAccess::applyOnlineCatalog(
+			sameVersionScene, sameVersionCatalog) &&
+		GamepadEssentialUITestAccess::selectResourceEntry(
+			sameVersionScene,
+			GamepadEssentialUITestAccess::resourceEntryIndexByGameId(
+				sameVersionScene, sameVersionPackage.gameId)) &&
+		GamepadEssentialUITestAccess::selectedResourceNeedsContinueUpdate(
+			sameVersionScene),
+		"an incomplete chain receipt is labelled as resource content that still"
+		" needs the continue-update action") && ok;
 	sameVersionScene.setRunning(true);
 	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
 	ok = check(
@@ -3825,7 +3864,7 @@ bool testResourceSelectionController(
 			resourceInstallConfirmationUsesIncrementalOnly(sameVersionScene) &&
 		GamepadEssentialUITestAccess::
 			cancelLocalEntryUpdatePromptWithKeyboard(sameVersionScene),
-		"entering an installed resource detects a changed incremental receipt"
+		"entering an installed resource detects an incomplete incremental chain"
 		" even when its display version is unchanged, and Back dismisses the"
 		" prompt without entering") && ok;
 	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
@@ -3848,6 +3887,10 @@ bool testResourceSelectionController(
 	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
 		installedIncrementalArtifactCrc32 =
 			sameVersionIncremental.crc32Hex;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalChainCrc32s =
+			sameVersionFirstIncremental.crc32Hex + "," +
+			sameVersionIncremental.crc32Hex;
 	sameVersionScene.setRunning(true);
 	GamepadEssentialUITestAccess::confirmSelectedResource(sameVersionScene);
 	ok = check(
@@ -3860,6 +3903,8 @@ bool testResourceSelectionController(
 		installedArtifactCrc32 = previousFullReceipt;
 	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
 		installedIncrementalArtifactCrc32 = previousIncrementalReceipt;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalChainCrc32s = previousIncrementalChainReceipt;
 	OnlineUpdate::Catalog testCatalog;
 	OnlineUpdate::CommonPackage commonPackage;
 	commonPackage.versionText = "1.0-test";

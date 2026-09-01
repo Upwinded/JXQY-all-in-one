@@ -50,7 +50,8 @@ void testDeterministicFullPackage()
         "Version=1.0\n\n[Release]\n"
         "MinimumEngineVersion=2.0.0\n"
         "InstalledArtifactCrc32=deadbeef\n"
-        "InstalledIncrementalArtifactCrc32=feedface\n\n[Resource]\n"
+        "InstalledIncrementalArtifactCrc32=feedface\n"
+        "InstalledIncrementalChainCrc32s=deadbeef,feedface\n\n[Resource]\n"
         "ResourceOnly=1\n"),
         "manifest fixture writes");
     expect(writeFile(
@@ -81,7 +82,8 @@ void testDeterministicFullPackage()
                 "Version=1.0\n\n[Release]\n"
                 "MinimumEngineVersion=2.0.0\n"
                 "InstalledArtifactCrc32=deadbeef\n"
-                "InstalledIncrementalArtifactCrc32=feedface\n\n[Resource]\n"
+                "InstalledIncrementalArtifactCrc32=feedface\n"
+                "InstalledIncrementalChainCrc32s=deadbeef,feedface\n\n[Resource]\n"
                 "ResourceOnly=1\n"),
         "publication does not modify the source manifest");
     expect(QFileInfo::exists(firstResult.catalogPath) &&
@@ -350,6 +352,10 @@ void testCatalogPublishing()
         QDir(artifactRoot).filePath("resources/test-incremental.zip");
     expect(writeFile(incrementalArtifactPath, "incremental bytes"),
         "publisher incremental artifact fixture writes");
+    const QString firstIncrementalArtifactPath =
+        QDir(artifactRoot).filePath("resources/test-incremental-001.zip");
+    expect(writeFile(firstIncrementalArtifactPath, "first incremental bytes"),
+        "publisher first chain artifact fixture writes");
     const QString commonArtifactPath =
         QDir(artifactRoot).filePath("common.zip");
     expect(writeFile(commonArtifactPath, "common bytes"),
@@ -369,13 +375,20 @@ void testCatalogPublishing()
         "\n"
         "[Resource.TEST]\n"
         "Version=1.0\n"
-        "MinimumEngineVersion=2.0.0\n"
+        "MinimumEngineVersion=1.0.4\n"
         "Artifact=resources/test.zip\n"
         "Size=1\n"
         "Crc32=00000000\n"
         "IncrementalArtifact=resources/test-incremental.zip\n"
         "IncrementalSize=1\n"
-        "IncrementalCrc32=00000000\n"),
+        "IncrementalCrc32=00000000\n"
+        "IncrementalChainCount=2\n"
+        "IncrementalChain1Artifact=resources/test-incremental-001.zip\n"
+        "IncrementalChain1Size=1\n"
+        "IncrementalChain1Crc32=00000000\n"
+        "IncrementalChain2Artifact=resources/test-incremental.zip\n"
+        "IncrementalChain2Size=1\n"
+        "IncrementalChain2Crc32=00000000\n"),
         "catalog template fixture writes");
 
     const QString outputPath =
@@ -390,8 +403,8 @@ void testCatalogPublishing()
                   << published.detail.toStdString()
                   << std::endl;
     }
-    expect(published.succeeded() && published.artifactCount == 3,
-        "publisher checksums common, full and incremental artifacts");
+    expect(published.succeeded() && published.artifactCount == 4,
+        "publisher checksums each unique common, full and chain artifact");
 
     const QByteArray catalogBytes = readAll(outputPath);
     const OnlineUpdate::CatalogParseResult catalog =
@@ -407,10 +420,33 @@ void testCatalogPublishing()
         catalog.catalog.resourcePackages.at("test").incrementalPackage.
             has_value() &&
         catalog.catalog.resourcePackages.at("test").incrementalPackage->
-            artifactSize == QByteArray("incremental bytes").size(),
-        "published catalog contains computed artifact metadata");
+            artifactSize == QByteArray("incremental bytes").size() &&
+        catalog.catalog.resourcePackages.at("test").incrementalChain.size() == 2 &&
+        catalog.catalog.resourcePackages.at("test").incrementalChain[0].
+            artifactSize == QByteArray("first incremental bytes").size() &&
+        catalog.catalog.resourcePackages.at("test").incrementalChain[1].
+            crc32Hex == catalog.catalog.resourcePackages.at("test").
+                incrementalPackage->crc32Hex,
+        "published catalog contains computed metadata and preserves the legacy"
+        " alias to the chain tail");
     expect(!QFileInfo::exists(outputPath + ".sig"),
         "publisher does not create a detached signature sidecar");
+
+    QByteArray unsupportedTemplate = readAll(templatePath);
+    unsupportedTemplate.replace(
+        "MinimumEngineVersion=1.0.4",
+        "MinimumEngineVersion=1.0.3");
+    expect(writeFile(templatePath, unsupportedTemplate),
+        "unsupported incremental chain template fixture writes");
+    const auto unsupported = OnlineUpdateCatalogPublisher::publish(
+        templatePath,
+        artifactRoot,
+        QDir(temporary.path()).filePath("release/unsupported-catalog.ini"));
+    expect(unsupported.status ==
+            OnlineUpdateCatalogPublisher::Status::InvalidTemplate &&
+        unsupported.detail == QStringLiteral(
+            "Resource.TEST.MinimumEngineVersion"),
+        "publisher rejects an incremental chain below engine version 1.0.4");
 }
 }
 

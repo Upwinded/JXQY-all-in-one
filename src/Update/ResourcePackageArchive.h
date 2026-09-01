@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <vector>
 
 namespace OnlineUpdate
 {
@@ -85,12 +86,32 @@ ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits = {});
 
+// Validates and extracts one ordered chain overlay. Historical entries only
+// need a valid manifest with the expected Game.Id; the last entry must match
+// the current catalog metadata and receives the complete chain receipt.
+ResourcePackageArchiveResult prepareIncrementalChainPackageArchive(
+	const ResourcePackage& expectedPackage,
+	std::size_t chainIndex,
+	const std::filesystem::path& archivePath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits = {});
+
 // Copies an installed tree to a new destination and applies a previously
 // validated incremental overlay. Neither input tree is modified.
 ResourcePackageArchiveResult materializeIncrementalResourcePackage(
 	const ResourcePackage& expectedPackage,
 	const std::filesystem::path& installedResourcePath,
 	const std::filesystem::path& preparedOverlayPath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits = {});
+
+// Copies one installed/full base and applies an ordered suffix of previously
+// validated chain overlays. The last overlay must be the catalog's final chain
+// package and supplies the current manifest and complete local receipts.
+ResourcePackageArchiveResult materializeIncrementalResourcePackageChain(
+	const ResourcePackage& expectedPackage,
+	const std::filesystem::path& installedResourcePath,
+	const std::vector<std::filesystem::path>& preparedOverlayPaths,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits = {});
 

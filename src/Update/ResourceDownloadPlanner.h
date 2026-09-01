@@ -36,6 +36,7 @@ struct ResourceDownloadPlan
 	{
 		const ResourcePackage* package = nullptr;
 		ArtifactKind artifactKind = ArtifactKind::Full;
+		std::size_t incrementalChainStartIndex = 0;
 		std::uint64_t downloadSize = 0;
 	};
 
@@ -55,6 +56,7 @@ struct InstalledResourceArtifacts
 	// True when the installed tree can be copied into a private staging area
 	// before applying an incremental overlay.
 	bool supportsIncrementalUpdate = false;
+	std::vector<std::string> incrementalChainCrc32s;
 };
 
 // Game.Id -> local full/incremental receipts. Keys and CRCs are normalized by

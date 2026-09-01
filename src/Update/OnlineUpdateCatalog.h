@@ -18,6 +18,7 @@ constexpr std::size_t MaximumCatalogUrlsPerType = 16;
 constexpr std::size_t MaximumResourcePackageCount = 512;
 constexpr std::size_t MaximumProgramPackageCount = 128;
 constexpr std::size_t MaximumDependencyCountPerPackage = 64;
+constexpr std::size_t MaximumIncrementalChainPackageCount = 64;
 constexpr std::size_t MaximumCommonVersionFileBytes = 4 * 1024;
 
 struct IncrementalResourcePackage
@@ -42,6 +43,10 @@ struct ResourcePackage
 	// when the full-package receipt already matches. Absence is the Schema 1
 	// default.
 	std::optional<IncrementalResourcePackage> incrementalPackage;
+	// Ordered overlays for current clients. When present, the legacy optional
+	// package above must be byte-for-byte identical to the last chain entry so
+	// older clients keep seeing one valid Incremental* package.
+	std::vector<IncrementalResourcePackage> incrementalChain;
 	std::vector<std::string> dependencyGameIds;
 	bool resourceOnly = false;
 	std::string releaseNotes;
@@ -174,6 +179,9 @@ std::string foldGameId(std::string_view gameId);
 bool isValidOnlineGameId(std::string_view gameId);
 bool isSafeArtifactPath(std::string_view path) noexcept;
 bool isValidCrc32Hex(std::string_view text) noexcept;
+bool parseIncrementalChainReceipt(
+	std::string_view text,
+	std::vector<std::string>& crc32s);
 bool parseCommonPackageVersion(
 	std::string_view utf8Text,
 	std::string& versionText);

@@ -187,6 +187,8 @@ bool GameProfile::loadFromFile(const QString& filePath)
         ini.get("Release", "InstalledArtifactCrc32", "");
     loadedProfile.releaseMetadata.installedIncrementalArtifactCrc32 =
         ini.get("Release", "InstalledIncrementalArtifactCrc32", "");
+    loadedProfile.releaseMetadata.installedIncrementalChainCrc32s =
+        ini.get("Release", "InstalledIncrementalChainCrc32s", "");
 
     // ResourceManifest normalizes feature names for runtime lookups. Keep the
     // source spelling in the editor UI.
@@ -504,6 +506,11 @@ bool GameProfile::prepareSaveBytes(
         "Release",
         "InstalledIncrementalArtifactCrc32",
         releaseMetadata.installedIncrementalArtifactCrc32);
+    setOrRemove(
+        ini,
+        "Release",
+        "InstalledIncrementalChainCrc32s",
+        releaseMetadata.installedIncrementalChainCrc32s);
     ini.set("Startup", "Videos", videosToString().toUtf8().toStdString());
     ini.set("Title", "Menu", titleMenu.toUtf8().toStdString());
     setOrRemove(ini, "Title", "NewYearMenu", titleNewYearMenu);

@@ -268,6 +268,10 @@ InstalledResourceState installedResourceState()
 			artifacts.incrementalArtifactCrc32 =
 				pack.manifest.releaseMetadata.
 					installedIncrementalArtifactCrc32;
+			OnlineUpdate::parseIncrementalChainReceipt(
+				pack.manifest.releaseMetadata.
+					installedIncrementalChainCrc32s,
+				artifacts.incrementalChainCrc32s);
 			try
 			{
 				std::error_code canonicalError;
@@ -1638,6 +1642,7 @@ void ResourceSelectScene::rebuildResourceEntries()
 		packs.size() + diagnostics.size() +
 			onlineCatalog.resourcePackages.size());
 	std::set<std::string> localGameIds;
+	const InstalledResourceState installedState = installedResourceState();
 	for (int packIndex = 0;
 		packIndex < static_cast<int>(packs.size());
 		packIndex++)
@@ -1687,6 +1692,17 @@ void ResourceSelectScene::rebuildResourceEntries()
 				entry.onlineAvailable = true;
 				entry.onlineVersion = online->second.versionText;
 				entry.releaseNotes = online->second.releaseNotes;
+				const OnlineUpdate::ResourceDownloadPlan plan =
+					OnlineUpdate::planResourceDownload(
+						onlineCatalog,
+						entry.gameId,
+						JxqyBuildVersion::EngineVersion,
+						installedState.artifacts,
+						OnlineUpdate::RequestedResourceDownloadMode::IfNeeded);
+				entry.hasPendingOnlineArtifacts = plan.succeeded() &&
+					!plan.downloadOrder.empty();
+				entry.requiresNewerEngine = plan.status ==
+					OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
 			}
 		}
 		resourceEntries.push_back(std::move(entry));
@@ -1758,6 +1774,17 @@ void ResourceSelectScene::rebuildResourceEntries()
 		entry.onlineVersion = package.versionText;
 		entry.releaseNotes = package.releaseNotes;
 		entry.onlineAvailable = true;
+		const OnlineUpdate::ResourceDownloadPlan plan =
+			OnlineUpdate::planResourceDownload(
+				onlineCatalog,
+				entry.gameId,
+				JxqyBuildVersion::EngineVersion,
+				installedState.artifacts,
+				OnlineUpdate::RequestedResourceDownloadMode::IfNeeded);
+		entry.hasPendingOnlineArtifacts = plan.succeeded() &&
+			!plan.downloadOrder.empty();
+		entry.requiresNewerEngine = plan.status ==
+			OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
 		resourceEntries.push_back(std::move(entry));
 	}
 	sortOnlineOnlyResourceEntries(firstOnlineEntry);
@@ -1831,6 +1858,9 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 	selectedDetails.onlineVersionMatches = !entry.isOnlineOnly() &&
 		!entry.localVersion.empty() &&
 		entry.localVersion == entry.onlineVersion;
+	selectedDetails.hasPendingOnlineArtifacts =
+		entry.hasPendingOnlineArtifacts;
+	selectedDetails.requiresNewerEngine = entry.requiresNewerEngine;
 	selectedDetails.wasRecentlySelected = entry.wasRecentlySelected;
 	if (entry.configurationError)
 	{
@@ -1850,9 +1880,10 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 	{
 		selectedDetails.version = u8"未安装";
 		selectedDetails.releaseDate = u8"未声明";
-		selectedDetails.runStatus =
-			u8"尚未安装；可获取线上版本 " +
-			valueOrUndeclared(entry.onlineVersion);
+		selectedDetails.runStatus = entry.requiresNewerEngine
+			? std::string(u8"尚未安装；需要先更新主程序")
+			: u8"尚未安装；可获取线上版本 " +
+				valueOrUndeclared(entry.onlineVersion);
 		selectedDetails.description = entry.releaseNotes.empty()
 			? std::string(u8"未提供线上说明") : entry.releaseNotes;
 		return;
@@ -1877,11 +1908,22 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 	selectedDetails.runStatus = describePackRunStatus(pack.compatibility);
 	if (entry.onlineAvailable)
 	{
-		selectedDetails.runStatus +=
-			selectedDetails.onlineVersionMatches
-				? std::string(u8"；已与线上版本一致")
-				: u8"；线上版本 " +
-					valueOrUndeclared(entry.onlineVersion) + u8" 可更新";
+		if (entry.requiresNewerEngine)
+		{
+			selectedDetails.runStatus += u8"；需要先更新主程序";
+		}
+		else if (entry.hasPendingOnlineArtifacts)
+		{
+			selectedDetails.runStatus += u8"；资源内容仍需更新";
+		}
+		else
+		{
+			selectedDetails.runStatus +=
+				selectedDetails.onlineVersionMatches
+					? std::string(u8"；已与线上版本一致")
+					: u8"；线上版本 " +
+						valueOrUndeclared(entry.onlineVersion) + u8" 可更新";
+		}
 	}
 	selectedDetails.wasRecentlySelected = pack.wasRecentlySelected;
 	selectedDetails.description = u8"未提供简介";
@@ -2476,6 +2518,7 @@ void ResourceSelectScene::refreshOnlineActionButton()
 		!externalResourceDialogVisible &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden &&
 		selectedDetails.packIndex >= 0 && selectedDetails.onlineAvailable &&
+		!selectedDetails.requiresNewerEngine &&
 		catalogCheckState == CatalogCheckState::Ready;
 	onlineActionButton->visible = available;
 	onlineActionButton->activated = available;
@@ -2484,6 +2527,8 @@ void ResourceSelectScene::refreshOnlineActionButton()
 		onlineActionButton->setUTF8Str(
 			selectedDetails.onlineOnly
 				? u8"下载此游戏"
+				: selectedDetails.hasPendingOnlineArtifacts
+					? u8"继续更新"
 				: selectedDetails.onlineVersionMatches
 					? u8"重新下载" : u8"更新此游戏");
 		onlineActionButton->rect = getOnlineActionButtonRect();

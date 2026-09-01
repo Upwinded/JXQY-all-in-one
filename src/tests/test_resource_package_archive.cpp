@@ -1379,6 +1379,164 @@ void testDownloadPreparation(const TemporaryTree& tree)
 		"a changed full package downloads and applies its declared incremental"
 		" overlay before producing one install target");
 
+	const std::filesystem::path chainOneArchive =
+		nextPath(tree, "download-target-chain-one", ".zip");
+	const std::filesystem::path chainTwoArchive =
+		nextPath(tree, "download-target-chain-two", ".zip");
+	expect(writeZip(chainOneArchive,
+		{
+			{ "game_profile.ini", downloadManifest("YYCS", "0.9", "JXQY2") },
+			{ "script/story.txt", "chain-one" },
+			{ "script/one.txt", "one" }
+		}) && writeZip(chainTwoArchive,
+		{
+			{ "game_profile.ini", downloadManifest("YYCS", "1.0", "JXQY2") },
+			{ "script/story.txt", "chain-two" },
+			{ "script/two.txt", "two" }
+		}),
+		"ordered incremental chain ZIPs are created");
+	OnlineUpdate::IncrementalResourcePackage chainOne;
+	chainOne.artifactPath = "resources/yycs-chain-001.zip";
+	std::uint32_t chainOneChecksum = 0;
+	expect(OnlineUpdate::calculateFileCrc32(
+			chainOneArchive, chainOneChecksum, chainOne.artifactSize),
+		"first chain ZIP checksum is calculated");
+	chainOne.crc32Hex = OnlineUpdate::crc32ToLowerHex(chainOneChecksum);
+	OnlineUpdate::IncrementalResourcePackage chainTwo;
+	chainTwo.artifactPath = "resources/yycs-chain-002.zip";
+	std::uint32_t chainTwoChecksum = 0;
+	expect(OnlineUpdate::calculateFileCrc32(
+			chainTwoArchive, chainTwoChecksum, chainTwo.artifactSize),
+		"last chain ZIP checksum is calculated");
+	chainTwo.crc32Hex = OnlineUpdate::crc32ToLowerHex(chainTwoChecksum);
+	OnlineUpdate::ResourcePackage chainTargetPackage = targetPackage;
+	chainTargetPackage.incrementalPackage = chainTwo;
+	chainTargetPackage.incrementalChain = { chainOne, chainTwo };
+	OnlineUpdate::Catalog chainCatalog;
+	chainCatalog.resourcePackages.emplace(
+		OnlineUpdate::foldGameId(basePackage.gameId), basePackage);
+	chainCatalog.resourcePackages.emplace(
+		OnlineUpdate::foldGameId(chainTargetPackage.gameId), chainTargetPackage);
+
+	std::vector<std::string> chainUrls;
+	const auto chainDownloader =
+		[&targetArchive,
+		 &chainOneArchive,
+		 &chainTwoArchive,
+		 &chainUrls](
+			const std::string& url,
+			const std::filesystem::path& destinationPath,
+			std::uint64_t,
+			std::uint64_t expectedBytes,
+			const OnlineUpdate::HttpsDownloadProgress& progress)
+		{
+			chainUrls.push_back(url);
+			const std::filesystem::path* sourcePath = &targetArchive;
+			if (url.find("chain-001.zip") != std::string::npos)
+			{
+				sourcePath = &chainOneArchive;
+			}
+			else if (url.find("chain-002.zip") != std::string::npos)
+			{
+				sourcePath = &chainTwoArchive;
+			}
+			OnlineUpdate::HttpsDownloadResult downloadResult;
+			std::error_code copyError;
+			std::filesystem::copy_file(
+				*sourcePath,
+				destinationPath,
+				std::filesystem::copy_options::none,
+				copyError);
+			if (copyError)
+			{
+				downloadResult.status =
+					OnlineUpdate::HttpsDownloadStatus::WriteFailed;
+				return downloadResult;
+			}
+			downloadResult.transferredBytes = expectedBytes;
+			if (progress && !progress(expectedBytes, expectedBytes))
+			{
+				downloadResult.status =
+					OnlineUpdate::HttpsDownloadStatus::Cancelled;
+				return downloadResult;
+			}
+			downloadResult.status = OnlineUpdate::HttpsDownloadStatus::Success;
+			return downloadResult;
+		};
+	OnlineUpdate::InstalledResourceArtifactMap chainReceipts;
+	chainReceipts["JXQY2"] = { basePackage.crc32Hex, {}, false };
+	const std::filesystem::path chainWorkspace =
+		nextPath(tree, "download-chain-workspace");
+	const OnlineUpdate::ResourceDownloadPreparationResult chainResult =
+		OnlineUpdate::prepareResourceDownload(
+			chainCatalog,
+			"YYCS",
+			"2.0.0",
+			{ { "https://updates.example/catalog.ini" }, {} },
+			chainWorkspace,
+			chainReceipts,
+			{},
+			OnlineUpdate::RequestedResourceDownloadMode::IfNeeded,
+			{},
+			chainDownloader);
+	const std::filesystem::path chainPrepared =
+		chainWorkspace / "prepared/package-0";
+	ResourceManifest chainManifest;
+	const std::string chainManifestText =
+		readText(chainPrepared / "game_profile.ini");
+	expect(chainResult.succeeded() && chainUrls.size() == 3 &&
+		chainUrls[0].find("yycs.zip") != std::string::npos &&
+		chainUrls[1].find("chain-001.zip") != std::string::npos &&
+		chainUrls[2].find("chain-002.zip") != std::string::npos &&
+		readText(chainPrepared / "script/story.txt") == "chain-two" &&
+		readText(chainPrepared / "script/one.txt") == "one" &&
+		readText(chainPrepared / "script/two.txt") == "two" &&
+		chainManifest.loadFromBuffer(
+			chainManifestText.data(),
+			static_cast<int>(chainManifestText.size())) &&
+		chainManifest.releaseMetadata.installedArtifactCrc32 ==
+			targetPackage.crc32Hex &&
+		chainManifest.releaseMetadata.installedIncrementalArtifactCrc32 ==
+			chainTwo.crc32Hex &&
+		chainManifest.releaseMetadata.installedIncrementalChainCrc32s ==
+			chainOne.crc32Hex + "," + chainTwo.crc32Hex,
+		"resource preparation downloads and applies every chain entry in order,"
+		" accepts historical metadata before the tail, and records the complete"
+		" receipt only after the current tail");
+
+	int blockedDownloadCount = 0;
+	const std::filesystem::path blockedWorkspace =
+		nextPath(tree, "download-chain-blocked-engine");
+	const OnlineUpdate::ResourceDownloadPreparationResult blockedByEngine =
+		OnlineUpdate::prepareResourceDownload(
+			chainCatalog,
+			"YYCS",
+			"1.9.9",
+			{ { "https://updates.example/catalog.ini" }, {} },
+			blockedWorkspace,
+			{},
+			{},
+			OnlineUpdate::RequestedResourceDownloadMode::IfNeeded,
+			{},
+			[&blockedDownloadCount](
+				const std::string&,
+				const std::filesystem::path&,
+				std::uint64_t,
+				std::uint64_t,
+				const OnlineUpdate::HttpsDownloadProgress&)
+			{
+				blockedDownloadCount++;
+				return OnlineUpdate::HttpsDownloadResult{};
+			});
+	expect(blockedByEngine.status ==
+		OnlineUpdate::ResourceDownloadPreparationStatus::PlanFailed &&
+		blockedByEngine.planStatus ==
+			OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine &&
+		blockedDownloadCount == 0 &&
+		!std::filesystem::exists(blockedWorkspace),
+		"an outdated program exits before creating a workspace or downloading"
+		" any resource artifact");
+
 	const std::filesystem::path cancelledWorkspace =
 		nextPath(tree, "download-cancelled");
 	const OnlineUpdate::ResourceDownloadPreparationResult cancelled =

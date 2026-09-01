@@ -314,6 +314,7 @@ bool inspectWrittenArchive(
                static_cast<int>(manifestBytes.size())) &&
         !manifest.hasKey("Release", "InstalledArtifactCrc32") &&
         !manifest.hasKey("Release", "InstalledIncrementalArtifactCrc32") &&
+        !manifest.hasKey("Release", "InstalledIncrementalChainCrc32s") &&
         QString::fromStdString(manifest.get("Game", "Id", "")).compare(
             expectedGameId, Qt::CaseInsensitive) == 0;
 }
@@ -593,13 +594,17 @@ exportDirectoryPackage(
         const bool hasLocalReceipt =
             publishedManifest.hasKey("Release", "InstalledArtifactCrc32") ||
             publishedManifest.hasKey(
-                "Release", "InstalledIncrementalArtifactCrc32");
+                "Release", "InstalledIncrementalArtifactCrc32") ||
+            publishedManifest.hasKey(
+                "Release", "InstalledIncrementalChainCrc32s");
         if (hasLocalReceipt)
         {
             publishedManifest.removeKey(
                 "Release", "InstalledArtifactCrc32");
             publishedManifest.removeKey(
                 "Release", "InstalledIncrementalArtifactCrc32");
+            publishedManifest.removeKey(
+                "Release", "InstalledIncrementalChainCrc32s");
             const std::string publishedText = publishedManifest.saveToString();
             publishedManifestBytes = QByteArray(
                 publishedText.data(),

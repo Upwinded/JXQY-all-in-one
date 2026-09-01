@@ -1058,6 +1058,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
             profile.releaseMetadata.descriptionFilePath.empty() &&
             profile.releaseMetadata.installedArtifactCrc32.empty() &&
             profile.releaseMetadata.installedIncrementalArtifactCrc32.empty() &&
+            profile.releaseMetadata.installedIncrementalChainCrc32s.empty() &&
             profile.levelUpRandomEffects.isEmpty() &&
             profile.levelUpMaleEffect.isEmpty() &&
             profile.levelUpFemaleEffect.isEmpty() &&
@@ -1099,6 +1100,8 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     profile.releaseMetadata.descriptionFilePath = u8"docs/MOD 简介.txt";
     profile.releaseMetadata.installedArtifactCrc32 = "abcdef12";
     profile.releaseMetadata.installedIncrementalArtifactCrc32 = "1234abcd";
+    profile.releaseMetadata.installedIncrementalChainCrc32s =
+        "abcdef12,1234abcd";
     profile.typeDefined = false;
     profile.defeatedNpcExperienceMode =
         DefeatedNpcExperienceMode::LevelProductWithBonus;
@@ -1159,7 +1162,9 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
                 u8"docs/MOD 简介.txt" &&
             loaded.releaseMetadata.installedArtifactCrc32 == "abcdef12" &&
             loaded.releaseMetadata.installedIncrementalArtifactCrc32 ==
-                "1234abcd",
+                "1234abcd" &&
+            loaded.releaseMetadata.installedIncrementalChainCrc32s ==
+                "abcdef12,1234abcd",
         "GameProfile release metadata round trip preserves display and UTF-8 values") && ok;
     ok = check(!loaded.typeDefined, "GameProfile preserves inherited Game.Type") && ok;
     ok = check(
@@ -1239,7 +1244,9 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
                 "DescriptionFile=docs/MOD 简介.txt")) &&
             text.contains("InstalledArtifactCrc32=abcdef12") &&
             text.contains(
-                "InstalledIncrementalArtifactCrc32=1234abcd"),
+                "InstalledIncrementalArtifactCrc32=1234abcd") &&
+            text.contains(
+                "InstalledIncrementalChainCrc32s=abcdef12,1234abcd"),
         "GameProfile writes release metadata only to the manifest") && ok;
     ok = check(text.contains("DependencyId=JXQY2,YYCS"), "GameProfile writes ordered DependencyId list") && ok;
     ok = check(text.contains("ResourceOnly=1"),
@@ -1306,7 +1313,9 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
             !withoutTeamInfoText.contains("DescriptionFile=") &&
             !withoutTeamInfoText.contains("InstalledArtifactCrc32=") &&
             !withoutTeamInfoText.contains(
-                "InstalledIncrementalArtifactCrc32="),
+                "InstalledIncrementalArtifactCrc32=") &&
+            !withoutTeamInfoText.contains(
+                "InstalledIncrementalChainCrc32s="),
         "GameProfile removes empty author, team, and release metadata") && ok;
 
     const QString preservingPath = tempDir.filePath("preserving_profile.ini");

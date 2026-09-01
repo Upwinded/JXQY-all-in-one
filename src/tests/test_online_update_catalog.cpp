@@ -75,6 +75,30 @@ std::string validCatalog()
 		"Crc32=44444444\n";
 }
 
+std::string multiIncrementCatalog()
+{
+	return
+		"[Catalog]\n"
+		"SchemaVersion=1\n"
+		"\n"
+		"[Resource.CHAIN]\n"
+		"Version=2.0\n"
+		"MinimumEngineVersion=2.0.0\n"
+		"Artifact=resources/chain-full.zip\n"
+		"Size=100\n"
+		"Crc32=11111111\n"
+		"IncrementalArtifact=resources/chain-002.zip\n"
+		"IncrementalSize=20\n"
+		"IncrementalCrc32=BBBBBBBB\n"
+		"IncrementalChainCount=2\n"
+		"IncrementalChain1Artifact=resources/chain-001.zip\n"
+		"IncrementalChain1Size=10\n"
+		"IncrementalChain1Crc32=AAAAAAAA\n"
+		"IncrementalChain2Artifact=resources/chain-002.zip\n"
+		"IncrementalChain2Size=20\n"
+		"IncrementalChain2Crc32=BBBBBBBB\n";
+}
+
 void testCatalogParsing()
 {
 	using namespace OnlineUpdate;
@@ -268,6 +292,58 @@ void testCatalogParsing()
 		"Crc32=55555555\n";
 	expect(!parseCatalog(invalid).succeeded(),
 		"the optional Common section is unique ignoring ASCII case");
+}
+
+void testIncrementalChainCatalog()
+{
+	using namespace OnlineUpdate;
+	const CatalogParseResult parsed = parseCatalog(multiIncrementCatalog());
+	expect(parsed.succeeded() &&
+		parsed.catalog.resourcePackages.at("chain").incrementalChain.size() == 2 &&
+		parsed.catalog.resourcePackages.at("chain").incrementalChain[0].
+			artifactPath == "resources/chain-001.zip" &&
+		parsed.catalog.resourcePackages.at("chain").incrementalChain[1].
+			crc32Hex == "bbbbbbbb" &&
+		parsed.catalog.resourcePackages.at("chain").incrementalPackage->
+			artifactPath == "resources/chain-002.zip",
+		"Schema 1 parses an ordered incremental chain while retaining the"
+		" legacy alias to its last package");
+
+	std::string invalid = multiIncrementCatalog();
+	const std::string legacyCrc = "IncrementalCrc32=BBBBBBBB";
+	invalid.replace(
+		invalid.find(legacyCrc), legacyCrc.size(),
+		"IncrementalCrc32=CCCCCCCC");
+	expect(!parseCatalog(invalid).succeeded(),
+		"the legacy incremental fields must exactly alias the chain tail");
+
+	invalid = multiIncrementCatalog();
+	const std::string chainOneSize = "IncrementalChain1Size=10\n";
+	invalid.erase(invalid.find(chainOneSize), chainOneSize.size());
+	expect(!parseCatalog(invalid).succeeded(),
+		"each numbered chain entry requires artifact, size and CRC fields");
+
+	invalid = multiIncrementCatalog();
+	invalid += "IncrementalChain3Artifact=resources/unlisted.zip\n";
+	expect(!parseCatalog(invalid).succeeded(),
+		"numbered chain fields outside the declared count are rejected");
+
+	invalid = multiIncrementCatalog();
+	const std::string secondArtifact =
+		"IncrementalChain2Artifact=resources/chain-002.zip";
+	invalid.replace(
+		invalid.find(secondArtifact), secondArtifact.size(),
+		"IncrementalChain2Artifact=resources/chain-001.zip");
+	expect(!parseCatalog(invalid).succeeded(),
+		"the same artifact path cannot appear twice in one chain");
+
+	std::vector<std::string> receipts;
+	expect(parseIncrementalChainReceipt(
+		"AAAAAAAA, bbbbbbbb", receipts) && receipts.size() == 2 &&
+		receipts[0] == "aaaaaaaa" && receipts[1] == "bbbbbbbb" &&
+		parseIncrementalChainReceipt("", receipts) && receipts.empty() &&
+		!parseIncrementalChainReceipt("aaaaaaaa,,bbbbbbbb", receipts),
+		"local chain receipts parse as a bounded normalized CRC prefix");
 }
 
 void testUpdateSourceParsing()
@@ -513,6 +589,76 @@ void testResourcePlanning()
 		"planner rejects an overflowing dependency download total");
 }
 
+void testIncrementalChainPlanning()
+{
+	using namespace OnlineUpdate;
+	const Catalog catalog = parseCatalog(multiIncrementCatalog()).catalog;
+	ResourceDownloadPlan plan = planResourceDownload(
+		catalog, "CHAIN", "1.9.9");
+	expect(plan.status == ResourcePlanStatus::RequiresNewerEngine &&
+		plan.downloadOrder.empty() && plan.totalDownloadBytes == 0,
+		"a newer minimum engine blocks the complete resource chain before any"
+		" resource download is planned");
+
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0");
+	expect(plan.succeeded() && plan.downloadOrder.size() == 1 &&
+		plan.downloadOrder[0].artifactKind ==
+			ResourceDownloadPlan::ArtifactKind::FullAndIncremental &&
+		plan.downloadOrder[0].incrementalChainStartIndex == 0 &&
+		plan.downloadOrder[0].downloadSize == 130,
+		"a fresh install downloads the full package followed by the complete"
+		" incremental chain");
+
+	InstalledResourceArtifactMap installed;
+	installed["CHAIN"] = { "11111111", "bbbbbbbb", true };
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0", installed);
+	expect(plan.succeeded() && plan.downloadOrder.size() == 1 &&
+		plan.downloadOrder[0].artifactKind ==
+			ResourceDownloadPlan::ArtifactKind::Incremental &&
+		plan.downloadOrder[0].incrementalChainStartIndex == 0 &&
+		plan.downloadOrder[0].downloadSize == 30,
+		"a legacy-only receipt does not claim that earlier chain packages were"
+		" installed");
+
+	installed["CHAIN"].incrementalChainCrc32s = { "aaaaaaaa" };
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0", installed);
+	expect(plan.succeeded() && plan.downloadOrder.size() == 1 &&
+		plan.downloadOrder[0].incrementalChainStartIndex == 1 &&
+		plan.downloadOrder[0].downloadSize == 20,
+		"a valid installed prefix downloads only its missing suffix");
+
+	installed["CHAIN"].incrementalChainCrc32s = {
+		"aaaaaaaa", "bbbbbbbb" };
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0", installed);
+	expect(plan.succeeded() && plan.downloadOrder.empty(),
+		"matching chain and legacy receipts require no resource download");
+
+	installed["CHAIN"].incrementalArtifactCrc32.clear();
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0", installed);
+	expect(plan.succeeded() && plan.downloadOrder.size() == 1 &&
+		plan.downloadOrder[0].incrementalChainStartIndex == 1 &&
+		plan.downloadOrder[0].downloadSize == 20,
+		"a missing legacy tail receipt reapplies the last chain package");
+
+	installed["CHAIN"].incrementalArtifactCrc32 = "bbbbbbbb";
+	installed["CHAIN"].incrementalChainCrc32s = {
+		"aaaaaaaa", "cccccccc" };
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0", installed);
+	expect(plan.succeeded() && plan.downloadOrder.size() == 1 &&
+		plan.downloadOrder[0].incrementalChainStartIndex == 1 &&
+		plan.downloadOrder[0].downloadSize == 20,
+		"a CRC mismatch reapplies that entry and every following package");
+
+	installed["CHAIN"].supportsIncrementalUpdate = false;
+	plan = planResourceDownload(catalog, "CHAIN", "2.0.0", installed);
+	expect(plan.succeeded() && plan.downloadOrder.size() == 1 &&
+		plan.downloadOrder[0].artifactKind ==
+			ResourceDownloadPlan::ArtifactKind::FullAndIncremental &&
+		plan.downloadOrder[0].incrementalChainStartIndex == 0 &&
+		plan.downloadOrder[0].downloadSize == 130,
+		"an installation that cannot be copied is rebuilt from full plus chain");
+}
+
 void testProgramUpdateCheck()
 {
 	using namespace OnlineUpdate;
@@ -570,10 +716,12 @@ void testArtifactHashing()
 int main()
 {
 	testCatalogParsing();
+	testIncrementalChainCatalog();
 	testUpdateSourceParsing();
 	testCommonVersionMarker();
 	testCatalogLimits();
 	testResourcePlanning();
+	testIncrementalChainPlanning();
 	testProgramUpdateCheck();
 	testArtifactHashing();
 	if (failureCount != 0)

@@ -297,6 +297,134 @@ void parseIncrementalArtifactFields(
 	incrementalPackage = std::move(package);
 }
 
+void parseIncrementalChainFields(
+	OnlineUpdate::CatalogParseResult& result,
+	const ResourceIniReader& ini,
+	const std::string& section,
+	const std::optional<OnlineUpdate::IncrementalResourcePackage>& legacy,
+	std::vector<OnlineUpdate::IncrementalResourcePackage>& chain)
+{
+	chain.clear();
+	const std::vector<std::string> keys = ini.sectionKeys(section);
+	const bool countDeclared =
+		ini.hasKey(section, "IncrementalChainCount");
+	bool chainFieldDeclared = false;
+	for (const std::string& key : keys)
+	{
+		if (key.rfind("incrementalchain", 0) == 0 &&
+			key != "incrementalchaincount")
+		{
+			chainFieldDeclared = true;
+			break;
+		}
+	}
+	if (!countDeclared && !chainFieldDeclared)
+	{
+		return;
+	}
+	if (!countDeclared)
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::MissingField,
+			section, "IncrementalChainCount");
+		return;
+	}
+
+	std::uint64_t count = 0;
+	const std::string countText = trimAscii(
+		ini.get(section, "IncrementalChainCount", ""));
+	if (!parseUnsignedDecimal(countText, count) || count == 0 ||
+		count > OnlineUpdate::MaximumIncrementalChainPackageCount)
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::InvalidList,
+			section, "IncrementalChainCount", countText);
+		return;
+	}
+	if (!legacy.has_value())
+	{
+		appendIssue(result, OnlineUpdate::CatalogParseError::MissingField,
+			section, "IncrementalArtifact");
+	}
+
+	std::set<std::string> allowedKeys = { "incrementalchaincount" };
+	std::set<std::string> artifactPaths;
+	chain.reserve(static_cast<std::size_t>(count));
+	for (std::size_t index = 1; index <= count; index++)
+	{
+		const std::string prefix =
+			"IncrementalChain" + std::to_string(index);
+		const std::string artifactField = prefix + "Artifact";
+		const std::string sizeField = prefix + "Size";
+		const std::string crc32Field = prefix + "Crc32";
+		allowedKeys.insert(foldAscii(artifactField));
+		allowedKeys.insert(foldAscii(sizeField));
+		allowedKeys.insert(foldAscii(crc32Field));
+
+		OnlineUpdate::IncrementalResourcePackage package;
+		package.artifactPath = trimAscii(
+			ini.get(section, artifactField, ""));
+		if (package.artifactPath.empty())
+		{
+			appendIssue(result, OnlineUpdate::CatalogParseError::MissingField,
+				section, artifactField);
+		}
+		else if (!OnlineUpdate::isSafeArtifactPath(package.artifactPath))
+		{
+			appendIssue(result,
+				OnlineUpdate::CatalogParseError::UnsafeArtifactPath,
+				section, artifactField, package.artifactPath);
+		}
+		else if (!artifactPaths.insert(foldAscii(package.artifactPath)).second)
+		{
+			appendIssue(result,
+				OnlineUpdate::CatalogParseError::DuplicateIdentifier,
+				section, artifactField, package.artifactPath);
+		}
+
+		const std::string sizeText = trimAscii(
+			ini.get(section, sizeField, ""));
+		if (!parseUnsignedDecimal(sizeText, package.artifactSize) ||
+			package.artifactSize == 0)
+		{
+			appendIssue(result,
+				OnlineUpdate::CatalogParseError::InvalidArtifactSize,
+				section, sizeField, sizeText);
+		}
+		package.crc32Hex = trimAscii(ini.get(section, crc32Field, ""));
+		if (!OnlineUpdate::isValidCrc32Hex(package.crc32Hex))
+		{
+			appendIssue(result, OnlineUpdate::CatalogParseError::InvalidCrc32,
+				section, crc32Field, package.crc32Hex);
+		}
+		else
+		{
+			package.crc32Hex = foldAscii(package.crc32Hex);
+		}
+		chain.push_back(std::move(package));
+	}
+
+	for (const std::string& key : keys)
+	{
+		if (key.rfind("incrementalchain", 0) == 0 &&
+			allowedKeys.find(key) == allowedKeys.end())
+		{
+			appendIssue(result, OnlineUpdate::CatalogParseError::InvalidList,
+				section, key);
+		}
+	}
+
+	if (legacy.has_value() && !chain.empty())
+	{
+		const OnlineUpdate::IncrementalResourcePackage& last = chain.back();
+		if (legacy->artifactPath != last.artifactPath ||
+			legacy->artifactSize != last.artifactSize ||
+			legacy->crc32Hex != last.crc32Hex)
+		{
+			appendIssue(result, OnlineUpdate::CatalogParseError::InvalidList,
+				section, "IncrementalArtifact", legacy->artifactPath);
+		}
+	}
+}
+
 bool validateDependencyGraph(OnlineUpdate::CatalogParseResult& result)
 {
 	enum class VisitState
@@ -498,6 +626,34 @@ bool isValidCrc32Hex(std::string_view text) noexcept
 	});
 }
 
+bool parseIncrementalChainReceipt(
+	std::string_view text,
+	std::vector<std::string>& crc32s)
+{
+	crc32s.clear();
+	if (text.empty())
+	{
+		return true;
+	}
+	const std::vector<std::string> values = splitCommaList(std::string(text));
+	if (values.empty() ||
+		values.size() > MaximumIncrementalChainPackageCount)
+	{
+		return false;
+	}
+	crc32s.reserve(values.size());
+	for (const std::string& value : values)
+	{
+		if (!isValidCrc32Hex(value))
+		{
+			crc32s.clear();
+			return false;
+		}
+		crc32s.push_back(foldAscii(value));
+	}
+	return true;
+}
+
 CatalogParseResult parseCatalog(std::string_view utf8Text)
 {
 	return parseCatalog(utf8Text.data(), utf8Text.size());
@@ -648,6 +804,12 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 			package.artifactSize, package.crc32Hex);
 		parseIncrementalArtifactFields(
 			result, ini, section, package.incrementalPackage);
+		parseIncrementalChainFields(
+			result,
+			ini,
+			section,
+			package.incrementalPackage,
+			package.incrementalChain);
 		package.releaseNotes = ini.get(section, "ReleaseNotes", "");
 		package.resourceOnly = ini.getBoolean(
 			section, "ResourceOnly", false);
