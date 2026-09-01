@@ -1,5 +1,6 @@
 #include "../Game/Data/MobileTouchInteraction.h"
 #include "../Game/Data/PlayerMovementIntent.h"
+#include "../Component/ItemTouchPolicy.h"
 
 #include <iostream>
 #include <vector>
@@ -50,6 +51,23 @@ int main()
 		"right-only script keeps immediate primary fallback path") && ok;
 	ok = check(!shouldDeferMobileRightScriptChoice("primary.lua", ""),
 		"primary-only script does not defer") && ok;
+	const int smallItemTolerance =
+		ItemTouchPolicy::calculateLongPressMoveTolerance(30, 38);
+	const int largeItemTolerance =
+		ItemTouchPolicy::calculateLongPressMoveTolerance(60, 75);
+	ok = check(smallItemTolerance == 7,
+		"small item hint uses one quarter of its shorter edge") && ok;
+	ok = check(largeItemTolerance == 12,
+		"large item hint caps movement tolerance at 12 pixels") && ok;
+	ok = check(ItemTouchPolicy::isWithinLongPressMoveTolerance(
+		smallItemTolerance, 0, smallItemTolerance),
+		"item hint keeps a touch exactly at its movement tolerance") && ok;
+	ok = check(!ItemTouchPolicy::isWithinLongPressMoveTolerance(
+		smallItemTolerance + 1, 0, smallItemTolerance),
+		"item hint rejects movement beyond its tolerance") && ok;
+	ok = check(!ItemTouchPolicy::isWithinLongPressMoveTolerance(
+		50000, 50000, smallItemTolerance),
+		"large item-hint movement does not overflow into the tolerance") && ok;
 
 	ok = check(!shouldUseMobileRightScript(MOBILE_RIGHT_SCRIPT_LONG_PRESS_MS - 1, 0, 0),
 		"short touch keeps primary script") && ok;

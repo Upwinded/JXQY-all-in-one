@@ -1,6 +1,7 @@
 #include "Item.h"
 #include "../Engine/Engine.h"
 #include "ComponentRegistry.h"
+#include "ItemTouchPolicy.h"
 
 #include <algorithm>
 #include <cmath>
@@ -151,6 +152,41 @@ void Item::onEvent()
 void Item::onMouseMoveIn(int x, int y)
 {
 	moveInTime = getTime();
+}
+
+void Item::onMouseMoving(int x, int y)
+{
+	if (canShowHint && touchingDownID != TOUCH_UNTOUCHEDID && touchingDownID != TOUCH_MOUSEID)
+	{
+		const Point moveDelta = getTouchingDownMoveDelta(x, y);
+		const int tolerance = ItemTouchPolicy::calculateLongPressMoveTolerance(
+			rect.w,
+			rect.h);
+		dragRange = ItemTouchPolicy::isWithinLongPressMoveTolerance(
+			moveDelta.x,
+			moveDelta.y,
+			tolerance)
+			? tolerance + 1
+			: 1;
+		return;
+	}
+	dragRange = 1;
+}
+
+bool Item::shouldKeepTouchWhenPointerLeaves(int x, int y)
+{
+	if (canShowHint && touchingDownID != TOUCH_UNTOUCHEDID && touchingDownID != TOUCH_MOUSEID)
+	{
+		const Point moveDelta = getTouchingDownMoveDelta(x, y);
+		const int tolerance = ItemTouchPolicy::calculateLongPressMoveTolerance(
+			rect.w,
+			rect.h);
+		return ItemTouchPolicy::isWithinLongPressMoveTolerance(
+			moveDelta.x,
+			moveDelta.y,
+			tolerance);
+	}
+	return false;
 }
 
 void Item::onDraw()

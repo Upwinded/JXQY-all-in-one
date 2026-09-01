@@ -7,6 +7,8 @@
 #include "../Game/Menu/ToolTip.h"
 #include "../Game/Menu/YesNo.h"
 #include "../Component/ConfigDrivenPanel.h"
+#include "../Component/Item.h"
+#include "../Component/ItemTouchPolicy.h"
 #include "../Engine/Engine.h"
 #include "../Game/GameManager/GameManager.h"
 #include "../File/File.h"
@@ -362,6 +364,61 @@ bool check(bool condition, const char* message)
 bool check(bool condition, const std::string& message)
 {
 	return check(condition, message.c_str());
+}
+
+class ItemLongPressProbe : public Item
+{
+public:
+	void beginPointer(EventTouchID pointerID, int x, int y)
+	{
+		canShowHint = true;
+		touchingDownID = pointerID;
+		mouseLDownX = x;
+		mouseLDownY = y;
+	}
+
+	void movePointer(int x, int y)
+	{
+		onMouseMoving(x, y);
+	}
+
+	bool keepPointerOutside(int x, int y)
+	{
+		return shouldKeepTouchWhenPointerLeaves(x, y);
+	}
+
+	int currentDragRange() const
+	{
+		return dragRange;
+	}
+};
+
+bool testItemLongPressTouchTolerance()
+{
+	ItemLongPressProbe item;
+	item.rect = { 90, 90, 30, 38 };
+	const int tolerance = ItemTouchPolicy::calculateLongPressMoveTolerance(
+		item.rect.w,
+		item.rect.h);
+	item.beginPointer(7, 100, 100);
+	item.movePointer(100 + tolerance, 100);
+	bool ok = check(item.currentDragRange() == tolerance + 1
+			&& item.keepPointerOutside(100 + tolerance, 100),
+		"touch item hint keeps the press through its size-based tolerance");
+
+	item.movePointer(100 + tolerance + 1, 100);
+	ok = check(item.currentDragRange() == 1
+			&& !item.keepPointerOutside(100 + tolerance + 1, 100),
+		"touch item hint starts dragging beyond its size-based tolerance")
+		&& ok;
+
+	item.beginPointer(TOUCH_MOUSEID, 100, 100);
+	item.movePointer(102, 100);
+	ok = check(item.currentDragRange() == 1
+			&& !item.keepPointerOutside(102, 100),
+		"mouse item dragging keeps the original one-pixel threshold")
+		&& ok;
+	return ok;
 }
 
 std::shared_ptr<Element> makeTestFocusElement(
@@ -4910,6 +4967,7 @@ bool runUIFocusTests()
 {
 	bool ok = true;
 	ok = testInputEventHelpers() && ok;
+	ok = testItemLongPressTouchTolerance() && ok;
 	ok = testCrossControlPointerDragContract() && ok;
 	ok = testInputAwareFocusPresentation() && ok;
 	ok = testKeyboardEventRoutingPrecedence() && ok;

@@ -38,6 +38,8 @@ protected:
 	virtual void onEvent();
 	virtual void onUpdate();
 	virtual void onMouseMoveIn(int x, int y);
+	virtual void onMouseMoving(int x, int y) override;
+	virtual bool shouldKeepTouchWhenPointerLeaves(int x, int y) override;
 
 	virtual void onDrawDrag(int x, int y);
 	virtual bool onHandleEvent(AEvent & e);
