@@ -39,7 +39,7 @@ git submodule update --init --recursive
 
 SDL3、SDL3_image、SDL3_ttf、SDL3_mixer 和 FFmpeg 的平台开发库放在 `ThirdParty/devel/`。该目录是本地构建输入，不由主仓库跟踪。
 
-各平台压缩包名称、架构、下载地址和 SHA-256 以 [`ThirdParty/dependencies.ini`](ThirdParty/dependencies.ini) 为准，也可以从 [thirdparty Release](https://cnb.cool/upwinded/jxqy-all-in-one/-/releases/tag/thirdparty) 选择对应平台包。
+各平台压缩包名称、架构、下载地址和 SHA-256 以 [`ThirdParty/dependencies.ini`](ThirdParty/dependencies.ini) 为准，也可以从 [thirdparty Release](https://github.com/Upwinded/JXQY-all-in-one/releases/tag/thirdparty) 选择对应平台包。
 
 解压后请确认目录结构符合下表：
 
