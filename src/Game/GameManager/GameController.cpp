@@ -143,13 +143,19 @@ void GameController::init()
 	skillPanel = std::make_shared<SkillsPanel>();
 	addChild(skillPanel);
 
-	if (gm->menu->bottomMenu != nullptr)
+	if (skillPanel != nullptr && gm != nullptr && gm->menu != nullptr &&
+		gm->menu->bottomMenu != nullptr)
 	{
-		skillPanel->skillBtn[0]->drawItem = gm->menu->bottomMenu->magicItem[0];
-		skillPanel->skillBtn[1]->drawItem = gm->menu->bottomMenu->magicItem[1];
-		skillPanel->skillBtn[2]->drawItem = gm->menu->bottomMenu->magicItem[2];
-		skillPanel->skillBtn[3]->drawItem = gm->menu->bottomMenu->magicItem[3];
-		skillPanel->skillBtn[4]->drawItem = gm->menu->bottomMenu->magicItem[4];
+		for (std::size_t index = 0;
+			index < SKILL_PANEL_SKILL_COUNT;
+			++index)
+		{
+			if (skillPanel->skillBtn[index] != nullptr)
+			{
+				skillPanel->skillBtn[index]->drawItem =
+					gm->menu->bottomMenu->magicItem[index];
+			}
+		}
 	}
 	setTouchControlsVisible(touchControlsVisible);
 }

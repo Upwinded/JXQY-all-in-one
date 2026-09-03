@@ -1373,8 +1373,17 @@ bool ResourceManager::applyActiveResourcePack(int index)
 			: selectedPack.catalogEntryKey);
 	activeManifest = selection.activeManifest;
 	activeResourceSelectionValid = true;
-	commonResourceRoot = normalizeRoot(
+	const std::string selectedCommonResourceRoot = normalizeRoot(
 		selection.commonResourceRoot.generic_u8string());
+	// A packaged application may intentionally omit Common while keeping its
+	// logical CommonPath in resources.ini. In that layout the catalog snapshot
+	// has already mapped the logical bundled path to the platform-writable
+	// collection. An exact selection cannot stat the omitted bundled directory,
+	// so keep the snapshot value instead of discarding the writable mapping.
+	if (!selectedCommonResourceRoot.empty())
+	{
+		commonResourceRoot = selectedCommonResourceRoot;
+	}
 	writableCommonResourceRoot = resolveWritableCommonResourceRoot(
 		assetsCollectionRoot,
 		writableResourceCollectionRoot,
@@ -1437,9 +1446,20 @@ bool ResourceManager::applyActiveResourcePack(int index)
 		commonResourceRoot);
 	File::setActiveSaveNamespace(
 		selection.effectiveSaveNamespace);
+	const bool writableCommonAvailable =
+		!writableCommonResourceRoot.empty() &&
+		isPlainFilesystemDirectory(
+			std::filesystem::u8path(
+				writableCommonResourceRoot));
 	for (const RuntimeResource::CatalogDiagnostic& diagnostic :
 		selectionResult.diagnostics)
 	{
+		if (diagnostic.code ==
+				"resource.catalog.common_root_unavailable" &&
+			writableCommonAvailable)
+		{
+			continue;
+		}
 		GameLog::write(
 			"ResourceManager: selection diagnostic [%s] entry=%s id=%s: %s\n",
 			diagnostic.code.c_str(),

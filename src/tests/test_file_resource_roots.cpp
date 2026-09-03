@@ -5281,6 +5281,13 @@ bool testWritableCommonIsNotResourceCandidate(
 	writeRawFile(
 		writableCommonRoot / "version.ini",
 		"[Common]\nVersion=1.0.0\n");
+	writeRawFile(
+		writableCommonRoot / "config" / "common-only.txt",
+		"writable-common-content");
+	writeRawFile(
+		writableCommonRoot / "ini" / "ui" / "mobile" /
+			"skills" / "skills.menu.ini",
+		"writable-common-mobile-ui");
 
 	ResourceManagerPolicyTestAccess::reset(manager);
 	ResourceManagerPolicyTestAccess::scanCollectionWithWritableRoot(
@@ -5324,8 +5331,32 @@ bool testWritableCommonIsNotResourceCandidate(
 		!manager.setActiveResourcePackById("SHARED") &&
 		manager.setActiveResourcePackById("DOWNLOADED") &&
 		readViaFile("config/shared-only.txt") ==
-			"shared-resource-content",
-		"resource-only packs cannot start directly but remain in dependency loading") && ok;
+			"shared-resource-content" &&
+		readViaCommonResourceFile("config/common-only.txt") ==
+			"writable-common-content" &&
+		readViaFile("ini/ui/mobile/skills/skills.menu.ini") ==
+			"writable-common-mobile-ui",
+		"resource-only dependencies and writable Common remain routed after selecting a downloaded game") && ok;
+
+	writeRawFile(
+		collectionRoot / "common" / "config" / "common-only.txt",
+		"bundled-common-content");
+	writeRawFile(
+		collectionRoot / "common" / "ini" / "ui" / "mobile" /
+			"skills" / "skills.menu.ini",
+		"bundled-common-mobile-ui");
+	ResourceManagerPolicyTestAccess::reset(manager);
+	ResourceManagerPolicyTestAccess::scanCollectionWithWritableRoot(
+		manager,
+		collectionRoot.u8string(),
+		writableRoot.u8string());
+	ok = check(
+		manager.setActiveResourcePackById("DOWNLOADED") &&
+		readViaCommonResourceFile("config/common-only.txt") ==
+			"writable-common-content" &&
+		readViaFile("ini/ui/mobile/skills/skills.menu.ini") ==
+			"writable-common-mobile-ui",
+		"downloaded Common overrides bundled Common after selecting a downloaded game") && ok;
 
 	ResourceManagerPolicyTestAccess::reset(manager);
 	fs::remove_all(fixtureRoot);
@@ -5805,6 +5836,9 @@ int main(int argc, char* argv[])
 	{
 		bool resourcePolicyOk =
 			testResourceManagerDependencySelection(root);
+		resourcePolicyOk =
+			testWritableCommonIsNotResourceCandidate(root) &&
+			resourcePolicyOk;
 #if defined(__MOBILE__) && !defined(__ANDROID__)
 		resourcePolicyOk =
 			testPackagedEmptyPrimaryRootSelection(root) &&
