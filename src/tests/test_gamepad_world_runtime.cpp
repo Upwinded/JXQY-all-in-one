@@ -1,4 +1,5 @@
 #include "../Game/Data/Map.h"
+#include "../Game/Data/Effect.h"
 #include "../Engine/Engine.h"
 #include "../Game/Data/MobileTouchInteraction.h"
 #include "../Game/GameManager/GameManager.h"
@@ -2404,6 +2405,32 @@ bool runMovementAndAttackTests()
 		&& player.nextAction->action == acARun
 		&& samePoint(player.nextAction->dest, expectedStep),
 		"left stick run did not queue one alternate-run map step") && ok;
+
+	auto controlledActor = fixture.addNPC(
+		PlayerPosition, "controlled actor without run resources");
+	controlledActor->res.walk.imagePackage = makeActionImage();
+	controlledActor->res.awalk.imagePackage = makeActionImage();
+	auto controlEffect = std::make_shared<Effect>();
+	player.beginControlCharacter(controlledActor, controlEffect);
+	NextAction touchRunAction;
+	touchRunAction.action = acRun;
+	touchRunAction.dest = expectedStep;
+	player.nextAction = nullptr;
+	ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(
+			controller, touchRunAction)
+		&& player.nextAction != nullptr
+		&& player.nextAction->action == acWalk,
+		"touch run did not use the controlled actor's walk fallback") && ok;
+	NextAction virtualJoystickRunAction;
+	virtualJoystickRunAction.action = acARun;
+	virtualJoystickRunAction.dest = expectedStep;
+	player.nextAction = nullptr;
+	ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(
+			controller, virtualJoystickRunAction)
+		&& player.nextAction != nullptr
+		&& player.nextAction->action == acAWalk,
+		"virtual joystick run did not use the controlled actor's alternate-walk fallback") && ok;
+	player.endControlCharacter(controlEffect.get());
 
 	player.nextAction = nullptr;
 	GameInput::GamepadAxisState axes;

@@ -1549,8 +1549,9 @@ bool Player::addNextAction(NextAction& act)
 {
 	if (act.action == acRun || act.action == acWalk || act.action == acARun || act.action == acAWalk)
 	{
+		auto actionActor = getActionActor();
 		if (act.destKind == ndNone
-			&& !gm->map->canWalkForActor(act.dest, getActionActor()))
+			&& !gm->map->canWalkForActor(act.dest, actionActor))
 		{
 			return false;
 		}
@@ -1574,7 +1575,13 @@ bool Player::addNextAction(NextAction& act)
 		{
 			runThewLowMessageShown = false;
 		}
-		bool useRun = shouldUseRunForPlayerMoveIntent(runRequested, walkIsRun, canRun, canPayRunThewCost);
+		const NPCActionType requestedRunAction =
+			alternateAction ? acARun : acRun;
+		bool useRun = shouldUseRunForPlayerMoveIntent(
+			runRequested, walkIsRun,
+			canRun && actionActor != nullptr
+				&& actionActor->canDoAction(requestedRunAction),
+			canPayRunThewCost);
 		act.action = alternateAction
 			? (useRun ? acARun : acAWalk)
 			: (useRun ? acRun : acWalk);
