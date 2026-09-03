@@ -3,6 +3,22 @@
 #include "LogicalResolutionPolicy.h"
 #include "../Image/IMP.h"
 
+namespace
+{
+std::string normalizeActionSoundCachePart(std::string value)
+{
+	convert::replaceAllString(value, "\\", "/");
+	return value;
+}
+
+std::string getActionSoundCacheScope()
+{
+	return normalizeActionSoundCachePart(File::getAssetsCollectionRoot()) + "\n" +
+		normalizeActionSoundCachePart(File::getActiveResourceRoot()) + "\n" +
+		File::getActiveSaveNamespace();
+}
+}
+
 Engine::Engine()
 {
 }
@@ -1188,6 +1204,68 @@ _channel Engine::playSound(_music music, float x, float y)
 _channel Engine::playSound(_music music)
 {
 	return playSound(music, 0, 0);
+}
+
+_channel Engine::playCachedSoundFile(const std::string& fileName,
+	float x, float y, float volume)
+{
+	if (fileName.empty())
+	{
+		return nullptr;
+	}
+	const std::string scope = getActionSoundCacheScope();
+	const std::string cacheKey = scope + "\n" +
+		normalizeActionSoundCachePart(fileName);
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	setActionSoundCacheScope(scope);
+
+	_music music = getCachedActionSound(cacheKey);
+	bool cached = music != nullptr;
+	if (music == nullptr)
+	{
+		music = loadSound(fileName);
+		if (music == nullptr)
+		{
+			return nullptr;
+		}
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+		actionSoundDecodeCountForTests++;
+#endif
+		_music retainedMusic = cacheActionSound(cacheKey, music);
+		if (retainedMusic != nullptr)
+		{
+			if (retainedMusic != music)
+			{
+				freeMusic(music);
+				music = retainedMusic;
+			}
+			cached = true;
+		}
+	}
+
+	if (volume < 0.0f)
+	{
+		volume = soundVolume;
+	}
+	_channel channel = EngineBase::playMusic(music, x, y, volume);
+	if (channel == nullptr)
+	{
+		if (!cached)
+		{
+			freeMusic(music);
+		}
+		return nullptr;
+	}
+	if (cached)
+	{
+		return channel;
+	}
+	if (soundAutoRelease(music, channel))
+	{
+		return channel;
+	}
+	freeMusic(music);
+	return nullptr;
 }
 
 void Engine::stopAllSounds()

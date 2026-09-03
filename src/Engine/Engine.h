@@ -266,6 +266,9 @@ private:
 	_channel channelBGM = nullptr;
 	_music talk = nullptr;
 	_channel channelTalk = nullptr;
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+	std::size_t actionSoundDecodeCountForTests = 0;
+#endif
 public:
 
 	//声音通用接口
@@ -295,6 +298,8 @@ public:
 	_channel playSound(_music music, float x, float y, float volume);
 	_channel playSound(_music music, float x, float y);
 	_channel playSound(_music music);
+	_channel playCachedSoundFile(const std::string& fileName,
+		float x = 0.0f, float y = 0.0f, float volume = -1.0f);
 	void stopAllSounds();
 
 	//播放结束自动释放

@@ -154,6 +154,7 @@ struct AudioBuffer
 	SDL_AudioSpec spec = {};
 	MIX_Audio* audio = nullptr;
 	std::vector<uint8_t> data;
+	std::size_t decodedByteCount = 0;
 	bool loop = false;
 	bool positional = false;
 	int durationMs = 0;
@@ -677,13 +678,26 @@ private:
 	void releaseAudioChannelSlot(std::size_t slotIndex);
 	void clearAudioChannels();
 
+	// ponytail: fixed cache budget; add eviction only if profiling shows that
+	// frequently reused sounds arrive after the cache has filled.
+	static constexpr std::size_t ActionSoundCacheLimitBytes =
+		16ULL * 1024ULL * 1024ULL;
 	static std::vector<SoundAutoRelease_t> soundList;
 	std::vector<AudioChannelSlot> channelSlots;
+	std::unordered_map<std::string, _music> actionSoundCache;
+	std::size_t actionSoundCacheBytes = 0;
+	std::string actionSoundCacheScope;
 #endif
 
 protected:
 	_music createMusic(const std::unique_ptr<char[]>& data, int size, bool loop, bool music3d, unsigned char priority = 128);
 	void freeMusic(_music music);
+#ifdef SHF_USE_AUDIO
+	_music getCachedActionSound(const std::string& key);
+	_music cacheActionSound(const std::string& key, _music music);
+	void setActionSoundCacheScope(const std::string& scope);
+	void clearActionSoundCache();
+#endif
 	//以中心位置播放音乐
 	_channel playMusic(_music music, float volume);
 	//指定坐标播放音乐

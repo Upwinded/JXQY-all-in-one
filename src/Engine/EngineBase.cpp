@@ -682,12 +682,14 @@ bool loadRawMixerAudio(AudioBuffer& audio)
 		return false;
 	}
 
+	const std::size_t decodedByteCount = audio.data.size();
 	audio.audio = MIX_LoadRawAudio(sdlMixer, audio.data.data(), audio.data.size(), &audio.spec);
 	if (audio.audio == nullptr)
 	{
 		return false;
 	}
 
+	audio.decodedByteCount = decodedByteCount;
 	std::vector<uint8_t>().swap(audio.data);
 	return true;
 }
@@ -5352,6 +5354,72 @@ void EngineBase::clearAudioChannels()
 	}
 }
 
+_music EngineBase::getCachedActionSound(const std::string& key)
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	auto cached = actionSoundCache.find(key);
+	return cached == actionSoundCache.end() ? nullptr : cached->second;
+}
+
+_music EngineBase::cacheActionSound(const std::string& key, _music music)
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	if (key.empty() || music == nullptr || music->decodedByteCount == 0)
+	{
+		return nullptr;
+	}
+	auto cached = actionSoundCache.find(key);
+	if (cached != actionSoundCache.end())
+	{
+		return cached->second;
+	}
+	if (actionSoundCacheBytes > ActionSoundCacheLimitBytes ||
+		music->decodedByteCount >
+			ActionSoundCacheLimitBytes - actionSoundCacheBytes)
+	{
+		return nullptr;
+	}
+	try
+	{
+		actionSoundCache.emplace(key, music);
+	}
+	catch (const std::bad_alloc&)
+	{
+		return nullptr;
+	}
+	catch (const std::length_error&)
+	{
+		return nullptr;
+	}
+	actionSoundCacheBytes += music->decodedByteCount;
+	return music;
+}
+
+void EngineBase::clearActionSoundCache()
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	for (auto& cached : actionSoundCache)
+	{
+		if (cached.second != nullptr)
+		{
+			freeMusic(cached.second);
+		}
+	}
+	actionSoundCache.clear();
+	actionSoundCacheBytes = 0;
+}
+
+void EngineBase::setActionSoundCacheScope(const std::string& scope)
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	if (scope == actionSoundCacheScope)
+	{
+		return;
+	}
+	clearActionSoundCache();
+	actionSoundCacheScope = scope;
+}
+
 void EngineBase::destroySoundSystem()
 {
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
@@ -5365,6 +5433,7 @@ void EngineBase::destroySoundSystem()
 		}
 	}
 	soundList.resize(0);
+	clearActionSoundCache();
 	clearAudioChannels();
 	if (sdlMixer != nullptr)
 	{

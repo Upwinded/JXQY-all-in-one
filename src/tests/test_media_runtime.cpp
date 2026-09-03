@@ -58,6 +58,26 @@ void writeAudioUint32(std::vector<uint8_t>& data, size_t offset, uint32_t value)
 	}
 }
 
+std::vector<uint8_t> makeTestPcmWave(std::size_t monoSampleCount)
+{
+	const uint32_t sampleBytes =
+		static_cast<uint32_t>(monoSampleCount * sizeof(std::int16_t));
+	std::vector<uint8_t> wave(44 + sampleBytes, 0);
+	std::memcpy(wave.data(), "RIFF", 4);
+	writeAudioUint32(wave, 4, 36 + sampleBytes);
+	std::memcpy(wave.data() + 8, "WAVEfmt ", 8);
+	writeAudioUint32(wave, 16, 16);
+	writeAudioUint16(wave, 20, 1);
+	writeAudioUint16(wave, 22, 1);
+	writeAudioUint32(wave, 24, 8000);
+	writeAudioUint32(wave, 28, 16000);
+	writeAudioUint16(wave, 32, 2);
+	writeAudioUint16(wave, 34, 16);
+	std::memcpy(wave.data() + 36, "data", 4);
+	writeAudioUint32(wave, 40, sampleBytes);
+	return wave;
+}
+
 bool runAudioDecodeSafetyTests()
 {
 	bool ok = true;
@@ -87,19 +107,7 @@ bool runAudioDecodeSafetyTests()
 			AudioDecodeSafety::MaxDecodedAudioBytes + 1, 0),
 		"decoded audio budget uses checked cumulative addition") && ok;
 
-	std::vector<uint8_t> wave(46, 0);
-	std::memcpy(wave.data(), "RIFF", 4);
-	writeAudioUint32(wave, 4, 38);
-	std::memcpy(wave.data() + 8, "WAVEfmt ", 8);
-	writeAudioUint32(wave, 16, 16);
-	writeAudioUint16(wave, 20, 1);
-	writeAudioUint16(wave, 22, 1);
-	writeAudioUint32(wave, 24, 8000);
-	writeAudioUint32(wave, 28, 16000);
-	writeAudioUint16(wave, 32, 2);
-	writeAudioUint16(wave, 34, 16);
-	std::memcpy(wave.data() + 36, "data", 4);
-	writeAudioUint32(wave, 40, 2);
+	std::vector<uint8_t> wave = makeTestPcmWave(1);
 	AudioBuffer decodedWave;
 	ok = check(AudioDecodeSafety::decodeFromMemory(wave.data(),
 		static_cast<int>(wave.size()), false, true, decodedWave) &&
@@ -1006,7 +1014,186 @@ bool runMediaRuntimeTests()
 	{
 		std::lock_guard<std::recursive_mutex> locker(audioEngineBase->soundMutex);
 		audioEngineBase->clearAudioChannels();
+		audioEngineBase->clearActionSoundCache();
 	}
+	const bool audioWasInitialized = SDL_WasInit(SDL_INIT_AUDIO) != 0;
+	if (!audioWasInitialized)
+	{
+		SDL_SetHint(SDL_HINT_AUDIO_DRIVER, "dummy");
+	}
+	const bool audioSubsystemReady = audioWasInitialized ||
+		SDL_InitSubSystem(SDL_INIT_AUDIO);
+	ok = check(audioSubsystemReady,
+		"action sound cache test initializes the SDL audio subsystem") && ok;
+	if (audioSubsystemReady)
+	{
+		const bool mixerReady = audioEngineBase->initSoundSystem() == 0;
+		ok = check(mixerReady,
+			"action sound cache test initializes the SDL mixer") && ok;
+		if (mixerReady)
+		{
+			namespace fs = std::filesystem;
+			fs::path cacheTestRoot =
+				makeUniqueTestDirectory("jxqy-action-sound-cache-tests");
+			fs::path resourceRootA = cacheTestRoot / "resource-a";
+			fs::path resourceRootB = cacheTestRoot / "resource-b";
+			std::error_code cacheTestError;
+			fs::create_directories(resourceRootA / "sound", cacheTestError);
+			fs::create_directories(resourceRootB / "sound", cacheTestError);
+			const std::vector<uint8_t> cachedWave = makeTestPcmWave(800);
+			for (const fs::path& resourceRoot :
+				{ resourceRootA, resourceRootB })
+			{
+				std::ofstream output(
+					resourceRoot / "sound" / "cached.wav", std::ios::binary);
+				output.write(
+					reinterpret_cast<const char*>(cachedWave.data()),
+					static_cast<std::streamsize>(cachedWave.size()));
+			}
+
+			File::setActiveResourceRoot(resourceRootA.string());
+			File::setActiveSaveNamespace("action-sound-cache-a");
+			File::setResourceFallbackRoots({});
+			audioEngineBase->clearActionSoundCache();
+			engine->actionSoundDecodeCountForTests = 0;
+			_channel cachedSoundHandleA = engine->playCachedSoundFile(
+				"sound\\cached.wav", 10.0f, 20.0f, 0.25f);
+			_channel cachedSoundHandleB = engine->playCachedSoundFile(
+				"sound/cached.wav", 120.0f, 240.0f, 0.75f);
+			_music cachedSound = nullptr;
+			{
+				std::lock_guard<std::recursive_mutex> locker(
+					audioEngineBase->soundMutex);
+				auto* cachedChannelA =
+					audioEngineBase->resolveAudioChannel(cachedSoundHandleA);
+				auto* cachedChannelB =
+					audioEngineBase->resolveAudioChannel(cachedSoundHandleB);
+				if (cachedChannelA != nullptr)
+				{
+					cachedSound = cachedChannelA->music;
+				}
+				ok = check(cachedChannelA != nullptr &&
+					cachedChannelB != nullptr && cachedSound != nullptr &&
+					cachedChannelB->music == cachedSound &&
+					cachedChannelA->volume == 0.25f &&
+					cachedChannelA->positionX == 10.0f &&
+					cachedChannelA->positionY == 20.0f &&
+					cachedChannelB->volume == 0.75f &&
+					cachedChannelB->positionX == 120.0f &&
+					cachedChannelB->positionY == 240.0f &&
+					engine->actionSoundDecodeCountForTests == 1 &&
+					audioEngineBase->actionSoundCache.size() == 1 &&
+					audioEngineBase->actionSoundCacheBytes > 0 &&
+					audioEngineBase->actionSoundCacheBytes <=
+						EngineBase::ActionSoundCacheLimitBytes,
+					"repeated action sound playback decodes once and uses independent channels") && ok;
+			}
+			engine->stopMusic(cachedSoundHandleA);
+			{
+				std::lock_guard<std::recursive_mutex> locker(
+					audioEngineBase->soundMutex);
+				auto* cachedChannelB =
+					audioEngineBase->resolveAudioChannel(cachedSoundHandleB);
+				ok = check(
+					audioEngineBase->resolveAudioChannel(cachedSoundHandleA) ==
+						nullptr &&
+					cachedChannelB != nullptr && cachedChannelB->music == cachedSound &&
+					audioEngineBase->actionSoundCache.size() == 1,
+					"stopping one cached sound channel preserves the other channel and buffer") && ok;
+			}
+
+			File::setActiveResourceRoot(resourceRootB.string());
+			File::setActiveSaveNamespace("action-sound-cache-b");
+			_channel switchedResourceHandle = engine->playCachedSoundFile(
+				"sound/cached.wav", 1.0f, 2.0f, 0.5f);
+			ok = check(switchedResourceHandle != nullptr &&
+				!engine->getMusicPlaying(cachedSoundHandleB) &&
+				engine->actionSoundDecodeCountForTests == 2 &&
+				audioEngineBase->actionSoundCache.size() == 1,
+				"resource switch clears old cached sounds before decoding the new scope") && ok;
+			const std::size_t decodeCountBeforeInvalidFile =
+				engine->actionSoundDecodeCountForTests;
+			ok = check(engine->playCachedSoundFile(
+					"sound/missing.wav", 1.0f, 2.0f, 0.5f) == nullptr &&
+				engine->actionSoundDecodeCountForTests ==
+					decodeCountBeforeInvalidFile &&
+				audioEngineBase->actionSoundCache.size() == 1,
+				"invalid action sound preserves cache and decode accounting") && ok;
+			engine->stopMusic(switchedResourceHandle);
+			audioEngineBase->clearActionSoundCache();
+
+			auto* fullCacheSound = new AudioBuffer;
+			fullCacheSound->decodedByteCount =
+				EngineBase::ActionSoundCacheLimitBytes;
+			_music retainedFullCacheSound = audioEngineBase->cacheActionSound(
+				"full-cache-placeholder", fullCacheSound);
+			const std::size_t decodeCountBeforeCapacityFallback =
+				engine->actionSoundDecodeCountForTests;
+			_channel capacityFallbackHandle = engine->playCachedSoundFile(
+				"sound/cached.wav", 3.0f, 4.0f, 0.6f);
+			ok = check(retainedFullCacheSound == fullCacheSound &&
+				capacityFallbackHandle != nullptr &&
+				engine->actionSoundDecodeCountForTests ==
+					decodeCountBeforeCapacityFallback + 1 &&
+				audioEngineBase->actionSoundCache.size() == 1 &&
+				audioEngineBase->actionSoundCacheBytes ==
+					EngineBase::ActionSoundCacheLimitBytes &&
+				EngineBase::soundList.size() == 1 &&
+				EngineBase::soundList.front().c == capacityFallbackHandle,
+				"full action sound cache falls back to auto-released playback") && ok;
+			engine->stopMusic(capacityFallbackHandle);
+			audioEngineBase->checkSoundRelease();
+			ok = check(EngineBase::soundList.empty(),
+				"capacity fallback sound releases after its channel stops") && ok;
+			if (retainedFullCacheSound == nullptr)
+			{
+				audioEngineBase->freeMusic(fullCacheSound);
+			}
+			audioEngineBase->clearActionSoundCache();
+			fs::remove_all(cacheTestRoot, cacheTestError);
+			audioEngineBase->destroySoundSystem();
+		}
+	}
+	if (!audioWasInitialized)
+	{
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
+	}
+	audioEngineBase->setActionSoundCacheScope("capacity-test");
+
+	auto* nearlyFullSound = new AudioBuffer;
+	nearlyFullSound->decodedByteCount =
+		EngineBase::ActionSoundCacheLimitBytes - 1;
+	auto* finalCacheByteSound = new AudioBuffer;
+	finalCacheByteSound->decodedByteCount = 1;
+	auto* overflowSound = new AudioBuffer;
+	overflowSound->decodedByteCount = 1;
+	_music retainedNearlyFullSound = audioEngineBase->cacheActionSound(
+		"capacity-test\nsound/nearly-full.wav", nearlyFullSound);
+	_music retainedFinalCacheByteSound = audioEngineBase->cacheActionSound(
+		"capacity-test\nsound/final-byte.wav", finalCacheByteSound);
+	_music retainedOverflowSound = audioEngineBase->cacheActionSound(
+		"capacity-test\nsound/overflow.wav", overflowSound);
+	ok = check(retainedNearlyFullSound == nearlyFullSound &&
+		retainedFinalCacheByteSound == finalCacheByteSound &&
+		retainedOverflowSound == nullptr &&
+		audioEngineBase->actionSoundCacheBytes ==
+			EngineBase::ActionSoundCacheLimitBytes &&
+		audioEngineBase->actionSoundCache.size() == 2,
+		"action sound cache accepts exactly 16 MiB and rejects overflow") && ok;
+	if (retainedNearlyFullSound == nullptr)
+	{
+		audioEngineBase->freeMusic(nearlyFullSound);
+	}
+	if (retainedFinalCacheByteSound == nullptr)
+	{
+		audioEngineBase->freeMusic(finalCacheByteSound);
+	}
+	audioEngineBase->freeMusic(overflowSound);
+	audioEngineBase->clearActionSoundCache();
+	ok = check(engine->playCachedSoundFile("", 1.0f, 2.0f, 0.5f) == nullptr &&
+		audioEngineBase->actionSoundCache.empty() &&
+		audioEngineBase->actionSoundCacheBytes == 0,
+		"invalid cached action sound input fails without changing cache state") && ok;
 
 	_channel stoppedHandle = createTestAudioChannel(0.5f);
 	const std::size_t singleChannelHighWater = audioEngineBase->channelSlots.size();

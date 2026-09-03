@@ -3,7 +3,6 @@
 #include "Map.h"
 #include "MediaPathResolver.h"
 #include "ProjectedMovement.h"
-#include "../../Engine/AudioDecodeSafety.h"
 #include "../GameManager/GameManager.h"
 
 
@@ -35,22 +34,8 @@ _channel GameElement::playSoundFile(const std::string & fileName, float x, float
 	{
 		return nullptr;
 	}
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	if (File::readFile(resolveSoundAssetPath(fileName), s, len,
-		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)) &&
-		len > 0 && s != nullptr)
-	{
-		if (volume == -1.0f)
-		{
-			return engine->playSound(s, len, x, y);
-		}
-		else
-		{
-			return engine->playSound(s, len, x, y, volume);
-		}
-	}
-	return nullptr;
+	return engine->playCachedSoundFile(
+		resolveSoundAssetPath(fileName), x, y, volume);
 }
 
 void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff)
