@@ -194,7 +194,7 @@ public:
 
 	//按优先级读取 NPC/OBJ INI 文件内容
 	//优先 save\game\，失败回退 ini\save\
-	//返回 true 表示成功读取，data 和 len 为文件内容
+	//返回 true 表示文件存在且读取成功；空文件的 len 为 0，data 仍有效
 	static bool ReadNpcObjFile(const std::string& fileName,
 	                           std::unique_ptr<char[]>& data,
 	                           int& len,

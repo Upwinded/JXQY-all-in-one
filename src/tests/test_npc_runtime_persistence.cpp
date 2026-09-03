@@ -726,6 +726,133 @@ bool runNpcCollectionLoadSafety(GameManager& gameManager, const std::filesystem:
 	return ok;
 }
 
+bool runCompatibleStoryEntityListLoads(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	struct Fixture
+	{
+		std::string fileName;
+		std::string content;
+	};
+	const std::vector<Fixture> npcFixtures = {
+		{ "story-empty.npc", "" },
+		{
+			"story-wrong-sections.npc",
+			"[Head]\nCount=1\n[OBJ000]\nObjName=WrongType\n"
+		},
+		{ "story-malformed.npc", "[Head\nCount=1\n" }
+	};
+	const std::vector<Fixture> objectFixtures = {
+		{ "story-empty.obj", "" },
+		{
+			"story-wrong-sections.obj",
+			"[Head]\nCount=1\n[NPC000]\nName=WrongType\n"
+		},
+		{ "story-malformed.obj", "[Head\nCount=1\n" }
+	};
+
+	bool ok = true;
+	prepareMap(gameManager);
+	for (const auto& fixture : npcFixtures)
+	{
+		ok = check(
+			writeTextFile(
+				saveGameFixturePath(root, fixture.fileName),
+				fixture.content),
+			"write compatible story NPC fixture") && ok;
+		gameManager.npcManager->freeResource();
+		auto retainedNpc = addTestNpc(
+			gameManager,
+			"RetainedNpc",
+			nkBattle,
+			{ 2, 2 });
+		ok = check(
+			!gameManager.npcManager->load(fixture.fileName, true) &&
+				containsNpc(gameManager, retainedNpc),
+			"direct NPC manager loads remain strict for invalid story files") && ok;
+
+		gameManager.global.data.npcName = "previous.npc";
+		gameManager.global.data.objName = "retained.obj";
+		ok = check(
+			gameManager.scriptAPI.loadNPC(fixture.fileName) &&
+				gameManager.npcManager->npcList.empty() &&
+				gameManager.global.data.npcName == fixture.fileName,
+			"ordinary story NPC loads accept an empty compatible list and bind its file name") && ok;
+		gameManager.scriptAPI.saveNPC("");
+		INIReader savedNpc(
+			"save\\game\\" + fixture.fileName);
+		ok = check(
+			savedNpc.ParseError() == 0 &&
+				savedNpc.GetInteger("Head", "Count", -1) == 0,
+			"SaveNPC writes the compatible empty list back to the bound file") && ok;
+	}
+
+	for (const auto& fixture : objectFixtures)
+	{
+		ok = check(
+			writeTextFile(
+				saveGameFixturePath(root, fixture.fileName),
+				fixture.content),
+			"write compatible story object fixture") && ok;
+		gameManager.objectManager->freeResource();
+		auto retainedObject = std::make_shared<Object>();
+		retainedObject->objName = "RetainedObject";
+		retainedObject->setPosition({ 3, 3 });
+		gameManager.objectManager->objectList.push_back(retainedObject);
+		gameManager.objectManager->addChild(retainedObject);
+		gameManager.map->addObjectToDataMap(
+			retainedObject->getPosition(),
+			retainedObject);
+		ok = check(
+			!gameManager.objectManager->load(fixture.fileName) &&
+				gameManager.objectManager->objectList.size() == 1 &&
+				gameManager.objectManager->objectList.front() == retainedObject,
+			"direct object manager loads remain strict for invalid story files") && ok;
+
+		gameManager.global.data.npcName = "retained.npc";
+		gameManager.global.data.objName = "previous.obj";
+		ok = check(
+			gameManager.scriptAPI.loadObject(fixture.fileName) &&
+				gameManager.objectManager->objectList.empty() &&
+				gameManager.global.data.objName == fixture.fileName,
+			"ordinary story object loads accept an empty compatible list and bind its file name") && ok;
+		gameManager.scriptAPI.saveObject("");
+		INIReader savedObject(
+			"save\\game\\" + fixture.fileName);
+		ok = check(
+			savedObject.ParseError() == 0 &&
+				savedObject.GetInteger("Head", "Count", -1) == 0,
+			"SaveObj writes the compatible empty list back to the bound file") && ok;
+	}
+
+	gameManager.npcManager->freeResource();
+	auto retainedNpc = addTestNpc(
+		gameManager,
+		"MissingFileRetainedNpc",
+		nkBattle,
+		{ 4, 4 });
+	gameManager.global.data.npcName = "retained-missing.npc";
+	ok = check(
+		!gameManager.scriptAPI.loadNPC("missing-story.npc") &&
+			containsNpc(gameManager, retainedNpc) &&
+			gameManager.global.data.npcName == "retained-missing.npc",
+		"ordinary story NPC loads still reject a missing file without rebinding") && ok;
+
+	gameManager.objectManager->freeResource();
+	auto retainedObject = std::make_shared<Object>();
+	retainedObject->objName = "MissingFileRetainedObject";
+	gameManager.objectManager->objectList.push_back(retainedObject);
+	gameManager.global.data.objName = "retained-missing.obj";
+	ok = check(
+		!gameManager.scriptAPI.loadObject("missing-story.obj") &&
+			gameManager.objectManager->objectList.size() == 1 &&
+			gameManager.objectManager->objectList.front() == retainedObject &&
+			gameManager.global.data.objName == "retained-missing.obj",
+		"ordinary story object loads still reject a missing file without rebinding") && ok;
+	return ok;
+}
+
 bool runPreparedNpcLoadWithoutSource(
 	GameManager& gameManager,
 	const std::filesystem::path& root)
@@ -1532,6 +1659,7 @@ bool runNpcRuntimePersistenceTests()
 				1),
 		"runtime NPC population validation rejects combined NPC and partner overflow");
 	ok = runNpcCollectionLoadSafety(gameManager, root) && ok;
+	ok = runCompatibleStoryEntityListLoads(gameManager, root) && ok;
 	ok = runStatusDurationInputSafety() && ok;
 	ok = runLegacyNpcObjectDefaults() && ok;
 	ok = runPlayerChangePersistenceAndPartnerContinuity(

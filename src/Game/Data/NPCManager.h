@@ -257,7 +257,8 @@ public:
 		const std::string& fileName,
 		bool clearCurrent = true,
 		const std::function<void()>& beforeMutation = {},
-		const std::function<bool()>& preparationCheckpoint = {});
+		const std::function<bool()>& preparationCheckpoint = {},
+		bool allowIncompleteSectionList = false);
 	bool validate(const std::string& fileName);
 	bool loadExactResourceBytes(
 		const std::string& virtualPath,

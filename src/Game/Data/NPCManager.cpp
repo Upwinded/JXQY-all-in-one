@@ -1914,6 +1914,18 @@ bool NPCManager::prepareParsedLoad(
 	auto parsedIni = std::make_shared<INIReader>(data);
 	if (parsedIni->ParseError() != 0)
 	{
+		if (allowIncompleteSectionList)
+		{
+			GameLog::write(
+				"NPCManager: compatible NPC list %s has invalid or empty INI content; loading an empty list\n",
+				sourcePath.c_str());
+			PreparedLoad candidate;
+			candidate.parsedIni = std::move(parsedIni);
+			candidate.preparedNpcCount = 0;
+			candidate.resolvedSourcePath = sourcePath;
+			preparedLoad = std::move(candidate);
+			return true;
+		}
 		GameLog::write(
 			exactResource
 				? "NPCManager: invalid exact NPC list %s\n"
@@ -2206,10 +2218,14 @@ bool NPCManager::load(
 	const std::string& fileName,
 	bool clearCurrent,
 	const std::function<void()>& beforeMutation,
-	const std::function<bool()>& preparationCheckpoint)
+	const std::function<bool()>& preparationCheckpoint,
+	bool allowIncompleteSectionList)
 {
 	PreparedLoad preparedLoad;
-	return prepareLoad(fileName, preparedLoad) &&
+	return prepareLoad(
+			fileName,
+			preparedLoad,
+			allowIncompleteSectionList) &&
 		commitPreparedLoad(
 			preparedLoad,
 			clearCurrent,

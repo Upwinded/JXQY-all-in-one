@@ -82,7 +82,8 @@ public:
 	virtual bool load(
 		const std::string& fileName,
 		const std::function<void()>& beforeMutation = {},
-		const std::function<bool()>& preparationCheckpoint = {});
+		const std::function<bool()>& preparationCheckpoint = {},
+		bool allowIncompleteSectionList = false);
 	bool prepareLoad(
 		const std::string& fileName,
 		PreparedObjectLoad& preparedLoad,

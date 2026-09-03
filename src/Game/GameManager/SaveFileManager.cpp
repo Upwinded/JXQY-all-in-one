@@ -557,7 +557,7 @@ bool SaveFileManager::ReadNpcObjFile(const std::string& fileName,
 
 	//优先从当前显式 generation 读取；默认仍为 save\game\。
 	const std::string savePath = CurrentPath() + fileName;
-	if (File::readFile(savePath, data, len, maximumBytes) && len > 0 && data != nullptr)
+	if (File::readFile(savePath, data, len, maximumBytes) && data != nullptr)
 	{
 		if (loadedPath) *loadedPath = savePath;
 		return true;
@@ -565,7 +565,7 @@ bool SaveFileManager::ReadNpcObjFile(const std::string& fileName,
 
 	//回退到 ini\save\ 读取原始模板
 	const std::string templatePath = std::string(INI_SAVE_FOLDER) + fileName;
-	if (File::readFile(templatePath, data, len, maximumBytes) && len > 0 && data != nullptr)
+	if (File::readFile(templatePath, data, len, maximumBytes) && data != nullptr)
 	{
 		if (loadedPath) *loadedPath = templatePath;
 		return true;

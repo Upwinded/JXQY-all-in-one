@@ -412,12 +412,14 @@ bool ObjectManager::validate(const std::string& fileName)
 bool ObjectManager::load(
 	const std::string& fileName,
 	const std::function<void()>& beforeMutation,
-	const std::function<bool()>& preparationCheckpoint)
+	const std::function<bool()>& preparationCheckpoint,
+	bool allowIncompleteSectionList)
 {
 	PreparedObjectLoad preparedLoad;
 	if (!prepareLoad(
 			fileName,
-			preparedLoad))
+			preparedLoad,
+			allowIncompleteSectionList))
 	{
 		return false;
 	}
@@ -447,6 +449,15 @@ bool ObjectManager::prepareLoad(
 	auto reader = std::make_shared<INIReader>(data);
 	if (reader->ParseError() != 0)
 	{
+		if (allowIncompleteSectionList)
+		{
+			GameLog::write(
+				"ObjectManager: compatible object list %s has invalid or empty INI content; loading an empty list\n",
+				loadedPath.c_str());
+			preparedLoad.reader = std::move(reader);
+			preparedLoad.count = 0;
+			return true;
+		}
 		GameLog::write("ObjectManager: invalid object list %s\n", loadedPath.c_str());
 		return false;
 	}

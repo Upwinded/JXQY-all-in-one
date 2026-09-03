@@ -7683,7 +7683,8 @@ void ScriptAPI::loadObjectAsync(const std::string& fileName)
 			const bool valid =
 				gameManager->objectManager->prepareLoad(
 					fileName,
-					preparedLoad);
+					preparedLoad,
+					true);
 			if (cancellationToken.isCancellationRequested())
 			{
 				return GameLoading::LoadingTaskResult::cancellation();
@@ -7909,7 +7910,8 @@ void ScriptAPI::loadNPCAsync(const std::string& fileName)
 			const bool valid =
 				gameManager->npcManager->prepareLoad(
 					fileName,
-					preparedLoad);
+					preparedLoad,
+					true);
 			if (cancellationToken.isCancellationRequested())
 			{
 				return GameLoading::LoadingTaskResult::cancellation();
@@ -11050,7 +11052,9 @@ void ScriptAPI::mergeNpc(const std::string& fileName)
 			if (!gameManager->npcManager->load(
 					fileName,
 					false,
-					beforeMutation))
+					beforeMutation,
+					{},
+					true))
 			{
 				return false;
 			}
@@ -11365,7 +11369,8 @@ bool ScriptAPI::loadNPCWithPreparationCheckpoint(
 					fileName,
 					true,
 					beforeMutation,
-					preparationCheckpoint);
+					preparationCheckpoint,
+					true);
 			if (!loaded)
 			{
 				return false;
@@ -11605,7 +11610,8 @@ bool ScriptAPI::loadObjectWithPreparationCheckpoint(
 				: gameManager->objectManager->load(
 					fileName,
 					beforeMutation,
-					preparationCheckpoint);
+					preparationCheckpoint,
+					true);
 			if (!loaded)
 			{
 				return false;
