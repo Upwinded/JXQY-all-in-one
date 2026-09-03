@@ -222,6 +222,43 @@ bool testValidationFailureRollsBackGroup()
 	return ok;
 }
 
+bool testCommitRecordFailureCanRollBackGroup()
+{
+	TemporaryTree tree("jxqy-resource-install-commit-record-failure");
+	const std::filesystem::path assets = tree.root / "assets";
+	std::filesystem::create_directories(assets);
+	bool ok = writeResource(assets / "moon", "YYCS", "old") &&
+		prepareWorkspace(assets, {{"YYCS", "new"}});
+	if (!ok)
+	{
+		return false;
+	}
+
+	const auto staged = OnlineUpdate::stageResourceInstallTransaction(
+		assets, "YYCS", {{"YYCS", "moon"}});
+	const auto switched =
+		OnlineUpdate::beginResourceInstallTransaction(assets);
+	const std::filesystem::path blockedTemporaryRecord =
+		OnlineUpdate::resourceUpdateWorkspacePath(assets) / "install.ini.tmp";
+	std::filesystem::create_directory(blockedTemporaryRecord);
+	const auto commitFailed =
+		OnlineUpdate::completeResourceInstallTransaction(assets, true);
+	const auto rolledBack =
+		OnlineUpdate::completeResourceInstallTransaction(assets, false);
+	ok = expect(staged.succeeded() && switched.needsValidation &&
+			commitFailed.status ==
+				OnlineUpdate::ResourceInstallTransactionStatus::RecordUnavailable,
+		"commit record failure: switched group cannot record Committed") && ok;
+	ok = expect(rolledBack.status ==
+			OnlineUpdate::ResourceInstallTransactionStatus::Success &&
+			rolledBack.rolledBack &&
+			readText(assets / "moon" / "payload.txt") == "old" &&
+			!std::filesystem::exists(
+				OnlineUpdate::resourceUpdateWorkspacePath(assets)),
+		"commit record failure: existing rollback restores the old group") && ok;
+	return ok;
+}
+
 bool testCommonSwitchAndRollback()
 {
 	TemporaryTree commitTree("jxqy-common-install-success");
@@ -526,6 +563,7 @@ int main()
 	ok = testSuccessfulGroupSwitch() && ok;
 	ok = testDependencyOnlySwitch() && ok;
 	ok = testValidationFailureRollsBackGroup() && ok;
+	ok = testCommitRecordFailureCanRollBackGroup() && ok;
 	ok = testCommonSwitchAndRollback() && ok;
 	ok = testInterruptedSwitchRestoresOldGroup() && ok;
 	ok = testInterruptedRollbackCanResume() && ok;

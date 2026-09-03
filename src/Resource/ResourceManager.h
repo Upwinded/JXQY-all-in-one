@@ -95,7 +95,7 @@ public:
 	// 解析 --assets 参数并完成资源包发现/选择。
 	// assetsArg 为空时使用平台默认 assets 路径作为集合目录。
 	// 资源错误不应阻止普通游戏启动：零包或多包都会返回 true 并进入选择/
-	// 管理界面；单包直接激活，Release 版本声明不参与门禁。
+	// 管理界面；资源自身仍可因确定的版本或依赖问题被禁止进入。
 	// 仅当 --assets/默认集合根本身不可解析（路径错误，而非资源错误）时返回 false。
 	bool initialize(const std::string& assetsArg);
 
@@ -154,7 +154,9 @@ public:
 	// Activates a fully downloaded Ready transaction while the resource
 	// selection page is still open, validates the switched group, and refreshes
 	// discovery. It never selects or starts a game.
-	bool activateStagedResourceInstall(std::string& errorText);
+	bool activateStagedResourceInstall(
+		std::string& errorText,
+		bool allowUnplayableImportedResource = false);
 
 	// 是否已确定 active resource selection。Android 打包资源的合法逻辑根
 	// 可以为空，因此不能通过 getActiveResourceRoot().empty() 判断。
@@ -164,6 +166,9 @@ public:
 	// compatibilityResult 非空时始终返回有效索引对应的缓存判定。
 	bool setActiveResourcePack(int index,
 		ModRelease::CompatibilityResult* compatibilityResult = nullptr);
+	// 资源可以保留在选择列表中，但确定的版本、身份或依赖问题会禁止进入。
+	bool canActivateResourcePack(
+		int index, std::string* blockingReason = nullptr) const;
 
 	// 记录资源选择页中由用户确认的资源包。记录保存在集合级
 	// save 目录，不属于任何单个资源包或其存档命名空间。

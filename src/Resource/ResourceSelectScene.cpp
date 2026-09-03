@@ -125,6 +125,8 @@ constexpr const char* ResourceSelectSubtitle = u8"请选择资源包";
 constexpr const char* EmptyResourceListPrimary = u8"未发现可用资源包";
 constexpr const char* ExternalResourceCollectionInstruction =
 	u8"可选，外部 MOD 读取：Android 11+ 需所有文件访问权限";
+constexpr const char* ResourcePackageImportInstruction =
+	u8"可导入完整资源包、common 或增量包，安装到应用专属目录";
 constexpr const char* CheatHelpText =
 	u8"进入游戏后，可打开“系统 → 选项 → 作弊设置”；纯触屏和桌面触屏均可直接操作。\n"
 	u8"键盘仍可按 Shift+F12 开关作弊模式，再使用：\n"
@@ -335,19 +337,35 @@ bool mobileResourceSelectUiEnabled()
 
 bool externalResourceToggleAvailable()
 {
-#if defined(__ANDROID__) || \
-	defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+#if defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
 	return true;
 #else
 	return false;
 #endif
 }
 
+bool resourcePackageImportAvailable()
+{
+#if defined(__ANDROID__) && \
+	!defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+	return true;
+#else
+	return false;
+#endif
+}
+
+bool mobileResourceFooterActionAvailable()
+{
+	return externalResourceToggleAvailable() ||
+		resourcePackageImportAvailable();
+}
+
 const char* emptyResourceListHint()
 {
-#if defined(__ANDROID__) || \
-	defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+#if defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
 	return u8"请检查更新，或启用下方外部 MOD 目录";
+#elif defined(__ANDROID__)
+	return u8"请检查更新，或使用下方按钮导入资源包";
 #elif defined(__MOBILE__) || \
 	(defined(__APPLE__) && TARGET_OS_IOS)
 	return u8"请检查更新下载资源";
@@ -360,7 +378,7 @@ const char* emptyResourceListHint()
 // 其它平台只保留一行外部链接按钮。
 int footerReservedHeight()
 {
-	return externalResourceToggleAvailable()
+	return mobileResourceFooterActionAvailable()
 		? MobilePanelListAndFooterHeight
 		: DesktopPanelListAndFooterHeight;
 }
@@ -502,14 +520,14 @@ const char* catalogDownloadFailureText(
 	return u8"在线目录读取失败";
 }
 
-// Release.MinimumEngineVersion 只作为作者声明显示，不参与运行门禁。
+// 有效且高于当前引擎的声明禁止进入；无效声明只提示未知风险。
 std::string describePackRunStatus(const ModRelease::CompatibilityResult& compatibility)
 {
 	switch (compatibility.status)
 	{
 	case ModRelease::CompatibilityStatus::RequiresNewerEngine:
 	{
-		std::string text = u8"需要更高引擎版本";
+		std::string text = u8"当前无法运行：需要更高引擎版本";
 		if (compatibility.minimumVersion.has_value())
 		{
 			text += u8"（要求 ";
@@ -519,12 +537,13 @@ std::string describePackRunStatus(const ModRelease::CompatibilityResult& compati
 		return text;
 	}
 	case ModRelease::CompatibilityStatus::InvalidMinimumEngineVersion:
-		return u8"最低引擎版本格式无效";
+		return u8"兼容性声明无效，运行结果未知";
 	case ModRelease::CompatibilityStatus::InvalidCurrentEngineVersion:
-		return u8"当前引擎版本无法识别";
+		return u8"当前引擎版本无法校验，运行结果未知";
 	case ModRelease::CompatibilityStatus::LegacyCompatible:
-	case ModRelease::CompatibilityStatus::Compatible:
 		return u8"未声明版本要求";
+	case ModRelease::CompatibilityStatus::Compatible:
+		return u8"兼容当前引擎版本";
 	}
 	return u8"版本声明可读取";
 }
@@ -632,6 +651,48 @@ bool isPlainRegularFile(const std::filesystem::path& path)
 #else
 	return true;
 #endif
+}
+
+bool calculatePlainDirectoryBytes(
+	const std::filesystem::path& root,
+	std::uint64_t& bytes)
+{
+	bytes = 0;
+	if (!isPlainDirectory(root))
+	{
+		return false;
+	}
+	std::error_code error;
+	for (std::filesystem::recursive_directory_iterator iterator(
+			root,
+			std::filesystem::directory_options::skip_permission_denied,
+			error), end;
+		!error && iterator != end;
+		iterator.increment(error))
+	{
+		const std::filesystem::path path = iterator->path();
+		if (iterator->is_directory(error))
+		{
+			if (error || !isPlainDirectory(path))
+			{
+				return false;
+			}
+			continue;
+		}
+		if (error || !isPlainRegularFile(path))
+		{
+			return false;
+		}
+		const std::uintmax_t fileBytes =
+			std::filesystem::file_size(path, error);
+		if (error || fileBytes > std::numeric_limits<std::uint64_t>::max() ||
+			bytes > std::numeric_limits<std::uint64_t>::max() - fileBytes)
+		{
+			return false;
+		}
+		bytes += static_cast<std::uint64_t>(fileBytes);
+	}
+	return !error;
 }
 
 bool removePlainOwnedFileIfPresent(
@@ -1152,6 +1213,8 @@ std::string programPackageFailureText(
 		return u8"程序安装包缺少引擎启动资源";
 	case Status::MissingCommonBootstrap:
 		return u8"程序安装包缺少游戏公共资源";
+	case Status::InsufficientDiskSpace:
+		return u8"磁盘空间不足，无法解压程序安装包";
 	case Status::InvalidEntryPath:
 	case Status::DuplicateEntryPath:
 	case Status::UnsupportedEntry:
@@ -1163,6 +1226,50 @@ std::string programPackageFailureText(
 	case Status::Success:
 	default:
 		return u8"程序安装包无法安全解压";
+	}
+}
+
+std::string importedResourcePackageFailureText(
+	OnlineUpdate::ResourcePackageArchiveStatus status)
+{
+	using Status = OnlineUpdate::ResourcePackageArchiveStatus;
+	switch (status)
+	{
+	case Status::ArchiveUnavailable:
+	case Status::ArchiveOpenFailed:
+		return u8"所选资源包无法读取或不是有效 ZIP";
+	case Status::TooManyEntries:
+	case Status::UncompressedSizeLimitExceeded:
+		return u8"资源包文件数量或解压大小超过安全限制";
+	case Status::InsufficientDiskSpace:
+		return u8"磁盘空间不足，无法解压资源包";
+	case Status::InvalidEntryPath:
+	case Status::DuplicateEntryPath:
+	case Status::UnsupportedEntry:
+		return u8"资源包包含不安全、重复或不支持的文件";
+	case Status::MissingManifest:
+	case Status::ManifestReadFailed:
+	case Status::InvalidManifest:
+		return u8"资源包缺少有效的根目录 game_profile.ini";
+	case Status::GameIdMismatch:
+		return u8"资源包的 Game.Id 无效";
+	case Status::DisplayVersionMismatch:
+		return u8"资源包的 Game.Version 缺失或无效";
+	case Status::MinimumEngineVersionMismatch:
+		return u8"资源包的 MinimumEngineVersion 缺失或无效";
+	case Status::DependencyMismatch:
+		return u8"资源包声明了无效或自身依赖";
+	case Status::ResourceOnlyMismatch:
+		return u8"第一版导入只接受可直接运行的完整游戏资源包";
+	case Status::DestinationAlreadyExists:
+	case Status::UnsafeDestination:
+	case Status::DestinationCreateFailed:
+		return u8"无法创建安全的资源包导入暂存目录";
+	case Status::CleanupFailed:
+		return u8"资源包导入失败且暂存目录清理未完成，请重启后重试";
+	case Status::Success:
+	default:
+		return u8"资源包校验或解压失败";
 	}
 }
 
@@ -1291,6 +1398,8 @@ void ResourceSelectScene::freeResource()
 	resourceInstallDialogState = ResourceInstallDialogState::Hidden;
 	resourceInstallOperation = ResourceInstallOperation::OnlineDownload;
 	pendingResourceInstall = {};
+	resourcePackageImportKind = ResourcePackageImportKind::Full;
+	pendingImportedPackage = {};
 	pendingResourceRemoval = {};
 	pendingResourceRemovalSavePolicy =
 		ResourceManager::ResourceRemovalSavePolicy::Unselected;
@@ -1308,6 +1417,7 @@ void ResourceSelectScene::freeResource()
 	pendingDownloadUsesMeteredNetwork = false;
 	pendingMeteredDownloadConfirmed = false;
 	resourceUpdatePromptedByEntry = false;
+	resourcePackageImportSelectionPending = false;
 	pendingExternalRescan = false;
 	externalResourcePresentationState =
 		ExternalResourcePresentationState::Disabled;
@@ -1552,6 +1662,14 @@ void ResourceSelectScene::createControls()
 		addChild(enableExternalButton);
 		refreshExternalResourcePresentation();
 	}
+	else if (resourcePackageImportAvailable())
+	{
+		enableExternalButton = std::make_shared<FlatTextButton>();
+		enableExternalButton->name = "resource-select-import-package";
+		enableExternalButton->setFontSize(20);
+		enableExternalButton->setUTF8Str(u8"导入资源包");
+		addChild(enableExternalButton);
+	}
 
 	externalLinkButtons.reserve(ExternalLinks.size());
 	for (int linkIndex = 0; linkIndex < static_cast<int>(ExternalLinks.size()); linkIndex++)
@@ -1666,6 +1784,16 @@ void ResourceSelectScene::rebuildResourceEntries()
 		entry.localVersion =
 			pack.manifest.releaseMetadata.displayVersion;
 		entry.wasRecentlySelected = pack.wasRecentlySelected;
+		entry.requiresNewerEngine = pack.compatibility.status ==
+			ModRelease::CompatibilityStatus::RequiresNewerEngine;
+		std::string activationBlockReason;
+		if (!resourceManager.canActivateResourcePack(
+				packIndex, &activationBlockReason) &&
+			!entry.requiresNewerEngine)
+		{
+			entry.configurationError = true;
+			entry.configurationErrorText = activationBlockReason;
+		}
 		for (const RuntimeResource::CatalogDiagnostic& diagnostic : diagnostics)
 		{
 			if (diagnostic.severity !=
@@ -1701,8 +1829,9 @@ void ResourceSelectScene::rebuildResourceEntries()
 						OnlineUpdate::RequestedResourceDownloadMode::IfNeeded);
 				entry.hasPendingOnlineArtifacts = plan.succeeded() &&
 					!plan.downloadOrder.empty();
-				entry.requiresNewerEngine = plan.status ==
-					OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
+				entry.requiresNewerEngine = entry.requiresNewerEngine ||
+					plan.status ==
+						OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
 			}
 		}
 		resourceEntries.push_back(std::move(entry));
@@ -2403,6 +2532,7 @@ void ResourceSelectScene::refreshCheckUpdatesButton()
 		? HeaderActionCompactFontSize : HeaderActionFontSize);
 	checkUpdatesButton->activated =
 		!displaySettingsVisible &&
+		!resourcePackageImportSelectionPending &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden &&
 		resourceInstallRunner == nullptr && catalogCheckRunner == nullptr &&
 		catalogCheckState != CatalogCheckState::Checking;
@@ -2437,6 +2567,7 @@ void ResourceSelectScene::refreshProgramActionButton()
 	}
 	bool available = false;
 	if (!displaySettingsVisible && !cheatHelpVisible &&
+		!resourcePackageImportSelectionPending &&
 		!externalResourceDialogVisible &&
 		catalogCheckState == CatalogCheckState::Ready &&
 		programUpdatePlatformAvailable() && catalogCheckRunner == nullptr &&
@@ -2515,6 +2646,7 @@ void ResourceSelectScene::refreshOnlineActionButton()
 		return;
 	}
 	const bool available = !displaySettingsVisible && !cheatHelpVisible &&
+		!resourcePackageImportSelectionPending &&
 		!externalResourceDialogVisible &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden &&
 		selectedDetails.packIndex >= 0 && selectedDetails.onlineAvailable &&
@@ -2543,6 +2675,7 @@ void ResourceSelectScene::refreshOnlineActionButton()
 void ResourceSelectScene::refreshResourceManagementButtons()
 {
 	const bool dialogHidden = !displaySettingsVisible && !cheatHelpVisible &&
+		!resourcePackageImportSelectionPending &&
 		!externalResourceDialogVisible &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden;
 	if (resourceRemoveButton != nullptr)
@@ -2574,6 +2707,705 @@ void ResourceSelectScene::refreshResourceManagementButtons()
 			saveManagementButton->cancelPointerInteraction();
 		}
 	}
+}
+
+void ResourceSelectScene::showResourcePackageImportMenu()
+{
+	if (!resourcePackageImportAvailable() ||
+		resourcePackageImportSelectionPending ||
+		resourceInstallRunner != nullptr ||
+		resourceInstallDialogState != ResourceInstallDialogState::Hidden)
+	{
+		return;
+	}
+	cancelPointerInteraction();
+	resourceInstallOperation = ResourceInstallOperation::ResourceImport;
+	resourceInstallDialogState = ResourceInstallDialogState::ChoosingImportType;
+	pendingResourceInstall = {};
+	pendingImportedPackage = {};
+	resourceInstallDialogMessage.clear();
+	resourceInstallConfirmationPage = 0;
+	setMainControlsAvailable(false);
+	refreshResourceInstallDialogControls();
+	semanticFocusVisible = focusManager.focusNode("install-primary");
+	updateFocusPresentation();
+}
+
+void ResourceSelectScene::beginResourcePackageImportSelection(
+	ResourcePackageImportKind kind)
+{
+	if (!resourcePackageImportAvailable() ||
+		resourcePackageImportSelectionPending ||
+		resourceInstallRunner != nullptr ||
+		resourceInstallDialogState !=
+			ResourceInstallDialogState::ChoosingImportType)
+	{
+		return;
+	}
+	cancelPointerInteraction();
+	if (!AndroidExternalStorage::requestResourcePackageImport())
+	{
+		catalogStatusText = u8"无法打开 Android 文件选择器";
+		return;
+	}
+	resourcePackageImportKind = kind;
+	resourcePackageImportSelectionPending = true;
+	catalogStatusText = kind == ResourcePackageImportKind::Full
+		? std::string(u8"请选择完整资源包或 common ZIP")
+		: std::string(u8"请选择增量资源包 ZIP");
+	setMainControlsAvailable(false);
+	semanticFocusVisible = false;
+	updateFocusPresentation();
+}
+
+void ResourceSelectScene::pollResourcePackageImportSelection()
+{
+	if (!resourcePackageImportSelectionPending)
+	{
+		return;
+	}
+	const AndroidExternalStorage::ResourcePackageImportSelection selection =
+		AndroidExternalStorage::consumeResourcePackageImportSelection();
+	using SelectionStatus =
+		AndroidExternalStorage::ResourcePackageImportSelectionStatus;
+	if (selection.status == SelectionStatus::Pending)
+	{
+		return;
+	}
+	resourcePackageImportSelectionPending = false;
+	if (selection.status == SelectionStatus::Cancelled)
+	{
+		catalogStatusText = u8"已取消导入资源包";
+		semanticFocusVisible = focusManager.focusNode(
+			resourcePackageImportKind == ResourcePackageImportKind::Full
+				? "install-primary" : "install-secondary");
+		updateFocusPresentation();
+		return;
+	}
+	if (selection.status == SelectionStatus::Failed)
+	{
+		catalogStatusText = selection.errorMessage.empty()
+			? std::string(u8"无法读取所选资源包")
+			: selection.errorMessage;
+		semanticFocusVisible = focusManager.focusNode(
+			resourcePackageImportKind == ResourcePackageImportKind::Full
+				? "install-primary" : "install-secondary");
+		updateFocusPresentation();
+		return;
+	}
+	beginResourcePackageImportPreparation(selection.archivePath);
+}
+
+void ResourceSelectScene::beginResourcePackageImportPreparation(
+	const std::string& archivePathText)
+{
+	std::filesystem::path archivePath;
+	std::filesystem::path collectionRoot;
+	try
+	{
+		archivePath = std::filesystem::u8path(archivePathText);
+		collectionRoot = std::filesystem::u8path(
+			ResourceManager::instance().getWritableResourceCollectionRoot());
+	}
+	catch (const std::exception&)
+	{
+		archivePath.clear();
+		collectionRoot.clear();
+	}
+	std::error_code canonicalError;
+	if (!collectionRoot.empty())
+	{
+		collectionRoot = std::filesystem::canonical(
+			collectionRoot, canonicalError);
+	}
+	if (archivePath.empty() || !isPlainRegularFile(archivePath) ||
+		collectionRoot.empty() || canonicalError ||
+		!isPlainDirectory(collectionRoot))
+	{
+		resourceInstallOperation = ResourceInstallOperation::ResourceImport;
+		resourceInstallDialogState = ResourceInstallDialogState::Failed;
+		resourceInstallDialogMessage =
+			u8"所选资源包或应用专属资源目录不可用";
+		refreshResourceInstallDialogControls();
+		semanticFocusVisible = focusManager.focusNode("install-primary");
+		updateFocusPresentation();
+		return;
+	}
+
+	std::error_code sizeError;
+	const std::uintmax_t archiveSize =
+		std::filesystem::file_size(archivePath, sizeError);
+	const std::filesystem::space_info space =
+		std::filesystem::space(collectionRoot, sizeError);
+	if (sizeError || archiveSize == 0 ||
+		archiveSize > std::numeric_limits<std::uint64_t>::max() ||
+		archiveSize > std::numeric_limits<std::uint64_t>::max() -
+			ResourceDownloadDiskHeadroom ||
+		space.available < archiveSize + ResourceDownloadDiskHeadroom)
+	{
+		resourceInstallOperation = ResourceInstallOperation::ResourceImport;
+		resourceInstallDialogState = ResourceInstallDialogState::Failed;
+		resourceInstallDialogMessage =
+			sizeError ? std::string(u8"无法检查资源包或磁盘空间")
+				: std::string(u8"磁盘空间不足，无法导入资源包");
+		refreshResourceInstallDialogControls();
+		semanticFocusVisible = focusManager.focusNode("install-primary");
+		updateFocusPresentation();
+		return;
+	}
+
+	const std::filesystem::path updateDirectory =
+		OnlineUpdate::resourceUpdateDirectoryPath(collectionRoot);
+	const std::filesystem::path workspacePath =
+		OnlineUpdate::resourceUpdateWorkspacePath(collectionRoot);
+	const std::filesystem::path preparedRoot = workspacePath / "prepared";
+	std::error_code error;
+	const bool updateDirectoryExists =
+		std::filesystem::exists(updateDirectory, error);
+	if (error || (!updateDirectoryExists &&
+		(!std::filesystem::create_directory(updateDirectory, error) || error)) ||
+		!isPlainDirectory(updateDirectory) ||
+		std::filesystem::exists(workspacePath, error) || error ||
+		!std::filesystem::create_directories(preparedRoot, error) || error ||
+		!isPlainDirectory(workspacePath) || !isPlainDirectory(preparedRoot))
+	{
+		resourceInstallOperation = ResourceInstallOperation::ResourceImport;
+		resourceInstallDialogState = ResourceInstallDialogState::Failed;
+		resourceInstallDialogMessage =
+			u8"已有待处理资源更新，或无法创建安全的导入暂存目录";
+		refreshResourceInstallDialogControls();
+		semanticFocusVisible = focusManager.focusNode("install-primary");
+		updateFocusPresentation();
+		return;
+	}
+
+	resourceInstallOperation = ResourceInstallOperation::ResourceImport;
+	pendingResourceInstall = {};
+	pendingResourceInstall.collectionRoot = collectionRoot.generic_u8string();
+	pendingResourceInstall.totalDownloadBytes =
+		static_cast<std::uint64_t>(archiveSize);
+	resourceInstallWorkerResult =
+		std::make_shared<ResourceInstallWorkerResult>();
+	resourceInstallWorkerResult->operation = resourceInstallOperation;
+	resourceInstallWorkerResult->resourceImportStage =
+		ResourceImportWorkerStage::PreparingArchive;
+	resourceInstallWorkerResult->packageCount = 1;
+	resourceInstallWorkerResult->totalBytes =
+		pendingResourceInstall.totalDownloadBytes;
+	resourceInstallWorkerResult->progressStage.store(
+		ResourceInstallProgressStage::ValidatingAndExtracting,
+		std::memory_order_release);
+	const std::shared_ptr<ResourceInstallWorkerResult> workerResult =
+		resourceInstallWorkerResult;
+	const ResourcePackageImportKind importKind = resourcePackageImportKind;
+	resourceInstallDialogState = ResourceInstallDialogState::Downloading;
+	resourceInstallDialogMessage = importKind == ResourcePackageImportKind::Full
+		? std::string(u8"正在校验并解压完整资源包…")
+		: std::string(u8"正在校验并解压增量资源包…");
+	refreshResourceInstallDialogControls();
+	semanticFocusVisible = focusManager.focusNode("install-secondary");
+	resourceInstallRunner =
+		std::make_unique<GameLoading::ExclusiveLoadingRunner>(
+			[archivePath, workspacePath, workerResult, importKind](
+				const GameLoading::LoadingCancellationToken& cancellationToken)
+			{
+				const std::filesystem::path preparedPackagePath =
+					workspacePath / "prepared" /
+					(importKind == ResourcePackageImportKind::Full
+						? "package-0" : "overlay-0");
+				workerResult->importedPackage = importKind ==
+						ResourcePackageImportKind::Full
+					? OnlineUpdate::prepareImportedFullResourcePackageArchive(
+						archivePath, preparedPackagePath)
+					: OnlineUpdate::
+						prepareImportedIncrementalResourcePackageArchive(
+							archivePath, preparedPackagePath);
+				std::error_code archiveCleanupError;
+				std::filesystem::remove(archivePath, archiveCleanupError);
+				if (cancellationToken.isCancellationRequested())
+				{
+					std::error_code cleanupError;
+					std::filesystem::remove_all(workspacePath, cleanupError);
+					if (cleanupError)
+					{
+						workerResult->importedPackage.archive.status =
+							OnlineUpdate::ResourcePackageArchiveStatus::CleanupFailed;
+						return GameLoading::LoadingTaskResult::failure(
+							"Cancelled resource import cleanup failed.");
+					}
+					return GameLoading::LoadingTaskResult::cancellation();
+				}
+				if (!workerResult->importedPackage.succeeded())
+				{
+					std::error_code cleanupError;
+					std::filesystem::remove_all(workspacePath, cleanupError);
+					if (cleanupError)
+					{
+						workerResult->importedPackage.archive.status =
+							OnlineUpdate::ResourcePackageArchiveStatus::CleanupFailed;
+					}
+					return GameLoading::LoadingTaskResult::failure(
+						"Imported resource package validation failed.");
+				}
+				workerResult->completedBytes.store(
+					workerResult->totalBytes, std::memory_order_release);
+				return GameLoading::LoadingTaskResult::success();
+			});
+}
+
+bool ResourceSelectScene::buildResourceImportConfirmation(
+	const OnlineUpdate::ImportedResourcePackageMetadata& package,
+	ResourcePackageImportKind kind,
+	ResourceInstallConfirmation& confirmation,
+	std::string& errorText) const
+{
+	confirmation = {};
+	errorText.clear();
+	if ((!package.common &&
+			!OnlineUpdate::isValidOnlineGameId(package.gameId)) ||
+		(package.common && kind != ResourcePackageImportKind::Full))
+	{
+		errorText = u8"资源包身份无效";
+		return false;
+	}
+	std::filesystem::path collectionRoot;
+	try
+	{
+		collectionRoot = std::filesystem::canonical(
+			std::filesystem::u8path(
+				ResourceManager::instance().getWritableResourceCollectionRoot()));
+	}
+	catch (const std::exception&)
+	{
+		errorText = u8"应用专属资源目录无效";
+		return false;
+	}
+	if (!isPlainDirectory(collectionRoot))
+	{
+		errorText = u8"应用专属资源目录不可用";
+		return false;
+	}
+	if (package.common)
+	{
+		const std::filesystem::path commonRoot = collectionRoot / "common";
+		std::error_code commonError;
+		const bool replacing = std::filesystem::exists(commonRoot, commonError);
+		if (commonError || (replacing && !isPlainDirectory(commonRoot)))
+		{
+			errorText = u8"现有 common 目录不可安全替换";
+			return false;
+		}
+		confirmation.requestedGameId = "common";
+		confirmation.collectionRoot = collectionRoot.generic_u8string();
+		confirmation.totalDownloadBytes = package.artifactSize;
+		confirmation.requestedResourceInstalled = replacing;
+		confirmation.targets.push_back({ "common", "common" });
+		ResourceInstallConfirmationItem item;
+		item.title = u8"公共资源 common";
+		item.version = package.displayVersion;
+		item.targetDirectoryName = "common";
+		item.replacing = replacing;
+		item.releaseNotes = u8"common 版本：" +
+			valueOrUndeclared(package.displayVersion) +
+			u8"\n将完整替换应用专属 common。内容不兼容时，"
+			u8"可重新导入正确 common 修复。";
+		confirmation.items.push_back(std::move(item));
+		return true;
+	}
+
+	bool sameGameInstalled = false;
+	bool sameVersionInstalled = false;
+	bool overridingPackagedResource = false;
+	std::string targetDirectoryName;
+	std::filesystem::path installedResourceRoot;
+	const auto& packs = ResourceManager::instance().getDiscoveredPacks();
+	std::vector<std::string> warnings;
+	ModRelease::ModReleaseMetadata releaseMetadata;
+	releaseMetadata.minimumEngineVersion = package.minimumEngineVersion;
+	const ModRelease::CompatibilityStatus compatibility =
+		ModRelease::evaluateCompatibility(
+			releaseMetadata, JxqyBuildVersion::EngineVersion).status;
+	if (compatibility ==
+		ModRelease::CompatibilityStatus::RequiresNewerEngine)
+	{
+		warnings.push_back(
+			u8"警告：当前引擎版本过低；允许导入，但当前版本不能进入");
+	}
+	else if (compatibility ==
+		ModRelease::CompatibilityStatus::InvalidMinimumEngineVersion)
+	{
+		warnings.push_back(u8"警告：兼容性声明无效，运行结果未知");
+	}
+	for (const std::string& dependencyId : package.dependencyGameIds)
+	{
+		const std::size_t dependencyCount = static_cast<std::size_t>(
+			std::count_if(
+				packs.begin(), packs.end(),
+				[&dependencyId](const ResourceManager::ResourcePack& pack)
+				{
+					return OnlineUpdate::foldGameId(pack.manifest.id) ==
+						OnlineUpdate::foldGameId(dependencyId);
+				}));
+		if (dependencyCount != 1)
+		{
+			warnings.push_back(dependencyCount == 0
+				? std::string(u8"警告：缺少依赖 ") + dependencyId
+				: std::string(u8"警告：依赖 ID 重复 ") + dependencyId);
+		}
+	}
+	std::size_t sameIdentifierCount = 0;
+	for (const ResourceManager::ResourcePack& pack : packs)
+	{
+		if (OnlineUpdate::foldGameId(pack.manifest.id) !=
+			OnlineUpdate::foldGameId(package.gameId))
+		{
+			continue;
+		}
+		sameIdentifierCount++;
+		sameGameInstalled = true;
+		sameVersionInstalled = sameVersionInstalled ||
+			pack.manifest.releaseMetadata.displayVersion ==
+				package.displayVersion;
+		std::error_code canonicalError;
+		std::filesystem::path packRoot;
+		try
+		{
+			packRoot = std::filesystem::canonical(
+				std::filesystem::u8path(pack.rootPath), canonicalError);
+		}
+		catch (const std::exception&)
+		{
+			overridingPackagedResource = pack.sourceTag.empty();
+			continue;
+		}
+		std::error_code equivalentError;
+		if (canonicalError || !std::filesystem::equivalent(
+			packRoot.parent_path(), collectionRoot, equivalentError) ||
+			equivalentError)
+		{
+			overridingPackagedResource = pack.sourceTag.empty();
+			continue;
+		}
+		if (!isPlainDirectory(packRoot))
+		{
+			errorText = u8"现有同 ID 资源目录不可安全替换";
+			return false;
+		}
+		const std::string candidate =
+			packRoot.filename().generic_u8string();
+		if (!isSafeResourceDirectoryName(candidate) ||
+			(!targetDirectoryName.empty() &&
+				foldAscii(targetDirectoryName) != foldAscii(candidate)))
+		{
+			errorText = u8"存在多个同 ID 的可写资源目录";
+			return false;
+		}
+		targetDirectoryName = candidate;
+		installedResourceRoot = packRoot;
+	}
+	if (sameIdentifierCount > 1)
+	{
+		errorText = u8"存在多个同 ID 资源，无法确定导入目标";
+		return false;
+	}
+	if (sameIdentifierCount == 1 && targetDirectoryName.empty() &&
+		!(kind == ResourcePackageImportKind::Full &&
+			overridingPackagedResource))
+	{
+		errorText = kind == ResourcePackageImportKind::Incremental
+			? std::string(u8"增量包只能覆盖应用专属目录中的同 ID 基包")
+			: std::string(u8"同 ID 资源位于只读或外部目录，无法安全替换");
+		return false;
+	}
+	if (kind == ResourcePackageImportKind::Incremental &&
+		(sameIdentifierCount != 1 || installedResourceRoot.empty()))
+	{
+		errorText = u8"增量包需要一个同 ID 的可写完整基包";
+		return false;
+	}
+
+	if (kind == ResourcePackageImportKind::Full &&
+		targetDirectoryName.empty())
+	{
+		std::set<std::string> occupiedNames;
+		std::error_code directoryError;
+		for (std::filesystem::directory_iterator iterator(
+				collectionRoot,
+				std::filesystem::directory_options::skip_permission_denied,
+				directoryError), end;
+			!directoryError && iterator != end;
+			iterator.increment(directoryError))
+		{
+			occupiedNames.insert(foldAscii(
+				iterator->path().filename().generic_u8string()));
+		}
+		if (directoryError)
+		{
+			errorText = u8"无法读取应用专属资源目录";
+			return false;
+		}
+		const std::string baseName = isSafeResourceDirectoryName(package.gameId)
+			? package.gameId : std::string("resource");
+		targetDirectoryName = baseName;
+		for (int suffix = 2;
+			occupiedNames.find(foldAscii(targetDirectoryName)) !=
+				occupiedNames.end(); suffix++)
+		{
+			targetDirectoryName = baseName + "-" + std::to_string(suffix);
+		}
+	}
+
+	confirmation.requestedGameId = package.gameId;
+	confirmation.collectionRoot = collectionRoot.generic_u8string();
+	confirmation.totalDownloadBytes = package.artifactSize;
+	confirmation.requestedResourceInstalled = sameGameInstalled;
+	confirmation.requestedVersionMatches = sameVersionInstalled;
+	confirmation.targets.push_back({ package.gameId, targetDirectoryName });
+	if (kind == ResourcePackageImportKind::Incremental)
+	{
+		confirmation.installedResourceRoots.emplace(
+			package.gameId, installedResourceRoot);
+	}
+	ResourceInstallConfirmationItem item;
+	item.title = package.displayName.empty()
+		? package.gameId : package.displayName;
+	item.version = package.displayVersion;
+	item.targetDirectoryName = targetDirectoryName;
+	item.replacing = sameGameInstalled;
+	item.artifactKind = kind == ResourcePackageImportKind::Incremental
+		? OnlineUpdate::ResourceDownloadPlan::ArtifactKind::Incremental
+		: OnlineUpdate::ResourceDownloadPlan::ArtifactKind::Full;
+	item.releaseNotes = kind == ResourcePackageImportKind::Incremental
+		? std::string(u8"导入类型：增量包\n增量导入会保留 ZIP 中未覆盖的旧文件。"
+			u8"如果误选了完整包，可能残留旧文件，可重新导入正确完整包修复。")
+		: std::string(u8"导入类型：完整包\n完整导入会完全替换同 ID 资源。"
+			u8"如果选择的不是完整包，游戏可能无法运行，可重新导入正确完整包修复。");
+	if (overridingPackagedResource)
+	{
+		item.releaseNotes +=
+			u8"\n内置资源不可修改，本次会在应用专属目录安装覆盖版本；"
+			u8"删除覆盖版本后可恢复使用内置资源。";
+	}
+	item.releaseNotes += u8"\n最低引擎版本：" +
+		valueOrUndeclared(package.minimumEngineVersion);
+	if (!package.author.empty())
+	{
+		item.releaseNotes += u8"\n作者：" + package.author;
+	}
+	if (!package.dependencyGameIds.empty())
+	{
+		item.releaseNotes += u8"\n依赖：";
+		for (std::size_t index = 0;
+			index < package.dependencyGameIds.size(); index++)
+		{
+			if (index != 0)
+			{
+				item.releaseNotes += ", ";
+			}
+			item.releaseNotes += package.dependencyGameIds[index];
+		}
+	}
+	if (package.resourceOnly)
+	{
+		warnings.push_back(
+			u8"提示：这是 ResourceOnly 资源包，不能作为独立游戏进入");
+	}
+	for (const std::string& warning : warnings)
+	{
+		item.releaseNotes += "\n" + warning;
+	}
+	confirmation.items.push_back(std::move(item));
+	return true;
+}
+
+void ResourceSelectScene::startConfirmedResourceImport()
+{
+	if (resourceInstallOperation != ResourceInstallOperation::ResourceImport ||
+		resourceInstallDialogState != ResourceInstallDialogState::Confirming ||
+		resourceInstallRunner != nullptr ||
+		pendingResourceInstall.targets.size() != 1)
+	{
+		return;
+	}
+	if (resourcePackageImportKind == ResourcePackageImportKind::Incremental)
+	{
+		const auto installedRoot =
+			pendingResourceInstall.installedResourceRoots.find(
+				pendingResourceInstall.requestedGameId);
+		std::filesystem::path collectionRoot;
+		try
+		{
+			collectionRoot = std::filesystem::u8path(
+				pendingResourceInstall.collectionRoot);
+		}
+		catch (const std::exception&)
+		{
+			collectionRoot.clear();
+		}
+		std::uint64_t installedBytes = 0;
+		std::error_code spaceError;
+		const std::filesystem::space_info space = collectionRoot.empty()
+			? std::filesystem::space_info{}
+			: std::filesystem::space(collectionRoot, spaceError);
+		if (installedRoot ==
+				pendingResourceInstall.installedResourceRoots.end() ||
+			collectionRoot.empty() || spaceError ||
+			!calculatePlainDirectoryBytes(
+				installedRoot->second, installedBytes) ||
+			installedBytes > std::numeric_limits<std::uint64_t>::max() -
+				ResourceDownloadDiskHeadroom ||
+			space.available < installedBytes + ResourceDownloadDiskHeadroom)
+		{
+			resourceInstallDialogState = ResourceInstallDialogState::Failed;
+			resourceInstallDialogMessage = spaceError
+				? std::string(u8"无法检查增量安装所需磁盘空间")
+				: std::string(u8"增量安装需要复制完整基包，磁盘空间不足或基包不安全");
+			refreshResourceInstallDialogControls();
+			semanticFocusVisible = focusManager.focusNode("install-primary");
+			updateFocusPresentation();
+			return;
+		}
+
+		const std::filesystem::path workspacePath =
+			OnlineUpdate::resourceUpdateWorkspacePath(collectionRoot);
+		resourceInstallWorkerResult =
+			std::make_shared<ResourceInstallWorkerResult>();
+		resourceInstallWorkerResult->operation = resourceInstallOperation;
+		resourceInstallWorkerResult->resourceImportStage =
+			ResourceImportWorkerStage::MaterializingIncremental;
+		resourceInstallWorkerResult->packageCount = 1;
+		resourceInstallWorkerResult->totalBytes = installedBytes;
+		resourceInstallWorkerResult->progressStage.store(
+			ResourceInstallProgressStage::Staging,
+			std::memory_order_release);
+		const std::shared_ptr<ResourceInstallWorkerResult> workerResult =
+			resourceInstallWorkerResult;
+		const OnlineUpdate::ImportedResourcePackageMetadata package =
+			pendingImportedPackage;
+		const std::filesystem::path installedResourcePath =
+			installedRoot->second;
+		const std::string requestedGameId =
+			pendingResourceInstall.requestedGameId;
+		const std::vector<OnlineUpdate::ResourceInstallTarget> targets =
+			pendingResourceInstall.targets;
+		resourceInstallDialogState = ResourceInstallDialogState::Downloading;
+		resourceInstallDialogMessage =
+			u8"正在复制基包并应用增量资源…";
+		refreshResourceInstallDialogControls();
+		semanticFocusVisible = focusManager.focusNode("install-secondary");
+		resourceInstallRunner =
+			std::make_unique<GameLoading::ExclusiveLoadingRunner>(
+				[collectionRoot,
+				 workspacePath,
+				 installedResourcePath,
+				 requestedGameId,
+				 targets,
+				 package,
+				 workerResult](
+					const GameLoading::LoadingCancellationToken& cancellationToken)
+				{
+					workerResult->importedMaterialization =
+						OnlineUpdate::materializeImportedIncrementalResourcePackage(
+							package,
+							installedResourcePath,
+							workspacePath / "prepared" / "overlay-0",
+							workspacePath / "prepared" / "package-0");
+					if (cancellationToken.isCancellationRequested())
+					{
+						std::error_code cleanupError;
+						std::filesystem::remove_all(workspacePath, cleanupError);
+						return cleanupError
+							? GameLoading::LoadingTaskResult::failure(
+								"Cancelled incremental import cleanup failed.")
+							: GameLoading::LoadingTaskResult::cancellation();
+					}
+					if (!workerResult->importedMaterialization.succeeded())
+					{
+						return GameLoading::LoadingTaskResult::failure(
+							"Imported incremental package materialization failed.");
+					}
+					workerResult->transaction =
+						OnlineUpdate::stageResourceInstallTransaction(
+							collectionRoot, requestedGameId, targets);
+					if (workerResult->transaction.status !=
+						OnlineUpdate::ResourceInstallTransactionStatus::Success)
+					{
+						return GameLoading::LoadingTaskResult::failure(
+							"Imported incremental package staging failed.");
+					}
+					workerResult->completedBytes.store(
+						workerResult->totalBytes, std::memory_order_release);
+					return GameLoading::LoadingTaskResult::success();
+				});
+		return;
+	}
+	const OnlineUpdate::ResourceInstallTransactionResult transaction =
+		OnlineUpdate::stageResourceInstallTransaction(
+			std::filesystem::u8path(pendingResourceInstall.collectionRoot),
+			pendingResourceInstall.requestedGameId,
+			pendingResourceInstall.targets);
+	if (transaction.status !=
+		OnlineUpdate::ResourceInstallTransactionStatus::Success)
+	{
+		resourceInstallDialogState = ResourceInstallDialogState::Failed;
+		resourceInstallDialogMessage =
+			resourceTransactionFailureText(transaction.status);
+		cleanupPendingResourceImportWorkspace();
+	}
+	else
+	{
+		std::string activationError;
+		if (ResourceManager::instance().activateStagedResourceInstall(
+			activationError, true))
+		{
+			buildResourceList();
+			configureFocus();
+			resourceInstallDialogState = ResourceInstallDialogState::Completed;
+			resourceInstallDialogMessage =
+				u8"资源包已导入应用专属目录并刷新资源列表。"
+				u8"关闭此提示后即可选择进入。";
+			catalogStatusText = u8"资源包导入完成";
+		}
+		else
+		{
+			resourceInstallDialogState = ResourceInstallDialogState::Failed;
+			resourceInstallDialogMessage = activationError.empty()
+				? std::string(u8"资源包未能启用，请重启后重试")
+				: activationError;
+			catalogStatusText = u8"资源包导入失败";
+		}
+	}
+	refreshResourceInstallDialogControls();
+	semanticFocusVisible = focusManager.focusNode("install-primary");
+	updateFocusPresentation();
+}
+
+bool ResourceSelectScene::cleanupPendingResourceImportWorkspace()
+{
+	if (pendingResourceInstall.collectionRoot.empty())
+	{
+		return true;
+	}
+	std::filesystem::path collectionRoot;
+	try
+	{
+		collectionRoot = std::filesystem::u8path(
+			pendingResourceInstall.collectionRoot);
+	}
+	catch (const std::exception&)
+	{
+		return false;
+	}
+	const std::filesystem::path workspacePath =
+		OnlineUpdate::resourceUpdateWorkspacePath(collectionRoot);
+	if (!removePlainOwnedDirectoryIfPresent(workspacePath))
+	{
+		return false;
+	}
+	std::error_code error;
+	std::filesystem::remove(
+		OnlineUpdate::resourceUpdateDirectoryPath(collectionRoot), error);
+	return true;
 }
 
 bool ResourceSelectScene::buildResourceInstallConfirmation(
@@ -3095,7 +3927,12 @@ void ResourceSelectScene::executeSaveRemoval()
 
 void ResourceSelectScene::activateResourceDialogPrimary()
 {
-	if (resourceInstallDialogState == ResourceInstallDialogState::Confirming)
+	if (resourceInstallDialogState ==
+		ResourceInstallDialogState::ChoosingImportType)
+	{
+		beginResourcePackageImportSelection(ResourcePackageImportKind::Full);
+	}
+	else if (resourceInstallDialogState == ResourceInstallDialogState::Confirming)
 	{
 		if (resourceInstallOperation == ResourceInstallOperation::ResourceRemoval)
 		{
@@ -3103,6 +3940,12 @@ void ResourceSelectScene::activateResourceDialogPrimary()
 		}
 		else
 		{
+			if (resourceInstallOperation ==
+				ResourceInstallOperation::ResourceImport)
+			{
+				startConfirmedResourceImport();
+				return;
+			}
 			if (pendingDownloadUsesMeteredNetwork &&
 				!pendingMeteredDownloadConfirmed)
 			{
@@ -3160,6 +4003,13 @@ void ResourceSelectScene::activateResourceDialogPrimary()
 
 void ResourceSelectScene::activateResourceDialogSecondary()
 {
+	if (resourceInstallDialogState ==
+		ResourceInstallDialogState::ChoosingImportType)
+	{
+		beginResourcePackageImportSelection(
+			ResourcePackageImportKind::Incremental);
+		return;
+	}
 	if (resourceInstallDialogState ==
 		ResourceInstallDialogState::ConfirmingSaveRemoval)
 	{
@@ -4135,6 +4985,104 @@ void ResourceSelectScene::finishResourceInstall(
 		resourceInstallDialogMessage = u8"资源操作结果不可用";
 	}
 	else if (resourceInstallWorkerResult->operation ==
+		ResourceInstallOperation::ResourceImport)
+	{
+		if (completion.taskResult.status ==
+			GameLoading::LoadingTaskStatus::Cancelled)
+		{
+			cleanupPendingResourceImportWorkspace();
+			catalogStatusText = u8"资源包导入已取消，现有资源未改变";
+			resourceInstallDialogState = ResourceInstallDialogState::Hidden;
+			pendingResourceInstall = {};
+			resourceInstallDialogMessage.clear();
+			resourceInstallConfirmationPage = 0;
+			refreshResourceInstallDialogControls();
+			setMainControlsAvailable(true);
+			semanticFocusVisible = focusManager.focusNode("enable-external");
+			updateFocusPresentation();
+			return;
+		}
+		if (resourceInstallWorkerResult->resourceImportStage ==
+			ResourceImportWorkerStage::MaterializingIncremental)
+		{
+			if (completion.taskResult.succeeded() &&
+				resourceInstallWorkerResult->importedMaterialization.succeeded() &&
+				resourceInstallWorkerResult->transaction.status ==
+					OnlineUpdate::ResourceInstallTransactionStatus::Success)
+			{
+				std::string activationError;
+				if (ResourceManager::instance().activateStagedResourceInstall(
+					activationError, true))
+				{
+					buildResourceList();
+					configureFocus();
+					resourceInstallDialogState =
+						ResourceInstallDialogState::Completed;
+					resourceInstallDialogMessage =
+						u8"增量包已覆盖到同 ID 基包并刷新资源列表。";
+					catalogStatusText = u8"增量资源包导入完成";
+				}
+				else
+				{
+					resourceInstallDialogState =
+						ResourceInstallDialogState::Failed;
+					resourceInstallDialogMessage = activationError.empty()
+						? std::string(u8"增量资源未能启用，请重启后重试")
+						: activationError;
+					catalogStatusText = u8"增量资源包导入失败";
+				}
+			}
+			else
+			{
+				resourceInstallDialogState = ResourceInstallDialogState::Failed;
+				if (!resourceInstallWorkerResult->importedMaterialization.succeeded())
+				{
+					resourceInstallDialogMessage = importedResourcePackageFailureText(
+						resourceInstallWorkerResult->importedMaterialization.status);
+				}
+				else
+				{
+					resourceInstallDialogMessage = resourceTransactionFailureText(
+						resourceInstallWorkerResult->transaction.status);
+				}
+				cleanupPendingResourceImportWorkspace();
+				catalogStatusText =
+					u8"增量资源包导入失败，现有资源未改变";
+			}
+		}
+		else
+		{
+			std::string confirmationError;
+			ResourceInstallConfirmation confirmation;
+			if (completion.taskResult.succeeded() &&
+				resourceInstallWorkerResult->importedPackage.succeeded() &&
+				buildResourceImportConfirmation(
+					resourceInstallWorkerResult->importedPackage.package,
+					resourcePackageImportKind,
+					confirmation,
+					confirmationError))
+			{
+				pendingImportedPackage =
+					resourceInstallWorkerResult->importedPackage.package;
+				pendingResourceInstall = std::move(confirmation);
+				resourceInstallDialogState =
+					ResourceInstallDialogState::Confirming;
+				resourceInstallDialogMessage.clear();
+				resourceInstallConfirmationPage = 0;
+			}
+			else
+			{
+				resourceInstallDialogState = ResourceInstallDialogState::Failed;
+				resourceInstallDialogMessage = !confirmationError.empty()
+					? confirmationError
+					: importedResourcePackageFailureText(
+						resourceInstallWorkerResult->importedPackage.archive.status);
+				cleanupPendingResourceImportWorkspace();
+				catalogStatusText = u8"资源包校验失败，现有资源未改变";
+			}
+		}
+	}
+	else if (resourceInstallWorkerResult->operation ==
 		ResourceInstallOperation::ProgramDownload)
 	{
 		if (completion.taskResult.status ==
@@ -4254,8 +5202,7 @@ void ResourceSelectScene::finishResourceInstall(
 			resourceInstallDialogMessage = activationError.empty()
 				? std::string(u8"资源已下载，但未能刷新资源列表")
 				: activationError;
-			catalogStatusText =
-				u8"资源刷新失败，现有资源仍可继续使用";
+			catalogStatusText = u8"资源刷新失败，请按提示处理";
 		}
 	}
 	else
@@ -4280,7 +5227,8 @@ void ResourceSelectScene::finishResourceInstall(
 	}
 	refreshResourceInstallDialogControls();
 	semanticFocusVisible = focusManager.focusNode(
-		resourceInstallDialogState == ResourceInstallDialogState::ReadyToRestart
+		resourceInstallDialogState == ResourceInstallDialogState::ReadyToRestart ||
+			resourceInstallDialogState == ResourceInstallDialogState::Confirming
 			? "install-secondary" : "install-primary");
 	updateFocusPresentation();
 }
@@ -4463,7 +5411,10 @@ void ResourceSelectScene::cancelResourceInstall()
 			resourceInstallRunner->requestCancellation();
 			resourceInstallDialogState =
 				ResourceInstallDialogState::Cancelling;
-			resourceInstallDialogMessage = u8"正在取消下载…";
+			resourceInstallDialogMessage = resourceInstallOperation ==
+					ResourceInstallOperation::ResourceImport
+				? std::string(u8"正在取消导入…")
+				: std::string(u8"正在取消下载…");
 			refreshResourceInstallDialogControls();
 			updateFocusPresentation();
 		}
@@ -4482,9 +5433,22 @@ void ResourceSelectScene::dismissResourceInstallDialog()
 	{
 		return;
 	}
+	if (resourceInstallOperation == ResourceInstallOperation::ResourceImport &&
+		!cleanupPendingResourceImportWorkspace())
+	{
+		resourceInstallDialogState = ResourceInstallDialogState::Failed;
+		resourceInstallDialogMessage =
+			u8"无法清理资源包导入暂存目录，请重启后重试";
+		refreshResourceInstallDialogControls();
+		semanticFocusVisible = focusManager.focusNode("install-primary");
+		updateFocusPresentation();
+		return;
+	}
 	resourceInstallDialogState = ResourceInstallDialogState::Hidden;
 	resourceInstallOperation = ResourceInstallOperation::OnlineDownload;
 	pendingResourceInstall = {};
+	resourcePackageImportKind = ResourcePackageImportKind::Full;
+	pendingImportedPackage = {};
 	pendingProgramPackagePath.clear();
 	resourceInstallDialogMessage.clear();
 	resourceInstallConfirmationPage = 0;
@@ -4540,7 +5504,20 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 			resourceInstallNextPageButton, false, false);
 		return;
 	}
-	if (resourceInstallDialogState == ResourceInstallDialogState::Confirming)
+	if (resourceInstallDialogState ==
+		ResourceInstallDialogState::ChoosingImportType)
+	{
+		resourceInstallPrimaryButton->setUTF8Str(u8"导入完整包");
+		resourceInstallSecondaryButton->setUTF8Str(u8"导入增量包");
+		resourceInstallPreviousPageButton->setUTF8Str(u8"返回");
+		primaryVisible = true;
+		primaryActivated = true;
+		secondaryVisible = true;
+		secondaryActivated = true;
+		previousVisible = true;
+		previousActivated = true;
+	}
+	else if (resourceInstallDialogState == ResourceInstallDialogState::Confirming)
 	{
 		if (resourceInstallOperation ==
 			ResourceInstallOperation::ResourceRemoval)
@@ -4582,6 +5559,15 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 				resourceInstallPrimaryButton->setUTF8Str(
 					update.hasUpdate() ? u8"下载并更新" : u8"确认重装");
 #endif
+			}
+			else if (resourceInstallOperation ==
+				ResourceInstallOperation::ResourceImport)
+			{
+				const bool replacing =
+					!pendingResourceInstall.items.empty() &&
+					pendingResourceInstall.items.front().replacing;
+				resourceInstallPrimaryButton->setUTF8Str(
+					replacing ? u8"确认替换" : u8"确认导入");
 			}
 			else
 			{
@@ -4647,7 +5633,9 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 	else if (resourceInstallDialogState ==
 		ResourceInstallDialogState::Downloading)
 	{
-		resourceInstallSecondaryButton->setUTF8Str(u8"取消下载");
+		resourceInstallSecondaryButton->setUTF8Str(
+			resourceInstallOperation == ResourceInstallOperation::ResourceImport
+				? u8"取消导入" : u8"取消下载");
 		secondaryVisible = true;
 		secondaryActivated = true;
 	}
@@ -4721,6 +5709,12 @@ void ResourceSelectScene::moveResourceInstallConfirmationPage(int offset)
 {
 	if (offset == 0)
 	{
+		return;
+	}
+	if (resourceInstallDialogState ==
+		ResourceInstallDialogState::ChoosingImportType)
+	{
+		dismissResourceInstallDialog();
 		return;
 	}
 	if (resourceInstallDialogState == ResourceInstallDialogState::Confirming &&
@@ -5130,7 +6124,17 @@ void ResourceSelectScene::configureFocus()
 			"enable-external",
 			enableExternalButton,
 			{ "resource-actions", 1, 0 },
-			[this]() { showExternalResourceDialog(true); },
+			[this]()
+			{
+				if (externalResourceToggleAvailable())
+				{
+					showExternalResourceDialog(true);
+				}
+				else
+				{
+					showResourcePackageImportMenu();
+				}
+			},
 			UIFocusManager::ActionHandler(),
 			[this](UIFocusDirection direction)
 			{
@@ -5166,7 +6170,7 @@ void ResourceSelectScene::configureFocus()
 			{
 				if (direction == UIFocusDirection::Up)
 				{
-					// 移动端竖直顺序：resource-list → enable-external → external-links。
+					// 移动端竖直顺序：resource-list → footer action → external-links。
 					// 桌面端：resource-list → external-links（无中间节点）。
 					if (enableExternalButton != nullptr)
 					{
@@ -5476,6 +6480,11 @@ void ResourceSelectScene::confirmSelection()
 		catalogStatusText = u8"资源配置错误，不能进入：" + entry.title;
 		return;
 	}
+	if (entry.requiresNewerEngine)
+	{
+		catalogStatusText = u8"当前引擎版本过低，不能进入：" + entry.title;
+		return;
+	}
 	if (entry.isOnlineOnly())
 	{
 		beginResourceDownloadConfirmation();
@@ -5496,7 +6505,8 @@ void ResourceSelectScene::enterSelectedResource(int selectedIndex)
 		return;
 	}
 	const ResourceSelectionEntry& entry = resourceEntries[selectedIndex];
-	if (entry.configurationError || entry.localPackIndex < 0)
+	if (entry.configurationError || entry.requiresNewerEngine ||
+		entry.localPackIndex < 0)
 	{
 		return;
 	}
@@ -6046,11 +7056,11 @@ void ResourceSelectScene::updateLayout(int width, int height)
 		: minimumListHeight + narrowDetailHeight + detailGap;
 	const int reservedFooterHeight = compactMobileLayout
 		? CompactMobilePanelListTopOffset +
-			(externalResourceToggleAvailable()
+			(mobileResourceFooterActionAvailable()
 				? CompactMobileExternalFooterHeight
 				: CompactMobileCreditsFooterHeight)
 		: footerReservedHeight() -
-			(compactVerticalLayout && externalResourceToggleAvailable()
+			(compactVerticalLayout && mobileResourceFooterActionAvailable()
 				? 12
 				: 0);
 	const int desiredPanelHeight =
@@ -6846,6 +7856,7 @@ void ResourceSelectScene::onDraw()
 {
 	pollOnlineCatalogCheck();
 	presentPendingProgramUpdateDialog();
+	pollResourcePackageImportSelection();
 	pollResourceInstall();
 	// 权限设置页返回后只检查一次；只有实际授权成功才提交“已开启”。
 	if (pendingExternalRescan &&
@@ -6933,7 +7944,10 @@ void ResourceSelectScene::onDrawEnd()
 				{ InputAction::Cancel,
 					resourceInstallDialogState ==
 						ResourceInstallDialogState::Downloading
-						? "取消下载" : "返回" }
+						? resourceInstallOperation ==
+								ResourceInstallOperation::ResourceImport
+							? "取消导入" : "取消下载"
+						: "返回" }
 			};
 	}
 	else if (!resourceInstallDialogVisible)
@@ -7107,21 +8121,26 @@ void ResourceSelectScene::drawPanel()
 		{
 			const Rect pathHintRect = getExternalResourcePathHintRect();
 			drawCenteredText(
-				ExternalResourceCollectionInstruction,
+				externalResourceToggleAvailable()
+					? ExternalResourceCollectionInstruction
+					: ResourcePackageImportInstruction,
 				centerX,
 				pathHintRect.y,
 				17,
 				0xFFD8C59A,
 				pathHintRect.w,
 				14);
-			drawCenteredText(
-				externalResourceDirectoryPath,
-				centerX,
-				pathHintRect.y + 21,
-				18,
-				0xFFFFE7B0,
-				pathHintRect.w,
-				14);
+			if (externalResourceToggleAvailable())
+			{
+				drawCenteredText(
+					externalResourceDirectoryPath,
+					centerX,
+					pathHintRect.y + 21,
+					18,
+					0xFFFFE7B0,
+					pathHintRect.w,
+					14);
+			}
 		}
 	}
 
@@ -7372,6 +8391,9 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 	std::string title;
 	switch (resourceInstallDialogState)
 	{
+	case ResourceInstallDialogState::ChoosingImportType:
+		title = u8"导入资源包";
+		break;
 	case ResourceInstallDialogState::Confirming:
 		if (pendingDownloadUsesMeteredNetwork &&
 			pendingMeteredDownloadConfirmed &&
@@ -7385,6 +8407,11 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			ResourceInstallOperation::ResourceRemoval)
 		{
 			title = u8"确认删除游戏资源";
+		}
+		else if (resourceInstallOperation ==
+			ResourceInstallOperation::ResourceImport)
+		{
+			title = u8"确认导入资源包";
 		}
 		else if (resourceInstallOperation ==
 			ResourceInstallOperation::ProgramDownload)
@@ -7421,12 +8448,17 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		break;
 	case ResourceInstallDialogState::Downloading:
 		title = resourceInstallOperation ==
-					ResourceInstallOperation::ProgramDownload
+				ResourceInstallOperation::ProgramDownload
 			? u8"正在准备主程序"
-			: u8"正在准备游戏资源";
+			: resourceInstallOperation ==
+					ResourceInstallOperation::ResourceImport
+				? u8"正在校验资源包"
+				: u8"正在准备游戏资源";
 		break;
 	case ResourceInstallDialogState::Cancelling:
-		title = u8"正在取消下载";
+		title = resourceInstallOperation ==
+				ResourceInstallOperation::ResourceImport
+			? u8"正在取消导入" : u8"正在取消下载";
 		break;
 	case ResourceInstallDialogState::ReadyToRestart:
 		title = resourceInstallOperation ==
@@ -7443,6 +8475,11 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			ResourceInstallOperation::ResourceRemoval)
 		{
 			title = u8"资源删除完成";
+		}
+		else if (resourceInstallOperation ==
+			ResourceInstallOperation::ResourceImport)
+		{
+			title = u8"资源包导入完成";
 		}
 		else
 		{
@@ -7465,6 +8502,11 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		{
 			title = u8"存档删除失败";
 		}
+		else if (resourceInstallOperation ==
+			ResourceInstallOperation::ResourceImport)
+		{
+			title = u8"资源包导入失败";
+		}
 		else
 		{
 			title = u8"资源准备失败";
@@ -7480,6 +8522,27 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		25, 0xFFFFE7B0, std::max(1, dialog.w - 32), 17);
 	engine->fillRect(dialog.x + 16, dialog.y + 50,
 		std::max(1, dialog.w - 32), 1, 216, 184, 112, 120);
+	if (resourceInstallDialogState ==
+		ResourceInstallDialogState::ChoosingImportType)
+	{
+		drawCenteredText(
+			u8"请选择要导入的资源包类型",
+			dialog.x + dialog.w / 2,
+			dialog.y + 82,
+			21, 0xFFFFE7B0, dialog.w - 48, 16);
+		drawWrappedDescription(
+			u8"完整包：导入游戏、MOD、ResourceOnly 资源或 common，"
+			u8"程序会自动识别。\n\n"
+			u8"增量包：覆盖到本机唯一的同 Game.Id 可写基包。"
+			u8"不要求与线上目录一致，导入错误可重新导入修复。",
+			{ dialog.x + 36, dialog.y + 122,
+				std::max(1, dialog.w - 72),
+				std::max(1,
+					getResourceInstallPreviousPageButtonRect().y -
+						dialog.y - 142) },
+			16, 0xFFFFFFFF);
+		return;
+	}
 
 	if (resourceInstallDialogState == ResourceInstallDialogState::Confirming)
 	{
@@ -7633,6 +8696,67 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 						u8"下载完成后仍由你决定是否安装；assets 和 save 不会改变。"),
 				dialog.x + 26, footerY, 13, 0xFFBFE2B4,
 				std::max(1, dialog.w - 52), 12);
+			return;
+		}
+		if (resourceInstallOperation ==
+			ResourceInstallOperation::ResourceImport)
+		{
+			const ResourceInstallConfirmationItem* item =
+				pendingResourceInstall.items.empty()
+					? nullptr : &pendingResourceInstall.items.front();
+			if (item == nullptr)
+			{
+				drawCenteredText(
+					u8"资源包信息不可用。",
+					dialog.x + dialog.w / 2,
+					dialog.y + 112,
+					18, 0xFFFFB0A0, dialog.w - 48, 14);
+				return;
+			}
+			drawTextLine(
+				item->replacing
+					? std::string(
+						u8"已存在相同 Game.Id；确认后才会原子替换，失败会恢复原资源。")
+					: std::string(
+						u8"确认后安装到应用专属目录；失败不会改变现有资源。"),
+				dialog.x + 22, dialog.y + 62, 16,
+				item->replacing ? 0xFFFFD39A : 0xFFBFE2B4,
+				std::max(1, dialog.w - 44), 14);
+			int lineY = dialog.y + 98;
+			drawTextLine(
+				(resourcePackageImportKind ==
+						ResourcePackageImportKind::Incremental
+					? std::string(u8"增量：")
+					: item->replacing ? std::string(u8"替换：")
+						: std::string(u8"新增：")) +
+					item->title + u8"    版本：" +
+					valueOrUndeclared(item->version),
+				dialog.x + 26, lineY, 16, 0xFFFFE7B0,
+				std::max(1, dialog.w - 52), 14);
+			lineY += 24;
+			drawTextLine(
+				u8"Game.Id：" + pendingResourceInstall.requestedGameId,
+				dialog.x + 38, lineY, 14, 0xFFB9AA87,
+				std::max(1, dialog.w - 64), 13);
+			lineY += 22;
+			drawTextLine(
+				u8"目录：assets/" + item->targetDirectoryName + "/",
+				dialog.x + 38, lineY, 14, 0xFFB9AA87,
+				std::max(1, dialog.w - 64), 13);
+			lineY += 22;
+			drawTextLine(
+				u8"压缩包：" + formatByteCount(
+					pendingResourceInstall.totalDownloadBytes),
+				dialog.x + 38, lineY, 14, 0xFFB9AA87,
+				std::max(1, dialog.w - 64), 13);
+			lineY += 28;
+			drawWrappedDescription(
+				item->releaseNotes,
+				{ dialog.x + 38, lineY,
+					std::max(1, dialog.w - 64),
+					std::max(1,
+						getResourceInstallPrimaryButtonRect().y - lineY - 12) },
+				14, 0xFFFFFFFF);
 			return;
 		}
 		std::string actionDescription;
@@ -7835,11 +8959,17 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				progressMessage = resourceInstallOperation ==
 						ResourceInstallOperation::ProgramDownload
 					? std::string(u8"下载完成，正在校验并解压主程序…")
-					: std::string(u8"下载完成，正在校验并解压当前资源…");
+					: resourceInstallOperation ==
+							ResourceInstallOperation::ResourceImport
+						? std::string(u8"正在校验并解压所选资源包…")
+						: std::string(u8"下载完成，正在校验并解压当前资源…");
 			}
 			else if (progressStage == ResourceInstallProgressStage::Staging)
 			{
-				progressMessage = u8"解压完成，正在启用并刷新资源列表…";
+				progressMessage = resourceInstallOperation ==
+						ResourceInstallOperation::ResourceImport
+					? std::string(u8"正在复制基包、应用增量并准备原子替换…")
+					: std::string(u8"解压完成，正在启用并刷新资源列表…");
 			}
 		}
 		drawCenteredText(progressMessage,
@@ -8335,7 +9465,14 @@ void ResourceSelectScene::onChildCallBack(PElement child)
 	}
 	if (child == enableExternalButton)
 	{
-		showExternalResourceDialog(false);
+		if (externalResourceToggleAvailable())
+		{
+			showExternalResourceDialog(false);
+		}
+		else
+		{
+			showResourcePackageImportMenu();
+		}
 		return;
 	}
 	for (int linkIndex = 0; linkIndex < static_cast<int>(externalLinkButtons.size()); linkIndex++)
@@ -8378,12 +9515,17 @@ bool ResourceSelectScene::onHandleEvent(AEvent& event)
 	}
 	return cheatHelpVisible || externalResourceDialogVisible ||
 		displaySettingsVisible ||
+		resourcePackageImportSelectionPending ||
 		resourceInstallDialogState != ResourceInstallDialogState::Hidden;
 }
 
 bool ResourceSelectScene::onHandleUIAction(UIAction action)
 {
 	keyboardSemanticFocus = dispatchingKeyboardUIAction;
+	if (resourcePackageImportSelectionPending)
+	{
+		return true;
+	}
 	if (displaySettingsVisible)
 	{
 		if (action == UIAction::Cancel)
@@ -8444,6 +9586,12 @@ bool ResourceSelectScene::onHandleUIAction(UIAction action)
 		}
 		if (action == UIAction::Cancel)
 		{
+			if (resourceInstallDialogState ==
+				ResourceInstallDialogState::ChoosingImportType)
+			{
+				dismissResourceInstallDialog();
+				return true;
+			}
 			if (resourceInstallDialogState ==
 					ResourceInstallDialogState::Confirming &&
 				resourceInstallOperation ==

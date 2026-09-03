@@ -2,6 +2,7 @@
 
 #include "ArtifactChecksum.h"
 #include "../File/StrictRelativeResourcePath.h"
+#include "../Resource/ModReleaseMetadata.h"
 #include "../Resource/ResourceIniReader.h"
 #include "../Resource/ResourceManifest.h"
 
@@ -753,11 +754,26 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	const std::string& desktopProgramBinPrefix,
 	const std::string& requiredProgramExecutable,
 	const std::string& requiredProgramUpdaterPath,
+	ImportedResourcePackageMetadata* importedResourcePackage,
+	bool importingIncrementalResource,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits)
 {
 	ResourcePackageArchiveResult result;
+	if (importedResourcePackage != nullptr)
+	{
+		*importedResourcePackage = {};
+	}
+	const bool importingResource =
+		archiveKind == PackageArchiveKind::Resource &&
+		expectedResourcePackage == nullptr &&
+		importedResourcePackage != nullptr;
+	const bool importingCommon =
+		archiveKind == PackageArchiveKind::Common &&
+		expectedCommonPackage == nullptr &&
+		importedResourcePackage != nullptr;
+	const bool importingPackage = importingResource || importingCommon;
 	std::vector<std::string> parsedChainReceipts;
 	const bool invalidInstalledReceipts = expectedResourcePackage != nullptr &&
 		(!isValidCrc32Hex(installedFullArtifactCrc32) ||
@@ -769,8 +785,10 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		limits.maximumEntryCount == 0 ||
 		limits.maximumUncompressedBytes == 0 ||
 		limits.maximumManifestBytes == 0 ||
-		expectedArtifactSize == 0 ||
-		!isValidCrc32Hex(expectedCrc32Hex) ||
+		(importingIncrementalResource && !importingResource) ||
+		(!importingPackage &&
+			(expectedArtifactSize == 0 ||
+				!isValidCrc32Hex(expectedCrc32Hex))) ||
 		invalidInstalledReceipts)
 	{
 		result.status = ResourcePackageArchiveStatus::InvalidInput;
@@ -814,8 +832,9 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	std::uint32_t checksum = 0;
 	std::uint64_t artifactSize = 0;
 	if (!calculateFileCrc32(archivePath, checksum, artifactSize) ||
-		artifactSize != expectedArtifactSize ||
-		crc32ToLowerHex(checksum) != expectedCrc32Hex)
+		(!importingPackage &&
+			(artifactSize != expectedArtifactSize ||
+				crc32ToLowerHex(checksum) != expectedCrc32Hex)))
 	{
 		result.status = ResourcePackageArchiveStatus::ArtifactMismatch;
 		result.filesystemPath = archivePath;
@@ -1036,6 +1055,12 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		result.status = ResourcePackageArchiveStatus::CommonVersionMismatch;
 		return result;
 	}
+	if (importingCommon && commonVersionCount == 0)
+	{
+		result.status = ResourcePackageArchiveStatus::MissingCommonBootstrap;
+		result.archiveEntryPath = "version.ini";
+		return result;
+	}
 	if (archiveKind == PackageArchiveKind::DesktopProgram &&
 		!desktopProgramExecutableFound)
 	{
@@ -1089,6 +1114,17 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			result.archiveEntryPath = entry.path;
 			return result;
 		}
+	}
+	std::error_code spaceError;
+	const std::filesystem::space_info space =
+		std::filesystem::space(destinationParent, spaceError);
+	if (spaceError || result.uncompressedBytes > space.available ||
+		limits.minimumFreeSpaceAfterExtractionBytes >
+			space.available - result.uncompressedBytes)
+	{
+		result.status = ResourcePackageArchiveStatus::InsufficientDiskSpace;
+		result.filesystemPath = destinationParent;
+		return result;
 	}
 
 	std::error_code createRootError;
@@ -1177,9 +1213,10 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	{
 		const std::filesystem::path versionPath =
 			destinationPath / "version.ini";
-		const std::string expectedVersionFile =
-			"[Common]\nVersion=" +
-			expectedCommonPackage->versionText + "\n";
+		const std::string expectedVersionFile = importingCommon
+			? std::string()
+			: "[Common]\nVersion=" +
+				expectedCommonPackage->versionText + "\n";
 		if (commonVersionCount == 0)
 		{
 			std::ofstream versionOutput(
@@ -1208,7 +1245,8 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			!parseCommonPackageVersion(
 				std::string_view(versionBytes.data(), versionBytes.size()),
 				installedVersion) ||
-			installedVersion != expectedCommonPackage->versionText)
+			(!importingCommon &&
+				installedVersion != expectedCommonPackage->versionText))
 		{
 			result.status =
 				ResourcePackageArchiveStatus::CommonVersionMismatch;
@@ -1216,13 +1254,15 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			return cleanupFailure(
 				result, destinationPath, destinationCreated);
 		}
+		const std::string artifactCrc32 = importingCommon
+			? crc32ToLowerHex(checksum) : expectedCrc32Hex;
 		if (!writeIniValue(
 				versionPath,
 				versionBytes,
 				MaximumCommonVersionFileBytes,
 				"Common",
 				"InstalledArtifactCrc32",
-				expectedCrc32Hex))
+				artifactCrc32))
 		{
 			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
 			result.filesystemPath = versionPath;
@@ -1237,13 +1277,22 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			!parseCommonPackageInstallation(
 				std::string_view(versionBytes.data(), versionBytes.size()),
 				installation) ||
-			installation.versionText != expectedCommonPackage->versionText ||
-			installation.installedArtifactCrc32 != expectedCrc32Hex)
+			installation.versionText != installedVersion ||
+			installation.installedArtifactCrc32 != artifactCrc32)
 		{
 			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
 			result.filesystemPath = versionPath;
 			return cleanupFailure(
 				result, destinationPath, destinationCreated);
+		}
+		if (importingCommon)
+		{
+			importedResourcePackage->gameId = "common";
+			importedResourcePackage->displayName = "common";
+			importedResourcePackage->displayVersion = installedVersion;
+			importedResourcePackage->artifactSize = artifactSize;
+			importedResourcePackage->artifactCrc32 = artifactCrc32;
+			importedResourcePackage->common = true;
 		}
 		result.status = ResourcePackageArchiveStatus::Success;
 		result.filesystemPath = destinationPath;
@@ -1358,7 +1407,6 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		return result;
 	}
 
-	const ResourcePackage& expectedPackage = *expectedResourcePackage;
 	std::vector<char> manifestBytes;
 	const std::filesystem::path manifestPath =
 		destinationPath / "game_profile.ini";
@@ -1381,6 +1429,102 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		result.filesystemPath = manifestPath;
 		return cleanupFailure(result, destinationPath, destinationCreated);
 	}
+	if (importingResource)
+	{
+		const std::vector<std::string> dependencies =
+			manifest.getDependencyIds();
+		if (!isValidOnlineGameId(manifest.id))
+		{
+			result.status = ResourcePackageArchiveStatus::GameIdMismatch;
+			result.filesystemPath = manifestPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
+		if (std::any_of(
+			dependencies.begin(), dependencies.end(),
+			[](const std::string& dependency)
+			{
+				return !isValidOnlineGameId(dependency);
+			}))
+		{
+			result.status = ResourcePackageArchiveStatus::DependencyMismatch;
+			result.filesystemPath = manifestPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
+		const std::vector<ModRelease::MetadataValidationIssue> metadataIssues =
+			ModRelease::validateMetadata(manifest.releaseMetadata);
+		const bool unsafeVisibleMetadata = std::any_of(
+			metadataIssues.begin(), metadataIssues.end(),
+			[](const ModRelease::MetadataValidationIssue& issue)
+			{
+				return issue.field == ModRelease::MetadataField::DisplayVersion ||
+					issue.field == ModRelease::MetadataField::CoverPath ||
+					issue.field ==
+						ModRelease::MetadataField::DescriptionFilePath;
+			});
+		if (unsafeVisibleMetadata)
+		{
+			result.status = ResourcePackageArchiveStatus::InvalidManifest;
+			result.filesystemPath = manifestPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
+		const std::string artifactCrc32 = crc32ToLowerHex(checksum);
+		if (!importingIncrementalResource && (!writeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledArtifactCrc32",
+				artifactCrc32) ||
+			!readManifest(
+				manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+			!removeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledIncrementalArtifactCrc32") ||
+			!readManifest(
+				manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+			!removeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledIncrementalChainCrc32s") ||
+			!readManifest(
+				manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+			!manifest.loadFromBuffer(
+				manifestBytes.data(), static_cast<int>(manifestBytes.size())) ||
+			manifest.releaseMetadata.installedArtifactCrc32 != artifactCrc32 ||
+			!manifest.releaseMetadata.installedIncrementalArtifactCrc32.empty() ||
+			!manifest.releaseMetadata.installedIncrementalChainCrc32s.empty()))
+		{
+			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+			result.filesystemPath = manifestPath;
+			return cleanupFailure(
+				result, destinationPath, destinationCreated);
+		}
+
+		importedResourcePackage->gameId = manifest.id;
+		importedResourcePackage->displayName = manifest.name;
+		importedResourcePackage->author = manifest.author;
+		importedResourcePackage->displayVersion =
+			manifest.releaseMetadata.displayVersion;
+		importedResourcePackage->minimumEngineVersion =
+			manifest.releaseMetadata.minimumEngineVersion;
+		importedResourcePackage->dependencyGameIds = dependencies;
+		importedResourcePackage->artifactSize = artifactSize;
+		importedResourcePackage->artifactCrc32 = artifactCrc32;
+		importedResourcePackage->resourceOnly = manifest.resourceOnly;
+		result.status = ResourcePackageArchiveStatus::Success;
+		result.filesystemPath = destinationPath;
+		return result;
+	}
+
+	const ResourcePackage& expectedPackage = *expectedResourcePackage;
 	if (!sameIdentifier(manifest.id, expectedPackage.gameId))
 	{
 		result.status = ResourcePackageArchiveStatus::GameIdMismatch;
@@ -1512,9 +1656,99 @@ ResourcePackageArchiveResult prepareResourcePackageArchive(
 		{},
 		{},
 		{},
+		nullptr,
+		false,
 		archivePath,
 		destinationPath,
 		limits);
+}
+
+ImportedResourcePackageArchiveResult prepareImportedResourcePackageArchive(
+	const std::filesystem::path& archivePath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits)
+{
+	ImportedResourcePackageArchiveResult result;
+	result.archive = preparePackageArchive(
+		0,
+		{},
+		{},
+		{},
+		{},
+		true,
+		nullptr,
+		nullptr,
+		PackageArchiveKind::Resource,
+		{},
+		{},
+		{},
+		&result.package,
+		false,
+		archivePath,
+		destinationPath,
+		limits);
+	return result;
+}
+
+ImportedResourcePackageArchiveResult prepareImportedFullResourcePackageArchive(
+	const std::filesystem::path& archivePath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits)
+{
+	ImportedResourcePackageArchiveResult result =
+		prepareImportedResourcePackageArchive(
+			archivePath, destinationPath, limits);
+	if (result.archive.status != ResourcePackageArchiveStatus::MissingManifest)
+	{
+		return result;
+	}
+	result.archive = preparePackageArchive(
+		0,
+		{},
+		{},
+		{},
+		{},
+		true,
+		nullptr,
+		nullptr,
+		PackageArchiveKind::Common,
+		{},
+		{},
+		{},
+		&result.package,
+		false,
+		archivePath,
+		destinationPath,
+		limits);
+	return result;
+}
+
+ImportedResourcePackageArchiveResult
+	prepareImportedIncrementalResourcePackageArchive(
+		const std::filesystem::path& archivePath,
+		const std::filesystem::path& destinationPath,
+		const ResourcePackageArchiveLimits& limits)
+{
+	ImportedResourcePackageArchiveResult result;
+	result.archive = preparePackageArchive(
+		0,
+		{},
+		{},
+		{},
+		{},
+		true,
+		nullptr,
+		nullptr,
+		PackageArchiveKind::Resource,
+		{},
+		{},
+		{},
+		&result.package,
+		true,
+		archivePath,
+		destinationPath,
+		limits);
+	return result;
 }
 
 ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
@@ -1547,6 +1781,8 @@ ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
 		{},
 		{},
 		{},
+		nullptr,
+		false,
 		archivePath,
 		destinationPath,
 		limits);
@@ -1612,13 +1848,17 @@ ResourcePackageArchiveResult prepareIncrementalChainPackageArchive(
 		{},
 		{},
 		{},
+		nullptr,
+		false,
 		archivePath,
 		destinationPath,
 		limits);
 }
 
 static ResourcePackageArchiveResult materializeIncrementalOverlays(
-	const ResourcePackage& expectedPackage,
+	const std::string& expectedGameId,
+	const std::string& expectedFullReceipt,
+	bool requirePreparedReceipts,
 	const std::filesystem::path& installedResourcePath,
 	const std::vector<std::filesystem::path>& preparedOverlayPaths,
 	const std::string& expectedIncrementalReceipt,
@@ -1630,6 +1870,9 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 	if (installedResourcePath.empty() || preparedOverlayPaths.empty() ||
 		destinationPath.empty() || limits.maximumManifestBytes == 0 ||
 		!isValidCrc32Hex(expectedIncrementalReceipt) ||
+		(requirePreparedReceipts &&
+			!isValidCrc32Hex(expectedFullReceipt)) ||
+		!isValidOnlineGameId(expectedGameId) ||
 		!isSafeExistingDirectory(installedResourcePath))
 	{
 		result.status = ResourcePackageArchiveStatus::InvalidInput;
@@ -1660,9 +1903,10 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 	};
 	ResourceManifest installedManifest;
 	if (!loadManifest(installedResourcePath, installedManifest) ||
-		!sameIdentifier(installedManifest.id, expectedPackage.gameId) ||
-		foldAscii(installedManifest.releaseMetadata.installedArtifactCrc32) !=
-			expectedPackage.crc32Hex)
+		!sameIdentifier(installedManifest.id, expectedGameId) ||
+		(requirePreparedReceipts &&
+			foldAscii(installedManifest.releaseMetadata.installedArtifactCrc32) !=
+				expectedFullReceipt))
 	{
 		result.status = ResourcePackageArchiveStatus::ArtifactMismatch;
 		result.filesystemPath = installedResourcePath / "game_profile.ini";
@@ -1672,17 +1916,21 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 	{
 		ResourceManifest overlayManifest;
 		const bool finalOverlay = index + 1 == preparedOverlayPaths.size();
-		if (!loadManifest(preparedOverlayPaths[index], overlayManifest) ||
-			!sameIdentifier(overlayManifest.id, expectedPackage.gameId) ||
-			overlayManifest.releaseMetadata.installedArtifactCrc32 !=
-				expectedPackage.crc32Hex ||
-			(finalOverlay &&
+		const bool manifestLoaded =
+			loadManifest(preparedOverlayPaths[index], overlayManifest);
+		const bool receiptsMatch = !requirePreparedReceipts ||
+			(overlayManifest.releaseMetadata.installedArtifactCrc32 ==
+				expectedFullReceipt &&
+			(!finalOverlay ||
 				(overlayManifest.releaseMetadata.
-					installedIncrementalArtifactCrc32 !=
-						expectedIncrementalReceipt ||
+					installedIncrementalArtifactCrc32 ==
+						expectedIncrementalReceipt &&
 				 overlayManifest.releaseMetadata.
-					installedIncrementalChainCrc32s !=
-						expectedChainReceipt)))
+					installedIncrementalChainCrc32s ==
+						expectedChainReceipt)));
+		if (!manifestLoaded ||
+			!sameIdentifier(overlayManifest.id, expectedGameId) ||
+			!receiptsMatch)
 		{
 			result.status = ResourcePackageArchiveStatus::InvalidManifest;
 			result.filesystemPath =
@@ -1734,11 +1982,58 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 			return cleanupFailure(result, destinationPath, true);
 		}
 	}
+	const std::string installedFullReceipt = requirePreparedReceipts
+		? expectedFullReceipt
+		: installedManifest.releaseMetadata.installedArtifactCrc32;
+	if (!requirePreparedReceipts)
+	{
+		const std::filesystem::path manifestPath =
+			destinationPath / "game_profile.ini";
+		std::vector<char> manifestBytes;
+		if (!readManifest(
+				manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+			(installedFullReceipt.empty()
+				? !removeIniValue(
+					manifestPath,
+					manifestBytes,
+					limits.maximumManifestBytes,
+					"Release",
+					"InstalledArtifactCrc32")
+				: !writeIniValue(
+					manifestPath,
+					manifestBytes,
+					limits.maximumManifestBytes,
+					"Release",
+					"InstalledArtifactCrc32",
+					installedFullReceipt)) ||
+			!readManifest(
+				manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+			!writeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledIncrementalArtifactCrc32",
+				expectedIncrementalReceipt) ||
+			!readManifest(
+				manifestPath, limits.maximumManifestBytes, manifestBytes) ||
+			!removeIniValue(
+				manifestPath,
+				manifestBytes,
+				limits.maximumManifestBytes,
+				"Release",
+				"InstalledIncrementalChainCrc32s"))
+		{
+			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+			result.filesystemPath = manifestPath;
+			return cleanupFailure(result, destinationPath, true);
+		}
+	}
 	ResourceManifest materializedManifest;
 	if (!loadManifest(destinationPath, materializedManifest) ||
-		!sameIdentifier(materializedManifest.id, expectedPackage.gameId) ||
+		!sameIdentifier(materializedManifest.id, expectedGameId) ||
 		materializedManifest.releaseMetadata.installedArtifactCrc32 !=
-			expectedPackage.crc32Hex ||
+			installedFullReceipt ||
 		materializedManifest.releaseMetadata.
 			installedIncrementalArtifactCrc32 !=
 			expectedIncrementalReceipt ||
@@ -1768,7 +2063,9 @@ ResourcePackageArchiveResult materializeIncrementalResourcePackage(
 		return result;
 	}
 	return materializeIncrementalOverlays(
-		expectedPackage,
+		expectedPackage.gameId,
+		expectedPackage.crc32Hex,
+		true,
 		installedResourcePath,
 		{ preparedOverlayPath },
 		expectedPackage.incrementalPackage->crc32Hex,
@@ -1792,11 +2089,39 @@ ResourcePackageArchiveResult materializeIncrementalResourcePackageChain(
 		return result;
 	}
 	return materializeIncrementalOverlays(
-		expectedPackage,
+		expectedPackage.gameId,
+		expectedPackage.crc32Hex,
+		true,
 		installedResourcePath,
 		preparedOverlayPaths,
 		expectedPackage.incrementalChain.back().crc32Hex,
 		incrementalChainReceipt(expectedPackage),
+		destinationPath,
+		limits);
+}
+
+ResourcePackageArchiveResult materializeImportedIncrementalResourcePackage(
+	const ImportedResourcePackageMetadata& package,
+	const std::filesystem::path& installedResourcePath,
+	const std::filesystem::path& preparedOverlayPath,
+	const std::filesystem::path& destinationPath,
+	const ResourcePackageArchiveLimits& limits)
+{
+	if (package.common || !isValidOnlineGameId(package.gameId) ||
+		!isValidCrc32Hex(package.artifactCrc32))
+	{
+		ResourcePackageArchiveResult result;
+		result.status = ResourcePackageArchiveStatus::InvalidInput;
+		return result;
+	}
+	return materializeIncrementalOverlays(
+		package.gameId,
+		{},
+		false,
+		installedResourcePath,
+		{ preparedOverlayPath },
+		package.artifactCrc32,
+		{},
 		destinationPath,
 		limits);
 }
@@ -1830,6 +2155,8 @@ ResourcePackageArchiveResult prepareCommonPackageArchive(
 		{},
 		{},
 		{},
+		nullptr,
+		false,
 		archivePath,
 		destinationPath,
 		limits);
@@ -1885,6 +2212,8 @@ ResourcePackageArchiveResult prepareDesktopProgramPackageArchive(
 		binPrefix,
 		executableName,
 		updaterPath,
+		nullptr,
+		false,
 		archivePath,
 		destinationPath,
 		limits);

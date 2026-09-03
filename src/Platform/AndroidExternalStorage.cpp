@@ -19,6 +19,8 @@ struct CachedBindings
 	jmethodID consumeRequestCompletedMethod = nullptr;
 	jmethodID getRootMethod = nullptr;
 	jmethodID getApplicationResourceDirectoryMethod = nullptr;
+	jmethodID requestResourcePackageImportMethod = nullptr;
+	jmethodID consumeResourcePackageImportResultMethod = nullptr;
 	bool valid = false;
 };
 
@@ -108,11 +110,18 @@ bool ensureBindings(CachedBindings& result)
 	candidate.getApplicationResourceDirectoryMethod = getStaticMethod(
 		env, localClass, "getApplicationResourceDirectoryPath",
 		"()Ljava/lang/String;");
+	candidate.requestResourcePackageImportMethod = getStaticMethod(
+		env, localClass, "requestResourcePackageImport", "()Z");
+	candidate.consumeResourcePackageImportResultMethod = getStaticMethod(
+		env, localClass, "consumeResourcePackageImportResult",
+		"()Ljava/lang/String;");
 	if (candidate.isGrantedMethod == nullptr
 		|| candidate.requestMethod == nullptr
 		|| candidate.consumeRequestCompletedMethod == nullptr
 		|| candidate.getRootMethod == nullptr
-		|| candidate.getApplicationResourceDirectoryMethod == nullptr)
+		|| candidate.getApplicationResourceDirectoryMethod == nullptr
+		|| candidate.requestResourcePackageImportMethod == nullptr
+		|| candidate.consumeResourcePackageImportResultMethod == nullptr)
 	{
 		env->DeleteLocalRef(localClass);
 		return false;
@@ -300,6 +309,72 @@ std::string getApplicationResourceDirectoryPath()
 	}
 	return root;
 }
+
+bool requestResourcePackageImport()
+{
+	CachedBindings bindings;
+	if (!ensureBindings(bindings))
+	{
+		return false;
+	}
+	JNIEnv* env = getJNIEnv();
+	if (env == nullptr)
+	{
+		return false;
+	}
+	const jboolean requested = env->CallStaticBooleanMethod(
+		bindings.activityClass,
+		bindings.requestResourcePackageImportMethod);
+	if (clearPendingException(
+		env, "CallStaticBooleanMethod(requestResourcePackageImport)"))
+	{
+		return false;
+	}
+	return requested != JNI_FALSE;
+}
+
+ResourcePackageImportSelection consumeResourcePackageImportSelection()
+{
+	ResourcePackageImportSelection selection;
+	CachedBindings bindings;
+	if (!ensureBindings(bindings))
+	{
+		return selection;
+	}
+	const std::string result = callStaticStringMethod(
+		bindings,
+		bindings.consumeResourcePackageImportResultMethod,
+		"CallStaticObjectMethod(consumeResourcePackageImportResult)");
+	if (result.empty())
+	{
+		return selection;
+	}
+	if (result == "cancelled")
+	{
+		selection.status = ResourcePackageImportSelectionStatus::Cancelled;
+		return selection;
+	}
+	constexpr const char SelectedPrefix[] = "selected\n";
+	constexpr const char ErrorPrefix[] = "error\n";
+	if (result.compare(0, sizeof(SelectedPrefix) - 1, SelectedPrefix) == 0)
+	{
+		selection.archivePath = result.substr(sizeof(SelectedPrefix) - 1);
+		selection.status = selection.archivePath.empty()
+			? ResourcePackageImportSelectionStatus::Failed
+			: ResourcePackageImportSelectionStatus::Selected;
+		if (selection.status == ResourcePackageImportSelectionStatus::Failed)
+		{
+			selection.errorMessage = u8"Android 未返回资源包路径";
+		}
+		return selection;
+	}
+	selection.status = ResourcePackageImportSelectionStatus::Failed;
+	selection.errorMessage =
+		result.compare(0, sizeof(ErrorPrefix) - 1, ErrorPrefix) == 0
+			? result.substr(sizeof(ErrorPrefix) - 1)
+			: std::string(u8"Android 返回了无效的资源包选择结果");
+	return selection;
+}
 }
 
 #else // 非 Android 平台：空实现。
@@ -312,6 +387,11 @@ bool consumeAllFilesAccessRequestCompleted() { return false; }
 std::string getPublicStorageRoot() { return ""; }
 std::string getExternalResourceDirectoryPath() { return ""; }
 std::string getApplicationResourceDirectoryPath() { return ""; }
+bool requestResourcePackageImport() { return false; }
+ResourcePackageImportSelection consumeResourcePackageImportSelection()
+{
+	return {};
+}
 }
 
 #endif

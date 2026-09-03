@@ -18,6 +18,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -43,12 +44,223 @@ import org.libsdl.app.SDLActivity;
 public class JxqyActivity extends SDLActivity
 {
 	private static final int ExternalStoragePermissionRequestCode = 4301;
+	private static final int ResourcePackageImportRequestCode = 4302;
 	private static final int MaximumHttpsRedirects = 5;
+	private static final long MaximumImportedResourcePackageBytes =
+		256L * 1024L * 1024L * 1024L;
+	private static final long ResourcePackageImportDiskHeadroomBytes =
+		64L * 1024L * 1024L;
 	private static final Object AllFilesAccessRequestLock = new Object();
+	private static final Object ResourcePackageImportLock = new Object();
 	private static boolean allFilesAccessRequestPending = false;
 	private static boolean allFilesAccessRequestObservedDeparture = false;
 	private static boolean allFilesAccessRequestCompleted = false;
+	private static boolean resourcePackageImportPending = false;
+	private static String resourcePackageImportResult = "";
 	private static File pendingProgramInstallFile = null;
+
+	private static boolean beginResourcePackageImport()
+	{
+		synchronized (ResourcePackageImportLock)
+		{
+			if (resourcePackageImportPending)
+			{
+				return false;
+			}
+			resourcePackageImportPending = true;
+			resourcePackageImportResult = "";
+			return true;
+		}
+	}
+
+	private static void completeResourcePackageImport(String result)
+	{
+		synchronized (ResourcePackageImportLock)
+		{
+			resourcePackageImportPending = false;
+			resourcePackageImportResult = result == null
+				? "error\n无法读取所选资源包" : result;
+		}
+	}
+
+	/**
+	 * 消费一次资源包选择结果。空字符串表示仍在等待；其它结果以
+	 * selected、cancelled 或 error 开头，由 native 侧解析。
+	 */
+	public static String consumeResourcePackageImportResult()
+	{
+		synchronized (ResourcePackageImportLock)
+		{
+			String result = resourcePackageImportResult;
+			resourcePackageImportResult = "";
+			return result;
+		}
+	}
+
+	/**
+	 * 使用 Android Storage Access Framework 选择一个完整资源 ZIP。
+	 * 文件选择结果会先复制到应用私有缓存目录，native 不直接持有 URI。
+	 */
+	public static boolean requestResourcePackageImport()
+	{
+		if (!beginResourcePackageImport())
+		{
+			return false;
+		}
+		SDLActivity activity = mSingleton;
+		if (activity == null)
+		{
+			completeResourcePackageImport("error\n无法打开 Android 文件选择器");
+			return false;
+		}
+		try
+		{
+			activity.runOnUiThread(new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					try
+					{
+						Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+						intent.addCategory(Intent.CATEGORY_OPENABLE);
+						intent.setType("application/zip");
+						intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[] {
+							"application/zip",
+							"application/x-zip-compressed",
+							"application/octet-stream"
+						});
+						intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+						activity.startActivityForResult(
+							intent, ResourcePackageImportRequestCode);
+					}
+					catch (Exception exception)
+					{
+						completeResourcePackageImport(
+							"error\n无法打开 Android 文件选择器");
+					}
+				}
+			});
+			return true;
+		}
+		catch (Exception exception)
+		{
+			completeResourcePackageImport("error\n无法打开 Android 文件选择器");
+			return false;
+		}
+	}
+
+	@Override
+	protected void onActivityResult(
+		int requestCode,
+		int resultCode,
+		Intent data)
+	{
+		super.onActivityResult(requestCode, resultCode, data);
+		if (requestCode != ResourcePackageImportRequestCode)
+		{
+			return;
+		}
+		if (resultCode != RESULT_OK || data == null || data.getData() == null)
+		{
+			completeResourcePackageImport("cancelled");
+			return;
+		}
+		final Uri selectedUri = data.getData();
+		final SDLActivity activity = mSingleton;
+		if (activity == null)
+		{
+			completeResourcePackageImport("error\n无法读取所选资源包");
+			return;
+		}
+		new Thread(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				copySelectedResourcePackage(activity, selectedUri);
+			}
+		}, "jxqy-resource-package-import").start();
+	}
+
+	private static void copySelectedResourcePackage(
+		SDLActivity activity,
+		Uri selectedUri)
+	{
+		File temporaryFile = null;
+		boolean insufficientDiskSpace = false;
+		try
+		{
+			File importDirectory = new File(
+				activity.getCacheDir(), "resource-import").getCanonicalFile();
+			if ((!importDirectory.exists() && !importDirectory.mkdirs()) ||
+				!importDirectory.isDirectory())
+			{
+				throw new IOException("cannot create import cache");
+			}
+			temporaryFile = new File(
+				importDirectory, "selected-resource-package.zip.tmp");
+			File selectedFile = new File(
+				importDirectory, "selected-resource-package.zip");
+			try (InputStream input = activity.getContentResolver().openInputStream(
+					selectedUri);
+				 OutputStream output = new FileOutputStream(temporaryFile, false))
+			{
+				if (input == null)
+				{
+					throw new IOException("selected document is unavailable");
+				}
+				byte[] buffer = new byte[64 * 1024];
+				long copiedBytes = 0;
+				int count;
+				while ((count = input.read(buffer)) >= 0)
+				{
+					if (count == 0)
+					{
+						continue;
+					}
+					if (copiedBytes >
+						MaximumImportedResourcePackageBytes - count)
+					{
+						throw new IOException("selected package is too large");
+					}
+					if (importDirectory.getUsableSpace() <
+						ResourcePackageImportDiskHeadroomBytes + count)
+					{
+						insufficientDiskSpace = true;
+						throw new IOException("insufficient import disk space");
+					}
+					output.write(buffer, 0, count);
+					copiedBytes += count;
+				}
+				output.flush();
+				if (copiedBytes == 0)
+				{
+					throw new IOException("selected package is empty");
+				}
+			}
+			if (selectedFile.exists() && !selectedFile.delete())
+			{
+				throw new IOException("cannot replace import cache");
+			}
+			if (!temporaryFile.renameTo(selectedFile))
+			{
+				throw new IOException("cannot finalize import cache");
+			}
+			completeResourcePackageImport(
+				"selected\n" + selectedFile.getAbsolutePath());
+		}
+		catch (Exception exception)
+		{
+			if (temporaryFile != null)
+			{
+				temporaryFile.delete();
+			}
+			completeResourcePackageImport(insufficientDiskSpace
+				? "error\n磁盘空间不足，无法复制所选资源包"
+				: "error\n无法复制所选资源包");
+		}
+	}
 
 	private static boolean beginAllFilesAccessRequest()
 	{

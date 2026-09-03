@@ -462,10 +462,40 @@ bool resourceInstallResultAllowsScan(
 			(result.state == State::None || result.state == State::Committed));
 }
 
+bool resourceInstallResultIsCommitted(
+	const OnlineUpdate::ResourceInstallTransactionResult& result)
+{
+	using State = OnlineUpdate::ResourceInstallTransactionState;
+	using Status = OnlineUpdate::ResourceInstallTransactionStatus;
+	return result.status == Status::Success ||
+		(result.status == Status::CleanupFailed &&
+			result.state == State::Committed);
+}
+
+OnlineUpdate::ResourceInstallTransactionResult
+completeValidatedResourceInstall(
+	const std::filesystem::path& collectionRoot,
+	bool validationSucceeded,
+	bool& commitFailed)
+{
+	commitFailed = false;
+	OnlineUpdate::ResourceInstallTransactionResult result =
+		OnlineUpdate::completeResourceInstallTransaction(
+			collectionRoot, validationSucceeded);
+	if (!validationSucceeded || resourceInstallResultIsCommitted(result))
+	{
+		return result;
+	}
+	commitFailed = true;
+	return OnlineUpdate::completeResourceInstallTransaction(
+		collectionRoot, false);
+}
+
 bool validateActivatedResourceGroup(
 	const std::string& collectionRoot,
 	const OnlineUpdate::ResourceInstallTransactionResult& transaction,
 	const std::vector<ResourceManager::ResourcePack>& packs,
+	bool requirePlayableResourceGroup,
 	std::string& failedGameId)
 {
 	failedGameId.clear();
@@ -516,16 +546,9 @@ bool validateActivatedResourceGroup(
 		{
 			return false;
 		}
-		const ModRelease::CompatibilityStatus compatibility =
-			exactPack->compatibility.status;
-		if (compatibility ==
-				ModRelease::CompatibilityStatus::RequiresNewerEngine ||
-			compatibility ==
-				ModRelease::CompatibilityStatus::InvalidMinimumEngineVersion ||
-			compatibility ==
-				ModRelease::CompatibilityStatus::InvalidCurrentEngineVersion)
+		if (!requirePlayableResourceGroup)
 		{
-			return false;
+			continue;
 		}
 		for (const std::string& dependencyId :
 			exactPack->manifest.getDependencyIds())
@@ -1298,8 +1321,12 @@ int ResourceManager::findPackById(const std::string& id, int excludeIndex) const
 
 bool ResourceManager::applyActiveResourcePack(int index)
 {
-	if (index < 0 || index >= (int)discoveredPacks.size())
+	std::string blockingReason;
+	if (!canActivateResourcePack(index, &blockingReason))
 	{
+		GameLog::write(
+			"ResourceManager: resource pack cannot be activated: %s\n",
+			blockingReason.c_str());
 		return false;
 	}
 
@@ -1307,13 +1334,6 @@ bool ResourceManager::applyActiveResourcePack(int index)
 	// conflicts through ResourceCatalog. Packaged platforms change only the
 	// bounded byte/directory adapter used by that shared resolver.
 	const ResourcePack& selectedPack = discoveredPacks[index];
-	if (!selectedPack.isLaunchable())
-	{
-		GameLog::write(
-			"ResourceManager: resource-only pack %s cannot be activated\n",
-			describePack(selectedPack).c_str());
-		return false;
-	}
 	if (selectedPack.catalogEntryKey.empty())
 	{
 		GameLog::write(
@@ -1521,13 +1541,13 @@ void ResourceManager::scanCollectionRoot(const std::string& collectionRoot)
 				ModRelease::evaluateCompatibility(
 					pack.manifest.releaseMetadata,
 					currentEngineVersion());
-			// 最低引擎版本只用于提示，不参与资源包激活。
+			// 无效声明只提示未知风险；有效且过高的声明由进入门禁处理。
 			if (pack.compatibility.status ==
 				ModRelease::CompatibilityStatus::InvalidMinimumEngineVersion)
 			{
 				GameLog::write(
 					"ResourceManager: resource pack %s has invalid MinimumEngineVersion=%s; "
-					"ignoring the advisory field\n",
+					"allowing launch with unknown compatibility\n",
 					pack.manifest.id.c_str(),
 					pack.manifest.releaseMetadata.minimumEngineVersion.c_str());
 			}
@@ -1663,20 +1683,24 @@ bool ResourceManager::initialize(const std::string& assetsArg)
 			writableResourceCollectionRoot,
 			installTransaction,
 			discoveredPacks,
+			true,
 			failedGameId);
+		bool commitFailed = false;
 		const OnlineUpdate::ResourceInstallTransactionResult completion =
-			OnlineUpdate::completeResourceInstallTransaction(
+			completeValidatedResourceInstall(
 				std::filesystem::u8path(
 					writableResourceCollectionRoot),
-				resourceGroupValid);
-		if (!resourceGroupValid)
+				resourceGroupValid,
+				commitFailed);
+		if (!resourceGroupValid || commitFailed)
 		{
 			if (completion.status !=
 					OnlineUpdate::ResourceInstallTransactionStatus::Success ||
 				!completion.rolledBack)
 			{
 				GameLog::write(
-					"ResourceManager: installed resource validation failed for %s and rollback failed [%s] path=%s; resource scan blocked\n",
+					"ResourceManager: installed resource %s failed for %s and rollback failed [%s] path=%s; resource scan blocked\n",
+					commitFailed ? "commit" : "validation",
 					failedGameId.c_str(),
 					resourceInstallStatusText(completion.status),
 					completion.filesystemPath.generic_u8string().c_str());
@@ -1684,7 +1708,8 @@ bool ResourceManager::initialize(const std::string& assetsArg)
 				return true;
 			}
 			GameLog::write(
-				"ResourceManager: installed resource validation failed for %s; restored previous resource group\n",
+				"ResourceManager: installed resource %s failed for %s; restored previous resource group\n",
+				commitFailed ? "commit" : "validation",
 				failedGameId.c_str());
 			scanCollectionRoot(collectionRoot);
 		}
@@ -2598,7 +2623,9 @@ void ResourceManager::rescanResources()
 	File::setActiveSaveNamespace("");
 }
 
-bool ResourceManager::activateStagedResourceInstall(std::string& errorText)
+bool ResourceManager::activateStagedResourceInstall(
+	std::string& errorText,
+	bool allowUnplayableImportedResource)
 {
 	errorText.clear();
 	if (activeResourceSelectionValid)
@@ -2632,41 +2659,41 @@ bool ResourceManager::activateStagedResourceInstall(std::string& errorText)
 		writableResourceCollectionRoot,
 		activation,
 		discoveredPacks,
+		!allowUnplayableImportedResource,
 		failedGameId);
+	bool commitFailed = false;
 	const OnlineUpdate::ResourceInstallTransactionResult completion =
-		OnlineUpdate::completeResourceInstallTransaction(
+		completeValidatedResourceInstall(
 			std::filesystem::u8path(writableResourceCollectionRoot),
-			resourceGroupValid);
-	if (!resourceGroupValid)
+			resourceGroupValid,
+			commitFailed);
+	if (!resourceGroupValid || commitFailed)
 	{
 		if (completion.rolledBack)
 		{
 			rescanResources();
 		}
-		errorText = u8"已下载资源验证失败";
-		if (!failedGameId.empty())
+		if (commitFailed)
 		{
-			errorText += u8"：" + failedGameId;
+			errorText = completion.rolledBack
+				? std::string(u8"资源安装失败，旧资源已恢复")
+				: std::string(u8"资源恢复未完成，请重启后重试");
 		}
-		if (!completion.rolledBack)
+		else
 		{
-			errorText += u8"；恢复旧资源失败";
+			errorText = u8"已下载资源验证失败";
+			if (!failedGameId.empty())
+			{
+				errorText += u8"：" + failedGameId;
+			}
+			if (!completion.rolledBack)
+			{
+				errorText += u8"；资源恢复未完成，请重启后重试";
+			}
 		}
 		return false;
 	}
 
-	const bool committed = completion.status ==
-			OnlineUpdate::ResourceInstallTransactionStatus::Success ||
-		(completion.status ==
-				OnlineUpdate::ResourceInstallTransactionStatus::CleanupFailed &&
-			completion.state ==
-				OnlineUpdate::ResourceInstallTransactionState::Committed);
-	if (!committed)
-	{
-		errorText = std::string(u8"资源已验证，但提交未完成：") +
-			resourceInstallStatusText(completion.status);
-		return false;
-	}
 	if (completion.status ==
 		OnlineUpdate::ResourceInstallTransactionStatus::CleanupFailed)
 	{
@@ -2679,6 +2706,65 @@ bool ResourceManager::activateStagedResourceInstall(std::string& errorText)
 bool ResourceManager::hasActiveResourceRoot() const
 {
 	return activeResourceSelectionValid;
+}
+
+bool ResourceManager::canActivateResourcePack(
+	int index, std::string* blockingReason) const
+{
+	if (blockingReason != nullptr)
+	{
+		blockingReason->clear();
+	}
+	const auto block = [blockingReason](const std::string& reason)
+	{
+		if (blockingReason != nullptr)
+		{
+			*blockingReason = reason;
+		}
+		return false;
+	};
+	if (index < 0 || index >= static_cast<int>(discoveredPacks.size()))
+	{
+		return block(u8"资源索引无效");
+	}
+	const ResourcePack& pack = discoveredPacks[index];
+	if (!pack.isLaunchable())
+	{
+		return block(u8"ResourceOnly 资源不能独立进入");
+	}
+	if (pack.compatibility.status ==
+		ModRelease::CompatibilityStatus::RequiresNewerEngine)
+	{
+		return block(u8"当前引擎版本低于资源要求");
+	}
+	const auto identifierCount = [this](const std::string& gameId)
+	{
+		return static_cast<std::size_t>(std::count_if(
+			discoveredPacks.begin(),
+			discoveredPacks.end(),
+			[&gameId](const ResourcePack& candidate)
+			{
+				return toLowerAscii(candidate.manifest.id) ==
+					toLowerAscii(gameId);
+			}));
+	};
+	if (identifierCount(pack.manifest.id) != 1)
+	{
+		return block(u8"Game.Id 重复");
+	}
+	for (const std::string& dependencyId : pack.manifest.getDependencyIds())
+	{
+		const std::size_t dependencyCount = identifierCount(dependencyId);
+		if (dependencyCount == 0)
+		{
+			return block(u8"缺少依赖：" + dependencyId);
+		}
+		if (dependencyCount > 1)
+		{
+			return block(u8"依赖 ID 重复：" + dependencyId);
+		}
+	}
+	return true;
 }
 
 bool ResourceManager::needsSelection() const
@@ -2721,7 +2807,7 @@ bool ResourceManager::rememberResourcePackSelection(int index) const
 	}
 
 	const ResourcePack& pack = discoveredPacks[index];
-	if (!pack.isLaunchable())
+	if (!canActivateResourcePack(index))
 	{
 		return false;
 	}

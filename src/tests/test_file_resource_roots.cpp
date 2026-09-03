@@ -4988,13 +4988,13 @@ bool testResourceManagerDependencySelection(const std::filesystem::path& root)
 				ModRelease::CompatibilityStatus::InvalidMinimumEngineVersion,
 			"ResourceManager caches each pack's engine compatibility result") && ok;
 		ModRelease::CompatibilityResult activationCompatibility;
-		ok = check(manager.setActiveResourcePack(
+		ok = check(!manager.setActiveResourcePack(
 			tooNewIndex, &activationCompatibility) &&
 			activationCompatibility.status ==
 				ModRelease::CompatibilityStatus::RequiresNewerEngine &&
-			manager.hasActiveResourceRoot(),
-			"MinimumEngineVersion remains advisory and never blocks MOD activation") && ok;
-		// 新规则：最低引擎版本格式无效只记录告警并忽略该字段，不阻止激活。
+			!manager.hasActiveResourceRoot(),
+			"a valid newer-engine requirement blocks MOD activation") && ok;
+		// 格式无效只记录未知兼容性，不把不规范字段当作运行许可开关。
 		ok = check(manager.setActiveResourcePackById(
 			"INVALIDMINIMUM", &activationCompatibility) &&
 			activationCompatibility.status ==
@@ -5041,11 +5041,8 @@ bool testResourceManagerDependencySelection(const std::filesystem::path& root)
 		collectionRoot / "NoSuchPath";
 	ok = check(
 		missingPathIndex >= 0 &&
-			manager.setActiveResourcePack(missingPathIndex) &&
-			readViaFile("config/local-only.txt") ==
-				"missing-path-local",
-		"a missing DependencyId keeps the selected pack's local content runnable") &&
-		ok;
+			!manager.setActiveResourcePack(missingPathIndex),
+		"a missing DependencyId remains visible but cannot be activated") && ok;
 	writeRawFile(
 		lateMissingDependencyRoot / "config" /
 			"late-created.txt",
@@ -5087,13 +5084,13 @@ bool testResourceManagerDependencySelection(const std::filesystem::path& root)
 		"ResourceManager rejects unknown resource pack id") && ok;
 	ok = check(manager.setActiveResourcePackById("chainmod"),
 		"ResourceManager selects pack by id case-insensitively") && ok;
-	ModRelease::CompatibilityResult advisoryCompatibility;
-	ok = check(manager.setActiveResourcePackById(
-		"TOONEW", &advisoryCompatibility) &&
-		advisoryCompatibility.status ==
+	ModRelease::CompatibilityResult blockedCompatibility;
+	ok = check(!manager.setActiveResourcePackById(
+		"TOONEW", &blockedCompatibility) &&
+		blockedCompatibility.status ==
 			ModRelease::CompatibilityStatus::RequiresNewerEngine &&
-		manager.getActiveManifest().id == "TOONEW",
-		"a newer-engine declaration is reported but does not gate resource routing") && ok;
+		manager.getActiveManifest().id == "CHAINMOD",
+		"a newer-engine declaration is reported and leaves existing routing unchanged") && ok;
 	ok = check(manager.setActiveResourcePackById("CHAINMOD"),
 		"ResourceManager can restore the dependency-chain fixture after advisory metadata checks") && ok;
 	ok = check(manager.getActiveManifest().type == 2,
@@ -5648,7 +5645,7 @@ bool testStartupTolerance(const std::filesystem::path& root)
 			"empty resource directory reaches the selection/management UI (needsSelection)") && ok;
 	}
 
-	// 2. 单包的版本声明只用于提示；普通启动仍要求用户在资源页确认。
+	// 2. 单包即使要求更高版本也保持可见，但不能被激活。
 	{
 		const fs::path tooNewRoot = root / "startup-too-new";
 		fs::remove_all(tooNewRoot);
@@ -5668,7 +5665,7 @@ bool testStartupTolerance(const std::filesystem::path& root)
 			manager.needsSelection() &&
 			manager.getDiscoveredPacks().front().compatibility.status ==
 				ModRelease::CompatibilityStatus::RequiresNewerEngine,
-			"single-pack startup still reaches explicit selection while MinimumEngineVersion remains advisory") && ok;
+			"single-pack startup keeps a newer-engine resource visible for blocked selection") && ok;
 	}
 
 	// 3. 损坏 resources.ini 不退出；单坏索引条目不影响其他有效包。

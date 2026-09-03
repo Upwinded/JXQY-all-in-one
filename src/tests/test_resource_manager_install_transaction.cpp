@@ -250,6 +250,48 @@ bool testInvalidActivatedGroupRollsBackAndRescans()
 	return ok;
 }
 
+bool testOpenImportCanCommitAnUnplayableResource()
+{
+	TemporaryTree tree("jxqy-resource-manager-open-import");
+	const std::filesystem::path assets = tree.root / "assets";
+	const std::string unplayableManifest =
+		"[Game]\nId=YYCS\nName=Open Import\nVersion=2.0\nType=0\n"
+		"[Release]\nMinimumEngineVersion=999.0.0\n"
+		"[Resource]\nDependencyId=MISSING_DEPENDENCY\n";
+	bool ok = writeText(
+		assets / "resources.ini", "[Collection]\nCommonPath=common\n") &&
+		writeResource(assets / "moon", validManifest("YYCS"), "old");
+	if (!ok)
+	{
+		return false;
+	}
+	ResourceManager& manager = ResourceManager::instance();
+	ResourceManagerPolicyTestAccess::reset(manager);
+	ok = expect(manager.initialize(assets.generic_u8string()),
+		"open import: manager initializes") && ok;
+	ok = expect(prepareSingleUpdate(assets, unplayableManifest),
+		"open import: semantically unplayable resource is staged") && ok;
+	std::string errorText;
+	ok = expect(manager.activateStagedResourceInstall(errorText, true) &&
+			errorText.empty(),
+		"open import: explicit permissive activation commits structural package")
+		&& ok;
+	ok = expect(readText(assets / "moon" / "payload.txt") == "new" &&
+			!std::filesystem::exists(
+				OnlineUpdate::resourceUpdateWorkspacePath(assets)) &&
+			manager.getDiscoveredPacks().size() == 1 &&
+			manager.getDiscoveredPacks().front().compatibility.status ==
+				ModRelease::CompatibilityStatus::RequiresNewerEngine,
+		"open import: incompatible package remains installed and diagnosable")
+		&& ok;
+	std::string blockingReason;
+	ok = expect(!manager.canActivateResourcePack(0, &blockingReason) &&
+			!blockingReason.empty(),
+		"open import: confirmed incompatibility remains blocked from launch") && ok;
+	ResourceManagerPolicyTestAccess::reset(manager);
+	return ok;
+}
+
 bool testCommonCommitsAfterRuntimeValidation()
 {
 	TemporaryTree tree("jxqy-resource-manager-common-success");
@@ -324,6 +366,7 @@ int main()
 	ok = testValidGroupCommitsAfterRuntimeScan() && ok;
 	ok = testSelectionSceneActivatesAndRescansWithoutRestart() && ok;
 	ok = testInvalidActivatedGroupRollsBackAndRescans() && ok;
+	ok = testOpenImportCanCommitAnUnplayableResource() && ok;
 	ok = testCommonCommitsAfterRuntimeValidation() && ok;
 	ok = testResourceConfigurationErrorsRemainVisible() && ok;
 	return ok ? 0 : 1;

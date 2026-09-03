@@ -67,6 +67,7 @@ private:
 	enum class ResourceInstallOperation
 	{
 		OnlineDownload,
+		ResourceImport,
 		ProgramDownload,
 		ResourceRemoval,
 		SaveManagement
@@ -77,6 +78,18 @@ private:
 		Downloading,
 		ValidatingAndExtracting,
 		Staging
+	};
+
+	enum class ResourcePackageImportKind
+	{
+		Full,
+		Incremental
+	};
+
+	enum class ResourceImportWorkerStage
+	{
+		PreparingArchive,
+		MaterializingIncremental
 	};
 
 	struct ResourceInstallWorkerResult
@@ -93,6 +106,10 @@ private:
 		OnlineUpdate::CommonDownloadPreparationResult commonPreparation;
 		OnlineUpdate::ProgramDownloadPreparationResult programPreparation;
 		OnlineUpdate::ResourcePackageArchiveResult programPackageResult;
+		OnlineUpdate::ImportedResourcePackageArchiveResult importedPackage;
+		OnlineUpdate::ResourcePackageArchiveResult importedMaterialization;
+		ResourceImportWorkerStage resourceImportStage =
+			ResourceImportWorkerStage::PreparingArchive;
 		std::string preparedProgramPath;
 		std::string programFailureMessage;
 		bool programReady = false;
@@ -102,6 +119,7 @@ private:
 	enum class ResourceInstallDialogState
 	{
 		Hidden,
+		ChoosingImportType,
 		Confirming,
 		BrowsingSaves,
 		ConfirmingSaveRemoval,
@@ -137,6 +155,17 @@ private:
 	void activateProgramActionButton();
 	void refreshOnlineActionButton();
 	void refreshResourceManagementButtons();
+	void showResourcePackageImportMenu();
+	void beginResourcePackageImportSelection(ResourcePackageImportKind kind);
+	void pollResourcePackageImportSelection();
+	void beginResourcePackageImportPreparation(const std::string& archivePath);
+	bool buildResourceImportConfirmation(
+		const OnlineUpdate::ImportedResourcePackageMetadata& package,
+		ResourcePackageImportKind kind,
+		ResourceInstallConfirmation& confirmation,
+		std::string& errorText) const;
+	void startConfirmedResourceImport();
+	bool cleanupPendingResourceImportWorkspace();
 	bool beginResourceDownloadConfirmation(bool promptedByEntry = false);
 	void beginProgramDownloadConfirmation();
 	void beginResourceRemovalConfirmation();
@@ -402,6 +431,10 @@ private:
 	bool pendingDownloadUsesMeteredNetwork = false;
 	bool pendingMeteredDownloadConfirmed = false;
 	bool resourceUpdatePromptedByEntry = false;
+	bool resourcePackageImportSelectionPending = false;
+	ResourcePackageImportKind resourcePackageImportKind =
+		ResourcePackageImportKind::Full;
+	OnlineUpdate::ImportedResourcePackageMetadata pendingImportedPackage;
 	enum class ExternalResourcePresentationState
 	{
 		Disabled,

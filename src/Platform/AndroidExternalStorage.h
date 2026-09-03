@@ -7,6 +7,22 @@
 // 非 Android 平台提供空实现，调用处无需 #ifdef。
 namespace AndroidExternalStorage
 {
+	enum class ResourcePackageImportSelectionStatus
+	{
+		Pending,
+		Selected,
+		Cancelled,
+		Failed
+	};
+
+	struct ResourcePackageImportSelection
+	{
+		ResourcePackageImportSelectionStatus status =
+			ResourcePackageImportSelectionStatus::Pending;
+		std::string archivePath;
+		std::string errorMessage;
+	};
+
 	// 查询当前应用是否已获得访问公开外部存储的权限
 	// （Android 11+ 即 MANAGE_EXTERNAL_STORAGE / isExternalStorageManager）。
 	// 非 Android 平台始终返回 false。
@@ -34,4 +50,12 @@ namespace AndroidExternalStorage
 	// getExternalFilesDir(null) + "/assets/"。在线更新和游戏内导入使用该目录；
 	// 非 Android 平台返回空。
 	std::string getApplicationResourceDirectoryPath();
+
+	// 打开 Android SAF 文件选择器并将所选 ZIP 复制到应用私有缓存。
+	// 返回 false 表示选择流程未能启动；非 Android 平台始终返回 false。
+	bool requestResourcePackageImport();
+
+	// 消费一次资源包选择结果。Pending 表示 Java 仍在等待用户选择或复制；
+	// Selected 的 archivePath 是应用私有缓存中的普通文件路径。
+	ResourcePackageImportSelection consumeResourcePackageImportSelection();
 }

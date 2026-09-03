@@ -328,6 +328,14 @@ def check_android_external_storage_bridge_contract(
         "onResume()",
         "onWindowFocusChanged(boolean hasFocus)",
         "onRequestPermissionsResult(",
+        "Intent.ACTION_OPEN_DOCUMENT",
+        "activity.startActivityForResult(",
+        "onActivityResult(",
+        "activity.getCacheDir()",
+        "importDirectory.getUsableSpace()",
+        "ResourcePackageImportDiskHeadroomBytes",
+        "new FileOutputStream(temporaryFile, false)",
+        "consumeResourcePackageImportResult()",
     )
     for expected in required_activity_behavior:
         if expected not in activity_source:
@@ -360,6 +368,10 @@ def check_android_external_storage_bridge_contract(
         "std::atomic<bool>",
         '"consumeAllFilesAccessRequestCompleted", "()Z"',
         "bool consumeAllFilesAccessRequestCompleted()",
+        '"requestResourcePackageImport", "()Z"',
+        '"consumeResourcePackageImportResult"',
+        "bool requestResourcePackageImport()",
+        "consumeResourcePackageImportSelection()",
     )
     for expected in required_native_behavior:
         if expected not in native_source:
@@ -382,6 +394,72 @@ def check_android_external_storage_bridge_contract(
     if "bool consumeAllFilesAccessRequestCompleted();" not in native_header:
         errors.append(
             "Android external-storage header does not expose request completion"
+        )
+    for expected in (
+        "bool requestResourcePackageImport();",
+        "consumeResourcePackageImportSelection();",
+    ):
+        if expected not in native_header:
+            errors.append(
+                "Android resource-package import bridge is missing: " + expected
+            )
+
+    resource_scene_source = (
+        root / "src/Resource/ResourceSelectScene.cpp"
+    ).read_text(encoding="utf-8")
+    required_resource_import_behavior = (
+        "bool externalResourceToggleAvailable()",
+        "#if defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)",
+        "bool resourcePackageImportAvailable()",
+        "导入资源包",
+        "showResourcePackageImportMenu()",
+        "ResourceInstallDialogState::ChoosingImportType",
+        "导入完整包",
+        "导入增量包",
+        "prepareImportedFullResourcePackageArchive(",
+        "prepareImportedIncrementalResourcePackageArchive(",
+        "materializeImportedIncrementalResourcePackage(",
+        "stageResourceInstallTransaction(",
+        "activateStagedResourceInstall(",
+        "完整导入会完全替换同 ID 资源",
+        "增量导入会保留 ZIP 中未覆盖的旧文件",
+        "将完整替换应用专属 common",
+        "内置资源不可修改，本次会在应用专属目录安装覆盖版本",
+        "兼容性声明无效，运行结果未知",
+    )
+    for expected in required_resource_import_behavior:
+        if expected not in resource_scene_source:
+            errors.append(
+                "Android resource-package import UI is missing behavior: "
+                + expected
+            )
+
+    external_toggle_start = resource_scene_source.find(
+        "bool externalResourceToggleAvailable()"
+    )
+    import_toggle_start = resource_scene_source.find(
+        "bool resourcePackageImportAvailable()", external_toggle_start
+    )
+    external_toggle_source = resource_scene_source[
+        external_toggle_start:import_toggle_start
+    ]
+    if (
+        external_toggle_start < 0
+        or import_toggle_start < 0
+        or "JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI" not in external_toggle_source
+        or "defined(__ANDROID__)" in external_toggle_source
+    ):
+        errors.append(
+            "Android all-files resource entry must stay hidden in production "
+            "and available only to its compatibility UI tests"
+        )
+
+    android_manifest = (
+        root / "android/app/src/main/AndroidManifest.xml"
+    ).read_text(encoding="utf-8")
+    if "android.permission.MANAGE_EXTERNAL_STORAGE" not in android_manifest:
+        errors.append(
+            "Android all-files permission must remain while only its UI entry is hidden"
         )
 
 

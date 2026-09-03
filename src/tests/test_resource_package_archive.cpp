@@ -461,6 +461,141 @@ void testValidPackage(const TemporaryTree& tree)
 		" incremental receipt");
 }
 
+void testImportedResourcePackage(const TemporaryTree& tree)
+{
+	const std::filesystem::path archive =
+		nextPath(tree, "imported-resource", ".zip");
+	const std::string manifest =
+		"[Game]\n"
+		"Id=IMPORTED_GAME\n"
+		"Name=Imported Game\n"
+		"Author=Importer\n"
+		"Version=1.2.3\n"
+		"\n"
+		"[Release]\n"
+		"MinimumEngineVersion=2.0.0\n"
+		"InstalledArtifactCrc32=deadbeef\n"
+		"InstalledIncrementalArtifactCrc32=feedface\n"
+		"InstalledIncrementalChainCrc32s=11111111,22222222\n"
+		"\n"
+		"[Resource]\n"
+		"DependencyId=JXQY2\n";
+	expect(writeZip(archive,
+		{
+			{ "game_profile.ini", manifest },
+			{ "script/start.txt", "start" }
+		}), "imported resource ZIP is created");
+	const std::filesystem::path destination =
+		nextPath(tree, "imported-resource-staging");
+	const OnlineUpdate::ImportedResourcePackageArchiveResult result =
+		OnlineUpdate::prepareImportedResourcePackageArchive(
+			archive, destination);
+	ResourceManifest installedManifest;
+	const std::string installedManifestText =
+		readText(destination / "game_profile.ini");
+	expect(result.succeeded() &&
+		result.package.gameId == "IMPORTED_GAME" &&
+		!result.package.common &&
+		!result.package.resourceOnly &&
+		result.package.displayName == "Imported Game" &&
+		result.package.author == "Importer" &&
+		result.package.displayVersion == "1.2.3" &&
+		result.package.minimumEngineVersion == "2.0.0" &&
+		result.package.dependencyGameIds ==
+			std::vector<std::string>{ "JXQY2" } &&
+		result.package.artifactSize == std::filesystem::file_size(archive) &&
+		OnlineUpdate::isValidCrc32Hex(result.package.artifactCrc32),
+		"standalone import reads required identity and release metadata");
+	expect(installedManifest.loadFromBuffer(
+			installedManifestText.data(),
+			static_cast<int>(installedManifestText.size())) &&
+		installedManifest.releaseMetadata.installedArtifactCrc32 ==
+			result.package.artifactCrc32 &&
+		installedManifest.releaseMetadata.
+			installedIncrementalArtifactCrc32.empty() &&
+		installedManifest.releaseMetadata.
+			installedIncrementalChainCrc32s.empty(),
+		"standalone import records the selected full ZIP and clears stale"
+		" incremental receipts");
+
+	const std::filesystem::path unsafeArchive =
+		nextPath(tree, "imported-unsafe-path", ".zip");
+	expect(writeZip(unsafeArchive,
+		{
+			{ "game_profile.ini", manifest },
+			{ "../outside.txt", "escape" }
+		}), "unsafe imported resource ZIP is created");
+	const std::filesystem::path unsafeDestination =
+		nextPath(tree, "imported-unsafe-path-staging");
+	const auto unsafeResult =
+		OnlineUpdate::prepareImportedResourcePackageArchive(
+			unsafeArchive, unsafeDestination);
+	expect(unsafeResult.archive.status ==
+			OnlineUpdate::ResourcePackageArchiveStatus::InvalidEntryPath &&
+		!std::filesystem::exists(unsafeDestination) &&
+		!std::filesystem::exists(unsafeDestination.parent_path() / "outside.txt"),
+		"standalone import reuses traversal rejection and failure cleanup");
+
+	const auto expectAcceptedManifest =
+		[&tree](
+			const std::string& name,
+			const std::string& manifestText,
+			bool resourceOnly)
+		{
+			const std::filesystem::path acceptedArchive =
+				nextPath(tree, "imported-" + name, ".zip");
+			expect(writeZip(acceptedArchive,
+				{ { "game_profile.ini", manifestText } }),
+				"open import fixture is created: " + name);
+			const std::filesystem::path acceptedDestination =
+				nextPath(tree, "imported-" + name + "-staging");
+			const auto accepted =
+				OnlineUpdate::prepareImportedResourcePackageArchive(
+					acceptedArchive, acceptedDestination);
+			expect(accepted.succeeded() &&
+				accepted.package.resourceOnly == resourceOnly &&
+				std::filesystem::is_regular_file(
+					acceptedDestination / "game_profile.ini"),
+				"open import accepts semantically unplayable package: " + name);
+		};
+	expectAcceptedManifest(
+		"missing-version",
+		"[Game]\nId=IMPORT\n[Release]\nMinimumEngineVersion=2.0.0\n",
+		false);
+	expectAcceptedManifest(
+		"invalid-engine-version",
+		"[Game]\nId=IMPORT\nVersion=1.0.0\n"
+		"[Release]\nMinimumEngineVersion=invalid\n",
+		false);
+	expectAcceptedManifest(
+		"self-dependency",
+		"[Game]\nId=IMPORT\nVersion=1.0.0\n"
+		"[Release]\nMinimumEngineVersion=2.0.0\n"
+		"[Resource]\nDependencyId=IMPORT\n",
+		false);
+	expectAcceptedManifest(
+		"resource-only",
+		"[Game]\nId=IMPORT\nVersion=1.0.0\n"
+		"[Release]\nMinimumEngineVersion=2.0.0\n"
+		"[Resource]\nResourceOnly=1\n",
+		true);
+
+	const std::filesystem::path invalidIdArchive =
+		nextPath(tree, "imported-invalid-id", ".zip");
+	expect(writeZip(invalidIdArchive,
+		{ { "game_profile.ini", "[Game]\nId=BAD,ID\n" } }),
+		"invalid imported identity fixture is created");
+	const std::filesystem::path invalidIdDestination =
+		nextPath(tree, "imported-invalid-id-staging");
+	const auto invalidId =
+		OnlineUpdate::prepareImportedResourcePackageArchive(
+			invalidIdArchive, invalidIdDestination);
+	expect(invalidId.archive.status ==
+			OnlineUpdate::ResourcePackageArchiveStatus::GameIdMismatch &&
+		!std::filesystem::exists(invalidIdDestination),
+		"open import still rejects an unsafe Game.Id used by installation");
+}
+
 void testCommonPackage(const TemporaryTree& tree)
 {
 	const std::filesystem::path archive =
@@ -567,6 +702,126 @@ void testCommonPackage(const TemporaryTree& tree)
 		std::filesystem::is_regular_file(
 			sharedOnlyDestination / "version.ini"),
 		"common package does not require engine bootstrap files");
+}
+
+void testImportedCommonAndIncrementalPackage(const TemporaryTree& tree)
+{
+	const std::filesystem::path commonArchive =
+		nextPath(tree, "imported-common", ".zip");
+	expect(writeZip(commonArchive,
+		{
+			{ "version.ini", "[Common]\nVersion=custom-1\n" },
+			{ "image/ui/imported.png", "common-image" }
+		}), "imported common ZIP is created");
+	const std::filesystem::path commonDestination =
+		nextPath(tree, "imported-common-staging");
+	const auto importedCommon =
+		OnlineUpdate::prepareImportedFullResourcePackageArchive(
+			commonArchive, commonDestination);
+	OnlineUpdate::CommonPackageInstallation commonInstallation;
+	const std::string commonVersionText =
+		readText(commonDestination / "version.ini");
+	expect(importedCommon.succeeded() && importedCommon.package.common &&
+		importedCommon.package.gameId == "common" &&
+		importedCommon.package.displayVersion == "custom-1" &&
+		OnlineUpdate::parseCommonPackageInstallation(
+			commonVersionText, commonInstallation) &&
+		commonInstallation.installedArtifactCrc32 ==
+			importedCommon.package.artifactCrc32,
+		"full import auto-detects common and records the selected ZIP receipt");
+
+	const std::filesystem::path unmarkedCommonArchive =
+		nextPath(tree, "imported-common-unmarked", ".zip");
+	expect(writeZip(unmarkedCommonArchive,
+		{ { "image/ui/imported.png", "common-image" } }),
+		"unmarked imported common fixture is created");
+	const std::filesystem::path unmarkedCommonDestination =
+		nextPath(tree, "imported-common-unmarked-staging");
+	const auto unmarkedCommon =
+		OnlineUpdate::prepareImportedFullResourcePackageArchive(
+			unmarkedCommonArchive, unmarkedCommonDestination);
+	expect(unmarkedCommon.archive.status == OnlineUpdate::
+			ResourcePackageArchiveStatus::MissingCommonBootstrap &&
+		!std::filesystem::exists(unmarkedCommonDestination),
+		"offline common import requires version.ini when no catalog supplies it");
+
+	const std::filesystem::path installedRoot =
+		nextPath(tree, "imported-incremental-base");
+	std::error_code directoryError;
+	std::filesystem::create_directories(
+		installedRoot / "script", directoryError);
+	const std::string installedManifest =
+		"[Game]\n"
+		"Id=OPEN_INCREMENTAL\n"
+		"Name=Installed Base\n"
+		"Version=1.0\n"
+		"\n"
+		"[Release]\n"
+		"InstalledArtifactCrc32=a1b2c3d4\n"
+		"InstalledIncrementalArtifactCrc32=01020304\n"
+		"InstalledIncrementalChainCrc32s=11111111,22222222\n";
+	expect(!directoryError &&
+		writeBytes(installedRoot / "game_profile.ini",
+			std::vector<std::uint8_t>(
+				installedManifest.begin(), installedManifest.end())) &&
+		writeBytes(installedRoot / "script/story.txt",
+			std::vector<std::uint8_t>{ 'o', 'l', 'd' }) &&
+		writeBytes(installedRoot / "script/keep.txt",
+			std::vector<std::uint8_t>{ 'k', 'e', 'e', 'p' }),
+		"open incremental installed base fixture is created");
+
+	const std::filesystem::path incrementalArchive =
+		nextPath(tree, "imported-incremental", ".zip");
+	const std::string overlayManifest =
+		"[Game]\n"
+		"Id=OPEN_INCREMENTAL\n"
+		"Name=Imported Overlay\n"
+		"Version=2.0\n"
+		"\n"
+		"[Release]\n"
+		"MinimumEngineVersion=99.invalid\n"
+		"InstalledArtifactCrc32=ffffffff\n"
+		"InstalledIncrementalArtifactCrc32=eeeeeeee\n"
+		"InstalledIncrementalChainCrc32s=dddddddd\n";
+	expect(writeZip(incrementalArchive,
+		{
+			{ "game_profile.ini", overlayManifest },
+			{ "script/story.txt", "updated" },
+			{ "script/new.txt", "new" }
+		}), "open incremental ZIP is created");
+	const std::filesystem::path preparedOverlay =
+		nextPath(tree, "imported-incremental-overlay");
+	const auto importedIncremental =
+		OnlineUpdate::prepareImportedIncrementalResourcePackageArchive(
+			incrementalArchive, preparedOverlay);
+	const std::filesystem::path materializedRoot =
+		nextPath(tree, "imported-incremental-materialized");
+	const auto materialized =
+		OnlineUpdate::materializeImportedIncrementalResourcePackage(
+			importedIncremental.package,
+			installedRoot,
+			preparedOverlay,
+			materializedRoot);
+	ResourceManifest materializedManifest;
+	const std::string materializedManifestText =
+		readText(materializedRoot / "game_profile.ini");
+	expect(importedIncremental.succeeded() && materialized.succeeded() &&
+		readText(materializedRoot / "script/story.txt") == "updated" &&
+		readText(materializedRoot / "script/new.txt") == "new" &&
+		readText(materializedRoot / "script/keep.txt") == "keep" &&
+		readText(installedRoot / "script/story.txt") == "old" &&
+		materializedManifest.loadFromBuffer(
+			materializedManifestText.data(),
+			static_cast<int>(materializedManifestText.size())) &&
+		materializedManifest.releaseMetadata.installedArtifactCrc32 ==
+			"a1b2c3d4" &&
+		materializedManifest.releaseMetadata.
+			installedIncrementalArtifactCrc32 ==
+				importedIncremental.package.artifactCrc32 &&
+		materializedManifest.releaseMetadata.
+			installedIncrementalChainCrc32s.empty(),
+		"open incremental import copies the base, overlays content, preserves the"
+		" full receipt and replaces unverifiable incremental receipts");
 }
 
 void testDesktopProgramPackage(const TemporaryTree& tree)
@@ -868,6 +1123,20 @@ void testLimitsAndManifest(const TemporaryTree& tree)
 		ResourcePackageArchiveStatus::UncompressedSizeLimitExceeded &&
 		!std::filesystem::exists(destination),
 		"total uncompressed-size limit is enforced before extraction");
+
+	limits = {};
+	limits.minimumFreeSpaceAfterExtractionBytes =
+		std::numeric_limits<std::uint64_t>::max();
+	result = prepare(
+		tree,
+		{ { "game_profile.ini", validManifest() } },
+		destination,
+		nullptr,
+		limits);
+	expect(result.status ==
+		ResourcePackageArchiveStatus::InsufficientDiskSpace &&
+		!std::filesystem::exists(destination),
+		"target filesystem free space is checked before extraction");
 
 	limits = {};
 	limits.maximumManifestBytes = 8;
@@ -2230,7 +2499,9 @@ int main()
 	}
 
 	testValidPackage(tree);
+	testImportedResourcePackage(tree);
 	testCommonPackage(tree);
+	testImportedCommonAndIncrementalPackage(tree);
 	testDesktopProgramPackage(tree);
 	testUnsafePathsAndConflicts(tree);
 	testSpecialEntry(tree);
