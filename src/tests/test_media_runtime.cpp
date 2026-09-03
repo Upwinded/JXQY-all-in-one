@@ -19,6 +19,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <iterator>
 #include <memory>
@@ -1317,6 +1318,146 @@ bool runMediaRuntimeTests()
 			"mode switching preserves mutex usability for an unlocked begin") && ok;
 
 		EngineBase* engineBase = static_cast<EngineBase*>(engine);
+		EngineBase::multiThreadedMode.store(false);
+		bool beganReusableTalk = engine->beginDrawTalk(4, 4);
+		if (beganReusableTalk)
+		{
+			engine->fillRect(0, 0, 1, 1, 255, 0, 0, 255);
+		}
+		auto reusableTalkImage = beganReusableTalk
+			? engine->endDrawTalk()
+			: nullptr;
+		bool beganTalkAppend = reusableTalkImage != nullptr &&
+			engine->beginDrawTalk(reusableTalkImage);
+		if (beganTalkAppend)
+		{
+			engine->fillRect(1, 0, 1, 1, 0, 255, 0, 255);
+		}
+		auto appendedTalkImage = beganTalkAppend
+			? engine->endDrawTalk()
+			: nullptr;
+		const bool reusableTalkTargetBound =
+			appendedTalkImage != nullptr &&
+			SDL_SetRenderTarget(
+				talkRenderer,
+				appendedTalkImage.get());
+		auto reusableTalkSurface = make_shared_surface(
+			reusableTalkTargetBound
+				? SDL_RenderReadPixels(talkRenderer, nullptr)
+				: nullptr);
+		const bool reusableTalkTargetRestored =
+			SDL_SetRenderTarget(
+				talkRenderer,
+				originalRenderTarget.get());
+		std::uint8_t firstRed = 0;
+		std::uint8_t firstGreen = 0;
+		std::uint8_t secondRed = 0;
+		std::uint8_t secondGreen = 0;
+		const bool readReusableTalkPixels =
+			reusableTalkSurface != nullptr &&
+			SDL_ReadSurfacePixel(
+				reusableTalkSurface.get(),
+				0,
+				0,
+				&firstRed,
+				&firstGreen,
+				nullptr,
+				nullptr) &&
+			SDL_ReadSurfacePixel(
+				reusableTalkSurface.get(),
+				1,
+				0,
+				&secondRed,
+				&secondGreen,
+				nullptr,
+				nullptr);
+		ok = check(
+			beganReusableTalk &&
+			beganTalkAppend &&
+			appendedTalkImage != nullptr &&
+			appendedTalkImage.get() == reusableTalkImage.get() &&
+			reusableTalkTargetRestored &&
+			readReusableTalkPixels &&
+			firstRed == 255 && firstGreen == 0 &&
+			secondRed == 0 && secondGreen == 255,
+			"talk drawing appends to the same render target without losing earlier pixels") &&
+			ok;
+		reusableTalkSurface.reset();
+		appendedTalkImage.reset();
+		reusableTalkImage.reset();
+
+		const bool initializedSdlThreadIdentity =
+			SDL_Init(0) && SDL_IsMainThread();
+		const int previousTtfInitCount = TTF_WasInit();
+		const bool initializedTtfForFontCache =
+			initializedSdlThreadIdentity &&
+			(previousTtfInitCount > 0 || TTF_Init());
+		const std::filesystem::path fontPath =
+			std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() /
+			"assets" / "engine" / "font" / "font.ttf";
+		engine->setFontName(fontPath.string());
+		_shared_image workerThreadText;
+		std::promise<void> workerTextReturnedPromise;
+		auto workerTextReturned = workerTextReturnedPromise.get_future();
+		EngineBase::multiThreadedMode.store(true);
+		EngineBase::_mutex.lock();
+		std::thread workerTextThread([&]()
+		{
+			workerThreadText =
+				engine->createText("worker", 16, 0xFFFFFFFF);
+			workerTextReturnedPromise.set_value();
+		});
+		const bool workerTextReturnedWhileLocked =
+			workerTextReturned.wait_for(std::chrono::seconds(1)) ==
+			std::future_status::ready;
+		EngineBase::_mutex.unlock();
+		workerTextThread.join();
+		ok = check(
+			workerTextReturnedWhileLocked &&
+			workerThreadText == nullptr &&
+			engineBase->fontCache.count(16) == 0,
+			"worker-thread text rendering is rejected before waiting for the global mutex or touching the font cache") &&
+			ok;
+		EngineBase::multiThreadedMode.store(false);
+		auto mainThreadText = initializedTtfForFontCache
+			? engine->createText("main", 16, 0xFFFFFFFF)
+			: nullptr;
+		ok = check(
+			mainThreadText != nullptr &&
+			engineBase->fontCache.count(16) == 1,
+			"main-thread text rendering can populate the font cache") && ok;
+		auto firstCachedText = initializedTtfForFontCache
+			? engine->createText("A", 12, 0xFFFFFFFF)
+			: nullptr;
+		TTF_Font* cachedTwelvePointFont =
+			engineBase->fontCache.count(12) == 1
+				? engineBase->fontCache.at(12)
+				: nullptr;
+		auto secondCachedText = firstCachedText != nullptr
+			? engine->createText("B", 12, 0xFFFFFFFF)
+			: nullptr;
+		auto cachedDifferentSizeText = secondCachedText != nullptr
+			? engine->createText("C", 14, 0xFFFFFFFF)
+			: nullptr;
+		ok = check(
+			firstCachedText != nullptr &&
+			secondCachedText != nullptr &&
+			cachedDifferentSizeText != nullptr &&
+			engineBase->fontCache.size() == 3 &&
+			engineBase->fontCache.at(12) == cachedTwelvePointFont,
+			"text rendering reuses one cached font per point size") && ok;
+		engine->setFontName("");
+		ok = check(engineBase->fontCache.empty(),
+			"changing the font source releases cached fonts") && ok;
+		cachedDifferentSizeText.reset();
+		secondCachedText.reset();
+		firstCachedText.reset();
+		mainThreadText.reset();
+		if (previousTtfInitCount == 0 && initializedTtfForFontCache)
+		{
+			TTF_Quit();
+		}
+
 		const int renderSessionPreviousWidth =
 			engineBase->width;
 		const int renderSessionPreviousHeight =

@@ -705,6 +705,26 @@ void Engine::drawGeometry(_shared_image image, const std::vector<Vertex>& vertic
 
 bool Engine::beginDrawTalk(int w, int h)
 {
+	return beginDrawTalkInternal(w, h, nullptr);
+}
+
+bool Engine::beginDrawTalk(const _shared_image& target)
+{
+	return target != nullptr &&
+		beginDrawTalkInternal(0, 0, target);
+}
+
+bool Engine::beginDrawTalkInternal(
+	int width,
+	int height,
+	const _shared_image& target)
+{
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: talk drawing must run on the SDL main thread\n");
+		return false;
+	}
 	{
 		std::lock_guard<std::mutex> locker(_talk_drawing_state_mutex);
 		if (_talk_drawing_state != TalkDrawingState::idle)
@@ -733,7 +753,9 @@ bool Engine::beginDrawTalk(int w, int h)
 	bool beganDrawing = false;
 	try
 	{
-		beganDrawing = EngineBase::beginDrawTalk(w, h);
+		beganDrawing = target != nullptr
+			? EngineBase::beginDrawTalk(target)
+			: EngineBase::beginDrawTalk(width, height);
 	}
 	catch (...)
 	{
@@ -858,18 +880,36 @@ _shared_image Engine::createSnowflake()
 
 void Engine::setFontName(const std::string & fontName)
 {
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached font source changes must run on the SDL main thread\n");
+		return;
+	}
 	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setFontName(fontName);
 }
 
 void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 {
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached font source changes must run on the SDL main thread\n");
+		return;
+	}
 	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::setFontFromMem(data, size);
 }
 
 _shared_image Engine::createText(const std::string & text, int size, unsigned int color)
 {
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached text rendering must run on the SDL main thread\n");
+		return nullptr;
+	}
 	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createText(text, size, color, true);
 }
@@ -889,6 +929,12 @@ _shared_image Engine::createTextWithFontData(
 
 void Engine::drawText(const std::string & text, int x, int y, int size, unsigned int color)
 {
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached text rendering must run on the SDL main thread\n");
+		return;
+	}
 	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawText(text, x, y, size, color);
 }

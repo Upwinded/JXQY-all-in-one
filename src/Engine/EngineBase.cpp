@@ -2738,12 +2738,13 @@ void EngineBase::drawGeometry(_shared_image image, const std::vector<Vertex>& ve
 bool EngineBase::beginRenderTargetSession(
 	RenderTargetSessionKind kind,
 	int targetWidth,
-	int targetHeight)
+	int targetHeight,
+	const _shared_image& reusableTarget)
 {
 	SDL_Renderer* activeRenderer = renderer.load();
 	if (kind == RenderTargetSessionKind::none ||
-		targetWidth <= 0 ||
-		targetHeight <= 0 ||
+		(reusableTarget == nullptr &&
+			(targetWidth <= 0 || targetHeight <= 0)) ||
 		activeRenderer == nullptr ||
 		!canPrepareRenderFrame())
 	{
@@ -2759,13 +2760,17 @@ bool EngineBase::beginRenderTargetSession(
 		return false;
 	}
 
-	auto temporaryTarget = make_shared_image(
-		SDL_CreateTexture(
-			activeRenderer,
-			SDL_PIXELFORMAT_ARGB8888,
-			SDL_TEXTUREACCESS_TARGET,
-			targetWidth,
-			targetHeight));
+	auto temporaryTarget = reusableTarget;
+	if (temporaryTarget == nullptr)
+	{
+		temporaryTarget = make_shared_image(
+			SDL_CreateTexture(
+				activeRenderer,
+				SDL_PIXELFORMAT_ARGB8888,
+				SDL_TEXTUREACCESS_TARGET,
+				targetWidth,
+				targetHeight));
+	}
 	if (temporaryTarget == nullptr ||
 		!SDL_SetTextureBlendMode(
 			temporaryTarget.get(),
@@ -2942,7 +2947,8 @@ bool EngineBase::beginDrawTalk(int w, int h)
 	if (!beginRenderTargetSession(
 		RenderTargetSessionKind::talk,
 		w,
-		h))
+		h,
+		nullptr))
 	{
 		return false;
 	}
@@ -2984,15 +2990,20 @@ bool EngineBase::beginDrawTalk(int w, int h)
 	return true;
 }
 
+bool EngineBase::beginDrawTalk(const _shared_image& target)
+{
+	return target != nullptr &&
+		beginRenderTargetSession(
+			RenderTargetSessionKind::talk,
+			0,
+			0,
+			target);
+}
+
 _shared_image EngineBase::endDrawTalk()
 {
-	auto target = endRenderTargetSession(
+	return endRenderTargetSession(
 		RenderTargetSessionKind::talk);
-	if (target == nullptr)
-	{
-		return nullptr;
-	}
-	return createNewImageFromImage(target);
 }
 
 _shared_image EngineBase::loadSaveShotFromPixels(int w, int h, const char* data, int size)
@@ -3036,7 +3047,8 @@ bool EngineBase::beginSaveScreen()
 	return beginRenderTargetSession(
 		RenderTargetSessionKind::saveScreen,
 		width,
-		height);
+		height,
+		nullptr);
 }
 
 _shared_image EngineBase::endSaveScreen()
@@ -4041,6 +4053,13 @@ void EngineBase::setCursorHardware(bool isHardware)
 
 void EngineBase::setFontName(const std::string & fontName)
 {
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached font source changes must run on the SDL main thread\n");
+		return;
+	}
+	clearFontCache();
 	font = fontName;
 	if (fontData != nullptr)
 	{
@@ -4056,18 +4075,29 @@ void EngineBase::setFontName(const std::string & fontName)
 
 void EngineBase::drawTalk(const std::string& text, int x, int y, int size, unsigned int color)
 {
-	_shared_image t = createText(text, size, color);
-	SDL_SetTextureBlendMode(t.get(), SDL_BLENDMODE_NONE);
-	drawImage(t, x, y);
+	_shared_image textTexture = createText(text, size, color);
+	if (textTexture == nullptr)
+	{
+		return;
+	}
+	SDL_SetTextureBlendMode(textTexture.get(), SDL_BLENDMODE_NONE);
+	drawImage(textTexture, x, y);
 	//freeImage(t);
 }
 
 void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 {
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached font source changes must run on the SDL main thread\n");
+		return;
+	}
 	if (data == nullptr || size <= 0)
 	{
 		return;
 	}
+	clearFontCache();
 	if (fontData != nullptr)
 	{
 		SDL_CloseIO(fontData);
@@ -4081,19 +4111,54 @@ void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 	fontBuffer = std::move(data);
 }
 
-_shared_image EngineBase::createText(const std::string& text, int size, unsigned int color, bool safe)
+TTF_Font* EngineBase::getCachedFont(int size)
 {
-	TTF_Font * _font = nullptr;
+	if (size <= 0)
+	{
+		return nullptr;
+	}
+	auto cachedFont = fontCache.find(size);
+	if (cachedFont != fontCache.end())
+	{
+		return cachedFont->second;
+	}
+
+	TTF_Font* openedFont = nullptr;
 	if (!fontData)
 	{
-		_font = TTF_OpenFont(font.c_str(), size);
+		openedFont = TTF_OpenFont(font.c_str(), size);
 	}
 	else
 	{
 		SDL_SeekIO(fontData, 0, SDL_IO_SEEK_SET);
-		_font = TTF_OpenFontIO(fontData, 0, size);	
-	}	
-	if (!_font) 
+		openedFont = TTF_OpenFontIO(fontData, 0, size);
+	}
+	if (openedFont != nullptr)
+	{
+		fontCache.emplace(size, openedFont);
+	}
+	return openedFont;
+}
+
+void EngineBase::clearFontCache()
+{
+	for (auto& cachedFont : fontCache)
+	{
+		TTF_CloseFont(cachedFont.second);
+	}
+	fontCache.clear();
+}
+
+_shared_image EngineBase::createText(const std::string& text, int size, unsigned int color, bool safe)
+{
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached text rendering must run on the SDL main thread\n");
+		return nullptr;
+	}
+	TTF_Font* textFont = getCachedFont(size);
+	if (textFont == nullptr)
 	{ 
 		return nullptr; 
 	}
@@ -4104,10 +4169,10 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	c.r = (color & 0xFF0000) >> 16;	
 	c.a = (color & 0xFF000000) >> 24;
 
-	auto text_s = TTF_RenderText_Blended(_font, text.c_str(), text.size(), c);
+	auto text_s = TTF_RenderText_Blended(
+		textFont, text.c_str(), text.size(), c);
 	if (text_s == nullptr)
 	{
-		TTF_CloseFont(_font);
 		return nullptr;
 	}
 	_shared_image text_t;
@@ -4123,7 +4188,6 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	setImageAlpha(text_t, c.a);
 
 	SDL_DestroySurface(text_s);
-	TTF_CloseFont(_font);
 	return text_t;
 }
 
@@ -5136,6 +5200,12 @@ void EngineBase::destroySDL()
 	logo.reset();
 	realScreen.reset();
 	ImageThreadSafety::flushPendingTextureDestructions();
+	if (!SDL_IsMainThread() && !fontCache.empty())
+	{
+		GameLog::write(
+			"Engine: ERROR: cached fonts are being destroyed outside the SDL main thread\n");
+	}
+	clearFontCache();
 	if (fontBuffer != nullptr)
 	{
 		fontBuffer = nullptr;

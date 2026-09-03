@@ -184,6 +184,7 @@ public:
 
 	//保存字符串到图片子程序
 	bool beginDrawTalk(int w, int h);
+	bool beginDrawTalk(const _shared_image& target);
 	_shared_image endDrawTalk();
 	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
 private:
@@ -198,6 +199,10 @@ private:
 	TalkDrawingState _talk_drawing_state = TalkDrawingState::idle;
 	std::thread::id _talk_drawing_thread;
 	bool _talk_drawing_lock_held = false;
+	bool beginDrawTalkInternal(
+		int width,
+		int height,
+		const _shared_image& target);
 	void clearTalkDrawingState();
 	void releaseTalkDrawingLock();
 

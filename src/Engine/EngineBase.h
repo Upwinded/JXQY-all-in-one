@@ -542,7 +542,8 @@ private:
 	bool beginRenderTargetSession(
 		RenderTargetSessionKind kind,
 		int targetWidth,
-		int targetHeight);
+		int targetHeight,
+		const _shared_image& reusableTarget);
 	_shared_image endRenderTargetSession(
 		RenderTargetSessionKind kind);
 	bool abortRenderTargetSession(
@@ -555,6 +556,7 @@ private:
 protected:
 	//将对话字符串保存为Texture，用于提升绘图速度
 	bool beginDrawTalk(int w, int h);
+	bool beginDrawTalk(const _shared_image& target);
 	_shared_image endDrawTalk();
 	void drawTalk(const std::string& text, int x, int y, int size, unsigned int color);
 
@@ -639,6 +641,9 @@ private:
 	std::string font = "";
 	SDL_IOStream * fontData = nullptr;
 	std::unique_ptr<char[]> fontBuffer = nullptr;
+	std::unordered_map<int, TTF_Font*> fontCache;
+	TTF_Font* getCachedFont(int size);
+	void clearFontCache();
 protected:
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
 	_shared_image createText(const std::string& text, int size, unsigned int color, bool safe = false);

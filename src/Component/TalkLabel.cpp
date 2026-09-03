@@ -49,8 +49,10 @@ void TalkLabel::setTalkStr(TalkString& tString)
 	// 保存当前页数据，重置逐字显示状态
 	currentTalkData = tString;
 	displayedCharCount = 0;
+	renderedCharCount = 0;
 	lastCharTime = getTime();
 	pageComplete = (currentTalkData.talkChar.empty());
+	impImage = nullptr;
 
 	// 初始渲染0个字符（清空显示）
 	renderUpToIndex(0);
@@ -70,28 +72,43 @@ void TalkLabel::showAllImmediately()
 
 void TalkLabel::renderUpToIndex(int endIndex)
 {
-	impImage = nullptr;
-
 	int totalChars = static_cast<int>(currentTalkData.talkChar.size());
-	if (totalChars == 0 || endIndex <= 0)
+	if (totalChars == 0)
 	{
 		return;
 	}
 
-	// 限制显示数量不超过总字符数
-	if (endIndex > totalChars)
+	endIndex = convert_max(0, convert_min(endIndex, totalChars));
+	_shared_image talkImage = IMP::loadImage(impImage, 0);
+	int imageWidth = 0;
+	int imageHeight = 0;
+	const bool targetSizeMatches = talkImage != nullptr &&
+		engine->getImageSize(talkImage, imageWidth, imageHeight) &&
+		imageWidth == rect.w && imageHeight == rect.h;
+	const bool createTarget = !targetSizeMatches ||
+		endIndex < renderedCharCount;
+	if (createTarget)
 	{
-		endIndex = totalChars;
+		talkImage = nullptr;
+		impImage = nullptr;
+		renderedCharCount = 0;
 	}
 
-	if (!engine->beginDrawTalk(rect.w, rect.h))
+	if (endIndex == renderedCharCount && talkImage != nullptr)
 	{
-		impImage = nullptr;
+		return;
+	}
+
+	const bool beganDrawing = createTarget
+		? engine->beginDrawTalk(rect.w, rect.h)
+		: engine->beginDrawTalk(talkImage);
+	if (!beganDrawing)
+	{
 		return;
 	}
 
 	const int lineHeight = getLineHeight();
-	for (int i = 0; i < endIndex; i++)
+	for (int i = renderedCharCount; i < endIndex; i++)
 	{
 		const TalkChar& character = currentTalkData.talkChar[i];
 		engine->drawTalk(
@@ -101,8 +118,16 @@ void TalkLabel::renderUpToIndex(int endIndex)
 			fontSize,
 			character.color);
 	}
-	auto img = engine->endDrawTalk();
-	impImage = IMP::createIMPImageFromImage(img);
+	auto renderedImage = engine->endDrawTalk();
+	if (renderedImage == nullptr)
+	{
+		return;
+	}
+	if (talkImage == nullptr || renderedImage.get() != talkImage.get())
+	{
+		impImage = IMP::createIMPImageFromImage(renderedImage);
+	}
+	renderedCharCount = endIndex;
 }
 
 int TalkLabel::getCharactersPerLine() const

@@ -52,7 +52,7 @@ protected:
 private:
 	virtual void setStr(const std::string & ws) {};
 
-	// 根据当前显示索引重新渲染文字图片
+	// 将尚未渲染的字符追加到当前页纹理
 	void renderUpToIndex(int endIndex);
 	int getCharactersPerLine() const;
 	int getCharactersPerPage() const;
@@ -63,6 +63,7 @@ private:
 
 	// 当前已显示的字符数
 	int displayedCharCount = 0;
+	int renderedCharCount = 0;
 
 	// 上次增加字符的时间点
 	UTime lastCharTime = 0;
