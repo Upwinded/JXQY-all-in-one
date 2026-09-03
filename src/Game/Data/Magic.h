@@ -181,6 +181,7 @@ struct MagicLevel
 };
 
 class Effect;
+class NPC;
 
 class Magic
 {
@@ -263,6 +264,44 @@ public:
 	void copy(Magic& magic);
 	void freeResource();
 	void loadRes();
+	static std::string resolvePlayerActionFileName(
+		const std::string& actionFile,
+		const std::string& npcIni)
+	{
+		if (actionFile.empty())
+		{
+			return "";
+		}
+
+		size_t indexEnd = npcIni.find_last_of('.');
+		if (indexEnd == std::string::npos)
+		{
+			indexEnd = npcIni.size();
+		}
+		size_t indexBegin = indexEnd;
+		while (indexBegin > 0 && npcIni[indexBegin - 1] >= '0' && npcIni[indexBegin - 1] <= '9')
+		{
+			indexBegin--;
+		}
+		const std::string index = indexBegin < indexEnd
+			? npcIni.substr(indexBegin, indexEnd - indexBegin)
+			: "1";
+
+		std::string resolved = actionFile;
+		const size_t slash = resolved.find_last_of("/\\");
+		const size_t extension = resolved.find_last_of('.');
+		if (extension != std::string::npos &&
+			(slash == std::string::npos || extension > slash))
+		{
+			resolved.insert(extension, index);
+		}
+		else
+		{
+			resolved += index;
+		}
+		return resolved;
+	}
+	_shared_imp getActionImageForNPC(const NPC* npc) const;
 	UTime getSpecialKindDurationMilliseconds(int lvl) const;
 	const MagicLinkedLevel& getLinkedLevel(int lvl) const;
 	const std::string& getExplodeMagicFileForLevel(int lvl) const;

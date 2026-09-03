@@ -3866,6 +3866,17 @@ _shared_imp Magic::loadActionImage()
 	return image;
 }
 
+_shared_imp Magic::getActionImageForNPC(const NPC* npc) const
+{
+	if (actionImage != nullptr || npc == nullptr || npc->kind != nkPlayer ||
+		gm == nullptr || gm->npcManager == nullptr)
+	{
+		return actionImage;
+	}
+	return gm->npcManager->loadActionImage(
+		resolvePlayerActionFileName(actionFile, npc->npcIni));
+}
+
 _shared_imp Magic::loadActionShadow()
 {
 	if (actionShadowFile.empty())

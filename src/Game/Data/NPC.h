@@ -1253,7 +1253,7 @@ public:
 	int getMagicActionDirectionCount(std::shared_ptr<Magic> magic) const
 	{
 		int useActionDirectionCount = magic != nullptr ? getImageDirectionCount(magic->useActionImage) : -1;
-		int actionDirectionCount = magic != nullptr ? getImageDirectionCount(magic->actionImage) : -1;
+		int actionDirectionCount = magic != nullptr ? getImageDirectionCount(magic->getActionImageForNPC(this)) : -1;
 		return selectMagicActionDirectionCount(getUseMagicDirectionCount(), useActionDirectionCount, actionDirectionCount);
 	}
 	bool canActToward(Point dest, int directionCount) const

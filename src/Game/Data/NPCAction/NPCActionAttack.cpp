@@ -71,7 +71,7 @@ void NPCActionAttack::enter()
     {
         auto attackActionImage = _actionMagic != nullptr && _actionMagic->useActionImage != nullptr
             ? _actionMagic->useActionImage
-            : (_actionMagic != nullptr ? _actionMagic->actionImage : nullptr);
+            : (_actionMagic != nullptr ? _actionMagic->getActionImageForNPC(_npc) : nullptr);
         if (player && attackActionImage != nullptr)
         {
             _attackType = NPCActionType::acSpecialAttack;
@@ -165,9 +165,13 @@ _shared_imp NPCActionAttack::getAttackImagePackage() const
     {
         return _actionMagic->useActionImage;
     }
-    if (_attackType == NPCActionType::acSpecialAttack && _actionMagic != nullptr && _actionMagic->actionImage != nullptr)
+    if (_attackType == NPCActionType::acSpecialAttack && _actionMagic != nullptr)
     {
-        return _actionMagic->actionImage;
+        auto actionImage = _actionMagic->getActionImageForNPC(_npc);
+        if (actionImage != nullptr)
+        {
+            return actionImage;
+        }
     }
 
     switch (_attackType)

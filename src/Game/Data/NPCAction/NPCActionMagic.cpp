@@ -126,9 +126,10 @@ _shared_imp NPCActionMagic::getMagicActionImagePackage() const
         {
             return _magicToUse->useActionImage;
         }
-        if (_magicToUse->actionImage != nullptr)
+        auto actionImage = _magicToUse->getActionImageForNPC(_npc);
+        if (actionImage != nullptr)
         {
-            return _magicToUse->actionImage;
+            return actionImage;
         }
     }
     return _npc->res.magic.imagePackage;

@@ -1,4 +1,5 @@
 #include "../Game/Data/NPCAction/NPCActionMagic.h"
+#include "../Game/Data/Magic.h"
 
 #include <iostream>
 
@@ -28,6 +29,12 @@ int main()
         "legacy player magic still triggers before a short action exits") && ok;
     ok = check(NPCActionMagic::resolveMagicTriggerTime(0, true, false) == 0,
         "zero-duration player magic triggers immediately instead of being skipped") && ok;
+    ok = check(Magic::resolvePlayerActionFileName(
+        "烈火情天攻击", "z-杨影枫.ini") == "烈火情天攻击1",
+        "legacy player action defaults to form one") && ok;
+    ok = check(Magic::resolvePlayerActionFileName(
+        "烈火情天攻击.asf", "ini/npcres/z-杨影枫2.ini") == "烈火情天攻击2.asf",
+        "legacy player action uses the trailing NPC resource form index") && ok;
 
     return ok ? 0 : 1;
 }
