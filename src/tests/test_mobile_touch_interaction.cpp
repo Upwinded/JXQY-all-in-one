@@ -84,16 +84,29 @@ int main()
 		"mobile joystick ignores movement inside the dead zone") && ok;
 	ok = check(isMobileJoystickDirectionActive(0, 5, 100),
 		"mobile joystick direction activates at the current dead-zone edge") && ok;
-	ok = check(!isMobileJoystickWalking(0, 5, 100),
-		"mobile joystick exact dead-zone edge is not yet walking") && ok;
-	ok = check(isMobileJoystickWalking(0, 6, 100),
-		"mobile joystick movement past the dead-zone edge is walking") && ok;
-	ok = check(isMobileJoystickWalking(0, 15, 100),
-		"mobile joystick run threshold edge remains walking") && ok;
-	ok = check(!isMobileJoystickRunning(0, 15, 100),
-		"mobile joystick run threshold requires movement beyond the edge") && ok;
-	ok = check(isMobileJoystickRunning(0, 16, 100),
-		"mobile joystick movement beyond the run threshold is running") && ok;
+	MobileJoystickMovementState movementState = MobileJoystickMovementState::Idle;
+	movementState = getMobileJoystickMovementState(movementState, 0, 13, 240);
+	ok = check(movementState == MobileJoystickMovementState::Walk,
+		"mobile joystick starts walking beyond the dead zone") && ok;
+	movementState = getMobileJoystickMovementState(movementState, 0, 41, 240);
+	ok = check(movementState == MobileJoystickMovementState::Walk,
+		"mobile joystick stays walking below the run-entry threshold") && ok;
+	movementState = getMobileJoystickMovementState(movementState, 0, 42, 240);
+	ok = check(movementState == MobileJoystickMovementState::Run,
+		"mobile joystick enters running above the upper hysteresis threshold") && ok;
+	movementState = getMobileJoystickMovementState(movementState, 0, 31, 240);
+	ok = check(movementState == MobileJoystickMovementState::Run,
+		"mobile joystick stays running above the run-exit threshold") && ok;
+	movementState = getMobileJoystickMovementState(movementState, 0, 30, 240);
+	ok = check(movementState == MobileJoystickMovementState::Walk,
+		"mobile joystick exits running below the lower hysteresis threshold") && ok;
+	movementState = getMobileJoystickMovementState(movementState, 0, 12, 240);
+	ok = check(movementState == MobileJoystickMovementState::Idle,
+		"mobile joystick returns to idle at the dead-zone edge") && ok;
+	movementState = getMobileJoystickMovementState(
+		MobileJoystickMovementState::Run, 0, 20, 0);
+	ok = check(movementState == MobileJoystickMovementState::Idle,
+		"mobile joystick invalid range resets movement state") && ok;
 	ok = check(!isMobileJoystickDirectionActive(0, 20, 0),
 		"mobile joystick ignores invalid range") && ok;
 

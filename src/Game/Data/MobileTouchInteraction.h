@@ -9,7 +9,15 @@ constexpr uint64_t MOBILE_RIGHT_SCRIPT_LONG_PRESS_MS = 600;
 constexpr int MOBILE_RIGHT_SCRIPT_MOVE_TOLERANCE_PIXELS = 24;
 constexpr float MOBILE_JOYSTICK_DEAD_ZONE_RATIO = 1.0f / 20.0f;
 constexpr float MOBILE_JOYSTICK_RUN_ZONE_RATIO = 3.0f / 20.0f;
+constexpr float MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO = 3.0f / 20.0f;
 constexpr double MOBILE_JOYSTICK_PI = 3.14159265358979323846;
+
+enum class MobileJoystickMovementState
+{
+	Idle,
+	Walk,
+	Run
+};
 
 inline bool shouldDeferMobileRightScriptChoice(const std::string& scriptFile, const std::string& scriptFileRight)
 {
@@ -64,24 +72,33 @@ inline bool isMobileJoystickDirectionActive(int deltaX, int deltaY, int range)
 	return getMobileJoystickDistance(deltaX, deltaY) >= range * MOBILE_JOYSTICK_DEAD_ZONE_RATIO;
 }
 
-inline bool isMobileJoystickWalking(int deltaX, int deltaY, int range)
+inline MobileJoystickMovementState getMobileJoystickMovementState(
+	MobileJoystickMovementState currentState,
+	int deltaX,
+	int deltaY,
+	int range)
 {
 	if (range <= 0)
 	{
-		return false;
+		return MobileJoystickMovementState::Idle;
 	}
-	int distance = getMobileJoystickDistance(deltaX, deltaY);
-	return distance > range * MOBILE_JOYSTICK_DEAD_ZONE_RATIO
-		&& distance <= range * MOBILE_JOYSTICK_RUN_ZONE_RATIO;
-}
 
-inline bool isMobileJoystickRunning(int deltaX, int deltaY, int range)
-{
-	if (range <= 0)
+	const int distance = getMobileJoystickDistance(deltaX, deltaY);
+	if (distance <= range * MOBILE_JOYSTICK_DEAD_ZONE_RATIO)
 	{
-		return false;
+		return MobileJoystickMovementState::Idle;
 	}
-	return getMobileJoystickDistance(deltaX, deltaY) > range * MOBILE_JOYSTICK_RUN_ZONE_RATIO;
+
+	const float runThreshold = range * MOBILE_JOYSTICK_RUN_ZONE_RATIO;
+	if (currentState == MobileJoystickMovementState::Run)
+	{
+		return distance < runThreshold * (1.0f - MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO)
+			? MobileJoystickMovementState::Walk
+			: MobileJoystickMovementState::Run;
+	}
+	return distance > runThreshold * (1.0f + MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO)
+		? MobileJoystickMovementState::Run
+		: MobileJoystickMovementState::Walk;
 }
 
 inline double getMobileJoystickAngle(int deltaX, int deltaY)

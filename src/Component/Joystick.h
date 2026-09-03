@@ -1,5 +1,6 @@
 #pragma once
 #include "RoundButton.h"
+#include "../Game/Data/MobileTouchInteraction.h"
 #include <vector>
 
 #define OutRange -1000
@@ -14,6 +15,8 @@ protected:
 	Point touchPosition = { OutRange, OutRange };
 private:
 	bool useStaticImages = false;
+	MobileJoystickMovementState movementState = MobileJoystickMovementState::Idle;
+	void updateMovementState();
 public:
 	std::vector<int> getDirectionList();
 	bool isRunning();

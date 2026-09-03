@@ -6,7 +6,6 @@
 #include "../Engine/Engine.h"
 #include "../File/log.h"
 #include "ComponentRegistry.h"
-#include "../Game/Data/MobileTouchInteraction.h"
 
 namespace
 {
@@ -32,23 +31,25 @@ std::vector<int> Joystick::getDirectionList()
 
 bool Joystick::isRunning()
 {
-	if (touchPosition.x <= OutRange || touchPosition.y <= OutRange)
-	{
-		return false;
-	}
-	return isMobileJoystickRunning(
-		touchPosition.x - rect.w / 2,
-		touchPosition.y - rect.h / 2,
-		roundRange);
+	updateMovementState();
+	return movementState == MobileJoystickMovementState::Run;
 }
 
 bool Joystick::isWalking()
 {
+	updateMovementState();
+	return movementState == MobileJoystickMovementState::Walk;
+}
+
+void Joystick::updateMovementState()
+{
 	if (touchPosition.x <= OutRange || touchPosition.y <= OutRange)
 	{
-		return false;
+		movementState = MobileJoystickMovementState::Idle;
+		return;
 	}
-	return isMobileJoystickWalking(
+	movementState = getMobileJoystickMovementState(
+		movementState,
 		touchPosition.x - rect.w / 2,
 		touchPosition.y - rect.h / 2,
 		roundRange);
@@ -64,6 +65,7 @@ int Joystick::distanceToCenter()
 void Joystick::resetInput()
 {
 	touchPosition = { OutRange, OutRange };
+	movementState = MobileJoystickMovementState::Idle;
 }
 
 bool Joystick::mouseInRect(int x, int y)
@@ -117,19 +119,18 @@ void Joystick::onMouseMoveOut()
 {
 	if (touchingDownID == TOUCH_UNTOUCHEDID)
 	{
-		touchPosition.x = OutRange;
-		touchPosition.y = OutRange;
+		resetInput();
 	}
 }
 
 void Joystick::onMouseLeftUp(int x, int y)
 {
-	touchPosition.x = OutRange;
-	touchPosition.y = OutRange;
+	resetInput();
 }
 
 void Joystick::onMouseLeftDown(int x, int y)
 {
+	resetInput();
     touchPosition.x = x - rect.x;
     touchPosition.y = y - rect.y;
 	result |= erMouseLDown;
