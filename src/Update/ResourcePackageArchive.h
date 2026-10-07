@@ -73,6 +73,7 @@ struct ResourcePackageArchiveResult
 struct ImportedResourcePackageMetadata
 {
 	std::string gameId;
+	std::string installDirectory;
 	std::string displayName;
 	std::string author;
 	std::string displayVersion;

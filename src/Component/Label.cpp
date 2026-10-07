@@ -67,6 +67,75 @@ _shared_image createElidedTextImage(Engine* engine, const std::string& text,
 }
 }
 
+const _shared_image& CachedTextTexture::get(
+	Engine* engine,
+	const std::string& text,
+	int fontSize,
+	unsigned int color)
+{
+	if (engine == nullptr || text.empty() || fontSize <= 0)
+	{
+		clear();
+		return image;
+	}
+	if (image != nullptr
+		&& cachedText == text
+		&& cachedFontSize == fontSize
+		&& cachedColor == color)
+	{
+		return image;
+	}
+
+	image = engine->createText(text, fontSize, color);
+	if (image != nullptr)
+	{
+		cachedText = text;
+		cachedFontSize = fontSize;
+		cachedColor = color;
+	}
+	return image;
+}
+
+void CachedTextTexture::draw(
+	Engine* engine,
+	const std::string& text,
+	int x,
+	int y,
+	int fontSize,
+	unsigned int color)
+{
+	const _shared_image& textImage = get(engine, text, fontSize, color);
+	if (engine != nullptr && textImage != nullptr)
+	{
+		engine->drawImage(textImage, x, y);
+	}
+}
+
+void CachedTextTexture::drawWithAlpha(
+	Engine* engine,
+	const std::string& text,
+	int x,
+	int y,
+	int fontSize,
+	unsigned int color,
+	unsigned char alpha)
+{
+	const _shared_image& textImage = get(engine, text, fontSize, color);
+	if (engine != nullptr && textImage != nullptr)
+	{
+		engine->drawImageWithBlendAlpha(
+			textImage, x, y, alpha, SDL_BLENDMODE_BLEND);
+	}
+}
+
+void CachedTextTexture::clear()
+{
+	image = nullptr;
+	cachedText.clear();
+	cachedFontSize = -1;
+	cachedColor = 0;
+}
+
 Label::Label()
 {
 	name = "Label";
@@ -87,6 +156,13 @@ void Label::initFromIni(INIReader & ini)
 	autoShrink = ini.GetBoolean("Init", "AutoShrink", autoShrink);
 	elideOverflow = ini.GetBoolean("Init", "ElideOverflow", elideOverflow);
 	minimumFontSize = ini.GetInteger("Init", "MinimumFont", minimumFontSize);
+	autoNextLine = ini.GetBoolean("Init", "AutoNextLine", autoNextLine);
+	if (ini.GetBoolean("Init", "CenterText", false))
+	{
+		horizontalAlignment = TextHorizontalAlignment::Center;
+		verticalAlignment = TextVerticalAlignment::Center;
+	}
+	setStr(ini.Get("Init", "Text", ""));
 }
 
 void Label::setStr(const std::string & s)
@@ -97,6 +173,15 @@ void Label::setStr(const std::string & s)
 		invalidateTextLayout();
 	}
 	refreshTextLayout();
+}
+
+void Label::setColorTagsEnabled(bool enabled)
+{
+	if (interpretColorTags != enabled)
+	{
+		interpretColorTags = enabled;
+		invalidateTextLayout();
+	}
 }
 
 void Label::refreshTextLayout()
@@ -110,6 +195,7 @@ void Label::refreshTextLayout()
 		&& renderedAutoNextLine == autoNextLine
 		&& renderedAutoShrink == autoShrink
 		&& renderedElideOverflow == elideOverflow
+		&& renderedColorTagsEnabled == interpretColorTags
 		&& renderedMinimumFontSize == minimumFontSize)
 	{
 		return;
@@ -122,7 +208,64 @@ void Label::refreshTextLayout()
 	strImage.clear();
 	renderedFontSize = fontSize;
 
-	if (autoNextLine)
+	const bool hasColorTags = interpretColorTags
+		&& str.find("<color=") != std::string::npos;
+	if (hasColorTags)
+	{
+		const int charactersPerLine = autoNextLine
+			? TextLayout::charactersPerLineForWidth(rect.w, fontSize)
+			: std::max(1,
+				static_cast<int>(TextLayout::countUtf8Characters(str)));
+		const auto lines = TextLayout::wrapColorTaggedUtf8Text(
+			str, charactersPerLine, color);
+		for (const auto& line : lines)
+		{
+			std::vector<_shared_image> runImages;
+			int lineWidth = 0;
+			int lineHeight = std::max(1, fontSize);
+			std::string plainLine;
+			for (const auto& run : line)
+			{
+				plainLine += run.text;
+				_shared_image runImage = engine->createText(
+					run.text, fontSize, run.color);
+				int runWidth = 0;
+				int runHeight = 0;
+				if (runImage != nullptr
+					&& engine->getImageSize(runImage, runWidth, runHeight))
+				{
+					lineWidth += runWidth;
+					lineHeight = std::max(lineHeight, runHeight);
+				}
+				runImages.push_back(std::move(runImage));
+			}
+			if (runImages.empty())
+			{
+				strImage.push_back(nullptr);
+				continue;
+			}
+			if (!engine->beginDrawTalk(std::max(1, lineWidth), lineHeight))
+			{
+				strImage.push_back(engine->createText(
+					plainLine, fontSize, color));
+				continue;
+			}
+			int drawX = 0;
+			for (const auto& runImage : runImages)
+			{
+				int runWidth = 0;
+				int runHeight = 0;
+				if (runImage != nullptr
+					&& engine->getImageSize(runImage, runWidth, runHeight))
+				{
+					engine->drawImage(runImage, drawX, 0);
+					drawX += runWidth;
+				}
+			}
+			strImage.push_back(engine->endDrawTalk());
+		}
+	}
+	else if (autoNextLine)
 	{
 		int charactersPerLine = TextLayout::charactersPerLineForWidth(rect.w, fontSize);
 		auto lines = TextLayout::wrapUtf8Text(str, charactersPerLine);
@@ -177,6 +320,7 @@ void Label::refreshTextLayout()
 	renderedAutoNextLine = autoNextLine;
 	renderedAutoShrink = autoShrink;
 	renderedElideOverflow = elideOverflow;
+	renderedColorTagsEnabled = interpretColorTags;
 	renderedMinimumFontSize = minimumFontSize;
 	textLayoutValid = true;
 }

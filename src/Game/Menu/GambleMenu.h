@@ -103,6 +103,13 @@ private:
 	UTime diceLastUpdateTime = 0;
 	std::string dicePlayerTalk;
 	std::string diceNpcTalk;
+	CachedTextTexture diceTitleTextTexture;
+	CachedTextTexture diceCloseTextTexture;
+	CachedTextTexture dicePlayerNameTextTexture;
+	CachedTextTexture diceNpcNameTextTexture;
+	std::array<std::vector<CachedTextTexture>, 2> diceTalkTextTextures;
+	CachedTextTexture diceStakeTextTexture;
+	std::array<CachedTextTexture, 3> diceButtonTextTextures;
 
 	struct FishMovie
 	{
@@ -141,7 +148,11 @@ private:
 	UTime fishRippleBeginTime = 0;
 	UTime fishTransientTipUntil = 0;
 	std::string fishTransientTip;
+	CachedTextTexture fishTitleTextTexture;
+	CachedTextTexture fishCloseTextTexture;
+	CachedTextTexture fishTipTextTexture;
 	UIFocusManager controllerFocusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 
 	void resetForRound(int roundCost, int roundNpcType);
 	void resetForDiceGame(const std::string& npcName);

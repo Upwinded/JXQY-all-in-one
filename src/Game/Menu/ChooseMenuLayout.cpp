@@ -13,7 +13,7 @@ constexpr int VIEWPORT_MARGIN = 10;
 constexpr int DESKTOP_PANEL_BOTTOM_CLEARANCE = 96;
 constexpr int MINIMUM_CONTENT_PADDING = 8;
 constexpr int MINIMUM_PANEL_EDGE_PADDING = 24;
-constexpr int MINIMUM_TOUCH_HEIGHT = 28;
+constexpr int MINIMUM_TOUCH_HEIGHT = 24;
 constexpr int TEXT_VERTICAL_PADDING = 3;
 constexpr int TEXT_LINE_GAP = 2;
 constexpr int SECTION_GAP = 4;
@@ -351,7 +351,18 @@ ChooseMenuLayoutOutput calculateChooseMenuLayout(const ChooseMenuLayoutInput& in
 		rows.push_back(row);
 	}
 
-	const int topPadding = std::max(MINIMUM_CONTENT_PADDING, input.preferredMessage.y);
+	const int nativeTopPadding = std::max(MINIMUM_CONTENT_PADDING, input.preferredMessage.y);
+	const int nativeBottomPadding = MINIMUM_PANEL_EDGE_PADDING;
+	const int paddingReferenceHeight = std::max(
+		input.preferredPanel.height, nativeTopPadding + nativeBottomPadding + 1);
+	// The entire background is stretched, including its decorative edges.
+	// Reserve the same inset proportions when growing or paginating the panel.
+	const auto scaledPadding = [paddingReferenceHeight](int padding, int height)
+	{
+		return static_cast<int>(static_cast<long long>(padding) * height / paddingReferenceHeight);
+	};
+	int topPadding = scaledPadding(nativeTopPadding, maximumPanelHeight);
+	int bottomPadding = scaledPadding(nativeBottomPadding, maximumPanelHeight);
 	const bool speakerVisible = input.showSpeaker && !input.speakerName.empty();
 	const bool portraitVisible = input.showPortrait;
 	const int portraitSize = portraitVisible
@@ -377,7 +388,6 @@ ChooseMenuLayoutOutput calculateChooseMenuLayout(const ChooseMenuLayoutInput& in
 			SECTION_GAP,
 			input.preferredOption.y - input.preferredMessage.y - input.preferredMessage.height)
 		: 0;
-	const int bottomPadding = MINIMUM_PANEL_EDGE_PADDING;
 	const int footerHeight = std::max(MINIMUM_TOUCH_HEIGHT, std::max(1, input.preferredOption.height));
 	const int multipleFooterHeight = input.multipleFooter ? footerHeight : 0;
 	const int multipleFooterGap = input.multipleFooter ? FOOTER_GAP : 0;
@@ -424,10 +434,16 @@ ChooseMenuLayoutOutput calculateChooseMenuLayout(const ChooseMenuLayoutInput& in
 	{
 		maximumPageContentHeight = std::max(maximumPageContentHeight, page.contentHeight);
 	}
-	const int requiredPanelHeight = fixedHeight + maximumPageContentHeight;
+	const int requiredContentHeight = fixedHeight - topPadding - bottomPadding + maximumPageContentHeight;
+	const int nativeContentHeight = paddingReferenceHeight - nativeTopPadding - nativeBottomPadding;
+	const int requiredPanelHeight = static_cast<int>(std::min<long long>(maximumPanelHeight,
+		(static_cast<long long>(requiredContentHeight) * paddingReferenceHeight + nativeContentHeight - 1)
+			/ nativeContentHeight));
 	const int panelHeight = std::min(
 		maximumPanelHeight,
 		std::max(std::max(1, input.preferredPanel.height), requiredPanelHeight));
+	topPadding = scaledPadding(nativeTopPadding, panelHeight);
+	bottomPadding = scaledPadding(nativeBottomPadding, panelHeight);
 	const int preferredPanelCenterX = input.preferredPanel.x + input.preferredPanel.width / 2;
 	const int panelX = clampInteger(
 		preferredPanelCenterX - panelWidth / 2,

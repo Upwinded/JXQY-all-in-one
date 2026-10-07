@@ -5,6 +5,7 @@
 #include <iostream>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace
@@ -150,9 +151,51 @@ bool testYycsDialogAlignedChoice()
 		&& !isSameRectangle(longContentLayout.message, { 166, 302, 310, 22 }),
 		"long YYCS choice content falls back to the responsive layout") && ok;
 	ok = check(longContentLayout.pageItems.size() == 2
-		&& longContentLayout.pageItems[0].rect.height >= 28
-		&& longContentLayout.pageItems[1].rect.height >= 28,
-		"responsive YYCS fallback keeps touch-sized option rectangles") && ok;
+		&& longContentLayout.pageItems[0].rect.height >= 24
+		&& longContentLayout.pageItems[1].rect.height >= 24,
+		"responsive YYCS fallback keeps compact usable option rectangles") && ok;
+	return ok;
+}
+
+bool testYuchenTalentInsets()
+{
+	bool ok = true;
+	for (const auto viewport : { std::pair<int, int>{1280, 720}, {800, 600}, {640, 480}, {400, 360} })
+	{
+		ChooseMenuLayoutInput input = makeYycsInput(viewport.first, viewport.second);
+		input.showSpeaker = true;
+		input.speakerRight = true;
+		input.speakerName = u8"酒肆老板";
+		input.message = u8"……";
+		for (const char* text : { u8"偷取", u8"查看友好度", u8"查看友好度上限", u8"减1000友好", u8"学习天赋【偷取】", u8"增加【偷取】经验" })
+		{
+			input.visibleItems.push_back({ static_cast<int>(input.visibleItems.size()), text });
+		}
+		const auto first = calculateChooseMenuLayout(input);
+		std::vector<int> indices;
+		for (int page = 0; page < first.pageCount; ++page)
+		{
+			input.requestedPageIndex = page;
+			const auto layout = calculateChooseMenuLayout(input);
+			// The real 438x123 parchment's text area is inside y=18..106.
+			const int paperTop = layout.panel.y + (layout.panel.height * 18 + 122) / 123;
+			const int paperBottom = layout.panel.y + layout.panel.height * 106 / 123;
+			ok = check(layout.speaker.y >= paperTop + 4 && layout.message.y >= paperTop + 4,
+				"speaker and prompt stay inset from the stretched parchment top") && ok;
+			for (const auto& item : layout.pageItems)
+			{
+				indices.push_back(item.originalIndex);
+				ok = check(item.rect.y >= paperTop + 4 && item.rect.bottom() <= paperBottom - 4,
+					"every talent option stays inset from the stretched parchment edges") && ok;
+				ok = check(item.rect.height == 24,
+					"single-line talent options use compact nonoverlapping 24-pixel rows") && ok;
+			}
+			ok = checkAllRectanglesWithinViewport(layout, viewport.first, viewport.second,
+				"talent menu and navigation stay within the viewport") && ok;
+		}
+		ok = check(indices == std::vector<int>({0, 1, 2, 3, 4, 5}),
+			"compact talent menu preserves all six branch indices") && ok;
+	}
 	return ok;
 }
 
@@ -195,6 +238,52 @@ bool testUtf8TextLayout()
 		"fixed-height labels draw only complete lines inside their rectangle") && ok;
 	ok = check(TextLayout::visibleWrappedLineCount(4, 31, 16) == 1,
 		"fixed-height labels do not draw a partially clipped second line") && ok;
+
+	const unsigned int defaultColor = 0xFF102030;
+	const auto colorTaggedLines = TextLayout::wrapColorTaggedUtf8Text(
+		u8"说明<color=Red>红<color=Black>黑<enter>"
+		u8"<color=1,2,3,128>半<color=Default>常",
+		20,
+		defaultColor);
+	ok = check(colorTaggedLines.size() == 2
+		&& colorTaggedLines[0].size() == 3
+		&& colorTaggedLines[0][0].text == u8"说明"
+		&& colorTaggedLines[0][0].color == defaultColor
+		&& colorTaggedLines[0][1].text == u8"红"
+		&& colorTaggedLines[0][1].color == 0xFFFF0000
+		&& colorTaggedLines[0][2].text == u8"黑"
+		&& colorTaggedLines[0][2].color == 0xFF000000
+		&& colorTaggedLines[1].size() == 2
+		&& colorTaggedLines[1][0].text == u8"半"
+		&& colorTaggedLines[1][0].color == 0x80010203
+		&& colorTaggedLines[1][1].text == u8"常"
+		&& colorTaggedLines[1][1].color == defaultColor,
+		"color-tagged text matches the reference named, numeric, alpha,"
+		" default-reset, and explicit-line behavior") && ok;
+	const auto wrappedColorTaggedLines =
+		TextLayout::wrapColorTaggedUtf8Text(
+			u8"<color=255,0,255>甲乙丙", 2, defaultColor);
+	ok = check(wrappedColorTaggedLines.size() == 2
+		&& wrappedColorTaggedLines[0].size() == 1
+		&& wrappedColorTaggedLines[0][0].text == u8"甲乙"
+		&& wrappedColorTaggedLines[0][0].color == 0xFFFF00FF
+		&& wrappedColorTaggedLines[1].size() == 1
+		&& wrappedColorTaggedLines[1][0].text == u8"丙"
+		&& wrappedColorTaggedLines[1][0].color == 0xFFFF00FF,
+		"color markup is excluded from width while its color survives wrapping") && ok;
+	const auto rangeDefaultLines = TextLayout::wrapColorTaggedUtf8Text(
+		u8"<color=Red><color=BeginRangeDefault>红"
+		u8"<color=1,2,3>数<color=Default>复"
+		u8"<color=EndRangeDefault><color=Default>常",
+		20,
+		0x80102030);
+	ok = check(rangeDefaultLines.size() == 1
+		&& rangeDefaultLines[0].size() == 4
+		&& rangeDefaultLines[0][0].color == 0x80FF0000
+		&& rangeDefaultLines[0][1].color == 0x80010203
+		&& rangeDefaultLines[0][2].color == 0x80FF0000
+		&& rangeDefaultLines[0][3].color == 0x80102030,
+		"color ranges preserve the contextual default and inherit its alpha") && ok;
 	return ok;
 }
 
@@ -229,8 +318,8 @@ bool testDesktopLayout()
 	{
 		ok = check(isInside(item.rect, layout.panel),
 			"desktop option click rectangle stays inside the panel") && ok;
-		ok = check(item.rect.height >= 28,
-			"desktop option has a touch-sized click rectangle") && ok;
+		ok = check(item.rect.height >= 24,
+			"desktop option has a compact usable click rectangle") && ok;
 	}
 	ok = check(layout.panel.bottom() - layout.pageItems.back().rect.bottom() >= 24,
 		"desktop options keep a readable margin above the panel border") && ok;
@@ -256,8 +345,8 @@ bool testMobilePaginationAndOriginalIndices()
 	ok = check(compactLayout.message.x == compactLayout.panel.x + 65 &&
 		compactLayout.message.right() == compactLayout.panel.x + 375,
 		"extended YYCS title stays inside the native dialog text rectangle") && ok;
-	ok = check(compactLayout.message.y == compactLayout.panel.y + 32,
-		"single-line extended YYCS prompt is centered in its native text rectangle") && ok;
+	ok = check(compactLayout.message.y == compactLayout.panel.y + compactLayout.panel.height * 30 / 123 + 2,
+		"single-line extended YYCS prompt is centered after applying the stretched background inset") && ok;
 	ok = check(compactLayout.pageItems.size() == 4 &&
 		compactLayout.pageItems.front().rect.y > compactLayout.message.y,
 		"four-option YYCS layout keeps every option below the centered prompt") && ok;
@@ -417,6 +506,7 @@ int main()
 	bool ok = true;
 	ok = testUtf8TextLayout() && ok;
 	ok = testYycsDialogAlignedChoice() && ok;
+	ok = testYuchenTalentInsets() && ok;
 	ok = testDesktopLayout() && ok;
 	ok = testMobilePaginationAndOriginalIndices() && ok;
 	ok = testEmptyItemsAndSparseOriginalIndices() && ok;

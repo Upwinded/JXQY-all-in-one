@@ -1062,7 +1062,9 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
             profile.levelUpRandomEffects.isEmpty() &&
             profile.levelUpMaleEffect.isEmpty() &&
             profile.levelUpFemaleEffect.isEmpty() &&
-            profile.levelUpThresholdModeDefined &&
+            !profile.defeatedNpcExperienceModeDefined &&
+            !profile.experienceMultiplierDefined &&
+            !profile.levelUpThresholdModeDefined &&
             profile.partnerFollowRadiusDefined &&
             profile.partnerFollowRunRadiusDefined &&
             profile.npcActionProfileDefined &&
@@ -1071,7 +1073,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
             profile.addLifeModeDefined &&
             profile.uiProfile == "JXQY2" &&
             profile.features.value("RainSceneTint", true) == false,
-        "default GameProfile omits optional publishing fields and explicitly defines gameplay compatibility settings");
+        "default GameProfile omits optional publishing fields, leaves experience settings inheritable, and explicitly defines gameplay compatibility settings");
     const QString invalidUnicodePath(1, QChar(0xD800));
     ok = check(
         EditorResourcePath::isSafeOptionalRelativeResourcePath(QString()) &&
@@ -1091,6 +1093,8 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
         !EditorResourcePath::isSafeOptionalRelativeResourcePath(invalidUnicodePath),
         "optional resource path validation matches strict runtime safety") && ok;
     profile.id = "MOD_A";
+    profile.installDirectory = "mod_a";
+    profile.minimumCompatibleSaveResourceVersion = "1.03";
     profile.name = QString::fromUtf8("测试 Mod");
     profile.author = QString::fromUtf8("作者甲、作者乙");
     profile.releaseMetadata.displayVersion = "1.041";
@@ -1119,6 +1123,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     profile.magicEffectCalculationMode =
         MagicEffectCalculationMode::AddToAttack;
     profile.magicEffectCalculationModeDefined = true;
+    profile.scriptPlayerName = QString::fromUtf8("杨影枫");
     profile.npcActionProfile = ScriptNpcActionProfile::Xjxqy;
     profile.npcActionProfileDefined = true;
     profile.npcRuntimeProfile = ScriptNpcRuntimeProfile::Trilogy;
@@ -1128,6 +1133,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     profile.addLifeMode = ScriptAddLifeMode::DirectClamp;
     profile.addLifeModeDefined = true;
     profile.levelUpMessage = QString::fromUtf8("{name}升到{level}级");
+    profile.levelUpEffectMode = LevelUpEffectMode::Replace;
     profile.levelUpRandomEffects = {
         "level-up-a.ini", "level-up-b.ini" };
     profile.levelUpMaleEffect = "level-up-male.ini";
@@ -1141,7 +1147,10 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     profile.preferLocalUi = false;
     profile.features.insert("TopButtonsLayout", false);
     profile.features.insert("MagicTriggerAtAnimationEnd", true);
+    profile.features.insert("NativeNpcAttackAtAnimationEnd", true);
     profile.features.insert("RageSystem", true);
+    profile.features.insert("SeparateTalentSlots", true);
+    profile.features.insert("MagicLevelLimitFromDefinition", true);
     profile.titleNewYearMenu = "ini\\ui\\title\\newyear.menu.ini";
     profile.teamInfoFile = QString::fromUtf8("说明\\开发团队.txt");
 
@@ -1150,6 +1159,9 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     GameProfile loaded;
     ok = check(loaded.loadFromFile(manifestPath), "load GameProfile dependency manifest") && ok;
     ok = check(loaded.id == "MOD_A", "GameProfile id round trip") && ok;
+    ok = check(loaded.installDirectory == "mod_a" &&
+        loaded.minimumCompatibleSaveResourceVersion == "1.03",
+        "GameProfile install directory and save lower bound round trip") && ok;
     ok = check(loaded.author == QString::fromUtf8("作者甲、作者乙"),
                "GameProfile Game.Author UTF-8 round trip") && ok;
     ok = check(
@@ -1191,7 +1203,8 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
                 MagicEffectCalculationMode::AddToAttack,
         "GameProfile combat settings round trip") && ok;
     ok = check(
-        loaded.npcActionProfileDefined &&
+        loaded.scriptPlayerName == QString::fromUtf8("杨影枫") &&
+            loaded.npcActionProfileDefined &&
             loaded.npcActionProfile == ScriptNpcActionProfile::Xjxqy &&
             loaded.npcRuntimeProfileDefined &&
             loaded.npcRuntimeProfile == ScriptNpcRuntimeProfile::Trilogy &&
@@ -1203,6 +1216,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     ok = check(
         loaded.levelUpMessage ==
                 QString::fromUtf8("{name}升到{level}级") &&
+            loaded.levelUpEffectMode == LevelUpEffectMode::Replace &&
             loaded.levelUpRandomEffects ==
                 QStringList{ "level-up-a.ini", "level-up-b.ini" } &&
             loaded.levelUpMaleEffect == "level-up-male.ini" &&
@@ -1221,8 +1235,14 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
                "GameProfile disabled feature round trip") && ok;
     ok = check(loaded.features.value("MagicTriggerAtAnimationEnd", false),
                "GameProfile enabled feature round trip") && ok;
+    ok = check(loaded.features.value("NativeNpcAttackAtAnimationEnd", false),
+               "GameProfile preserves explicit native NPC attack protocol without game-specific defaults") && ok;
     ok = check(loaded.features.value("RageSystem", false),
                "GameProfile MG-only rage feature round trip") && ok;
+    ok = check(loaded.features.value("SeparateTalentSlots", false),
+               "GameProfile separate talent slots feature round trip") && ok;
+    ok = check(loaded.features.value("MagicLevelLimitFromDefinition", false),
+               "GameProfile declared magic level limit round trip") && ok;
     ok = check(loaded.titleNewYearMenu == "ini\\ui\\title\\newyear.menu.ini",
                "GameProfile Title.NewYearMenu round trip") && ok;
     ok = check(loaded.teamInfoFile == QString::fromUtf8("说明\\开发团队.txt"),
@@ -1258,6 +1278,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
         text.contains("LevelUpThresholdMode=GreaterThan") &&
             text.contains("PartnerFollowRadius=3") &&
             text.contains("PartnerFollowRunRadius=8") &&
+            text.contains(QString::fromUtf8("PlayerName=杨影枫")) &&
             text.contains("NpcActionProfile=XJXQY") &&
             text.contains("NpcRuntimeProfile=Trilogy") &&
             text.contains("SpecialActionMode=Overlay") &&
@@ -1299,6 +1320,7 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
 
     file.close();
     profile.author.clear();
+    profile.scriptPlayerName.clear();
     profile.teamInfoFile.clear();
     profile.releaseMetadata = {};
     profile.manifestPath = manifestPath;
@@ -1306,8 +1328,10 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     const QString withoutTeamInfoText = readUtf8TextFile(manifestPath);
     ok = check(
         !withoutTeamInfoText.contains("Author=") &&
+            !withoutTeamInfoText.contains("PlayerName=") &&
             !withoutTeamInfoText.contains("InfoFile=") &&
-            !withoutTeamInfoText.contains("Version=") &&
+            !withoutTeamInfoText.contains("\nVersion=") &&
+            withoutTeamInfoText.contains("MinimumCompatibleResourceVersion=1.03") &&
             !withoutTeamInfoText.contains("MinimumEngineVersion=") &&
             !withoutTeamInfoText.contains("Cover=") &&
             !withoutTeamInfoText.contains("DescriptionFile=") &&
@@ -2690,7 +2714,8 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
     }
     ok = check(writeUtf8TextFile(root.filePath("mod/game_profile.ini"),
         "[Game]\nId=MOD\nName=Mod\nAuthor=Manifest Author\n"
-        "Version=1.041\n"
+        "Version=1.041\nInstallDirectory=stable_mod\n"
+        "[Save]\nMinimumCompatibleResourceVersion=1.03\n"
         "[Release]\nDate=2026-07-24\nMinimumEngineVersion=1.0.0\n"
         "Cover=ui/mod-cover.png\nDescriptionFile=mod-description.txt\n"
         "[LevelUp]\nMessage={name}升级\n"
@@ -2701,6 +2726,7 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
         "[Combat]\nMinimumMagicDamage=6\n"
         "MagicEffectCalculationMode=AddToAttack\n"
         "[Script]\nNpcActionProfile=YYCS\nNpcRuntimeProfile=Trilogy\n"
+        "PlayerName=杨影枫\n"
         "SpecialActionMode=Overlay\nAddLifeMode=DirectClamp\n"
         "[Resource]\nDependencyId=MANIFEST_BASE\n"
         "[Custom]\nKeep=Value\n"),
@@ -2755,6 +2781,9 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
         window.findChild<QCheckBox*>("partnerFollowRunRadiusCheck");
     QSpinBox* partnerFollowRunRadiusSpin =
         window.findChild<QSpinBox*>("partnerFollowRunRadiusSpin");
+    QLineEdit* scriptPlayerNameEdit = window.findChild<QLineEdit*>("scriptPlayerNameEdit");
+    ok = check(scriptPlayerNameEdit && scriptPlayerNameEdit->text() == QString::fromUtf8("杨影枫"),
+        "ResourceProfileEditor reads the fixed story player name") && ok;
     QComboBox* npcActionProfileCombo =
         window.findChild<QComboBox*>("npcActionProfileCombo");
     QComboBox* npcRuntimeProfileCombo =
@@ -2765,6 +2794,8 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
         window.findChild<QComboBox*>("addLifeModeCombo");
     QLineEdit* levelUpMessageEdit =
         window.findChild<QLineEdit*>("levelUpMessageEdit");
+    QComboBox* levelUpEffectModeCombo =
+        window.findChild<QComboBox*>("levelUpEffectModeCombo");
     QPlainTextEdit* levelUpRandomEffectsEdit =
         window.findChild<QPlainTextEdit*>("levelUpRandomEffectsEdit");
     QLineEdit* levelUpMaleEffectEdit =
@@ -2812,6 +2843,8 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
         "ResourceProfileEditor exposes explicit gameplay and script behavior settings") && ok;
     ok = check(
         levelUpMessageEdit &&
+            levelUpEffectModeCombo && levelUpEffectModeCombo->count() == 2 &&
+            levelUpEffectModeCombo->currentIndex() == 0 &&
             levelUpMessageEdit->text() ==
                 QString::fromUtf8("{name}升级") &&
             levelUpRandomEffectsEdit &&
@@ -2832,8 +2865,8 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
         !partnerFollowRadiusSpin || !partnerFollowRunRadiusCheck ||
         !partnerFollowRunRadiusSpin || !npcActionProfileCombo ||
         !npcRuntimeProfileCombo || !specialActionModeCombo ||
-        !addLifeModeCombo ||
-        !levelUpMessageEdit || !levelUpRandomEffectsEdit ||
+        !addLifeModeCombo || !scriptPlayerNameEdit ||
+        !levelUpMessageEdit || !levelUpEffectModeCombo || !levelUpRandomEffectsEdit ||
         !levelUpMaleEffectEdit || !levelUpFemaleEffectEdit)
         return false;
     ok = check(
@@ -3018,6 +3051,8 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
             changedPackRoot = packRoot;
         });
     idEdit->setText(QStringLiteral("MOD_RENAMED"));
+    levelUpEffectModeCombo->setCurrentIndex(1);
+    scriptPlayerNameEdit->setText(QString::fromUtf8("  纳兰真  "));
     authorEdit->setText(QString::fromUtf8("作者甲、作者乙"));
     resourceOnlyCheck->setChecked(true);
     textEncodingConvertedCheck->setChecked(true);
@@ -3174,6 +3209,10 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
     const QString manifestText = readUtf8TextFile(root.filePath("mod/game_profile.ini"));
     const QString indexText = readUtf8TextFile(root.filePath("resources.ini"));
     ok = check(manifestText.contains("DependencyId=JXQY2,YYCS") &&
+                manifestText.contains("EffectMode=Replace") &&
+                manifestText.contains(QString::fromUtf8("PlayerName=纳兰真")) &&
+                manifestText.contains("InstallDirectory=stable_mod") &&
+                manifestText.contains("MinimumCompatibleResourceVersion=1.03") &&
                 manifestText.contains("ResourceOnly=1") &&
                 manifestText.contains("MinimumMagicDamage=9") &&
                 manifestText.contains(
@@ -12800,12 +12839,19 @@ bool testMainWindowTabbedWorkspaceAndEditRouting()
     if (!ok)
         return false;
 
+    // Hidden test windows need explicit Qt activation before focus can be routed.
+    QApplication::setActiveWindow(&window);
     scriptEditor->setFocus();
     scriptEditor->setPlainText(QStringLiteral("first"));
     scriptEditor->document()->clearUndoRedoStacks();
     scriptEditor->moveCursor(QTextCursor::End);
     scriptEditor->insertPlainText(QStringLiteral(" second"));
     QApplication::processEvents();
+    ok = check(
+             QApplication::activeWindow() == &window &&
+                 QApplication::focusWidget() == scriptEditor,
+             "workspace edit routing starts with the active document focused") &&
+        ok;
     ok = check(
              undoAction->isEnabled() &&
                  !redoAction->isEnabled(),
@@ -12834,6 +12880,17 @@ bool testMainWindowTabbedWorkspaceAndEditRouting()
              mapSubWindow && mapSubWindow != scriptSubWindow &&
                  mdiArea->subWindowList().size() == 2,
              "multiple editors share the tabbed document area") &&
+        ok;
+    ok = check(
+             !undoAction->isEnabled() && !redoAction->isEnabled() &&
+                 scriptEditor->document()->isUndoAvailable(),
+             "empty map tab does not expose inactive script undo history") &&
+        ok;
+    undoAction->trigger();
+    QApplication::processEvents();
+    ok = check(
+             scriptEditor->toPlainText() == QStringLiteral("first second"),
+             "main toolbar cannot undo edits in an inactive document") &&
         ok;
     mdiArea->setActiveSubWindow(scriptSubWindow);
     QApplication::processEvents();
@@ -14093,10 +14150,10 @@ bool testProjectAwareAssetMigrationWorkflow()
                    cropTransparent->isEnabled(),
                "project migration uses the core default image category matrix") && ok;
     ok = check(mapImagePolicyLabel->text().contains(
-                   QStringLiteral("只迁移")) &&
+                   QStringLiteral("原样复制")) &&
                    unknownImagePolicyLabel->text().contains(
-                       QStringLiteral("按原字节迁移")),
-               "project migration shows locked map and unknown behavior") && ok;
+                       QStringLiteral("原样复制")),
+               "project conversion shows locked map and unknown copy behavior") && ok;
     convertCharacterImages->setChecked(false);
     convertEffectImages->setChecked(false);
     convertObjectImages->setChecked(false);

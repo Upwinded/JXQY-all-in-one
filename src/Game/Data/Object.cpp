@@ -494,6 +494,10 @@ void Object::initFromIni(INIReader * ini, const std::string & section)
 
 	initRes(objectFile);
 	setKind(loadedKind);
+	if (nowAction == oaOpening || nowAction == oaClosing)
+	{
+		actionLastTime = IMP::getIMPImageActionTime(res.image);
+	}
 	if (shouldStartObjectResourceAnimation(kind, res.animation != nullptr, hasPersistedState))
 	{
 		nowAction = oaPlaying;
@@ -553,7 +557,7 @@ bool Object::applyTrapDamage()
 			{
 				continue;
 			}
-			npc->hurtLife(damage);
+			npc->hurtLife(damage, true);
 		}
 	}
 
@@ -561,7 +565,7 @@ bool Object::applyTrapDamage()
 		&& !(gm->player->isJumping() && gm->player->getJumpState() == jsJumping)
 		&& gm->player->getPosition() == position)
 	{
-		gm->player->hurtLife(damage);
+		gm->player->hurtLife(damage, true);
 	}
 	return true;
 }
@@ -766,7 +770,7 @@ void Object::onMouseLeftDown(int x, int y)
 
 	auto player = gm->player;
 	NextAction act;
-    if (player->canRun && (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
+    if (player->canRun && player->canPayRunThewCost())
     {
 		act.action = acRun;
 	}

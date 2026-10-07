@@ -15,6 +15,7 @@
 #include "../Game/Menu/SkillsPanel.h"
 #include "../Game/Menu/SystemNotice.h"
 #include "../Game/Scene/TitleTeam.h"
+#include "../Image/IMP.h"
 #include "../Input/PhysicalInputManager.h"
 #include "../Resource/ResourceManager.h"
 #include "../Resource/ResourcePackList.h"
@@ -1300,6 +1301,11 @@ bool testProductionMobileControlCreationAndDispatch()
 	gameManager.menu->clearMenu();
 	gameManager.controller->init();
 	prepareWalkableMobileWorld(gameManager);
+	auto alternateRunImage = std::make_shared<IMPImage>();
+	alternateRunImage->directions = 8;
+	alternateRunImage->interval = 16;
+	alternateRunImage->frame.resize(8);
+	gameManager.player->res.arun.imagePackage = alternateRunImage;
 
 	const std::shared_ptr<SkillsPanel> skillsPanel =
 		gameManager.controller->skillPanel;
@@ -1488,6 +1494,23 @@ bool testProductionMobileControlCreationAndDispatch()
 		"Engine synthetic mouse refresh stole the production virtual"
 		" joystick finger owner or blocked its down-plus-motion action")
 		&& ok;
+	gameManager.player->fightState.set(true);
+	gameManager.player->thew = 0;
+	gameManager.controller->onEvent();
+	ok = check(
+		gameManager.player->nextAction != nullptr
+			&& gameManager.player->nextAction->action == acAWalk,
+		"combat low stamina did not immediately downgrade the held outer-zone"
+		" virtual joystick run to walking")
+		&& ok;
+	gameManager.player->thew = RUN_THEW_COST;
+	gameManager.controller->onEvent();
+	ok = check(
+		gameManager.player->nextAction != nullptr
+			&& gameManager.player->nextAction->action == acARun,
+		"combat virtual joystick run did not resume at the exact stamina cost")
+		&& ok;
+	gameManager.player->fightState.set(false);
 
 	gameManager.scriptAPI.disableInput();
 	ok = check(

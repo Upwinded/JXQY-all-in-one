@@ -119,10 +119,21 @@ JXQY_SCRIPT_NOINLINE int runLuaChildScript(
 	return gameManager->scriptAPI.runScriptForLua(fileName);
 }
 
+JXQY_SCRIPT_NOINLINE int runLuaRandomChildScript(
+	lua_State* luaState,
+	GameManager* gameManager)
+{
+	return gameManager->scriptAPI.randRun(
+		getLuaString(luaState, 1),
+		getLuaString(luaState, 2),
+		getLuaString(luaState, 3));
+}
+
 std::string getLuaSpeakerDialogText(lua_State* l, int speakerIndex, int textIndex)
 {
 	std::string speaker = getLuaString(l, speakerIndex);
 	const std::string text = getLuaString(l, textIndex);
+	if (gm != nullptr) speaker = gm->global.resolveScriptCharacterName(speaker);
 	if (speaker == "#name" && gm != nullptr && gm->player != nullptr
 		&& !gm->player->npcName.empty())
 	{
@@ -447,6 +458,7 @@ int Script::runScriptWithChunkName(
 	}
 	if (source != nullptr && len >= 0)
 	{
+		const bool outermostScript = !running;
 		ScriptRunningHolder scriptRunningHolder(&running);
 		const int initialStackTop = lua_gettop(luaState);
 		int loadResult = luaL_loadbuffer(
@@ -513,6 +525,12 @@ int Script::runScriptWithChunkName(
 			}
 		}
 		lua_settop(luaState, initialStackTop);
+		if (outermostScript && gm != nullptr && &gm->script == this && gm->menu != nullptr
+			&& gm->result == erNone
+			&& !Engine::getInstance()->isApplicationQuitRequested())
+		{
+			gm->scriptAPI.showInterface();
+		}
 		return callResult;
 	}
 	if (exactResult != nullptr)
@@ -568,8 +586,11 @@ ExactScriptExecutionResult Script::runResolvedTraceScriptSource(
 		return result;
 	}
 
-	if (nextExecutionId == 0 ||
-		nextExecutionId >
+	const std::uint64_t executionId = runtimeTraceWriter != nullptr
+		? runtimeTraceWriter->allocateExecutionId()
+		: nextExecutionId++;
+	if (executionId == 0 ||
+		executionId >
 			EditorRun::RuntimeTraceMaximumExactJsonInteger)
 	{
 		result.status = ExactScriptExecutionStatus::LoadFailed;
@@ -577,7 +598,6 @@ ExactScriptExecutionResult Script::runResolvedTraceScriptSource(
 		return result;
 	}
 
-	const std::uint64_t executionId = nextExecutionId++;
 	std::optional<std::uint64_t> parentExecutionId;
 	if (parentWasCaptured)
 	{
@@ -1907,6 +1927,10 @@ int Script::lua_NpcAttack(lua_State * l)
 	if (argc >= 3)
 	{
 		gm->scriptAPI.attackTo(getLuaString(l, 1), (int)lua_tointeger(l, 2), (int)lua_tointeger(l, 3));
+	}
+	else if (argc == 2)
+	{
+		gm->scriptAPI.attackTo("", (int)lua_tointeger(l, 1), (int)lua_tointeger(l, 2));
 	}
 	return 0;
 }
@@ -3628,9 +3652,18 @@ int Script::lua_GetRandNum(lua_State* l)
 int Script::lua_RandRun(lua_State* l)
 {
 	int argc = lua_gettop(l);
-	if (argc >= 3)
+	GameManager* const gameManager = gm;
+	if (argc >= 3 && gameManager != nullptr)
 	{
-		gm->scriptAPI.randRun(getLuaString(l, 1), getLuaString(l, 2), getLuaString(l, 3));
+		const int childResult = runLuaRandomChildScript(l, gameManager);
+		if (childResult != 0 && !gameManager->getLastLoadFailureMessage().empty())
+		{
+			const std::string& reason = gameManager->getLastLoadFailureMessage();
+			lua_pushliteral(l, "randrun failed: ");
+			lua_pushlstring(l, reason.data(), reason.size());
+			lua_concat(l, 2);
+			return lua_error(l);
+		}
 	}
 	return 0;
 }

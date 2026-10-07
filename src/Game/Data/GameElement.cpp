@@ -1,7 +1,6 @@
 #include "GameElement.h"
 #include "../../Engine/Engine.h"
 #include "Map.h"
-#include "MediaPathResolver.h"
 #include "ProjectedMovement.h"
 #include "../GameManager/GameManager.h"
 
@@ -35,7 +34,7 @@ _channel GameElement::playSoundFile(const std::string & fileName, float x, float
 		return nullptr;
 	}
 	return engine->playCachedSoundFile(
-		resolveSoundAssetPath(fileName), x, y, volume);
+		fileName, x, y, volume);
 }
 
 void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff)

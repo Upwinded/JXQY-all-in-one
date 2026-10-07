@@ -505,7 +505,8 @@ std::shared_ptr<ChooseTextButton> ChooseMenu::getOrCreateChoiceButton(size_t dis
 	}
 
 	auto button = std::make_shared<ChooseTextButton>();
-	button->initFromIniFileName("ini\\ui\\choose\\btnA.ini");
+	button->initFromIniFileName(gm != nullptr && gm->global.feature.qingyuUi
+		? "ini\\ui\\qingyu\\choose\\selectA.ini" : "ini\\ui\\choose\\btnA.ini");
 	addChild(button);
 	return button;
 }
@@ -517,7 +518,8 @@ std::shared_ptr<ChooseTextButton> ChooseMenu::getOrCreateMultipleControlButton(
 	if (button == nullptr)
 	{
 		button = std::make_shared<ChooseTextButton>();
-		button->initFromIniFileName("ini\\ui\\choose\\btnA.ini");
+		button->initFromIniFileName(gm != nullptr && gm->global.feature.qingyuUi
+			? "ini\\ui\\qingyu\\choose\\selectA.ini" : "ini\\ui\\choose\\btnA.ini");
 		addChild(button);
 	}
 	button->index = -1;
@@ -530,7 +532,8 @@ std::shared_ptr<ChooseTextButton> ChooseMenu::getOrCreatePageButton(std::shared_
 	if (button == nullptr)
 	{
 		button = std::make_shared<ChooseTextButton>();
-		button->initFromIniFileName("ini\\ui\\choose\\btnA.ini");
+		button->initFromIniFileName(gm != nullptr && gm->global.feature.qingyuUi
+			? "ini\\ui\\qingyu\\choose\\selectA.ini" : "ini\\ui\\choose\\btnA.ini");
 		addChild(button);
 	}
 	button->index = -1;

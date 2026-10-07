@@ -757,7 +757,7 @@ void MenuController::init()
 	}
 
 	AddMenuChild(Panel, upMenu);
-	// A system notice is the only top overlay. Story dialogs stay above ordinary
+	// System notices and script messages are top overlays. Story dialogs stay above ordinary
 	// in-scene panels, while normal gameplay messages retain their old layer.
 	upMenu->setPriority(epMax + 2);
 
@@ -780,6 +780,8 @@ void MenuController::init()
 	dialog->visible = false;
 	AddMenuChild(SystemNotice, systemNotice);
 	systemNotice->setPriority(epMax);
+	scriptMessages = std::make_shared<SystemNotice>(SystemNotice::Mode::ScriptMessages);
+	addChild(scriptMessages);
 	AddUpMenuChild(ChooseMenu, chooseMenu);
 	AddUpMenuChild(TimerMenu, timerMenu);
 	AddUpMenuChild(BuySellMenu, buySellMenu);
@@ -814,6 +816,7 @@ void MenuController::init()
 
 void MenuController::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	setPartnerEquipmentPointerScope(false);
 	controllerTransferCoordinator.clear();
 	controllerFocusedMenu.reset();
@@ -857,6 +860,7 @@ void MenuController::freeResource()
 	freeMenu(columnMenu);
 	freeMenu(dialog);
 	freeMenu(systemNotice);
+	freeMenu(scriptMessages);
 
 }
 
@@ -2825,6 +2829,7 @@ bool MenuController::closeVisibleUnfocusedControllerSurface(
 bool MenuController::onHandleUIAction(UIAction action)
 {
 	synchronizeInputLifecycle();
+	if (toolTip && toolTip->turnPage(action)) return true;
 	UIFocusDirection direction = UIFocusDirection::Up;
 	bool directionalAction = true;
 	switch (action)
@@ -3073,7 +3078,29 @@ void MenuController::onDrawEnd()
 			}
 			const ControllerMenuDescriptor* descriptor =
 				findControllerMenuDescriptor(controllerFocusedRole);
-			if (descriptor != nullptr)
+			if (focusedMenu == magicMenu && magicMenu->isShowingDetails())
+			{
+				items = {
+					{ InputAction::NavigateUp, u8"选择操作" },
+					{ InputAction::Confirm, u8"确认" },
+					{ InputAction::PreviousPage, u8"翻页", { InputAction::NextPage } },
+					{ InputAction::Cancel, u8"返回列表" } };
+			}
+			else if (focusedMenu == magicMenu && gm->global.feature.qingyuUi)
+			{
+				items = {
+					{ InputAction::NavigateUp, u8"选择" },
+					{ InputAction::Confirm, u8"查看详情" },
+					{ InputAction::Cancel, u8"关闭" } };
+				if (!magicMenu->isShowingTalents()) items.push_back({ InputAction::Secondary, u8"拿起/交换" });
+			}
+			else if (focusedMenu == equipMenu && equipMenu->isShowingAttributes())
+			{
+				items = {
+					{ InputAction::NavigateLeft, u8"切换分页", { InputAction::NavigateRight } },
+					{ InputAction::Cancel, u8"返回装备" } };
+			}
+			else if (descriptor != nullptr)
 			{
 				items.insert(items.end(),
 					descriptor->prompts.begin(),
@@ -3119,8 +3146,23 @@ void MenuController::onDrawEnd()
 	{
 		return;
 	}
-	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+	if (gm != nullptr && gm->global.feature.qingyuUi)
+	{
+		auto options = ControllerPromptPresenter::bottomBarOptions(engine);
+		int width = 0, height = 0;
+		engine->getWindowSize(width, height);
+		options.height = 36;
+		options.y = height - options.height;
+		options.fontSize = 12;
+		options.verticalPadding = 2;
+		options.itemGap = 8;
+		ControllerPromptPresenter::draw(engine, engine->inputActions(), items, options, controllerPromptTextureCache);
+	}
+	else
+	{
+		ControllerPromptPresenter::drawBottomBar(
+			engine, engine->inputActions(), items, controllerPromptTextureCache);
+	}
 }
 
 void MenuController::update()
@@ -3263,7 +3305,8 @@ void MenuController::showSystemNotice(
 bool MenuController::showGoodsToolTip(
 	const PElement& owner,
 	const std::shared_ptr<Goods>& goods,
-	const PElement& anchor)
+	const PElement& anchor,
+	bool details)
 {
 	if (toolTip == nullptr || upMenu == nullptr || owner == nullptr
 		|| goods == nullptr || anchor == nullptr)
@@ -3272,9 +3315,29 @@ bool MenuController::showGoodsToolTip(
 		return false;
 	}
 	toolTip->showForOwner(owner);
-	upMenu->addChild(toolTip);
-	toolTip->setGoods(goods);
+	auto shop = BuySellMenu::getInstance();
+	if (shop != nullptr && shop->visible)
+	{
+		shop->addChild(toolTip);
+	}
+	else if (partnerEquipMenu != nullptr && partnerEquipMenu->visible)
+	{
+		partnerEquipMenu->addChild(toolTip);
+	}
+	else
+	{
+		upMenu->addChild(toolTip);
+	}
+	toolTip->setGoods(goods, shop != nullptr && shop->visible && anchor->dragType == dtGoods);
 	toolTip->placeNearElement(anchor);
+#ifdef __MOBILE__
+	// A touch hint is a deliberate long press; give it a readable, paged surface.
+	details = true;
+#endif
+	if (details && gm != nullptr && gm->global.feature.qingyuUi)
+	{
+		toolTip->runDetails();
+	}
 	return true;
 }
 

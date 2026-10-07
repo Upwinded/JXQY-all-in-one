@@ -151,6 +151,21 @@ public class JxqyActivity extends SDLActivity
 	}
 
 	@Override
+	public void startActivityForResult(Intent intent, int requestCode)
+	{
+		if (Intent.ACTION_CREATE_DOCUMENT.equals(intent.getAction()) &&
+			!intent.hasExtra(Intent.EXTRA_TITLE))
+		{
+			String filename = nativeGetHint("JXQY_SAVE_PACKAGE_EXPORT_NAME");
+			if (filename != null && !filename.isEmpty())
+			{
+				intent.putExtra(Intent.EXTRA_TITLE, filename);
+			}
+		}
+		super.startActivityForResult(intent, requestCode);
+	}
+
+	@Override
 	protected void onActivityResult(
 		int requestCode,
 		int resultCode,

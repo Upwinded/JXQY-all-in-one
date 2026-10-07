@@ -3,6 +3,7 @@
 #include "SaveLoad.h"
 #include "ControllerPromptPresenter.h"
 #include "../GameManager/GameManager.h"
+#include <chrono>
 
 System::System(bool focusOptionsValue)
 	: focusOptions(focusOptionsValue)
@@ -37,6 +38,7 @@ void System::init()
 
 void System::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	focusManager.clear();
 	title = nullptr;
 	returnBtn = nullptr;
@@ -108,9 +110,14 @@ void System::openSaveLoad()
 	{
 		index = saveLoad->index;
 		result = erSave;
-		if (GameManager::getInstance()->saveGame(index + 1))
+		const auto saveStarted = std::chrono::steady_clock::now();
+		if (gm->scriptAPI.saveGameWithFeedback(index + 1))
 		{
 			saveScreen();
+			logicRunning = false;
+			gm->showMessage("存档完成");
+			GameLog::write("Save timing: slot=%d phase=complete elapsed_ms=%lld", index + 1,
+				static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - saveStarted).count()));
 		}
 		else
 		{
@@ -205,7 +212,7 @@ void System::onDrawEnd()
 		{ InputAction::Cancel, "返回游戏" }
 	};
 	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+		engine, engine->inputActions(), items, controllerPromptTextureCache);
 }
 
 void System::onRun()
@@ -215,6 +222,7 @@ void System::onRun()
 
 void System::saveScreen()
 {
+	const auto started = std::chrono::steady_clock::now();
 	std::string imageName = SHOT_FOLDER + convert::formatString(SHOT_PNG, index + 1);
 	int w = 260;
 	int h = 200;
@@ -235,4 +243,6 @@ void System::saveScreen()
 	{
 		File::writeFile(imageName, data, len);
 	}
+	GameLog::write("Save timing: slot=%d phase=thumbnail elapsed_ms=%lld", index + 1,
+		static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
 }

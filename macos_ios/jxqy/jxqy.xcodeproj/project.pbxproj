@@ -58,7 +58,9 @@
 		8DCE5BE92AC41A3D00BBCF22 /* Config.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B3D2AC41A3D00BBCF22 /* Config.cpp */; };
 		8DCE5BEA2AC41A3D00BBCF22 /* Config.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B3D2AC41A3D00BBCF22 /* Config.cpp */; };
 		8DCE5BEB2AC41A3D00BBCF22 /* SaveFileManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B402AC41A3D00BBCF22 /* SaveFileManager.cpp */; };
+		5FB234F763D4124A65B846CC /* SavePackage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E431B6B7581E17F00C484585 /* SavePackage.cpp */; };
 		8DCE5BEC2AC41A3D00BBCF22 /* SaveFileManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B402AC41A3D00BBCF22 /* SaveFileManager.cpp */; };
+		8FE4082BC7063595F00B062C /* SavePackage.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E431B6B7581E17F00C484585 /* SavePackage.cpp */; };
 		8DCE5BED2AC41A3D00BBCF22 /* GameController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B412AC41A3D00BBCF22 /* GameController.cpp */; };
 		8DCE5BEE2AC41A3D00BBCF22 /* GameController.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B412AC41A3D00BBCF22 /* GameController.cpp */; };
 		8DCE5BEF2AC41A3D00BBCF22 /* GameManager.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8DCE5B422AC41A3D00BBCF22 /* GameManager.cpp */; };
@@ -438,7 +440,9 @@
 		E90000000000000000000001 /* ResourceInstallTransaction.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E80000000000000000000001 /* ResourceInstallTransaction.cpp */; };
 		E90000000000000000000002 /* ResourceInstallTransaction.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E80000000000000000000001 /* ResourceInstallTransaction.cpp */; };
 		DC6E9733EDD440FC5D3BE85B /* ResourceSelectScene.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC3E6D6A1448F0F40C9F8FBE /* ResourceSelectScene.cpp */; };
+		D4FA3EAED51B9307ACC573E8 /* ResourceSelectSceneSaveTransfer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5396F483266863CD28F4F1DC /* ResourceSelectSceneSaveTransfer.cpp */; };
 		DCF5CDD829DF1F56E9D3B2CF /* ResourceSelectScene.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC3E6D6A1448F0F40C9F8FBE /* ResourceSelectScene.cpp */; };
+		1A354CEC2ED1D1F49F87E65A /* ResourceSelectSceneSaveTransfer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5396F483266863CD28F4F1DC /* ResourceSelectSceneSaveTransfer.cpp */; };
 		D22100000000000000000001 /* FlatScrollbar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D22000000000000000000002 /* FlatScrollbar.cpp */; };
 		D22100000000000000000002 /* FlatScrollbar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D22000000000000000000002 /* FlatScrollbar.cpp */; };
 		D22100000000000000000003 /* FlatTextButton.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D22000000000000000000004 /* FlatTextButton.cpp */; };
@@ -491,6 +495,10 @@
 		D25100000000000000000004 /* SaveGeneration.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D25000000000000000000002 /* SaveGeneration.cpp */; };
 		D25100000000000000000005 /* ExclusiveLoadingRunner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D25000000000000000000003 /* ExclusiveLoadingRunner.cpp */; };
 		D25100000000000000000006 /* ExclusiveLoadingRunner.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D25000000000000000000003 /* ExclusiveLoadingRunner.cpp */; };
+		2407AE1A288E550A014EE77C /* AutomationPipe.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 080F2163E9A2E75D8F575346 /* AutomationPipe.cpp */; };
+		1220D9FC0A6AB05159308598 /* AutomationPipe.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 080F2163E9A2E75D8F575346 /* AutomationPipe.cpp */; };
+		1F908660507AA679A5BE4A57 /* GameplayAutomationSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */; };
+		D981D37D3D7F60CE844899FF /* GameplayAutomationSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -602,9 +610,11 @@
 		8DCE5B3D2AC41A3D00BBCF22 /* Config.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Config.cpp; sourceTree = "<group>"; };
 		8DCE5B3F2AC41A3D00BBCF22 /* MenuController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MenuController.h; sourceTree = "<group>"; };
 		8DCE5B402AC41A3D00BBCF22 /* SaveFileManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SaveFileManager.cpp; sourceTree = "<group>"; };
+		E431B6B7581E17F00C484585 /* SavePackage.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = SavePackage.cpp; sourceTree = "<group>"; };
 		8DCE5B412AC41A3D00BBCF22 /* GameController.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GameController.cpp; sourceTree = "<group>"; };
 		8DCE5B422AC41A3D00BBCF22 /* GameManager.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = GameManager.cpp; sourceTree = "<group>"; };
 		8DCE5B432AC41A3D00BBCF22 /* SaveFileManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SaveFileManager.h; sourceTree = "<group>"; };
+		C3B87C4184576513F2833CEE /* SavePackage.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SavePackage.h; sourceTree = "<group>"; };
 		8DCE5B442AC41A3D00BBCF22 /* GameController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GameController.h; sourceTree = "<group>"; };
 		8DCE5B452AC41A3D00BBCF22 /* GameManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GameManager.h; sourceTree = "<group>"; };
 		8DCE5B462AC41A3D00BBCF22 /* MenuController.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MenuController.cpp; sourceTree = "<group>"; };
@@ -959,6 +969,7 @@
 		E80000000000000000000001 /* ResourceInstallTransaction.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ResourceInstallTransaction.cpp; sourceTree = "<group>"; };
 		E80000000000000000000002 /* ResourceInstallTransaction.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ResourceInstallTransaction.h; sourceTree = "<group>"; };
 		DC3E6D6A1448F0F40C9F8FBE /* ResourceSelectScene.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ResourceSelectScene.cpp; sourceTree = "<group>"; };
+		5396F483266863CD28F4F1DC /* ResourceSelectSceneSaveTransfer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ResourceSelectSceneSaveTransfer.cpp; sourceTree = "<group>"; };
 		DCC3F85C668316F33F59A718 /* ResourceSelectScene.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ResourceSelectScene.h; sourceTree = "<group>"; };
 		D22000000000000000000001 /* FlatComponentPolicy.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FlatComponentPolicy.h; sourceTree = "<group>"; };
 		D22000000000000000000002 /* FlatScrollbar.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FlatScrollbar.cpp; sourceTree = "<group>"; };
@@ -1013,6 +1024,8 @@
 		D25000000000000000000001 /* RuntimeSaveGenerationPolicy.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = RuntimeSaveGenerationPolicy.cpp; sourceTree = "<group>"; };
 		D25000000000000000000002 /* SaveGeneration.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SaveGeneration.cpp; sourceTree = "<group>"; };
 		D25000000000000000000003 /* ExclusiveLoadingRunner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ExclusiveLoadingRunner.cpp; sourceTree = "<group>"; };
+		080F2163E9A2E75D8F575346 /* AutomationPipe.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = GameplayAutomation/AutomationPipe.cpp; sourceTree = "<group>"; };
+		E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = GameplayAutomation/GameplayAutomationSession.cpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1104,6 +1117,8 @@
 				8DCE5BAE2AC41A3D00BBCF22 /* Weather */,
 				8DCE5BB12AC41A3D00BBCF22 /* Engine */,
 				8DCE5BB62AC41A3D00BBCF22 /* main.cpp */,
+				080F2163E9A2E75D8F575346 /* AutomationPipe.cpp */,
+				E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */,
 				DC3F3253760061599FFE4BA4 /* Resource */,
 				F80000000000000000000001 /* Update */,
 				EC1000000000000000000005 /* Platform */,
@@ -1288,9 +1303,11 @@
 			children = (
 				8DCE5B3F2AC41A3D00BBCF22 /* MenuController.h */,
 				8DCE5B402AC41A3D00BBCF22 /* SaveFileManager.cpp */,
+				E431B6B7581E17F00C484585 /* SavePackage.cpp */,
 				8DCE5B412AC41A3D00BBCF22 /* GameController.cpp */,
 				8DCE5B422AC41A3D00BBCF22 /* GameManager.cpp */,
 				8DCE5B432AC41A3D00BBCF22 /* SaveFileManager.h */,
+				C3B87C4184576513F2833CEE /* SavePackage.h */,
 				8DCE5B442AC41A3D00BBCF22 /* GameController.h */,
 				8DCE5B452AC41A3D00BBCF22 /* GameManager.h */,
 				8DCE5B462AC41A3D00BBCF22 /* MenuController.cpp */,
@@ -1767,6 +1784,7 @@
 				F10000000000000000000001 /* SemanticVersion.cpp */,
 				F10000000000000000000002 /* SemanticVersion.h */,
 				DC3E6D6A1448F0F40C9F8FBE /* ResourceSelectScene.cpp */,
+				5396F483266863CD28F4F1DC /* ResourceSelectSceneSaveTransfer.cpp */,
 				DCC3F85C668316F33F59A718 /* ResourceSelectScene.h */,
 				D22000000000000000000006 /* ResourcePackCard.cpp */,
 				D22000000000000000000007 /* ResourcePackCard.h */,
@@ -2042,6 +2060,7 @@
 				DC76F1012E7A01001F000001 /* MinimapToggleButton.cpp in Sources */,
 				DC76F1052E7A01001F000001 /* MapThumbnailMenu.cpp in Sources */,
 				8DCE5BEB2AC41A3D00BBCF22 /* SaveFileManager.cpp in Sources */,
+				5FB234F763D4124A65B846CC /* SavePackage.cpp in Sources */,
 				DC9FE6402E4CB0590099790F /* lobject.c in Sources */,
 				DC9FE6412E4CB0590099790F /* lgc.c in Sources */,
 				DC9FE6422E4CB0590099790F /* lmem.c in Sources */,
@@ -2171,6 +2190,8 @@
 				F50000000000000000000001 /* EditorRunRuntimeTrace.cpp in Sources */,
 				F50000000000000000000003 /* EditorRunRuntimeTraceFile.cpp in Sources */,
 				F50000000000000000000005 /* EditorRunRuntimeTraceWriter.cpp in Sources */,
+				2407AE1A288E550A014EE77C /* AutomationPipe.cpp in Sources */,
+				1F908660507AA679A5BE4A57 /* GameplayAutomationSession.cpp in Sources */,
 				F70000000000000000000001 /* OnlineUpdateCatalog.cpp in Sources */,
 				C90000000000000000000001 /* HttpsDownload.cpp in Sources */,
 				A30000000000000000000001 /* AppleHttpsDownload.mm in Sources */,
@@ -2184,6 +2205,7 @@
 				B90000000000000000000007 /* miniz_tinfl.c in Sources */,
 				B90000000000000000000009 /* miniz_tdef.c in Sources */,
 				DC6E9733EDD440FC5D3BE85B /* ResourceSelectScene.cpp in Sources */,
+				D4FA3EAED51B9307ACC573E8 /* ResourceSelectSceneSaveTransfer.cpp in Sources */,
 				D22100000000000000000001 /* FlatScrollbar.cpp in Sources */,
 				D22100000000000000000003 /* FlatTextButton.cpp in Sources */,
 				D22100000000000000000005 /* ResourcePackCard.cpp in Sources */,
@@ -2264,6 +2286,7 @@
 				DC76F1022E7A01001F000002 /* MinimapToggleButton.cpp in Sources */,
 				DC76F1062E7A01001F000002 /* MapThumbnailMenu.cpp in Sources */,
 				8DCE5BEC2AC41A3D00BBCF22 /* SaveFileManager.cpp in Sources */,
+				8FE4082BC7063595F00B062C /* SavePackage.cpp in Sources */,
 				DC9FE61A2E4CB0590099790F /* lobject.c in Sources */,
 				DC9FE61B2E4CB0590099790F /* lgc.c in Sources */,
 				DC9FE61C2E4CB0590099790F /* lmem.c in Sources */,
@@ -2393,6 +2416,8 @@
 				F50000000000000000000002 /* EditorRunRuntimeTrace.cpp in Sources */,
 				F50000000000000000000004 /* EditorRunRuntimeTraceFile.cpp in Sources */,
 				F50000000000000000000006 /* EditorRunRuntimeTraceWriter.cpp in Sources */,
+				1220D9FC0A6AB05159308598 /* AutomationPipe.cpp in Sources */,
+				D981D37D3D7F60CE844899FF /* GameplayAutomationSession.cpp in Sources */,
 				F70000000000000000000002 /* OnlineUpdateCatalog.cpp in Sources */,
 				C90000000000000000000002 /* HttpsDownload.cpp in Sources */,
 				FE0000000000000000000001 /* MacProgramUpdate.mm in Sources */,
@@ -2407,6 +2432,7 @@
 				B90000000000000000000008 /* miniz_tinfl.c in Sources */,
 				B9000000000000000000000A /* miniz_tdef.c in Sources */,
 				DCF5CDD829DF1F56E9D3B2CF /* ResourceSelectScene.cpp in Sources */,
+				1A354CEC2ED1D1F49F87E65A /* ResourceSelectSceneSaveTransfer.cpp in Sources */,
 				D22100000000000000000002 /* FlatScrollbar.cpp in Sources */,
 				D22100000000000000000004 /* FlatTextButton.cpp in Sources */,
 				D22100000000000000000006 /* ResourcePackCard.cpp in Sources */,
@@ -2561,7 +2587,7 @@
 				CLANG_ENABLE_CPP_STATIC_DESTRUCTORS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.0.5;
+				CURRENT_PROJECT_VERSION = 1.1.0;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_APP_SANDBOX = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2594,7 +2620,7 @@
 					"@executable_path/Frameworks",
 				);
 				LINK_WITH_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2617,7 +2643,7 @@
 				CLANG_ENABLE_CPP_STATIC_DESTRUCTORS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.0.5;
+				CURRENT_PROJECT_VERSION = 1.1.0;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_APP_SANDBOX = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2650,7 +2676,7 @@
 					"@executable_path/Frameworks",
 				);
 				LINK_WITH_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2676,7 +2702,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.0.5;
+				CURRENT_PROJECT_VERSION = 1.1.0;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				FRAMEWORK_SEARCH_PATHS = (
 					../../ThirdParty/devel/mac_ios/SDL,
@@ -2705,7 +2731,7 @@
 				);
 				MACH_O_TYPE = mh_execute;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.1.0;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
@@ -2732,7 +2758,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.0.5;
+				CURRENT_PROJECT_VERSION = 1.1.0;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2761,7 +2787,7 @@
 				);
 				MACH_O_TYPE = mh_execute;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.1.0;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";

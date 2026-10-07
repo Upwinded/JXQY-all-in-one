@@ -590,13 +590,13 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+13"/>
-        <source>map：只迁移、不转换</source>
-        <translation>map：只遷移、不轉換</translation>
+        <source>map：原样复制</source>
+        <translation>map：原樣複製</translation>
     </message>
     <message>
         <location line="+7"/>
-        <source>unknown：按原字节迁移</source>
-        <translation>unknown：按原位元組遷移</translation>
+        <source>unknown：原样复制</source>
+        <translation>unknown：原樣複製</translation>
     </message>
     <message>
         <location line="+11"/>
@@ -665,13 +665,13 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <source>所有旧图片类别均按原字节迁移；map/unknown 只迁移</source>
-        <translation>所有舊圖片類別均按原位元組遷移；map/unknown 只遷移</translation>
+        <source>所有旧图片类别均按原字节复制；map/unknown 始终原样保留</source>
+        <translation>所有舊圖片類別均按原位元組複製；map/unknown 始終原樣保留</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>转换为 IMP/IMG：%1；map/unknown 只迁移</source>
-        <translation>轉換為 IMP/IMG：%1；map/unknown 只遷移</translation>
+        <source>转换为 IMP/IMG：%1；map/unknown 原样保留</source>
+        <translation>轉換為 IMP/IMG：%1；map/unknown 原樣保留</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -19305,4 +19305,9 @@ SellGoods(fileName)
     <message><source>直接增减并限制范围</source><translation>直接增減並限制範圍</translation></message>
 </context>
 
+<context>
+    <name>ResourceProfileEditorWindow</name>
+    <message><source>固定剧情角色名，留空保持原有行为</source><translation>固定劇情角色名，留空保持原有行為</translation></message>
+    <message><source>用于替换 #name；不随当前操控角色切换，也不作为存档变量。</source><translation>用於替換 #name；不隨目前操控角色切換，也不作為存檔變數。</translation></message>
+</context>
 </TS>

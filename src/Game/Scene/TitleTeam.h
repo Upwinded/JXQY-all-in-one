@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Element/Element.h"
+#include "../../Component/Label.h"
 #include "VideoPage.h"
 #include "../Data/GameElement.h"
 #include <string>
@@ -27,6 +28,9 @@ private:
 	virtual void onUpdate();
 	virtual bool onPointerInteractionCanceled(EventTouchID pointerID) override;
 	virtual void onAllPointerInteractionsCanceled() override;
+	static unsigned char fadeInTextureAlpha(
+		unsigned char maximumAlpha,
+		unsigned long elapsedMilliseconds);
 	void updateTextLayout();
 	void scrollByLines(int delta);
 	void closePage();
@@ -38,6 +42,9 @@ private:
 	std::string videoFileName;
 	std::string teamInfoText;
 	std::vector<std::string> wrappedTeamInfoLines;
+	std::vector<CachedTextTexture> teamInfoTextTextures;
+	CachedTextTexture scrollHintTextTexture;
+	CachedTextTexture closeTextTexture;
 	Rect textRect = { 0, 0, 0, 0 };
 	Rect closeRect = { 0, 0, 0, 0 };
 	int textFontSize = 24;

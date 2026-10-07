@@ -6,14 +6,13 @@
 #include <filesystem>
 #include <functional>
 #include "../../Types/CommonTypes.h"
+#include "../../Engine/ImageTypes.h"
 #include "../../File/RootedResourceReader.h"
 #include "../Loading/ExclusiveLoadingRunner.h"
 
 class GameManager;
 class Engine;
 struct ExactScriptExecutionResult;
-struct SaveGenerationLimits;
-struct SaveGenerationPreflightPolicy;
 namespace EditorRun
 {
 struct SearchRoot;
@@ -80,6 +79,7 @@ public:
 		bool resetCamera = true);
 	bool loadGameAsync(int index);
 	bool loadGame(int index);
+	bool saveGameWithFeedback(int index);
 	bool setEditorRunPlayerPositionAndCamera(
 		std::int32_t x,
 		std::int32_t y);
@@ -297,7 +297,7 @@ public:
 	void checkYear(const std::string& varName, const NewYearPeriod::LocalDate& localDate);
 
 	void getRandNum(const std::string& varName, int minVal, int maxVal);
-	void randRun(const std::string& varName, const std::string& successScript, const std::string& failScript);
+	int randRun(const std::string& varName, const std::string& successScript, const std::string& failScript);
 	void getPlayerLevel(const std::string& varName);
 	void getNpcCount(int kind, int relation);
 	void delCurObj();
@@ -393,6 +393,7 @@ private:
 		UTime lastPresentationTime);
 	void presentSynchronousLoadingStatusFrame(
 		const std::string& statusText) noexcept;
+	_shared_image captureSaveBackground() noexcept;
 
 	GameLoading::LoadingTaskResult runExclusiveLoadingTask(
 		const std::string& statusText,
@@ -401,7 +402,8 @@ private:
 			const std::function<bool()>& ownerCheckpoint)>
 			successFinalizer = {},
 		const std::function<void()>&
-			loadingPresentationPumpObserver = {});
+			loadingPresentationPumpObserver = {},
+		const _shared_image& presentationBackground = nullptr);
 	bool runOwnerWorldCommit(
 		const char* operationName,
 		const std::function<bool(
@@ -440,9 +442,8 @@ private:
 	void recoverFromPartialWorldFailure(
 		const char* operationName) noexcept;
 	void discardPartialWorldAfterFailedCommit() noexcept;
-	GameLoading::LoadingTaskResult commitPreparedSaveGeneration(
+	GameLoading::LoadingTaskResult finishGameLoad(
 		const std::string& preparedDirectory,
-		const SaveGenerationPreflightPolicy& policy,
 		const std::function<bool()>& ownerCheckpoint = {},
 		const std::function<bool(
 			const std::string& generationDirectory,

@@ -4,6 +4,7 @@
 #include "../Game/GameManager/GameManager.h"
 #include "../libconvert/libconvert.h"
 #include "../File/log.h"
+#include <algorithm>
 
 namespace
 {
@@ -52,9 +53,22 @@ void ConfigDrivenPanel::init()
 void ConfigDrivenPanel::loadMenuDefinition(const std::string& menuDefinitionFile)
 {
 	loadedMenuDefinitionFile = menuDefinitionFile;
+	std::string resolvedFile = menuDefinitionFile;
+	auto game = GameManager::getInstance();
+	if (game != nullptr && game->global.feature.qingyuUi)
+	{
+		convert::replaceAllString(resolvedFile, "/", "\\");
+		const std::string prefix = "ini\\ui\\";
+		if (resolvedFile.rfind(prefix, 0) == 0
+			&& resolvedFile.rfind(prefix + "qingyu\\", 0) != 0)
+		{
+			const std::string candidate = prefix + "qingyu\\" + resolvedFile.substr(prefix.size());
+			if (File::fileExist(candidate)) resolvedFile = candidate;
+		}
+	}
 
 	std::unique_ptr<char[]> content;
-	int length = File::readFile(menuDefinitionFile, content);
+	int length = File::readFile(resolvedFile, content);
 	if (content == nullptr || length == 0)
 	{
 		GameLog::write("no menu definition file: %s\n", menuDefinitionFile.c_str());
@@ -199,6 +213,8 @@ std::shared_ptr<BaseComponent> ConfigDrivenPanel::createComponentByType(
 	{
 		component->initFromIni(ini);
 	}
+	component->setPriority(static_cast<unsigned char>(std::clamp<long>(
+		ini.GetInteger("Init", "Priority", component->getPriority()), 0, 255)));
 
 	addChild(component);
 	return component;

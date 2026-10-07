@@ -16,6 +16,8 @@ public:
 	bool cropContent = false;
 	bool cropBlack = false;
 	int frameIndex = -1;
+	int nineSlice = 0;
+	int nineSliceWidth = 0;
 
 	virtual void initFromIni(INIReader & ini);
 

@@ -7,6 +7,7 @@
 #include "ScriptConverter.h"
 #include "LuaScriptSyntaxValidator.h"
 #include "MapConverter.h"
+#include "TiledMapConverter.h"
 #include "PicFileEditor.h"
 #include "Util.h"
 
@@ -1864,7 +1865,7 @@ bool mergeExistingOutputFiles(
                 QStringLiteral(
                     "preserve-existing-player-directory"),
                 QString::fromUtf8(
-                    "本次迁移未拥有该目录，保留旧输出目录项"),
+                    "本次转换未拥有该目录，保留旧输出目录项"),
                 false,
                 QStringLiteral("directory"));
             stagedPathsByKey.insert(
@@ -1937,7 +1938,7 @@ bool mergeExistingOutputFiles(
             QStringLiteral(
                 "preserve-existing-player-file"),
             QString::fromUtf8(
-                "本次迁移未拥有该路径，按原字节保留旧输出"),
+                "本次转换未拥有该路径，按原字节保留旧输出"),
             false,
             entryType,
             stagedSha256);
@@ -1950,7 +1951,7 @@ bool mergeExistingOutputFiles(
     if (preservedCount > 0)
     {
         const QString message = QString::fromUtf8(
-                "从旧输出保留 %1 个本次迁移未拥有的玩家目录项。")
+                "从旧输出保留 %1 个本次转换未拥有的玩家目录项。")
                 .arg(preservedCount);
         report.logLines.append(message);
         if (logCallback)
@@ -2333,7 +2334,7 @@ bool publishStagedRoot(
         if (!renamePath(outputRoot, backupPath,
                         JxAssetMigrator::FileSystemOperation::BackupRoot))
         {
-            errorMessage = QString::fromUtf8("无法备份上一份迁移输出: %1").arg(outputRoot);
+            errorMessage = QString::fromUtf8("无法备份上一份转换输出: %1").arg(outputRoot);
             return false;
         }
 
@@ -2403,13 +2404,13 @@ bool publishStagedRoot(
                 JxAssetMigrator::FileSystemOperation::RestoreRoot))
         {
             errorMessage = QString::fromUtf8(
-                "无法发布新迁移输出，且上一份输出恢复失败；备份仍位于 %1")
+                "无法发布新转换输出，且上一份输出恢复失败；备份仍位于 %1")
                 .arg(backupPath);
             retainedBackupPath = backupPath;
         }
         else
         {
-            errorMessage = QString::fromUtf8("无法发布新迁移输出，上一份输出已恢复: %1")
+            errorMessage = QString::fromUtf8("无法发布新转换输出，上一份输出已恢复: %1")
                 .arg(outputRoot);
         }
         return false;
@@ -2508,7 +2509,7 @@ bool publishStagedEntries(
     }
     if (!QDir().mkpath(outputRoot))
     {
-        errorMessage = QString::fromUtf8("无法创建迁移输出目录: %1").arg(outputRoot);
+        errorMessage = QString::fromUtf8("无法创建转换输出目录: %1").arg(outputRoot);
         return false;
     }
 
@@ -2534,7 +2535,7 @@ bool publishStagedEntries(
             if (!renamePath(finalPath, backupPath,
                             JxAssetMigrator::FileSystemOperation::BackupEntry))
             {
-                errorMessage = QString::fromUtf8("无法备份现有迁移子路径: %1").arg(finalPath);
+                errorMessage = QString::fromUtf8("无法备份现有转换子路径: %1").arg(finalPath);
                 publishOk = false;
                 publishedEntries.append(entry);
                 break;
@@ -2611,7 +2612,7 @@ bool publishStagedEntries(
             if (!renamePath(stagedPath, finalPath,
                             JxAssetMigrator::FileSystemOperation::PublishEntry))
             {
-                errorMessage = QString::fromUtf8("无法发布迁移子路径: %1").arg(finalPath);
+                errorMessage = QString::fromUtf8("无法发布转换子路径: %1").arg(finalPath);
                 publishOk = false;
                 break;
             }
@@ -3360,486 +3361,6 @@ UiWindowDefaultProfile detectUiWindowDefaultProfile(
     return uiWindowDefaultProfileForOptions(options);
 }
 
-void appendYycsUiWindowDefaultLines(const QString& menuName, QStringList& defaultLines)
-{
-    if (menuName == "dialog" || menuName == "choose")
-        defaultLines << "Align=alBottomCenter" << "AlignX=-45" << "AlignY=-100";
-    else if (menuName == "top")
-        defaultLines << "Align=alTopCenter" << "Scale=1.5" << "Stretch=true";
-    else if (menuName == "goods" || menuName == "memo" || menuName == "magic")
-        defaultLines << "Align=alRight" << "AlignX=30";
-    else if (menuName == "bottom")
-        defaultLines << "Align=alBottomCenter" << "AlignX=94";
-    else if (menuName == "option" || menuName == "littlemap" || menuName == "saveload")
-        defaultLines << "Align=alCenter" << "Stretch=false";
-    else if (menuName == "column")
-        defaultLines << "Align=alBottomCenter" << "AlignX=-211";
-    else if (menuName == "message")
-        defaultLines << "Align=alBottomCenter" << "AlignX=-10" << "AlignY=-71";
-    else if (menuName == "system")
-        defaultLines << "Align=alCenter";
-    else if (menuName == "title")
-        defaultLines << "Align=alClient" << "Stretch=true"
-            << "KeepAspect=true" << "FadeMirroredBars=true";
-    else if (menuName == "yesno")
-        defaultLines << "Align=alCenter" << "AlignX=0" << "AlignY=0";
-    else if (menuName == "timer")
-        defaultLines << "Align=alRTCorner" << "AlignX=30";
-    else if (menuName == "tooltip")
-        defaultLines << "Align=alTopCenter" << "AlignY=27";
-}
-
-void appendXjxqyUiWindowDefaultLines(const QString& menuName, QStringList& defaultLines)
-{
-    if (menuName == "dialog" || menuName == "choose")
-        defaultLines << "Align=alBottomCenter" << "AlignY=-110";
-    else if (menuName == "top")
-        defaultLines << "Align=alBottomCenter" << "AlignX=-274" << "AlignY=-13";
-    else if (menuName == "goods" || menuName == "memo" || menuName == "magic")
-        defaultLines << "Align=alRight" << "AlignX=30";
-    else if (menuName == "bottom")
-        defaultLines << "Align=alBottomCenter" << "AlignX=-38";
-    else if (menuName == "option" || menuName == "littlemap" ||
-        menuName == "saveload" || menuName == "littlegame")
-    {
-        defaultLines << "Align=alCenter" << "Stretch=false";
-    }
-    else if (menuName == "column")
-        defaultLines << "Align=alBottomCenter";
-    else if (menuName == "message")
-        defaultLines << "Align=alBottomCenter" << "AlignY=-100";
-    else if (menuName == "system" || menuName == "xiulian")
-        defaultLines << "Align=alCenter";
-    else if (menuName == "title")
-        defaultLines << "Align=alClient" << "Stretch=true"
-            << "KeepAspect=true" << "FadeMirroredBars=true";
-    else if (menuName == "yesno")
-        defaultLines << "Align=alTopCenter";
-    else if (menuName == "timer")
-        defaultLines << "Align=alRTCorner" << "AlignX=30";
-}
-
-void appendJxqy2UiWindowDefaultLines(const QString& menuName, QStringList& defaultLines)
-{
-    if (menuName == "buysell" || menuName == "equip" ||
-        menuName == "state" || menuName == "xiulian")
-    {
-        defaultLines << "Align=alLTCorner" << "AlignX=-30";
-    }
-    else if (menuName == "dialog" || menuName == "choose")
-        defaultLines << "Align=alBottomCenter" << "AlignX=0" << "AlignY=-96";
-    else if (menuName == "timer")
-        defaultLines << "Align=alTopCenter" << "AlignX=0" << "AlignY=0";
-    else if (menuName == "tooltip")
-        defaultLines << "Align=alBottomCenter" << "AlignX=-1" << "AlignY=-80";
-    else if (menuName == "yesno")
-        defaultLines << "Align=alCenter" << "AlignX=0" << "AlignY=0";
-    else if (menuName == "mapthumbnail")
-        defaultLines << "Align=alNone" << "Stretch=true";
-    else if (menuName == "title")
-        defaultLines << "Align=alClient" << "Stretch=true"
-            << "KeepAspect=true" << "FadeMirroredBars=true";
-}
-
-bool findUiWindowDefaultLines(const QString& relativePath, UiWindowDefaultProfile profile, QStringList& defaultLines)
-{
-    QString path = lowerPathKey(relativePath);
-    while (path.startsWith("./"))
-        path = path.mid(2);
-
-    if (profile == UiWindowDefaultProfile::Xjxqy &&
-        path == "ini/ui/title/window1.ini")
-    {
-        appendXjxqyUiWindowDefaultLines("title", defaultLines);
-        return !defaultLines.isEmpty();
-    }
-
-    const QString prefix = "ini/ui/";
-    const QString suffix = "/window.ini";
-    if (!path.startsWith(prefix) || !path.endsWith(suffix))
-        return false;
-
-    QString menuName = path.mid(prefix.size(), path.size() - prefix.size() - suffix.size());
-    if (menuName.contains('/'))
-        return false;
-
-    switch (profile)
-    {
-    case UiWindowDefaultProfile::Jxqy2:
-        appendJxqy2UiWindowDefaultLines(menuName, defaultLines);
-        break;
-    case UiWindowDefaultProfile::Xjxqy:
-        appendXjxqyUiWindowDefaultLines(menuName, defaultLines);
-        break;
-    case UiWindowDefaultProfile::Yycs:
-    default:
-        appendYycsUiWindowDefaultLines(menuName, defaultLines);
-        break;
-    }
-
-    return !defaultLines.isEmpty();
-}
-
-bool findUiTitleButtonDefaultLines(const QString& relativePath, QStringList& defaultLines)
-{
-    QString path = lowerPathKey(relativePath);
-    while (path.startsWith("./"))
-        path = path.mid(2);
-
-    const QString prefix = "ini/ui/title/";
-    if (!path.startsWith(prefix) || !path.endsWith(".ini"))
-        return false;
-
-    const QString fileName = path.mid(prefix.size(), path.size() - prefix.size() - 4);
-    static const QSet<QString> titleButtonFiles = {
-        "initbtn",
-        "loadbtn",
-        "teambtn",
-        "exitbtn",
-        "initbtn1",
-        "loadbtn1",
-        "teambtn1",
-        "exitbtn1"
-    };
-    if (!titleButtonFiles.contains(fileName))
-        return false;
-
-    defaultLines << "Stretch=true";
-    return true;
-}
-
-bool findYycsTopButtonDefaultLines(const QString& relativePath,
-    UiWindowDefaultProfile profile, QStringList& defaultLines)
-{
-    if (profile != UiWindowDefaultProfile::Yycs)
-        return false;
-
-    QString path = lowerPathKey(relativePath);
-    while (path.startsWith("./"))
-        path = path.mid(2);
-
-    if (!path.startsWith("ini/ui/top/btn") || !path.endsWith(".ini"))
-        return false;
-
-    defaultLines << "Stretch=true";
-    return true;
-}
-
-bool findUiDefaultLines(const QString& relativePath, UiWindowDefaultProfile profile, QStringList& defaultLines)
-{
-    if (findUiWindowDefaultLines(relativePath, profile, defaultLines))
-        return true;
-    if (findUiTitleButtonDefaultLines(relativePath, defaultLines))
-        return true;
-    return findYycsTopButtonDefaultLines(relativePath, profile, defaultLines);
-}
-
-bool isUiDefaultKey(const QString& key)
-{
-    return key == "align" || key == "alignx" || key == "aligny" ||
-        key == "stretch" || key == "scale" || key == "keepaspect";
-}
-
-QString iniKeyName(const QString& line)
-{
-    QString normalized = line;
-    if (normalized.endsWith('\r'))
-        normalized.chop(1);
-
-    QString trimmed = normalized.trimmed();
-    if (trimmed.startsWith(';') || trimmed.startsWith('#'))
-        return QString();
-
-    int separator = trimmed.indexOf('=');
-    if (separator <= 0)
-        return QString();
-
-    return trimmed.left(separator).trimmed().toLower();
-}
-
-bool isUiPresentationKey(const QString& key)
-{
-    static const QSet<QString> keys = {
-        QStringLiteral("left"),
-        QStringLiteral("top"),
-        QStringLiteral("width"),
-        QStringLiteral("height"),
-        QStringLiteral("font"),
-        QStringLiteral("color"),
-        QStringLiteral("normalcolor"),
-        QStringLiteral("hovercolor"),
-        QStringLiteral("presscolor"),
-        QStringLiteral("align"),
-        QStringLiteral("alignx"),
-        QStringLiteral("aligny"),
-        QStringLiteral("scale"),
-        QStringLiteral("stretch"),
-        QStringLiteral("keepaspect"),
-        QStringLiteral("fademirroredbars"),
-        QStringLiteral("scalechildren"),
-        QStringLiteral("centerchildren"),
-        QStringLiteral("charactersperline"),
-        QStringLiteral("lineheight"),
-        QStringLiteral("linecount")
-    };
-    return keys.contains(key);
-}
-
-QString iniSectionName(QString line)
-{
-    if (!line.isEmpty() && line.front() == QChar::ByteOrderMark)
-        line.remove(0, 1);
-    const QString trimmed = line.trimmed();
-    if (!trimmed.startsWith('[') || !trimmed.endsWith(']'))
-        return QString();
-    return trimmed.mid(1, trimmed.size() - 2).trimmed().toLower();
-}
-
-QString alignUiPresentationText(
-    const QString& localText,
-    const QString& baseText)
-{
-    struct SectionPresentation
-    {
-        QStringList orderedKeys;
-        QHash<QString, QString> lines;
-    };
-
-    QHash<QString, SectionPresentation> baseSections;
-    QString baseSection;
-    for (QString line : baseText.split('\n'))
-    {
-        const QString section = iniSectionName(line);
-        if (!section.isEmpty())
-        {
-            baseSection = section;
-            continue;
-        }
-        const QString key = iniKeyName(line);
-        if (baseSection.isEmpty() || !isUiPresentationKey(key))
-            continue;
-        if (line.endsWith('\r'))
-            line.chop(1);
-        SectionPresentation& presentation = baseSections[baseSection];
-        if (!presentation.lines.contains(key))
-            presentation.orderedKeys.append(key);
-        presentation.lines.insert(key, line);
-    }
-    if (baseSections.isEmpty())
-        return localText;
-
-    const bool usesCrLf = localText.contains(QStringLiteral("\r\n"));
-    const QString lineEnding = usesCrLf
-        ? QStringLiteral("\r\n")
-        : QStringLiteral("\n");
-    const bool hadFinalNewline = localText.endsWith('\n');
-    QStringList localLines = localText.split('\n');
-    if (hadFinalNewline && !localLines.isEmpty())
-        localLines.removeLast();
-    for (QString& line : localLines)
-    {
-        if (line.endsWith('\r'))
-            line.chop(1);
-    }
-
-    QStringList output;
-    QString localSection;
-    QSet<QString> writtenPresentationKeys;
-    auto appendMissingBaseLines = [&]()
-    {
-        const auto section = baseSections.constFind(localSection);
-        if (section == baseSections.cend())
-            return;
-        for (const QString& key : section->orderedKeys)
-        {
-            if (!writtenPresentationKeys.contains(key))
-                output.append(section->lines.value(key));
-        }
-    };
-
-    for (const QString& line : localLines)
-    {
-        const QString sectionName = iniSectionName(line);
-        if (!sectionName.isEmpty())
-        {
-            appendMissingBaseLines();
-            localSection = sectionName;
-            writtenPresentationKeys.clear();
-            output.append(line);
-            continue;
-        }
-
-        const auto section = baseSections.constFind(localSection);
-        const QString key = iniKeyName(line);
-        if (section != baseSections.cend() && isUiPresentationKey(key))
-        {
-            if (section->lines.contains(key) &&
-                !writtenPresentationKeys.contains(key))
-            {
-                output.append(section->lines.value(key));
-                writtenPresentationKeys.insert(key);
-            }
-            continue;
-        }
-        output.append(line);
-    }
-    appendMissingBaseLines();
-
-    QString result = output.join(lineEnding);
-    if (hadFinalNewline)
-        result.append(lineEnding);
-    return result;
-}
-
-QString iniInitValue(const QString& content, const QString& wantedKey)
-{
-    const QString normalizedWantedKey = wantedKey.trimmed().toLower();
-    const QStringList lines = content.split('\n');
-    bool inInitSection = false;
-    for (const QString& line : lines)
-    {
-        const QString trimmed = line.trimmed();
-        if (trimmed.startsWith('[') && trimmed.endsWith(']'))
-        {
-            inInitSection = trimmed.compare("[Init]", Qt::CaseInsensitive) == 0;
-            continue;
-        }
-        if (!inInitSection || iniKeyName(line) != normalizedWantedKey)
-            continue;
-
-        const int separator = line.indexOf('=');
-        if (separator >= 0)
-            return line.mid(separator + 1).trimmed();
-    }
-    return QString();
-}
-
-QString setIniInitValue(QString content, const QString& key, const QString& value)
-{
-    const bool hadFinalNewline = content.endsWith('\n');
-    QStringList lines = content.split('\n');
-    if (hadFinalNewline && !lines.isEmpty())
-        lines.removeLast();
-
-    int initStart = -1;
-    int initEnd = lines.size();
-    for (int i = 0; i < lines.size(); i++)
-    {
-        const QString trimmed = lines[i].trimmed();
-        if (!trimmed.startsWith('[') || !trimmed.endsWith(']'))
-            continue;
-        if (trimmed.compare("[Init]", Qt::CaseInsensitive) == 0)
-        {
-            initStart = i;
-            for (int j = i + 1; j < lines.size(); j++)
-            {
-                const QString nextTrimmed = lines[j].trimmed();
-                if (nextTrimmed.startsWith('[') && nextTrimmed.endsWith(']'))
-                {
-                    initEnd = j;
-                    break;
-                }
-            }
-            break;
-        }
-    }
-    if (initStart < 0)
-        return content;
-
-    const QString normalizedKey = key.trimmed().toLower();
-    for (int i = initStart + 1; i < initEnd; i++)
-    {
-        if (iniKeyName(lines[i]) == normalizedKey)
-        {
-            lines[i] = key + "=" + value;
-            QString result = lines.join('\n');
-            if (hadFinalNewline)
-                result.append('\n');
-            return result;
-        }
-    }
-
-    lines.insert(initEnd, key + "=" + value);
-    QString result = lines.join('\n');
-    if (hadFinalNewline)
-        result.append('\n');
-    return result;
-}
-
-bool readImageDimensions(const QString& imagePath, int& width, int& height)
-{
-    QFile imageFile(imagePath);
-    if (!imageFile.open(QIODevice::ReadOnly))
-        return false;
-    const QByteArray data = imageFile.readAll();
-    imageFile.close();
-    if (data.isEmpty())
-        return false;
-
-    PicFileEditor editor;
-    if (!editor.loadFromBuffer(
-            reinterpret_cast<const uint8_t*>(data.constData()), data.size()))
-    {
-        return false;
-    }
-
-    const PicFileData* picFile = editor.getPicFileData();
-    if (picFile == nullptr)
-        return false;
-
-    switch (picFile->picType)
-    {
-    case PicType::Mpc:
-    case PicType::Shd:
-        width = picFile->mpcFileHead.maxWidth;
-        height = picFile->mpcFileHead.maxHeight;
-        break;
-    case PicType::Asf100:
-    case PicType::Asf101:
-        width = picFile->asfFileHead.width;
-        height = picFile->asfFileHead.height;
-        break;
-    default:
-    {
-        const QImage frame = editor.getFrameImage(0);
-        width = frame.width();
-        height = frame.height();
-        break;
-    }
-    }
-    return width > 0 && height > 0;
-}
-
-QString resolveUiImagePath(const QString& outputDir, QString logicalPath)
-{
-    logicalPath.replace('\\', '/');
-    while (logicalPath.startsWith('/'))
-        logicalPath.remove(0, 1);
-    if (logicalPath.isEmpty())
-        return QString();
-
-    const QString directPath = appendPath(outputDir, logicalPath);
-    if (QFileInfo::exists(directPath))
-        return directPath;
-
-    if (!logicalPath.contains('/'))
-    {
-        const QStringList dialogPrefixes = {
-            "asf/ui/dialog/",
-            "mpc/ui/dialog/",
-            "asf/",
-            "mpc/"
-        };
-        for (const QString& prefix : dialogPrefixes)
-        {
-            const QString candidate = appendPath(outputDir, prefix + logicalPath);
-            if (QFileInfo::exists(candidate))
-                return candidate;
-        }
-    }
-    return QString();
-}
-
 bool isIgnoredLegacyNonRuntimeFile(const QString& filePath, const QString& relativePath)
 {
     QFileInfo fileInfo(filePath);
@@ -4185,59 +3706,6 @@ std::string lowercaseTextResourceReferences(
     return content;
 }
 
-const QSet<QString>& runtimeScriptApis()
-{
-    static const QSet<QString> knownApis = []() {
-        static const char* names[] = {
-            "printf", "assign", "getvar", "add",
-            "talk", "say", "fadein", "fadeout", "setfadelum", "setmainlum",
-            "playmusic", "playrandommusic", "stopmusic", "playsound", "runscript",
-            "movescreen", "sleep", "playmovie", "stopmovie", "loadmap", "loadgame",
-            "setmappos", "setmaptrap", "savemaptrap", "setmaptime", "changeasfcolor",
-            "changemapcolor", "loadobj", "saveobj", "addobj", "delobj", "setobjpos",
-            "setobjofs", "setobjkind", "setobjscript", "clearbody", "openbox", "closebox",
-            "loadnpc", "savenpc", "addnpc", "delnpc", "setnpcres", "setnpcscript",
-            "setnpcdeathscript", "npcgoto", "npcgotoex", "npcgotodir", "follownpc",
-            "followplayer", "enablenpcai", "disablenpcai", "npcattack", "setnpcpos",
-            "setnpcdir", "setnpckind", "setnpclevel", "setnpcaction",
-            "setnpcrelation", "setnpcactiontype", "setnpcactionfile",
-            "npcspecialaction", "npcspecialactionex", "changelife", "changemana",
-            "changethew", "getnpcstate", "addkindvalue", "setmapnpcattr",
-            "setnpctalkcontent", "talkselftip", "setallnpcisenemy",
-            "loadplayer", "saveplayer", "setplayerpos",
-            "setplayerdir", "setplayerscn", "setplayerlum", "setlevelfile",
-            "setmagiclevel", "getplayermagiclevel", "getleechcraftdifference", "movemagic", "setplayerlevel", "setplayerstate",
-            "enablerun", "disablerun", "enablejump", "disablejump", "enablefight",
-            "disablefight", "playergoto", "playergotoex", "playerrunto",
-            "playerjumpto", "playergotodir", "setwalkisrun", "addlife", "addlifemax", "addthew",
-            "addthewmax", "addmana", "addmanamax", "addattack", "adddefend",
-            "addevade", "addexp", "addmoney", "equipgoods", "addrandmoney",
-            "addgoods", "addrandgoods", "addmagic", "addtalent", "addonemagic", "delgoods",
-            "delmagic", "addmagicexp", "fulllife", "fullthew", "fullmana",
-            "updatestate", "savegoods", "loadgoods", "cleargoods", "getgoodsnum",
-            "getmoneynum", "setmoneynum", "gamble", "showstealwin", "showgivegoodswin", "showmessage", "showsystemmsg", "memo", "addtomemo", "clearmemo",
-            "buygoods", "buygoodsonly", "sellgoods", "returntotitle", "enableinput", "disableinput",
-            "hideinterface", "hidebottomwnd", "showbottomwnd", "hidemousecursor",
-            "showmousecursor", "showsnow", "showrandomsnow", "showrain", "beginrain",
-            "endrain", "checkyear", "getrandnum", "getplayerlevel", "getnpccount",
-            "delcurobj", "showinterface", "drawbackground", "cleareffect", "savegame",
-            "clearallsave", "enablesave", "disablesave",
-            "limitmana", "shownpc", "openwatereffect", "closewatereffect", "watch",
-            "settrap", "setnpcdestination", "setnpcmagicfile", "setnpcmagiclevel", "setnpcclickscript",
-            "setpartnerlevel", "playeraddemotion", "playeraddjustice", "getpartneridx", "movescreenex", "displaymessage",
-            "disablemapscroll", "enablemapscroll", "openobj", "freemap",
-            "opentimelimit", "closetimelimit", "hidetimerwnd", "settimescript",
-            "choose", "chooseex", "chooseplus", "select", "playerchange", "mergenpc",
-            "if", "goto", "return"
-        };
-        QSet<QString> result;
-        for (const char* name : names)
-            result.insert(QString::fromLatin1(name));
-        return result;
-    }();
-    return knownApis;
-}
-
 QStringList scanCallsOutsideStrings(const QString& text)
 {
     QStringList result;
@@ -4414,7 +3882,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             QStringLiteral(
                 "source-root-link-not-supported"),
             QString::fromUtf8(
-                "源目录根是文件系统链接；迁移不会跟随该链接"),
+                "源目录根是文件系统链接；转换不会跟随该链接"),
             true,
             migrationEntryType(sourceInfo));
         appendReportLog(
@@ -4486,7 +3954,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 report,
                 logCallback,
                 QString::fromUtf8(
-                    "错误: 依赖资源正在更新，无法取得一致的迁移基底。"));
+                    "错误: 依赖资源正在更新，无法取得一致的转换基底。"));
             return MigrationResult::Failed;
         }
         const QString dependencyManifestPath =
@@ -4500,7 +3968,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 report,
                 logCallback,
                 QString::fromUtf8(
-                    "错误: 依赖资源在迁移开始前发生变化，请重新执行转换。"));
+                    "错误: 依赖资源在转换开始前发生变化，请重新执行转换。"));
             return MigrationResult::Failed;
         }
         applyProfileDefaults(dependencyProfile, effectiveOptions);
@@ -4538,7 +4006,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     {
         report.errorCount++;
         appendReportLog(report, logCallback,
-            QString::fromUtf8("错误: 迁移选项组合无效；继承 Type 需要内容依赖，"
+            QString::fromUtf8("错误: 转换选项组合无效；继承 Type 需要内容依赖，"
                 "图片子集需要安全的相对 includePrefix，配置字段不能包含换行或 NUL。"));
         return MigrationResult::Failed;
     }
@@ -4602,7 +4070,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                     report,
                     logCallback,
                     QString::fromUtf8(
-                        "错误: UI 基底资源在迁移开始前发生变化，请重新执行转换。"));
+                        "错误: UI 基底资源在转换开始前发生变化，请重新执行转换。"));
                 return MigrationResult::Failed;
             }
         }
@@ -4666,7 +4134,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             QStringLiteral(
                 "existing-output-root-link-not-supported"),
             QString::fromUtf8(
-                "旧输出根是文件系统链接；迁移不会跟随该链接"),
+                "旧输出根是文件系统链接；转换不会跟随该链接"),
             false,
             migrationEntryType(outputInfo));
         appendReportLog(
@@ -4710,7 +4178,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                     report.errorCount++;
                     appendReportLog(report, logCallback,
                         QString::fromUtf8(
-                            "错误: 输出目录非空且不是旧迁移目录，请选择空目录: %1")
+                            "错误: 输出目录非空且不是旧转换目录，请选择空目录: %1")
                             .arg(finalOutputRoot));
                     return MigrationResult::Failed;
                 }
@@ -4727,7 +4195,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     {
         report.errorCount++;
         appendReportLog(report, logCallback,
-            QString::fromUtf8("错误: 无法创建迁移输出父目录: %1").arg(outputParent));
+            QString::fromUtf8("错误: 无法创建转换输出父目录: %1").arg(outputParent));
         return MigrationResult::Failed;
     }
 
@@ -4738,7 +4206,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     {
         report.errorCount++;
         appendReportLog(report, logCallback,
-            QString::fromUtf8("错误: 无法创建迁移暂存目录: %1").arg(stagingTemplate));
+            QString::fromUtf8("错误: 无法创建转换暂存目录: %1").arg(stagingTemplate));
         return MigrationResult::Failed;
     }
     const QString outputRoot = stagingDirectory->path();
@@ -4747,7 +4215,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     {
         report.errorCount++;
         appendReportLog(report, logCallback,
-            QString::fromUtf8("错误: 无法写入迁移输出标记: %1")
+            QString::fromUtf8("错误: 无法写入转换输出标记: %1")
                 .arg(appendPath(outputRoot, kMigrationMarkerFileName)));
         return MigrationResult::Failed;
     }
@@ -4774,7 +4242,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     auto preserveFailedStaging = [&](bool wasCancelled) {
         report.cancelled = report.cancelled || wasCancelled;
         appendReportLog(report, logCallback,
-            QString::fromUtf8("未发布失败/取消的迁移结果；诊断暂存目录保留在: %1")
+            QString::fromUtf8("未发布失败/取消的转换结果；诊断暂存目录保留在: %1")
                 .arg(outputRoot));
         writeReportFile(outputRoot, report);
         writeReportJsonFile(outputRoot, report, MigrationResult::Failed);
@@ -4782,7 +4250,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         if (!report.reportFilePath.isEmpty())
         {
             appendReportLog(report, logCallback,
-                QString::fromUtf8("迁移报告: %1").arg(report.reportFilePath));
+                QString::fromUtf8("转换报告: %1").arg(report.reportFilePath));
         }
         return MigrationResult::Failed;
     };
@@ -5267,7 +4735,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                     QStringLiteral(
                         "migration-cancelled-before-processing"),
                     QString::fromUtf8(
-                        "迁移取消，目录未处理"),
+                        "转换取消，目录未处理"),
                     true,
                     migrationEntryType(
                         remainingInformation));
@@ -5291,7 +4759,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 QStringLiteral(
                     "source-directory-link-not-supported"),
                 QString::fromUtf8(
-                    "迁移不会跟随源目录中的目录 symlink/junction"),
+                    "转换不会跟随源目录中的目录 symlink/junction"),
                 true,
                 entryType);
             appendReportLog(
@@ -5397,7 +4865,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 report,
                 logCallback,
                 QString::fromUtf8(
-                    "错误: 无法迁移源目录项 %1")
+                    "错误: 无法转换源目录项 %1")
                     .arg(sourceRelativePath));
             continue;
         }
@@ -5411,7 +4879,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             QStringLiteral(
                 "preserve-source-directory"),
             QString::fromUtf8(
-                "保留源目录项；空目录不会在迁移中丢失"),
+                "保留源目录项；空目录不会在转换中丢失"),
             true,
             QStringLiteral("directory"));
     }
@@ -5453,7 +4921,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                     QStringLiteral(
                         "migration-cancelled-before-processing"),
                     QString::fromUtf8(
-                        "迁移取消，文件未处理"));
+                        "转换取消，文件未处理"));
             }
             break;
         }
@@ -5486,7 +4954,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 QStringLiteral(
                     "superseded-by-legacy-save-template"),
                 QString::fromUtf8(
-                    "同一路径由 save/rpg0 旧存档模板迁移结果提供"));
+                    "同一路径由 save/rpg0 旧存档模板转换结果提供"));
             continue;
         }
         if (isLegacyNewGameSaveTemplate)
@@ -5519,7 +4987,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 QStringLiteral(
                     "source-file-link-not-supported"),
                 QString::fromUtf8(
-                    "迁移不会跟随源目录中的文件 symlink"),
+                    "转换不会跟随源目录中的文件 symlink"),
                 true,
                 migrationEntryType(
                     sourceFileInformation));
@@ -5542,7 +5010,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 QStringLiteral(
                     "known-non-runtime-file"),
                 QString::fromUtf8(
-                    "已识别的二进制、归档、存档或旧迁移报告不进入发布"));
+                    "已识别的二进制、归档、存档或旧转换报告不进入发布"));
             continue;
         }
 
@@ -5656,14 +5124,15 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 QStringLiteral("text-normalized-to-utf8");
             ok = processTextFile(filePath, outputPath, relativePath, effectiveOptions, report);
         }
-        else if (extension == "map" &&
+        else if ((extension == "map" || extension == "tmx") &&
                  isRuntimeMapPath(relativePath))
         {
             successfulAction =
                 AssetMigrationFileAction::Convert;
             successReason =
                 QStringLiteral("map-converted");
-            ok = processMapFile(filePath, outputPath, relativePath, effectiveOptions, report);
+            ok = processMapFile(filePath, outputPath, relativePath, effectiveOptions, report,
+                sourceDirObj.path(), outputRoot);
         }
         else if (isRawImageExtension(extension))
         {
@@ -5732,7 +5201,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         (cancelCallback && cancelCallback());
     if (cancelled)
     {
-        appendReportLog(report, logCallback, QString::fromUtf8("迁移已取消，跳过后续转换/验证步骤。"));
+        appendReportLog(report, logCallback, QString::fromUtf8("转换已取消，跳过后续转换/验证步骤。"));
         return preserveFailedStaging(true);
     }
 
@@ -5769,8 +5238,6 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         const int previousWrittenFiles = report.writtenFiles;
         convertTalkDatToTalkIndex(outputRoot, outputRoot, effectiveOptions,
             report, logCallback);
-        ensureMoneyDropScripts(outputRoot, report);
-        ensureKnownScriptLocations(outputRoot, report);
         addDomainWrittenFiles(report, AssetResourceType::Scripts,
             previousWrittenFiles);
     }
@@ -5778,12 +5245,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     if (completeProject)
     {
         const int previousWrittenFiles = report.writtenFiles;
-        ensureChooseMenuFiles(
-            outputRoot,
-            uiBaseRoot,
-            effectiveOptions,
-            report);
-        alignUiPresentationWithBase(
+        ensureChooseMenuDefinition(
             outputRoot,
             uiBaseRoot,
             report);
@@ -5981,7 +5443,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                     outcome->message =
                         QString::fromUtf8(
                             "无法在保留源清单未知内容的同时"
-                            "合并迁移选项");
+                            "合并转换选项");
                 }
                 if (!wasAlreadyFailed)
                 {
@@ -6028,14 +5490,14 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 outcome->message =
                     QString::fromUtf8(
                         "源目录已提供 game_profile.ini；"
-                        "保留未知内容并用迁移选项更新规范字段");
+                        "保留未知内容并用转换选项更新规范字段");
             }
             appendReportLog(
                 report,
                 logCallback,
                 QString::fromUtf8(
                     "源目录已提供 game_profile.ini，"
-                    "已保留未知内容并合并迁移选项中的规范字段。"));
+                    "已保留未知内容并合并转换选项中的规范字段。"));
         }
         addDomainWrittenFiles(report, AssetResourceType::Other,
             previousWrittenFiles);
@@ -6329,7 +5791,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             report,
             logCallback,
             QString::fromUtf8(
-                "错误: 无法写入带 SHA-256 provenance 的迁移输出标记，取消发布。"));
+                "错误: 无法写入带 SHA-256 provenance 的转换输出标记，取消发布。"));
     }
 
     // Determine final status before writing report
@@ -6337,18 +5799,18 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     if (report.errorCount > 0)
     {
         appendReportLog(report, logCallback,
-            QString::fromUtf8("迁移失败: %1 个错误").arg(report.errorCount));
+            QString::fromUtf8("转换失败: %1 个错误").arg(report.errorCount));
         result = MigrationResult::Failed;
     }
     else if (report.warningCount > 0)
     {
         appendReportLog(report, logCallback,
-            QString::fromUtf8("迁移完成但存在警告: %1 个").arg(report.warningCount));
+            QString::fromUtf8("转换完成但存在警告: %1 个").arg(report.warningCount));
         result = MigrationResult::Partial;
     }
     else
     {
-        appendReportLog(report, logCallback, QString::fromUtf8("迁移流程完成，未记录处理错误"));
+        appendReportLog(report, logCallback, QString::fromUtf8("转换流程完成，未记录处理错误"));
     }
 
     if (result == MigrationResult::Failed)
@@ -6362,7 +5824,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     {
         report.errorCount++;
         appendReportLog(report, logCallback,
-            QString::fromUtf8("错误: 无法完整写入迁移报告，取消发布新输出。"));
+            QString::fromUtf8("错误: 无法完整写入转换报告，取消发布新输出。"));
         return preserveFailedStaging(false);
     }
 
@@ -6486,7 +5948,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     }
 
     appendReportLog(report, logCallback,
-        QString::fromUtf8("迁移报告: %1").arg(report.reportFilePath));
+        QString::fromUtf8("转换报告: %1").arg(report.reportFilePath));
     return result;
 }
 
@@ -6676,9 +6138,6 @@ bool JxAssetMigrator::processTextFile(const QString& sourcePath, const QString& 
     if (lowerPathKey(relativePath).startsWith("ini/objres/") && extension == "ini")
         content = normalizeObjectResourceIni(content, relativePath);
 
-    if (extension == "ini")
-        content = applyUiDefaults(content, relativePath, options);
-
     if (isExecutableScriptText && options.convertScript)
     {
         ScriptConverter converter;
@@ -6721,7 +6180,8 @@ bool JxAssetMigrator::processTextFile(const QString& sourcePath, const QString& 
 }
 
 bool JxAssetMigrator::processMapFile(const QString& sourcePath, const QString& outputPath, const QString& relativePath,
-    const AssetMigrationOptions& options, AssetMigrationReport& report)
+    const AssetMigrationOptions& options, AssetMigrationReport& report,
+    const QString& sourceRoot, const QString& outputRoot)
 {
     if (!ensureParentDirectory(outputPath))
         return false;
@@ -6731,6 +6191,33 @@ bool JxAssetMigrator::processMapFile(const QString& sourcePath, const QString& o
         return false;
     QByteArray header = source.peek(MAP_EDITOR_HEADSTR_LEN);
     source.close();
+    if (!header.startsWith("MAP File") && QFileInfo(sourcePath).suffix().compare("tmx", Qt::CaseInsensitive) == 0)
+    {
+        QStringList generatedFiles;
+        QStringList warnings;
+        QString error;
+        const bool converted = TiledMapConverter::convert(sourcePath, sourceRoot, outputRoot,
+            mapOutputRelativePath(relativePath), generatedFiles, warnings, error);
+        for (const QString& warning : warnings)
+        {
+            report.warningCount++;
+            report.logLines.append(QStringLiteral("Warning: %1: %2").arg(relativePath, warning));
+        }
+        if (!converted)
+        {
+            report.logLines.append(error);
+            return false;
+        }
+        for (const QString& generated : generatedFiles)
+        {
+            appendFileOutcome(report, relativePath, generated, AssetResourceType::Maps,
+                AssetMigrationFileAction::Convert, QStringLiteral("tmx-generated-image-package"),
+                QString(), false);
+        }
+        report.writtenFiles += 1 + generatedFiles.size();
+        report.convertedMaps++;
+        return true;
+    }
     if (!header.startsWith("MAP File"))
     {
         report.warningCount++;
@@ -6859,17 +6346,6 @@ std::string JxAssetMigrator::rewriteLegacyJxReferences(const std::string& conten
     text.replace("content/partneridx.ini", "partneridx.ini", Qt::CaseInsensitive);
 
     const QString normalizedPath = lowerPathKey(relativePath);
-    if (normalizedPath.endsWith(
-            QString::fromUtf8(
-                "script/map/map_029_码头/结局2紫轩死亡.txt")))
-    {
-        // The symmetric branch in this script is MoveScreen(1,80,1).
-        text.replace(
-            QStringLiteral("MoveScreen(1.80,1)"),
-            QStringLiteral("MoveScreen(1,80,1)"),
-            Qt::CaseInsensitive);
-    }
-
     const bool isTitleConfiguration =
         normalizedPath.startsWith(QStringLiteral("ini/ui/title/"));
     const bool isGameProfile =
@@ -7043,172 +6519,6 @@ std::string JxAssetMigrator::normalizeObjectResourceIni(const std::string& conte
     return output.join('\n').toUtf8().toStdString();
 }
 
-std::string JxAssetMigrator::applyUiDefaults(const std::string& content, const QString& relativePath,
-    const AssetMigrationOptions& options) const
-{
-    const UiWindowDefaultProfile profile =
-        uiWindowDefaultProfileForOptions(options);
-    if (profile == UiWindowDefaultProfile::Yycs)
-    {
-        const QString path = lowerPathKey(relativePath);
-        QString text = QString::fromUtf8(
-            content.data(), static_cast<int>(content.size()));
-        if (path == QStringLiteral("ini/ui/dialog/label.ini"))
-        {
-            text = setIniInitValue(text, "Left", "65");
-            text = setIniInitValue(text, "Top", "30");
-            text = setIniInitValue(text, "Width", "310");
-            text = setIniInitValue(text, "Height", "70");
-            text = setIniInitValue(text, "Font", "18");
-            text = setIniInitValue(text, "CharactersPerLine", "17");
-            text = setIniInitValue(text, "LineHeight", "22");
-            text = setIniInitValue(text, "LineCount", "3");
-            return text.toUtf8().toStdString();
-        }
-        if (path == QStringLiteral("ini/ui/choose/label.ini"))
-        {
-            text = setIniInitValue(text, "Left", "65");
-            text = setIniInitValue(text, "Top", "30");
-            text = setIniInitValue(text, "Width", "310");
-            text = setIniInitValue(text, "Height", "22");
-            text = setIniInitValue(text, "Font", "18");
-            return text.toUtf8().toStdString();
-        }
-        if (path == QStringLiteral("ini/ui/choose/btna.ini") ||
-            path == QStringLiteral("ini/ui/choose/btnb.ini"))
-        {
-            text = setIniInitValue(text, "Left", "65");
-            text = setIniInitValue(
-                text,
-                "Top",
-                path.endsWith(QStringLiteral("btna.ini")) ? "52" : "74");
-            text = setIniInitValue(text, "Width", "310");
-            text = setIniInitValue(text, "Height", "22");
-            text = setIniInitValue(text, "Font", "18");
-            return text.toUtf8().toStdString();
-        }
-        if (path == QStringLiteral("ini/ui/message/window.ini"))
-        {
-            text = setIniInitValue(text, "Align", "alBottomCenter");
-            text = setIniInitValue(text, "AlignX", "-10");
-            text = setIniInitValue(text, "AlignY", "-71");
-            return text.toUtf8().toStdString();
-        }
-        if (path == QStringLiteral("ini/ui/message/label.ini"))
-        {
-            text = setIniInitValue(text, "Left", "46");
-            text = setIniInitValue(text, "Top", "32");
-            text = setIniInitValue(text, "Width", "148");
-            text = setIniInitValue(text, "Height", "50");
-            text = setIniInitValue(text, "Color", "155,34,22,204");
-            return text.toUtf8().toStdString();
-        }
-    }
-
-    QStringList defaultLines;
-    if (!findUiDefaultLines(relativePath, profile, defaultLines))
-        return content;
-
-    QString text = QString::fromUtf8(content.data(), static_cast<int>(content.size()));
-    bool hadFinalNewline = text.endsWith('\n');
-    QStringList lines = text.split('\n');
-    if (hadFinalNewline && !lines.isEmpty())
-        lines.removeLast();
-
-    int initStart = -1;
-    int initEnd = lines.size();
-    for (int i = 0; i < lines.size(); i++)
-    {
-        QString trimmed = lines[i].trimmed();
-        if (!trimmed.startsWith('[') || !trimmed.endsWith(']'))
-            continue;
-
-        if (trimmed.compare("[Init]", Qt::CaseInsensitive) == 0)
-        {
-            initStart = i;
-            initEnd = lines.size();
-            for (int j = i + 1; j < lines.size(); j++)
-            {
-                QString nextTrimmed = lines[j].trimmed();
-                if (nextTrimmed.startsWith('[') && nextTrimmed.endsWith(']'))
-                {
-                    initEnd = j;
-                    break;
-                }
-            }
-            break;
-        }
-    }
-
-    if (initStart < 0)
-        return content;
-
-    const bool usesAspectFitTitle = std::any_of(
-        defaultLines.cbegin(),
-        defaultLines.cend(),
-        [](const QString& line)
-        {
-            return iniKeyName(line) == "keepaspect";
-        });
-    if (usesAspectFitTitle)
-    {
-        for (int i = initStart + 1; i < initEnd;)
-        {
-            const QString key = iniKeyName(lines[i]);
-            if (key == "scalechildren" || key == "centerchildren")
-            {
-                lines.removeAt(i);
-                initEnd--;
-                continue;
-            }
-            i++;
-        }
-    }
-
-    QSet<QString> existingKeys;
-    int lastWindowKeyIndex = -1;
-    int imageKeyIndex = -1;
-
-    for (int i = initStart + 1; i < initEnd; i++)
-    {
-        QString key = iniKeyName(lines[i]);
-        if (isUiDefaultKey(key))
-        {
-            existingKeys.insert(key);
-            lastWindowKeyIndex = i;
-        }
-        else if (key == "image")
-        {
-            imageKeyIndex = i;
-        }
-    }
-
-    QStringList additions;
-    for (const QString& line : defaultLines)
-    {
-        QString key = iniKeyName(line);
-        if (!existingKeys.contains(key))
-            additions.append(line);
-    }
-
-    if (additions.isEmpty())
-        return content;
-
-    int insertIndex = initEnd;
-    if (lastWindowKeyIndex >= 0)
-        insertIndex = lastWindowKeyIndex + 1;
-    else if (imageKeyIndex >= 0)
-        insertIndex = imageKeyIndex + 1;
-
-    for (int i = additions.size() - 1; i >= 0; i--)
-        lines.insert(insertIndex, additions[i]);
-
-    QString result = lines.join('\n');
-    if (hadFinalNewline)
-        result.append('\n');
-    return result.toUtf8().toStdString();
-}
-
 std::string JxAssetMigrator::replacePlayMusicWavWithMp3(const std::string& content) const
 {
     std::istringstream stream(content);
@@ -7237,521 +6547,40 @@ std::string JxAssetMigrator::replacePlayMusicWavWithMp3(const std::string& conte
     return result;
 }
 
-void JxAssetMigrator::ensureMoneyDropScripts(
-    const QString& outputDir,
-    AssetMigrationReport& report)
-{
-    if (!QFileInfo(appendPath(
-             outputDir,
-             QString::fromUtf8("ini/obj/可捡钱.ini"))).isFile())
-    {
-        return;
-    }
-
-    const std::array<std::pair<int, int>, 7> moneyRanges = {{
-        {10, 40},
-        {50, 80},
-        {90, 120},
-        {130, 160},
-        {170, 200},
-        {210, 240},
-        {250, 280}
-    }};
-
-    for (std::size_t index = 0; index < moneyRanges.size(); ++index)
-    {
-        const QString relativePath = QString::fromUtf8(
-            "script/common/%1级钱.txt").arg(index + 1);
-        const QString path = appendPath(outputDir, relativePath);
-        const QFileInfo outputInfo(path);
-        if (outputInfo.isFile())
-            continue;
-
-        if (outputInfo.exists())
-        {
-            report.errorCount++;
-            domainReportFor(report, AssetResourceType::Scripts).
-                failedFiles++;
-            appendFileOutcome(
-                report,
-                QStringLiteral("<generated:money-drop-script>"),
-                relativePath,
-                AssetResourceType::Scripts,
-                AssetMigrationFileAction::Fail,
-                QStringLiteral("generated-money-drop-script-path-conflict"),
-                QString::fromUtf8(
-                    "钱袋脚本目标路径已被非文件对象占用"),
-                false);
-            report.logLines.append(QString::fromUtf8(
-                "错误: 钱袋脚本目标路径不可用 %1")
-                .arg(relativePath));
-            continue;
-        }
-
-        const auto [minimumMoney, maximumMoney] = moneyRanges[index];
-        const QString content = QString::fromUtf8(
-            "  playsound(\"物-银子.wav\");\n"
-            "  addrandmoney(%1,%2);\n"
-            "  delcurobj();\n")
-            .arg(minimumMoney)
-            .arg(maximumMoney);
-        if (writeTextFileUtf8(
-                path, content.toUtf8().toStdString(), false, report))
-        {
-            appendFileOutcome(
-                report,
-                QStringLiteral("<generated:money-drop-script>"),
-                relativePath,
-                AssetResourceType::Scripts,
-                AssetMigrationFileAction::Convert,
-                QStringLiteral("generated-money-drop-script"),
-                QString::fromUtf8(
-                    "补齐当前资源掉落钱袋所需的等级脚本"),
-                false);
-            continue;
-        }
-
-        report.errorCount++;
-        domainReportFor(report, AssetResourceType::Scripts).
-            failedFiles++;
-        appendFileOutcome(
-            report,
-            QStringLiteral("<generated:money-drop-script>"),
-            relativePath,
-            AssetResourceType::Scripts,
-            AssetMigrationFileAction::Fail,
-            QStringLiteral("generated-money-drop-script-write-failed"),
-            QString::fromUtf8(
-                "无法写入当前资源掉落钱袋的等级脚本"),
-            false);
-        report.logLines.append(QString::fromUtf8(
-            "错误: 无法生成钱袋脚本 %1").arg(relativePath));
-    }
-}
-
-void JxAssetMigrator::ensureKnownScriptLocations(
-    const QString& outputDir,
-    AssetMigrationReport& report)
-{
-    const std::array<std::pair<QString, QString>, 3> locations = {{
-        {
-            QString::fromUtf8("script/未找到的/1f66fded.txt"),
-            QString::fromUtf8("script/map/map101_天王帮大殿/杨瑛对话.txt")
-        },
-        {
-            QString::fromUtf8("script/未找到的/6da90a79.txt"),
-            QString::fromUtf8(
-                "script/map/map_033_落叶谷(破坏后)/孟知秋临终对话.txt")
-        },
-        {
-            QString::fromUtf8(
-                "script/map/map_002_凌绝峰峰顶/月眉儿之死.txt"),
-            QString::fromUtf8(
-                "script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt")
-        }
-    }};
-
-    for (const auto& [orphanRelativePath, runtimeRelativePath] : locations)
-    {
-        const QString sourcePath = appendPath(outputDir, orphanRelativePath);
-        if (!QFileInfo(sourcePath).isFile())
-            continue;
-
-        const QString outputPath = appendPath(outputDir, runtimeRelativePath);
-        const QFileInfo outputInfo(outputPath);
-        if (outputInfo.isFile())
-            continue;
-
-        if (outputInfo.exists() ||
-            !copyFileReplacing(sourcePath, outputPath, report))
-        {
-            report.errorCount++;
-            domainReportFor(report, AssetResourceType::Scripts).
-                failedFiles++;
-            appendFileOutcome(
-                report,
-                orphanRelativePath,
-                runtimeRelativePath,
-                AssetResourceType::Scripts,
-                AssetMigrationFileAction::Fail,
-                QStringLiteral("known-script-location-restore-failed"),
-                QString::fromUtf8(
-                    "已知剧情脚本的运行时目标路径不可用"),
-                false);
-            report.logLines.append(QString::fromUtf8(
-                "错误: 无法恢复已知剧情脚本 %1 -> %2")
-                .arg(orphanRelativePath, runtimeRelativePath));
-            continue;
-        }
-
-        appendFileOutcome(
-            report,
-            orphanRelativePath,
-            runtimeRelativePath,
-            AssetResourceType::Scripts,
-            AssetMigrationFileAction::Convert,
-            QStringLiteral("restored-known-script-location"),
-            QString::fromUtf8(
-                "将已确认来源的散落剧情脚本恢复到运行时地图目录"),
-            false);
-    }
-
-    const std::array<QString, 3> endingScripts = {{
-        QString::fromUtf8(
-            "script/map/map_002_凌绝峰峰顶/月眉儿之死.txt"),
-        QString::fromUtf8(
-            "script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt"),
-        QString::fromUtf8(
-            "script/map/map_026_摘星楼地下/纳兰潜凛死亡.txt")
-    }};
-    for (const QString& relativePath : endingScripts)
-    {
-        const QString path = appendPath(outputDir, relativePath);
-        QFile input(path);
-        if (!input.open(QIODevice::ReadOnly))
-            continue;
-
-        QByteArray content = input.readAll();
-        input.close();
-        if (!content.contains("logo.avi"))
-            continue;
-
-        content.replace("logo.avi", "logo.wmv");
-        if (writeTextFileUtf8(
-                path,
-                std::string(content.constData(), content.size()),
-                false,
-                report))
-        {
-            continue;
-        }
-
-        report.errorCount++;
-        domainReportFor(report, AssetResourceType::Scripts).failedFiles++;
-        appendFileOutcome(
-            report,
-            relativePath,
-            relativePath,
-            AssetResourceType::Scripts,
-            AssetMigrationFileAction::Fail,
-            QStringLiteral("known-movie-reference-rewrite-failed"),
-            QString::fromUtf8("无法修正月影结局影片资源名"),
-            false);
-        report.logLines.append(QString::fromUtf8(
-            "错误: 无法修正月影结局影片资源名 %1")
-            .arg(relativePath));
-    }
-}
-
-bool JxAssetMigrator::alignUiPresentationWithBase(
+void JxAssetMigrator::ensureChooseMenuDefinition(
     const QString& outputDir,
     const QString& uiBaseRoot,
     AssetMigrationReport& report)
 {
-    if (uiBaseRoot.isEmpty())
-        return true;
-
-    const QString outputUiRoot = appendPath(outputDir, "ini/ui");
-    const QString baseUiRoot = appendPath(uiBaseRoot, "ini/ui");
-    if (!QFileInfo(outputUiRoot).isDir() || !QFileInfo(baseUiRoot).isDir())
-        return true;
-
-    bool succeeded = true;
-    int alignedFileCount = 0;
-    const QDir outputRoot(outputDir);
-    const QDir outputUiDirectory(outputUiRoot);
-    QDirIterator iterator(
-        outputUiRoot,
-        QStringList{QStringLiteral("*.ini")},
-        QDir::Files,
-        QDirIterator::Subdirectories);
-    while (iterator.hasNext())
+    const QString relativePath = "ini/ui/choose/choose.menu.ini";
+    auto suppliedFile = [&](const QString& path)
     {
-        const QString localPath = iterator.next();
-        const QString uiRelativePath =
-            normalizePath(outputUiDirectory.relativeFilePath(localPath));
-        const QString basePath = appendPath(baseUiRoot, uiRelativePath);
-        if (!QFileInfo(basePath).isFile())
-            continue;
-
-        QFile localFile(localPath);
-        QFile baseFile(basePath);
-        if (!localFile.open(QIODevice::ReadOnly) ||
-            !baseFile.open(QIODevice::ReadOnly))
-        {
-            succeeded = false;
-        }
-        else
-        {
-            const QByteArray localBytes = localFile.readAll();
-            const QByteArray baseBytes = baseFile.readAll();
-            localFile.close();
-            baseFile.close();
-
-            const QString localText = QString::fromUtf8(localBytes);
-            const QString alignedText = alignUiPresentationText(
-                localText,
-                QString::fromUtf8(baseBytes));
-            if (alignedText == localText)
-                continue;
-
-            QSaveFile output(localPath);
-            output.setDirectWriteFallback(false);
-            if (!output.open(QIODevice::WriteOnly))
-            {
-                succeeded = false;
-            }
-            else
-            {
-                const QByteArray alignedBytes = alignedText.toUtf8();
-                if (output.write(alignedBytes) != alignedBytes.size() ||
-                    !output.commit())
-                {
-                    output.cancelWriting();
-                    succeeded = false;
-                }
-                else
-                {
-                    alignedFileCount++;
-                    continue;
-                }
-            }
-        }
-
-        const QString outputRelativePath =
-            normalizePath(outputRoot.relativeFilePath(localPath));
-        report.errorCount++;
-        domainReportFor(report, AssetResourceType::Other).failedFiles++;
-        appendFileOutcome(
-            report,
-            QStringLiteral("<inherited:ui-base-presentation>"),
-            outputRelativePath,
-            AssetResourceType::Other,
-            AssetMigrationFileAction::Fail,
-            QStringLiteral("ui-base-presentation-alignment-failed"),
-            QString::fromUtf8("无法按 UI 基底对齐本地界面布局"),
-            false);
-        report.logLines.append(
-            QString::fromUtf8("错误: 无法按 UI 基底对齐界面布局 %1")
-                .arg(outputRelativePath));
-    }
-
-    if (alignedFileCount > 0)
-    {
-        report.logLines.append(
-            QString::fromUtf8("按 UI 基底对齐本地界面布局: %1 个文件；基底=%2")
-                .arg(alignedFileCount)
-                .arg(uiBaseRoot));
-    }
-    return succeeded;
-}
-
-void JxAssetMigrator::ensureChooseMenuFiles(
-    const QString& outputDir,
-    const QString& uiBaseRoot,
-    const AssetMigrationOptions& options,
-    AssetMigrationReport& report)
-{
-    const QString dialogWindowPath = appendPath(outputDir, "ini/ui/dialog/window.ini");
-    if (!QFileInfo::exists(dialogWindowPath))
+        return QFileInfo(appendPath(outputDir, path)).isFile() ||
+            (!uiBaseRoot.isEmpty() && QFileInfo(appendPath(uiBaseRoot, path)).isFile());
+    };
+    if (suppliedFile(relativePath))
         return;
 
-    QFile dialogWindowFile(dialogWindowPath);
-    if (!dialogWindowFile.open(QIODevice::ReadOnly))
-    {
-        report.errorCount++;
-        report.logLines.append(QString::fromUtf8("错误: 无法读取选择菜单基准文件 %1")
-            .arg(dialogWindowPath));
-        return;
-    }
-    const QByteArray dialogWindowContent = dialogWindowFile.readAll();
-    dialogWindowFile.close();
-    if (dialogWindowContent.isEmpty())
+    const bool hasLocalChoice = QFileInfo(appendPath(outputDir, "ini/ui/choose")).exists();
+    const bool hasLocalDialog = QFileInfo(appendPath(outputDir, "ini/ui/dialog/window.ini")).isFile();
+    if (!hasLocalChoice && !hasLocalDialog)
         return;
 
-    QString chooseWindowContent = QString::fromUtf8(dialogWindowContent);
-    const QString imageValue = iniInitValue(chooseWindowContent, "Image");
-    const QString imagePath = resolveUiImagePath(outputDir, imageValue);
-    int nativeImageWidth = 0;
-    int nativeImageHeight = 0;
-    if (!imagePath.isEmpty() && readImageDimensions(imagePath, nativeImageWidth, nativeImageHeight))
+    QStringList missingLayout;
+    for (const QString& file : {QString("window.ini"), QString("label.ini"),
+             QString("btna.ini"), QString("btnb.ini")})
     {
-        bool widthOk = false;
-        const int configuredWidth = iniInitValue(chooseWindowContent, "Width").toInt(&widthOk);
-        bool heightOk = false;
-        const int configuredHeight = iniInitValue(chooseWindowContent, "Height").toInt(&heightOk);
-        bool alignXOk = false;
-        int alignX = iniInitValue(chooseWindowContent, "AlignX").toInt(&alignXOk);
-        if (!alignXOk)
-            alignX = 0;
-        bool alignYOk = false;
-        int alignY = iniInitValue(chooseWindowContent, "AlignY").toInt(&alignYOk);
-        if (!alignYOk)
-            alignY = 0;
-
-        chooseWindowContent = setIniInitValue(
-            chooseWindowContent, "Width", QString::number(nativeImageWidth));
-        chooseWindowContent = setIniInitValue(
-            chooseWindowContent, "Height", QString::number(nativeImageHeight));
-        const QString align = iniInitValue(chooseWindowContent, "Align").toLower();
-        if (widthOk && configuredWidth > 0 && align.contains("center"))
-        {
-            alignX += (nativeImageWidth - configuredWidth) / 2;
-            chooseWindowContent = setIniInitValue(
-                chooseWindowContent, "AlignX", QString::number(alignX));
-        }
-        if (heightOk && configuredHeight > 0 && nativeImageHeight > configuredHeight &&
-            align.contains("bottom"))
-        {
-            alignY += nativeImageHeight - configuredHeight;
-            chooseWindowContent = setIniInitValue(
-                chooseWindowContent, "AlignY", QString::number(alignY));
-        }
+        const QString path = "ini/ui/choose/" + file;
+        if (!suppliedFile(path))
+            missingLayout.append(path);
     }
-
-    const UiWindowDefaultProfile profile = uiWindowDefaultProfileForOptions(options);
-    if (profile == UiWindowDefaultProfile::Yycs)
+    if (!missingLayout.isEmpty())
     {
-        chooseWindowContent = setIniInitValue(chooseWindowContent, "Left", "0");
-        chooseWindowContent = setIniInitValue(chooseWindowContent, "Top", "0");
-    }
-    QString label;
-    QString buttonA;
-    QString buttonB;
-    switch (profile)
-    {
-    case UiWindowDefaultProfile::Jxqy2:
-        label =
-            "[Init]\n"
-            "Left=36\n"
-            "Top=18\n"
-            "Width=384\n"
-            "Height=28\n"
-            "Font=17\n"
-            "Color=40,32,24\n";
-        buttonA =
-            "[Init]\n"
-            "Left=36\n"
-            "Top=52\n"
-            "Width=384\n"
-            "Height=24\n"
-            "Font=17\n"
-            "Color=30,65,145,230\n"
-            "NormalColor=30,65,145,230\n"
-            "HoverColor=170,45,30,240\n"
-            "PressColor=170,45,30,240\n";
-        buttonB = buttonA;
-        buttonB.replace("Top=52", "Top=82");
-        break;
-    case UiWindowDefaultProfile::Xjxqy:
-        label =
-            "[Init]\n"
-            "Left=50\n"
-            "Top=14\n"
-            "Width=456\n"
-            "Height=18\n"
-            "Font=16\n"
-            "Color=255,255,255\n";
-        buttonA =
-            "[Init]\n"
-            "Left=50\n"
-            "Top=32\n"
-            "Width=456\n"
-            "Height=18\n"
-            "Font=16\n"
-            "NormalColor=80,160,255,230\n"
-            "HoverColor=220,40,40,230\n"
-            "PressColor=220,40,40,230\n";
-        buttonB = buttonA;
-        buttonB.replace("Top=32", "Top=50");
-        break;
-    case UiWindowDefaultProfile::Yycs:
-    default:
-    {
-        bool panelWidthOk = false;
-        const int panelWidth = iniInitValue(
-            chooseWindowContent, "Width").toInt(&panelWidthOk);
-        bool panelHeightOk = false;
-        const int panelHeight = iniInitValue(
-            chooseWindowContent, "Height").toInt(&panelHeightOk);
-        const bool compactDialogPanel =
-            panelWidthOk && panelHeightOk &&
-            panelWidth >= 160 && panelHeight >= 72 &&
-            (panelWidth < 400 || panelHeight < 110);
-        if (compactDialogPanel)
-        {
-            const int horizontalInset = std::clamp(
-                panelWidth / 14, 16, 45);
-            const int contentWidth = std::max(
-                1, panelWidth - horizontalInset * 2);
-            const int labelTop = std::max(6, panelHeight / 10);
-            const int labelHeight = std::clamp(
-                panelHeight / 4, 18, 28);
-            const int optionHeight = std::clamp(
-                (panelHeight - labelTop - labelHeight - 7) / 2,
-                20,
-                24);
-            const int optionATop = labelTop + labelHeight + 1;
-            const int optionBTop = optionATop + optionHeight;
-            label = QString(
-                "[Init]\n"
-                "Left=%1\n"
-                "Top=%2\n"
-                "Width=%3\n"
-                "Height=%4\n"
-                "Font=17\n"
-                "Color=20,20,20\n")
-                .arg(horizontalInset)
-                .arg(labelTop)
-                .arg(contentWidth)
-                .arg(labelHeight);
-            auto makeCompactButton = [&](int top)
-            {
-                return QString(
-                    "[Init]\n"
-                    "Left=%1\n"
-                    "Top=%2\n"
-                    "Width=%3\n"
-                    "Height=%4\n"
-                    "Font=17\n"
-                    "Color=0,0,180\n"
-                    "NormalColor=0,0,180\n"
-                    "HoverColor=180,0,0\n"
-                    "PressColor=180,0,0\n")
-                    .arg(horizontalInset)
-                    .arg(top)
-                    .arg(contentWidth)
-                    .arg(optionHeight);
-            };
-            buttonA = makeCompactButton(optionATop);
-            buttonB = makeCompactButton(optionBTop);
-        }
-        else
-        {
-            label =
-                "[Init]\n"
-                "Left=65\n"
-                "Top=30\n"
-                "Width=310\n"
-                "Height=22\n"
-                "Font=18\n"
-                "Color=20,20,20\n";
-            buttonA =
-                "[Init]\n"
-                "Left=65\n"
-                "Top=52\n"
-                "Width=310\n"
-                "Height=22\n"
-                "Font=18\n"
-                "Color=0,0,180\n"
-                "NormalColor=0,0,180\n"
-                "HoverColor=180,0,0\n"
-                "PressColor=180,0,0\n";
-            buttonB = buttonA;
-            buttonB.replace("Top=52", "Top=74");
-        }
-        break;
-    }
+        report.warningCount++;
+        report.logLines.append(QString::fromUtf8(
+            "警告: 缺少选择菜单布局配置，未生成菜单定义；请在资源中补齐: %1")
+            .arg(missingLayout.join(", ")));
+        return;
     }
 
     const QString menu =
@@ -7766,97 +6595,30 @@ void JxAssetMigrator::ensureChooseMenuFiles(
         "[component2]\n"
         "type=ChooseTextButton\n"
         "name=selectA\n"
-        "file=ini\\ui\\choose\\btnA.ini\n\n"
+        "file=ini\\ui\\choose\\btna.ini\n\n"
         "[component3]\n"
         "type=ChooseTextButton\n"
         "name=selectB\n"
-        "file=ini\\ui\\choose\\btnB.ini\n";
+        "file=ini\\ui\\choose\\btnb.ini\n";
 
-    bool wroteAny = false;
-    auto writeIfMissing = [&](const QString& relativePath, const QByteArray& content)
+    const bool written = writeTextFileUtf8(
+        appendPath(outputDir, relativePath), menu.toUtf8().toStdString(), false, report);
+    appendFileOutcome(
+        report,
+        QStringLiteral("<generated:choose-menu>"),
+        relativePath,
+        AssetResourceType::Other,
+        written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+        written ? QStringLiteral("generated-choose-menu")
+                : QStringLiteral("generated-choose-menu-write-failed"),
+        written ? QString::fromUtf8("根据现有选择布局组装菜单定义")
+                : QString::fromUtf8("无法写入选择菜单定义"),
+        false);
+    if (!written)
     {
-        const QString path = appendPath(outputDir, relativePath);
-        if (QFileInfo::exists(path))
-            return;
-        const QString inheritedPath = uiBaseRoot.isEmpty()
-            ? QString()
-            : appendPath(uiBaseRoot, relativePath);
-        const bool inheritsBaseFile =
-            !inheritedPath.isEmpty() && QFileInfo(inheritedPath).isFile();
-        const bool written = inheritsBaseFile
-            ? copyFileReplacing(inheritedPath, path, report)
-            : writeTextFileUtf8(path, content.toStdString(), false, report);
-        if (written)
-        {
-            wroteAny = true;
-            appendFileOutcome(
-                report,
-                inheritsBaseFile
-                    ? QStringLiteral("<inherited:ui-base>")
-                    : QStringLiteral("<generated:choose-menu>"),
-                relativePath,
-                AssetResourceType::Other,
-                AssetMigrationFileAction::Convert,
-                inheritsBaseFile
-                    ? QStringLiteral("inherited-ui-base-file")
-                    : QStringLiteral("generated-choose-menu"),
-                inheritsBaseFile
-                    ? QString::fromUtf8(
-                          "源资源未提供选择菜单，继承 UI 基底的现有配置")
-                    : QString::fromUtf8(
-                          "根据对话窗口基准生成缺失的选择菜单配置"),
-                false);
-        }
-        else
-        {
-            report.errorCount++;
-            domainReportFor(
-                report,
-                AssetResourceType::Other).
-                    failedFiles++;
-            appendFileOutcome(
-                report,
-                inheritsBaseFile
-                    ? QStringLiteral("<inherited:ui-base>")
-                    : QStringLiteral("<generated:choose-menu>"),
-                relativePath,
-                AssetResourceType::Other,
-                AssetMigrationFileAction::Fail,
-                inheritsBaseFile
-                    ? QStringLiteral("inherited-ui-base-file-copy-failed")
-                    : QStringLiteral("generated-choose-menu-write-failed"),
-                inheritsBaseFile
-                    ? QString::fromUtf8("无法复制 UI 基底的选择菜单配置")
-                    : QString::fromUtf8("无法写入缺失的选择菜单配置"),
-                false);
-            report.logLines.append(
-                (inheritsBaseFile
-                     ? QString::fromUtf8("错误: 无法继承 UI 基底文件 %1")
-                     : QString::fromUtf8("错误: 无法生成选择菜单文件 %1"))
-                    .arg(relativePath));
-        }
-    };
-
-    writeIfMissing("ini/ui/choose/choose.menu.ini", menu.toUtf8());
-    writeIfMissing("ini/ui/choose/window.ini", chooseWindowContent.toUtf8());
-    writeIfMissing("ini/ui/choose/label.ini", label.toUtf8());
-    writeIfMissing("ini/ui/choose/btnA.ini", buttonA.toUtf8());
-    writeIfMissing("ini/ui/choose/btnB.ini", buttonB.toUtf8());
-    if (wroteAny)
-    {
-        QString message = uiBaseRoot.isEmpty()
-            ? QString::fromUtf8(
-                  "生成同源选择菜单配置: UI profile=%1").arg(options.uiProfile)
-            : QString::fromUtf8(
-                  "补齐选择菜单配置并优先继承 UI 基底: %1")
-                  .arg(uiBaseRoot);
-        if (nativeImageWidth > 0 && nativeImageHeight > 0)
-        {
-            message += QString::fromUtf8(", 图片尺寸=%1x%2")
-                .arg(nativeImageWidth)
-                .arg(nativeImageHeight);
-        }
-        report.logLines.append(message);
+        report.errorCount++;
+        domainReportFor(report, AssetResourceType::Other).failedFiles++;
+        report.logLines.append(QString::fromUtf8("错误: 无法写入选择菜单定义 %1").arg(relativePath));
     }
 }
 
@@ -8011,7 +6773,7 @@ bool JxAssetMigrator::writeModProfileFile(const QString& outputDir, const AssetM
             AssetMigrationFileAction::Convert,
             QStringLiteral("generated-game-profile"),
             QString::fromUtf8(
-                "源目录未提供资源包清单，按迁移选项生成默认清单"),
+                "源目录未提供资源包清单，按转换选项生成默认清单"),
             false);
     }
     else if (!written &&
@@ -8034,7 +6796,6 @@ bool JxAssetMigrator::writeModProfileFile(const QString& outputDir, const AssetM
 
 void JxAssetMigrator::scanUnsupportedScriptApis(const std::string& convertedContent, const QString& sourcePath, AssetMigrationReport& report) const
 {
-    const QSet<QString>& knownApis = runtimeScriptApis();
     QString text = QString::fromUtf8(convertedContent.data(), static_cast<int>(convertedContent.size()));
     QStringList calls = scanCallsOutsideStrings(text);
 
@@ -8043,7 +6804,8 @@ void JxAssetMigrator::scanUnsupportedScriptApis(const std::string& convertedCont
         existing.insert(item);
     for (const QString& call : calls)
     {
-        if (knownApis.contains(call))
+        if (ScriptConverter::isSupportedRuntimeApi(call.toStdString()) ||
+            call == "if" || call == "goto" || call == "return")
             continue;
         QString item = QString("%1: %2").arg(call, sourcePath);
         if (!existing.contains(item))
@@ -8070,7 +6832,7 @@ bool JxAssetMigrator::writeReportFile(const QString& outputDir, AssetMigrationRe
 
     QTextStream stream(&file);
     stream.setEncoding(QStringConverter::Utf8);
-    stream << "JX legacy assets migration report\n";
+    stream << "JX legacy assets conversion report\n";
     stream << "Selected resource types: "
         << report.selectedResourceTypes.join(QStringLiteral(", ")) << "\n";
     stream << "Complete project: " << (report.completeProject ? "yes" : "no") << "\n";

@@ -48,6 +48,12 @@ enum class ScriptAddLifeMode
 	DirectClamp
 };
 
+enum class LevelUpEffectMode
+{
+	Append,
+	Replace
+};
+
 // 资源清单字段，对应 game_profile.ini 的内容。
 // 字段大小写不敏感（由 INIReader 处理）；空字段安全跳过。
 struct ResourceManifest
@@ -58,6 +64,7 @@ struct ResourceManifest
 	// [Game]
 	std::string id;            // 资源包 ID，如 JXQY2/YYCS/XJXQY/自定义
 	std::string name;          // 显示名称
+	std::string installDirectory; // 首次安装目录名，与完整包文件名独立
 	std::string author;        // 资源包署名；非空时由资源选择界面显示
 	ModRelease::ModReleaseMetadata releaseMetadata;
 	int type = 0;              // 对应 GAME_JXQY2/GAME_YYCS/GAME_XJXQY/GAME_CUSTOM
@@ -93,6 +100,7 @@ struct ResourceManifest
 	bool magicEffectCalculationModeDefined = false;
 
 	// [Script]
+	std::string scriptPlayerName; // Optional fixed story name for #name.
 	ScriptNpcActionProfile npcActionProfile =
 		ScriptNpcActionProfile::Legacy;
 	bool npcActionProfileDefined = false;
@@ -110,9 +118,14 @@ struct ResourceManifest
 	// Message supports {name} and {level}. Effect names are relative to
 	// ini/magic; the random list is used when no sex-specific entry applies.
 	std::string levelUpMessage = "{name}的等级得到提升！";
+	bool levelUpMessageDefined = false;
+	LevelUpEffectMode levelUpEffectMode = LevelUpEffectMode::Append;
 	std::vector<std::string> levelUpRandomEffects;
 	std::string levelUpMaleEffect;
 	std::string levelUpFemaleEffect;
+	bool levelUpEffectsResolved = false;
+	std::vector<std::string> levelUpMaleEffectCandidates;
+	std::vector<std::string> levelUpFemaleEffectCandidates;
 
 	// [Resource]
 	std::string dependencyId;   // 有序依赖资源包 Game.Id；多个 Id 以逗号分隔
@@ -131,6 +144,7 @@ struct ResourceManifest
 
 	// [Save]
 	std::string saveNamespace;  // 移动端/Apple 平台用于隔离存档的命名空间
+	std::string minimumCompatibleSaveResourceVersion = "1.0.0";
 
 	// [Startup]
 	std::vector<std::string> startupVideos;  // 文件名相对于 video 目录
@@ -179,4 +193,5 @@ struct ResourceManifest
 	ScriptNpcRuntimeProfile resolvedNpcRuntimeProfile() const;
 	ScriptSpecialActionMode resolvedSpecialActionMode() const;
 	ScriptAddLifeMode resolvedAddLifeMode() const;
+	std::vector<std::string> getLevelUpEffectCandidates(int sex) const;
 };

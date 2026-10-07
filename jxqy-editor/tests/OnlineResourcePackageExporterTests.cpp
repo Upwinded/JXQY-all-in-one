@@ -87,6 +87,7 @@ void testDeterministicFullPackage()
     expect(writeFile(
         QDir(root).filePath("game_profile.ini"),
         "[Game]\nId=TEST\nName=测试资源\nAuthor=测试作者\n"
+        "InstallDirectory=stable_mod\n"
         "Version=1.0\n\n[Release]\n"
         "MinimumEngineVersion=2.0.0\n"
         "InstalledArtifactCrc32=deadbeef\n"
@@ -119,6 +120,7 @@ void testDeterministicFullPackage()
         "repeated exports are byte-for-byte deterministic");
     expect(readAll(QDir(root).filePath("game_profile.ini")) ==
             QByteArray("[Game]\nId=TEST\nName=测试资源\nAuthor=测试作者\n"
+                "InstallDirectory=stable_mod\n"
                 "Version=1.0\n\n[Release]\n"
                 "MinimumEngineVersion=2.0.0\n"
                 "InstalledArtifactCrc32=deadbeef\n"
@@ -142,6 +144,7 @@ void testDeterministicFullPackage()
                 QString::fromUtf8("测试作者").toStdString() &&
             catalog.catalog.resourcePackages.at("test").artifactPath ==
                 "first.zip" &&
+            catalog.catalog.resourcePackages.at("test").installDirectory == "stable_mod" &&
             catalog.catalog.resourcePackages.at("test").resourceOnly &&
             catalog.catalog.resourcePackages.at("test").crc32Hex ==
                 firstResult.crc32Hex.toStdString(),

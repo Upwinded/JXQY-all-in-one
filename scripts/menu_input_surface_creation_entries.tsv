@@ -65,6 +65,7 @@ surface-resource	tooltip	src/Game/Menu/ToolTip.cpp	ToolTip::init	resource-load	l
 surface-resource	hud.top	src/Game/Menu/TopMenu.cpp	TopMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\top\\\\top.menu.ini"
 surface-resource	global.yes-no	src/Game/Menu/YesNo.cpp	YesNo::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\yesno\\\\yesno.menu.ini"
 surface-resource	startup.title	src/Game/Scene/Title.cpp	Title::init	resource-load	loadMenuDefinition	this:menuName
+surface-instance	system-notice	src/Game/Scene/Title.cpp	Title::init	make-shared	SystemNotice	systemNotice
 surface-instance	video.playback	src/Game/Scene/Title.cpp	Title::onRun	make-shared	VideoPage	vp
 surface-instance	save-load.title	src/Game/Scene/Title.cpp	Title::openSavedGame	make-shared	SaveLoad	saveLoad
 surface-instance	title.team	src/Game/Scene/Title.cpp	Title::openTeamPage	make-shared	TitleTeam	titleTeam

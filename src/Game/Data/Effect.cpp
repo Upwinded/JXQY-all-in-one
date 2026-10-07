@@ -16,7 +16,31 @@
 
 namespace
 {
-constexpr UTime MgAttributeEffectFrameMilliseconds = 10;
+constexpr UTime SelfMagicFrameMilliseconds = 10;
+
+bool isProjectilePathBlockedByWall(const Effect& effect)
+{
+	return !effect.canPassThroughWall()
+		&& (!gm->map->canFly(effect.position)
+			|| (effect.doing != ekThrowing
+				&& std::any_of(effect.passPath.begin(), effect.passPath.end(), [](Point tile)
+				{
+					return !gm->map->canFly(tile);
+				})));
+}
+
+bool isCharacterTerrainBlocked(Point tile)
+{
+	if (!gm->map->isInMap(tile) || !tileObstacleAllowsWalk(gm->map->data->tile[tile.y][tile.x].obstacle))
+	{
+		return true;
+	}
+	const auto& objects = gm->map->dataMap.tile[tile.y][tile.x].objList;
+	return std::any_of(objects.begin(), objects.end(), [](const auto& object)
+	{
+		return isObjectObstacleKind(object->kind);
+	});
+}
 
 int clampDrawCoordinate(int base, double offset, int imageOffset, int heightOffset)
 {
@@ -443,11 +467,19 @@ UTime Effect::getExplodinUTime()
 		{
 			return IMP::getIMPImageActionTime(magic.explodeImage);
 		}
+		else if (getMoveKind() == mmkSelf)
+		{
+			// Published Moonlight, New Sword and MG use 10ms units for
+			// MoveKind 13, independently of the visual's frame interval.
+			return magic.level[level].lifeFrame > 0
+				? static_cast<UTime>(magic.level[level].lifeFrame) * SelfMagicFrameMilliseconds
+				: IMP::getIMPImageActionTime(magic.flyImage);
+		}
 		else if (magic.level[level].specialKind == mskChangeAttributes
 			&& gm != nullptr
 			&& gm->global.feature.rageSystem)
 		{
-			return static_cast<UTime>(magic.level[level].lifeFrame) * MgAttributeEffectFrameMilliseconds;
+			return static_cast<UTime>(magic.level[level].lifeFrame) * SelfMagicFrameMilliseconds;
 		}
 		else if (isLifeFrameSelfAnchoredSpecialKind(magic.level[level].specialKind))
 		{
@@ -477,7 +509,9 @@ UTime Effect::getSuperImageTime()
 	return IMP::getIMPImageActionTime(magic.superImage);
 }
 
-void Effect::beginExplode(Point pos)
+void Effect::beginExplode(
+	Point pos,
+	std::optional<PointEx> collisionOffset)
 {
 	doing = ekExploding;
 	if (magic.level[level].moveKind == mmkSummon)
@@ -502,6 +536,11 @@ void Effect::beginExplode(Point pos)
 		{
 			position = pos;
 		}
+	}
+	else if (collisionOffset.has_value())
+	{
+		position = pos;
+		offset = collisionOffset.value();
 	}
 	else if (flyingDirection.is_zero() || pos == src)
 	{
@@ -684,10 +723,8 @@ void Effect::attachCarryUser(std::shared_ptr<NPC> npc)
 		npc->setHiddenByCarryMagic(std::dynamic_pointer_cast<Effect>(getMySharedPtr()));
 	}
 	npc->stopMovement();
-	npc->setPosition(position, false);
-	npc->setOffset(offset);
-	npc->direction = direction;
-	if (magic.carryUser == 4)
+	updateCarryUserPosition();
+	if (carryUserActive && magic.carryUser == 4)
 	{
 		handleCarryUser4NeighborCollisions();
 	}
@@ -872,7 +909,7 @@ bool Effect::hasAttachedNPC(std::shared_ptr<NPC> npc) const
 
 bool Effect::skipsCharacterCollision() const
 {
-	if (getMoveKind() == mmkTransport || getMoveKind() == mmkControl)
+	if (getMoveKind() == mmkTransport || getMoveKind() == mmkControl || getMoveKind() == mmkWarningRegion)
 	{
 		return true;
 	}
@@ -973,6 +1010,10 @@ void Effect::updateAttachedNPCs()
 		clearAttachedNPCs();
 		return;
 	}
+	if (isProjectilePathBlockedByWall(*this))
+	{
+		return;
+	}
 
 	bool destroyEffect = false;
 	for (auto& item : attachedNPCs)
@@ -1024,7 +1065,9 @@ void Effect::updateAttachedNPCs()
 	}
 }
 
-void Effect::addDestroyVisualEffect(Point hitPosition)
+void Effect::addDestroyVisualEffect(
+	Point hitPosition,
+	std::optional<PointEx> hitOffset)
 {
 	if (gm == nullptr || gm->effectManager == nullptr)
 	{
@@ -1045,14 +1088,15 @@ void Effect::addDestroyVisualEffect(Point hitPosition)
 	destroyEffect->evade = evade;
 	destroyEffect->position = hitPosition;
 	destroyEffect->src = hitPosition;
-	destroyEffect->offset = getCollideOffset(hitPosition);
+	destroyEffect->offset = hitOffset.value_or(getCollideOffset(hitPosition));
 	destroyEffect->srcOffset = destroyEffect->offset;
-	destroyEffect->beginExplode(hitPosition);
+	destroyEffect->beginExplode(hitPosition, destroyEffect->offset);
 	gm->effectManager->addEffect(destroyEffect);
 }
 
 void Effect::reflectBallFromPoint(Point hitPosition, PointEx normalPoint)
 {
+	const PointEx hitOffset = offset;
 	PointEx effectPoint = getWorldPosition(position, offset);
 	float normalX = effectPoint.x - normalPoint.x;
 	float normalY = effectPoint.y - normalPoint.y;
@@ -1088,7 +1132,7 @@ void Effect::reflectBallFromPoint(Point hitPosition, PointEx normalPoint)
 	srcOffset = offset;
 	calDest();
 	passPath.clear();
-	addDestroyVisualEffect(hitPosition);
+	addDestroyVisualEffect(hitPosition, hitOffset);
 }
 
 void Effect::reflectBallFromWall(Point hitPosition)
@@ -1293,9 +1337,13 @@ void Effect::handleCarryUser4NeighborCollisions()
 	}
 }
 
-bool Effect::handleDiscardOppositeMagic(std::shared_ptr<Effect> other)
+bool Effect::handleDiscardOppositeMagic(
+	std::shared_ptr<Effect> other,
+	bool collisionConfirmed)
 {
-	if (magic.discardOppositeMagic <= 0 || other == nullptr || other.get() == this || position != other->position)
+	if (magic.discardOppositeMagic <= 0 || other == nullptr ||
+		other.get() == this ||
+		(!collisionConfirmed && position != other->position))
 	{
 		return false;
 	}
@@ -1310,9 +1358,13 @@ bool Effect::handleDiscardOppositeMagic(std::shared_ptr<Effect> other)
 	return true;
 }
 
-bool Effect::handleExchangeUserWithOppositeMagic(std::shared_ptr<Effect> other)
+bool Effect::handleExchangeUserWithOppositeMagic(
+	std::shared_ptr<Effect> other,
+	bool collisionConfirmed)
 {
-	if (magic.exchangeUser <= 0 || other == nullptr || other.get() == this || position != other->position)
+	if (magic.exchangeUser <= 0 || other == nullptr ||
+		other.get() == this ||
+		(!collisionConfirmed && position != other->position))
 	{
 		return false;
 	}
@@ -1435,6 +1487,26 @@ void Effect::updateCarryUserPosition()
 	if (doing == ekExploding && magic.hideUserWhenCarry <= 0)
 	{
 		clearCarryUser();
+		return;
+	}
+
+	// Collision detection runs after effects update. Keep the caster before a wall
+	// until that pass stops the projectile, including frames that cross the wall.
+	if (isProjectilePathBlockedByWall(*this))
+	{
+		return;
+	}
+
+	// Ground carrying must also stop at terrain that only projectiles can cross.
+	if (!canPassThroughWall() && doing != ekThrowing
+		&& (isCharacterTerrainBlocked(position)
+			|| std::any_of(passPath.begin(), passPath.end(), isCharacterTerrainBlocked)))
+	{
+		clearCarryUser();
+		if (magic.carryUser != 1)
+		{
+			beginExplode(position, offset);
+		}
 		return;
 	}
 
@@ -1657,7 +1729,7 @@ bool Effect::shouldExplodeWhenLifeFrameEnds() const
 		return true;
 	}
 	const int moveKind = magic.level[level].moveKind;
-	return moveKind == mmkPoint || moveKind == mmkRegion;
+	return moveKind == mmkPoint || moveKind == mmkRegion || moveKind == mmkWarningRegion;
 }
 
 bool Effect::hasLeapHitTarget(std::shared_ptr<NPC> npc) const
@@ -1683,7 +1755,7 @@ bool Effect::canPassThrough() const
 
 bool Effect::canPassThroughWall() const
 {
-	return magic.passThroughWall > 0;
+	return getMoveKind() == mmkWarningRegion || magic.passThroughWall > 0;
 }
 
 bool Effect::canParasitic() const
@@ -1707,7 +1779,9 @@ bool Effect::hasPassThroughHitTarget(std::shared_ptr<NPC> npc) const
 	return false;
 }
 
-void Effect::addPassThroughDestroyEffect(Point hitPosition)
+void Effect::addPassThroughDestroyEffect(
+	Point hitPosition,
+	PointEx hitOffset)
 {
 	if (magic.passThroughWithDestroyEffect <= 0 || gm == nullptr || gm->effectManager == nullptr)
 	{
@@ -1728,20 +1802,23 @@ void Effect::addPassThroughDestroyEffect(Point hitPosition)
 	destroyEffect->evade = evade;
 	destroyEffect->position = hitPosition;
 	destroyEffect->src = hitPosition;
-	destroyEffect->offset = getCollideOffset(hitPosition);
+	destroyEffect->offset = hitOffset;
 	destroyEffect->srcOffset = destroyEffect->offset;
-	destroyEffect->beginExplode(hitPosition);
+	destroyEffect->beginExplode(hitPosition, hitOffset);
 	gm->effectManager->addEffect(destroyEffect);
 }
 
-bool Effect::handlePassThroughAfterHit(std::shared_ptr<NPC> hitTarget, Point hitPosition)
+bool Effect::handlePassThroughAfterHit(
+	std::shared_ptr<NPC> hitTarget,
+	Point hitPosition,
+	PointEx hitOffset)
 {
 	if (hitTarget == nullptr || !canPassThrough())
 	{
 		return false;
 	}
 	passThroughHitTargets.push_back(hitTarget);
-	addPassThroughDestroyEffect(hitPosition);
+	addPassThroughDestroyEffect(hitPosition, hitOffset);
 	return true;
 }
 
@@ -2021,11 +2098,12 @@ void Effect::triggerExplodeMagic(Point explodePosition)
 
 	explodeMagicTriggered = true;
 	Point magicTo = explodePosition;
-	if (!flyingDirection.is_zero())
+	// MG warning regions release their impact at the marker itself.
+	if (getMoveKind() != mmkWarningRegion && !flyingDirection.is_zero())
 	{
 		magicTo = Map::getSubPoint(explodePosition, direction / 2);
 	}
-	else
+	else if (getMoveKind() != mmkWarningRegion)
 	{
 		Point delta = explodePosition - userPtr->position;
 		magicTo = explodePosition + delta;
@@ -2189,7 +2267,7 @@ void Effect::updateRangeEffect(UTime frameTime)
 
 	auto applyRangeAttackEffect = [&](std::shared_ptr<NPC> target)
 	{
-		if (!canReceiveRangeAttackEffect(target))
+		if (!canReceiveRangeAttackEffect(target) || target->isImmuneToAbnormalState())
 		{
 			return;
 		}
@@ -2290,7 +2368,7 @@ void Effect::calDest()
 	}
 }
 
-auto Effect::getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset)
+std::deque<Point> Effect::getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {
 	std::deque<Point> result, tempPath[3];
 	if (flyingDirection.is_zero())
@@ -2972,6 +3050,7 @@ void Effect::initFromIni(
 	level = ini->GetInteger(section, "Level", 0);
 
 	magic.initFromIni(fileName);
+	magic.experienceOwner = gm->magicManager.loadExperienceOwner(*ini, section);
 	magicDispatchContext = magic.loadSucceeded
 		? Magic::createRootDispatchContext(std::make_shared<Magic>(magic))
 		: nullptr;
@@ -3199,6 +3278,7 @@ void Effect::saveToIni(
 	ini->SetInteger(section, "Damage3", damage3);
 	ini->SetInteger(section, "DamageMana", damageMana);
 	ini->Set(section, "ExperienceOwnerMagicFile", magic.experienceOwnerMagicFile);
+	gm->magicManager.saveExperienceOwner(*ini, section, Magic::getExperienceOwner(magicDispatchContext));
 	ini->SetInteger(section, "EffectSpeed", speed);
 	ini->SetInteger(section, "MagicLevelSpeed", magic.level[clampMagicLevel(level)].speed);
 	ini->SetInteger(section, "AdditionalEffect", additionalEffect);
@@ -3505,19 +3585,12 @@ void Effect::playSound(int act)
 
 int Effect::getDirection(Point fDir)
 {
-	fDir.x = - fDir.x;
-	float angle = atan2((float)fDir.x, (float)fDir.y);
-
-	if (angle < 0)
+	int directionCount = 16;
+	if (magic.flyImage != nullptr && magic.flyImage->directions > 0)
 	{
-		angle += 2 * M_PI;
+		directionCount = magic.flyImage->directions;
 	}
-
-	if (angle > 2 * M_PI)
-	{
-		angle -= 2 * M_PI;
-	}
-	return (int)(angle / (M_PI / 8));	
+	return Magic::getDirection(getEffectProjectedMovementAngle(fDir), directionCount);
 }
 
 int Effect::getDirection()
@@ -3661,6 +3734,10 @@ void Effect::freeResource()
 
 void Effect::onUpdate()
 {
+	collisionSweepStartPosition = position;
+	collisionSweepStartOffset = offset;
+	collisionSweepInitialized = true;
+
 	auto ft = getFrameTime();
 	if (magic.level[level].moveKind == mmkSummon && !vanishing && doing != ekHiding)
 	{

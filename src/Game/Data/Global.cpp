@@ -1,10 +1,13 @@
 #include "Global.h"
+#include "SaveVersionCompatibility.h"
+#include "../../JxqyEngineVersion.h"
 #include "../../libconvert/libconvert.h"
 #include "ColorStyle.h"
 #include "../../File/log.h"
 #include "../../Resource/ResourceManager.h"
 #include "../../Resource/ResourceManifest.h"
 #include "../GameManager/SaveFileManager.h"
+#include "../Config/Config.h"
 #include <algorithm>
 #include <set>
 
@@ -161,6 +164,12 @@ MagicListLayout makeDefaultMagicLayout(const GameFeatureFlags& feature)
 		layout.bottomEnd = TRILOGY_EXTENDED_MAGIC_BOTTOM_END;
 		layout.practiceIndex = TRILOGY_EXTENDED_MAGIC_PRACTICE_INDEX;
 	}
+	if (feature.separateTalentSlots)
+	{
+		// Published MG stores talents in one-based slots 416 through 445.
+		layout.talentBegin = 415;
+		layout.talentEnd = 444;
+	}
 	return layout;
 }
 
@@ -266,7 +275,7 @@ int MagicListLayout::bottomCount() const
 
 int MagicListLayout::listLength() const
 {
-	return std::max({ storeEnd, bottomEnd, practiceIndex }) + 1;
+	return std::max({ storeEnd, bottomEnd, practiceIndex, talentEnd }) + 1;
 }
 
 bool MagicListLayout::isStoreIndex(int index) const
@@ -315,6 +324,7 @@ int Global::getPartnerFollowRunRadius() const
 
 void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 {
+	scriptPlayerName = manifest.scriptPlayerName;
 	feature = GameFeatureFlags();
 	minimumMagicDamage = manifest.resolvedMinimumMagicDamage();
 	magicEffectCalculationMode =
@@ -340,10 +350,13 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	applyBooleanFeatureOverride(manifest, "PoisonVisualEffect", feature.poisonVisualEffect);
 	applyBooleanFeatureOverride(manifest, "PetrifyVisualEffect", feature.petrifyVisualEffect);
 	applyBooleanFeatureOverride(manifest, "MagicTriggerAtAnimationEnd", feature.magicTriggerAtAnimationEnd);
+	applyBooleanFeatureOverride(manifest, "NativeNpcAttackAtAnimationEnd", feature.nativeNpcAttackAtAnimationEnd);
 	applyBooleanFeatureOverride(manifest, "LumAsBrightness", feature.lumAsBrightness);
 	applyBooleanFeatureOverride(manifest, "AmbientLumOverlay", feature.ambientLumOverlay);
 	applyBooleanFeatureOverride(manifest, "TopButtonsLayout", feature.topButtonsLayout);
 	applyBooleanFeatureOverride(manifest, "ExtendedInventoryLayout", feature.extendedInventoryLayout);
+	applyBooleanFeatureOverride(manifest, "SeparateTalentSlots", feature.separateTalentSlots);
+	applyBooleanFeatureOverride(manifest, "MagicLevelLimitFromDefinition", feature.magicLevelLimitFromDefinition);
 	applyBooleanFeatureOverride(manifest, "StateEquipIntegratedLayout", feature.stateEquipIntegratedLayout);
 	applyBooleanFeatureOverride(manifest, "HideRightMenusWithIntegratedEquip", feature.hideRightMenusWithIntegratedEquip);
 	applyBooleanFeatureOverride(manifest, "PracticeMenuDisabled", feature.practiceMenuDisabled);
@@ -370,10 +383,13 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 		"poisonvisualeffect",
 		"petrifyvisualeffect",
 		"magictriggeratanimationend",
+		"nativenpcattackatanimationend",
 		"lumasbrightness",
 		"ambientlumoverlay",
 		"topbuttonslayout",
 		"extendedinventorylayout",
+		"separatetalentslots",
+		"magiclevellimitfromdefinition",
 		"stateequipintegratedlayout",
 		"hiderightmenuswithintegratedequip",
 		"practicemenudisabled",
@@ -391,6 +407,20 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 		{
 			GameLog::write("Global: unknown manifest feature %s ignored\n", manifestFeature.first.c_str());
 		}
+	}
+	// Presentation changes never change the profile's inventory or talent indices.
+	feature.qingyuUi = Config::useQingyuUi
+		&& File::fileExist("ini\\ui\\qingyu\\theme.ini")
+		&& File::fileExist("asf\\ui\\qingyu\\panel.png");
+	if (feature.qingyuUi)
+	{
+		feature.topButtonsLayout = true;
+		feature.stateEquipIntegratedLayout = true;
+		feature.hideRightMenusWithIntegratedEquip = false;
+		feature.practiceMenuDisabled = false;
+		feature.magicButtonOpensIntegratedEquip = false;
+		feature.equipPlayerNameImages = false;
+		feature.characterPanelImages = false;
 	}
 }
 
@@ -429,6 +459,15 @@ void Global::loadUiSettings()
 	if (!isValidMagicLayout(magicLayout))
 	{
 		magicLayout = defaultMagicLayout;
+	}
+	if (magicLayout.talentBegin >= 0 &&
+		(rangesOverlap(magicLayout.talentBegin, magicLayout.talentEnd, magicLayout.storeBegin, magicLayout.storeEnd) ||
+		 rangesOverlap(magicLayout.talentBegin, magicLayout.talentEnd, magicLayout.bottomBegin, magicLayout.bottomEnd) ||
+		 rangeContains(magicLayout.talentBegin, magicLayout.talentEnd, magicLayout.practiceIndex) ||
+		 magicLayout.talentEnd + 1 >= magicLayout.hideStartIndex))
+	{
+		GameLog::write("Global: talent slots overlap the configured magic layout; keeping ordinary slots unchanged\n");
+		magicLayout.talentBegin = magicLayout.talentEnd = -1;
 	}
 }
 
@@ -478,7 +517,7 @@ bool Global::load()
 	data.snowShow = ini.GetBoolean("Option", "SnowShow", false);
 	data.rainShow = ini.GetBoolean("Option", "RainShow", false);
 	data.NPCAI = ini.GetBoolean("Option", "NPCAI", true);
-	data.PartnerCombat = ini.GetBoolean("Option", "PartnerCombat", false);
+	data.PartnerCombat = ini.GetBoolean("Option", "PartnerCombat", true);
 	data.canInput = ini.GetBoolean("Option", "CanInput", true);
 	data.saveDisabled = ini.GetBoolean("Option", "SaveDisabled", false);
 	data.dropDisabled = ini.GetBoolean("Option", "DropDisabled", false);
@@ -489,6 +528,23 @@ bool Global::load()
 
 	return true;
 }
+
+std::string Global::resolveScriptCharacterName(const std::string& name) const
+{
+	return name == "#name" && !scriptPlayerName.empty() ? scriptPlayerName : name;
+}
+
+std::string Global::resolveScriptText(const std::string& text) const
+{
+	if (scriptPlayerName.empty())
+	{
+		return text;
+	}
+	std::string result = text;
+	convert::replaceAllString(result, "#name", scriptPlayerName);
+	return result;
+}
+
 bool Global::save()
 {
 	std::string fileName =
@@ -497,6 +553,11 @@ bool Global::save()
 	// rebuilt from game_profile.ini whenever a game or save is loaded.
 	INIReader ini;
 
+	ini.Set("Save", "EngineVersion", JxqyBuildVersion::EngineVersion);
+	ini.Set("Save", "ResourceVersion",
+		SaveVersionCompatibility::resourceVersionOrDefault(
+			ResourceManager::instance().getActiveManifest()
+				.releaseMetadata.displayVersion));
 	ini.Set("State", "Map", data.mapName);
 	ini.Set("State", "Npc", data.npcName);
 	ini.Set("State", "Obj", data.objName);

@@ -590,13 +590,13 @@ Details: %6</translation>
     </message>
     <message>
         <location line="+13"/>
-        <source>map：只迁移、不转换</source>
-        <translation>map: Preserve Only; Do Not Convert</translation>
+        <source>map：原样复制</source>
+        <translation>map: Copy Unchanged</translation>
     </message>
     <message>
         <location line="+7"/>
-        <source>unknown：按原字节迁移</source>
-        <translation>unknown: Preserve Byte-for-Byte</translation>
+        <source>unknown：原样复制</source>
+        <translation>unknown: Copy Unchanged</translation>
     </message>
     <message>
         <location line="+11"/>
@@ -665,12 +665,12 @@ Details: %6</translation>
     </message>
     <message>
         <location line="+5"/>
-        <source>所有旧图片类别均按原字节迁移；map/unknown 只迁移</source>
+        <source>所有旧图片类别均按原字节复制；map/unknown 始终原样保留</source>
         <translation>All legacy image categories are preserved byte-for-byte; map/unknown are preserve-only</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>转换为 IMP/IMG：%1；map/unknown 只迁移</source>
+        <source>转换为 IMP/IMG：%1；map/unknown 原样保留</source>
         <translation>Convert to IMP/IMG: %1; map/unknown are preserve-only</translation>
     </message>
     <message>
@@ -19305,4 +19305,9 @@ The reference can still be saved</translation></message>
     <message><source>直接增减并限制范围</source><translation>Apply directly and clamp the result</translation></message>
 </context>
 
+<context>
+    <name>ResourceProfileEditorWindow</name>
+    <message><source>固定剧情角色名，留空保持原有行为</source><translation>Fixed story character name; leave empty to keep existing behavior</translation></message>
+    <message><source>用于替换 #name；不随当前操控角色切换，也不作为存档变量。</source><translation>Replaces #name; does not change with the controlled character and is not a save variable.</translation></message>
+</context>
 </TS>

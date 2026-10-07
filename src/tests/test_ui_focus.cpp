@@ -2997,7 +2997,8 @@ bool testControllerToolTipRouting()
 	};
 	auto controllerToolTipMatches = [&gameManager, testEngine](
 		const std::string& expectedName,
-		const PElement& anchor)
+		const PElement& anchor,
+		const Element* expectedParent = nullptr)
 	{
 		if (anchor == nullptr || gameManager.menu->toolTip == nullptr
 			|| gameManager.menu->toolTip->name == nullptr)
@@ -3021,7 +3022,7 @@ bool testControllerToolTipRouting()
 			windowHeight - gameManager.menu->toolTip->rect.h));
 		return gameManager.menu->toolTip->visible
 			&& gameManager.menu->toolTip->parent
-				== gameManager.menu->upMenu.get()
+				== (expectedParent != nullptr ? expectedParent : gameManager.menu->upMenu.get())
 			&& gameManager.menu->toolTip->name->getStr() == expectedName
 			&& gameManager.menu->toolTip->rect.x == expectedX
 			&& gameManager.menu->toolTip->rect.y == expectedY;
@@ -3031,7 +3032,8 @@ bool testControllerToolTipRouting()
 	GoodsInfo& goodsInfo = gameManager.goodsManager.goodsList[goodsIndex];
 	setControllerTestGoods(goodsInfo, "controller_tooltip_goods.ini");
 	goodsInfo.goods->name = "controller tooltip goods";
-	goodsInfo.goods->intro = "controller tooltip intro";
+	goodsInfo.goods->intro =
+		"controller tooltip intro<color=Red> highlighted";
 	gameManager.menu->goodsMenu->updateGoods();
 
 	auto partner = std::make_shared<NPC>();
@@ -3056,7 +3058,11 @@ bool testControllerToolTipRouting()
 			"partner equipment routes Details through its production pane") && ok;
 
 		ok = check(controllerToolTipMatches(
-			"controller tooltip goods", controllerAnchor),
+			"controller tooltip goods", controllerAnchor, gameManager.menu->partnerEquipMenu.get())
+			&& gameManager.menu->toolTip->intro2 != nullptr
+			&& gameManager.menu->toolTip->intro2->colorTagsEnabled()
+			&& gameManager.menu->toolTip->intro2->getStr()
+				== goodsInfo.goods->intro,
 			"partner controller details attach, populate, and anchor after XJXQY reflow")
 			&& ok;
 		gameManager.menu->goodsMenu->visible = false;
@@ -3113,9 +3119,15 @@ bool testControllerToolTipRouting()
 		setControllerTestMagic(
 			practiceInfo, "controller_tooltip_practice.ini");
 		practiceInfo.magic->name = "controller tooltip practice magic";
+		practiceInfo.magic->intro =
+			"practice intro<color=255,0,255> highlighted";
 		gameManager.menu->practiceMenu->visible = true;
 		gameManager.menu->practiceMenu->updateMagic();
-		ok = check(gameManager.menu->practiceMenu->focusControllerDefault(),
+		ok = check(gameManager.menu->practiceMenu->focusControllerDefault()
+			&& gameManager.menu->practiceMenu->intro != nullptr
+			&& gameManager.menu->practiceMenu->intro->colorTagsEnabled()
+			&& gameManager.menu->practiceMenu->intro->getStr()
+				== practiceInfo.magic->intro,
 			"practice controller tooltip route activates its production slot") && ok;
 		const PElement practiceAnchor = gameManager.menu->practiceMenu->magic;
 		if (practiceAnchor != nullptr)
@@ -3193,7 +3205,7 @@ bool testControllerToolTipRouting()
 		ok = check(shopAnchor != nullptr
 			&& gameManager.menu->buySellMenu->handleUIAction(UIAction::Details)
 			&& controllerToolTipMatches(
-				"controller tooltip shop goods", shopAnchor),
+				"controller tooltip shop goods", shopAnchor, gameManager.menu->buySellMenu.get()),
 			"buy-sell menu routes controller details through the shared tooltip facade")
 			&& ok;
 
@@ -3261,13 +3273,13 @@ bool testControllerToolTipRouting()
 		ok = check(playerPageAnchor != nullptr
 			&& gameManager.menu->buySellMenu->handleUIAction(UIAction::Details)
 			&& controllerToolTipMatches(
-				"controller tooltip player page goods", playerPageAnchor),
+				"controller tooltip player page goods", playerPageAnchor, gameManager.menu->buySellMenu.get()),
 			"buy-sell borrowed view resolves details from the refreshed logical page")
 			&& ok;
 
 		auto magic = std::make_shared<Magic>();
 		magic->name = "controller tooltip magic";
-		magic->intro = "controller magic intro";
+		magic->intro = "controller magic intro<color=Red> highlighted";
 		ok = check(gameManager.menu->showMagicToolTip(
 			gameManager.menu->magicMenu,
 			magic,
@@ -3278,7 +3290,10 @@ bool testControllerToolTipRouting()
 			&& gameManager.menu->toolTip->name->getStr()
 				== "controller tooltip magic"
 			&& gameManager.menu->toolTip->cost != nullptr
-			&& gameManager.menu->toolTip->cost->getStr() == "等级： 7",
+			&& gameManager.menu->toolTip->cost->getStr() == "等级： 7"
+			&& gameManager.menu->toolTip->intro2 != nullptr
+			&& gameManager.menu->toolTip->intro2->colorTagsEnabled()
+			&& gameManager.menu->toolTip->intro2->getStr() == magic->intro,
 			"shared controller tooltip facade presents magic content") && ok;
 		ok = check(!gameManager.menu->showGoodsToolTip(
 			gameManager.menu->magicMenu,

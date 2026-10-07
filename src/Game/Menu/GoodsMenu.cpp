@@ -20,6 +20,11 @@ GoodsMenu::~GoodsMenu()
 
 void GoodsMenu::updateMoney()
 {
+	if (gm->global.feature.qingyuUi)
+	{
+		updateDataBindings();
+		return;
+	}
 	if (money)
 	{
 		money->setStr(convert::formatString("%d", gm->player->money));
@@ -116,6 +121,16 @@ void GoodsMenu::onEvent()
 		}
 		int listIndex = gm->goodsManager.storeBegin() + static_cast<int>(i) + scrollbar->position * scrollbar->lineSize;
 		unsigned int ret = item[i]->getResult();
+#ifndef __MOBILE__
+		if (gm->global.feature.qingyuUi && (ret & erClick)
+			&& gm->goodsManager.goodsListExists(listIndex))
+		{
+			gm->menu->showGoodsToolTip(getMySharedPtr(),
+				gm->goodsManager.goodsList[listIndex].goods, item[i], true);
+			item[i]->resetHint();
+			continue;
+		}
+#endif
 		if (ret & erShowHint)
 		{
 			if (gm->goodsManager.goodsListExists(listIndex))

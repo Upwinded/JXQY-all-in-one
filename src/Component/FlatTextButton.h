@@ -34,6 +34,7 @@ class FlatTextButton : public TextButton
 public:
 	FlatTextButton();
 	virtual ~FlatTextButton();
+	void initFromIni(INIReader& ini) override;
 
 	void setStyle(const FlatTextButtonStyle& value);
 	const FlatTextButtonStyle& getStyle() const;

@@ -1,3 +1,4 @@
+#include "../../GameplayAutomation/GameplayAutomationSession.h"
 #ifndef _USE_MATH_DEFINES
 #define _USE_MATH_DEFINES 
 #endif
@@ -84,7 +85,7 @@ static int getDirectionDistance8(int dir1, int dir2)
 
 static void drawFeatheredThumbnail(Engine* engine, const _shared_image& source,
 	const Rect& sourceRect, int sourceWidth, int sourceHeight,
-	int thumbnailWidth, int thumbnailHeight)
+	int thumbnailWidth, int thumbnailHeight, float sourceScale)
 {
 	if (engine == nullptr || source == nullptr || sourceWidth <= 0 || sourceHeight <= 0
 		|| thumbnailWidth <= 0 || thumbnailHeight <= 0)
@@ -126,8 +127,8 @@ static void drawFeatheredThumbnail(Engine* engine, const _shared_image& source,
 			Vertex vertex;
 			vertex.position = { x, y };
 			vertex.tex_coord = {
-				sourceX / static_cast<float>(sourceWidth),
-				sourceY / static_cast<float>(sourceHeight),
+				sourceX * sourceScale / static_cast<float>(sourceWidth),
+				sourceY * sourceScale / static_cast<float>(sourceHeight),
 			};
 			const bool atOuterEdge = row == 0 || row == 3 || column == 0 || column == 3;
 			vertex.color = { 1.0f, 1.0f, 1.0f, atOuterEdge ? 0.0f : 1.0f };
@@ -456,10 +457,14 @@ bool Map::commitPreparedLoadCandidate(
 	{
 		beforeMutation();
 	}
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	GameplayAutomationSession::worldChanged();
+#endif
 	data = std::move(candidate.parsedData);
 	mapMpc = std::move(preparedMapMpc);
 	dataMap = std::move(candidate.preparedDataMap);
 	initTime();
+	generateThumbnail();
 	return true;
 }
 
@@ -1232,12 +1237,57 @@ std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius, int direc
 	}
 
 	// The target tile can be occupied or enclosed even though a reachable tile
-	// inside the requested radius exists. Search those approach tiles only when
-	// the legacy exact-target path fails, keeping the common path fast.
+	// inside the requested radius exists. Build reachability once so disconnected
+	// candidates do not each repeat the same failed path search.
 	const int minimumX = std::max(0, to.x - radius);
 	const int maximumX = std::min(data->head.width - 1, to.x + radius);
 	const int minimumY = std::max(0, to.y - radius * 2);
 	const int maximumY = std::min(data->head.height - 1, to.y + radius * 2);
+	const int width = data->head.width;
+	const int height = data->head.height;
+	if (width <= 0 || height <= 0 || !isInMap(from))
+	{
+		return result;
+	}
+
+	auto tileIndex = [width](Point position)
+	{
+		return static_cast<size_t>(position.y) * static_cast<size_t>(width)
+			+ static_cast<size_t>(position.x);
+	};
+	std::vector<uint8_t> reachable(
+		static_cast<size_t>(width) * static_cast<size_t>(height), 0);
+	std::deque<Point> reachabilityFrontier;
+	reachable[tileIndex(from)] = 1;
+	reachabilityFrontier.push_back(from);
+	while (!reachabilityFrontier.empty())
+	{
+		const Point current = reachabilityFrontier.front();
+		reachabilityFrontier.pop_front();
+		for (int direction = 0; direction < 8; ++direction)
+		{
+			if (!NPC::canMoveInDirection(direction, directionCount))
+			{
+				continue;
+			}
+			const Point neighbor = getSubPoint(current, direction);
+			if (!isInMap(neighbor)
+				|| reachable[tileIndex(neighbor)] != 0
+				|| !canWalk(neighbor))
+			{
+				continue;
+			}
+			if (direction % 2 == 0
+				&& (!canPass(getSubPoint(current, NormalizeDirection(direction - 1)))
+					|| !canPass(getSubPoint(current, NormalizeDirection(direction + 1)))))
+			{
+				continue;
+			}
+			reachable[tileIndex(neighbor)] = 1;
+			reachabilityFrontier.push_back(neighbor);
+		}
+	}
+
 	std::deque<Point> bestPath;
 	for (int y = minimumY; y <= maximumY; ++y)
 	{
@@ -1245,6 +1295,14 @@ std::deque<Point> Map::getRadiusPath(Point from, Point to, int radius, int direc
 		{
 			const Point candidate = { x, y };
 			if (calDistance(candidate, to) > radius || !canWalk(candidate))
+			{
+				continue;
+			}
+			const bool cannotImproveBestPath = !bestPath.empty()
+				&& calDistance(from, candidate)
+					>= static_cast<int>(bestPath.size());
+			if (reachable[tileIndex(candidate)] == 0
+				|| cannotImproveBestPath)
 			{
 				continue;
 			}
@@ -1428,7 +1486,7 @@ std::deque<Point> Map::getPassPathEx(Point from, PointEx fromOffset, Point to, P
 	return result;
 }
 
-Point Map::getJumpPath(Point from, Point to)
+Point Map::getJumpPath(Point from, Point to, int jumpRadius)
 {
 	if (from == to)
 	{
@@ -1437,6 +1495,30 @@ Point Map::getJumpPath(Point from, Point to)
 	if (!isInMap(from) || !isInMap(to))
 	{
 		return from;
+	}
+	if (jumpRadius > 0)
+	{
+		// MG takes one neighbour before its radius loop, using tile-coordinate
+		// direction. Use the jumping actor's origin, then retain normal collision
+		// and trap resolution below. Zero/negative values keep the legacy path.
+		Point limited = from;
+		Point previous = from;
+		for (int64_t left = static_cast<int64_t>(jumpRadius) + 1; left > 0 && limited != to; --left)
+		{
+			const float angle = std::atan2(static_cast<float>(limited.x) - to.x, static_cast<float>(to.y) - limited.y);
+			const Point next = getSubPoint(limited, NPC::getDirection(angle));
+			if (next == previous)
+			{
+				// Odd-row vertical targets can alternate between two neighbours.
+				// Skip complete pairs without changing the published endpoint.
+				limited = left % 2 == 0 ? limited : next;
+				break;
+			}
+			previous = limited;
+			limited = next;
+		}
+		to = limited;
+		if (from == to || !isInMap(to)) return from;
 	}
 	float angle;
 	if (from.x == to.x && std::llabs(static_cast<int64_t>(from.y) - to.y) % 2 == 0)
@@ -2614,9 +2696,10 @@ void Map::addNPCToDataMap(Point pos, std::shared_ptr<NPC> npc)
 
 void Map::generateThumbnail()
 {
+	thumbnailImage = nullptr;
+	thumbnailSourceRect = { 0, 0, 0, 0 };
 	if (data == nullptr || mapMpc == nullptr)
 	{
-		thumbnailSourceRect = { 0, 0, 0, 0 };
 		return;
 	}
 
@@ -2624,7 +2707,6 @@ void Map::generateThumbnail()
 	int mapHeight = data->head.height;
 	if (mapWidth <= 0 || mapHeight <= 0)
 	{
-		thumbnailSourceRect = { 0, 0, 0, 0 };
 		return;
 	}
 
@@ -2634,12 +2716,29 @@ void Map::generateThumbnail()
 	int paddingX = TILE_WIDTH;
 	int paddingY = TILE_HEIGHT;
 
-	int canvasWidth = tilePixelWidth + paddingX * 2;
-	int canvasHeight = tilePixelHeight + paddingY * 2;
+	const int fullCanvasWidth = tilePixelWidth + paddingX * 2;
+	const int fullCanvasHeight = tilePixelHeight + paddingY * 2;
+	// Keep world coordinates available even when no thumbnail texture can be created.
+	thumbnailSourceRect = {
+		paddingX, paddingY, tilePixelWidth, tilePixelHeight + TILE_HEIGHT / 2
+	};
 
+	const int maximumWidth = MapThumbnailStyle::CanvasWidth * 2;
+	const int maximumHeight = MapThumbnailStyle::CanvasHeight * 2;
+	const float canvasScale = std::min({
+		1.0f,
+		static_cast<float>(maximumWidth) / fullCanvasWidth,
+		static_cast<float>(maximumHeight) / fullCanvasHeight
+	});
+	const int canvasWidth = std::clamp(
+		static_cast<int>(std::ceil(fullCanvasWidth * canvasScale)), 1, maximumWidth);
+	const int canvasHeight = std::clamp(
+		static_cast<int>(std::ceil(fullCanvasHeight * canvasScale)), 1, maximumHeight);
 	auto canvas = engine->createCanvasImage(canvasWidth, canvasHeight);
 	if (canvas == nullptr)
 	{
+		GameLog::write("Map thumbnail canvas %dx%d for %dx%d tiles failed: %s\n",
+			canvasWidth, canvasHeight, mapWidth, mapHeight, SDL_GetError());
 		return;
 	}
 	SDL_SetTextureBlendMode(canvas.get(), SDL_BLENDMODE_BLEND);
@@ -2647,6 +2746,7 @@ void Map::generateThumbnail()
 	auto originalTarget = engine->getRenderTarget();
 	if (!engine->setSharedImageAsRenderTarget(canvas))
 	{
+		GameLog::write("Map thumbnail render target failed: %s\n", SDL_GetError());
 		return;
 	}
 	engine->renderClear(0, 0, 0, 0);
@@ -2654,7 +2754,19 @@ void Map::generateThumbnail()
 	Point cenScreen = { paddingX, paddingY };
 	Point cenTile = { 0, 0 };
 	PointEx offset = { 0.0, 0.0 };
-
+	std::vector<Vertex> tileVertices(5);
+	tileVertices[0].tex_coord = { 0.0f, 0.0f };
+	tileVertices[1].tex_coord = { 1.0f, 0.0f };
+	tileVertices[2].tex_coord = { 1.0f, 1.0f };
+	tileVertices[3].tex_coord = { 0.0f, 1.0f };
+	tileVertices[4].tex_coord = { 0.5f, 0.5f };
+	for (auto& vertex : tileVertices)
+	{
+		vertex.color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	}
+	// A center vertex avoids SDL's software rectangle fast path and preserves
+	// fractional placement of adjacent diamond tiles during downsampling.
+	const std::vector<int> tileIndices = { 0, 1, 4, 1, 2, 4, 2, 3, 4, 3, 0, 4 };
 	for (int i = 0; i < mapHeight; i++)
 	{
 		for (int j = 0; j < mapWidth; j++)
@@ -2662,7 +2774,23 @@ void Map::generateThumbnail()
 			Point tile = { j, i };
 			for (int layer = 0; layer < MAP_TILE_LAYER; layer++)
 			{
-				drawTile(layer, tile, cenTile, cenScreen, offset, 0xFFFFFF);
+				int xOffset = 0, yOffset = 0, width = 0, height = 0;
+				auto image = loadTileImage(layer, tile, xOffset, yOffset);
+				if (!image || !engine->getImageSize(image, width, height))
+				{
+					continue;
+				}
+				const Point position = getTilePosition(tile, cenTile, cenScreen, offset);
+				const float left = static_cast<float>(position.x - xOffset) * canvasScale;
+				const float top = static_cast<float>(position.y - yOffset) * canvasScale;
+				const float right = left + width * canvasScale;
+				const float bottom = top + height * canvasScale;
+				tileVertices[0].position = { left, top };
+				tileVertices[1].position = { right, top };
+				tileVertices[2].position = { right, bottom };
+				tileVertices[3].position = { left, bottom };
+				tileVertices[4].position = { (left + right) / 2.0f, (top + bottom) / 2.0f };
+				engine->drawGeometry(image, tileVertices, tileIndices);
 			}
 		}
 	}
@@ -2684,9 +2812,9 @@ void Map::generateThumbnail()
 		engine->renderClear(0, 0, 0, 0);
 
 		Rect srcRect = { paddingX, paddingY, tilePixelWidth - TILE_WIDTH / 2, tilePixelHeight - TILE_HEIGHT / 2 };
-		thumbnailSourceRect = srcRect;
+		SDL_SetTextureScaleMode(canvas.get(), SDL_SCALEMODE_LINEAR);
 		drawFeatheredThumbnail(engine, canvas, srcRect, canvasWidth, canvasHeight,
-			thumbnailWidth, thumbnailHeight);
+			thumbnailWidth, thumbnailHeight, canvasScale);
 
 		if (!engine->
 			restoreImageRenderTargetAfterAcceptedOperation(
@@ -2697,10 +2825,13 @@ void Map::generateThumbnail()
 		}
 		SDL_SetTextureBlendMode(thumbnailCanvas.get(), SDL_BLENDMODE_BLEND);
 
+		thumbnailSourceRect = srcRect;
 		thumbnailImage = IMP::createIMPImageFromImage(thumbnailCanvas);
 	}
 	else
 	{
+		GameLog::write("Map thumbnail output %dx%d failed: %s\n",
+			thumbnailWidth, thumbnailHeight, SDL_GetError());
 		if (!engine->
 			restoreImageRenderTargetAfterAcceptedOperation(
 				originalTarget,
@@ -2708,8 +2839,6 @@ void Map::generateThumbnail()
 		{
 			return;
 		}
-		thumbnailSourceRect = { 0, 0, canvasWidth, canvasHeight };
-		thumbnailImage = IMP::createIMPImageFromImage(canvas);
 	}
 }
 
@@ -2750,32 +2879,35 @@ void Map::freeData()
 	}
 }
 
-void Map::drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
+_shared_image Map::loadTileImage(int layer, Point tile, int& xOffset, int& yOffset)
 {
 	if (!isInMap(tile))
 	{
-		return;
+		return nullptr;
 	}
 	if (data->tile[tile.y][tile.x].layer[layer].mpc == 0)
 	{
-		return;
+		return nullptr;
 	}
-	int x, y;
-	Point point = getTilePosition(tile, cenTile, cenScreen, offset);
-	_shared_image img = nullptr;
 	if (data->mpc.mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].dynamic != 0)
 	{
-		img = IMP::loadImageForTime(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, getTime(), &x, &y);
-		
+		return IMP::loadImageForTime(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, getTime(), &xOffset, &yOffset);
 	}
 	else
 	{
-		img = IMP::loadImage(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, data->tile[tile.y][tile.x].layer[layer].frame, &x, &y);
+		return IMP::loadImage(mapMpc->mpc[data->tile[tile.y][tile.x].layer[layer].mpc - 1].img, data->tile[tile.y][tile.x].layer[layer].frame, &xOffset, &yOffset);
 	}
+}
+
+void Map::drawTile(int layer, Point tile, Point cenTile, Point cenScreen, PointEx offset, uint32_t colorStyle)
+{
+	int x, y;
+	auto img = loadTileImage(layer, tile, x, y);
 	if (img == nullptr)
 	{
 		return;
 	}
+	Point point = getTilePosition(tile, cenTile, cenScreen, offset);
 	ColorStyle::drawImage(engine, img, point.x - x, point.y - y, colorStyle);
 }
 
@@ -2891,7 +3023,8 @@ LinePathPoint Map::getLineSubStepEx(Point from, PointEx fromOffset, float angle)
 	LinePathPoint result;
 	result.pos = from;
 	result.pixelOffset = fromOffset;
-	result.pixelOffset.x /= (TILE_WIDTH / 2 / MapXRatio);
+	// Pixel offsets already include the map projection; keep normalization and restoration symmetric.
+	result.pixelOffset.x /= (TILE_WIDTH / 2);
 	result.pixelOffset.y /= (TILE_HEIGHT / 2);
 	int dir = 0;
 	if (angle <= M_PI / 4 || angle > M_PI * 7 / 4)
@@ -3004,7 +3137,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		result.push_back(pos);
 	}
 	//向上时
-	else if (angle == M_PI / 2)
+	else if (angle == static_cast<float>(M_PI / 2))
 	{
 		Point pos;
 		pos.x = from.x - 1 + line;
@@ -3018,7 +3151,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		result.push_back(pos);
 	}
 	//向左时
-	else if (angle == M_PI)
+	else if (angle == static_cast<float>(M_PI))
 	{
 		Point pos;
 		pos.x = from.x - 1 + line;
@@ -3032,7 +3165,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 		result.push_back(pos);
 	}
 	//向下时
-	else if (angle == M_PI * 3 / 2)
+	else if (angle == static_cast<float>(M_PI * 3 / 2))
 	{
 		Point pos;
 		pos.x = from.x - 1 + line;

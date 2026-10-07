@@ -13,6 +13,9 @@ enum class RuntimeTraceVariableValueType;
 
 class VariableList
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
 public:
 	VariableList();
 	virtual ~VariableList();

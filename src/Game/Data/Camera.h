@@ -46,6 +46,31 @@ public:
 	void snapToFollowTarget();
 	// Clamp the current camera position to map bounds, centering axes smaller than the screen.
 	void clampToMapBounds();
+	static float clampHorizontalWorldPosition(float worldPosition, int mapColumnCount, int mapRowCount, int viewportWidth)
+	{
+		const float mapPixelWidth = static_cast<float>(mapRowCount <= 1
+			? mapColumnCount - 1 : mapColumnCount) * TILE_WIDTH;
+		const float minimumMapX = static_cast<float>(TILE_WIDTH) / 2.0f;
+		const float maximumMapX = mapPixelWidth - minimumMapX;
+		if (maximumMapX - minimumMapX <= static_cast<float>(viewportWidth))
+		{
+			return (minimumMapX + maximumMapX) / 2.0f;
+		}
+		const float halfViewportWidth = static_cast<float>(viewportWidth) / 2.0f;
+		return std::clamp(worldPosition, minimumMapX + halfViewportWidth, maximumMapX - halfViewportWidth);
+	}
+	static float clampVerticalWorldPosition(float worldPosition, int mapRowCount, int viewportHeight)
+	{
+		// Inset every map edge by half a tile to exclude the staggered tile tips.
+		const float minimumMapY = static_cast<float>(TILE_HEIGHT) / 2.0f;
+		const float maximumMapY = static_cast<float>(mapRowCount - 1) * TILE_HEIGHT / 2.0f - minimumMapY;
+		if (maximumMapY - minimumMapY <= static_cast<float>(viewportHeight))
+		{
+			return (minimumMapY + maximumMapY) / 2.0f;
+		}
+		const float halfViewportHeight = static_cast<float>(viewportHeight) / 2.0f;
+		return std::clamp(worldPosition, minimumMapY + halfViewportHeight, maximumMapY - halfViewportHeight);
+	}
 	// Reset to player follow mode, stop camera flight, snap to target, and clear movement delta.
 	void resetView();
 	static int resolveVibrationDegree(int currentDegree, int requestedDegree)

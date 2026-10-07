@@ -2,6 +2,9 @@
 
 namespace
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+NewYearPeriod::LocalDate automationLocalDate;
+#endif
 int getDaysInMonth(int year, int month)
 {
 	static constexpr int DaysInMonth[] = {
@@ -71,6 +74,53 @@ bool contains(std::chrono::system_clock::time_point time)
 
 bool containsCurrentLocalDate()
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	if (automationLocalDate.year != 0)
+	{
+		return contains(automationLocalDate);
+	}
+#endif
 	return contains(std::chrono::system_clock::now());
 }
+
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+bool tryParseLocalDate(const std::string& text, LocalDate& date)
+{
+	if (text.size() != 10 || text[4] != '-' || text[7] != '-')
+	{
+		return false;
+	}
+	for (std::size_t index = 0; index < text.size(); ++index)
+	{
+		if (index != 4 && index != 7 && (text[index] < '0' || text[index] > '9'))
+		{
+			return false;
+		}
+	}
+	const LocalDate parsed = {
+		std::stoi(text.substr(0, 4)), std::stoi(text.substr(5, 2)), std::stoi(text.substr(8, 2))
+	};
+	if (!isValidLocalDate(parsed))
+	{
+		return false;
+	}
+	date = parsed;
+	return true;
+}
+
+bool setAutomationLocalDate(const LocalDate& date)
+{
+	if (!isValidLocalDate(date))
+	{
+		return false;
+	}
+	automationLocalDate = date;
+	return true;
+}
+
+void clearAutomationLocalDate()
+{
+	automationLocalDate = {};
+}
+#endif
 }

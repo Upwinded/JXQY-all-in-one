@@ -1,8 +1,6 @@
 #pragma once
 #include "BaseComponent.h"
 
-#define SOUND_DYNAMIC_LOAD
-
 class Button :
 	public BaseComponent
 {
@@ -11,6 +9,7 @@ public:
 	virtual ~Button();
 
 	bool stretch = false;
+	bool flat = false;
 	bool animateFrames = false;
 	bool hoverSoundEnabled = true;
 
@@ -20,11 +19,7 @@ public:
 
 	_shared_imp image[3] = { nullptr, nullptr, nullptr };
 
-#ifdef SOUND_DYNAMIC_LOAD
 	std::string sound[3] = { "", "", "" };
-#else
-	_music sound[3] = { nullptr,nullptr,nullptr };
-#endif // SOUND_DYNAMIC_LOAD
 
 	void loadSound(const std::string & fileName, int index);
 	

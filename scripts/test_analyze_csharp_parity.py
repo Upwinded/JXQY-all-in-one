@@ -47,6 +47,14 @@ def main() -> int:
                 ("func", ""),
                 ("HistoricalCall", "RealCall"),
             ]
+            with tempfile.TemporaryDirectory() as external_dir:
+                external_root = Path(external_dir)
+                script = external_root / "script" / "example.txt"
+                script.parent.mkdir()
+                script.write_text('say("hello");\n', encoding="utf-8")
+                calls = parity.scan_resource_script_calls(external_root, 1)
+                assert [(item["name"], item["count"]) for item in calls] == [("say", 1)]
+                assert calls[0]["examples"] == [{"file": script.as_posix(), "line": 1}]
     finally:
         parity.REPO_ROOT = original_repo_root
     return 0

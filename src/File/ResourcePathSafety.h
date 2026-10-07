@@ -174,4 +174,26 @@ inline bool isSafeVirtualResourcePath(std::string fileName)
 	}
 	return hasResourceSegment;
 }
+
+inline bool isSafeInstallDirectoryName(const std::string& name)
+{
+	if (name.empty() || name.size() > 200 || name == "." || name == ".." ||
+		name.find('/') != std::string::npos ||
+		name.find('\\') != std::string::npos ||
+		!isSafeVirtualResourcePath(name))
+	{
+		return false;
+	}
+	std::string folded = name;
+	for (char& character : folded)
+	{
+		if (character >= 'A' && character <= 'Z')
+		{
+			character += 'a' - 'A';
+		}
+	}
+	return folded != ".jxqy-update" && folded != "common" &&
+		folded != "engine" && folded != "save" && folded != ".git" &&
+		folded != ".jxqy_editor";
+}
 }

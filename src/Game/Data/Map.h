@@ -175,7 +175,7 @@ public:
 	//得到起止之间的所有点(带偏移)
 	std::deque<Point> getPassPathEx(Point from, PointEx fromOffset, Point to, PointEx toOffset, Point flyDirection);
 
-	Point getJumpPath(Point from, Point to);
+	Point getJumpPath(Point from, Point to, int jumpRadius = 0);
 	bool canSee(Point from, Point to);
 
 	int getTrapIndex(Point pos);
@@ -233,6 +233,7 @@ public:
 	Rect getThumbnailSourceRect() const { return thumbnailSourceRect; }
 
 private:
+	_shared_image loadTileImage(int layer, Point tile, int& xOffset, int& yOffset);
 	std::shared_ptr<MapMpc> createMapMpc(
 		const std::shared_ptr<MapData>& mapData,
 		const std::function<bool()>& preparationCheckpoint = {});

@@ -216,8 +216,10 @@ private:
     QComboBox* m_npcRuntimeProfileCombo = nullptr;
     QComboBox* m_specialActionModeCombo = nullptr;
     QComboBox* m_addLifeModeCombo = nullptr;
+    QLineEdit* m_scriptPlayerNameEdit = nullptr;
 
     // [LevelUp]
+    QComboBox* m_levelUpEffectModeCombo = nullptr;
     QLineEdit* m_levelUpMessageEdit = nullptr;
     QPlainTextEdit* m_levelUpRandomEffectsEdit = nullptr;
     QLineEdit* m_levelUpMaleEffectEdit = nullptr;

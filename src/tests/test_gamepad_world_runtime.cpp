@@ -27,6 +27,13 @@
 class GamepadWorldRuntimeTestAccess
 {
 public:
+	static void advanceActorFrame(Element& element, UTime elapsed)
+	{
+		element.setTime(element.getTime() + elapsed);
+		element.frameTime = elapsed;
+		element.onUpdate();
+	}
+
 	static GameInput::PhysicalInputManager& inputManager()
 	{
 		return *Engine::getInstance()->physicalInputManager;
@@ -61,15 +68,13 @@ public:
 
 	static void prepareHeadlessMapThumbnail(
 		MapThumbnailMenu& menu,
-		const Rect& bounds,
-		const std::string& currentMapName)
+		const Rect& bounds)
 	{
 		menu.removeAllChild();
 		menu.thumbnailContainer = std::make_shared<ImageContainer>();
 		menu.thumbnailContainer->rect = bounds;
 		menu.thumbnailContainer->coverMouse = true;
 		menu.addChild(menu.thumbnailContainer);
-		menu.currentMapName = currentMapName;
 		menu.visible = false;
 		menu.controllerCursorNormalizedX = 0.5f;
 		menu.controllerCursorNormalizedY = 0.5f;
@@ -670,7 +675,7 @@ bool runMapPointerElementTreeTests()
 	GameManager& gameManager = fixture.gameManager;
 	auto mapMenu = std::make_shared<MapThumbnailMenu>();
 	GamepadWorldRuntimeTestAccess::prepareHeadlessMapThumbnail(
-		*mapMenu, { 240, 120, 200, 160 }, "pointer routing map");
+		*mapMenu, { 240, 120, 200, 160 });
 	gameManager.menu->mapThumbnailMenu = mapMenu;
 	gameManager.menu->addChild(mapMenu);
 	mapMenu->setControllerVisible(true);
@@ -770,7 +775,7 @@ bool runPointerTransactionDragAndHideTests()
 	GameManager& gameManager = fixture.gameManager;
 	auto mapMenu = std::make_shared<MapThumbnailMenu>();
 	GamepadWorldRuntimeTestAccess::prepareHeadlessMapThumbnail(
-		*mapMenu, { 240, 120, 200, 160 }, "pointer transaction map");
+		*mapMenu, { 240, 120, 200, 160 });
 	gameManager.menu->mapThumbnailMenu = mapMenu;
 	gameManager.menu->addChild(mapMenu);
 	mapMenu->setControllerVisible(true);
@@ -889,7 +894,7 @@ bool runPointerTransactionFingerCancelTests()
 	GameManager& gameManager = fixture.gameManager;
 	auto mapMenu = std::make_shared<MapThumbnailMenu>();
 	GamepadWorldRuntimeTestAccess::prepareHeadlessMapThumbnail(
-		*mapMenu, { 240, 120, 200, 160 }, "finger cancel map");
+		*mapMenu, { 240, 120, 200, 160 });
 	gameManager.menu->mapThumbnailMenu = mapMenu;
 	gameManager.menu->addChild(mapMenu);
 	mapMenu->setControllerVisible(true);
@@ -1019,7 +1024,7 @@ bool runHeldMouseLifecycleTransactionTests()
 	GameController& controller = *gameManager.controller;
 	auto mapMenu = std::make_shared<MapThumbnailMenu>();
 	GamepadWorldRuntimeTestAccess::prepareHeadlessMapThumbnail(
-		*mapMenu, { 240, 120, 200, 160 }, "lifecycle pointer map");
+		*mapMenu, { 240, 120, 200, 160 });
 	gameManager.menu->mapThumbnailMenu = mapMenu;
 	gameManager.menu->addChild(mapMenu);
 	mapMenu->setControllerVisible(true);
@@ -1111,7 +1116,7 @@ bool runHeldWorldMouseAcrossMenuTransitionTests()
 	GameController& controller = *gameManager.controller;
 	auto mapMenu = std::make_shared<MapThumbnailMenu>();
 	GamepadWorldRuntimeTestAccess::prepareHeadlessMapThumbnail(
-		*mapMenu, { 240, 120, 200, 160 }, "world-held transition map");
+		*mapMenu, { 240, 120, 200, 160 });
 	gameManager.menu->mapThumbnailMenu = mapMenu;
 	gameManager.menu->addChild(mapMenu);
 	auto pointerObject = fixture.addHeadlessPointerObject(
@@ -1775,8 +1780,8 @@ bool runProductionTargetPromptAndInvalidationTests()
 	ok = check(!gameManager.map->canSee(PlayerPosition, npc->getPosition()),
 		"line-of-sight fixture did not block the focused NPC") && ok;
 	runControllerInputFrame(controller, inputManager, nowMilliseconds);
-	ok = check(GamepadWorldRuntimeTestAccess::focusedTarget(controller) == nullptr,
-		"neutral production frame retained an NPC behind an obstacle") && ok;
+	ok = check(GamepadWorldRuntimeTestAccess::focusedTarget(controller) == npc,
+		"neutral production frame preserves an in-range talk target behind an obstacle") && ok;
 	ok = check(SDL_WasInit(SDL_INIT_VIDEO) == 0,
 		"target prompt test initialized SDL video") && ok;
 	return ok;
@@ -2035,8 +2040,7 @@ bool runMapThumbnailPhysicalLinkTests()
 		gameManager.menu->mapThumbnailMenu = mapMenu;
 		GamepadWorldRuntimeTestAccess::prepareHeadlessMapThumbnail(
 			*mapMenu,
-			{ 20, 20, 641, 361 },
-			gameManager.global.data.mapName);
+			{ 20, 20, 641, 361 });
 
 		auto uiRoot = std::make_shared<HeadlessGamepadUIRoot>(gameManager);
 		HeadlessPhysicalInputTest::ScopedRunningOwner runningOwner(uiRoot);
@@ -2406,6 +2410,55 @@ bool runMovementAndAttackTests()
 		&& samePoint(player.nextAction->dest, expectedStep),
 		"left stick run did not queue one alternate-run map step") && ok;
 
+	player.fightState.set(true);
+	player.thew = RUN_THEW_COST - 1;
+	player.nextAction = nullptr;
+	GamepadWorldRuntimeTestAccess::move(
+		controller, 1.0f, 0.0f, 1.0f, true);
+	ok = check(player.nextAction != nullptr
+		&& player.nextAction->action == acAWalk,
+		"combat left stick run did not walk below the stamina cost") && ok;
+
+	player.thew = RUN_THEW_COST;
+	player.nextAction = nullptr;
+	GamepadWorldRuntimeTestAccess::move(
+		controller, 1.0f, 0.0f, 1.0f, true);
+	ok = check(player.nextAction != nullptr
+		&& player.nextAction->action == acARun,
+		"combat left stick run did not resume at the exact stamina cost") && ok;
+
+	NextAction shiftMouseRunAction;
+	shiftMouseRunAction.action = acRun;
+	shiftMouseRunAction.dest = expectedStep;
+	player.thew = RUN_THEW_COST - 1;
+	player.nextAction = nullptr;
+	ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(
+			controller, shiftMouseRunAction)
+		&& player.nextAction != nullptr
+		&& player.nextAction->action == acWalk,
+		"combat Shift-mouse run did not walk below the stamina cost") && ok;
+
+	shiftMouseRunAction.action = acRun;
+	player.thew = RUN_THEW_COST;
+	player.nextAction = nullptr;
+	ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(
+			controller, shiftMouseRunAction)
+		&& player.nextAction != nullptr
+		&& player.nextAction->action == acRun,
+		"combat Shift-mouse run did not resume at the exact stamina cost") && ok;
+	player.fightState.set(false);
+	player.thew = 100;
+	player.res.arun.imagePackage.reset();
+	player.nextAction = nullptr;
+	GamepadWorldRuntimeTestAccess::move(
+		controller, 1.0f, 0.0f, 1.0f, true);
+	ok = check(player.canDoAction(acRun)
+		&& !player.canDoAction(acARun)
+		&& player.nextAction != nullptr
+		&& player.nextAction->action == acARun,
+		"virtual joystick run rejected the player's normal-run resource") && ok;
+	player.res.arun.imagePackage = makeActionImage();
+
 	auto controlledActor = fixture.addNPC(
 		PlayerPosition, "controlled actor without run resources");
 	controlledActor->res.walk.imagePackage = makeActionImage();
@@ -2430,6 +2483,14 @@ bool runMovementAndAttackTests()
 		&& player.nextAction != nullptr
 		&& player.nextAction->action == acAWalk,
 		"virtual joystick run did not use the controlled actor's alternate-walk fallback") && ok;
+	controlledActor->res.run.imagePackage = makeActionImage();
+	virtualJoystickRunAction.action = acARun;
+	player.nextAction = nullptr;
+	ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(
+			controller, virtualJoystickRunAction)
+		&& player.nextAction != nullptr
+		&& player.nextAction->action == acARun,
+		"virtual joystick run rejected the controlled actor's normal-run fallback") && ok;
 	player.endControlCharacter(controlEffect.get());
 
 	player.nextAction = nullptr;
@@ -2442,6 +2503,52 @@ bool runMovementAndAttackTests()
 		&& player.nextAction->destGE.expired()
 		&& samePoint(player.nextAction->dest, expectedStep),
 		"attack without a hostile target did not queue the facing fallback") && ok;
+	return ok;
+}
+
+bool runControlledHeldKeyboardMovementTests()
+{
+	bool ok = true;
+	for (int pathFinder : { pfSingle, pfBest })
+	{
+		GamepadWorldFixture fixture;
+		auto& game = fixture.gameManager;
+		game.global.data.NPCAI = false;
+		game.player->setPosition({ 5, 5 }, false);
+		game.player->setTime(1000);
+		const Point start{ 20, 40 };
+		auto actor = fixture.addNPC(start, "held keyboard actor");
+		actor->kind = nkBattle;
+		actor->life = actor->thew = 100;
+		actor->pathFinder = pathFinder;
+		actor->setTime(1000);
+		actor->res.stand.imagePackage = actor->res.walk.imagePackage = actor->res.awalk.imagePackage = makeActionImage();
+		game.map->createDataMap();
+		auto effect = std::make_shared<Effect>();
+		game.player->beginControlCharacter(actor, effect);
+		bool casePassed = check(game.player->isControllingCharacter(), "held keyboard fixture controls the real NPC");
+		int preservedStepFrames = 0;
+		Point positionAfterTwentyFrames;
+		for (int frame = 1; frame <= 200; ++frame)
+		{
+			const UTime previousStepBeginTime = actor->stepBeginTime;
+			const bool wasWalking = actor->isWalking();
+			GamepadWorldRuntimeTestAccess::moveWithLegacyKeyboard(*game.controller, true, false, false, false, false);
+			GamepadWorldRuntimeTestAccess::advanceActorFrame(*game.player, 50);
+			if (wasWalking && actor->isWalking() && previousStepBeginTime == actor->stepBeginTime) ++preservedStepFrames;
+			GamepadWorldRuntimeTestAccess::advanceActorFrame(*actor, 50);
+			if (frame == 20) positionAfterTwentyFrames = actor->getPosition();
+		}
+		casePassed = check(positionAfterTwentyFrames.y < start.y - 2 && actor->getPosition().y < start.y - 2
+			&& actor->getPosition().x == start.x && preservedStepFrames > 0,
+			"held keyboard progresses across tiles without restarting every incomplete controlled step") && casePassed;
+		std::cout << "Controlled held keyboard: pathFinder=" << pathFinder
+			<< " position20=" << positionAfterTwentyFrames.x << "," << positionAfterTwentyFrames.y
+			<< " position200=" << actor->getPosition().x << "," << actor->getPosition().y
+			<< " preservedStepFrames=" << preservedStepFrames << " passed=" << casePassed << std::endl;
+		game.player->endControlCharacter();
+		ok = casePassed && ok;
+	}
 	return ok;
 }
 
@@ -2506,6 +2613,91 @@ bool runSkillAndJumpTests()
 		&& player.nextAction->action == acJump
 		&& !samePoint(positiveJumpDestination, player.nextAction->dest),
 		"opposite left-stick directions did not change the jump destination") && ok;
+	return ok;
+}
+
+bool runQueuedSkillStepCompletionTests()
+{
+	bool ok = true;
+	for (const bool running : { false, true })
+	for (const int pursuitMode : { 0, 1, 2 })
+	for (const bool steppingIn : { false, true })
+	for (const bool physicalInput : { false, true })
+	{
+		GamepadWorldFixture fixture;
+		auto& game = fixture.gameManager;
+		auto& player = *game.player;
+		auto target = fixture.addNPC({ 30, 20 }, "queued skill target");
+		target->kind = nkBattle;
+		target->relation = nrHostile;
+		target->life = 100;
+		player.setTime(1000);
+		player.canUseMana = true;
+		player.mana = player.info.manaMax = 100;
+		auto& skill = game.magicManager.magicList[game.magicManager.bottomIndex(0)];
+		skill.iniFile = "queued-step-skill.ini";
+		skill.magic = std::make_shared<Magic>();
+		skill.level = 1;
+		game.map->createDataMap();
+		player.nextAction.reset();
+		if (pursuitMode == 2)
+		{
+			ok = check(game.queueNPCAttackInteraction(target, running), "manual skill fixture queues attack pursuit") && ok;
+			GamepadWorldRuntimeTestAccess::advanceActorFrame(player, 0);
+		}
+		else if (pursuitMode == 1)
+		{
+			NextAction pursuit;
+			pursuit.action = running ? acRun : acWalk;
+			pursuit.dest = target->getPosition();
+			pursuit.destKind = ndAttack;
+			pursuit.destGE = target;
+			ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(*game.controller, pursuit),
+				"manual skill fixture queues a legacy attack pursuit") && ok;
+			GamepadWorldRuntimeTestAccess::advanceActorFrame(player, 0);
+		}
+		else if (running)
+		{
+			player.beginRun(target->getPosition());
+		}
+		else
+		{
+			player.beginWalk(target->getPosition());
+		}
+		const bool moving = running ? player.isRunning() : player.isWalking();
+		ok = check(moving && !player.stepList.empty() && player.stepLastTime > 1,
+			"manual skill fixture starts a real tile step") && ok;
+		if (!moving || player.stepList.empty() || player.stepLastTime <= 1) continue;
+		const Point arrival = player.stepList.front();
+		const UTime arrivalTime = player.stepBeginTime + player.stepLastTime * 2;
+		GamepadWorldRuntimeTestAccess::advanceActorFrame(player,
+			player.stepLastTime / 2 + (steppingIn ? player.stepLastTime : 0));
+		const PointEx movementOffset = player.getOffset();
+		ok = check(movementOffset != PointEx{ 0, 0 }, "manual skill fixture is between tile centers") && ok;
+		if (physicalInput)
+		{
+			GamepadWorldRuntimeTestAccess::dispatch(*game.controller, GameInput::InputAction::CastSkill1, {});
+		}
+		else
+		{
+			NextAction action;
+			action.action = acMagic;
+			action.actionParam = 0;
+			action.dest = target->getPosition();
+			action.destGE = target;
+			ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(*game.controller, action),
+				"legacy skill submission accepts the player's aimed request") && ok;
+		}
+		ok = check((running ? player.isRunning() : player.isWalking()) && player.getOffset() == movementOffset
+			&& player.nextAction && player.nextAction->action == acMagic,
+			"manual skill queues without snapping a walk or run to standing") && ok;
+		GamepadWorldRuntimeTestAccess::advanceActorFrame(player, arrivalTime - 1 - player.getTime());
+		ok = check((running ? player.isRunning() : player.isWalking()) && player.nextAction && player.mana == 100,
+			"manual skill waits until the full tile step completes") && ok;
+		GamepadWorldRuntimeTestAccess::advanceActorFrame(player, 1);
+		ok = check(player.isMagicing() && !player.nextAction && player.getPosition() == arrival
+			&& player.getOffset() == PointEx{ 0, 0 }, "manual skill starts at the next tile center") && ok;
+	}
 	return ok;
 }
 
@@ -3146,6 +3338,7 @@ bool runLegacyWorldInputCompatibilityTests()
 	auto mobileOrdinaryMenu = std::make_shared<MemoMenu>();
 	mobileOrdinaryMenu->visible = true;
 	gameManager.menu->memoMenu = mobileOrdinaryMenu;
+	player.thew = RUN_THEW_COST;
 	auto touchObject = fixture.addObject(
 		{ 24, 20 }, "touch object", "touch_object.lua");
 	ok = check(primeStrictControllerQueue(fixture, controllerTarget),
@@ -3159,8 +3352,10 @@ bool runLegacyWorldInputCompatibilityTests()
 		"legacy mobile Object touch changed the queued target") && objectTouchOK;
 	objectTouchOK = check(player.nextAction != nullptr
 			&& player.nextAction->destKind == ndObj
+			&& player.nextAction->action == acRun
 			&& !player.nextAction->useRightScript,
-		"legacy mobile Object touch changed the interaction side") && objectTouchOK;
+		"legacy mobile Object touch did not run at the exact stamina cost"
+		" or changed the interaction side") && objectTouchOK;
 	objectTouchOK = check(legacyWorldInputOwnsState(fixture),
 		"legacy mobile Object touch retained controller state") && objectTouchOK;
 	ok = objectTouchOK && ok;
@@ -3178,8 +3373,10 @@ bool runLegacyWorldInputCompatibilityTests()
 		"legacy mobile NPC touch changed the queued target") && npcTouchOK;
 	npcTouchOK = check(player.nextAction != nullptr
 			&& player.nextAction->destKind == ndTalk
+			&& player.nextAction->action == acRun
 			&& !player.nextAction->useRightScript,
-		"legacy mobile NPC touch changed the interaction side") && npcTouchOK;
+		"legacy mobile NPC touch did not run at the exact stamina cost"
+		" or changed the interaction side") && npcTouchOK;
 	npcTouchOK = check(legacyWorldInputOwnsState(fixture),
 		"legacy mobile NPC touch retained controller state") && npcTouchOK;
 	ok = npcTouchOK && ok;
@@ -3230,6 +3427,7 @@ bool runLegacyWorldInputCompatibilityTests()
 	mobileNonModalMap->visible = false;
 	gameManager.menu->mapThumbnailMenu = nullptr;
 	gameManager.menu->memoMenu = nullptr;
+	player.thew = 100;
 #endif
 
 	gameManager.npcManager->clickIndex = -1;
@@ -3676,7 +3874,9 @@ bool runGamepadWorldRuntimeTests()
 	}
 	ok = runWorldInputGateTests() && ok;
 	ok = runMovementAndAttackTests() && ok;
+	ok = runControlledHeldKeyboardMovementTests() && ok;
 	ok = runSkillAndJumpTests() && ok;
+	ok = runQueuedSkillStepCompletionTests() && ok;
 	ok = runLegacyWorldInputCompatibilityTests() && ok;
 	ok = runQuickItemAndSitTests() && ok;
 	ok = runGP03PhysicalLinkTests() && ok;

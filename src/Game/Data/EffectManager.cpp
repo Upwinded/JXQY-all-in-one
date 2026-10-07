@@ -341,6 +341,7 @@ void EffectManager::addEffect(std::shared_ptr<Effect> effect)
 	{
 		return;
 	}
+	effect->projectileCollisionCreationFrame = projectileCollisionFrame;
 	effectList.push_back(effect);
 	addChild(effect);
 	effect->initTime();
@@ -640,6 +641,7 @@ void EffectManager::loadFromIni(INIReader& ini)
 			return std::shared_ptr<Magic>();
 		}
 		std::string experienceOwner = ini.Get(pendingSection, "ExperienceOwnerMagicFile", "");
+		magic->experienceOwner = gm->magicManager.loadExperienceOwner(ini, pendingSection);
 		if (!experienceOwner.empty())
 		{
 			magic->experienceOwnerMagicFile = experienceOwner;
@@ -769,6 +771,7 @@ void EffectManager::saveToIni(INIReader& ini)
 			&referenceContext);
 		ini.Set(section, "MagicFile", info.magic->iniName);
 		ini.Set(section, "ExperienceOwnerMagicFile", info.magic->experienceOwnerMagicFile);
+		gm->magicManager.saveExperienceOwner(ini, section, Magic::getExperienceOwner(info.dispatchContext));
 		ini.SetInteger(section, "LastMapX", info.lastPosition.x);
 		ini.SetInteger(section, "LastMapY", info.lastPosition.y);
 		ini.SetTime(section, "RemainingTime", info.remainingTime);
@@ -798,6 +801,7 @@ void EffectManager::saveToIni(INIReader& ini)
 		Effect::saveElementReference(ini, section, "Target", info.target.lock());
 		ini.Set(section, "MagicFile", info.magic->iniName);
 		ini.Set(section, "ExperienceOwnerMagicFile", info.magic->experienceOwnerMagicFile);
+		gm->magicManager.saveExperienceOwner(ini, section, Magic::getExperienceOwner(info.dispatchContext));
 		ini.SetInteger(section, "FromMapX", info.from.x);
 		ini.SetInteger(section, "FromMapY", info.from.y);
 		ini.SetInteger(section, "ToMapX", info.to.x);
@@ -915,6 +919,53 @@ bool EffectManager::shouldUpdateChild(PElement child)
 	auto active = getActiveTimeStopperEffect();
 	return shouldUpdateEffectManagerChildDuringTimeStop(active != nullptr,
 		child != nullptr && child.get() == active.get());
+}
+
+void EffectManager::onPreTreatment()
+{
+	projectileCollisionFrame++;
+}
+
+std::shared_ptr<NPC> EffectManager::captureCasterSnapshot(const std::shared_ptr<NPC>& caster) const
+{
+	if (caster == nullptr)
+	{
+		return nullptr;
+	}
+	const bool referenced = std::any_of(effectList.begin(), effectList.end(),
+		[&](const auto& effect) { return effect != nullptr && effect->user.lock() == caster; })
+		|| std::any_of(delayedMagicList.begin(), delayedMagicList.end(),
+			[&](const auto& info) { return info.user.lock() == caster; })
+		|| std::any_of(trailMagicList.begin(), trailMagicList.end(),
+			[&](const auto& info) { return info.user.lock() == caster; });
+	if (!referenced)
+	{
+		return nullptr;
+	}
+	INIReader snapshot;
+	saveDetachedEffectCaster(snapshot, "Caster", caster);
+	return loadDetachedEffectCaster(snapshot, "Caster");
+}
+
+void EffectManager::replaceCasterReferences(const std::shared_ptr<GameElement>& caster,
+	const std::shared_ptr<GameElement>& replacement)
+{
+	if (caster == nullptr || replacement == nullptr)
+	{
+		return;
+	}
+	for (const auto& effect : effectList)
+	{
+		if (effect != nullptr && effect->user.lock() == caster) effect->user = replacement;
+	}
+	for (auto& info : delayedMagicList)
+	{
+		if (info.user.lock() == caster) info.user = replacement;
+	}
+	for (auto& info : trailMagicList)
+	{
+		if (info.user.lock() == caster) info.user = replacement;
+	}
 }
 
 void EffectManager::onUpdate()

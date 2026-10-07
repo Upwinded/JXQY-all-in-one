@@ -152,7 +152,7 @@ std::vector<WorldInteractionCandidate> WorldInteractionResolver::findCandidates(
 			}
 
 			int distance = Map::calDistance(query.origin, object->position);
-			if (distance > radius || !map->canSee(query.origin, object->position))
+			if (distance > radius)
 			{
 				continue;
 			}
@@ -183,7 +183,8 @@ std::vector<WorldInteractionCandidate> WorldInteractionResolver::findCandidates(
 			}
 
 			int distance = Map::calDistance(query.origin, npc->getPosition());
-			if (distance > radius || !map->canSee(query.origin, npc->getPosition()))
+			if (distance > radius || (intent == WorldInteractionIntent::Attack
+				&& !map->canSee(query.origin, npc->getPosition())))
 			{
 				continue;
 			}

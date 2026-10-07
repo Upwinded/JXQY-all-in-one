@@ -54,4 +54,5 @@ private:
     Point _attackDest = { 0, 0 };                          // 攻击目标位置
     std::weak_ptr<GameElement> _target;                    // 攻击目标
     bool _attackDone = false;                              // 是否已释放伤害
+    std::shared_ptr<Magic> _specialAttackMagic = nullptr;
 };

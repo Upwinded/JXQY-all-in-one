@@ -354,6 +354,11 @@ elseif(APPLE)
     set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin/macos)
 endif()
 
+# Respect an explicit build-local runtime directory for isolated test binaries.
+if(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(EXECUTABLE_OUTPUT_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+endif()
+
 if(UNIX AND NOT APPLE)
     set(JXQY_LINUX_APPLICATION_ID "com.jxqy.jxqy-all-in-one")
     set(JXQY_LINUX_ICON_NAME "jxqy-all-in-one")
@@ -729,6 +734,26 @@ target_include_directories(jxqy-desktop-program-updater-tests PRIVATE
 add_test(NAME jxqy-desktop-program-updater-tests
     COMMAND jxqy-desktop-program-updater-tests)
 
+add_executable(jxqy-save-package-tests
+    ${SRC_DIR}/tests/test_save_package.cpp
+    ${SRC_DIR}/Game/GameManager/SavePackage.cpp
+    ${SRC_DIR}/Game/GameManager/RuntimeSaveGenerationPolicy.cpp
+    ${SRC_DIR}/Resource/SemanticVersion.cpp
+    ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
+    ${SRC_DIR}/File/ini.cpp
+    ${JXQY_MINIZ_SOURCES}
+)
+if(WIN32)
+    target_link_libraries(jxqy-save-package-tests PRIVATE SDL3_lib)
+    add_custom_command(TARGET jxqy-save-package-tests POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${SDL3_DLL}" "$<TARGET_FILE_DIR:jxqy-save-package-tests>"
+        VERBATIM)
+elseif(UNIX AND NOT APPLE)
+    target_link_libraries(jxqy-save-package-tests PRIVATE ${JXQY_LINUX_MEDIA_LIBRARIES})
+endif()
+add_test(NAME jxqy-save-package-tests COMMAND jxqy-save-package-tests)
+
 add_executable(jxqy-resource-package-archive-tests
     ${SRC_DIR}/tests/test_resource_package_archive.cpp
     ${SRC_DIR}/Update/ResourceDownloadPreparation.cpp
@@ -790,15 +815,24 @@ add_test(NAME jxqy-https-download-tests
 add_executable(jxqy-editor-run-launch-tests
     ${SRC_DIR}/tests/test_editor_run_preflight.cpp
     ${SRC_DIR}/Launch/GameLaunchArguments.cpp
+    ${SRC_DIR}/Game/Data/NewYearPeriod.cpp
     ${SRC_DIR}/Launch/EditorRunDescriptor.cpp
     ${SRC_DIR}/File/StrictRelativeResourcePath.cpp
 )
 add_test(NAME jxqy-editor-run-launch-tests
     COMMAND jxqy-editor-run-launch-tests)
 
+add_executable(jxqy-gameplay-automation-protocol-tests
+    ${SRC_DIR}/tests/test_gameplay_automation_protocol.cpp
+    ${SRC_DIR}/Launch/GameLaunchArguments.cpp
+    ${SRC_DIR}/Game/Data/NewYearPeriod.cpp)
+target_include_directories(jxqy-gameplay-automation-protocol-tests PRIVATE ${SRC_DIR})
+add_test(NAME jxqy-gameplay-automation-protocol-tests COMMAND jxqy-gameplay-automation-protocol-tests)
+
 add_executable(jxqy-newgame-automation-probe-tests
     ${SRC_DIR}/tests/test_newgame_automation_process.cpp
     ${SRC_DIR}/Launch/GameLaunchArguments.cpp
+    ${SRC_DIR}/Game/Data/NewYearPeriod.cpp
 )
 add_test(NAME jxqy-newgame-automation-process-tests
     COMMAND ${Python3_EXECUTABLE}
@@ -857,6 +891,7 @@ add_test(NAME jxqy-editor-run-resource-routing-tests
 
 add_executable(jxqy-resource-catalog-supplemental-tests
     ${SRC_DIR}/tests/test_resource_catalog_supplemental.cpp
+    ${JXQY_MINIZ_SOURCES}
     ${SRC_DIR}/Resource/ResourceCatalog.cpp
     ${SRC_DIR}/Resource/ResourceManifest.cpp
     ${JXQY_MOD_RELEASE_METADATA_SOURCES}
@@ -1084,6 +1119,7 @@ set(JXQY_NPC_TARGETING_RUNTIME_SOURCES ${SOURCE_FILES})
 list(REMOVE_ITEM JXQY_NPC_TARGETING_RUNTIME_SOURCES ${SRC_DIR}/main.cpp)
 
 add_executable(jxqy-npc-targeting-tests
+    ${SRC_DIR}/tests/test_gameplay_automation_runtime.cpp
     ${SRC_DIR}/tests/test_npc_targeting.cpp
     ${SRC_DIR}/tests/test_npc_runtime_persistence.cpp
     ${SRC_DIR}/tests/test_effect_runtime_persistence.cpp
@@ -1136,15 +1172,72 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 add_test(NAME jxqy-npc-targeting-tests COMMAND jxqy-npc-targeting-tests)
+if(WIN32)
+    add_test(NAME jxqy-gameplay-automation-runtime-tests COMMAND jxqy-npc-targeting-tests --gameplay-automation)
+    set_tests_properties(jxqy-gameplay-automation-runtime-tests PROPERTIES TIMEOUT 60)
+endif()
 add_test(NAME jxqy-npc-runtime-persistence-tests COMMAND jxqy-npc-targeting-tests --npc-persistence)
 add_test(NAME jxqy-effect-runtime-persistence-tests COMMAND jxqy-npc-targeting-tests --effect-persistence)
 add_test(NAME jxqy-gamble-menu-runtime-tests COMMAND jxqy-npc-targeting-tests --gamble-menu)
 add_test(NAME jxqy-magic-derived-runtime-tests COMMAND jxqy-npc-targeting-tests --magic-derived)
 add_test(NAME jxqy-magic-experience-tests COMMAND jxqy-npc-targeting-tests --magic-experience)
+add_test(NAME jxqy-replacement-experience-tests COMMAND jxqy-npc-targeting-tests --replacement-experience)
 add_test(NAME jxqy-object-animation-runtime-tests COMMAND jxqy-npc-targeting-tests --object-animation)
 add_test(NAME jxqy-media-runtime-tests COMMAND jxqy-npc-targeting-tests --media-runtime)
 add_test(NAME jxqy-core-lifecycle-tests COMMAND jxqy-npc-targeting-tests --core-lifecycle)
+add_test(NAME jxqy-script-movement-tests COMMAND jxqy-npc-targeting-tests --script-movement)
 set_tests_properties(jxqy-core-lifecycle-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-current-mod-compatibility-tests COMMAND jxqy-npc-targeting-tests --current-mod-compatibility)
+add_test(NAME jxqy-qingyu-ui-tests COMMAND jxqy-npc-targeting-tests --qingyu-ui)
+set_tests_properties(jxqy-qingyu-ui-tests PROPERTIES TIMEOUT 180)
+set_tests_properties(jxqy-current-mod-compatibility-tests PROPERTIES TIMEOUT 180)
+if(WIN32 AND BUILD_TESTING)
+    add_test(NAME jxqy-save-write-sharing-tests COMMAND jxqy-npc-targeting-tests --save-write-sharing)
+    set_tests_properties(jxqy-save-write-sharing-tests PROPERTIES TIMEOUT 180)
+endif()
+add_test(NAME jxqy-xiaoxiang-missing-object-route-tests COMMAND jxqy-npc-targeting-tests --xiaoxiang-missing-object-routes)
+set_tests_properties(jxqy-xiaoxiang-missing-object-route-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-xiaoxiang-tournament-route-tests COMMAND jxqy-npc-targeting-tests --xiaoxiang-tournament-routes)
+set_tests_properties(jxqy-xiaoxiang-tournament-route-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-xiaoxiang-prison-ending-tests COMMAND jxqy-npc-targeting-tests --xiaoxiang-prison-ending)
+set_tests_properties(jxqy-xiaoxiang-prison-ending-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-xiaoxiang-companion-history-sync-tests COMMAND jxqy-npc-targeting-tests --xiaoxiang-companion-history-sync)
+add_test(NAME jxqy-xiaoxiang-companion-history-async-tests COMMAND jxqy-npc-targeting-tests --xiaoxiang-companion-history-async)
+set_tests_properties(jxqy-xiaoxiang-companion-history-sync-tests jxqy-xiaoxiang-companion-history-async-tests PROPERTIES
+    TIMEOUT 1800
+    ENVIRONMENT "JXQY_TEST_RANDOM_SEED=20260925")
+add_test(NAME jxqy-xiaoxiang-legacy-entrance-tests COMMAND jxqy-npc-targeting-tests --xiaoxiang-legacy-entrances)
+set_tests_properties(jxqy-xiaoxiang-legacy-entrance-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-moonlight-trap-route-tests COMMAND jxqy-npc-targeting-tests --moonlight-trap-routes)
+set_tests_properties(jxqy-moonlight-trap-route-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-moonlight-departure-tests COMMAND jxqy-npc-targeting-tests --moonlight-departure)
+set_tests_properties(jxqy-moonlight-departure-tests PROPERTIES TIMEOUT 90)
+add_test(NAME jxqy-new-sword-boat-route-tests COMMAND jxqy-npc-targeting-tests --new-sword-boat-routes)
+set_tests_properties(jxqy-new-sword-boat-route-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-new-sword-yang-ying-route-tests COMMAND jxqy-npc-targeting-tests --new-sword-yang-ying-routes)
+set_tests_properties(jxqy-new-sword-yang-ying-route-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-moonlight-ending-two-route-tests COMMAND jxqy-npc-targeting-tests --moonlight-ending-two-routes)
+set_tests_properties(jxqy-moonlight-ending-two-route-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-sword-two-partner-departure-tests COMMAND jxqy-npc-targeting-tests --sword-two-partner-departures)
+set_tests_properties(jxqy-sword-two-partner-departure-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-sword-two-historical-script-tests COMMAND jxqy-npc-targeting-tests --sword-two-historical-scripts)
+set_tests_properties(jxqy-sword-two-historical-script-tests PROPERTIES TIMEOUT 120)
+add_test(NAME jxqy-bilibili-story-feedback-tests COMMAND jxqy-npc-targeting-tests --bilibili-story-feedback)
+set_tests_properties(jxqy-bilibili-story-feedback-tests PROPERTIES TIMEOUT 240)
+add_test(NAME jxqy-merged-entity-save-tests COMMAND jxqy-npc-targeting-tests --merged-entity-save)
+set_tests_properties(jxqy-merged-entity-save-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-production-attack-file-tests COMMAND jxqy-npc-targeting-tests --production-attack-files)
+set_tests_properties(jxqy-production-attack-file-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-full-attack-save-tests COMMAND jxqy-npc-targeting-tests --full-attack-save)
+set_tests_properties(jxqy-full-attack-save-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-equipment-replacement-save-tests COMMAND jxqy-npc-targeting-tests --equipment-replacement-save)
+set_tests_properties(jxqy-equipment-replacement-save-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-dynamic-magic-list-save-tests COMMAND jxqy-npc-targeting-tests --dynamic-magic-list-save)
+set_tests_properties(jxqy-dynamic-magic-list-save-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-full-experience-save-tests COMMAND jxqy-npc-targeting-tests --full-experience-save)
+set_tests_properties(jxqy-full-experience-save-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-character-caster-save-tests COMMAND jxqy-npc-targeting-tests --character-caster-save)
+set_tests_properties(jxqy-character-caster-save-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-ui-focus-tests COMMAND jxqy-npc-targeting-tests --ui-focus)
 add_test(NAME jxqy-map-thumbnail-controller-tests
 	COMMAND jxqy-npc-targeting-tests --map-thumbnail-controller)
@@ -1459,6 +1552,15 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 add_test(NAME jxqy-file-tests COMMAND jxqy-file-tests)
+add_test(NAME jxqy-ini-numeric-default-tests COMMAND jxqy-file-tests --ini-numeric-defaults)
+set_tests_properties(jxqy-ini-numeric-default-tests PROPERTIES TIMEOUT 30)
+if(WIN32 AND BUILD_TESTING)
+    add_test(NAME jxqy-transaction-rename-retry-tests
+        COMMAND jxqy-file-tests --transaction-retry-boundaries)
+    set_tests_properties(jxqy-transaction-rename-retry-tests PROPERTIES TIMEOUT 30)
+    add_test(NAME jxqy-checked-write-recovery-tests COMMAND jxqy-file-tests --checked-write-recovery)
+    set_tests_properties(jxqy-checked-write-recovery-tests PROPERTIES TIMEOUT 30)
+endif()
 if(JXQY_FORCE_MOBILE_UI)
     add_test(
         NAME jxqy-mobile-resource-policy-tests

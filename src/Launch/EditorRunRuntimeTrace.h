@@ -217,6 +217,14 @@ RuntimeTraceValidationResult serializeRuntimeTraceRecord(
 	const RuntimeTraceRecord& record,
 	std::string& output);
 
+namespace detail
+{
+// Writer-only path: the event was validated before enqueue, and the writer
+// owns the already-validated session and bounded sequence number.
+void serializeValidatedRuntimeTraceRecord(
+	const RuntimeTraceRecord& record, std::string& output);
+}
+
 // SHA-256 of the exact supplied bytes, encoded as 64 lowercase hex digits.
 std::string runtimeTraceSha256Hex(std::string_view bytes);
 }

@@ -1697,6 +1697,169 @@ bool resolveEffectiveGameType(
 	return false;
 }
 
+void resolveEffectiveProgressionSettings(
+	Catalog& catalog,
+	const RuntimePolicyEvaluation& evaluation,
+	std::size_t startIndex,
+	RuntimeResource::ExactSelectionResult& result,
+	ResourceManifest& materializedManifest)
+{
+	struct ResolutionFrame
+	{
+		fs::path root;
+		std::unique_ptr<ResourceManifest> manifest;
+		std::optional<std::size_t> indexedPack;
+		std::size_t depth = 1;
+		std::vector<std::string> dependencyIds;
+		std::size_t nextDependencyIndex = 0;
+		std::string key;
+		bool entered = false;
+		bool inheritEffects = true;
+	};
+
+	materializedManifest.levelUpEffectsResolved = true;
+	materializedManifest.levelUpMaleEffectCandidates.clear();
+	materializedManifest.levelUpFemaleEffectCandidates.clear();
+	const auto inheritDefinedSettings =
+		[&materializedManifest](
+			const ResourceManifest& source)
+		{
+			if (!materializedManifest.defeatedNpcExperienceModeDefined
+				&& source.defeatedNpcExperienceModeDefined)
+			{
+				materializedManifest.defeatedNpcExperienceMode =
+					source.defeatedNpcExperienceMode;
+				materializedManifest.defeatedNpcExperienceModeDefined = true;
+			}
+			if (!materializedManifest.experienceMultiplierDefined
+				&& source.experienceMultiplierDefined)
+			{
+				materializedManifest.experienceMultiplier =
+					source.experienceMultiplier;
+				materializedManifest.experienceMultiplierDefined = true;
+			}
+			if (!materializedManifest.levelUpThresholdModeDefined
+				&& source.levelUpThresholdModeDefined)
+			{
+				materializedManifest.levelUpThresholdMode =
+					source.levelUpThresholdMode;
+				materializedManifest.levelUpThresholdModeDefined = true;
+			}
+			if (!materializedManifest.levelUpMessageDefined
+				&& source.levelUpMessageDefined)
+			{
+				materializedManifest.levelUpMessage = source.levelUpMessage;
+				materializedManifest.levelUpMessageDefined = true;
+			}
+		};
+	const auto appendEffects = [](std::vector<std::string>& destination,
+		const std::vector<std::string>& effects)
+	{
+		for (const std::string& effect : effects)
+		{
+			if (std::none_of(destination.begin(), destination.end(),
+				[&effect](const std::string& existing)
+				{
+					return foldAsciiCase(existing) == foldAsciiCase(effect);
+				}))
+			{
+				destination.push_back(effect);
+			}
+		}
+	};
+
+	std::set<std::string> visiting;
+	std::set<std::string> completed;
+	std::vector<ResolutionFrame> stack;
+	stack.reserve(RuntimeResource::MaximumCatalogDependencyDepth);
+	const CatalogPack& active = catalog.packs[startIndex];
+	stack.push_back({
+		active.root,
+		std::make_unique<ResourceManifest>(active.manifest),
+		startIndex,
+		1 });
+
+	while (!stack.empty())
+	{
+		ResolutionFrame& frame = stack.back();
+		if (!frame.entered)
+		{
+			inheritDefinedSettings(*frame.manifest);
+			frame.key = frame.indexedPack.has_value()
+				? "indexed:" +
+					std::to_string(frame.indexedPack.value())
+				: "path:" + normalizedRootString(frame.root);
+			frame.key += frame.inheritEffects ? ":effects" : ":settings";
+			if (completed.find(frame.key) != completed.end() ||
+				!visiting.insert(frame.key).second)
+			{
+				stack.pop_back();
+				continue;
+			}
+			if (frame.inheritEffects)
+			{
+				appendEffects(materializedManifest.levelUpMaleEffectCandidates,
+					frame.manifest->getLevelUpEffectCandidates(0));
+				appendEffects(materializedManifest.levelUpFemaleEffectCandidates,
+					frame.manifest->getLevelUpEffectCandidates(2));
+			}
+			frame.dependencyIds =
+				frame.manifest->getDependencyIds();
+			frame.entered = true;
+			continue;
+		}
+
+		if (frame.nextDependencyIndex <
+			frame.dependencyIds.size())
+		{
+			const std::string dependencyId =
+				frame.dependencyIds[
+					frame.nextDependencyIndex++];
+			const std::vector<std::size_t> matches =
+				findSelectablePacksById(
+					catalog,
+					evaluation.enabled,
+					dependencyId,
+					frame.indexedPack);
+			if (matches.empty())
+			{
+				continue;
+			}
+			if (matches.size() != 1)
+			{
+				continue;
+			}
+			const std::size_t dependencyIndex = matches.front();
+			const fs::path dependencyRoot =
+				catalog.packs[dependencyIndex].root;
+			auto dependencyManifest =
+				std::make_unique<ResourceManifest>(
+					catalog.packs[dependencyIndex].manifest);
+			if (rejectForDependencyDepth(
+					frame.depth,
+					*dependencyManifest,
+					dependencyRoot,
+					result))
+			{
+				return;
+			}
+			ResolutionFrame dependencyFrame{
+				dependencyRoot,
+				std::move(dependencyManifest),
+				dependencyIndex,
+				frame.depth + 1 };
+			dependencyFrame.inheritEffects = frame.inheritEffects &&
+				frame.manifest->levelUpEffectMode == LevelUpEffectMode::Append;
+			stack.push_back(std::move(dependencyFrame));
+			continue;
+		}
+
+		visiting.erase(frame.key);
+		completed.insert(frame.key);
+		stack.pop_back();
+	}
+}
+
 bool resolveEffectiveUiProfile(
 	Catalog& catalog,
 	const RuntimePolicyEvaluation& evaluation,
@@ -2305,6 +2468,12 @@ ExactSelectionResult resolveCatalogSelection(
 			materializedManifest.type = resolvedType;
 			materializedManifest.typeDefined = true;
 		}
+		resolveEffectiveProgressionSettings(
+			catalog,
+			policy,
+			activeIndex,
+			result,
+			materializedManifest);
 		if (!materializedManifest.uiProfile.empty())
 		{
 			const std::string canonicalProfile =

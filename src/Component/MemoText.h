@@ -17,8 +17,9 @@ public:
 	std::vector<std::shared_ptr<Label>> mstr;
 	virtual void initFromIni(INIReader & ini);
 protected:
+	bool fitLines = false;
+	void onSetChildRect() override;
 	void freeResource();
 
 };
-
 

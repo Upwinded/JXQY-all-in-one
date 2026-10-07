@@ -149,6 +149,13 @@ public:
 		return scene.exitButton != nullptr;
 	}
 
+	static bool resourceRemovalAvailable(const ResourceSelectScene& scene)
+	{
+		return scene.resourceRemoveButton != nullptr
+			&& scene.resourceRemoveButton->visible
+			&& scene.resourceRemoveButton->activated;
+	}
+
 	static bool prepareOrdinaryChoice(
 		ChooseMenu& menu,
 		const std::string& message,
@@ -498,6 +505,17 @@ bool testAllSurfaceClassifications()
 		"surface=LoadNpc phase=script-binding"
 			" expected=no-interface-created actual=loading-overlay")
 		&& ok;
+	for (const char* registration : { "ShowSystemMsg", "ShowSystemMessage", "TalkSelfTip" })
+	{
+		const auto binding = std::find_if(MenuSurfaceCatalog::kScriptBindings.begin(),
+			MenuSurfaceCatalog::kScriptBindings.end(), [registration](const auto& candidate)
+			{
+				return candidate.registration == registration;
+			});
+		ok = checkContract(binding != MenuSurfaceCatalog::kScriptBindings.end() &&
+			binding->policyKeyOrExemption == "system-notice",
+			std::string("surface=") + registration + " phase=script-binding expected=system-notice") && ok;
+	}
 	return ok;
 }
 
@@ -1305,6 +1323,10 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 	};
 	optionCandidates.push_back("touch-controls");
 	optionCandidates.push_back("cheat-settings");
+	if (File::fileExist("ini\\ui\\qingyu\\theme.ini") && File::fileExist("asf\\ui\\qingyu\\panel.png"))
+	{
+		optionCandidates.push_back("ui-theme");
+	}
 
 	std::vector<PhysicalTraversalSpec> specs;
 	// Rect half-plane checks apply to non-wrapping spatial contracts.
@@ -1332,7 +1354,9 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 			"resource-remove",
 			"cheat-help",
 			"save-management",
+#if !defined(__MOBILE__)
 			"display-settings",
+#endif
 			"check-updates",
 			"exit",
 #if defined(__ANDROID__) || \
@@ -1456,6 +1480,10 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 				{ "touch-controls", option->touchControlsButton });
 			candidates.push_back(
 				{ "cheat-settings", option->cheatSettingsButton });
+			if (option->themeButton != nullptr)
+			{
+				candidates.push_back({ "ui-theme", option->themeButton });
+			}
 			return PhysicalFocusFixture
 			{
 				option,
@@ -1612,35 +1640,50 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 		std::vector<std::string> footerCandidates;
 		std::string defaultFocus;
 	};
-	const std::array<ExpectedPaginatedChoicePage, 4>
+	// The 800x600 resource fixture leaves 315 pixels for rows after the
+	// scaled parchment insets and header/footer. Four 61-pixel rows with
+	// 6-pixel gaps fit (262 pixels); five need 329 pixels.
+	const std::array<ExpectedPaginatedChoicePage, 6>
 		expectedPaginatedPages =
 	{{
 		{
-			{ 0, 1, 2, 3, 4, 5, 6 },
+			{ 0, 1, 2, 3 },
 			{ "next-page" },
 			"choice-0"
 		},
 		{
-			{ 7, 8, 9, 10, 11, 12, 13 },
+			{ 4, 5, 6, 7 },
 			{ "previous-page", "next-page" },
-			"choice-7"
+			"choice-4"
 		},
 		{
-			{ 14, 15, 16, 17, 18, 19, 20 },
+			{ 8, 9, 10, 11 },
 			{ "previous-page", "next-page" },
-			"choice-14"
+			"choice-8"
 		},
 		{
-			{ 21, 22, 23 },
+			{ 12, 13, 14, 15 },
+			{ "previous-page", "next-page" },
+			"choice-12"
+		},
+		{
+			{ 16, 17, 18, 19 },
+			{ "previous-page", "next-page" },
+			"choice-16"
+		},
+		{
+			{ 20, 21, 22, 23 },
 			{ "previous-page" },
-			"choice-21"
+			"choice-20"
 		}
 	}};
-	const std::array<const char*, 4> paginatedPageVariants =
+	const std::array<const char*, 6> paginatedPageVariants =
 	{{
 		"paginated-first-page",
 		"paginated-middle-page-1",
 		"paginated-middle-page-2",
+		"paginated-middle-page-3",
+		"paginated-middle-page-4",
 		"paginated-last-page"
 	}};
 	PhysicalFocusFixture paginatedProbe = makeOrdinaryChoiceFixture(
@@ -1658,7 +1701,7 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 			!= expectedPaginatedPages.front().defaultFocus)
 	{
 		throw std::runtime_error(
-			"choice pagination fixture violated the explicit four-page"
+			"choice pagination fixture violated the explicit six-page"
 				" default-focus contract");
 	}
 	for (std::size_t pageIndex = 0;
@@ -1970,7 +2013,10 @@ bool testLowRiskPhysicalFocusGraphs()
 
 	const std::filesystem::path repositoryRoot =
 		std::filesystem::path(__FILE__).parent_path().parent_path().parent_path();
-	const std::filesystem::path assetsRoot = repositoryRoot / "assets";
+	// This traversal includes removal, so use plain directories rather than a
+	// checkout's optional assets junction, which removal deliberately rejects.
+	const std::filesystem::path assetsRoot =
+		std::filesystem::canonical(repositoryRoot / "assets");
 	File::setAssetsCollectionRoot(assetsRoot.generic_string());
 	File::setActiveResourceRoot("");
 	File::setCommonResourceRoot("");
@@ -2005,6 +2051,22 @@ bool testLowRiskPhysicalFocusGraphs()
 		auto resourceProbeScene =
 			std::dynamic_pointer_cast<ResourceSelectScene>(
 				resourceProbe.owner);
+		int removableCount = 0;
+		for (int index = 0; index < static_cast<int>(resourceManager.getDiscoveredPacks().size()); ++index)
+		{
+			if (resourceManager.isResourcePackRemovable(index)) ++removableCount;
+		}
+		std::cout << "Resource removal focus:\troot=" << resourceManager.getWritableResourceCollectionRoot()
+			<< "\tremovable=" << removableCount
+			<< "\tbutton=" << (resourceProbeScene != nullptr
+				&& GamepadSurfaceContractTestAccess::resourceRemovalAvailable(*resourceProbeScene)) << std::endl;
+		if (!checkContract(removableCount == 11 && resourceProbeScene != nullptr
+			&& GamepadSurfaceContractTestAccess::resourceRemovalAvailable(*resourceProbeScene),
+			"surface=startup.resource-select phase=removal-fixture"
+			" expected=11-plain-removable-packs-and-enabled-button actual=unavailable"))
+		{
+			return false;
+		}
 		constexpr std::size_t ExpectedResourceCandidateCount = 21;
 		if (!checkContract(
 				resourceProbeScene != nullptr

@@ -55,6 +55,7 @@ private:
     int _magicLevel = 1;
     int _magicListIndex = -1;
     std::shared_ptr<Magic> _magicToUse = nullptr;
+    std::shared_ptr<Magic> _sourceMagic = nullptr;
     std::weak_ptr<GameElement> _target;
     bool _magicDone = false;
 };

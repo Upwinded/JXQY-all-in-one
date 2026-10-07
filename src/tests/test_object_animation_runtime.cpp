@@ -441,6 +441,7 @@ bool runObjectAnimationRuntimeTests()
 			incompleteObjectLoad,
 			true) &&
 			incompleteObjectLoad.objectCount() == 1 &&
+			incompleteObjectLoad.needsNormalization() &&
 			gameManager.objectManager->commitPreparedLoad(
 				std::move(incompleteObjectLoad)) &&
 			gameManager.objectManager->objectList.size() == 1 &&

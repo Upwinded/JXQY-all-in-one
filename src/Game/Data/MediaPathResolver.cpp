@@ -151,6 +151,9 @@ std::string resolveMediaAssetPath(
 	const std::string& fileName,
 	const std::vector<std::string>& fallbackExtensions)
 {
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+	++mediaAssetResolutionCountForTests;
+#endif
 	std::vector<std::string> candidates = buildMediaAssetCandidates(folder, fileName, fallbackExtensions);
 	std::string resolvedCandidate = File::resolveFirstExistingResource(candidates);
 	if (!resolvedCandidate.empty())
@@ -163,4 +166,16 @@ std::string resolveMediaAssetPath(
 std::string resolveSoundAssetPath(const std::string& fileName)
 {
 	return resolveMediaAssetPath(SOUND_FOLDER, fileName, { ".wav" });
+}
+
+std::string buildSoundAssetPath(const std::string& fileName)
+{
+	return File::isSafeResourcePath(fileName)
+		? buildDirectMediaPath(SOUND_FOLDER, fileName) : std::string();
+}
+
+std::string resolveVideoAssetPath(const std::string& fileName)
+{
+	return resolveMediaAssetPath(VIDEO_FOLDER, fileName,
+		{ ".avi", ".mp4", ".wmv", ".mpg", ".mpeg" });
 }

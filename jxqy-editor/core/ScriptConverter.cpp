@@ -416,7 +416,11 @@ std::string normalizeVariableName(std::string text)
     if (!text.empty() && text.front() == '$')
         text.erase(text.begin());
     if (text.size() >= 2 && text.front() == '"' && text.back() == '"')
+    {
         text = text.substr(1, text.size() - 2);
+        if (!text.empty() && text.front() == '$')
+            text.erase(text.begin());
+    }
     return text;
 }
 
@@ -491,6 +495,14 @@ std::vector<std::string> splitArguments(const std::string& text)
         }
         if (ch == '"')
         {
+            const std::string previous = trimCopy(current);
+            if (!inString && depth == 0 && isQuotedStringLiteral(previous) &&
+                findClosingQuote(previous, 0) == previous.size() - 1)
+            {
+                // C# accepts adjacent quoted arguments without a comma.
+                result.push_back(previous);
+                current.clear();
+            }
             current += ch;
             inString = !inString;
             continue;
@@ -593,13 +605,14 @@ std::string variableNameLiteral(const std::string& arg)
 
 bool outputVariableNameLiteral(const std::string& arg, std::string& literal)
 {
-    if (isVariableArgument(arg))
+    std::string trimmed = stripTrailingSemicolon(stripBalancedParentheses(trimCopy(arg)));
+    if (isVariableArgument(arg) ||
+        (isQuotedStringLiteral(trimmed) && trimmed.size() > 2 && trimmed[1] == '$'))
     {
         literal = variableNameLiteral(arg);
         return true;
     }
 
-    std::string trimmed = stripTrailingSemicolon(stripBalancedParentheses(trimCopy(arg)));
     std::string name;
     std::string args;
     std::string suffix;
@@ -673,6 +686,10 @@ void normalizeLegacyOutputArguments(const std::string& lowerName, std::vector<st
 {
     std::string outputLiteral;
     if ((lowerName == "getrandnum" ||
+         lowerName == "getexp" ||
+         lowerName == "checkfreegoodsspace" ||
+         lowerName == "checkfreemagicspace" ||
+         lowerName == "isequipweapon" ||
          lowerName == "getpartneridx" ||
          lowerName == "getmoneynum" ||
          lowerName == "checkyear" ||
@@ -704,7 +721,8 @@ void normalizeLegacyOutputArguments(const std::string& lowerName, std::vector<st
     {
         args[2] = outputLiteral;
     }
-    else if (lowerName == "getplayermagiclevel" && args.size() >= 2 && outputVariableNameLiteral(args[1], outputLiteral))
+    else if ((lowerName == "getplayermagiclevel" || lowerName == "getplayerstate") &&
+             args.size() >= 2 && outputVariableNameLiteral(args[1], outputLiteral))
     {
         args[1] = outputLiteral;
     }
@@ -717,11 +735,27 @@ void normalizeLegacyOutputArguments(const std::string& lowerName, std::vector<st
         args[2] = outputLiteral;
     }
 
+    if (lowerName == "clearallvar" || lowerName == "clearallvars")
+    {
+        for (std::string& arg : args)
+        {
+            if (outputVariableNameLiteral(arg, outputLiteral))
+                arg = outputLiteral;
+        }
+    }
+    if (lowerName == "getplayerstate" && !args.empty() &&
+        isBareIdentifier(trimCopy(args[0])))
+    {
+        args[0] = quoteLuaStringLiteral(trimCopy(args[0]));
+    }
+
     for (std::string& arg : args)
     {
         arg = normalizeValueArgument(arg);
     }
 }
+
+bool isSignedIntegerText(const std::string& text);
 
 void repairLegacyArgumentList(std::vector<std::string>& args)
 {
@@ -747,6 +781,18 @@ void repairLegacyArgumentList(std::vector<std::string>& args)
                     repaired.push_back(rest);
                     continue;
                 }
+            }
+        }
+        else
+        {
+            const size_t quotePos = trimmed.find('"');
+            if (quotePos != std::string::npos &&
+                isSignedIntegerText(trimCopy(trimmed.substr(0, quotePos))) &&
+                findClosingQuote(trimmed, quotePos) == trimmed.size() - 1)
+            {
+                repaired.push_back(trimCopy(trimmed.substr(0, quotePos)));
+                repaired.push_back(trimmed.substr(quotePos));
+                continue;
             }
         }
 
@@ -1107,6 +1153,11 @@ ScriptConverter::~ScriptConverter()
 const std::set<std::string>& ScriptConverter::runtimeApiNames()
 {
     return knownRuntimeScriptApis();
+}
+
+bool ScriptConverter::isSupportedRuntimeApi(const std::string& name)
+{
+    return acceptedRuntimeScriptApis().count(toLowerAscii(name)) != 0;
 }
 
 std::string ScriptConverter::getLastMessage() const
@@ -1520,7 +1571,11 @@ std::string ScriptConverter::convertLegacyConditionToLua(const std::string& cond
             return "";
 
         std::string rhs;
-        if (isVariableArgument(value))
+        // The C# If parser reads a numeric RHS even with a stray '$' prefix.
+        // Keep this compatibility local to conditions, not variable names.
+        if (isVariableArgument(value) && isSignedIntegerText(value.substr(1)))
+            rhs = value.substr(1);
+        else if (isVariableArgument(value))
             rhs = "getvar(" + variableNameLiteral(value) + ")";
         else
             rhs = value;
@@ -1662,7 +1717,6 @@ std::string ScriptConverter::normalizeFunctionCall(const std::string& line)
         {"getgoodsmun", "getgoodsnum"},
         {"hidebottomwindow", "hidebottomwnd"},
         {"lodaobj", "loadobj"},
-        {"memo", "addtomemo"},
         {"messagebox", "displaymessage"},
         {"npcaction", "setnpcaction"},
         {"playerruntoex", "playerrunto"},

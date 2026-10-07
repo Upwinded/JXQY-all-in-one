@@ -52,7 +52,8 @@ public:
 	bool showGoodsToolTip(
 		const PElement& owner,
 		const std::shared_ptr<Goods>& goods,
-		const PElement& anchor);
+		const PElement& anchor,
+		bool details = false);
 	bool showMagicToolTip(
 		const PElement& owner,
 		const std::shared_ptr<Magic>& magic,
@@ -96,6 +97,7 @@ public:
 
 	std::shared_ptr<MsgBox> messageBox = nullptr;
 	std::shared_ptr<SystemNotice> systemNotice = nullptr;
+	std::shared_ptr<SystemNotice> scriptMessages = nullptr;
 	std::shared_ptr<StateMenu> stateMenu = nullptr;
 	std::shared_ptr<ToolTip> toolTip = nullptr;
 	std::shared_ptr<MemoMenu> memoMenu = nullptr;
@@ -119,6 +121,7 @@ public:
 	std::shared_ptr<NpcInfoPanel> npcInfoPanel = nullptr;
 
 private:
+	ControllerPromptTextureCache controllerPromptTextureCache;
 	enum class ControllerMenuRole
 	{
 		None,

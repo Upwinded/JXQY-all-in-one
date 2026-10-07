@@ -318,6 +318,150 @@ bool smokeSelectedPack(
 		ok = check(File::fileExist("video\\begin.avi") &&
 			resolvedOpeningMovie.find("/jxqy2/") != std::string::npos,
 			"XIAOXIANGXING_1_022 resolves its opening movie from the primary JXQY2 parent") && ok;
+
+		std::unique_ptr<char[]> initialTrapContent;
+		const int initialTrapLength = File::readFile("ini\\save\\traps.ini", initialTrapContent);
+		ok = check(initialTrapLength > 0 && initialTrapContent != nullptr,
+			"XIAOXIANGXING_1_022 initial trap definitions resolve") && ok;
+		struct DisabledLegacyTrap
+		{
+			const char* mapName;
+			const char* trapIndex;
+			const char* scriptName;
+		};
+		const std::array<DisabledLegacyTrap, 29> disabledLegacyTraps = {{
+			{ u8"狂沙镇", "4", u8"柴嵩交谈.txt" },
+			{ u8"主角家-狂沙镇", "1", u8"地图切换.txt" },
+			{ u8"主角家-狂沙镇", "2", u8"地图切换1.txt" },
+			{ u8"主角家-狂沙镇", "3", u8"地图切换2.txt" },
+			{ u8"铁门寨", "2", u8"地图切换1.txt" },
+			{ u8"铁门寨", "3", u8"进入山寨.txt" },
+			{ u8"狂沙镇", "6", u8"告示牌.txt" },
+			{ u8"狂沙镇-龙门客栈", "3", u8"对话.txt" },
+			{ u8"风雪山庄", "2", u8"地图陷阱2.txt" },
+			{ u8"龙门客栈", "3", u8"柴嵩.txt" },
+			{ u8"临安大牢第1层", "1", u8"地图陷阱1.txt" },
+			{ u8"大牢出口1", "1", "trap2-to大牢.txt" },
+			{ u8"天忍教-地下迷宫2", "3", u8"地图陷阱3.txt" },
+			{ u8"天忍教-地下迷宫3", "3", u8"地图陷阱3.txt" },
+			{ u8"长安", "2", "trap-2.txt" },
+			{ u8"临安城", "1", "first.txt" },
+			{ u8"临安城", "4", "trap4.txt" },
+			{ u8"临安城", "5", "trap5.txt" },
+			{ u8"凤池山庄", "4", "maptrap4.txt" },
+			{ u8"凤池山庄", "5", "datingtalk.txt" },
+			{ u8"凤池山庄", "7", u8"后厅.txt" },
+			{ u8"中都", "3", u8"酒店门口地图陷阱.txt" },
+			{ u8"中都", "5", u8"龙音寺门口地图陷阱5.txt" },
+			{ u8"中都", "7", "trap-7.txt" },
+			{ u8"中都", "11", u8"地图陷阱11.txt" },
+			{ u8"中都", "14", "trap-14.txt" },
+			{ u8"中都", "15", "trap-15.txt" },
+			{ u8"葬马岗", "2", u8"地图陷阱2.txt" },
+			{ u8"矿山", "2", u8"地图陷阱2.txt" },
+		}};
+		if (initialTrapLength > 0 && initialTrapContent != nullptr)
+		{
+			INIReader initialTrapIni(initialTrapContent);
+			for (const auto& disabledTrap : disabledLegacyTraps)
+			{
+				ok = check(!initialTrapIni.HasKey(
+						disabledTrap.mapName, disabledTrap.trapIndex),
+					"XIAOXIANGXING_1_022 new games omit an unsafe legacy trap " +
+						std::string(disabledTrap.mapName) + ":" + disabledTrap.trapIndex) && ok;
+			}
+			ok = check(initialTrapIni.Get(
+					u8"大牢出口1", "2", "") == "trap1-to临安.txt" &&
+				initialTrapIni.Get(u8"长安迷宫", "1", "") == "trap1.txt",
+				"XIAOXIANGXING_1_022 keeps its two required parent-map exits") && ok;
+		}
+
+		for (const auto& disabledTrap : disabledLegacyTraps)
+		{
+			const std::string legacyTrapScript = "script\\map\\" +
+				std::string(disabledTrap.mapName) + "\\" + disabledTrap.scriptName;
+			const std::string resolvedLegacyTrapScript = toLowerAscii(normalizeSlash(
+				File::getAssetsName(legacyTrapScript)));
+			std::unique_ptr<char[]> legacyTrapContent;
+			const int legacyTrapLength = File::readFile(legacyTrapScript, legacyTrapContent);
+			const std::string legacyTrapText = legacyTrapLength > 0 && legacyTrapContent != nullptr
+				? std::string(legacyTrapContent.get(), static_cast<std::size_t>(legacyTrapLength))
+				: std::string();
+			const std::string clearTrap = "setmaptrap(" +
+				std::string(disabledTrap.trapIndex) + ",\"\");";
+			ok = check(resolvedLegacyTrapScript.find(u8"/潇湘行/") != std::string::npos &&
+				legacyTrapText.find(clearTrap) != std::string::npos &&
+				legacyTrapText.find("savemaptrap();") != std::string::npos &&
+				legacyTrapText.find("talk(") == std::string::npos &&
+				legacyTrapText.find("loadmap(") == std::string::npos,
+				"XIAOXIANGXING_1_022 clears an unsafe legacy trap for old saves: " +
+					std::string(disabledTrap.mapName) + ":" + disabledTrap.trapIndex) && ok;
+		}
+
+		for (const auto& localExit : {
+			u8"script\\map\\大牢出口1\\trap1-to临安.txt",
+			u8"script\\map\\长安迷宫\\trap1.txt" })
+		{
+			const std::string resolvedLocalExit = toLowerAscii(normalizeSlash(
+				File::getAssetsName(localExit)));
+			ok = check(resolvedLocalExit.find(u8"/潇湘行/") != std::string::npos,
+				"XIAOXIANGXING_1_022 owns its required parent-map exit: " +
+					std::string(localExit)) && ok;
+		}
+		std::unique_ptr<char[]> changanMazeExitContent;
+		const int changanMazeExitLength = File::readFile(
+			u8"script\\map\\长安迷宫\\trap1.txt", changanMazeExitContent);
+		const std::string changanMazeExitText =
+			changanMazeExitLength > 0 && changanMazeExitContent != nullptr
+				? std::string(changanMazeExitContent.get(),
+					static_cast<std::size_t>(changanMazeExitLength))
+				: std::string();
+		ok = check(changanMazeExitText.find("loadnpc(\"ca.npc\");") != std::string::npos &&
+			changanMazeExitText.find("loadobj(\"ca.obj\");") != std::string::npos &&
+			changanMazeExitText.find("changan.npc") == std::string::npos,
+			"XIAOXIANGXING_1_022 returns from the Changan maze with its own entity state") && ok;
+		std::unique_ptr<char[]> changanMazeNpcContent;
+		const int changanMazeNpcLength = File::readFile(
+			"ini\\save\\camg.npc", changanMazeNpcContent);
+		const std::string changanMazeNpcText =
+			changanMazeNpcLength > 0 && changanMazeNpcContent != nullptr
+				? std::string(changanMazeNpcContent.get(),
+					static_cast<std::size_t>(changanMazeNpcLength))
+				: std::string();
+		ok = check(changanMazeNpcText.find(
+				u8"ScriptFile=天王帮弟子对话.txt") == std::string::npos,
+			"XIAOXIANGXING_1_022 does not expose a missing Changan-maze NPC dialogue") && ok;
+		std::unique_ptr<char[]> openingSceneContent;
+		const int openingSceneLength = File::readFile(
+			u8"script\\map\\狂沙镇\\开始游戏.txt", openingSceneContent);
+		const std::string openingSceneText = openingSceneLength > 0 && openingSceneContent != nullptr
+			? std::string(openingSceneContent.get(), static_cast<std::size_t>(openingSceneLength))
+			: std::string();
+		ok = check(openingSceneText.find(u8"两人喝酒") == std::string::npos,
+			"XIAOXIANGXING_1_022 does not inject the inherited drinking action") && ok;
+
+		const std::string learnedSkillSound = u8"sound\\界-使用物品.wav";
+		const std::string resolvedLearnedSkillSound = toLowerAscii(normalizeSlash(
+			File::getAssetsName(learnedSkillSound)));
+		ok = check(File::fileExist(learnedSkillSound) &&
+			resolvedLearnedSkillSound.find(u8"/潇湘行/") != std::string::npos,
+			"XIAOXIANGXING_1_022 provides local learned-skill feedback audio") && ok;
+		for (const std::string& bookScript : {
+			"book00-太极剑谱.txt", "book01-风火雷.txt", "book02-灭绝剑法.txt",
+			"book03-醉花诀.txt", "book04-无忧剑法.txt", "book05-逆转心经.txt",
+			"book07-潮月剑法.txt", "book08-云生结海.txt", "book09-漫天花雨.txt",
+			"book10-孤烟逐云.txt", "book11-镇狱破天劲.txt", "book14-金钟罩.txt" })
+		{
+			std::unique_ptr<char[]> bookContent;
+			const int bookLength = File::readFile(
+				u8"script\\goods\\" + bookScript, bookContent);
+			const std::string bookText = bookLength > 0 && bookContent != nullptr
+				? std::string(bookContent.get(), static_cast<std::size_t>(bookLength))
+				: std::string();
+			ok = check(bookText.find(u8"playsound(\"界-使用物品.wav\");") != std::string::npos &&
+				bookText.find(u8"学会武功.wav") == std::string::npos,
+				"XIAOXIANGXING_1_022 skill book uses available feedback audio: " + bookScript) && ok;
+		}
 	}
 	if (!pack.manifest.titleNewYearMenu.empty())
 	{

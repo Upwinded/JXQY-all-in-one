@@ -1,6 +1,9 @@
 #include "../Game/Data/BuySellInventory.h"
 
 #include <iostream>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
 
 namespace
 {
@@ -28,7 +31,7 @@ bool runBase64Test()
 bool runParseTest()
 {
 	const std::string text =
-		"// Formal legacy shop description\n"
+		"\xEF\xBB\xBF// Formal legacy shop description\n"
 		"[Head]\n"
 		"Count=2\n"
 		"BuyPercent=125\n"
@@ -54,6 +57,39 @@ bool runParseTest()
 		ok = check(inventory.items[0].iniFile == "drug.ini", "first item ini parsed") && ok;
 		ok = check(inventory.items[0].number == 0, "parser keeps missing number as zero for target-backed shops") && ok;
 		ok = check(inventory.items[1].number == 4, "explicit item number parsed") && ok;
+	}
+	return ok;
+}
+
+bool runProductionTableCompatibilityTest()
+{
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	bool ok = true;
+	for (const char* pack : { "jxqy2", "xjxqy", "yycs", u8"剑二改承合版", u8"江湖余尘", u8"江湖余尘二",
+		u8"潇湘行", u8"新月无痕", u8"月眉儿外传" })
+	{
+		const auto directory = assetsRoot / std::filesystem::u8path(pack) / "ini/buy";
+		if (!std::filesystem::exists(directory))
+		{
+			std::cout << "SKIP: optional production shop tables absent: " << pack << '\n';
+			continue;
+		}
+		int count = 0;
+		for (const auto& entry : std::filesystem::directory_iterator(directory))
+		{
+			if (!entry.is_regular_file() || entry.path().extension() != ".ini")
+			{
+				continue;
+			}
+			std::ifstream input(entry.path(), std::ios::binary);
+			const std::string text((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+			BuySellInventoryData inventory;
+			const std::string message = "parse actual production shop table: " + entry.path().u8string();
+			ok = check(BuySellInventory::parseText(text, inventory), message.c_str()) && ok;
+			++count;
+		}
+		ok = check(count > 0, "present production pack supplies shop tables") && ok;
+		std::cout << "Production shop tables checked: " << pack << " count=" << count << '\n';
 	}
 	return ok;
 }
@@ -156,6 +192,7 @@ int main()
 	bool ok = true;
 	ok = runBase64Test() && ok;
 	ok = runParseTest() && ok;
+	ok = runProductionTableCompatibilityTest() && ok;
 	ok = runHeaderNumberValidParseTest() && ok;
 	ok = runSerializeTest() && ok;
 	ok = runInvalidIntegerTest() && ok;

@@ -113,6 +113,8 @@ bool testSuccessfulGroupSwitch()
 	std::filesystem::create_directories(assets);
 	bool ok = writeResource(assets / "dependency", "JXQY2", "old dependency") &&
 		writeResource(assets / "moon", "YYCS", "old moon") &&
+		writeText(assets / "dependency" / "obsolete.txt", "obsolete") &&
+		writeText(assets / "moon" / "obsolete.txt", "obsolete") &&
 		writeText(assets / "common" / "sentinel.txt", "common") &&
 		writeText(assets / "unrelated" / "sentinel.txt", "unrelated") &&
 		prepareWorkspace(assets, {
@@ -144,8 +146,12 @@ bool testSuccessfulGroupSwitch()
 			"successful switch: validated group committed") && ok;
 	ok = expect(readText(assets / "dependency" / "payload.txt") ==
 			"new dependency" &&
-			readText(assets / "moon" / "payload.txt") == "new moon",
-			"successful switch: all live targets use new content") && ok;
+			readText(assets / "moon" / "payload.txt") == "new moon" &&
+			!std::filesystem::exists(
+				assets / "dependency" / "obsolete.txt") &&
+			!std::filesystem::exists(
+				assets / "moon" / "obsolete.txt"),
+			"successful switch: complete packages replace the whole target directories") && ok;
 	ok = expect(readText(assets / "common" / "sentinel.txt") == "common" &&
 			readText(assets / "unrelated" / "sentinel.txt") == "unrelated",
 			"successful switch: unrelated directories remain untouched") && ok;
@@ -193,6 +199,7 @@ bool testValidationFailureRollsBackGroup()
 	const std::filesystem::path assets = tree.root / "assets";
 	std::filesystem::create_directories(assets);
 	bool ok = writeResource(assets / "moon", "YYCS", "old moon") &&
+		writeText(assets / "moon" / "obsolete.txt", "obsolete") &&
 		prepareWorkspace(assets, {
 			{"JXQY2", "new dependency"},
 			{"YYCS", "new moon"}});
@@ -215,7 +222,8 @@ bool testValidationFailureRollsBackGroup()
 			OnlineUpdate::ResourceInstallTransactionStatus::Success &&
 			rolledBack.rolledBack,
 			"validation rollback: rollback reported success") && ok;
-	ok = expect(readText(assets / "moon" / "payload.txt") == "old moon",
+	ok = expect(readText(assets / "moon" / "payload.txt") == "old moon" &&
+			readText(assets / "moon" / "obsolete.txt") == "obsolete",
 		"validation rollback: replaced resource restored") && ok;
 	ok = expect(!std::filesystem::exists(assets / "dependency"),
 		"validation rollback: newly installed dependency removed") && ok;

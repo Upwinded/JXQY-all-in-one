@@ -56,7 +56,8 @@ bool isLegacyArgumentName(const std::string& argument)
 		argument == "--pack-id" ||
 		argument == "--skip-startup-video" ||
 		argument == "--skip-startup-videos" ||
-		argument == "--probe-resource"
+		argument == "--probe-resource" || argument == "--automation-pipe" ||
+		argument == "--automation-local-date"
 #if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
 		||
 		argument == "--enable-automation-hooks" ||
@@ -197,8 +198,49 @@ Arguments parseArguments(
 		{
 			result.legacy.probeResource = true;
 		}
+
+        else if (argument == "--automation-pipe")
+        {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS) && defined(_WIN32)
+            if (!result.legacy.automationPipeName.empty() || index + 1 >= argc || argv[index + 1] == nullptr)
+            {
+                setError(result, ArgumentError::InvalidValue, "Missing or duplicate --automation-pipe");
+                break;
+            }
+            result.legacy.automationPipeName = argv[++index];
+            const auto& name = result.legacy.automationPipeName;
+            if (name.empty() || name.size() > 80 || name.find_first_not_of(
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_") != std::string::npos)
+            {
+                setError(result, ArgumentError::InvalidValue, "Invalid --automation-pipe name");
+                break;
+            }
+            restrictedAutomationArgumentRequested = true;
+#else
+            setError(result, ArgumentError::UnauthorizedAutomation, "Automation pipe is unavailable in this build");
+            break;
+#endif
+        }
+        else if (argument == "--automation-local-date")
+        {
 #if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
-		else if (argument == "--enable-automation-hooks")
+            if (result.legacy.automationLocalDate.year != 0 || index + 1 >= argc ||
+                argv[index + 1] == nullptr ||
+                !NewYearPeriod::tryParseLocalDate(argv[index + 1], result.legacy.automationLocalDate))
+            {
+                setError(result, ArgumentError::InvalidValue,
+                    "Missing, duplicate or invalid --automation-local-date; expected YYYY-MM-DD");
+                break;
+            }
+            ++index;
+            restrictedAutomationArgumentRequested = true;
+#else
+            setError(result, ArgumentError::UnauthorizedAutomation, "Automation date is unavailable in this build");
+            break;
+#endif
+        }
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+        else if (argument == "--enable-automation-hooks")
 		{
 			result.legacy.automationHooksEnabled = true;
 		}
@@ -330,7 +372,21 @@ Arguments parseArguments(
 			"--enable-automation-hooks");
 		return result;
 	}
+	if (result.legacy.automationLocalDate.year != 0 && result.legacy.automationPipeName.empty())
+	{
+		setError(result, ArgumentError::InvalidValue, "Automation date requires an isolated automation pipe session");
+		return result;
+	}
 #endif
+
+    if (!result.legacy.automationPipeName.empty() &&
+        (result.legacy.userDataRootPath.empty() || result.legacy.probeResource ||
+         !result.legacy.startupIntegerVariables.empty() || result.legacy.exitAfterNewGameScript))
+    {
+        setError(result, ArgumentError::InvalidValue,
+            "Automation pipe requires an explicit isolated --user-data-root and cannot use scenario injection or automatic exit");
+        return result;
+    }
 	if (sawEditorRun && sawOtherArgument)
 	{
 		setError(

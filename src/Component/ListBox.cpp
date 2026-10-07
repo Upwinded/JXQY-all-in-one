@@ -37,6 +37,7 @@ void ListBox::initFromIni(INIReader & ini)
 	soundName = ini.Get("Init", "Sound", "");
 	itemHeight = ini.GetInteger("Init", "ItemHeight", itemHeight);
 	itemCount = ini.GetInteger("Init", "ItemCount", itemCount);
+	fitItems = ini.GetBoolean("Init", "FitItems", false);
 	
 	std::string soundName = ini.Get("Init", "Sound", "");
 
@@ -66,6 +67,7 @@ void ListBox::initFromIni(INIReader & ini)
 
 void ListBox::updateItemButtonRect()
 {
+	if (fitItems && itemCount > 0) itemHeight = rect.h / itemCount;
 	for (size_t i = 0; i < itemButton.size(); i++)
 	{
 		if (itemButton[i])

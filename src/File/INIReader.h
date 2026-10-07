@@ -34,6 +34,12 @@ struct IniMap
 	std::map<std::string, IniSection> sections;
 };
 
+enum class IniKeyCaseSensitivity
+{
+	Insensitive,
+	Sensitive
+};
+
 // Read an INI file into easy-to-access name/value pairs. (Note that I've gone
 // for simplicity here rather than speed, but it should be pretty decent.)
 class INIReader
@@ -41,14 +47,22 @@ class INIReader
 public:
 	std::string fileName = "";
 
-	INIReader();
+	explicit INIReader(
+		IniKeyCaseSensitivity keyCaseSensitivity =
+			IniKeyCaseSensitivity::Insensitive);
     // Construct INIReader and parse given filename. See ini.h for more info
     // about the parsing.
-    INIReader(const std::string& filename);
+	INIReader(
+		const std::string& filename,
+		IniKeyCaseSensitivity keyCaseSensitivity =
+			IniKeyCaseSensitivity::Insensitive);
 	
 	// Construct INIReader from std::string stream.
 	// (Added by Upwinded.)
-	INIReader(const std::unique_ptr<char[]>& s);
+	INIReader(
+		const std::unique_ptr<char[]>& s,
+		IniKeyCaseSensitivity keyCaseSensitivity =
+			IniKeyCaseSensitivity::Insensitive);
 
 	//(Added by Upwinded.)
 	virtual ~INIReader();
@@ -70,6 +84,7 @@ public:
 	void SetColor(const std::string& section, const std::string& name, uint32_t value);
 	void Remove(const std::string& section, const std::string& name);
 	bool HasSection(const std::string& section) const;
+	bool HasKey(const std::string& section, const std::string& name) const;
 	std::vector<std::string> GetSectionNames() const;
 	std::vector<std::string> GetSectionKeys(const std::string& section) const;
 
@@ -107,8 +122,10 @@ private:
     int _error = 0;
     //std::map<std::string, std::map<std::string, std::string>> _values;
 	IniMap map;
+	IniKeyCaseSensitivity keyCaseSensitivity =
+		IniKeyCaseSensitivity::Insensitive;
 
-    static std::string MakeKey(const std::string& section, const std::string& name);
+	std::string normalizeKeyName(const std::string& name) const;
     static int ValueHandler(void* user, const char* section, const char* name,
                             const char* value);
 };

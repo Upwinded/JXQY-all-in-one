@@ -1,18 +1,11 @@
 #include "RuntimeSaveGenerationPolicy.h"
 
-#include "GameManager.h"
-
-SaveGenerationPreflightPolicy createRuntimeSaveGenerationPolicy(
-	GameManager& gameManager,
-	RuntimeSaveGenerationPolicyMode mode)
+SaveGenerationPolicy createRuntimeSaveGenerationPolicy()
 {
-	(void)gameManager;
-	(void)mode;
-
 	// Runtime load/save preparation parses the files it actually needs. Keep
 	// only practical copy bounds here instead of duplicating every subsystem's
 	// semantic validation before the real load.
-	SaveGenerationPreflightPolicy policy;
+	SaveGenerationPolicy policy;
 	policy.limits.maximumFileCount = 2048;
 	policy.limits.maximumTotalBytes =
 		64ULL * 1024ULL * 1024ULL;

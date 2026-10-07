@@ -12,8 +12,13 @@ class GamepadSurfaceContractTestAccess;
 class ChooseMenu :
 	public ConfigDrivenPanel
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+	friend class GameplayAutomationTestAccess;
+#endif
 	friend class GamepadEssentialUITestAccess;
 	friend class GamepadSurfaceContractTestAccess;
+	friend class CoreLifecycleTestAccess;
 public:
 	ChooseMenu();
 	virtual ~ChooseMenu();

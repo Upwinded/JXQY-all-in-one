@@ -46,6 +46,7 @@ struct MagicDispatchContext
 {
 	std::shared_ptr<MagicDispatchBudget> budget = nullptr;
 	std::vector<std::string> ancestry;
+	MagicExperienceOwner experienceOwner;
 };
 
 namespace
@@ -433,6 +434,21 @@ int Magic::calculatePrimaryEffectAmount(
 		static_cast<long long>(std::numeric_limits<int>::max())));
 }
 
+bool Magic::hasPositionCastLimit(int effectLevel) const
+{
+	const auto& data = level[clampMagicLevel(effectLevel)];
+	if (data.moveKind == mmkSelf || data.moveKind == mmkTimeStop || data.moveKind == mmkFullScreen)
+	{
+		return false;
+	}
+	return data.moveKind == mmkPoint || data.moveKind == mmkLine || data.moveKind == mmkTransport
+		|| data.moveKind == mmkControl || data.moveKind == mmkSummon
+		|| ((data.moveKind == mmkRegion || data.moveKind == mmkWarningRegion)
+			&& (data.region == mrSquare || data.region == mrRegionFile))
+		|| beginAtMouse > 0 || meteorMove > 0 || bodyRadius > 0 || reviveBodyRadius > 0
+		|| getLinkedLevel(effectLevel).jumpToTarget > 0;
+}
+
 Magic::Magic()
 {
 }
@@ -445,6 +461,7 @@ Magic::~Magic()
 void Magic::reset()
 {
 	experienceOwnerMagicFile = "";
+	experienceOwner = {};
 	name = "";
 	type = "";
 	injuryType = "";
@@ -498,6 +515,7 @@ void Magic::reset()
 	regionFileLoaded = false;
 	keepMilliseconds = 0;
 	maxLevel = 0;
+	definedLearningLevelLimit = 0;
 	goodsName = "";
 	npcFile = "";
 	npcIni = "";
@@ -609,6 +627,7 @@ void Magic::reset()
 		level[i].defend2 = 0;
 		level[i].defend3 = 0;
 		level[i].evade = 0;
+		level[i].jumpRadius = 0;
 		level[i].addThewRestorePercent = 0;
 		level[i].addManaRestorePercent = 0;
 		level[i].addLifeRestorePercent = 0;
@@ -691,6 +710,10 @@ void Magic::initFromIniWithContext(
 			return;
 		}
 		std::string section = "Init";
+		if (gm != nullptr && gm->global.feature.magicLevelLimitFromDefinition)
+		{
+			definedLearningLevelLimit = 1;
+		}
 		name = ini.Get(section, "Name", "");
 		type = ini.Get(section, "Type", "");
 		injuryType = ini.Get(section, "InjuryType", "");
@@ -1028,6 +1051,10 @@ void Magic::initFromIniWithContext(
 			else
 			{
 				section = convert::formatString("Level%d", i);
+				if (definedLearningLevelLimit > 0 && ini.HasSection(section))
+				{
+					definedLearningLevelLimit = i;
+				}
 			}
 			int idx = i - 1 < 0 ? 0 : i - 1;
 			level[i].effect = ini.GetInteger(section, "Effect", level[idx].effect);
@@ -1045,6 +1072,7 @@ void Magic::initFromIniWithContext(
 			level[i].defend2 = ini.GetInteger(section, "Defend2", level[idx].defend2);
 			level[i].defend3 = ini.GetInteger(section, "Defend3", level[idx].defend3);
 			level[i].evade = ini.GetInteger(section, "Evade", level[idx].evade);
+			level[i].jumpRadius = ini.GetInteger(section, "JumpRadius", level[0].jumpRadius);
 			level[i].addThewRestorePercent = ini.GetInteger(section, "AddThewRestorePercent", level[idx].addThewRestorePercent);
 			level[i].addManaRestorePercent = ini.GetInteger(section, "AddManaRestorePercent", level[idx].addManaRestorePercent);
 			level[i].addLifeRestorePercent = ini.GetInteger(section, "AddLifeRestorePercent", level[idx].addLifeRestorePercent);
@@ -1060,7 +1088,8 @@ void Magic::initFromIniWithContext(
 			level[i].leapTimes = ini.GetInteger(section, "LeapTimes", level[idx].leapTimes);
 			level[i].leapFrame = ini.GetInteger(section, "LeapFrame", level[idx].leapFrame);
 			level[i].effectReducePercentage = ini.GetInteger(section, "EffectReducePercentage", level[idx].effectReducePercentage);
-			level[i].levelupExp = ini.GetInteger(section, "LevelupExp", level[idx].levelupExp);
+			// Upgrade thresholds default to Init, not the preceding level's threshold.
+			level[i].levelupExp = ini.GetInteger(section, "LevelupExp", level[0].levelupExp);
 			level[i].lifeCost = ini.GetInteger(section, "LifeCost", level[idx].lifeCost);
 			level[i].manaCost = ini.GetInteger(section, "ManaCost", level[idx].manaCost);
 			level[i].thewCost = ini.GetInteger(section, "ThewCost", level[idx].thewCost);
@@ -1236,7 +1265,13 @@ std::shared_ptr<MagicDispatchContext> Magic::createRootDispatchContext(
 	context->budget = std::make_shared<MagicDispatchBudget>();
 	context->budget->nodeCount = 1;
 	context->ancestry.push_back(getMagicRuntimeIdentity(magic));
+	context->experienceOwner = magic->experienceOwner;
 	return context;
+}
+
+MagicExperienceOwner Magic::getExperienceOwner(const std::shared_ptr<MagicDispatchContext>& context)
+{
+	return context != nullptr ? context->experienceOwner : MagicExperienceOwner{};
 }
 
 std::shared_ptr<MagicDispatchContext> Magic::createDerivedDispatchContext(
@@ -1286,6 +1321,12 @@ std::shared_ptr<MagicDispatchContext> Magic::createDerivedDispatchContext(
 	childContext->budget = parentContext->budget;
 	childContext->ancestry = parentContext->ancestry;
 	childContext->ancestry.push_back(childIdentity);
+	// These children inherit ItemInfo in the published engine. Independent
+	// second/random/counter casts retain their own experience ownership.
+	childContext->experienceOwner = relationshipName == "FlyMagic"
+		|| relationshipName == "ParasiticMagic" || relationshipName == "JumpEndMagic"
+		|| relationshipName == "ExplodeMagicFile"
+		? parentContext->experienceOwner : childMagic->experienceOwner;
 	return childContext;
 }
 
@@ -1391,7 +1432,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addEffect(
 
 	if (srcMagic->bodyRadius > 0 && target != nullptr && gm != nullptr && gm->objectManager != nullptr)
 	{
-		auto bodies = gm->objectManager->takeBodiesInRadius(target->position, srcMagic->bodyRadius);
+		auto bodies = gm->objectManager->takeBodiesInRadius(to, srcMagic->bodyRadius);
 		if (bodies.empty())
 		{
 			return finish({});
@@ -1553,6 +1594,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addEffect(
 		}
 		break;
 	}
+	case mmkWarningRegion:
 	case mmkRegion:
 	{
 		{
@@ -1611,7 +1653,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addEffect(
 	case mmkFullScreen:
 	{
 		{
-			return finish(addFullScreenEffect(srcMagic, user, from, to, lvl, damage, evade, launcher));
+			return finish(addFullScreenEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, dispatchContext));
 		}
 		break;
 	}
@@ -1882,16 +1924,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 		e->level = lvl;
 		e->user = user;
 		e->initFromMagic(srcMagic);
-        if (srcMagic->flyImage != nullptr)
-        {
-            e->direction = getDirection(-angle - M_PI / 2, srcMagic->flyImage->directions);
-        }
-        else
-        {
-            e->direction = getDirection(-angle - M_PI / 2);
-        }
 		e->flyingDirection.x = (int)(cos(angle) * 1000.0);// / TILE_HEIGHT);
 		e->flyingDirection.y = (int)(-sin(angle) * 1000.0);// / TILE_WIDTH);
+		e->direction = e->getDirection();
 		e->position = from;// = Map::getSubPoint(from, NPC::getDirection(angle));
 		e->src = e->position;
 		e->launcherKind = launcher;
@@ -1938,16 +1973,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr
 		e->user = user;
 		e->initFromMagic(srcMagic);
 
-        if (srcMagic->flyImage != nullptr)
-        {
-            e->direction = getDirection(-angle - M_PI / 2, srcMagic->flyImage->directions);
-        }
-        else
-        {
-            e->direction = getDirection(-angle - M_PI / 2);
-        }
 		e->flyingDirection.x = (int)(cos(angle) * 1000.0);// / TILE_HEIGHT);
 		e->flyingDirection.y = (int)(-sin(angle) * 1000.0);// / TILE_WIDTH);
+		e->direction = e->getDirection();
 		e->position = from;// = Map::getSubPoint(from, NPC::getDirection(angle));
 		e->src = e->position;
 		e->launcherKind = launcher;
@@ -2031,16 +2059,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 		e->user = user;
 		e->initFromMagic(srcMagic);
 
-        if (srcMagic->flyImage != nullptr)
-        {
-            e->direction = getDirection(-angle - M_PI / 2, srcMagic->flyImage->directions);
-        }
-        else
-        {
-            e->direction = getDirection(-angle - M_PI / 2);
-        }
 		e->flyingDirection.x = (int)(cos(angle) * 1000);
 		e->flyingDirection.y = (int)(-sin(angle) * 1000);
+		e->direction = e->getDirection();
 		e->position = from; //Map::getSubPoint(from, NPC::getDirection(angle));
 		e->src = e->position;
 		e->launcherKind = launcher;
@@ -2104,17 +2125,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->level = lvl;
 			e->user = user;
 			e->initFromMagic(srcMagic);
-            if (srcMagic->flyImage != nullptr)
-            {
-                e->direction = getDirection(normalizeAngle(angle), srcMagic->flyImage->directions);
-            }
-            else
-            {
-                e->direction = getDirection(normalizeAngle(angle));
-            }
-//			e->direction = getDirection(normalizeAngle(angle));
 			e->flyingDirection.x = (int)(-sin(angle) * 1000.0);// / TILE_HEIGHT);
 			e->flyingDirection.y = (int)(cos(angle) * 1000.0);// / TILE_WIDTH);
+			e->direction = e->getDirection();
 			e->position = from;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -2160,17 +2173,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->level = lvl;
 			e->user = user;
 			e->initFromMagic(srcMagic);
-            if (srcMagic->flyImage != nullptr)
-            {
-                e->direction = getDirection(normalizeAngle(angle), srcMagic->flyImage->directions);
-            }
-            else
-            {
-                e->direction = getDirection(normalizeAngle(angle));
-            }
-//			e->direction = getDirection(normalizeAngle(angle));
 			e->flyingDirection.x = (int)(-sin(angle) * 1000.0);// / TILE_HEIGHT);
 			e->flyingDirection.y = (int)(cos(angle) * 1000.0);// / TILE_WIDTH);
+			e->direction = e->getDirection();
 			e->position = from;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -2209,17 +2214,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->user = user;
 			e->initFromMagic(srcMagic);
 
-            if (srcMagic->flyImage != nullptr)
-            {
-                e->direction = getDirection(normalizeAngle(angle), srcMagic->flyImage->directions);
-            }
-            else
-            {
-                e->direction = getDirection(normalizeAngle(angle));
-            }
-            //			e->direction = getDirection(normalizeAngle(angle));
 			e->flyingDirection.x = (int)(-sin(angle) * 1000.0);// / TILE_HEIGHT);
 			e->flyingDirection.y = (int)(cos(angle) * 1000.0);// / TILE_WIDTH);
+			e->direction = e->getDirection();
 			e->position = from;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -2256,17 +2253,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			e->level = lvl;
 			e->user = user;
 			e->initFromMagic(srcMagic);
-            if (srcMagic->flyImage != nullptr)
-            {
-                e->direction = getDirection(normalizeAngle(angle), srcMagic->flyImage->directions);
-            }
-            else
-            {
-                e->direction = getDirection(normalizeAngle(angle));
-            }
-//			e->direction = getDirection(normalizeAngle(angle));
 			e->flyingDirection.x = (int)(-sin(angle) * 1000.0);// / TILE_HEIGHT);
 			e->flyingDirection.y = (int)(cos(angle) * 1000.0);// / TILE_WIDTH);
+			e->direction = e->getDirection();
 			e->position = from;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -2666,70 +2655,44 @@ std::vector<std::shared_ptr<Effect>> Magic::addWaveEffect(std::shared_ptr<Magic>
 {
 	std::vector<std::shared_ptr<Effect>> ret;
 	gm->effectManager->setPaused(true);
-	int hrange = 3 + ((lvl - 1) / 3) * 2;
-	int wrange = 2;
 	Point tempTo = to;
 	if (from == to && !preserveZeroMoveDirection(*srcMagic))
 	{
 		tempTo = Map::getSubPoint(to, 0);
 	}
-	int srcDir = NPC::getDirection(from, tempTo);
-	//int magicDir = getDirection(from, tempTo);
-	int dir = srcDir;
-	int magicDir = dir * 2;
-	dir += 2;
-	if (dir > 7)
+	const auto tiles = getWaveMagicRegionTiles(from, NPC::getDirection(from, tempTo), lvl);
+	for (const auto& tile : tiles)
 	{
-		dir -= 8;
-	}
-	int dir2 = dir + 4;
-	if (dir2 > 7)
-	{
-		dir2 -= 8;
-	}
-	Point pos = Map::getSubPoint(from, srcDir);
-	for (int i = 0; i < wrange; i++)
-	{
-		pos = Map::getSubPoint(pos, dir2);
-	}
-	for (int i = 0; i < hrange; i++)
-	{
-		Point newPos = pos;
-		for (int j = 0; j < wrange * 2 + 1; j++)
+		std::shared_ptr<Effect> e = std::make_shared<Effect>();
+		e->user = user;
+		e->level = lvl;
+		e->initFromMagic(srcMagic);
+		e->direction = 0;
+		e->flyingDirection = { 0, 0 };
+		e->position = tile.position;
+		e->src = e->position;
+		e->launcherKind = launcher;
+		e->damage = damage;
+		e->evade = evade;
+		e->lifeTime = e->getFlyinUTime();
+		e->waitTime += tile.delayMilliseconds;
+		if (e->lifeTime == 0)
 		{
-			std::shared_ptr<Effect> e = std::make_shared<Effect>();
-			e->user = user;
-			e->level = lvl;
-			e->initFromMagic(srcMagic);
-			e->direction = 0;
-			e->flyingDirection = { 0, 0 };
-			e->position = newPos;
-			e->src = e->position;
-			e->launcherKind = launcher;
-			e->damage = damage;
-			e->evade = evade;
-			e->lifeTime = e->getFlyinUTime();
-			e->waitTime += i * 60;
-			if (e->lifeTime == 0)
-			{
-				e->lifeTime = (unsigned int)(EFFECT_FRAME_TIME * 2);
-			}
-			if (e->waitTime > 0)
-			{
-				e->doing = ekHiding;
-			}
-			else
-			{
-				//e->doing = ekFlying;
-				e->beginFly();
-			}
-			e->calDest();
-			gm->effectManager->addEffect(e);
-			e->beginTime = e->getTime();
-			newPos = Map::getSubPoint(newPos, dir);
-			ret.push_back(e);
+			e->lifeTime = (unsigned int)(EFFECT_FRAME_TIME * 2);
 		}
-		pos = Map::getSubPoint(pos, srcDir);
+		if (e->waitTime > 0)
+		{
+			e->doing = ekHiding;
+		}
+		else
+		{
+			//e->doing = ekFlying;
+			e->beginFly();
+		}
+		e->calDest();
+		gm->effectManager->addEffect(e);
+		e->beginTime = e->getTime();
+		ret.push_back(e);
 	}
 	gm->effectManager->setPaused(false);
 	return ret;
@@ -3240,14 +3203,15 @@ std::vector<std::shared_ptr<Effect>> Magic::addSelfEffect(std::shared_ptr<Magic>
 	return ret;
 }
 
-std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher)
+std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher,
+	std::shared_ptr<MagicDispatchContext> dispatchContext)
 {
 	std::shared_ptr<Effect> e = std::make_shared<Effect>();
 	Point effectPosition = user != nullptr ? user->position : from;
 	PointEx effectOffset = user != nullptr ? user->offset : PointEx{ 0, 0 };
 	e->user = user;
 	e->level = lvl;
-	e->initFromMagic(srcMagic);
+	e->initFromMagic(srcMagic, dispatchContext);
 	e->flyingDirection = { 0, 0 };
 	e->position = effectPosition;
 	e->src = e->position;
@@ -3309,7 +3273,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<
 		e = std::make_shared<Effect>();
 		e->user = user;
 		e->level = lvl;
-		e->initFromMagic(srcMagic);
+		e->initFromMagic(srcMagic, dispatchContext);
 		e->flyingDirection = { 0, 0 };
 		e->position = damageList[i]->getPosition();
 		e->src = e->position;
@@ -3430,6 +3394,10 @@ std::vector<std::shared_ptr<Effect>> Magic::addControlEffect(std::shared_ptr<Mag
 		return ret;
 	}
 	if (gm->npcManager == nullptr || !gm->npcManager->findNPC(targetNPC))
+	{
+		return ret;
+	}
+	if (Map::calDistance(player->getPosition(), targetNPC->getPosition()) > MAGIC_MAX_CAST_DISTANCE)
 	{
 		return ret;
 	}
@@ -3561,6 +3529,7 @@ void Magic::copy(Magic & magic)
 
 	copyData(iniName);
 	copyData(experienceOwnerMagicFile);
+	copyData(experienceOwner);
 	copyData(name);
 	copyData(type);
 	copyData(injuryType);
@@ -3604,6 +3573,7 @@ void Magic::copy(Magic & magic)
 	copyData(regionFileLoaded);
 	copyData(keepMilliseconds);
 	copyData(maxLevel);
+	copyData(definedLearningLevelLimit);
 	copyData(goodsName);
 	copyData(npcFile);
 	copyData(npcIni);
@@ -3720,6 +3690,7 @@ void Magic::copy(Magic & magic)
 		copyData(level[i].defend2);
 		copyData(level[i].defend3);
 		copyData(level[i].evade);
+		copyData(level[i].jumpRadius);
 		copyData(level[i].addThewRestorePercent);
 		copyData(level[i].addManaRestorePercent);
 		copyData(level[i].addLifeRestorePercent);

@@ -48,6 +48,294 @@
 class GamepadEssentialUITestAccess
 {
 public:
+	class CapturedResourceScene : public ResourceSelectScene
+	{
+	public:
+		_shared_surface beforePrompt;
+		_shared_surface afterPrompt;
+	private:
+		void onDrawEnd() override
+		{
+			beforePrompt = make_shared_surface(SDL_RenderReadPixels(Engine::renderer.load(), nullptr));
+			ResourceSelectScene::onDrawEnd();
+			afterPrompt = make_shared_surface(SDL_RenderReadPixels(Engine::renderer.load(), nullptr));
+		}
+	};
+
+	static SDL_Renderer* exchangeRenderer(SDL_Renderer* renderer)
+	{
+		return Engine::renderer.exchange(renderer);
+	}
+
+	static void setLogicalSize(int width, int height)
+	{
+		Engine::getInstance()->EngineBase::width = width;
+		Engine::getInstance()->EngineBase::height = height;
+	}
+
+	static void drawResourceSelection(ResourceSelectScene& scene)
+	{
+		scene.drawSelf();
+	}
+
+	static Rect resourcePanelRect(const ResourceSelectScene& scene)
+	{
+		return { scene.panelX, scene.panelY, scene.panelWidth, scene.panelHeight };
+	}
+
+	static bool saveTransferControls(ResourceSelectScene& scene)
+	{
+		using State = ResourceSelectScene::ResourceInstallDialogState;
+		using Operation = ResourceSelectScene::ResourceInstallOperation;
+		scene.resourceInstallOperation = Operation::SaveManagement;
+		scene.resourceInstallDialogState = State::BrowsingSaves;
+		scene.saveNamespaceEntries = { { "test_mod", u8"测试模组", 1024, 2 } };
+		scene.selectedSaveNamespaceIndex = 0;
+		scene.setMainControlsAvailable(false);
+		scene.refreshResourceInstallDialogControls();
+		bool ok = scene.saveExportButton->activated && scene.saveImportButton->activated;
+		const auto inside = [](const Rect& inner, const Rect& outer)
+		{
+			return inner.x >= outer.x && inner.y >= outer.y &&
+				inner.x + inner.w <= outer.x + outer.w && inner.y + inner.h <= outer.y + outer.h;
+		};
+		const Rect dialog = scene.getResourceInstallDialogRect();
+		ok = ok && inside(scene.saveExportButton->rect, dialog) && inside(scene.saveImportButton->rect, dialog) &&
+			scene.saveExportButton->rect.y >= dialog.y + 130 &&
+			scene.saveExportButton->rect.y + scene.saveExportButton->rect.h < scene.resourceInstallPreviousPageButton->rect.y;
+		scene.semanticFocusVisible = scene.focusManager.focusNode("install-secondary");
+		scene.onHandleUIAction(UIAction::NavigateUp);
+		ok = ok && scene.focusManager.getFocusedElement() == scene.saveImportButton;
+		scene.onHandleUIAction(UIAction::NavigateLeft);
+		ok = ok && scene.focusManager.getFocusedElement() == scene.saveExportButton;
+		scene.onHandleUIAction(UIAction::Confirm);
+		ok = ok && scene.saveTransferAction == ResourceSelectScene::SaveTransferAction::Export;
+		scene.onHandleUIAction(UIAction::Cancel);
+		ok = ok && scene.resourceInstallDialogState == State::BrowsingSaves &&
+			scene.focusManager.getFocusedElement() == scene.saveExportButton;
+		scene.resourceInstallOperation = Operation::SaveTransfer;
+		scene.resourceInstallDialogState = State::ChoosingSaveExport;
+		scene.saveExportSlots = { 0, 1, SavePackage::AutomaticSlot };
+		scene.selectedTransferSlot = 0;
+		scene.refreshResourceInstallDialogControls();
+		scene.onHandleUIAction(UIAction::PagePrevious);
+		ok = ok && scene.selectedTransferSlot == 2 && !scene.saveImportButton->visible;
+		scene.onHandleUIAction(UIAction::PageNext);
+		ok = ok && scene.selectedTransferSlot == 0;
+		scene.onHandleUIAction(UIAction::Cancel);
+		ok = ok && scene.resourceInstallDialogState == State::BrowsingSaves;
+		scene.saveNamespaceEntries.clear();
+		scene.refreshResourceInstallDialogControls();
+		ok = ok && scene.saveImportButton->activated && !scene.saveExportButton->activated &&
+			!scene.resourceInstallPrimaryButton->activated;
+		scene.saveNamespaceEntries = { { "test_mod", u8"测试模组", 1024, 0 } };
+		scene.selectedSaveNamespaceIndex = 0;
+		scene.refreshResourceInstallDialogControls();
+		ok = ok && scene.saveImportButton->activated && !scene.saveExportButton->activated;
+		scene.saveNamespaceEntries = { { "test_mod", u8"测试模组", 1024, 2 } };
+		scene.refreshResourceInstallDialogControls();
+		scene.semanticFocusVisible = scene.focusManager.focusNode("install-secondary");
+		return ok;
+	}
+
+	static bool saveTransferPromptDoesNotCoverControls(const ResourceSelectScene& scene)
+	{
+		const auto prompt = scene.controllerPromptOptions();
+		return scene.resourceInstallPrimaryButton->rect.y + scene.resourceInstallPrimaryButton->rect.h <= prompt.y &&
+			scene.saveExportButton->rect.y + scene.saveExportButton->rect.h <= prompt.y;
+	}
+
+	static bool previewSaveImport(ResourceSelectScene& scene, const SavePackage::Package& package)
+	{
+		scene.resourceInstallOperation = ResourceSelectScene::ResourceInstallOperation::SaveTransfer;
+		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::ConfirmingSaveImport;
+		scene.pendingSavePackage = std::make_shared<SavePackage::Package>(package);
+		scene.saveTransferGame = package.game();
+		scene.selectedTransferSlot = package.slots().size() == 1 ? 1 : SavePackage::AllSlots;
+		scene.saveImportWillOverwrite = true;
+		scene.refreshResourceInstallDialogControls();
+		scene.semanticFocusVisible = scene.focusManager.focusNode("install-primary");
+		scene.updateFocusPresentation();
+		return scene.resourceInstallPrimaryButton->activated &&
+			scene.resourceInstallPreviousPageButton->visible == (package.slots().size() == 1) &&
+			scene.getResourceInstallDialogRect().y + 170 < scene.getResourceInstallPreviousPageButtonRect().y;
+	}
+
+	static bool auditResourceSurfaces(CapturedResourceScene& scene)
+	{
+		bool ok = true;
+		const auto verify = [&](bool condition, const std::string& message)
+		{
+			if (!condition) std::cerr << "Resource audit " << scene.rect.w << 'x' << scene.rect.h << ": " << message << '\n';
+			ok = condition && ok;
+		};
+		const auto capture = [&](const std::string& label, const std::vector<Rect>& controls)
+		{
+			scene.drawSelf();
+			for (const Rect& area : controls)
+			{
+				bool intact = area.x >= 0 && area.y >= 0 && area.x + area.w <= scene.rect.w && area.y + area.h <= scene.rect.h;
+				for (int y = area.y; intact && y < area.y + area.h; ++y)
+				{
+					for (int x = area.x; intact && x < area.x + area.w; ++x)
+					{
+						Uint8 r, g, b, a, cr, cg, cb, ca;
+						intact = SDL_ReadSurfacePixel(scene.beforePrompt.get(), x, y, &r, &g, &b, &a) &&
+							SDL_ReadSurfacePixel(scene.afterPrompt.get(), x, y, &cr, &cg, &cb, &ca) &&
+							r == cr && g == cg && b == cb && a == ca;
+					}
+				}
+				verify(intact, label + " controls stay visible in the final composition");
+			}
+			if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+			{
+				const auto path = std::filesystem::u8path(directory) / ("audit-" + label + "-" +
+					std::to_string(scene.rect.w) + "x" + std::to_string(scene.rect.h) + ".png");
+				verify(IMG_SavePNG(scene.afterPrompt.get(), path.string().c_str()), "write " + label);
+			}
+		};
+		scene.loadSceneImages();
+		scene.resourceList->setFrameImages(scene.itemFrameImage, scene.selectedItemFrameImage);
+		scene.semanticFocusVisible = scene.focusManager.focusNode("resource-list");
+		scene.keyboardSemanticFocus = false;
+		scene.drawSelf();
+		std::vector<Rect> cards;
+		for (const auto& card : scene.resourceList->cards)
+		{
+			if (!card->visible) continue;
+			cards.push_back(card->rect);
+			verify(card->rect.y + card->rect.h <= scene.resourceListArea.y + scene.resourceListArea.h,
+				"whole card fits the list viewport");
+		}
+		capture("main", cards);
+		presentProgramUpdateAction(scene);
+		scene.drawSelf();
+		const std::vector<std::shared_ptr<FlatTextButton>> header = { scene.cheatHelpButton,
+			scene.saveManagementButton, scene.displaySettingsButton, scene.programActionButton,
+			scene.checkUpdatesButton, scene.exitButton };
+		for (std::size_t index = 0; index < header.size(); ++index)
+		{
+			if (!header[index] || !header[index]->visible) continue;
+			for (std::size_t other = index + 1; other < header.size(); ++other)
+			{
+				if (!header[other] || !header[other]->visible) continue;
+				const Rect a = header[index]->rect, b = header[other]->rect;
+				verify(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y,
+					"header actions do not overlap with program update available");
+			}
+		}
+		capture("program-action", {});
+		if (scene.compactMobileLayout)
+		{
+			scene.focusManager.focusNode("check-updates");
+			scene.onHandleUIAction(UIAction::NavigateLeft);
+			verify(scene.focusManager.getFocusedElement() == scene.programActionButton,
+				"header left follows the visible program button");
+			scene.onHandleUIAction(UIAction::NavigateLeft);
+			verify(scene.focusManager.getFocusedElement() == (scene.displaySettingsButton
+				? scene.displaySettingsButton : scene.saveManagementButton), "program back follows header order");
+			scene.focusManager.focusNode("check-updates");
+			scene.onHandleUIAction(UIAction::NavigateDown);
+			verify(scene.focusManager.getFocusedElement() == scene.resourceList,
+				"compact header down enters the resource list");
+		}
+		activateProgramUpdate(scene);
+		scene.drawSelf();
+		capture("program-confirm", { scene.resourceInstallPrimaryButton->rect, scene.resourceInstallSecondaryButton->rect });
+		scene.dismissResourceInstallDialog();
+		scene.resourceInstallOperation = ResourceSelectScene::ResourceInstallOperation::ResourceRemoval;
+		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Confirming;
+		scene.pendingResourceRemoval.entries.clear();
+		for (int index = 0; index < 4; ++index)
+		{
+			ResourceManager::ResourceRemovalEntry entry;
+			entry.name = u8"待删除游戏 " + std::to_string(index + 1);
+			entry.version = "1.0.0";
+			scene.pendingResourceRemoval.entries.push_back(entry);
+		}
+		scene.setMainControlsAvailable(false);
+		scene.refreshResourceInstallDialogControls();
+		scene.semanticFocusVisible = scene.focusManager.focusNode("install-secondary");
+		scene.drawSelf();
+		capture("resource-removal", { scene.resourceInstallPrimaryButton->rect,
+			scene.resourceInstallSecondaryButton->rect, scene.resourceInstallPreviousPageButton->rect,
+			scene.resourceInstallNextPageButton->rect });
+		scene.dismissResourceInstallDialog();
+		scene.showCheatHelp(true);
+		scene.drawSelf();
+		capture("cheat", { scene.cheatHelpCloseButton->rect });
+		scene.onHandleUIAction(UIAction::Cancel);
+		verify(!scene.cheatHelpVisible && scene.focusManager.getFocusedElement() == scene.cheatHelpButton,
+			"cheat back restores its entry");
+#if !defined(__MOBILE__)
+		scene.desktopDisplays = { DesktopDisplayInfo{} };
+		scene.pendingDisplaySettings = {};
+		scene.displaySettingsVisible = true;
+		scene.setMainControlsAvailable(false);
+		scene.refreshDisplaySettingsOptions();
+		scene.setDisplaySettingsControlsVisible(true);
+		scene.semanticFocusVisible = scene.focusManager.focusNode("display-settings-next-1");
+		scene.drawSelf();
+		std::vector<Rect> settings{ scene.displaySettingsApplyButton->rect, scene.displaySettingsBackButton->rect };
+		for (const auto& button : scene.displaySettingsNextButtons) settings.push_back(button->rect);
+		capture("settings", settings);
+		verify(settings.back().y + settings.back().h + 24 <= settings.front().y,
+			"last display setting leaves space for status and apply buttons");
+		scene.onHandleUIAction(UIAction::Cancel);
+#endif
+		scene.resourceInstallOperation = ResourceSelectScene::ResourceInstallOperation::OnlineDownload;
+		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Failed;
+		scene.resourceInstallDialogMessage = u8"网络连接失败，请检查网络后重试。";
+		scene.setMainControlsAvailable(false);
+		scene.refreshResourceInstallDialogControls();
+		scene.semanticFocusVisible = scene.focusManager.focusNode("install-primary");
+		capture("failure", { scene.resourceInstallPrimaryButton->rect });
+		scene.dismissResourceInstallDialog();
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+		scene.showExternalResourceDialog(true);
+		scene.drawSelf();
+		capture("external", { scene.externalResourceConfirmButton->rect, scene.externalResourceCancelButton->rect });
+		scene.hideExternalResourceDialog(true);
+#endif
+		scene.beginSaveManagement();
+		verify(scene.focusManager.getFocusedElement() != scene.resourceInstallPrimaryButton,
+			"save management does not start on delete");
+		scene.saveNamespaceEntries = { { "first", u8"第一游戏", 1024, 2 }, { "second", u8"第二游戏", 2048, 3 } };
+		scene.selectedSaveNamespaceIndex = 0;
+		scene.refreshResourceInstallDialogControls();
+		scene.semanticFocusVisible = scene.focusManager.focusNode("install-next");
+		scene.onHandleUIAction(UIAction::Confirm);
+		const auto focused = scene.focusManager.getFocusedElement();
+		verify(scene.selectedSaveNamespaceIndex == 1 && focused && focused->visible && focused->activated,
+			"last save page keeps an available focus");
+		capture("save-pages", { scene.resourceInstallPrimaryButton->rect, scene.saveImportButton->rect });
+		scene.resourceInstallOperation = ResourceSelectScene::ResourceInstallOperation::SaveTransfer;
+		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Completed;
+		scene.refreshResourceInstallDialogControls();
+		scene.activateResourceDialogPrimary();
+		verify(scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::BrowsingSaves,
+			"transfer completion returns to save management");
+		scene.dismissResourceInstallDialog();
+		verify(scene.focusManager.getFocusedElement() == scene.saveManagementButton,
+			"save management back restores its entry");
+		return ok;
+	}
+
+	static ControllerPromptDrawOptions resourcePromptOptions(const ResourceSelectScene& scene)
+	{
+		return scene.controllerPromptOptions();
+	}
+
+	static std::vector<Rect> resourceExternalLinkRects(const ResourceSelectScene& scene)
+	{
+		std::vector<Rect> result;
+		for (const auto& button : scene.externalLinkButtons)
+		{
+			result.push_back(button->rect);
+		}
+		return result;
+	}
+
 	static bool dispatchControllerHelpEvent(
 		ControllerHelpOverlay& overlay,
 		AEvent event)
@@ -204,6 +492,14 @@ public:
 	static void updateTitleTeam(TitleTeam& titleTeam)
 	{
 		titleTeam.onUpdate();
+	}
+
+	static unsigned char titleTeamFadeAlpha(
+		unsigned char maximumAlpha,
+		unsigned long elapsedMilliseconds)
+	{
+		return TitleTeam::fadeInTextureAlpha(
+			maximumAlpha, elapsedMilliseconds);
 	}
 
 	static PElement focusedSaveLoadControl(const SaveLoad& saveLoad)
@@ -510,7 +806,7 @@ public:
 			compact ? 88 : 108,
 			std::max(1,
 				(scene.contentWidth - gap * (buttonCount - 1)) / buttonCount));
-		const int expectedCheckButtonWidth = compact
+		const int expectedCheckButtonWidth = compact || scene.compactMobileLayout
 			? expectedButtonWidth : 128;
 		const int expectedFontSize = compact ? 12 : 17;
 		const Rect externalLinkRect = scene.getExternalLinkRect(0);
@@ -569,6 +865,7 @@ public:
 			package.target, std::move(package));
 		scene.catalogCheckState = ResourceSelectScene::CatalogCheckState::Ready;
 		scene.refreshCheckUpdatesButton();
+		scene.updateLayout(scene.rect.w, scene.rect.h);
 		scene.configureFocus();
 		return scene.checkUpdatesButton != nullptr &&
 			scene.checkUpdatesButton->visible &&
@@ -1086,6 +1383,16 @@ public:
 			resourceOnlineActionIsAvailable(scene);
 	}
 
+	static bool selectedResourceKeepsNewerLocalVersion(
+		const ResourceSelectScene& scene)
+	{
+		return scene.selectedDetails.localVersionNewerThanOnline &&
+			scene.selectedDetails.hasPendingOnlineArtifacts &&
+			scene.selectedDetails.runStatus.find(u8"本地版本较新") !=
+				std::string::npos &&
+			resourceOnlineActionIsAvailable(scene);
+	}
+
 	static bool resourceRemovalRequiresExplicitSaveChoice(
 		ResourceSelectScene& scene)
 	{
@@ -1159,6 +1466,27 @@ public:
 		scene.beginResourceDownloadConfirmation();
 		return scene.resourceInstallDialogState ==
 			ResourceSelectScene::ResourceInstallDialogState::Confirming;
+	}
+
+	static bool importedPackageUsesStableDirectory(const ResourceSelectScene& scene)
+	{
+		OnlineUpdate::ImportedResourcePackageMetadata package;
+		package.gameId = "IMPORTED_MOD_1_03";
+		package.installDirectory = "imported_mod";
+		package.displayVersion = "1.03";
+		package.minimumEngineVersion = "1.0.6";
+		ResourceSelectScene::ResourceInstallConfirmation confirmation;
+		std::string error;
+		const bool prepared = scene.buildResourceImportConfirmation(package,
+			ResourceSelectScene::ResourcePackageImportKind::Full, confirmation, error);
+		if (!prepared || confirmation.targets.size() != 1 ||
+			confirmation.targets.front().targetDirectoryName != "imported_mod")
+		{
+			return false;
+		}
+		package.installDirectory = "../outside";
+		return !scene.buildResourceImportConfirmation(package,
+			ResourceSelectScene::ResourcePackageImportKind::Full, confirmation, error);
 	}
 
 	static bool resourceInstallConfirmationContains(
@@ -1239,6 +1567,17 @@ public:
 	{
 		return scene.pendingResourceInstall.items.size() == 1 &&
 			scene.pendingResourceInstall.items.front().artifactKind ==
+				OnlineUpdate::ResourceDownloadPlan::ArtifactKind::Incremental;
+	}
+
+	static bool onlineVersionSelectionForcesFullPackage(
+		ResourceSelectScene& scene)
+	{
+		return scene.beginResourceDownloadConfirmation() &&
+			scene.pendingResourceInstall.requestedDownloadMode ==
+				OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage &&
+			!scene.pendingResourceInstall.items.empty() &&
+			scene.pendingResourceInstall.items.front().artifactKind !=
 				OnlineUpdate::ResourceDownloadPlan::ArtifactKind::Incremental;
 	}
 
@@ -1624,6 +1963,60 @@ public:
 		const ResourceSelectScene& scene)
 	{
 		return scene.logicRunning;
+	}
+
+	static bool discardResourceStartupPointerEvents(
+		ResourceSelectScene& scene, int cardIndex)
+	{
+		if (!SDL_InitSubSystem(SDL_INIT_EVENTS))
+		{
+			return false;
+		}
+		bool ok = true;
+		for (const Uint32 type :
+			{ SDL_EVENT_FINGER_DOWN, SDL_EVENT_FINGER_UP,
+				SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP,
+				SDL_EVENT_QUIT, SDL_EVENT_WINDOW_RESIZED, SDL_EVENT_KEY_DOWN })
+		{
+			SDL_Event event = {};
+			event.type = type;
+			ok = SDL_PushEvent(&event) && ok;
+		}
+		scene.onRun();
+		for (const Uint32 type :
+			{ SDL_EVENT_FINGER_DOWN, SDL_EVENT_FINGER_UP,
+				SDL_EVENT_MOUSE_BUTTON_DOWN, SDL_EVENT_MOUSE_BUTTON_UP })
+		{
+			ok = !SDL_HasEvent(type) && ok;
+		}
+		for (const Uint32 type :
+			{ SDL_EVENT_QUIT, SDL_EVENT_WINDOW_RESIZED, SDL_EVENT_KEY_DOWN })
+		{
+			SDL_Event event = {};
+			ok = SDL_PeepEvents(&event, 1, SDL_GETEVENT, type, type) == 1 && ok;
+		}
+
+		// A press during startup can still be held when the page becomes ready.
+		SDL_Event touch = {};
+		touch.type = SDL_EVENT_FINGER_DOWN;
+		touch.tfinger.fingerID = 87;
+		ok = SDL_PushEvent(&touch) && ok;
+		scene.onRun();
+		ok = !SDL_HasEvent(SDL_EVENT_FINGER_DOWN) && ok;
+		touch.type = SDL_EVENT_FINGER_UP;
+		ok = SDL_PushEvent(&touch) && ok;
+		ok = SDL_PeepEvents(&touch, 1, SDL_GETEVENT,
+			SDL_EVENT_FINGER_UP, SDL_EVENT_FINGER_UP) == 1 && ok;
+		const auto& card = scene.resourceList->cards[cardIndex];
+		Engine* engine = Engine::getInstance();
+		engine->pushEvent(AEvent(ET_FINGERUP,
+			static_cast<EventTouchID>(touch.tfinger.fingerID),
+			card->rect.x + std::max(1, card->rect.w / 2),
+			card->rect.y + std::max(1, card->rect.h / 2), false));
+		scene.allHandleEvents();
+		ok = engine->getEventCount() == 0 && scene.logicRunning && ok;
+		SDL_QuitSubSystem(SDL_INIT_EVENTS);
+		return ok;
 	}
 
 	static bool resourceCatalogStatusContains(
@@ -3218,17 +3611,19 @@ bool testResourceSelectionController(
 		"mobile external resources start disabled and present the fixed device"
 		" directory even when the host surrogate has no Android storage root")
 		&& ok;
+	ResourceSelectScene externalPermissionScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(externalPermissionScene, 800, 480);
 	ok = check(
 		GamepadEssentialUITestAccess::
-			resourceExternalDetailsRequireConfirmation(navigationScene),
+			resourceExternalDetailsRequireConfirmation(externalPermissionScene),
 		"the mobile external-resource button opens a modal explanation and"
 		" closing it does not change the setting without confirmation") && ok;
 	ok = check(
 		GamepadEssentialUITestAccess::
-			beginExternalPermissionRequest(navigationScene)
+			beginExternalPermissionRequest(externalPermissionScene)
 			&& !Config::externalResourcesEnabled
 			&& GamepadEssentialUITestAccess::
-				resourceExternalPresentationIsWaiting(navigationScene),
+				resourceExternalPresentationIsWaiting(externalPermissionScene),
 		"requesting external-resource permission does not present or persist"
 		" the feature as enabled before permission is granted") && ok;
 #endif
@@ -3507,7 +3902,8 @@ bool testResourceSelectionController(
 		"resource selection resize event does not leave the old list geometry")
 		&& ok;
 	ok = check(compactVisibleCount > 0
-			&& compactVisibleCount < tallVisibleCount
+			&& compactVisibleCount <= tallVisibleCount
+			&& compactListRect.h < tallListRect.h
 			&& !GamepadEssentialUITestAccess::resourceDetailsUseWideLayout(
 				resizeScene)
 			&& compactDetailRect.y + compactDetailRect.h
@@ -3905,7 +4301,73 @@ bool testResourceSelectionController(
 		installedIncrementalArtifactCrc32 = previousIncrementalReceipt;
 	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
 		installedIncrementalChainCrc32s = previousIncrementalChainReceipt;
+	const std::string previousLocalVersion =
+		mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+			displayVersion;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		displayVersion = "2.0.0";
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedArtifactCrc32.clear();
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32.clear();
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalChainCrc32s.clear();
+	OnlineUpdate::ResourcePackage olderOnlinePackage = sameVersionPackage;
+	olderOnlinePackage.versionText = "1.0.0";
+	OnlineUpdate::Catalog olderOnlineCatalog;
+	olderOnlineCatalog.resourcePackages.emplace(
+		OnlineUpdate::foldGameId(olderOnlinePackage.gameId),
+		olderOnlinePackage);
+	ResourceSelectScene newerLocalVersionScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		newerLocalVersionScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::applyOnlineCatalog(
+			newerLocalVersionScene, olderOnlineCatalog) &&
+		GamepadEssentialUITestAccess::selectResourceEntry(
+			newerLocalVersionScene,
+			GamepadEssentialUITestAccess::resourceEntryIndexByGameId(
+				newerLocalVersionScene, olderOnlinePackage.gameId)) &&
+		GamepadEssentialUITestAccess::selectedResourceKeepsNewerLocalVersion(
+			newerLocalVersionScene),
+		"a newer local resource is labelled as newer while keeping the explicit"
+		" online-version action") && ok;
+	newerLocalVersionScene.setRunning(true);
+	GamepadEssentialUITestAccess::confirmSelectedResource(
+		newerLocalVersionScene);
+	ok = check(
+		!GamepadEssentialUITestAccess::resourceSceneRunning(
+			newerLocalVersionScene) &&
+		!GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			newerLocalVersionScene),
+		"entering a newer local resource skips the online downgrade prompt") && ok;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedArtifactCrc32 = olderOnlinePackage.crc32Hex;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32 =
+			olderOnlinePackage.incrementalPackage->crc32Hex;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalChainCrc32s =
+			sameVersionFirstIncremental.crc32Hex + "," +
+			sameVersionIncremental.crc32Hex;
+	ok = check(
+		GamepadEssentialUITestAccess::onlineVersionSelectionForcesFullPackage(
+			newerLocalVersionScene),
+		"explicitly selecting the older online version forces its full package"
+		" even when local artifact receipts already match") && ok;
+	GamepadEssentialUITestAccess::cancelResourceInstallConfirmation(
+		newerLocalVersionScene);
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		displayVersion = previousLocalVersion;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedArtifactCrc32 = previousFullReceipt;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalArtifactCrc32 = previousIncrementalReceipt;
+	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
+		installedIncrementalChainCrc32s = previousIncrementalChainReceipt;
 	OnlineUpdate::Catalog testCatalog;
+	ok = check(GamepadEssentialUITestAccess::importedPackageUsesStableDirectory(onlineCatalogScene),
+		"local full import uses its declared directory and rejects traversal") && ok;
 	OnlineUpdate::CommonPackage commonPackage;
 	commonPackage.versionText = "1.0-test";
 	commonPackage.artifactPath = "resources/common.zip";
@@ -3915,6 +4377,7 @@ bool testResourceSelectionController(
 	testCatalog.commonPackage = commonPackage;
 	OnlineUpdate::ResourcePackage localOnlinePackage;
 	localOnlinePackage.gameId = packs.front().manifest.id;
+	localOnlinePackage.installDirectory = "ignored_for_existing_resource";
 	localOnlinePackage.displayName = "Online Local Match";
 	localOnlinePackage.author = "Online Author";
 	localOnlinePackage.versionText = "9.9-test";
@@ -3945,7 +4408,8 @@ bool testResourceSelectionController(
 	onlineOnlyPackage.author = "Online Author";
 	onlineOnlyPackage.versionText = "1.0-test";
 	onlineOnlyPackage.releaseNotes = "Online-only resource fixture";
-	onlineOnlyPackage.artifactPath = "resources/online-test-only.zip";
+	onlineOnlyPackage.artifactPath = "resources/online-test-only-1.03.zip";
+	onlineOnlyPackage.installDirectory = "online-test-only";
 	onlineOnlyPackage.artifactSize = 2048;
 	onlineOnlyPackage.crc32Hex = "03030303";
 	onlineOnlyPackage.dependencyGameIds.push_back(
@@ -4126,6 +4590,13 @@ bool testResourceSelectionController(
 	const std::string expectedId = packs[targetPackIndex].manifest.id;
 	const std::string expectedRootPath = packs[targetPackIndex].rootPath;
 	directEntryScene.setRunning(true);
+	const std::string activeRootBeforeStartup = resourceManager.getActiveResourceRoot();
+	ok = check(
+		GamepadEssentialUITestAccess::discardResourceStartupPointerEvents(
+			directEntryScene, targetEntryIndex)
+			&& resourceManager.getActiveResourceRoot() == activeRootBeforeStartup,
+		"resource selection discards queued startup mouse and touch clicks,"
+		" ignores an unmatched touch release, and preserves quit, resize, and key events") && ok;
 	const bool directEntryDispatched =
 		GamepadEssentialUITestAccess::dispatchRealResourceCardClick(
 			directEntryScene, targetEntryIndex);
@@ -4191,6 +4662,156 @@ bool testResourceSelectionController(
 	Config::externalResourcesEnabled = originalExternalResourcesEnabled;
 #endif
 	return ok;
+}
+
+bool testResourceSelectionFooterRendering(const std::filesystem::path& assetsRoot)
+{
+	const auto fixture = makeUniqueTestDirectory("jxqy-save-import-ui");
+	const auto source = fixture / "save" / "test_mod";
+	const auto archive = fixture / "preview.zip";
+	const SavePackage::GameIdentity game{ "TEST_MOD", u8"测试模组较长名称的存档导入确认", "test_mod", "1.0.0" };
+	SavePackage::Package singleSlot, allSlots;
+	std::string error;
+	for (int slot = 1; slot <= SavePackage::AutomaticSlot; ++slot)
+	{
+		std::filesystem::create_directories(source / SavePackage::slotDirectory(slot));
+		std::ofstream stream(source / SavePackage::slotDirectory(slot) / "game.ini", std::ios::binary);
+		stream << "[Save]\nEngineVersion=" << JxqyBuildVersion::EngineVersion << "\nResourceVersion=1.0.0\n";
+	}
+	const bool packagesReady = SavePackage::write(source, game, 1, archive.u8string(), error) &&
+		SavePackage::read(archive.u8string(), singleSlot, error) &&
+		SavePackage::write(source, game, SavePackage::AllSlots, archive.u8string(), error) &&
+		SavePackage::read(archive.u8string(), allSlots, error);
+	std::filesystem::remove_all(fixture);
+	if (!check(packagesReady, "prepare actual single-slot and all-slot import previews: " + error)) return false;
+	VirtualGamepadTest::SDLSession sdlSession;
+	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Resource Footer Pad");
+	Engine* engine = Engine::getInstance();
+	auto& input = const_cast<GameInput::PhysicalInputManager&>(engine->inputActions());
+	HeadlessPhysicalInputTest::ScopedPhysicalInputManager inputScope(input);
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (!check(inputScope.isInitialized() && (!initializeTtf || TTF_Init()),
+		"initialize offscreen resource footer input and font rendering")) return false;
+	int previousWidth = 0, previousHeight = 0;
+	engine->getWindowSize(previousWidth, previousHeight);
+	engine->setFontName((assetsRoot / "engine/font/font.ttf").string());
+	bool ok = true;
+	for (const Point size : { Point{1280, 720}, Point{800, 600}, Point{800, 480}, Point{640, 480}, Point{400, 480}, Point{800, 360}, Point{400, 360} })
+	{
+		auto surface = make_shared_surface(SDL_CreateSurface(size.x, size.y, SDL_PIXELFORMAT_ARGB8888));
+		SDL_Renderer* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+		if (!check(renderer != nullptr, "create a resource footer software renderer"))
+		{
+			ok = false;
+			break;
+		}
+		auto previousRenderer = GamepadEssentialUITestAccess::exchangeRenderer(renderer);
+		GamepadEssentialUITestAccess::setLogicalSize(size.x, size.y);
+		{
+			auto scene = std::make_shared<GamepadEssentialUITestAccess::CapturedResourceScene>();
+			GamepadEssentialUITestAccess::prepareResourceSelection(*scene, size.x, size.y);
+			HeadlessPhysicalInputTest::ScopedRunningOwner owner(scene);
+			GamepadEssentialUITestAccess::dispatchResourceListPointer(*scene);
+			GamepadEssentialUITestAccess::drawResourceSelection(*scene);
+			const Rect fullPanel = GamepadEssentialUITestAccess::resourcePanelRect(*scene);
+			std::uint64_t now = SDL_GetTicks();
+			HeadlessPhysicalInputTest::FrameDriver driver(input, now,
+				[]() { return dispatchPhysicalUIActions(Engine::getInstance()); }, {});
+			driver.runFrame();
+			ok = check(driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN),
+				"physical navigation activates resource footer prompts") && ok;
+			GamepadEssentialUITestAccess::drawResourceSelection(*scene);
+			const auto prompt = GamepadEssentialUITestAccess::resourcePromptOptions(*scene);
+			const Rect panel = GamepadEssentialUITestAccess::resourcePanelRect(*scene);
+			ok = check(GamepadEssentialUITestAccess::resourceExternalLinksStayVisible(*scene) &&
+				prompt.y >= panel.y && prompt.y + prompt.height <= panel.y + panel.h && panel.h == fullPanel.h,
+				"the prompt fits the existing footer without shrinking the resource panel") && ok;
+			const auto changedPixels = [&](const Rect& rect)
+			{
+				if (!scene->beforePrompt || !scene->afterPrompt) return -1;
+				int count = 0;
+				for (int y = rect.y; y < rect.y + rect.h; ++y)
+				{
+					for (int x = rect.x; x < rect.x + rect.w; ++x)
+					{
+						Uint8 r, g, b, a, cr, cg, cb, ca;
+						if (!SDL_ReadSurfacePixel(scene->beforePrompt.get(), x, y, &r, &g, &b, &a) ||
+							!SDL_ReadSurfacePixel(scene->afterPrompt.get(), x, y, &cr, &cg, &cb, &ca)) return -1;
+						if (r != cr || g != cg || b != cb || a != ca) ++count;
+					}
+				}
+				return count;
+			};
+			int linkChanges = 0;
+			for (const Rect& link : GamepadEssentialUITestAccess::resourceExternalLinkRects(*scene))
+			{
+				const int changes = changedPixels(link);
+				ok = check(changes == 0, "the final prompt draw leaves every external-link pixel intact") && ok;
+				linkChanges += changes;
+			}
+			const int promptChanges = changedPixels({ prompt.x, prompt.y, prompt.width, prompt.height });
+			ok = check(promptChanges > 100, "the final composition actually contains a rendered controller bar") && ok;
+			ok = check(changedPixels({ 0, 0, size.x, size.y }) == promptChanges,
+				"all prompt glyphs and background stay inside the dedicated footer area") && ok;
+			std::cout << "ResourceFooterPixels size=" << size.x << 'x' << size.y
+				<< " links=" << linkChanges << " prompt=" << promptChanges << std::endl;
+			if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+			{
+				std::filesystem::create_directories(std::filesystem::u8path(directory));
+				const auto path = std::filesystem::u8path(directory) / ("resource-footer-" +
+					std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+				ok = check(scene->afterPrompt && IMG_SavePNG(scene->afterPrompt.get(), path.string().c_str()),
+					"save actual resource footer composition") && ok;
+			}
+			GamepadEssentialUITestAccess::dispatchResourceKeyboardFrame(*scene, KEY_DOWN);
+			GamepadEssentialUITestAccess::drawResourceSelection(*scene);
+			ok = check(GamepadEssentialUITestAccess::resourcePanelRect(*scene).h == fullPanel.h &&
+				changedPixels({ 0, 0, size.x, size.y }) == 0,
+				"keyboard takeover restores full height and removes the prompt bar") && ok;
+			GamepadEssentialUITestAccess::dispatchResourceListPointer(*scene);
+			GamepadEssentialUITestAccess::drawResourceSelection(*scene);
+			ok = check(GamepadEssentialUITestAccess::resourcePanelRect(*scene).h == fullPanel.h,
+				"pointer takeover retains the full resource panel height") && ok;
+			driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+			ok = check(GamepadEssentialUITestAccess::auditResourceSurfaces(*scene),
+				"resource selection rendered surfaces and return paths") && ok;
+			ok = check(GamepadEssentialUITestAccess::saveTransferControls(*scene),
+				"save transfer controls fit compact layouts, support navigation and allow first import") && ok;
+			ok = check(driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP),
+				"save transfer responds to physical navigation") && ok;
+			GamepadEssentialUITestAccess::drawResourceSelection(*scene);
+			ok = check(GamepadEssentialUITestAccess::saveTransferPromptDoesNotCoverControls(*scene),
+				"save management controls remain above controller prompts") && ok;
+			if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+			{
+				const auto path = std::filesystem::u8path(directory) / ("save-management-" +
+					std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+				ok = check(scene->afterPrompt && IMG_SavePNG(scene->afterPrompt.get(), path.string().c_str()),
+					"save management offscreen composition") && ok;
+			}
+			for (const auto* package : { &singleSlot, &allSlots })
+			{
+				ok = check(GamepadEssentialUITestAccess::previewSaveImport(*scene, *package),
+					"import preview keeps target and overwrite text above controls") && ok;
+				GamepadEssentialUITestAccess::drawResourceSelection(*scene);
+				if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+				{
+					const auto path = std::filesystem::u8path(directory) / ("save-import-" +
+						std::to_string(package->slots().size()) + "-" +
+						std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+					ok = check(scene->afterPrompt && IMG_SavePNG(scene->afterPrompt.get(), path.string().c_str()),
+						"save import confirmation offscreen composition") && ok;
+				}
+			}
+		}
+		GamepadEssentialUITestAccess::exchangeRenderer(previousRenderer);
+		SDL_DestroyRenderer(renderer);
+	}
+	GamepadEssentialUITestAccess::setLogicalSize(previousWidth, previousHeight);
+	engine->setFontName("");
+	if (initializeTtf) TTF_Quit();
+	return check((SDL_WasInit(SDL_INIT_VIDEO) & SDL_INIT_VIDEO) == 0,
+		"resource footer composition never initializes SDL video or opens a window") && ok;
 }
 
 bool testResourceSelectionPhysicalFirstAction()
@@ -4680,6 +5301,12 @@ bool testTitlePhysicalExitLink()
 bool testActionOnlyModalSurfaces()
 {
 	bool ok = true;
+	ok = check(
+		GamepadEssentialUITestAccess::titleTeamFadeAlpha(0xD0, 0) == 0
+			&& GamepadEssentialUITestAccess::titleTeamFadeAlpha(0xD0, 500) == 42
+			&& GamepadEssentialUITestAccess::titleTeamFadeAlpha(0xD0, 1000) == 169
+			&& GamepadEssentialUITestAccess::titleTeamFadeAlpha(0xA0, 1000) == 100,
+		"title team fade composes raster and texture alpha consistently") && ok;
 	TitleTeam videoTeamPage(
 		"team.avi");
 	ok = check(
@@ -4762,6 +5389,7 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 		menu.stateMenu != nullptr
 			&& menu.messageBox != nullptr
 			&& menu.systemNotice != nullptr
+			&& menu.scriptMessages != nullptr
 			&& menu.timerMenu != nullptr
 			&& menu.toolTip != nullptr
 			&& menu.npcInfoPanel != nullptr
@@ -4824,6 +5452,14 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	menu.clearMenu();
 	menu.cancelControllerInteraction();
 	menu.messageBox->currentMessage.clear();
+	gameManager.scriptAPI.showSystemMessage("script message one", 5000);
+	gameManager.scriptAPI.showSystemMessage("script message two", 5000);
+	ok = checkPack(menu.scriptMessages->parent == &menu && menu.scriptMessages->hasFont() &&
+		!menu.scriptMessages->coverMouse && !menu.scriptMessages->needEvents &&
+		menu.scriptMessages->currentMessage == "script message one\nscript message two" &&
+		menu.messageBox->currentMessage.empty(), resourcePack,
+		"production menu lifecycle creates a separate pass-through script-message stack") && ok;
+	menu.scriptMessages->dismiss();
 	menu.messageBox->showed = false;
 	menu.messageBox->visible = false;
 	const int moneyBeforePickup = gameManager.player->money;
@@ -4844,7 +5480,7 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	gameManager.player->money = 0;
 	gameManager.scriptAPI.addMoney(std::numeric_limits<int>::min());
 	ok = checkPack(
-		gameManager.player->money == std::numeric_limits<int>::min()
+		gameManager.player->money == 0
 			&& menu.messageBox->currentMessage ==
 				u8"失去2147483648两银子！",
 		resourcePack,
@@ -5140,6 +5776,10 @@ bool testOptionController(
 		return false;
 	}
 	focusOrder.push_back("cheat-settings");
+	if (option.themeButton != nullptr)
+	{
+		focusOrder.push_back("ui-theme");
+	}
 
 	ok = checkPack(option.focusManager.getFocusedNodeId() == "music",
 		resourcePack,
@@ -5638,7 +6278,7 @@ bool testYesNoAndDialogController(const ResourcePackExpectation& resourcePack)
 			dialogLabel->splitTalkString(std::string(52, 'D'));
 		const std::vector<TalkString> explicitRows =
 			dialogLabel->splitTalkString(
-				u8"甲<enter><enter><color=red>乙\r\n丙");
+				u8"甲\n\n<color=red>乙\r\n丙");
 		ok = checkPack(
 			exactPage.size() == 1 && exactPage[0].talkChar.size() == 51 &&
 			overflowPage.size() == 2 &&
@@ -5655,9 +6295,74 @@ bool testYesNoAndDialogController(const ResourcePackExpectation& resourcePack)
 			explicitRows[1].talkChar.size() == 1 &&
 			explicitRows[1].talkChar[0].color == 0xFFFF0000,
 			resourcePack,
-			"dialog explicit breaks preserve blank rows and color across page boundaries") && ok;
+			"dialog literal line breaks preserve blank rows and color across page boundaries") && ok;
+
+		const unsigned int originalColor = dialogLabel->color;
+		dialogLabel->color = 0x80102030;
+		const std::vector<TalkString> rangedColors =
+			dialogLabel->splitTalkString(
+				u8"<color=1,2,3,64><color=BeginRangeDefault>甲"
+				u8"<color=Red>乙<color=Default>丙<enter>"
+				u8"<color=4,5,6>丁<color=EndRangeDefault>戊"
+				u8"<color=Default>己<color=Black>庚<color=Unknown>辛");
+		dialogLabel->color = originalColor;
+		ok = checkPack(
+			rangedColors.size() == 2 &&
+			rangedColors[0].talkChar.size() == 3 &&
+			rangedColors[0].talkChar[0].color == 0x40010203 &&
+			rangedColors[0].talkChar[1].color == 0x40FF0000 &&
+			rangedColors[0].talkChar[2].color == 0x40010203 &&
+			rangedColors[1].talkChar.size() == 5 &&
+			rangedColors[1].talkChar[0].color == 0x40040506 &&
+			rangedColors[1].talkChar[1].color == 0x40040506 &&
+			rangedColors[1].talkChar[2].color == 0x80102030 &&
+			rangedColors[1].talkChar[3].color == 0x80000000 &&
+			rangedColors[1].talkChar[4].color == 0x80000000,
+			resourcePack,
+			"dialog color ranges preserve contextual defaults and alpha across pages"
+			" without rendering markup or resetting color on range end") && ok;
 	}
 
+	{
+		const auto markedPages = dialogLabel->splitTalkString(
+			u8"甲<Enter><color=Red>乙<enter>丙\n丁\r\n戊\r己");
+		ok = checkPack(markedPages.size() == 4
+			&& markedPages[0].talkChar.size() == 1
+			&& markedPages[1].talkChar.size() == 1
+			&& markedPages[2].talkChar.size() == 3
+			&& markedPages[3].talkChar.size() == 1
+			&& markedPages[1].talkChar[0].row == 0
+			&& markedPages[1].talkChar[0].column == 0
+			&& markedPages[1].talkChar[0].color == 0xFFFF0000
+			&& markedPages[2].talkChar[0].row == 0
+			&& markedPages[2].talkChar[1].row == 1
+			&& markedPages[2].talkChar[2].row == 2
+			&& markedPages[3].talkChar[0].row == 0
+			&& markedPages[3].talkChar[0].color == 0xFFFF0000,
+			resourcePack,
+			"dialog Enter markers force pages while LF, CRLF, and CR retain line breaks and color") && ok;
+		const std::string fullPage(expectedDialogPageCharacters, 'D');
+		const auto boundaryPages = dialogLabel->splitTalkString(fullPage + u8"<enter>乙<Enter>");
+		ok = checkPack(boundaryPages.size() == 2
+			&& boundaryPages[0].talkChar.size() == fullPage.size()
+			&& boundaryPages[1].talkChar.size() == 1
+			&& boundaryPages[1].talkChar[0].s == u8"乙",
+			resourcePack,
+			"forced breaks at a full page and at the end do not append blank pages") && ok;
+		dialog.setTalkStr(u8"甲<Enter>乙");
+		dialog.setRunning(true);
+		ok = checkPack(dialog.handleUIAction(UIAction::Confirm) && dialog.result == erNone
+			&& dialogLabel->isPageComplete(), resourcePack,
+			"first confirmation reveals only the current forced page") && ok;
+		ok = checkPack(dialog.handleUIAction(UIAction::Confirm) && dialog.result == erNone
+			&& !dialogLabel->isPageComplete(), resourcePack,
+			"second confirmation opens the next forced page instead of closing dialogue") && ok;
+		ok = checkPack(dialog.handleUIAction(UIAction::Confirm) && dialog.result == erNone
+			&& dialogLabel->isPageComplete()
+			&& dialog.handleUIAction(UIAction::Confirm) && dialog.result == erOK,
+			resourcePack, "last forced page must be revealed and confirmed before dialogue closes") && ok;
+		dialog.result = erNone;
+	}
 	if (std::string(resourcePack.id) == "JXQY2")
 	{
 		TalkLabel defaultDialogLabel;
@@ -6012,6 +6717,7 @@ bool runGamepadEssentialUITests()
 	ok = testResourceSelectionController(resourceManager) && ok;
 	ok = testPublishedModTitleResources(resourceManager) && ok;
 	ok = testResourceSelectionPhysicalFirstAction() && ok;
+	ok = testResourceSelectionFooterRendering(assetsRoot) && ok;
 	ok = testTitlePhysicalExitLink() && ok;
 	ok = testActionOnlyModalSurfaces() && ok;
 

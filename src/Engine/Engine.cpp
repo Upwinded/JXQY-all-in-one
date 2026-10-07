@@ -2,19 +2,20 @@
 #include "AudioDecodeSafety.h"
 #include "LogicalResolutionPolicy.h"
 #include "../Image/IMP.h"
+#include "../Game/Data/MediaPathResolver.h"
 
 namespace
 {
-std::string normalizeActionSoundCachePart(std::string value)
+std::string normalizeSoundCachePart(std::string value)
 {
 	convert::replaceAllString(value, "\\", "/");
 	return value;
 }
 
-std::string getActionSoundCacheScope()
+std::string getSoundCacheScope()
 {
-	return normalizeActionSoundCachePart(File::getAssetsCollectionRoot()) + "\n" +
-		normalizeActionSoundCachePart(File::getActiveResourceRoot()) + "\n" +
+	return normalizeSoundCachePart(File::getAssetsCollectionRoot()) + "\n" +
+		normalizeSoundCachePart(File::getActiveResourceRoot()) + "\n" +
 		File::getActiveSaveNamespace();
 }
 }
@@ -1206,32 +1207,37 @@ _channel Engine::playSound(_music music)
 	return playSound(music, 0, 0);
 }
 
-_channel Engine::playCachedSoundFile(const std::string& fileName,
-	float x, float y, float volume)
+_music Engine::getOrLoadCachedSoundFile(
+	const std::string& fileName, bool& cached)
 {
+	cached = false;
 	if (fileName.empty())
 	{
 		return nullptr;
 	}
-	const std::string scope = getActionSoundCacheScope();
+	const std::string scope = getSoundCacheScope();
+	const std::string soundPath = buildSoundAssetPath(fileName);
+	if (soundPath.empty())
+	{
+		return nullptr;
+	}
 	const std::string cacheKey = scope + "\n" +
-		normalizeActionSoundCachePart(fileName);
-	std::lock_guard<std::recursive_mutex> locker(soundMutex);
-	setActionSoundCacheScope(scope);
+		normalizeSoundCachePart(soundPath);
+	setSoundCacheScope(scope);
 
-	_music music = getCachedActionSound(cacheKey);
-	bool cached = music != nullptr;
+	_music music = getCachedSound(cacheKey);
+	cached = music != nullptr;
 	if (music == nullptr)
 	{
-		music = loadSound(fileName);
+		music = loadSound(resolveSoundAssetPath(soundPath));
 		if (music == nullptr)
 		{
 			return nullptr;
 		}
 #if defined(JXQY_ENABLE_TEST_HOOKS)
-		actionSoundDecodeCountForTests++;
+		cachedSoundDecodeCountForTests++;
 #endif
-		_music retainedMusic = cacheActionSound(cacheKey, music);
+		_music retainedMusic = cacheSound(cacheKey, music);
 		if (retainedMusic != nullptr)
 		{
 			if (retainedMusic != music)
@@ -1241,6 +1247,35 @@ _channel Engine::playCachedSoundFile(const std::string& fileName,
 			}
 			cached = true;
 		}
+	}
+	return music;
+}
+
+bool Engine::preloadCachedSoundFile(const std::string& fileName)
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	bool cached = false;
+	_music music = getOrLoadCachedSoundFile(fileName, cached);
+	if (music == nullptr)
+	{
+		return false;
+	}
+	if (!cached)
+	{
+		freeMusic(music);
+	}
+	return cached;
+}
+
+_channel Engine::playCachedSoundFile(const std::string& fileName,
+	float x, float y, float volume)
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	bool cached = false;
+	_music music = getOrLoadCachedSoundFile(fileName, cached);
+	if (music == nullptr)
+	{
+		return nullptr;
 	}
 
 	if (volume < 0.0f)

@@ -143,6 +143,7 @@ set(CORE_SOURCES
     core/ScriptConverter.cpp
     core/LuaScriptSyntaxValidator.cpp
     core/MapConverter.cpp
+    core/TiledMapConverter.cpp
     core/IMPImageFile.cpp
     core/Util.cpp
     core/ini.cpp
@@ -211,6 +212,7 @@ set(CORE_HEADERS
     core/ScriptConverter.h
     core/LuaScriptSyntaxValidator.h
     core/MapConverter.h
+    core/TiledMapConverter.h
     core/IMPImageFile.h
     core/Util.h
     core/ini.h
@@ -1497,6 +1499,14 @@ if(WIN32)
                     ${WINDEPLOYQT_CONFIG_ARG}
                 COMMENT "Deploying Qt dependencies for ${deploy_target}..."
             )
+            if(TARGET Qt6::QOffscreenIntegrationPlugin)
+                add_custom_command(TARGET ${deploy_target} POST_BUILD
+                    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                        "$<TARGET_FILE:Qt6::QOffscreenIntegrationPlugin>"
+                        "$<TARGET_FILE_DIR:${deploy_target}>/platforms/"
+                    COMMENT "Deploying the Qt offscreen test platform..."
+                )
+            endif()
         endforeach()
     endif()
 endif()

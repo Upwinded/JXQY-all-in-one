@@ -138,7 +138,8 @@ bool validateGoodsUserRestriction(std::shared_ptr<Goods> goods, std::shared_ptr<
 		}
 		return false;
 	}
-	if (equipmentUse && goods->sex > 0 && user != nullptr && user->sex > 0 && user->sex != goods->sex)
+	if (equipmentUse && goods->sex > 0 && user != nullptr
+		&& (user->sex == 0 ? 1 : user->sex) != goods->sex)
 	{
 		if (message != nullptr)
 		{
@@ -387,10 +388,7 @@ void GoodsManager::clearItem(bool adjustCurrentValues)
 	{
 		goodsList[i].clear();
 	}
-	if (gm != nullptr && gm->player != nullptr)
-	{
-		gm->player->resetEquipmentGrantedMagicSync();
-	}
+	// Keep the previous grant counts so recalculation can remove equipment-only Magic.
 	refreshEquipmentEffects(adjustCurrentValues);
 	updateMenu();
 }
@@ -734,7 +732,7 @@ bool GoodsManager::buyItem(const std::string & itemName, int num)
 	}
 	if (addItem(itemName, num))
 	{
-		gm->player->money -= static_cast<int>(totalCost);
+		gm->player->setMoney(static_cast<int64_t>(gm->player->money) - totalCost);
 		return true;
 	}
 	gm->showMessage("物品栏位置已满！");
@@ -804,14 +802,7 @@ bool GoodsManager::useItem(int itemIndex)
 		{
 			goodsList[itemIndex].clear();
 		}
-		if (isStoreIndex(itemIndex))
-		{
-			gm->menu->goodsMenu->updateGoods();
-		}
-		else if (isBottomIndex(itemIndex))
-		{
-			gm->menu->bottomMenu->updateGoodsItem();
-		}
+		updateMenu(itemIndex);
 		return true;
 	}
 	else if (goodsList[itemIndex].goods->kind == gkEquipment)
@@ -821,20 +812,14 @@ bool GoodsManager::useItem(int itemIndex)
 			refreshEquipmentEffects();
 			return true;
 		}
-		int partIndex = gm->menu->equipMenu->getPartIndex(goodsList[itemIndex].goods->part);
+		int partIndex = NPC::getEquipmentPartIndex(goodsList[itemIndex].goods->part);
 		if (partIndex >= 0)
 		{
-			exchange(itemIndex, equipIndex(partIndex));
-			gm->menu->equipMenu->updateGoods();
+			const int equipmentIndex = equipIndex(partIndex);
+			exchange(itemIndex, equipmentIndex);
+			updateMenu(equipmentIndex);
 			gm->player->limitAttribute();
-			if (isStoreIndex(itemIndex))
-			{
-				gm->menu->goodsMenu->updateGoods();
-			}
-			else if (isBottomIndex(itemIndex))
-			{
-				gm->menu->bottomMenu->updateGoodsItem();
-			}
+			updateMenu(itemIndex);
 			return true;
 		}
 	}

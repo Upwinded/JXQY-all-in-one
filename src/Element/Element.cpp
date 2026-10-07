@@ -1,3 +1,4 @@
+#include "../GameplayAutomation/GameplayAutomationSession.h"
 #include "Element.h"
 #include "ElementPointerClickPolicy.h"
 #include "../Engine/Engine.h"
@@ -1665,6 +1666,9 @@ void Element::frame()
 	setRunningElementsPaused(!applicationActive || !frameReady);
 	if (!applicationActive || !frameReady)
 	{
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+        GameplayAutomationSession::onFrame();
+#endif
 		engine->delay(16);
 		return;
 	}
@@ -1722,6 +1726,14 @@ void Element::frame()
 	{
 		return;
 	}
+
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	if (GameplayAutomationSession::enabled())
+	{
+		GameplayAutomationSession::onFrame();
+		if (stopForApplicationQuit() || !logicRunning) return;
+	}
+#endif
 
 	updateAll();
 
@@ -1892,6 +1904,9 @@ unsigned int Element::run()
 			}
 			runningStackEntryActive = false;
 		});
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+    GameplayAutomationSession::contextChanged();
+#endif
 	runningElement.push_back(getMySharedPtr());
 	runningStackEntryActive = true;
 
@@ -1954,6 +1969,9 @@ unsigned int Element::run()
 	}
 	runningStackEntryActive = false;
 	runningStackCleanup.dismiss();
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+    GameplayAutomationSession::contextChanged();
+#endif
 
 	return result;
 }

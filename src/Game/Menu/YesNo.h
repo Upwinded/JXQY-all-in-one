@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Component/Component.h"
+#include "ControllerPromptPresenter.h"
 #include "UIFocusManager.h"
 
 class GamepadEssentialUITestAccess;
@@ -23,6 +24,7 @@ public:
 private:
 	std::string promptText;
 	UIFocusManager focusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 
 	void configureFocus(const std::string& preferredFocusId);
 	void selectYes();

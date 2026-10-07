@@ -1,10 +1,12 @@
 #include "../Resource/ResourceCatalog.h"
+#include "../Resource/PackagedAssetDirectories.h"
 
 #include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <set>
 #include <string>
@@ -39,6 +41,129 @@ bool writeText(const fs::path& path, const std::string& text)
 	output.write(
 		text.data(), static_cast<std::streamsize>(text.size()));
 	return output.good();
+}
+
+bool writeApk(
+	const fs::path& path,
+	const std::vector<std::pair<std::string, std::string>>& files)
+{
+	mz_zip_archive archive{};
+	if (!mz_zip_writer_init_file(&archive, path.u8string().c_str(), 0))
+	{
+		return false;
+	}
+	bool ok = true;
+	for (const auto& file : files)
+	{
+		if (!mz_zip_writer_add_mem(
+				&archive, file.first.c_str(), file.second.data(),
+				file.second.size(), MZ_NO_COMPRESSION))
+		{
+			ok = false;
+			break;
+		}
+	}
+	ok = ok && mz_zip_writer_finalize_archive(&archive);
+	return mz_zip_writer_end(&archive) && ok;
+}
+
+bool testApkAssetDirectories(const fs::path& root)
+{
+	const fs::path apk = root / "directories.apk";
+	const std::string invalidName = "assets/nul/name.txt";
+	if (!check(writeApk(apk,
+			{
+				{ "assets/engine/font/font.ttf", "font" },
+				{ "assets/jxqy2/game_profile.ini", "profile" },
+				{ "assets/jxqy2/map/deep/file.bin", "map" },
+				{ u8"assets/中文😀资源/game_profile.ini", "profile" },
+				{ "assets/deep/only/a/file.bin", "data" },
+				{ "assets/resources.ini", "collection" },
+				{ "assets2/outside/file.bin", "outside" },
+				{ "assets//file.bin", "empty name" },
+				{ "assets/./file.bin", "dot" },
+				{ "assets/../file.bin", "parent" },
+				{ "assets/back\\slash/file.bin", "backslash" },
+				{ invalidName, "embedded null" }
+			}), "create APK without explicit directory entries"))
+	{
+		return false;
+	}
+	std::string bytes;
+	{
+		std::ifstream input(apk, std::ios::binary);
+		bytes.assign(std::istreambuf_iterator<char>(input), {});
+	}
+	std::size_t position = 0;
+	unsigned int replaced = 0;
+	while ((position = bytes.find(invalidName, position)) != std::string::npos)
+	{
+		bytes[position + 7] = '\0';
+		position += invalidName.size();
+		++replaced;
+	}
+	if (!check(replaced == 2 && writeText(apk, bytes),
+			"put an embedded null in the local and central directory filename"))
+	{
+		return false;
+	}
+	const auto listed = RuntimeResource::listApkAssetDirectories(apk.u8string());
+	const std::set<std::string> expected = { "engine", "jxqy2", "deep", u8"中文😀资源" };
+	bool ok = check(
+		listed.status == RuntimeResource::CatalogDirectoryListStatus::Success &&
+			listed.childDirectoryNames ==
+				std::vector<std::string>(expected.begin(), expected.end()),
+		"APK discovery preserves UTF-8 and returns unique direct directories only");
+
+	const fs::path empty = root / "empty.apk";
+	ok = check(writeApk(empty, {}), "create empty APK") && ok;
+	const auto emptyList = RuntimeResource::listApkAssetDirectories(empty.u8string());
+	ok = check(emptyList.status == RuntimeResource::CatalogDirectoryListStatus::Success &&
+		emptyList.childDirectoryNames.empty(), "empty APK has no asset directories") && ok;
+	const fs::path damaged = root / "damaged.apk";
+	ok = check(writeText(damaged, "not a ZIP"), "create damaged APK") && ok;
+	for (const fs::path& unavailable : { damaged, root / "missing.apk" })
+	{
+		const auto unavailableList = RuntimeResource::listApkAssetDirectories(unavailable.u8string());
+		ok = check(unavailableList.status == RuntimeResource::CatalogDirectoryListStatus::Unavailable &&
+			unavailableList.childDirectoryNames.empty(),
+			"missing or damaged APK does not report successful empty discovery") && ok;
+	}
+
+	const fs::path payload = root / "damaged-payload.apk";
+	const std::string originalPayload = "unique stored APK payload";
+	if (!check(writeApk(payload, { { "assets/payload/data.bin", originalPayload } }),
+			"create APK payload fixture"))
+	{
+		return false;
+	}
+	{
+		std::ifstream input(payload, std::ios::binary);
+		bytes.assign(std::istreambuf_iterator<char>(input), {});
+	}
+	position = bytes.find(originalPayload);
+	if (!check(position != std::string::npos, "locate stored APK payload"))
+	{
+		return false;
+	}
+	bytes[position] ^= 1;
+	if (!check(writeText(payload, bytes), "damage payload without changing central directory"))
+	{
+		return false;
+	}
+	mz_zip_archive archive{};
+	if (!check(mz_zip_reader_init_file(&archive, payload.u8string().c_str(), 0),
+			"open APK with damaged payload metadata"))
+	{
+		return false;
+	}
+	ok = check(!mz_zip_validate_file(&archive, 0, 0), "payload checksum is actually invalid") && ok;
+	mz_zip_reader_end(&archive);
+	const auto payloadList = RuntimeResource::listApkAssetDirectories(payload.u8string());
+	ok = check(payloadList.status == RuntimeResource::CatalogDirectoryListStatus::Success &&
+		payloadList.childDirectoryNames == std::vector<std::string>{ "payload" },
+		"directory enumeration does not read or verify resource payloads") && ok;
+	return ok;
 }
 
 fs::path resolvedPath(const fs::path& path)
@@ -183,6 +308,9 @@ bool createFixture(const fs::path& root)
 			"Id=BASE\n"
 			"Name=Primary Base\n"
 			"Type=1\n"
+			"[Experience]\n"
+			"DefeatedNpcExperienceMode=StoredExperience\n"
+			"ExperienceMultiplier=2.5\n"
 			"[UI]\n"
 			"Profile=YYCS\n"
 			"[Save]\n"
@@ -203,7 +331,10 @@ bool createFixture(const fs::path& root)
 			"[Game]\n"
 			"Id=SUPPORT\n"
 			"Name=External Support\n"
-			"Type=2\n") &&
+			"Type=2\n"
+			"[Experience]\n"
+			"LevelUpThresholdMode=GreaterThan\n"
+			"ExperienceMultiplier=4.5\n") &&
 		writeText(
 			root / "external/c-single/game_profile.ini",
 			"[Game]\n"
@@ -380,6 +511,16 @@ bool testCombinedSelection(const fs::path& root)
 			selected.selection.activeManifest.uiProfile == "YYCS",
 		"supplemental active pack inherits Game.Type and UI.BaseId from the primary catalog") && ok;
 	ok = check(
+		selected.selection.activeManifest.defeatedNpcExperienceModeDefined &&
+			selected.selection.activeManifest.defeatedNpcExperienceMode ==
+				DefeatedNpcExperienceMode::StoredExperience &&
+			selected.selection.activeManifest.experienceMultiplierDefined &&
+			selected.selection.activeManifest.experienceMultiplier == 2.5 &&
+			selected.selection.activeManifest.levelUpThresholdModeDefined &&
+			selected.selection.activeManifest.levelUpThresholdMode ==
+				LevelUpThresholdMode::GreaterThan,
+		"active pack inherits undefined experience settings from the declared dependency chain in order") && ok;
+	ok = check(
 		!hasDiagnostic(
 			selected.diagnostics,
 			"resource.catalog.dependency_id_ambiguous"),
@@ -478,6 +619,89 @@ bool testPrimaryDirectChildrenAreDiscovered(const fs::path& root)
 			findEntry(snapshot.snapshot, "pack..staging") == nullptr &&
 			findEntry(snapshot.snapshot, "pack.nested") == nullptr,
 		"common, hidden transaction, and nested-only directories are not resources") && ok;
+	return ok;
+}
+
+bool testLevelUpInheritance(const fs::path& root)
+{
+	const fs::path collection = root / "level-up";
+	bool ok = writeText(collection / "base/game_profile.ini",
+		"[Game]\nId=LEVEL_BASE\nType=0\n"
+		"[LevelUp]\nMessage=base-message\nRandomEffects=base-a.ini,base-b.ini\n"
+		"MaleEffect=base-male.ini\nFemaleEffect=base-female.ini\n") &&
+		writeText(collection / "other/game_profile.ini",
+			"[Game]\nId=LEVEL_OTHER\nType=2\n"
+			"[Resource]\nDependencyId=LEVEL_BASE\n"
+			"[LevelUp]\nMessage=other-message\nRandomEffects=other.ini,BASE-MALE.INI\n") &&
+		writeText(collection / "middle/game_profile.ini",
+			"[Game]\nId=LEVEL_MIDDLE\n[Resource]\nDependencyId=LEVEL_BASE\n") &&
+		writeText(collection / "mod/game_profile.ini",
+			"[Game]\nId=LEVEL_MOD\nType=0\n"
+			"[Resource]\nDependencyId=LEVEL_MIDDLE,LEVEL_OTHER\n"
+			"[Experience]\nDefeatedNpcExperienceMode=StoredExperience\n"
+			"ExperienceMultiplier=3\nLevelUpThresholdMode=GreaterThanOrEqual\n");
+	RuntimeResource::ResourceCatalogRequest request;
+	request.primaryCollectionRoot = collection;
+	const auto inherited = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");
+	ok = check(inherited.succeeded() &&
+		inherited.selection.activeManifest.levelUpMessage == "base-message" &&
+		inherited.selection.activeManifest.getLevelUpEffectCandidates(0) ==
+			std::vector<std::string>{ "base-male.ini", "other.ini" } &&
+		inherited.selection.activeManifest.getLevelUpEffectCandidates(2) ==
+			std::vector<std::string>{ "base-female.ini", "other.ini", "BASE-MALE.INI" },
+		"missing effect mode appends recursively and removes shared-base and case-insensitive duplicates") && ok;
+	ok = writeText(collection / "mod/game_profile.ini",
+		"[Game]\nId=LEVEL_MOD\nType=0\n"
+		"[Resource]\nDependencyId=LEVEL_MIDDLE\n"
+		"[UI]\nBaseId=LEVEL_OTHER\n"
+		"[LevelUp]\nEffectMode=Append\nRandomEffects=new.ini,BASE-MALE.INI,new.ini\n") && ok;
+	const auto appended = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");
+	ok = check(appended.succeeded() &&
+		appended.selection.activeManifest.getLevelUpEffectCandidates(0) ==
+			std::vector<std::string>{ "new.ini", "BASE-MALE.INI" } &&
+		appended.selection.activeManifest.getLevelUpEffectCandidates(2) ==
+			std::vector<std::string>{ "new.ini", "BASE-MALE.INI", "base-female.ini" },
+		"append retains base definitions for each sex, removes local duplicates, and ignores UI-only dependencies") && ok;
+	ok = writeText(collection / "mod/game_profile.ini",
+		"[Game]\nId=LEVEL_MOD\n[Resource]\nDependencyId=LEVEL_MIDDLE\n"
+		"[LevelUp]\nEffectMode=Append\nRandomEffects=\nMaleEffect=\nFemaleEffect=\n") && ok;
+	const auto emptyAppend = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");
+	ok = check(emptyAppend.succeeded() &&
+		emptyAppend.selection.activeManifest.getLevelUpEffectCandidates(0) ==
+			std::vector<std::string>{ "base-male.ini" } &&
+		emptyAppend.selection.activeManifest.getLevelUpEffectCandidates(2) ==
+			std::vector<std::string>{ "base-female.ini" },
+		"append with no new effects preserves the base exactly") && ok;
+	ok = writeText(collection / "mod/game_profile.ini",
+		"[Game]\nId=LEVEL_MOD\n[Resource]\nDependencyId=LEVEL_MIDDLE,LEVEL_OTHER\n"
+		"[LevelUp]\nEffectMode=Replace\nMessage=mod-message\nMaleEffect=mod-male.ini\n") && ok;
+	const auto overridden = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");
+	ok = check(overridden.succeeded() &&
+		overridden.selection.activeManifest.levelUpMessage == "mod-message" &&
+		overridden.selection.activeManifest.getLevelUpEffectCandidates(0) ==
+			std::vector<std::string>{ "mod-male.ini" } &&
+		overridden.selection.activeManifest.getLevelUpEffectCandidates(2).empty(),
+		"replace does not borrow any base effect, including missing female effects") && ok;
+	ok = writeText(collection / "middle/game_profile.ini",
+		"[Game]\nId=LEVEL_MIDDLE\n[Resource]\nDependencyId=LEVEL_BASE\n"
+		"[LevelUp]\nEffectMode=Replace\nRandomEffects=middle.ini\n") &&
+		writeText(collection / "mod/game_profile.ini",
+			"[Game]\nId=LEVEL_MOD\n[Resource]\nDependencyId=LEVEL_MIDDLE,LEVEL_OTHER\n") && ok;
+	const auto nested = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");
+	ok = check(nested.succeeded() &&
+		nested.selection.activeManifest.getLevelUpEffectCandidates(0) ==
+			std::vector<std::string>{ "middle.ini", "other.ini", "BASE-MALE.INI" } &&
+		nested.selection.activeManifest.getLevelUpEffectCandidates(2) ==
+			std::vector<std::string>{ "middle.ini", "other.ini", "BASE-MALE.INI", "base-female.ini" },
+		"nested replace blocks only its branch; a shared base still contributes through an append sibling") && ok;
+	ok = writeText(collection / "mod/game_profile.ini",
+		"[Game]\nId=LEVEL_MOD\n[Resource]\nDependencyId=LEVEL_MIDDLE\n"
+		"[LevelUp]\nEffectMode=Replace\n") && ok;
+	const auto disabled = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");
+	ok = check(disabled.succeeded() &&
+		disabled.selection.activeManifest.getLevelUpEffectCandidates(0).empty() &&
+		disabled.selection.activeManifest.getLevelUpEffectCandidates(2).empty(),
+		"empty replace intentionally disables animations") && ok;
 	return ok;
 }
 
@@ -843,7 +1067,9 @@ int main()
 	}
 
 	bool ok = testSnapshotAggregation(root);
+	ok = testApkAssetDirectories(root) && ok;
 	ok = testCombinedSelection(root) && ok;
+	ok = testLevelUpInheritance(root) && ok;
 	ok = testPrimaryDirectChildrenAreDiscovered(root) && ok;
 	ok = testPackagedRootUsesConventionalCommon() && ok;
 	ok = testSupplementalBudgetDoesNotConsumeSelectionBudget() && ok;

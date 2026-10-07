@@ -20,6 +20,7 @@ void NPCActionMagic::enter()
     _magicDone = false;
     _target = _npc->destGE.lock();
     _magicToUse = _npc->preparedMagicAction;
+    _sourceMagic = _npc->preparedMagicActionSource;
     _magicDest = _npc->preparedMagicActionDest;
     _magicLevel = _npc->preparedMagicActionLevel;
     _magicListIndex = _npc->preparedMagicActionListIndex;
@@ -36,6 +37,7 @@ void NPCActionMagic::enter()
         {
             auto& magicInfo = gm->magicManager.magicList[listIndex];
             _magicToUse = player->resolveMagicReplacement(magicInfo.magic);
+            _sourceMagic = magicInfo.magic;
             _magicDest = player->magicDest;
             _magicLevel = magicInfo.level;
             _magicListIndex = listIndex;
@@ -61,6 +63,7 @@ void NPCActionMagic::update(UTime frameTime)
     {
         _magicDone = true;
         _npc->attackDone = true;
+        _npc->revealMagicInvisibilityOnAction();
         if (_magicToUse != nullptr)
         {
             bool canUse = true;
@@ -79,13 +82,9 @@ void NPCActionMagic::update(UTime frameTime)
             {
                 if (player != nullptr)
                 {
-                    gm->magicManager.recordCurrentUseMagic(_magicListIndex);
+                    gm->magicManager.finishMagicUse(_sourceMagic, _magicToUse->coldMilliSeconds, _magicListIndex >= 0);
                 }
                 _npc->useMagic(_magicToUse, _magicDest, level, _target.lock());
-                if (player != nullptr && _magicListIndex >= 0 && _magicListIndex < gm->magicManager.listLength())
-                {
-                    gm->magicManager.magicList[_magicListIndex].remainColdMilliseconds = _magicToUse->coldMilliSeconds;
-                }
             }
         }
     }
@@ -94,7 +93,6 @@ void NPCActionMagic::update(UTime frameTime)
     {
         _npc->fightState.set(true);
         _npc->lastBattleScanTime = _npc->getTime();
-        _npc->revealMagicInvisibilityOnAction();
         _npc->actionManager->forceChangeAction(NPCActionType::acStand);
     }
 }

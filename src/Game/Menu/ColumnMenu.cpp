@@ -46,6 +46,7 @@ void ColumnMenu::updateState()
 void ColumnMenu::onUpdate()
 {
 	updateState();
+	updateDataBindings();
 }
 
 void ColumnMenu::init()

@@ -2,12 +2,6 @@
 
 #include "../File/File.h"
 
-#if defined(_WIN32)
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-
 namespace
 {
 #if defined(JXQY_ENABLE_TEST_HOOKS)
@@ -18,21 +12,6 @@ std::mutex g_diagnosticsFileSinkDestructorTestHookMutex;
 EditorRun::DiagnosticsFileSinkDestructorTestHook
 	g_diagnosticsFileSinkDestructorTestHook;
 #endif
-
-bool flushDiagnosticsFile(std::FILE* file)
-{
-	if (file == nullptr || std::fflush(file) != 0)
-	{
-		return false;
-	}
-#if defined(_WIN32)
-	const int descriptor = _fileno(file);
-	return descriptor >= 0 && _commit(descriptor) == 0;
-#else
-	const int descriptor = fileno(file);
-	return descriptor >= 0 && fsync(descriptor) == 0;
-#endif
-}
 
 #if defined(JXQY_ENABLE_TEST_HOOKS)
 void invokeDiagnosticsFileSinkWriteTestHook()
@@ -118,12 +97,7 @@ std::shared_ptr<DiagnosticsFileSink> DiagnosticsFileSink::open()
 			state->path,
 			state->generation,
 			state->file,
-			state->parentToken) ||
-		!File::editorRunDiagnosticsHandleIsCurrent(
-			state->file,
-			state->parentToken,
-			state->path,
-			state->generation))
+			state->parentToken))
 	{
 		state->close();
 		return {};
@@ -199,11 +173,7 @@ bool DiagnosticsFileSink::appendAndFlush(std::string_view line)
 	std::lock_guard<std::mutex> lock(handleState->mutex);
 	if (!layoutUse.valid() ||
 		handleState->generation != expectedGeneration ||
-		!File::editorRunDiagnosticsHandleIsCurrent(
-			handleState->file,
-			handleState->parentToken,
-			handleState->path,
-			handleState->generation))
+		handleState->file == nullptr)
 	{
 		handleState->closeUnlocked();
 		return false;
@@ -211,27 +181,13 @@ bool DiagnosticsFileSink::appendAndFlush(std::string_view line)
 #if defined(JXQY_ENABLE_TEST_HOOKS)
 	invokeDiagnosticsFileSinkWriteTestHook();
 #endif
-	if (!File::editorRunDiagnosticsHandleIsCurrent(
-			handleState->file,
-			handleState->parentToken,
-			handleState->path,
-			handleState->generation))
-	{
-		handleState->closeUnlocked();
-		return false;
-	}
 	const std::size_t written =
 		std::fwrite(
 			line.data(), 1, line.size(),
 			handleState->file);
 	const bool succeeded =
 		written == line.size() &&
-		flushDiagnosticsFile(handleState->file) &&
-		File::editorRunDiagnosticsHandleIsCurrent(
-			handleState->file,
-			handleState->parentToken,
-			handleState->path,
-			handleState->generation);
+		std::fflush(handleState->file) == 0;
 	if (!succeeded)
 	{
 		handleState->closeUnlocked();

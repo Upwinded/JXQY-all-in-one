@@ -98,6 +98,11 @@ void PartnerHeadMenu::refreshPartnerButtons()
 	auto partners = gm->partnerManager.findPartnersFromNPCManager();
 	size_t controlIndex = 0;
 	int y = HeadStartY;
+	if (gm->global.feature.qingyuUi && gm->menu != nullptr && gm->menu->columnMenu != nullptr)
+	{
+		const auto& statusRect = gm->menu->columnMenu->rect;
+		y = statusRect.y + statusRect.h + HeadStartY;
+	}
 
 	for (auto& partner : partners)
 	{

@@ -202,6 +202,7 @@ void Title::init()
 
 void Title::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	focusManager.clear();
 	initBtn = nullptr;
 	exitBtn = nullptr;
@@ -722,5 +723,5 @@ void Title::onDrawEnd()
 		{ InputAction::Confirm, "确认" }
 	};
 	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+		engine, engine->inputActions(), items, controllerPromptTextureCache);
 }

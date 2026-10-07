@@ -10,6 +10,8 @@ public:
 	virtual ~Scrollbar();
 
 	ScrollbarStyle style = ssVertical;
+	bool flat = false;
+	bool fitTrack = false;
 	int position = 0;
 	int min = 0;
 	int max = 72;
@@ -53,4 +55,3 @@ private:
 	virtual void onSetChildRect();
 
 };
-

@@ -4,11 +4,27 @@
 #include "../GameManager/GameManager.h"
 #include "../../File/File.h"
 
+#include <algorithm>
 #include <string>
 #include <memory>
 
 namespace MenuResource
 {
+inline void updateMagicCooldown(const std::shared_ptr<Item>& item, MagicManager& manager, int index)
+{
+	if (item == nullptr)
+	{
+		return;
+	}
+	const MagicInfo* info = manager.magicListExists(index) ? &manager.magicList[index] : nullptr;
+	const UTime remaining = info != nullptr ? info->remainColdMilliseconds : 0;
+	// Read the existing cast timer. Moving a skill between slots must not restart it.
+	item->cooldownFraction = remaining > 0
+		? static_cast<float>(remaining) / static_cast<float>(std::max(remaining, info->magic->coldMilliSeconds))
+		: 0.0f;
+	item->setStr(remaining > 0 ? std::to_string(remaining / 1000 + (remaining % 1000 != 0)) : "");
+}
+
 inline std::string selectByMenuProfile(const std::string& defaultFile,
 	const std::string& yycsFile,
 	const std::string& xjqyFile)

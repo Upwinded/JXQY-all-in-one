@@ -9,17 +9,20 @@
 namespace
 {
 constexpr int TextPanelWidth = 440;
+}
 
-unsigned int fadeInColor(unsigned int maximumAlpha, unsigned long elapsedMilliseconds)
+unsigned char TitleTeam::fadeInTextureAlpha(
+	unsigned char maximumAlpha,
+	unsigned long elapsedMilliseconds)
 {
-	unsigned int alpha = maximumAlpha;
+	unsigned int rasterAlpha = static_cast<unsigned int>(maximumAlpha);
 	if (elapsedMilliseconds < 1000)
 	{
-		alpha = static_cast<unsigned int>(
+		rasterAlpha = static_cast<unsigned int>(
 			static_cast<double>(elapsedMilliseconds) / 1000.0 * maximumAlpha);
 	}
-	return 0x00FFFFFFU | (alpha << 24);
-}
+	return static_cast<unsigned char>(
+		rasterAlpha * rasterAlpha / 0xFFU);
 }
 
 TitleTeam::TitleTeam(
@@ -46,6 +49,9 @@ void TitleTeam::freeResource()
 	}
 	removeAllChild();
 	wrappedTeamInfoLines.clear();
+	teamInfoTextTextures.clear();
+	scrollHintTextTexture.clear();
+	closeTextTexture.clear();
 	activePointer = TOUCH_UNTOUCHEDID;
 }
 
@@ -105,6 +111,8 @@ void TitleTeam::updateTextLayout()
 	};
 	wrappedTeamInfoLines = TextLayout::wrapUtf8Text(teamInfoText,
 		TextLayout::charactersPerLineForWidth(textRect.w, textFontSize));
+	teamInfoTextTextures.clear();
+	teamInfoTextTextures.resize(wrappedTeamInfoLines.size());
 	visibleLineCount = TextLayout::visibleWrappedLineCount(
 		static_cast<int>(wrappedTeamInfoLines.size()), textRect.h,
 		textFontSize, textLineGap);
@@ -127,27 +135,47 @@ void TitleTeam::onDrawEnd()
 	engine->fillRect(
 		panelLeft, 0, width - panelLeft, height, 8, 10, 14, 245);
 
-	const unsigned int color = fadeInColor(0xD0, getTime());
+	const unsigned long elapsedMilliseconds = getTime();
+	const unsigned char textAlpha = fadeInTextureAlpha(
+		0xD0, elapsedMilliseconds);
 	updateTextLayout();
 	const int endLine = std::min(static_cast<int>(wrappedTeamInfoLines.size()),
 		firstVisibleLine + visibleLineCount);
 	int y = textRect.y;
 	for (int lineIndex = firstVisibleLine; lineIndex < endLine; ++lineIndex)
 	{
-		engine->drawText(wrappedTeamInfoLines[lineIndex], textRect.x, y,
-			textFontSize, color);
+		teamInfoTextTextures[static_cast<std::size_t>(lineIndex)].drawWithAlpha(
+			engine,
+			wrappedTeamInfoLines[static_cast<std::size_t>(lineIndex)],
+			textRect.x,
+			y,
+			textFontSize,
+			0xFFFFFFFF,
+			textAlpha);
 		y += textFontSize + textLineGap;
 	}
 
 	if (wrappedTeamInfoLines.size() > static_cast<std::size_t>(visibleLineCount))
 	{
-		engine->drawText("↑/↓ 或滚轮滚动", textRect.x,
-			closeRect.y + 7, 18, fadeInColor(0xA0, getTime()));
+		scrollHintTextTexture.drawWithAlpha(
+			engine,
+			"↑/↓ 或滚轮滚动",
+			textRect.x,
+			closeRect.y + 7,
+			18,
+			0xFFFFFFFF,
+			fadeInTextureAlpha(0xA0, elapsedMilliseconds));
 	}
 	engine->fillRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h,
 		35, 43, 55, 220);
-	engine->drawText("返回", closeRect.x + 35, closeRect.y + 6,
-		20, color);
+	closeTextTexture.drawWithAlpha(
+		engine,
+		"返回",
+		closeRect.x + 35,
+		closeRect.y + 6,
+		20,
+		0xFFFFFFFF,
+		textAlpha);
 }
 
 void TitleTeam::onChildCallBack(PElement child)

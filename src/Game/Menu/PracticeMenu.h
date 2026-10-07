@@ -42,6 +42,7 @@ private:
 	void configureControllerFocus();
 	void showControllerMagicDetails(int logicalIndex);
 	void hideControllerMagicDetails();
+	virtual void onUpdate() override;
 	virtual void onEvent() override;
 	virtual bool onHandleUIAction(UIAction action) override;
 	void freeResource();

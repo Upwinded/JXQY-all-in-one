@@ -62,6 +62,9 @@ struct ScriptTask
 class GameManager :
 	public Element
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
 	friend class ScriptAPI;
 	friend class CoreLifecycleTestAccess;
 	friend class EditorRunSceneRuntimeTestAccess;
@@ -127,7 +130,7 @@ public:
 	bool loadGame(int index);
 	const std::string& getLastLoadFailureMessage() const noexcept;
 
-	bool saveGame(int index);
+	bool saveGame(int index, const std::function<bool()>& ownerCheckpoint = {});
 
 	void clearMenu();
 	bool menuDisplayed();
@@ -332,9 +335,8 @@ private:
 	bool cheatInvincibilityEnabled = false;
 
 private:
-	bool writeSaveGenerationDraft(
-		const std::string& generationDirectory,
-		const SaveGenerationLimits& copyLimits,
+	bool writeCurrentSave(
+		Global& savedGlobal,
 		const std::function<bool()>& ownerCheckpoint = {});
 	void clearLastLoadFailureMessage();
 	void setLastLoadFailureMessage(std::string message);

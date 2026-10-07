@@ -431,7 +431,8 @@ void ResourcePackCard::drawOnlineOnlyBadge()
 		badgeRect.x + 1, badgeRect.y + 1,
 		badgeRect.w - 2, badgeRect.h - 2,
 		38, 92, 132, 245);
-	engine->drawText(
+	onlineOnlyBadgeTextTexture.draw(
+		engine,
 		u8"未下载", badgeRect.x + 7, badgeRect.y + 2,
 		CardBadgeFontSize, 0xFFF4FBFF);
 }
@@ -451,7 +452,8 @@ void ResourcePackCard::drawRecentSelectionBadge()
 		badgeRect.x + 1, badgeRect.y + 1,
 		badgeRect.w - 2, badgeRect.h - 2,
 		184, 58, 38, 245);
-	engine->drawText(
+	recentSelectionBadgeTextTexture.draw(
+		engine,
 		u8"上次选择", badgeRect.x + 5, badgeRect.y + 2,
 		CardBadgeFontSize, 0xFFFFF1D2);
 }

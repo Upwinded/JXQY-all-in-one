@@ -149,6 +149,7 @@ void RoundButton::onDraw()
 		Rect drawRect = { rect.x + (int)round(rect.w * 0.1), rect.y + (int)round(rect.h * 0.1), (int)round(rect.w * 0.8), (int)round(rect.h * 0.8)};
 		if (drawItem->drawImagetoRect(drawRect, true))
 		{
+			drawItem->drawCooldown(drawRect);
 			needDrawStr = false;
 		}
 	}

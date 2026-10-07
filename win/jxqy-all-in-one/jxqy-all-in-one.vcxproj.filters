@@ -211,6 +211,12 @@
     <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceFile.cpp">
       <Filter>Src\Launch</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\GameplayAutomation\AutomationPipe.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\GameplayAutomation\GameplayAutomationSession.cpp">
+      <Filter>Src</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceWriter.cpp">
       <Filter>Src\Launch</Filter>
     </ClCompile>
@@ -317,6 +323,9 @@
       <Filter>Src\Game\GameManager</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\GameManager\SaveFileManager.cpp">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\GameManager\SavePackage.cpp">
       <Filter>Src\Game\GameManager</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Game\Loading\ExclusiveLoadingRunner.cpp">
@@ -638,6 +647,9 @@
       <Filter>Src\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Resource\ResourceSelectScene.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Resource\ResourceSelectSceneSaveTransfer.cpp">
       <Filter>Src\Resource</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\Update\OnlineUpdateCatalog.cpp">
@@ -973,6 +985,9 @@
       <Filter>Src\Game\GameManager</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\GameManager\SaveFileManager.h">
+      <Filter>Src\Game\GameManager</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\GameManager\SavePackage.h">
       <Filter>Src\Game\GameManager</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\BottomMenu.h">

@@ -4,6 +4,7 @@
 #include "../Game/Menu/UIFocusManager.h"
 #include "../Game/GameManager/GameManager.h"
 #include "../File/File.h"
+#include "../Image/IMP.h"
 
 #include <cmath>
 #include <filesystem>
@@ -154,6 +155,12 @@ bool runMapThumbnailControllerTests()
 		gameManager.player->canRun = true;
 		gameManager.player->thew = 100;
 		gameManager.player->info.thewMax = 100;
+		auto movementImage = std::make_shared<IMPImage>();
+		movementImage->directions = 8;
+		movementImage->interval = 16;
+		movementImage->frame.resize(8);
+		gameManager.player->res.walk.imagePackage = movementImage;
+		gameManager.player->res.run.imagePackage = movementImage;
 		gameManager.menu->messageBox = std::make_shared<MsgBox>();
 
 		auto runtimeMenu = std::make_shared<MapThumbnailMenu>();
@@ -173,6 +180,7 @@ bool runMapThumbnailControllerTests()
 			&& gameManager.player->nextAction->action == acWalk,
 			"map confirm queues the shared walking semantic action") && ok;
 		gameManager.player->nextAction = nullptr;
+		gameManager.player->thew = RUN_THEW_COST;
 		ok = check(MapThumbnailMenuTestAccess::queueMovement(
 			*runtimeMenu, { 1, 1 }, true)
 			&& gameManager.player->nextAction != nullptr

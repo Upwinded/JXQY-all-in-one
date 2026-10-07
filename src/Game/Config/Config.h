@@ -22,6 +22,7 @@ public:
 
 	// 移动端是否启用外部资源目录扫描（用户在资源选择页切换，持久化到 config.ini）。
 	static bool externalResourcesEnabled;
+	static bool useQingyuUi;
 
 	static void load();
 	static void save();

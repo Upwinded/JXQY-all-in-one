@@ -60,6 +60,7 @@ GameProfile gameProfileFromManifest(
     profile.manifestPath = manifestPath;
     profile.id = QString::fromStdString(manifest.id);
     profile.name = QString::fromStdString(manifest.name);
+    profile.installDirectory = QString::fromStdString(manifest.installDirectory);
     profile.author = QString::fromStdString(manifest.author);
     profile.releaseMetadata = manifest.releaseMetadata;
     profile.type = manifest.type;
@@ -88,6 +89,7 @@ GameProfile gameProfileFromManifest(
         manifest.magicEffectCalculationMode;
     profile.magicEffectCalculationModeDefined =
         manifest.magicEffectCalculationModeDefined;
+    profile.scriptPlayerName = QString::fromStdString(manifest.scriptPlayerName);
     profile.npcActionProfile = manifest.npcActionProfile;
     profile.npcActionProfileDefined = manifest.npcActionProfileDefined;
     profile.npcRuntimeProfile = manifest.npcRuntimeProfile;
@@ -98,6 +100,8 @@ GameProfile gameProfileFromManifest(
     profile.addLifeModeDefined = manifest.addLifeModeDefined;
     profile.levelUpMessage =
         QString::fromStdString(manifest.levelUpMessage);
+    profile.levelUpMessageDefined = manifest.levelUpMessageDefined;
+    profile.levelUpEffectMode = manifest.levelUpEffectMode;
     for (const std::string& effect : manifest.levelUpRandomEffects)
     {
         profile.levelUpRandomEffects.append(
@@ -123,6 +127,8 @@ GameProfile gameProfileFromManifest(
     }
     profile.saveNamespace =
         QString::fromStdString(manifest.saveNamespace);
+    profile.minimumCompatibleSaveResourceVersion =
+        QString::fromStdString(manifest.minimumCompatibleSaveResourceVersion);
     for (const std::string& video : manifest.startupVideos)
     {
         profile.startupVideos.append(QString::fromStdString(video));
@@ -283,6 +289,7 @@ bool GameProfile::prepareSaveBytes(
 
     ini.set("Game", "Id", id.toUtf8().toStdString());
     ini.set("Game", "Name", name.toUtf8().toStdString());
+    setOrRemove(ini, "Game", "InstallDirectory", installDirectory);
     setOrRemove(ini, "Game", "Author", author.trimmed());
     setOrRemove(
         ini, "Game", "Version", releaseMetadata.displayVersion);
@@ -376,6 +383,7 @@ bool GameProfile::prepareSaveBytes(
     {
         ini.removeKey("Combat", "MagicEffectCalculationMode");
     }
+    setOrRemove(ini, "Script", "PlayerName", scriptPlayerName.trimmed());
     if (npcActionProfileDefined)
     {
         const char* value = "Legacy";
@@ -432,10 +440,17 @@ bool GameProfile::prepareSaveBytes(
     {
         ini.removeKey("Script", "AddLifeMode");
     }
-    ini.set(
-        "LevelUp",
-        "Message",
-        levelUpMessage.toUtf8().toStdString());
+    if (levelUpMessageDefined ||
+        levelUpMessage != QString::fromUtf8("{name}的等级得到提升！"))
+    {
+        ini.set("LevelUp", "Message", levelUpMessage.toUtf8().toStdString());
+    }
+    else
+    {
+        ini.removeKey("LevelUp", "Message");
+    }
+    ini.set("LevelUp", "EffectMode",
+        levelUpEffectMode == LevelUpEffectMode::Replace ? "Replace" : "Append");
     setOrRemove(
         ini,
         "LevelUp",
@@ -480,6 +495,8 @@ bool GameProfile::prepareSaveBytes(
     }
 
     setOrRemove(ini, "Save", "Namespace", saveNamespace);
+    setOrRemove(ini, "Save", "MinimumCompatibleResourceVersion",
+        minimumCompatibleSaveResourceVersion);
     setOrRemove(
         ini, "Release", "Date", releaseMetadata.releaseDate);
     ini.removeKey("Release", "PackageId");
@@ -544,14 +561,15 @@ GameProfile GameProfile::createDefault()
     profile.type = 0;
     profile.typeDefined = true;
     profile.useWav = false;
+    // 经验三键默认不写入配置：未显式设置时由运行时沿 DependencyId 继承基底包。
     profile.defeatedNpcExperienceMode =
         DefeatedNpcExperienceMode::StoredExperience;
-    profile.defeatedNpcExperienceModeDefined = true;
+    profile.defeatedNpcExperienceModeDefined = false;
     profile.experienceMultiplier = 3.0;
-    profile.experienceMultiplierDefined = true;
+    profile.experienceMultiplierDefined = false;
     profile.levelUpThresholdMode =
         LevelUpThresholdMode::GreaterThanOrEqual;
-    profile.levelUpThresholdModeDefined = true;
+    profile.levelUpThresholdModeDefined = false;
     profile.partnerFollowRadius = 1;
     profile.partnerFollowRadiusDefined = true;
     profile.partnerFollowRunRadius = 5;

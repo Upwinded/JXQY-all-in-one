@@ -1,8 +1,10 @@
 #pragma once
 
 #include "../../Element/Element.h"
+#include "../../Component/Label.h"
 #include "ControllerPromptPresenter.h"
 
+#include <array>
 #include <string>
 #include <vector>
 
@@ -26,6 +28,7 @@ private:
 	void drawSection(
 		const std::string& title,
 		const std::vector<HelpLine>& lines,
+		std::vector<CachedTextTexture>& textTextures,
 		int x,
 		int y,
 		int fontSize,
@@ -47,6 +50,9 @@ private:
 
 	ControllerPromptLabelTheme labelTheme;
 	_shared_image controllerImage = nullptr;
+	std::array<CachedTextTexture, 3> headerAndFooterTextTextures;
+	std::vector<CachedTextTexture> worldHelpTextTextures;
+	std::vector<CachedTextTexture> menuHelpTextTextures;
 	bool controllerImageLoadAttempted = false;
 	int windowWidth = 0;
 	int windowHeight = 0;

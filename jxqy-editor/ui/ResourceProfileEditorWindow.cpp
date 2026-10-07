@@ -549,6 +549,9 @@ void ResourceProfileEditorWindow::setupUi()
     auto* scriptGroup = new QGroupBox(this);
     scriptGroup->setObjectName(QStringLiteral("scriptGroup"));
     auto* scriptLayout = new QFormLayout(scriptGroup);
+    m_scriptPlayerNameEdit = new QLineEdit(this);
+    m_scriptPlayerNameEdit->setObjectName(QStringLiteral("scriptPlayerNameEdit"));
+    scriptLayout->addRow("PlayerName (#name):", m_scriptPlayerNameEdit);
     m_npcActionProfileCombo = new QComboBox(this);
     m_npcActionProfileCombo->setObjectName(
         QStringLiteral("npcActionProfileCombo"));
@@ -586,6 +589,11 @@ void ResourceProfileEditorWindow::setupUi()
     auto* levelUpGroup = new QGroupBox(this);
     levelUpGroup->setObjectName(QStringLiteral("levelUpGroup"));
     auto* levelUpLayout = new QFormLayout(levelUpGroup);
+    m_levelUpEffectModeCombo = new QComboBox(this);
+    m_levelUpEffectModeCombo->setObjectName(QStringLiteral("levelUpEffectModeCombo"));
+    auto* levelUpEffectModeFieldLabel = new QLabel(this);
+    levelUpEffectModeFieldLabel->setObjectName(QStringLiteral("levelUpEffectModeFieldLabel"));
+    levelUpLayout->addRow(levelUpEffectModeFieldLabel, m_levelUpEffectModeCombo);
     m_levelUpMessageEdit = new QLineEdit(this);
     m_levelUpMessageEdit->setObjectName(
         QStringLiteral("levelUpMessageEdit"));
@@ -897,6 +905,8 @@ void ResourceProfileEditorWindow::setupUi()
     connect(m_magicEffectCalculationModeCombo,
         QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ResourceProfileEditorWindow::onFieldChanged);
+    connect(m_scriptPlayerNameEdit, &QLineEdit::textChanged,
+        this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_npcActionProfileCombo,
         QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ResourceProfileEditorWindow::onFieldChanged);
@@ -912,6 +922,8 @@ void ResourceProfileEditorWindow::setupUi()
     connect(m_typeSpin, QOverload<int>::of(&QSpinBox::valueChanged),
         this, [this]() { updateExperiencePreview(); });
     connect(m_levelUpMessageEdit, &QLineEdit::textChanged,
+        this, &ResourceProfileEditorWindow::onFieldChanged);
+    connect(m_levelUpEffectModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_levelUpRandomEffectsEdit, &QPlainTextEdit::textChanged,
         this, &ResourceProfileEditorWindow::onFieldChanged);
@@ -1071,6 +1083,9 @@ void ResourceProfileEditorWindow::retranslateUi()
         "替代攻击力用于剑二和月影；叠加攻击力用于新剑。"));
     findChild<QLabel*>(QStringLiteral("levelUpMessageFieldLabel"))->setText(
         tr("提示模板:"));
+    findChild<QLabel*>(QStringLiteral("levelUpEffectModeFieldLabel"))->setText(tr("效果模式:"));
+    m_levelUpEffectModeCombo->setToolTip(tr(
+        "新增模式没有新项时沿用依赖效果；替换模式阻止该分支读取更深层的效果。"));
     findChild<QLabel*>(
         QStringLiteral("levelUpRandomEffectsFieldLabel"))->setText(
         tr("随机特效:"));
@@ -1119,12 +1134,16 @@ void ResourceProfileEditorWindow::retranslateUi()
         { tr("使用 Game.Type 默认值"),
           tr("经验大于或等于阈值"),
           tr("经验严格大于阈值") });
+    refillCombo(m_levelUpEffectModeCombo,
+        { tr("新增：合并依赖效果"), tr("替换：仅使用当前定义") });
     refillCombo(
         m_magicEffectCalculationModeCombo,
         { tr("Effect 替代人物攻击力"),
           tr("人物攻击力与 Effect 相加") });
     m_partnerFollowRadiusCheck->setText(tr("写入配置"));
     m_partnerFollowRunRadiusCheck->setText(tr("写入配置"));
+    m_scriptPlayerNameEdit->setPlaceholderText(tr("固定剧情角色名，留空保持原有行为"));
+    m_scriptPlayerNameEdit->setToolTip(tr("用于替换 #name；不随当前操控角色切换，也不作为存档变量。"));
     refillCombo(
         m_npcActionProfileCombo,
         { tr("使用 Game.Type 默认值"),
@@ -1556,6 +1575,7 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
                     MagicEffectCalculationMode::AddToAttack
             ? 1
             : 0);
+    m_scriptPlayerNameEdit->setText(profile.scriptPlayerName);
     int npcActionProfileIndex = 0;
     if (profile.npcActionProfileDefined)
     {
@@ -1590,6 +1610,8 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
                    ? 1
                    : 2));
     m_levelUpMessageEdit->setText(profile.levelUpMessage);
+    m_levelUpEffectModeCombo->setCurrentIndex(
+        profile.levelUpEffectMode == LevelUpEffectMode::Replace ? 1 : 0);
     m_levelUpRandomEffectsEdit->setPlainText(
         profile.levelUpRandomEffects.join('\n'));
     m_levelUpMaleEffectEdit->setText(profile.levelUpMaleEffect);
@@ -1652,6 +1674,15 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
 GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
 {
     GameProfile profile;
+    if (m_currentPackIndex >= 0 && m_currentPackIndex < m_packs.size())
+    {
+        // Preserve manifest-only settings when editing other profile fields.
+        const auto& source = m_packs[m_currentPackIndex].profile;
+        profile.installDirectory = source.installDirectory;
+        profile.minimumCompatibleSaveResourceVersion =
+            source.minimumCompatibleSaveResourceVersion;
+        profile.levelUpMessageDefined = source.levelUpMessageDefined;
+    }
     profile.id = m_idEdit->text();
     profile.name = m_nameEdit->text();
     profile.author = m_authorEdit->text().trimmed();
@@ -1691,6 +1722,7 @@ GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
             ? MagicEffectCalculationMode::AddToAttack
             : MagicEffectCalculationMode::ReplaceAttack;
     profile.magicEffectCalculationModeDefined = true;
+    profile.scriptPlayerName = m_scriptPlayerNameEdit->text().trimmed();
     profile.npcActionProfileDefined =
         m_npcActionProfileCombo->currentIndex() > 0;
     switch (m_npcActionProfileCombo->currentIndex())
@@ -1724,6 +1756,8 @@ GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
             ? ScriptAddLifeMode::DirectClamp
             : ScriptAddLifeMode::PlayerRules;
     profile.levelUpMessage = m_levelUpMessageEdit->text();
+    profile.levelUpEffectMode = m_levelUpEffectModeCombo->currentIndex() == 1
+        ? LevelUpEffectMode::Replace : LevelUpEffectMode::Append;
     profile.levelUpRandomEffects.clear();
     for (const QString& rawEffect :
          m_levelUpRandomEffectsEdit->toPlainText().split('\n'))

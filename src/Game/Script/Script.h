@@ -119,6 +119,7 @@ public:
 	bool running = false;
 private:	
 	friend class ScriptEngineRuntimeTestAccess;
+	friend class CoreLifecycleTestAccess;
 
 	int runScriptWithChunkName(
 		const char* source,

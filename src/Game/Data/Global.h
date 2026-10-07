@@ -38,7 +38,7 @@ struct GlobalData
 	bool rainShow = false;
 
 	bool NPCAI = true;
-	bool PartnerCombat = false;
+	bool PartnerCombat = true;
 	bool canInput = true;
 	bool saveDisabled = false;
 	bool dropDisabled = false;
@@ -67,14 +67,18 @@ enum MapThumbnailLayoutProfile
 
 struct GameFeatureFlags
 {
+	bool qingyuUi = false;
 	bool freezeVisualEffect = true;
 	bool poisonVisualEffect = true;
 	bool petrifyVisualEffect = true;
 	bool magicTriggerAtAnimationEnd = false;
+	bool nativeNpcAttackAtAnimationEnd = false;
 	bool lumAsBrightness = true;
 	bool ambientLumOverlay = true;
 	bool topButtonsLayout = false;
 	bool extendedInventoryLayout = false;
+	bool separateTalentSlots = false;
+	bool magicLevelLimitFromDefinition = false;
 	bool stateEquipIntegratedLayout = false;
 	bool hideRightMenusWithIntegratedEquip = false;
 	bool practiceMenuDisabled = false;
@@ -120,6 +124,8 @@ struct MagicListLayout
 	int bottomEnd = MAGIC_COUNT + MAGIC_TOOLBAR_COUNT - 1;
 	int practiceIndex = MAGIC_COUNT + MAGIC_TOOLBAR_COUNT;
 	int hideStartIndex = 1000;
+	int talentBegin = -1;
+	int talentEnd = -1;
 
 	int storeCount() const;
 	int bottomCount() const;
@@ -153,6 +159,7 @@ public:
 		ScriptSpecialActionMode::Replace;
 	ScriptAddLifeMode addLifeMode =
 		ScriptAddLifeMode::PlayerRules;
+	std::string scriptPlayerName;
 
 	GameFeatureFlags feature;
 	GoodsListLayout goodsLayout;
@@ -161,6 +168,8 @@ public:
 
 	// 覆盖顺序：通用默认值 -> UI.Profile 布局族 -> [Features] 显式开关。
 	void applyResourceManifestFeatures(const ResourceManifest& manifest);
+	std::string resolveScriptCharacterName(const std::string& name) const;
+	std::string resolveScriptText(const std::string& text) const;
 	int getPartnerFollowRadius() const;
 	int getPartnerFollowRunRadius() const;
 	void loadUiSettings();

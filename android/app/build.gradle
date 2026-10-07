@@ -65,10 +65,8 @@ if (releaseSigningValues.any { it != null && !it.isEmpty() } &&
         'four jxqyRelease* Gradle properties or JXQY_ANDROID_* environment variables.')
 }
 
-// Debug packages keep the full local asset repository for development. Release
-// packages contain only engine and resources.ini. Common and playable resource
-// packs are downloaded into the application-writable assets directory after
-// installation.
+// Debug and fullyRelease bundle the local asset collection. Release contains
+// only engine and resources.ini and downloads playable packs after installation.
 def androidAssetExcludes = [
     '**/save/rpg0/**',
     '**/save/game/**',
@@ -210,6 +208,14 @@ android {
                 srcDirs = ['../../assets']
             }
         }
+        fullyRelease {
+            assets {
+                srcDirs = ['../../assets']
+                androidAssetExcludes.each { pattern ->
+                    exclude pattern
+                }
+            }
+        }
     }
     signingConfigs {
         if (releaseSigningConfigured) {
@@ -233,6 +239,11 @@ android {
             // 若将来要真正启用代码优化/混淆，需将 minifyEnabled 改为 true，
             // 并在 proguard-rules.pro 中补齐 keep 规则。
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        fullyRelease {
+            initWith release
+            matchingFallbacks = ['release']
+            debuggable false
         }
     }
     if (!project.hasProperty('EXCLUDE_NATIVE_LIBS')) {
@@ -330,7 +341,8 @@ androidComponents {
             }
         }
 
-        def outputAPKName = "${artifactName}_${variant.name}_v${appVersion}.apk";
+        def outputVariantName = variant.buildType == 'fullyRelease' ? 'fully-release' : variant.name
+        def outputAPKName = "${artifactName}_${outputVariantName}_v${appVersion}.apk";
         def copyApkTask = tasks.register(
             "copy${variantTaskSuffix}ApkToDistribution", Copy) {
             from(variant.artifacts.get(SingleArtifact.APK.INSTANCE)) {

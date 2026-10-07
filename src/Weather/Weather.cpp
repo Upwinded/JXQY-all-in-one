@@ -295,7 +295,6 @@ void Weather::fadeInEx()
 	}
 	fadding = true;
 	isFadeIn = true;
-	isSleeping = false;
 	fadeBeginTime = getTime();
 }
 
@@ -307,7 +306,6 @@ void Weather::fadeIn()
 	}
 	fadding = true;
 	isFadeIn = true;
-	isSleeping = false;
 	fadeBeginTime = getTime();
 	run();
 }
@@ -321,18 +319,7 @@ void Weather::fadeOut()
 	}
 	fadding = true;
 	isFadeIn = false;
-	isSleeping = false;
 	fadeBeginTime = getTime();
-	run();
-}
-
-void Weather::sleep(unsigned int t)
-{
-	fadding = true;
-	isFadeIn = false;
-	isSleeping = true;
-	fadeBeginTime = getTime();
-	sleepLastTime = t;
 	run();
 }
 
@@ -523,12 +510,7 @@ void Weather::updateFade()
 	if (fadding)
 	{
 		auto t = getTime();
-		if (isSleeping && t - fadeBeginTime >= sleepLastTime)
-		{
-			fadding = false;
-			logicRunning = false;
-		}
-		else if (!isSleeping && t - fadeBeginTime >= fadeLastTime)
+		if (t - fadeBeginTime >= fadeLastTime)
 		{
 			fadding = false;
 			logicRunning = false;
@@ -543,7 +525,7 @@ void Weather::updateFade()
 				engine->setImageAlpha(fadeMask, 255 - fadeLum);
 			}
 		}
-		else if (!isSleeping)
+		else
 		{
 			if (isFadeIn)
 			{

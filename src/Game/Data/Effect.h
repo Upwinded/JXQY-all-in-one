@@ -1,7 +1,10 @@
 #pragma once
 #include "GameElement.h"
 #include "Magic.h"
+#include <cstdint>
 #include <deque>
+#include <limits>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -10,6 +13,7 @@ inline constexpr int MaximumPersistedEffectCollectionCount = 4096;
 class NPC;
 class EffectTestAccess;
 class RageSystemTestAccess;
+class ProjectileCollisionTestAccess;
 
 class EffectCasterReference
 {
@@ -85,6 +89,7 @@ class Effect :
 {
 	friend class EffectTestAccess;
 	friend class RageSystemTestAccess;
+	friend class ProjectileCollisionTestAccess;
 public:
 	Effect();
 	virtual ~Effect();
@@ -145,8 +150,15 @@ public:
 	std::shared_ptr<MagicDispatchContext> magicDispatchContext = nullptr;
 
 	std::deque<Point> passPath;
+	Point collisionSweepStartPosition = { 0, 0 };
+	PointEx collisionSweepStartOffset = { 0, 0 };
+	bool collisionSweepInitialized = false;
+	std::uint64_t projectileCollisionCreationFrame =
+		std::numeric_limits<std::uint64_t>::max();
 
-	void beginExplode(Point pos);
+	void beginExplode(
+		Point pos,
+		std::optional<PointEx> collisionOffset = std::nullopt);
 	void beginFly();
 	void beginDrop();
 	void initFromMagic(
@@ -179,7 +191,7 @@ public:
 		EffectReferenceSaveContext* referenceContext = nullptr);
 	virtual void playSound(int act);
 	
-	//技能方向为16个
+	// 按实际屏幕飞行方向和飞行图方向数选择动画方向
 	int getDirection(Point fDir);
 	int getDirection();
 
@@ -191,7 +203,7 @@ public:
 	UTime getSuperImageTime();
 	void calTime();
 	void calDest();
-	auto getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset);
+	std::deque<Point> getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset);
 	void changeFollowTarget(std::shared_ptr<GameElement> newTarget);
 	void attachCarryUser(std::shared_ptr<NPC> npc);
 	void clearCarryUser();
@@ -216,15 +228,22 @@ public:
 	bool canBeDiscardedByOppositeMagic() const;
 	bool canExchangeUserByOppositeMagic() const;
 	bool isOppositeEffect(std::shared_ptr<Effect> other) const;
-	bool handleDiscardOppositeMagic(std::shared_ptr<Effect> other);
-	bool handleExchangeUserWithOppositeMagic(std::shared_ptr<Effect> other);
+	bool handleDiscardOppositeMagic(
+		std::shared_ptr<Effect> other,
+		bool collisionConfirmed = false);
+	bool handleExchangeUserWithOppositeMagic(
+		std::shared_ptr<Effect> other,
+		bool collisionConfirmed = false);
 	bool canLeap() const;
 	bool hasLeapHitTarget(std::shared_ptr<NPC> npc) const;
 	bool handleLeapAfterHit(std::shared_ptr<NPC> hitTarget);
 	bool canPassThrough() const;
 	bool canPassThroughWall() const;
 	bool hasPassThroughHitTarget(std::shared_ptr<NPC> npc) const;
-	bool handlePassThroughAfterHit(std::shared_ptr<NPC> hitTarget, Point hitPosition);
+	bool handlePassThroughAfterHit(
+		std::shared_ptr<NPC> hitTarget,
+		Point hitPosition,
+		PointEx hitOffset);
 	bool canParasitic() const;
 	bool beginParasitic(std::shared_ptr<NPC> hitTarget, Point hitPosition);
 	void recordParasiticDamage(int amount);
@@ -269,7 +288,9 @@ private:
 	void attachNPCToEffect(std::shared_ptr<NPC> npc, bool preserveOffset, bool destroyOnObstacle);
 	void clearAttachedNPCs();
 	void updateAttachedNPCs();
-	void addDestroyVisualEffect(Point hitPosition);
+	void addDestroyVisualEffect(
+		Point hitPosition,
+		std::optional<PointEx> hitOffset = std::nullopt);
 	void reflectBallFromPoint(Point hitPosition, PointEx normalPoint);
 	void reflectBallFromWall(Point hitPosition);
 	Point findBallFallbackPosition(Point preferredPosition) const;
@@ -298,7 +319,7 @@ private:
 	void updateMagicWhenNewPosition();
 	void triggerExplodeMagic(Point position);
 	std::shared_ptr<NPC> findNextLeapTarget(Point fromPosition) const;
-	void addPassThroughDestroyEffect(Point hitPosition);
+	void addPassThroughDestroyEffect(Point hitPosition, PointEx hitOffset);
 
 	PointEx getCollideOffset(Point pos);
 	struct MeteorPathNode

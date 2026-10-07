@@ -71,6 +71,7 @@ void TextButton::initFromIni(INIReader & ini)
 	Button::initFromIni(ini);
 	label.fontSize = ini.GetInteger("Init", "Font", label.fontSize);
 	label.color = ini.GetColor("Init", "Color", label.color);
+	setUTF8Str(ini.Get("Init", "Text", ""));
 }
 
 void TextButton::onDraw()
@@ -101,5 +102,9 @@ void TextButton::onClick()
 		result = erClick;
 		parent->onChildCallBack(getMySharedPtr());
 		result = erNone;
+	}
+	else
+	{
+		result |= erClick;
 	}
 }

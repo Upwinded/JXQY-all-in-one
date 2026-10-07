@@ -4,6 +4,7 @@
 #include "../../Engine/AspectFitLayout.h"
 #include "../../Weather/Weather.h"
 #include "../Menu/UIFocusManager.h"
+#include "../Menu/ControllerPromptPresenter.h"
 #include "../Menu/SystemNotice.h"
 
 class GamepadEssentialUITestAccess;
@@ -36,6 +37,7 @@ private:
 	bool skipStartupVideos = false;
 	std::vector<AspectFitPointerRipple> pointerRipples;
 	UIFocusManager focusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 
 	bool ensureTitleCompositionCanvas();
 	void removeExpiredPointerRipples();

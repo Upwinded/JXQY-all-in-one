@@ -279,14 +279,14 @@
         <item row="4" column="0" colspan="2">
          <widget class="QLabel" name="mapImagePolicyLabel">
           <property name="text">
-           <string>map：只迁移、不转换</string>
+           <string>map：原样复制</string>
           </property>
          </widget>
         </item>
         <item row="4" column="2" colspan="2">
          <widget class="QLabel" name="unknownImagePolicyLabel">
           <property name="text">
-           <string>unknown：按原字节迁移</string>
+           <string>unknown：原样复制</string>
           </property>
          </widget>
         </item>

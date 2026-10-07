@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Component/Component.h"
+#include "ControllerPromptPresenter.h"
 #include "UIFocusManager.h"
 
 class System :
@@ -18,6 +19,7 @@ public:
 	std::shared_ptr<Button> optionBtn = nullptr;
 	std::shared_ptr<Button> quitBtn = nullptr;
 	UIFocusManager focusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 
 private:
 	bool focusOptions = false;

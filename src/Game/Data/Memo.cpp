@@ -86,8 +86,12 @@ Memo::~Memo()
 	memo.resize(0);
 }
 
-bool Memo::load(bool allowMissing)
+bool Memo::load(bool allowMissing, bool* needsNormalization)
 {
+	if (needsNormalization != nullptr)
+	{
+		*needsNormalization = true;
+	}
 	const std::string currentPath =
 		SaveFileManager::CurrentPath();
 	MemoAliasContent standard;
@@ -102,6 +106,10 @@ bool Memo::load(bool allowMissing)
 	if (canonical.exists &&
 		canonical.kind == MemoPersistence::ContentKind::Memo)
 	{
+		if (needsNormalization != nullptr)
+		{
+			*needsNormalization = false;
+		}
 		memo = std::move(canonical.lines);
 		return true;
 	}

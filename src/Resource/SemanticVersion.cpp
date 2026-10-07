@@ -3,6 +3,52 @@
 #include <algorithm>
 #include <limits>
 
+ModRelease::SemanticVersionParseResult ModRelease::parseResourceVersion(
+	std::string_view text)
+{
+	const auto strictVersion = parseSemanticVersion(text);
+	if (strictVersion.succeeded() || text.empty())
+	{
+		return strictVersion;
+	}
+	std::string normalized;
+	std::size_t start = 0;
+	int componentCount = 0;
+	while (start <= text.size())
+	{
+		const auto separator = text.find('.', start);
+		auto component = text.substr(start, separator == std::string_view::npos
+			? text.size() - start : separator - start);
+		if (++componentCount > 3 || component.empty() ||
+			!std::all_of(component.begin(), component.end(), [](char character)
+			{
+				return character >= '0' && character <= '9';
+			}))
+		{
+			return strictVersion;
+		}
+		while (component.size() > 1 && component.front() == '0')
+		{
+			component.remove_prefix(1);
+		}
+		if (!normalized.empty())
+		{
+			normalized += '.';
+		}
+		normalized.append(component);
+		if (separator == std::string_view::npos)
+		{
+			break;
+		}
+		start = separator + 1;
+	}
+	while (componentCount++ < 3)
+	{
+		normalized += ".0";
+	}
+	return parseSemanticVersion(normalized);
+}
+
 namespace
 {
 bool isAsciiDigit(char character)

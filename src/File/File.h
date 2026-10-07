@@ -17,6 +17,17 @@ extern "C"
 
 namespace File
 {
+	// Reuse directory name lookups only during this thread's loading operation.
+	// The outermost scope releases all entries, including missing names.
+	class ResourceLookupScope
+	{
+	public:
+		ResourceLookupScope();
+		~ResourceLookupScope();
+		ResourceLookupScope(const ResourceLookupScope&) = delete;
+		ResourceLookupScope& operator=(const ResourceLookupScope&) = delete;
+	};
+
 	struct EditorRunFileLayout
 	{
 		std::string overlayRoot;
@@ -40,8 +51,8 @@ namespace File
 		Invalid
 	};
 
-	// Holds one installed layout generation stable while an exact output writer
-	// validates and writes through its verified handle. resetEditorRunFileLayout()
+	// Holds one installed layout generation stable while an output writer
+	// writes through its opened handle. resetEditorRunFileLayout()
 	// waits for all live guards before closing registered generation-owned sinks.
 	class EditorRunFileLayoutUse final
 	{
@@ -81,11 +92,15 @@ namespace File
 	{
 		AfterLayoutOverlayIdentityCapture,
 		BeforeReadRootOpen,
+		BeforeResourceDirectoryEnumeration,
 		BeforeWriteRootOpen,
 		BeforeLogParentOpen,
 		BeforeDiagnosticsParentOpen,
 		BeforeRuntimeTraceParentOpen,
-		BeforeTransactionMutation
+		BeforeTransactionMutation,
+		AfterTransactionRenameFailure,
+		BeforeCheckedWriteOpen,
+		AfterCheckedWriteOpenFailure
 	};
 
 	using ResourceReadVisitor = std::function<bool(
@@ -160,6 +175,8 @@ namespace File
 	// isolatedSaveRoot without a second save/ component, shared application state
 	// uses applicationStateRoot exclusively, structured diagnostics use the
 	// exact diagnosticsPath, and logs use the exact logPath.
+	// Path queries return the installed configuration without probing the other
+	// output directories or diagnostic files on each resource operation.
 	bool installEditorRunFileLayout(
 		const EditorRunFileLayout& layout,
 		const EditorRunFileLayoutIdentityProof& proof);
@@ -265,6 +282,14 @@ namespace File
         bool* fileCountLimitExceeded = nullptr);
     bool removeFile(const std::string& fileName);
     bool clearDirectoryFiles(const std::string& directoryName);
+    // Clear the destination and copy files directly from a writable sibling
+    // or the merged resource read roots.
+    // A failure may leave the destination incomplete; no backup is created.
+    bool overwriteDirectoryFiles(const std::string& srcDirectoryName,
+        const std::string& dstDirectoryName,
+        const std::vector<std::string>& excludedFileNames = {},
+        const std::function<bool()>& cancellationRequested = {},
+        const DirectoryCopyLimits& limits = {});
     // Recover an interrupted sibling staging/backup transaction for a directory.
     // A verified first-save staging directory may be published; incomplete staging
     // is discarded, and an existing backup wins when the destination is missing.

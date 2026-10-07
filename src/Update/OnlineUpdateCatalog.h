@@ -32,6 +32,7 @@ struct ResourcePackage
 {
 	std::string gameId;
 	std::string displayName;
+	std::string installDirectory;
 	std::string author;
 	std::string versionText;
 	std::string minimumEngineVersionText;

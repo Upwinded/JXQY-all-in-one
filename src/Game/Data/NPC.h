@@ -156,7 +156,9 @@ struct SkillScore
 		{
 			return moveCost < other.moveCost;
 		}
-		if (isInertia != other.isInertia)
+		// Keep approach plans stable, but let equally ready attacks be randomly
+		// selected again after each release instead of locking onto the last one.
+		if (!canHitNow && isInertia != other.isInertia)
 		{
 			return isInertia > other.isInertia;
 		}
@@ -636,6 +638,7 @@ public:
 	int stopFindingTarget = 0;
 	bool hasAttackSpeedField = false;
 	float jumpSpeed = 10;
+	int jumpRadius = 0;
 
 	virtual int getEvade() { return applyTemporaryEvadeModifiers(evade + equipmentAttributes.evade); }
 	virtual int getDefend() { return applyTemporaryDefendModifiers(defend + equipmentAttributes.defend); }
@@ -735,7 +738,7 @@ public:
 	virtual void addLifeWithoutDeath(int value);
 	virtual void addThew(int value);
 	virtual void addMana(int value);
-	virtual void hurtLife(int damage);
+	virtual void hurtLife(int damage, bool ignoreDefense = false);
 	void loadLevel(const std::string& fileName);
 	void setPropToLevel(int lvl);
 
@@ -999,6 +1002,7 @@ public:
 	void clearPoisonedState();
 	void clearPetrifiedState();
 	void clearAbnormalState();
+	bool isImmuneToAbnormalState() const;
 	void rememberPoisonSource(std::shared_ptr<GameElement> source);
 	void awardDefeatedNpcExperience(std::shared_ptr<Effect> effect);
 	void rewardPoisonKillExperience();
@@ -1040,7 +1044,9 @@ public:
 	std::shared_ptr<Magic> preparedAttackMagic = nullptr;
 	bool hasPreparedAttackMagic = false;
 	bool preparedAttackUsesAdditionalEffect = false;
+	bool preparedAttackUsesNativeProtocol = false;
 	std::shared_ptr<Magic> preparedMagicAction = nullptr;
+	std::shared_ptr<Magic> preparedMagicActionSource = nullptr;
 	Point preparedMagicActionDest = { 0, 0 };
 	int preparedMagicActionLevel = 1;
 	int preparedMagicActionListIndex = -1;
@@ -1123,6 +1129,8 @@ public:
 	bool shouldUseSelfBuff(const NPCAttackOption& option) const;
 	bool trySelfBuff();
 	std::shared_ptr<Magic> selectAttackMagicForAction(Point dest, std::shared_ptr<GameElement> target, AttackReleaseMode releaseMode);
+	bool usesNativeAttackProtocol() const;
+	std::shared_ptr<Magic> selectNativeAttackMagicAtRelease();
 	bool releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, std::shared_ptr<GameElement> target, bool applyAdditionalEffect);
 	bool isCrossHit(Point casterPosition, Point targetPosition, int crossRange) const;
 	bool isTooCloseForAttackOption(const NPCAttackOption& option, Point casterPosition, Point targetPosition) const;
@@ -1325,6 +1333,12 @@ public:
 	virtual bool beginRetreatWalk(Point from, std::shared_ptr<GameElement> target = nullptr, int retreatDistance = 0);
 
 private:
+	std::optional<Point> scriptMoveDestination;
+	std::optional<UTime> scriptMoveRetryUntil;
+	std::deque<Point> findPathByTypeFrom(Point from, Point dest, int pathType, bool temporaryDisableRestrict) const;
+	void updateMovePathAfterCurrentStep(Point destination);
+	void moveToForScript(Point dest, bool isRun);
+	bool finishScriptMoveAtOccupiedDestination();
 	bool executeRetreatMovement(Point retreatDest);
 	bool tryAttackOrStand(Point from, std::shared_ptr<GameElement> target);
 	std::optional<Point> findRetreatDestination(Point from, int retreatDistance) const;
@@ -1386,6 +1400,7 @@ public:
 	void freeResource();
 
 protected:
+	bool deathTransitionInProgress = false;
 	unsigned int jumpState = 0;
 	unsigned int stepState = 0;
 	unsigned int sitState = 0;
@@ -1404,6 +1419,7 @@ protected:
 	void freeNPCRes(NPCRes& npcRes);
 	void freeNPCAction(NPCActionRes * act);
 	virtual void freeActionImage(NPCActionRes * act);
+	void refreshLoopingActionAnimation();
 	bool updateScriptSpecialActionOverlayForFrame(UTime frameTime);
 	void updateEventRunState();
 

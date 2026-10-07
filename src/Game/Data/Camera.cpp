@@ -142,19 +142,7 @@ void Camera::clampToMapBounds()
 
 	int w, h;
 	engine->getWindowSize(w, h);
-	constexpr int topBoundaryTileMargin = 1;
 
-	auto clampFloat = [](float value, float minValue, float maxValue) {
-		if (value < minValue)
-		{
-			return minValue;
-		}
-		if (value > maxValue)
-		{
-			return maxValue;
-		}
-		return value;
-	};
 	auto clampInt = [](int value, int minValue, int maxValue) {
 		if (value < minValue)
 		{
@@ -169,65 +157,11 @@ void Camera::clampToMapBounds()
 
 	PointEx cameraWorldPosition = Map::getTilePositionEx(position, { 0, 0 }, { 0, 0 }, { 0, 0 }) + offset;
 
-	int hscal = h / TILE_HEIGHT * 2 + 2;
-	if (hscal + 1 > maph)
-	{
-		// Center rows 0..maph-1 in world Y; avoid integer truncation on odd heights.
-		cameraWorldPosition.y = (float)(maph - 1) * ((float)TILE_HEIGHT / 2.0f) / 2.0f;
-	}
-	else
-	{
-		int line2 = std::abs(hscal / 2 - 1) % 2;
-		int line3 = std::abs(maph - hscal / 2 - 2) % 2;
-		float minWorldY = (float)(hscal / 2 - 1 - line2) * ((float)TILE_HEIGHT / 2.0f);
-		float maxWorldY = (float)(maph - hscal / 2 - 2 - line3) * ((float)TILE_HEIGHT / 2.0f);
-		minWorldY += (float)topBoundaryTileMargin * ((float)TILE_HEIGHT / 2.0f);
-		if (maxWorldY < minWorldY)
-		{
-			cameraWorldPosition.y = (minWorldY + maxWorldY) / 2.0f;
-		}
-		else
-		{
-			cameraWorldPosition.y = clampFloat(cameraWorldPosition.y, minWorldY, maxWorldY);
-		}
-	}
+	cameraWorldPosition.y = clampVerticalWorldPosition(cameraWorldPosition.y, maph, h);
 	position.y = clampInt((int)round(cameraWorldPosition.y / ((float)TILE_HEIGHT / 2.0f)), 0, maph > 0 ? maph - 1 : 0);
 	offset.y = cameraWorldPosition.y - (float)position.y * ((float)TILE_HEIGHT / 2.0f);
 
-	int wscal = w / TILE_WIDTH + 1;
-	if (wscal + 2 > mapw)
-	{
-		// Center the visual bounds. Multi-row maps include the odd-row TILE_WIDTH/2 shift;
-		// a single-row map has no odd-row extension and is centered by columns.
-		if (maph <= 1)
-		{
-			cameraWorldPosition.x = (float)(mapw - 1) * (float)TILE_WIDTH / 2.0f;
-		}
-		else
-		{
-			cameraWorldPosition.x = ((float)mapw * (float)TILE_WIDTH - (float)TILE_WIDTH / 2.0f) / 2.0f;
-		}
-	}
-	else
-	{
-		// Odd map rows start half a tile to the right. Move the viewport far
-		// enough into the map that the inward-shifted edge row is also hidden
-		// by half a tile, preventing the staggered row boundary from appearing.
-		const float halfViewportWidth = (float)w / 2.0f;
-		const float mapPixelWidth = (float)(mapw - 1) * (float)TILE_WIDTH;
-		const float halfTileWidth = static_cast<float>(TILE_WIDTH) / 2.0f;
-		float minWorldX = halfViewportWidth +
-			static_cast<float>(TILE_WIDTH);
-		float maxWorldX = mapPixelWidth - halfViewportWidth - halfTileWidth;
-		if (maxWorldX < minWorldX)
-		{
-			cameraWorldPosition.x = (minWorldX + maxWorldX) / 2.0f;
-		}
-		else
-		{
-			cameraWorldPosition.x = clampFloat(cameraWorldPosition.x, minWorldX, maxWorldX);
-		}
-	}
+	cameraWorldPosition.x = clampHorizontalWorldPosition(cameraWorldPosition.x, mapw, maph, w);
 	int line = std::abs(position.y) % 2;
 	if (line == 0)
 	{

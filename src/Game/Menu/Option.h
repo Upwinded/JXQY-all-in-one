@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Component/Component.h"
 #include "../Config/Config.h"
+#include "ControllerPromptPresenter.h"
 #include "UIFocusManager.h"
 
 #include <vector>
@@ -28,9 +29,11 @@ public:
 	std::shared_ptr<CheckBox> soundCB = nullptr;
 	std::shared_ptr<CheckBox> speedCB = nullptr;
 	UIFocusManager focusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 
 	std::shared_ptr<FlatTextButton> touchControlsButton = nullptr;
 	std::shared_ptr<FlatTextButton> cheatSettingsButton = nullptr;
+	std::shared_ptr<FlatTextButton> themeButton = nullptr;
 
 private:
 	struct ElementPresentationState
@@ -60,6 +63,7 @@ private:
 
 	void createFooterOptions();
 	void layoutFooterOptions();
+	void toggleThemeOption();
 	void syncTouchControlsOption();
 	void toggleTouchControlsOption();
 	void createCheatPanel();

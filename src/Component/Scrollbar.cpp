@@ -68,6 +68,8 @@ void Scrollbar::initFromIniWithName(INIReader & ini, const std::string& fileName
 	freeResource();
 
 	style = (ScrollbarStyle)ini.GetInteger("Init", "Style", int(style));
+	flat = ini.GetBoolean("Init", "Flat", false);
+	fitTrack = ini.GetBoolean("Init", "FitTrack", false);
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
 	rect.w = ini.GetInteger("Init", "Width", rect.w);
@@ -284,6 +286,11 @@ void Scrollbar::onMouseLeftDown(int x, int y)
 
 void Scrollbar::onDraw()
 {
+	if (flat)
+	{
+		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 183, 182, 151, 255);
+		return;
+	}
 	_shared_image image = IMP::loadImageForTime(impImage, getTime(), nullptr, nullptr);
 	engine->drawImage(image, rect.x, rect.y);
 }
@@ -294,6 +301,14 @@ void Scrollbar::onExit()
 
 void Scrollbar::onSetChildRect()
 {
+	if (fitTrack && slideBtn != nullptr)
+	{
+		if (style == ssVertical) slideBtn->rect.w = rect.w;
+		else slideBtn->rect.h = rect.h;
+		slideBeginOriginal = 0;
+		slideEndOriginal = style == ssVertical ? rect.h - slideBtn->rect.h : rect.w - slideBtn->rect.w;
+		if (slideEndOriginal < 0) slideEndOriginal = 0;
+	}
 	bool slideButtonRectIsAbsolute = slideBtn != nullptr && slideBtn->rect.x >= rect.x && slideBtn->rect.y >= rect.y;
 	setSlideBtnRect();
 	if (slideButtonRectIsAbsolute)

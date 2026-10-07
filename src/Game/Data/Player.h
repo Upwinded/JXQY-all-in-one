@@ -1,6 +1,7 @@
 #pragma once
 #include "NPC.h"
 #include "Object.h"
+#include <cstdint>
 #include <map>
 
 // ===================== 玩家属性与升级结构体 =====================
@@ -34,6 +35,7 @@ struct LevelInfo
 	int defend3 = 0;
 	int evade = 0;
 	std::string newMagic = "";
+	std::string newGood = "";
 };
 
 enum NextDest
@@ -71,17 +73,20 @@ struct NextAction
 #define EQUIPMENT_MANA_RESTORE_RATE 0.02
 #define MAGIC_RESTORE_INTERVAL 1000
 
-#define MIN_THEW_RATE_TO_RUN 0.3
-#define MIN_THEW_LIMIT_TO_RUN 50
 #define PATH_FIND_FAIL_COOLDOWN 200
 
 // ===================== Player 类 =====================
+
+struct MagicInfo;
 
 class Player :
 	public NPC
 {
 	friend class RageSystemTestAccess;
 	friend class WorldInteractionRuntimeTestAccess;
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+	friend class GameplayAutomationTestAccess;
+#endif
 public:
 	Player();
 	virtual ~Player();
@@ -106,6 +111,7 @@ public:
 	virtual void addDefend(int value, int type = 1);
 	virtual void addEvade(int value);
 	virtual void addMoney(int value);
+	void setMoney(std::int64_t value);
 
 	virtual int getEvade() {return applyTemporaryEvadeModifiers(info.evade);}
 	virtual int getDefend() {return applyTemporaryDefendModifiers(info.defend);}
@@ -117,7 +123,9 @@ public:
 	virtual int getLifeMax() {return info.lifeMax;}
 	virtual int getManaMax() {return info.manaMax;}
 	virtual int getThewMax() {return info.thewMax;}
-	bool ignoresRunThewCost() const { return equipmentIgnoresRunThewCost; }
+	bool hasUnlimitedCheatResources() const;
+	bool ignoresRunThewCost() const { return equipmentIgnoresRunThewCost || hasUnlimitedCheatResources(); }
+	bool canPayRunThewCost() const;
 
 	// ---- 经验与升级 ----
 	virtual void addExp(int aExp);
@@ -135,7 +143,7 @@ public:
 	bool nextDestStrictWorldInteraction = false;
 	bool nextDestRequestedRunning = false;
 	bool addNextAction(NextAction& act);
-	void cancelQueuedInteraction(bool strictOnly = false);
+	void cancelQueuedInteraction(bool strictOnly = false, bool stopCurrentMovement = true);
 	bool handleQueuedInteractionAtCurrentPosition();
 
 	// ---- 移动 ----
@@ -152,6 +160,7 @@ public:
 	// ---- 战斗 ----
 	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr);
+	void beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<GameElement> target = nullptr, int listIndex = -1);
 	virtual bool doSpecialAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	std::shared_ptr<Magic> prepareSpecialAttackMagicForAction(Point dest, std::shared_ptr<GameElement> target);
 	bool releasePreparedSpecialAttackMagic(Point dest, std::shared_ptr<GameElement> target);
@@ -164,7 +173,7 @@ public:
 	int applyCriticalDamage(int damage, int roll, bool* wasCritical = nullptr) const;
 	virtual void beginHurt(Point dest);
 	virtual void hurt(std::shared_ptr<Effect> e);
-	virtual void hurtLife(int damage);
+	virtual void hurtLife(int damage, bool ignoreDefense = false);
 	bool canHurt();
 	void suppressTrapAtScriptPosition();
 	void checkTrap();

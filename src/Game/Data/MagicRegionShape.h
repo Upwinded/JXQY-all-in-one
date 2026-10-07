@@ -72,6 +72,28 @@ inline int getMagicRegionShapeRange(int level)
 	return 3 + ((level - 1) / 3) * 2;
 }
 
+inline std::vector<MagicRegionFixedTile> getWaveMagicRegionTiles(Point origin, int direction, int level)
+{
+	const int forward = normalizeMagicRegionDirection(direction);
+	const int side = normalizeMagicRegionDirection(forward + 2);
+	const int rows = getMagicRegionShapeRange(level);
+	std::vector<MagicRegionFixedTile> tiles;
+	tiles.reserve(rows * 5);
+	Point row = getMagicRegionSubPoint(origin, forward);
+	for (int i = 0; i < 2; ++i) row = getMagicRegionSubPoint(row, side + 4);
+	for (int i = 0; i < rows; ++i)
+	{
+		Point tile = row;
+		for (int j = 0; j < 5; ++j)
+		{
+			tiles.push_back({tile, i * 60});
+			tile = getMagicRegionSubPoint(tile, side);
+		}
+		row = getMagicRegionSubPoint(row, forward);
+	}
+	return tiles;
+}
+
 inline std::vector<MagicRegionFixedTile> getVTypeMagicRegionTiles(Point origin, int direction, int level)
 {
 	const int normalizedDirection = normalizeMagicRegionDirection(direction);

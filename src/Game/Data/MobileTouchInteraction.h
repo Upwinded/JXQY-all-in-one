@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cmath>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -10,6 +11,7 @@ constexpr int MOBILE_RIGHT_SCRIPT_MOVE_TOLERANCE_PIXELS = 24;
 constexpr float MOBILE_JOYSTICK_DEAD_ZONE_RATIO = 1.0f / 20.0f;
 constexpr float MOBILE_JOYSTICK_RUN_ZONE_RATIO = 3.0f / 20.0f;
 constexpr float MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO = 3.0f / 20.0f;
+constexpr uint64_t MOBILE_JOYSTICK_RUN_EXIT_DELAY_MS = 300;
 constexpr double MOBILE_JOYSTICK_PI = 3.14159265358979323846;
 
 enum class MobileJoystickMovementState
@@ -76,26 +78,46 @@ inline MobileJoystickMovementState getMobileJoystickMovementState(
 	MobileJoystickMovementState currentState,
 	int deltaX,
 	int deltaY,
-	int range)
+	int range,
+	uint64_t nowMilliseconds,
+	std::optional<uint64_t>& runExitCandidateBeginTime)
 {
 	if (range <= 0)
 	{
+		runExitCandidateBeginTime.reset();
 		return MobileJoystickMovementState::Idle;
 	}
 
 	const int distance = getMobileJoystickDistance(deltaX, deltaY);
 	if (distance <= range * MOBILE_JOYSTICK_DEAD_ZONE_RATIO)
 	{
+		runExitCandidateBeginTime.reset();
 		return MobileJoystickMovementState::Idle;
 	}
 
 	const float runThreshold = range * MOBILE_JOYSTICK_RUN_ZONE_RATIO;
 	if (currentState == MobileJoystickMovementState::Run)
 	{
-		return distance < runThreshold * (1.0f - MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO)
-			? MobileJoystickMovementState::Walk
-			: MobileJoystickMovementState::Run;
+		if (distance >= runThreshold * (1.0f - MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO))
+		{
+			runExitCandidateBeginTime.reset();
+			return MobileJoystickMovementState::Run;
+		}
+		if (!runExitCandidateBeginTime.has_value()
+			|| nowMilliseconds < runExitCandidateBeginTime.value())
+		{
+			runExitCandidateBeginTime = nowMilliseconds;
+			return MobileJoystickMovementState::Run;
+		}
+		if (nowMilliseconds - runExitCandidateBeginTime.value()
+			< MOBILE_JOYSTICK_RUN_EXIT_DELAY_MS)
+		{
+			return MobileJoystickMovementState::Run;
+		}
+		runExitCandidateBeginTime.reset();
+		return MobileJoystickMovementState::Walk;
 	}
+	runExitCandidateBeginTime.reset();
 	return distance > runThreshold * (1.0f + MOBILE_JOYSTICK_RUN_HYSTERESIS_RATIO)
 		? MobileJoystickMovementState::Run
 		: MobileJoystickMovementState::Walk;

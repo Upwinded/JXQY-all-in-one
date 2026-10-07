@@ -1,6 +1,7 @@
 #include "ColumnImage.h"
 #include "../Engine/Engine.h"
 #include "ComponentRegistry.h"
+#include <algorithm>
 
 namespace
 {
@@ -24,8 +25,24 @@ ColumnImage::~ColumnImage()
 	freeResource();
 }
 
+void ColumnImage::initFromIni(INIReader& ini)
+{
+	ImageContainer::initFromIni(ini);
+	horizontal = ini.GetBoolean("Init", "Horizontal", false);
+	fillColor = ini.GetColor("Init", "FillColor", 0xFF527D6A);
+}
+
 void ColumnImage::onDraw()
 {
+	if (horizontal)
+	{
+		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 127, 122, 94, 255);
+		Rect inner = { rect.x + 1, rect.y + 1, std::max(0, rect.w - 2), std::max(0, rect.h - 2) };
+		engine->fillRect(inner.x, inner.y, inner.w, inner.h, 42, 55, 46, 255);
+		inner.w = static_cast<int>(inner.w * std::clamp(percent, 0.0f, 1.0f));
+		engine->fillRect(inner.x, inner.y, inner.w, inner.h, (fillColor >> 16) & 255, (fillColor >> 8) & 255, fillColor & 255, 255);
+		return;
+	}
 	_shared_image img = IMP::loadImageForTime(impImage, getTime());
 	if (img == nullptr)
 	{

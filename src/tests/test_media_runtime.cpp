@@ -1,10 +1,14 @@
 #include "../Engine/Engine.h"
 #include "../Engine/AspectFitLayout.h"
 #include "../Engine/AudioDecodeSafety.h"
+#include "../Component/Button.h"
+#include "../Component/Label.h"
 #include "../Component/Panel.h"
 #include "../Component/VideoPlayer.h"
 #include "../File/File.h"
 #include "../Game/Data/ColorStyle.h"
+#include "../Game/Data/GameElement.h"
+#include "../Game/Data/MediaPathResolver.h"
 #include "../Game/Script/ScriptAPI.h"
 #include "../Image/IMP.h"
 #include "../Image/PngImageEncoder.h"
@@ -33,6 +37,12 @@ class TestVideoPlayer : public VideoPlayer
 public:
 	using VideoPlayer::onExit;
 	using VideoPlayer::onRun;
+};
+
+class TestButton : public Button
+{
+public:
+	using Button::playSound;
 };
 
 bool check(bool condition, const char* message)
@@ -683,8 +693,11 @@ bool runVideoLifecycleTests()
 	File::setResourceFallbackRoots({});
 	for (int attempt = 0; attempt < 3; attempt++)
 	{
+		mediaAssetResolutionCountForTests = 0;
 		_video video = engine->loadVideo("video/corrupt.avi");
 		ok = check(video == nullptr, "corrupt existing video fails closed") && ok;
+		ok = check(mediaAssetResolutionCountForTests == 1,
+			"each video load resolves its format candidates once") && ok;
 		if (video != nullptr)
 		{
 			engine->freeVideo(video);
@@ -1014,7 +1027,7 @@ bool runMediaRuntimeTests()
 	{
 		std::lock_guard<std::recursive_mutex> locker(audioEngineBase->soundMutex);
 		audioEngineBase->clearAudioChannels();
-		audioEngineBase->clearActionSoundCache();
+		audioEngineBase->clearSoundCache();
 	}
 	const bool audioWasInitialized = SDL_WasInit(SDL_INIT_AUDIO) != 0;
 	if (!audioWasInitialized)
@@ -1024,17 +1037,17 @@ bool runMediaRuntimeTests()
 	const bool audioSubsystemReady = audioWasInitialized ||
 		SDL_InitSubSystem(SDL_INIT_AUDIO);
 	ok = check(audioSubsystemReady,
-		"action sound cache test initializes the SDL audio subsystem") && ok;
+		"sound cache test initializes the SDL audio subsystem") && ok;
 	if (audioSubsystemReady)
 	{
 		const bool mixerReady = audioEngineBase->initSoundSystem() == 0;
 		ok = check(mixerReady,
-			"action sound cache test initializes the SDL mixer") && ok;
+			"sound cache test initializes the SDL mixer") && ok;
 		if (mixerReady)
 		{
 			namespace fs = std::filesystem;
 			fs::path cacheTestRoot =
-				makeUniqueTestDirectory("jxqy-action-sound-cache-tests");
+				makeUniqueTestDirectory("jxqy-sound-cache-tests");
 			fs::path resourceRootA = cacheTestRoot / "resource-a";
 			fs::path resourceRootB = cacheTestRoot / "resource-b";
 			std::error_code cacheTestError;
@@ -1052,14 +1065,35 @@ bool runMediaRuntimeTests()
 			}
 
 			File::setActiveResourceRoot(resourceRootA.string());
-			File::setActiveSaveNamespace("action-sound-cache-a");
+			File::setActiveSaveNamespace("sound-cache-a");
 			File::setResourceFallbackRoots({});
-			audioEngineBase->clearActionSoundCache();
-			engine->actionSoundDecodeCountForTests = 0;
+			audioEngineBase->clearSoundCache();
+			engine->cachedSoundDecodeCountForTests = 0;
+			mediaAssetResolutionCountForTests = 0;
+			TestButton cachedSoundButtonA;
+			TestButton cachedSoundButtonB;
+			cachedSoundButtonA.loadSound("cached.wav", 1);
+			cachedSoundButtonB.loadSound("sound/cached.wav", 2);
+			ok = check(engine->cachedSoundDecodeCountForTests == 1 &&
+				mediaAssetResolutionCountForTests == 1 &&
+				audioEngineBase->soundCache.size() == 1,
+				"button sound loading prewarms the shared cache once") && ok;
+			const std::size_t channelCountBeforeButtonSound =
+				countActiveAudioChannels();
+			cachedSoundButtonA.playSound(1);
+			ok = check(engine->cachedSoundDecodeCountForTests == 1 &&
+				mediaAssetResolutionCountForTests == 1 &&
+				countActiveAudioChannels() == channelCountBeforeButtonSound + 1,
+				"button sound playback reuses the prewarmed cache") && ok;
 			_channel cachedSoundHandleA = engine->playCachedSoundFile(
 				"sound\\cached.wav", 10.0f, 20.0f, 0.25f);
 			_channel cachedSoundHandleB = engine->playCachedSoundFile(
 				"sound/cached.wav", 120.0f, 240.0f, 0.75f);
+			GameElement soundActor;
+			_channel actorSound = soundActor.playSoundFile("cached.wav", 0.0f, 0.0f, 0.5f);
+			ok = check(actorSound != nullptr && mediaAssetResolutionCountForTests == 1,
+				"cached action sound bypasses filesystem path resolution") && ok;
+			engine->stopMusic(actorSound);
 			_music cachedSound = nullptr;
 			{
 				std::lock_guard<std::recursive_mutex> locker(
@@ -1081,12 +1115,25 @@ bool runMediaRuntimeTests()
 					cachedChannelB->volume == 0.75f &&
 					cachedChannelB->positionX == 120.0f &&
 					cachedChannelB->positionY == 240.0f &&
-					engine->actionSoundDecodeCountForTests == 1 &&
-					audioEngineBase->actionSoundCache.size() == 1 &&
-					audioEngineBase->actionSoundCacheBytes > 0 &&
-					audioEngineBase->actionSoundCacheBytes <=
-						EngineBase::ActionSoundCacheLimitBytes,
+					engine->cachedSoundDecodeCountForTests == 1 &&
+					audioEngineBase->soundCache.size() == 1 &&
+					audioEngineBase->soundCacheBytes > 0 &&
+					audioEngineBase->soundCacheBytes <=
+						EngineBase::CachedSoundLimitBytes,
 					"repeated action sound playback decodes once and uses independent channels") && ok;
+				if (cachedChannelA != nullptr && cachedChannelA->track != nullptr)
+				{
+					engine->setMusicPosition(cachedSoundHandleA, 0.0f, 0.0f);
+					ok = check(std::abs(MIX_GetTrackGain(cachedChannelA->track) - 0.125f) < 0.0001f,
+						"positional sound preserves the legacy listener height and near gain") && ok;
+					engine->setMusicPosition(cachedSoundHandleA, 3.0f, 4.0f);
+					const float nearbyGain = MIX_GetTrackGain(cachedChannelA->track);
+					ok = check(nearbyGain > 0.024f && nearbyGain < 0.025f,
+						"five-unit positional sounds attenuate instead of mixing at full volume") && ok;
+					engine->setMusicPosition(cachedSoundHandleA, 10000.0f, 10000.0f);
+					ok = check(MIX_GetTrackGain(cachedChannelA->track) <= 0.000026f,
+						"offscreen ambient sources are effectively inaudible") && ok;
+				}
 			}
 			engine->stopMusic(cachedSoundHandleA);
 			{
@@ -1098,49 +1145,49 @@ bool runMediaRuntimeTests()
 					audioEngineBase->resolveAudioChannel(cachedSoundHandleA) ==
 						nullptr &&
 					cachedChannelB != nullptr && cachedChannelB->music == cachedSound &&
-					audioEngineBase->actionSoundCache.size() == 1,
+					audioEngineBase->soundCache.size() == 1,
 					"stopping one cached sound channel preserves the other channel and buffer") && ok;
 			}
 
 			File::setActiveResourceRoot(resourceRootB.string());
-			File::setActiveSaveNamespace("action-sound-cache-b");
+			File::setActiveSaveNamespace("sound-cache-b");
 			_channel switchedResourceHandle = engine->playCachedSoundFile(
 				"sound/cached.wav", 1.0f, 2.0f, 0.5f);
 			ok = check(switchedResourceHandle != nullptr &&
 				!engine->getMusicPlaying(cachedSoundHandleB) &&
-				engine->actionSoundDecodeCountForTests == 2 &&
-				audioEngineBase->actionSoundCache.size() == 1,
+				engine->cachedSoundDecodeCountForTests == 2 &&
+				audioEngineBase->soundCache.size() == 1,
 				"resource switch clears old cached sounds before decoding the new scope") && ok;
 			const std::size_t decodeCountBeforeInvalidFile =
-				engine->actionSoundDecodeCountForTests;
+				engine->cachedSoundDecodeCountForTests;
 			ok = check(engine->playCachedSoundFile(
 					"sound/missing.wav", 1.0f, 2.0f, 0.5f) == nullptr &&
-				engine->actionSoundDecodeCountForTests ==
+				engine->cachedSoundDecodeCountForTests ==
 					decodeCountBeforeInvalidFile &&
-				audioEngineBase->actionSoundCache.size() == 1,
+				audioEngineBase->soundCache.size() == 1,
 				"invalid action sound preserves cache and decode accounting") && ok;
 			engine->stopMusic(switchedResourceHandle);
-			audioEngineBase->clearActionSoundCache();
+			audioEngineBase->clearSoundCache();
 
 			auto* fullCacheSound = new AudioBuffer;
 			fullCacheSound->decodedByteCount =
-				EngineBase::ActionSoundCacheLimitBytes;
-			_music retainedFullCacheSound = audioEngineBase->cacheActionSound(
+				EngineBase::CachedSoundLimitBytes;
+			_music retainedFullCacheSound = audioEngineBase->cacheSound(
 				"full-cache-placeholder", fullCacheSound);
 			const std::size_t decodeCountBeforeCapacityFallback =
-				engine->actionSoundDecodeCountForTests;
+				engine->cachedSoundDecodeCountForTests;
 			_channel capacityFallbackHandle = engine->playCachedSoundFile(
 				"sound/cached.wav", 3.0f, 4.0f, 0.6f);
 			ok = check(retainedFullCacheSound == fullCacheSound &&
 				capacityFallbackHandle != nullptr &&
-				engine->actionSoundDecodeCountForTests ==
+				engine->cachedSoundDecodeCountForTests ==
 					decodeCountBeforeCapacityFallback + 1 &&
-				audioEngineBase->actionSoundCache.size() == 1 &&
-				audioEngineBase->actionSoundCacheBytes ==
-					EngineBase::ActionSoundCacheLimitBytes &&
+				audioEngineBase->soundCache.size() == 1 &&
+				audioEngineBase->soundCacheBytes ==
+					EngineBase::CachedSoundLimitBytes &&
 				EngineBase::soundList.size() == 1 &&
 				EngineBase::soundList.front().c == capacityFallbackHandle,
-				"full action sound cache falls back to auto-released playback") && ok;
+				"full sound cache falls back to auto-released playback") && ok;
 			engine->stopMusic(capacityFallbackHandle);
 			audioEngineBase->checkSoundRelease();
 			ok = check(EngineBase::soundList.empty(),
@@ -1149,7 +1196,7 @@ bool runMediaRuntimeTests()
 			{
 				audioEngineBase->freeMusic(fullCacheSound);
 			}
-			audioEngineBase->clearActionSoundCache();
+			audioEngineBase->clearSoundCache();
 			fs::remove_all(cacheTestRoot, cacheTestError);
 			audioEngineBase->destroySoundSystem();
 		}
@@ -1158,28 +1205,28 @@ bool runMediaRuntimeTests()
 	{
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 	}
-	audioEngineBase->setActionSoundCacheScope("capacity-test");
+	audioEngineBase->setSoundCacheScope("capacity-test");
 
 	auto* nearlyFullSound = new AudioBuffer;
 	nearlyFullSound->decodedByteCount =
-		EngineBase::ActionSoundCacheLimitBytes - 1;
+		EngineBase::CachedSoundLimitBytes - 1;
 	auto* finalCacheByteSound = new AudioBuffer;
 	finalCacheByteSound->decodedByteCount = 1;
 	auto* overflowSound = new AudioBuffer;
 	overflowSound->decodedByteCount = 1;
-	_music retainedNearlyFullSound = audioEngineBase->cacheActionSound(
+	_music retainedNearlyFullSound = audioEngineBase->cacheSound(
 		"capacity-test\nsound/nearly-full.wav", nearlyFullSound);
-	_music retainedFinalCacheByteSound = audioEngineBase->cacheActionSound(
+	_music retainedFinalCacheByteSound = audioEngineBase->cacheSound(
 		"capacity-test\nsound/final-byte.wav", finalCacheByteSound);
-	_music retainedOverflowSound = audioEngineBase->cacheActionSound(
+	_music retainedOverflowSound = audioEngineBase->cacheSound(
 		"capacity-test\nsound/overflow.wav", overflowSound);
 	ok = check(retainedNearlyFullSound == nearlyFullSound &&
 		retainedFinalCacheByteSound == finalCacheByteSound &&
 		retainedOverflowSound == nullptr &&
-		audioEngineBase->actionSoundCacheBytes ==
-			EngineBase::ActionSoundCacheLimitBytes &&
-		audioEngineBase->actionSoundCache.size() == 2,
-		"action sound cache accepts exactly 16 MiB and rejects overflow") && ok;
+		audioEngineBase->soundCacheBytes ==
+			EngineBase::CachedSoundLimitBytes &&
+		audioEngineBase->soundCache.size() == 2,
+		"sound cache accepts exactly 16 MiB and rejects overflow") && ok;
 	if (retainedNearlyFullSound == nullptr)
 	{
 		audioEngineBase->freeMusic(nearlyFullSound);
@@ -1189,11 +1236,11 @@ bool runMediaRuntimeTests()
 		audioEngineBase->freeMusic(finalCacheByteSound);
 	}
 	audioEngineBase->freeMusic(overflowSound);
-	audioEngineBase->clearActionSoundCache();
+	audioEngineBase->clearSoundCache();
 	ok = check(engine->playCachedSoundFile("", 1.0f, 2.0f, 0.5f) == nullptr &&
-		audioEngineBase->actionSoundCache.empty() &&
-		audioEngineBase->actionSoundCacheBytes == 0,
-		"invalid cached action sound input fails without changing cache state") && ok;
+		audioEngineBase->soundCache.empty() &&
+		audioEngineBase->soundCacheBytes == 0,
+		"invalid cached sound input fails without changing cache state") && ok;
 
 	_channel stoppedHandle = createTestAudioChannel(0.5f);
 	const std::size_t singleChannelHighWater = audioEngineBase->channelSlots.size();
@@ -1613,6 +1660,38 @@ bool runMediaRuntimeTests()
 			mainThreadText != nullptr &&
 			engineBase->fontCache.count(16) == 1,
 			"main-thread text rendering can populate the font cache") && ok;
+		CachedTextTexture cachedTextTexture;
+		auto firstTextTexture = initializedTtfForFontCache
+			? cachedTextTexture.get(engine, "cached", 16, 0xFFFFFFFF)
+			: nullptr;
+		auto reusedTextTexture = firstTextTexture != nullptr
+			? cachedTextTexture.get(engine, "cached", 16, 0xFFFFFFFF)
+			: nullptr;
+		auto changedTextTexture = reusedTextTexture != nullptr
+			? cachedTextTexture.get(engine, "changed", 16, 0xFFFFFFFF)
+			: nullptr;
+		auto changedSizeTexture = changedTextTexture != nullptr
+			? cachedTextTexture.get(engine, "changed", 14, 0xFFFFFFFF)
+			: nullptr;
+		auto changedColorTexture = changedSizeTexture != nullptr
+			? cachedTextTexture.get(engine, "changed", 14, 0xFFFFCC88)
+			: nullptr;
+		cachedTextTexture.clear();
+		auto clearedTextTexture = changedColorTexture != nullptr
+			? cachedTextTexture.get(engine, "changed", 14, 0xFFFFCC88)
+			: nullptr;
+		ok = check(
+			firstTextTexture != nullptr &&
+			reusedTextTexture.get() == firstTextTexture.get() &&
+			changedTextTexture != nullptr &&
+			changedTextTexture.get() != reusedTextTexture.get() &&
+			changedSizeTexture != nullptr &&
+			changedSizeTexture.get() != changedTextTexture.get() &&
+			changedColorTexture != nullptr &&
+			changedColorTexture.get() != changedSizeTexture.get() &&
+			clearedTextTexture != nullptr &&
+			clearedTextTexture.get() != changedColorTexture.get(),
+			"component text textures are reused until text, size, color, or layout invalidation changes") && ok;
 		auto firstCachedText = initializedTtfForFontCache
 			? engine->createText("A", 12, 0xFFFFFFFF)
 			: nullptr;
@@ -1639,6 +1718,12 @@ bool runMediaRuntimeTests()
 		cachedDifferentSizeText.reset();
 		secondCachedText.reset();
 		firstCachedText.reset();
+		clearedTextTexture.reset();
+		changedColorTexture.reset();
+		changedSizeTexture.reset();
+		changedTextTexture.reset();
+		reusedTextTexture.reset();
+		firstTextTexture.reset();
 		mainThreadText.reset();
 		if (previousTtfInitCount == 0 && initializedTtfForFontCache)
 		{

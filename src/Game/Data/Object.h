@@ -125,6 +125,9 @@ struct ObjectRes
 class Object :
 	public GameElement
 {
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+	friend class GameplayAutomationTestAccess;
+#endif
 public:
 	Object();
 	virtual ~Object();

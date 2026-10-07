@@ -1,3 +1,4 @@
+#include "../../GameplayAutomation/GameplayAutomationSession.h"
 #include <algorithm>
 #include <cerrno>
 #include <climits>
@@ -14,6 +15,7 @@
 #include <vector>
 #include "ScriptAPI.h"
 #include "ScriptNpcAction.h"
+#include "../../JxqyEngineVersion.h"
 #include "../GameManager/GameManager.h"
 #include "../Data/ColorStyle.h"
 #include "../Data/Effect.h"
@@ -24,6 +26,9 @@
 #include "../Data/NPC.h"
 #include "../Data/ObjectPersistence.h"
 #include "../Data/ProjectedMovement.h"
+#include "../Data/SaveIniPersistence.h"
+#include "../Data/SaveVersionCompatibility.h"
+#include "../../Resource/ResourceManager.h"
 #include "../../Engine/Engine.h"
 #include "../../Engine/AudioDecodeSafety.h"
 #include "../../File/File.h"
@@ -33,8 +38,10 @@
 #include "../../File/log.h"
 #include "../../Launch/EditorRunRuntimeTraceWriter.h"
 #include "../../libconvert/libconvert.h"
+#include "../../Resource/SemanticVersion.h"
 #include "../../Weather/Weather.h"
 #include "../Menu/BuySellMenu.h"
+#include "../Menu/SystemNotice.h"
 #include "../../Component/VideoPlayer.h"
 #include "../GameManager/SaveFileManager.h"
 #include "../GameManager/RuntimeSaveGenerationPolicy.h"
@@ -45,8 +52,6 @@ constexpr std::size_t MaximumEditorRunScriptBytes =
 	16 * 1024 * 1024;
 constexpr std::size_t MaximumEditorRunNpcListBytes =
 	16 * 1024 * 1024;
-constexpr const char* LoadCandidateGeneration =
-	"save\\load_candidate\\";
 constexpr const char* CompatibleEmptyNpcListSourcePath =
 	"__compatible_empty_npc_list__.npc";
 constexpr const char* CompatibleEmptyObjectListSourcePath =
@@ -92,6 +97,43 @@ struct PreparedSaveResources
 	}
 };
 
+bool validateSaveCompatibility(
+	const std::string& generationDirectory,
+	bool initialTemplate,
+	std::string& failureMessage)
+{
+	failureMessage.clear();
+	std::shared_ptr<INIReader> globalIni;
+	const SaveIniPersistence::ReadStatus readStatus =
+		SaveIniPersistence::read(
+			generationDirectory + GLOBAL_INI,
+			globalIni);
+	if (readStatus == SaveIniPersistence::ReadStatus::Missing)
+	{
+		failureMessage = u8"存档目录缺少 game.ini";
+		return false;
+	}
+	if (readStatus != SaveIniPersistence::ReadStatus::Loaded ||
+		globalIni == nullptr)
+	{
+		failureMessage =
+			u8"存档状态文件 game.ini 无法读取或格式错误";
+		return false;
+	}
+
+	if (!SaveVersionCompatibility::validateEngineVersion(
+		globalIni->Get("Save", "EngineVersion", "1.0.0"), initialTemplate, failureMessage))
+	{
+		return false;
+	}
+	const auto& manifest = ResourceManager::instance().getActiveManifest();
+	return SaveVersionCompatibility::validateResourceVersion(
+		globalIni->Get("Save", "ResourceVersion", "1.0.0"),
+		manifest.releaseMetadata.displayVersion,
+		manifest.minimumCompatibleSaveResourceVersion,
+		initialTemplate, failureMessage);
+}
+
 bool prepareSaveResources(
 	GameManager* gameManager,
 	const std::string& preparedDirectory,
@@ -113,7 +155,7 @@ bool prepareSaveResources(
 		preparedDirectory);
 	if (!generationPath.valid())
 	{
-		failureMessage = u8"存档临时目录无效";
+		failureMessage = u8"存档运行目录无效";
 		return false;
 	}
 	INIReader globalIni(
@@ -196,7 +238,8 @@ bool prepareSaveResources(
 				preparedResources.npc,
 				true);
 	preparedResources.npcFallbackUsed =
-		missingNpcList && !npcName.empty() && npcPrepared;
+		npcPrepared && !npcName.empty() &&
+		(missingNpcList || preparedResources.npc.needsNormalization());
 	if (!npcPrepared)
 	{
 		if (preparationCheckpoint && !preparationCheckpoint())
@@ -244,7 +287,8 @@ bool prepareSaveResources(
 				preparedResources.object,
 				true);
 	preparedResources.objectFallbackUsed =
-		missingObjectList && !objectName.empty() && objectPrepared;
+		objectPrepared && !objectName.empty() &&
+		(missingObjectList || preparedResources.object.needsNormalization());
 	if (!objectPrepared)
 	{
 		if (preparationCheckpoint && !preparationCheckpoint())
@@ -279,7 +323,7 @@ bool prepareSaveResources(
 }
 
 bool saveGenerationCancellationRequested(
-	const SaveGenerationPreflightPolicy& policy) noexcept
+	const SaveGenerationPolicy& policy) noexcept
 {
 	if (!policy.cancellationRequested)
 	{
@@ -314,8 +358,9 @@ bool ownerCheckpointCanContinue(
 
 SaveGenerationResult prepareLoadGeneration(
 	int index,
-	const SaveGenerationPreflightPolicy& policy,
-	std::string& preparedDirectory)
+	const SaveGenerationPolicy& policy,
+	std::string& preparedDirectory,
+	std::string& failureMessage)
 {
 	std::string sourceDirectory = index == 0
 		? std::string(INI_SAVE_FOLDER)
@@ -323,23 +368,24 @@ SaveGenerationResult prepareLoadGeneration(
 			? std::string(SAVE_AUTO_FOLDER)
 			: convert::formatString(SAVE_FOLDER, index));
 
-	if (index != 0 &&
-		!File::recoverDirectoryCopy(sourceDirectory))
+	if (!validateSaveCompatibility(sourceDirectory, index == 0, failureMessage))
 	{
 		SaveGenerationResult result;
-		result.error =
-			SaveGenerationError::SourceRecoveryFailed;
-		result.sourceDirectory = sourceDirectory;
-		result.errorPath = sourceDirectory;
+		result.error = SaveGenerationError::GameIniInvalid;
+		result.errorPath = sourceDirectory + GLOBAL_INI;
 		return result;
 	}
-	preparedDirectory = LoadCandidateGeneration;
-	if (!SaveFileManager::CopySaveGenerationWithinLimits(
+	preparedDirectory = SAVE_CURRENT_FOLDER;
+	File::DirectoryCopyLimits limits;
+	limits.maximumFileCount = policy.limits.maximumFileCount;
+	limits.maximumTotalBytes = policy.limits.maximumTotalBytes;
+	limits.maximumSingleFileBytes = policy.limits.maximumSingleFileBytes;
+	if (!File::overwriteDirectoryFiles(
 			sourceDirectory,
 			preparedDirectory,
-			policy.limits,
 			{ SAVE_LIST_FILE },
-			policy.cancellationRequested))
+			policy.cancellationRequested,
+			limits))
 	{
 		SaveGenerationResult result;
 		result.error =
@@ -784,6 +830,30 @@ private:
 	bool previousCanInput = false;
 };
 
+// Script waits use the game clock, not the weather clock frozen by time-stop magic.
+class ScriptSleep final : public Element
+{
+public:
+	explicit ScriptSleep(UTime duration) : duration(duration)
+	{
+		name = "ScriptSleep";
+		canDraw = false;
+		needEvents = false;
+		coverMouse = false;
+	}
+
+private:
+	void onUpdate() override
+	{
+		if (getTime() >= duration)
+		{
+			stop();
+		}
+	}
+
+	UTime duration;
+};
+
 void runNpcSpecialActionForTarget(const std::shared_ptr<NPC>& npc,
 	const std::string& fileName,
 	bool blocking)
@@ -1141,6 +1211,10 @@ bool evaluateChooseExCondition(GameManager* gameManager, const std::string& cond
 std::string resolveChoosePlusSpeakerName(GameManager* gameManager, const std::string& speakerName)
 {
 	std::string trimmedSpeakerName = trimAscii(speakerName);
+	if (gameManager != nullptr)
+	{
+		trimmedSpeakerName = gameManager->global.resolveScriptCharacterName(trimmedSpeakerName);
+	}
 	if (trimmedSpeakerName == "#name" && gameManager != nullptr && gameManager->player != nullptr && !gameManager->player->npcName.empty())
 	{
 		return gameManager->player->npcName;
@@ -1171,7 +1245,7 @@ ScriptChooseOptions buildScriptChooseOptions(GameManager* gameManager, const std
 			}
 		}
 
-		result.options.push_back(cleanOption);
+		result.options.push_back(gameManager->global.resolveScriptText(cleanOption));
 		result.visibleOptions.push_back(visibleOption);
 	}
 	return result;
@@ -1343,7 +1417,7 @@ bool consumeGambleAutomation(GameManager* gameManager, int cost, bool& result)
 	result = moneyDelta >= 0;
 	if (gameManager->player != nullptr)
 	{
-		gameManager->player->money = std::max(0, gameManager->player->money + moneyDelta);
+		gameManager->player->setMoney(static_cast<int64_t>(gameManager->player->money) + moneyDelta);
 	}
 	if (gameManager->menu != nullptr && gameManager->menu->goodsMenu != nullptr)
 	{
@@ -1402,17 +1476,23 @@ bool updateNpcObjAttributes(const std::string& fileName,
 		return false;
 	}
 
-	int count = (int)ini.GetInteger("Head", "Count", 0);
-	if (count < 0)
+	int count = 0;
+	const int maximumCount = sectionPrefix == "OBJ"
+		? ObjectPersistence::MaximumObjectCount
+		: NPCPersistence::MaximumNpcCount;
+	if (!NPCPersistence::readCount(ini, maximumCount, count))
 	{
-		count = 0;
+		GameLog::write("ScriptAPI: refusing to edit invalid entity count in %s\n", fileName.c_str());
+		return false;
 	}
 
+	const std::string targetName = sectionPrefix == "NPC" && gm != nullptr
+		? gm->global.resolveScriptCharacterName(name) : name;
 	bool found = false;
 	for (int i = 0; i < count; i++)
 	{
 		const std::string section = convert::formatString("%s%03d", sectionPrefix.c_str(), i);
-		if (ini.Get(section, nameKey, "") == name)
+		if (ini.HasKey(section, nameKey) && ini.Get(section, nameKey, "") == targetName)
 		{
 			for (const auto& assignment : assignments)
 			{
@@ -2457,13 +2537,14 @@ std::vector<std::shared_ptr<NPC>> findNPCForStateReadback(GameManager* gameManag
 	{
 		return result;
 	}
-	if (gameManager->player != nullptr && gameManager->player->npcName == name)
+	const std::string targetName = gameManager->global.resolveScriptCharacterName(name);
+	if (gameManager->player != nullptr && gameManager->player->npcName == targetName)
 	{
 		result.push_back(gameManager->player);
 	}
 	for (const auto& npc : gameManager->npcManager->npcList)
 	{
-		if (npc != nullptr && npc->npcName == name)
+		if (npc != nullptr && npc->npcName == targetName)
 		{
 			result.push_back(npc);
 		}
@@ -4461,7 +4542,8 @@ bool addNpcRuntimeProperty(GameManager* gameManager, const std::shared_ptr<NPC>&
 
 void applyStatusMillisecondsToPlayer(GameManager* gameManager, int statusKind, int milliseconds)
 {
-	if (gameManager == nullptr || gameManager->player == nullptr || milliseconds <= 0)
+	if (gameManager == nullptr || gameManager->player == nullptr || milliseconds <= 0
+		|| gameManager->player->isDying() || gameManager->player->isImmuneToAbnormalState())
 	{
 		return;
 	}
@@ -6087,7 +6169,7 @@ void ScriptAPI::talk(const std::string& part)
 		{
 			dialog->setHead2(head2);
 		}
-		dialog->setTalkStr(talkStr[i]);
+		dialog->setTalkStr(gameManager->global.resolveScriptText(talkStr[i]));
 		dialog->visible = true;
 		dialog->run();
 		dialog->visible = false;
@@ -6119,7 +6201,7 @@ void ScriptAPI::talk(int fromIdx, int toIdx)
 		{
 			dialog->setHead2(headName);
 		}
-		dialog->setTalkStr(talkList[i].text);
+		dialog->setTalkStr(gameManager->global.resolveScriptText(talkList[i].text));
 		dialog->visible = true;
 		dialog->run();
 		dialog->visible = false;
@@ -6139,7 +6221,7 @@ void ScriptAPI::say(const std::string& str, int index)
 	{
 		dialog->setHead1("");
 	}
-	dialog->setTalkStr(str);
+	dialog->setTalkStr(gameManager->global.resolveScriptText(str));
 	dialog->visible = true;
 	dialog->run();
 	dialog->visible = false;
@@ -6174,6 +6256,11 @@ void ScriptAPI::setMainLum(int lum)
 
 void ScriptAPI::playMusic(const std::string& fileName)
 {
+	if (fileName.empty())
+	{
+		stopMusic();
+		return;
+	}
 	gameManager->global.data.bgmName = fileName;
 	if (!gameManager->global.useWav)
 	{
@@ -6384,6 +6471,26 @@ int ScriptAPI::runScriptWithCapturedParent(
 		return -1;
 	}
 
+
+    auto executeLoaded = [&](std::unique_ptr<char[]>& bytes, int length, std::string path)
+    {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+        if (GameplayAutomationSession::enabled())
+        {
+            std::replace(path.begin(), path.end(), '\\', '/');
+            const std::string previous = GameplayAutomationSession::currentScript;
+            GameplayAutomationSession::currentScript = path;
+            FunctionScopeExit restoreScript([previous]() { GameplayAutomationSession::currentScript = previous; });
+            ResolvedTraceScriptSource source;
+            source.bytes.assign(bytes.get(), bytes.get() + length);
+            source.identity.virtualPath = path;
+            const auto result = gameManager->script.runResolvedTraceScriptSource(
+                std::move(source), capturedParentExecutionId, parentWasCaptured);
+            return result.succeeded() ? 0 : -1;
+        }
+#endif
+        return gameManager->script.runScript(bytes, length);
+    };
 	std::unique_ptr<char[]> s;
 	std::string newName = fileName;
 
@@ -6404,13 +6511,13 @@ int ScriptAPI::runScriptWithCapturedParent(
 				return -1;
 			}
 			GameLog::write("run script: %s%s\n", SCRIPT_COMMON_FOLDER, fileName.c_str());
-			return gameManager->script.runScript(s, len);
+			return executeLoaded(s, len, SCRIPT_COMMON_FOLDER + fileName);
 		}
 		GameLog::write("run script: %s%s\n", SCRIPT_GOODS_FOLDER, newName.c_str());
-		return gameManager->script.runScript(s, len);
+		return executeLoaded(s, len, SCRIPT_GOODS_FOLDER + fileName);
 	}
 	GameLog::write("run script: %s%s\\%s\n", SCRIPT_MAP_FOLDER, mapName.c_str(), newName.c_str());
-	return gameManager->script.runScript(s, len);
+	return executeLoaded(s, len, SCRIPT_MAP_FOLDER + mapName + "\\" + fileName);
 }
 
 ExactScriptExecutionResult ScriptAPI::runScriptFromExactRoot(
@@ -6539,12 +6646,16 @@ void ScriptAPI::moveScreenForFrameCount(
 
 void ScriptAPI::sleep(int time)
 {
-	if (time <= 0)
+	if (time <= 0 || gameManager == nullptr)
 	{
 		return;
 	}
 	ScopedScriptInputBlock inputBlock(gameManager);
-	gameManager->weather->sleep(static_cast<unsigned int>(time));
+	auto wait = std::make_shared<ScriptSleep>(static_cast<UTime>(time));
+	gameManager->addChild(wait);
+	FunctionScopeExit detachWait([&]() { gameManager->removeChild(wait); });
+	wait->initTime();
+	wait->run();
 }
 
 void ScriptAPI::playMovie(const std::string& fileName)
@@ -6560,10 +6671,7 @@ void ScriptAPI::playMovie(const std::string& fileName)
 	const std::string previousBgmName = gameManager->global.data.bgmName;
 	stopMusic();
 	GameLog::write("Play Movie %s\n", fileName.c_str());
-	std::string moviePath = resolveMediaAssetPath(VIDEO_FOLDER,
-		fileName,
-		{ ".avi", ".mp4", ".wmv", ".mpg", ".mpeg" });
-	gameManager->video = std::make_shared<VideoPlayer>(moviePath);
+	gameManager->video = std::make_shared<VideoPlayer>(fileName);
 	gameManager->video->drawFullScreen = true;
 	gameManager->video->run();
 
@@ -6930,7 +7038,8 @@ GameLoading::LoadingTaskResult ScriptAPI::runExclusiveLoadingTask(
 		const std::function<bool()>& ownerCheckpoint)>
 		successFinalizer,
 	const std::function<void()>&
-		loadingPresentationPumpObserver)
+		loadingPresentationPumpObserver,
+	const _shared_image& presentationBackground)
 {
 	if (gameManager == nullptr || engine == nullptr)
 	{
@@ -7001,6 +7110,7 @@ GameLoading::LoadingTaskResult ScriptAPI::runExclusiveLoadingTask(
 	const auto finishLoadingPresentationFrame =
 		[this,
 		 &loadingImage,
+		 &presentationBackground,
 		 &animationTime,
 		 &lastPresentationTime,
 		 &imageIndex](
@@ -7038,6 +7148,14 @@ GameLoading::LoadingTaskResult ScriptAPI::runExclusiveLoadingTask(
 				engine->isFrameReady() &&
 				!engine->isApplicationQuitRequested())
 			{
+				if (presentationBackground != nullptr)
+				{
+					int width = 0;
+					int height = 0;
+					engine->getWindowSize(width, height);
+					Rect destination{ 0, 0, width, height };
+					engine->drawImage(presentationBackground, nullptr, &destination);
+				}
 				if (!loadingImage.empty())
 				{
 					int width = 0;
@@ -7434,26 +7552,9 @@ bool ScriptAPI::loadGameAsync(int index)
 	{
 		return false;
 	}
-	if (!SaveFileManager::RecoverInterruptedSaveOperations())
-	{
-		GameLog::write(
-			"ScriptAPI: save recovery was incomplete; attempting the selected slot normally\n");
-	}
 	SaveFileManager::OperationScope loadOperation;
-	SaveFileManager::ScratchGenerationScope candidateCleanup(
-		LoadCandidateGeneration);
-	if (!candidateCleanup.valid())
-	{
-		gameManager->setLastLoadFailureMessage(
-			u8"无法创建安全的读档临时目录");
-		GameLog::write(
-			"ScriptAPI: invalid load candidate cleanup path\n");
-		return false;
-	}
-	const SaveGenerationPreflightPolicy policy =
-		createRuntimeSaveGenerationPolicy(
-			*gameManager,
-			RuntimeSaveGenerationPolicyMode::CompatibleLoad);
+	const SaveGenerationPolicy policy =
+		createRuntimeSaveGenerationPolicy();
 	std::string preparedDirectory;
 	SaveGenerationResult preparationResult;
 	PreparedSaveResources preparedResources;
@@ -7473,7 +7574,7 @@ bool ScriptAPI::loadGameAsync(int index)
 			{
 				return GameLoading::LoadingTaskResult::cancellation();
 			}
-			SaveGenerationPreflightPolicy workerPolicy =
+			SaveGenerationPolicy workerPolicy =
 				policy;
 			workerPolicy.cancellationRequested =
 				[cancellationToken]()
@@ -7483,7 +7584,8 @@ bool ScriptAPI::loadGameAsync(int index)
 			preparationResult = prepareLoadGeneration(
 				index,
 				workerPolicy,
-				preparedDirectory);
+				preparedDirectory,
+				resourcePreparationFailure);
 			if (preparationResult.error ==
 				SaveGenerationError::Cancelled)
 			{
@@ -7492,9 +7594,9 @@ bool ScriptAPI::loadGameAsync(int index)
 			}
 			if (!preparationResult.succeeded())
 			{
-				return loadingFailure(
-					u8"存档复制失败",
-					preparationResult);
+				return resourcePreparationFailure.empty()
+					? loadingFailure(u8"存档复制失败", preparationResult)
+					: GameLoading::LoadingTaskResult::failure(resourcePreparationFailure);
 			}
 			const std::function<bool()> preparationCheckpoint =
 				[cancellationToken]()
@@ -7520,7 +7622,6 @@ bool ScriptAPI::loadGameAsync(int index)
 	std::function<GameLoading::LoadingTaskResult(
 		const std::function<bool()>&)> successFinalizer =
 		[this,
-		 &policy,
 		 &preparedDirectory,
 		 &preparedResources](
 			const std::function<bool()>& ownerCheckpoint)
@@ -7582,9 +7683,8 @@ bool ScriptAPI::loadGameAsync(int index)
 							? preparedCallbacks
 							: PreparedSaveLoadCallbacks{});
 				};
-			return commitPreparedSaveGeneration(
+			return finishGameLoad(
 				preparedDirectory,
-				policy,
 				ownerCheckpoint,
 				generationLoad);
 		};
@@ -7601,6 +7701,11 @@ bool ScriptAPI::loadGameAsync(int index)
 				result.message.empty()
 					? std::string(u8"读档失败，未提供详细原因")
 					: result.message);
+		}
+		if (!preparedDirectory.empty())
+		{
+			discardPartialWorldAfterFailedCommit();
+			if (!engine->isApplicationQuitRequested()) returnToTitle();
 		}
 	}
 	else
@@ -7907,7 +8012,7 @@ void ScriptAPI::loadNPCAsync(const std::string& fileName)
 			{
 				return GameLoading::LoadingTaskResult::cancellation();
 			}
-			const bool valid =
+			const bool valid = fileName.empty() ||
 				gameManager->npcManager->prepareLoad(
 					fileName,
 					preparedLoad,
@@ -8232,7 +8337,7 @@ void ScriptAPI::followNPC(const std::string& follower, const std::string& leader
 	{
 		if (gameManager->scriptNPC != nullptr)
 		{
-			gameManager->scriptNPC->followNPC = leader;
+			gameManager->scriptNPC->followNPC = gameManager->global.resolveScriptCharacterName(leader);
 		}
 		return;
 	}
@@ -8240,7 +8345,7 @@ void ScriptAPI::followNPC(const std::string& follower, const std::string& leader
 	auto npcList = gameManager->npcManager->findNPC(follower);
 	if (!npcList.empty() && npcList.front() != nullptr)
 	{
-		npcList.front()->followNPC = leader;
+		npcList.front()->followNPC = gameManager->global.resolveScriptCharacterName(leader);
 	}
 }
 
@@ -8489,18 +8594,22 @@ void ScriptAPI::setNPCAction(const std::string& name, int action, int x, int y)
 		{
 		case ScriptNpcActionKind::Stand:
 		case ScriptNpcActionKind::FightStand:
+			npc->haveAsyncDest = false;
 			npc->beginStand();
 			break;
 		case ScriptNpcActionKind::Walk:
 		case ScriptNpcActionKind::FightWalk:
+			npc->haveAsyncDest = false;
 			npc->beginWalk(destination);
 			break;
 		case ScriptNpcActionKind::Run:
 		case ScriptNpcActionKind::FightRun:
+			npc->haveAsyncDest = false;
 			npc->beginRun(destination);
 			break;
 		case ScriptNpcActionKind::Jump:
 		case ScriptNpcActionKind::FightJump:
+			npc->haveAsyncDest = false;
 			npc->beginJump(destination);
 			break;
 		case ScriptNpcActionKind::Attack:
@@ -9050,12 +9159,13 @@ void ScriptAPI::setLevelFile(const std::string& fileName)
 	if (target == gameManager->player)
 	{
 		gameManager->player->levelIni = fileName;
+		gameManager->player->loadLevel(fileName);
 	}
 	else
 	{
 		target->npcLevelIni = fileName;
+		target->loadLevel(fileName);
 	}
-	target->loadLevel(fileName);
 }
 
 void ScriptAPI::setMagicLevel(const std::string& magicName, int level)
@@ -9364,6 +9474,7 @@ void ScriptAPI::playerRunToEx(int x, int y)
 	}
 	Point position = keepCurrentPositionWhenLegacyWildcard(x, y, target->getPosition());
 	target->destGE.reset();
+	target->haveAsyncDest = false;
 	if (target->getPosition() != position)
 	{
 		target->beginRun(position);
@@ -9419,24 +9530,14 @@ void ScriptAPI::useMagic(const std::string& magicName, int x, int y, bool hasDes
 	{
 		return;
 	}
-	if (magicInfo->remainColdMilliseconds > 0)
-	{
-		return;
-	}
 	auto magic = gameManager->player->resolveMagicReplacement(magicInfo->magic);
-	if (magic == nullptr || !gameManager->player->tryConsumeMagicCost(magic, magicInfo->level, true))
-	{
-		return;
-	}
 	Point destination = hasDestination
 		? Point{ x, y }
 		: Map::getSubPoint(gameManager->player->getPosition(), gameManager->player->direction);
-	gameManager->player->revealMagicInvisibilityOnAction();
 	std::shared_ptr<GameElement> target = hasDestination && shouldResolveScriptMagicTarget(magic, magicInfo->level)
 		? std::dynamic_pointer_cast<GameElement>(findScriptMagicTarget(destination))
 		: nullptr;
-	gameManager->player->useMagic(magic, destination, magicInfo->level, target);
-	magicInfo->remainColdMilliseconds = magic->coldMilliSeconds;
+	gameManager->player->beginMagic(*magicInfo, destination, target);
 }
 
 void ScriptAPI::petrifyMillisecond(int milliseconds)
@@ -9624,12 +9725,13 @@ void ScriptAPI::addMagic(const std::string& name)
 
 void ScriptAPI::addTalent(const std::string& name)
 {
-	addMagic(name);
+	gameManager->magicManager.addPrimaryMagic(name, true, true, true);
 }
 
 void ScriptAPI::addOneMagic(const std::string& playerName, const std::string& magicName)
 {
-	if (gameManager->player->npcName == playerName)
+	const std::string targetName = gameManager->global.resolveScriptCharacterName(playerName);
+	if (gameManager->player->npcName == targetName)
 	{
 		addMagic(magicName);
 		return;
@@ -9652,7 +9754,7 @@ void ScriptAPI::addOneMagic(const std::string& playerName, const std::string& ma
 		INIReader playerIni(playerData);
 		if (playerIni.ParseError() != 0 ||
 			!playerIni.HasSection("Init") ||
-			playerIni.Get("Init", "Name", "") != playerName)
+			playerIni.Get("Init", "Name", "") != targetName)
 		{
 			continue;
 		}
@@ -9833,8 +9935,7 @@ void ScriptAPI::getPlayerState(const std::string& stateName, const std::string& 
 	}
 	else if (normalizedStateName == "attack")
 	{
-		value = gameManager->player->attack +
-			gameManager->player->equipmentAttributes.attack;
+		value = gameManager->player->info.attack;
 		if (gameManager->player->weakMagic != nullptr)
 		{
 			value = value *
@@ -9843,8 +9944,7 @@ void ScriptAPI::getPlayerState(const std::string& stateName, const std::string& 
 	}
 	else if (normalizedStateName == "defend")
 	{
-		value = gameManager->player->defend +
-			gameManager->player->equipmentAttributes.defend;
+		value = gameManager->player->info.defend;
 		if (gameManager->player->weakMagic != nullptr)
 		{
 			value = value *
@@ -9853,8 +9953,7 @@ void ScriptAPI::getPlayerState(const std::string& stateName, const std::string& 
 	}
 	else if (normalizedStateName == "evade")
 	{
-		value = gameManager->player->evade +
-			gameManager->player->equipmentAttributes.evade;
+		value = gameManager->player->info.evade;
 	}
 	else if (normalizedStateName == "life")
 	{
@@ -10074,8 +10173,11 @@ void ScriptAPI::getMoneyNum(const std::string& varName)
 
 void ScriptAPI::setMoneyNum(int value)
 {
-	gameManager->player->money = value;
-	gameManager->menu->goodsMenu->updateMoney();
+	gameManager->player->setMoney(value);
+	if (gameManager->menu != nullptr && gameManager->menu->goodsMenu != nullptr)
+	{
+		gameManager->menu->goodsMenu->updateMoney();
+	}
 }
 
 bool ScriptAPI::showGamble(int cost, int npcType)
@@ -10231,23 +10333,26 @@ void ScriptAPI::showGiveGoodsWin(const std::string& targetGoodsName,
 
 void ScriptAPI::showMessage(const std::string& str)
 {
-	gameManager->menu->showMessage(str);
+	gameManager->menu->showMessage(gameManager->global.resolveScriptText(str));
 }
 
 void ScriptAPI::showSystemMessage(const std::string& str, int stayTime)
 {
 	const int duration = std::max(0, stayTime);
-	gameManager->menu->showMessage(str, (UTime)duration);
+	if (gameManager->menu != nullptr && gameManager->menu->scriptMessages != nullptr)
+	{
+		gameManager->menu->scriptMessages->showMessage(gameManager->global.resolveScriptText(str), static_cast<UTime>(duration));
+	}
 }
 
 void ScriptAPI::addToMemo(const std::string& str)
 {
-	gameManager->memo.add(str);
+	gameManager->memo.add(gameManager->global.resolveScriptText(str));
 }
 
 void ScriptAPI::deleteMemo(const std::string& str)
 {
-	gameManager->memo.remove(str);
+	gameManager->memo.remove(gameManager->global.resolveScriptText(str));
 }
 
 void ScriptAPI::clearMemo()
@@ -10287,6 +10392,13 @@ void ScriptAPI::buyGoodsOnly(const std::string& fileName)
 
 void ScriptAPI::sellGoods(const std::string& fileName)
 {
+	const auto owner = gameManager->scriptNPC;
+	if (owner != nullptr && (!owner->buyIniString.empty()
+		|| (fileName.empty() && !owner->buyIniFile.empty())))
+	{
+		buyGoods(fileName);
+		return;
+	}
 	gameManager->menu->buySellMenu->sell(fileName);
 }
 
@@ -10401,14 +10513,15 @@ void ScriptAPI::getRandNum(const std::string& varName, int minVal, int maxVal)
 	gameManager->varList.setInteger(varName, value);
 }
 
-void ScriptAPI::randRun(const std::string& varName, const std::string& successScript, const std::string& failScript)
+int ScriptAPI::randRun(const std::string& varName, const std::string& successScript, const std::string& failScript)
 {
 	int value = gameManager->varList.getInteger(varName);
 	const std::string& scriptName = engine->getRand(99) <= value ? successScript : failScript;
 	if (!isDisabledScriptName(scriptName))
 	{
-		runScript(scriptName);
+		return runScriptForLua(scriptName);
 	}
+	return 0;
 }
 
 void ScriptAPI::getPlayerLevel(const std::string& varName)
@@ -10485,6 +10598,65 @@ void ScriptAPI::saveGame()
 	{
 		GameLog::write("ScriptAPI: automatic save failed\n");
 	}
+}
+
+_shared_image ScriptAPI::captureSaveBackground() noexcept
+{
+	try
+	{
+		if (gameManager == nullptr || engine == nullptr || !engine->isMainThread()
+			|| gameManager->inThread.load())
+		{
+			return nullptr;
+		}
+		auto background = engine->createCanvasImage();
+		const auto originalTarget = engine->getRenderTarget();
+		bool targetChanged = false;
+		bool restored = false;
+		FunctionScopeExit restoreTarget([&]()
+		{
+			if (targetChanged)
+			{
+				restored = engine->restoreImageRenderTargetAfterAcceptedOperation(
+					originalTarget, background);
+			}
+		});
+		if (background == nullptr || !engine->setSharedImageAsRenderTarget(background))
+		{
+			return nullptr;
+		}
+		targetChanged = true;
+		// The nested menu's run() has already cleared the logical screen.
+		// Redraw once before saving takes any file locks; checkpoints only copy it.
+		engine->renderClear(0, 0, 0, 255);
+		gameManager->drawAll();
+		restoreTarget.run();
+		return restored && engine->isApplicationActive()
+			&& !engine->isApplicationQuitRequested() ? background : nullptr;
+	}
+	catch (...)
+	{
+		GameLog::write("ScriptAPI: save background capture failed\n");
+		return nullptr;
+	}
+}
+
+bool ScriptAPI::saveGameWithFeedback(int index)
+{
+	const auto background = captureSaveBackground();
+	// Saving live state stays on the owner thread. Reuse the loading runner's
+	// event pump at the save transaction's existing copy/checkpoint boundaries.
+	return runExclusiveLoadingTask(u8"正在保存",
+		[](const GameLoading::LoadingCancellationToken&)
+		{
+			return GameLoading::LoadingTaskResult::success();
+		},
+		[this, index](const std::function<bool()>& checkpoint)
+		{
+			return gameManager->saveGame(index, checkpoint)
+				? GameLoading::LoadingTaskResult::success()
+				: GameLoading::LoadingTaskResult::failure(u8"存档失败");
+		}, {}, background).succeeded();
 }
 
 void ScriptAPI::clearAllSave()
@@ -10664,6 +10836,12 @@ void ScriptAPI::setNpcMagicToUseWhenBeAttacked(const std::string& name, const st
 
 void ScriptAPI::setNpcClickScript(const std::string& name, const std::string& scriptFile)
 {
+	if (gameManager->global.npcActionProfile == ScriptNpcActionProfile::Xjxqy)
+	{
+		// The XJXQY reference queues this movement script without replacing the NPC dialogue.
+		runParallelScript(scriptFile, 0);
+		return;
+	}
 	auto npcList = gameManager->npcManager->findNPC(name);
 	if (!npcList.empty() && npcList.front() != nullptr)
 	{
@@ -10773,7 +10951,7 @@ void ScriptAPI::moveScreenEx(int x, int y, int speed)
 
 void ScriptAPI::displayMessage(const std::string& text)
 {
-	gameManager->menu->showMessage(text);
+	showMessage(text);
 }
 
 void ScriptAPI::disableMapScroll()
@@ -10862,7 +11040,8 @@ void ScriptAPI::setTimeScript(int seconds, const std::string& scriptFile)
 
 void ScriptAPI::choose(const std::string& message, const std::string& optionA, const std::string& optionB, const std::string& varName)
 {
-	gameManager->menu->chooseMenu->choose(message, optionA, optionB);
+	gameManager->menu->chooseMenu->choose(gameManager->global.resolveScriptText(message),
+		gameManager->global.resolveScriptText(optionA), gameManager->global.resolveScriptText(optionB));
 	int sel = gameManager->menu->chooseMenu->getSelection();
 	assign(varName, sel);
 }
@@ -10874,7 +11053,7 @@ void ScriptAPI::chooseEx(const std::string& message, const std::vector<std::stri
 	int sel = -1;
 	if (!consumeChooseAutomation(gameManager, chooseOptions, sel))
 	{
-		gameManager->menu->chooseMenu->chooseEx(message, chooseOptions.options, chooseOptions.visibleOptions);
+		gameManager->menu->chooseMenu->chooseEx(gameManager->global.resolveScriptText(message), chooseOptions.options, chooseOptions.visibleOptions);
 		sel = gameManager->menu->chooseMenu->getSelection();
 	}
 	assign(varName, sel);
@@ -10886,7 +11065,7 @@ void ScriptAPI::chooseMultiple(int columnCount, int selectionCount, const std::s
 	std::vector<int> selections;
 	if (!consumeChooseMultipleAutomation(gameManager, chooseOptions, selectionCount, selections))
 	{
-		gameManager->menu->chooseMenu->chooseMultiple(message, chooseOptions.options, chooseOptions.visibleOptions, columnCount, selectionCount);
+		gameManager->menu->chooseMenu->chooseMultiple(gameManager->global.resolveScriptText(message), chooseOptions.options, chooseOptions.visibleOptions, columnCount, selectionCount);
 		selections = gameManager->menu->chooseMenu->getMultipleSelection();
 	}
 	for (size_t i = 0; i < selections.size(); i++)
@@ -10910,7 +11089,7 @@ void ScriptAPI::choosePlus(const std::string& speakerName, int portraitIndex, in
 			resolveChoosePlusSpeakerName(gameManager, speakerName),
 			portraitFileName,
 			dialogPosition,
-			message,
+			gameManager->global.resolveScriptText(message),
 			chooseOptions.options,
 			chooseOptions.visibleOptions);
 		selection = gameManager->menu->chooseMenu->getSelection();
@@ -10923,9 +11102,7 @@ void ScriptAPI::select(int messageIdx, int optionAIdx, int optionBIdx, const std
 	std::string message = gameManager->talkTextList.getText(messageIdx);
 	std::string optionA = gameManager->talkTextList.getText(optionAIdx);
 	std::string optionB = gameManager->talkTextList.getText(optionBIdx);
-	gameManager->menu->chooseMenu->choose(message, optionA, optionB);
-	int sel = gameManager->menu->chooseMenu->getSelection();
-	assign(varName, sel);
+	choose(message, optionA, optionB, varName);
 }
 
 void ScriptAPI::playerChange(int index)
@@ -10954,6 +11131,12 @@ void ScriptAPI::playerChange(int index)
 		return;
 	}
 
+	// C# creates a new Player on a successful change. We reuse the scene's
+	// Player, so outstanding casts must retain the outgoing actor's state.
+	const auto outgoingCaster = gameManager->effectManager->captureCasterSnapshot(gameManager->player);
+	// Rollback must restore the learned objects referenced by outstanding casts,
+	// not create same-file replacements by reading the list again.
+	const auto previousMagicManager = gameManager->magicManager;
 	std::string failureReason;
 	bool loaded = gameManager->player->load(
 		index,
@@ -10976,12 +11159,12 @@ void ScriptAPI::playerChange(int index)
 		bool rollbackSucceeded = gameManager->player->load(
 			previousIndex,
 			&ignoredRollbackReason);
-		rollbackSucceeded = gameManager->magicManager.load(
-			previousIndex,
-			&ignoredRollbackReason) && rollbackSucceeded;
+		gameManager->magicManager = previousMagicManager;
 		rollbackSucceeded = gameManager->goodsManager.load(
 			previousIndex,
 			&ignoredRollbackReason) && rollbackSucceeded;
+		// Player::load cancels temporary forms; keep the restored list in sync.
+		gameManager->magicManager.stopReplaceMagicList();
 		GameLog::write(
 			"ScriptAPI: player change rejected index=%d reason=%s rollback=%d\n",
 			index,
@@ -11001,6 +11184,7 @@ void ScriptAPI::playerChange(int index)
 	}
 
 	gameManager->global.data.characterIndex = index;
+	gameManager->effectManager->replaceCasterReferences(gameManager->player, outgoingCaster);
 
 	gameManager->player->reloadAction();
 	if (gameManager->menu != nullptr)
@@ -11361,6 +11545,20 @@ bool ScriptAPI::loadNPCWithPreparationCheckpoint(
 			const std::function<void()>& beforeMutation,
 			const std::function<void()>& commitCompleted)
 		{
+			// An explicit empty LoadNpc clears the scene while keeping partners.
+			// It is not a failed file read or the omitted Lua argument.
+			if (fileName.empty())
+			{
+				if (!ownerCheckpointCanContinue(preparationCheckpoint))
+				{
+					return false;
+				}
+				beforeMutation();
+				gameManager->npcManager->clearNPC();
+				gameManager->global.data.npcName.clear();
+				commitCompleted();
+				return true;
+			}
 			const bool loaded = preparedLoadCommit
 				? preparedLoadCommit(
 					beforeMutation,
@@ -11776,27 +11974,19 @@ bool ScriptAPI::loadGameFromGeneration(
 		{
 			return false;
 		}
-		if (!File::recoverDirectoryCopy(
-				generationDirectory))
-		{
-			gameManager->setLastLoadFailureMessage(
-				std::string(u8"无法恢复读档临时目录：") +
-					generationDirectory);
-			return false;
-		}
 		SaveFileManager::CurrentPathScope generationPath(
 			generationDirectory);
 		if (!generationPath.valid())
 		{
 			gameManager->setLastLoadFailureMessage(
-				u8"读档临时目录无效");
+				u8"运行存档目录无效");
 			return false;
 		}
 		if (!File::fileExist(
 				SaveFileManager::CurrentPath() + GLOBAL_INI))
 		{
 			gameManager->setLastLoadFailureMessage(
-				u8"读档临时目录缺少 game.ini");
+				u8"运行存档目录缺少 game.ini");
 			return false;
 		}
 		return loadCurrentGame(
@@ -11817,9 +12007,8 @@ bool ScriptAPI::loadGameFromGeneration(
 }
 
 GameLoading::LoadingTaskResult
-ScriptAPI::commitPreparedSaveGeneration(
+ScriptAPI::finishGameLoad(
 	const std::string& preparedDirectory,
-	const SaveGenerationPreflightPolicy& policy,
 	const std::function<bool()>& ownerCheckpoint,
 	const std::function<bool(
 		const std::string& generationDirectory,
@@ -11877,41 +12066,6 @@ ScriptAPI::commitPreparedSaveGeneration(
 				failureMessage);
 		}
 
-		const SaveGenerationResult publication =
-			SaveFileManager::PublishPreparedLoadCandidateToCurrent(
-				policy.limits,
-				policy.cancellationRequested);
-		if (!publication.succeeded())
-		{
-			GameLog::write(
-				"ScriptAPI: loaded save successfully but could not refresh save/game error=%s path=%s\n",
-				SaveFileManager::DescribeSaveGenerationError(
-					publication.error),
-				publication.errorPath.c_str());
-			if (publication.error == SaveGenerationError::Cancelled)
-			{
-				discardPartialWorldAfterFailedCommit();
-				if (engine == nullptr ||
-					!engine->isApplicationQuitRequested())
-				{
-					returnToTitle();
-				}
-				return GameLoading::LoadingTaskResult::cancellation(
-					"Current save refresh was cancelled.");
-			}
-			const std::string failureMessage =
-				std::string(u8"存档内容已载入，但无法刷新当前存档目录：") +
-				SaveFileManager::DescribeSaveGenerationError(
-					publication.error) +
-				(publication.errorPath.empty()
-					? std::string()
-					: std::string(" (") + publication.errorPath + ")");
-			gameManager->setLastLoadFailureMessage(failureMessage);
-			discardPartialWorldAfterFailedCommit();
-			returnToTitle();
-			return GameLoading::LoadingTaskResult::failure(
-				failureMessage);
-		}
 		return GameLoading::LoadingTaskResult::success();
 	}
 	catch (...)
@@ -11950,32 +12104,17 @@ bool ScriptAPI::loadGame(int index)
 		return false;
 	}
 	presentSynchronousLoadingStatusFrame(u8"读取游戏中");
-	if (!SaveFileManager::RecoverInterruptedSaveOperations())
-	{
-		GameLog::write(
-			"ScriptAPI: save recovery was incomplete; attempting the selected slot normally\n");
-	}
 	SaveFileManager::OperationScope loadOperation;
-	SaveFileManager::ScratchGenerationScope candidateCleanup(
-		LoadCandidateGeneration);
-	if (!candidateCleanup.valid())
-	{
-		gameManager->setLastLoadFailureMessage(
-			u8"无法创建安全的读档临时目录");
-		GameLog::write(
-			"ScriptAPI: invalid load candidate cleanup path\n");
-		return false;
-	}
-	const SaveGenerationPreflightPolicy policy =
-		createRuntimeSaveGenerationPolicy(
-			*gameManager,
-			RuntimeSaveGenerationPolicyMode::CompatibleLoad);
+	const SaveGenerationPolicy policy =
+		createRuntimeSaveGenerationPolicy();
 	std::string preparedDirectory;
+	std::string resourcePreparationFailure;
 	const SaveGenerationResult preparation =
 		prepareLoadGeneration(
 			index,
 			policy,
-			preparedDirectory);
+			preparedDirectory,
+			resourcePreparationFailure);
 	if (!preparation.succeeded())
 	{
 		GameLog::write(
@@ -11985,16 +12124,21 @@ bool ScriptAPI::loadGame(int index)
 				preparation.error),
 			preparation.errorPath.c_str());
 		gameManager->setLastLoadFailureMessage(
+			!resourcePreparationFailure.empty() ? resourcePreparationFailure :
 			std::string(u8"存档复制失败：") +
 				SaveFileManager::DescribeSaveGenerationError(
 					preparation.error) +
 				(preparation.errorPath.empty()
 					? std::string()
 					: std::string(" (") + preparation.errorPath + ")"));
+		if (!preparedDirectory.empty())
+		{
+			discardPartialWorldAfterFailedCommit();
+			returnToTitle();
+		}
 		return false;
 	}
 	PreparedSaveResources preparedResources;
-	std::string resourcePreparationFailure;
 	if (!prepareSaveResources(
 			gameManager,
 			preparedDirectory,
@@ -12009,6 +12153,8 @@ bool ScriptAPI::loadGame(int index)
 			resourcePreparationFailure.empty()
 				? std::string(u8"存档资源准备失败")
 				: resourcePreparationFailure);
+		discardPartialWorldAfterFailedCommit();
+		returnToTitle();
 		return false;
 	}
 	PreparedSaveLoadCallbacks preparedCallbacks{};
@@ -12066,9 +12212,8 @@ bool ScriptAPI::loadGame(int index)
 					: PreparedSaveLoadCallbacks{});
 		};
 	const GameLoading::LoadingTaskResult commitResult =
-		commitPreparedSaveGeneration(
+		finishGameLoad(
 			preparedDirectory,
-			policy,
 			{},
 			generationLoad);
 	if (!commitResult.succeeded())
@@ -12096,6 +12241,7 @@ bool ScriptAPI::loadCurrentGame(
 	bool allowMissingObjectList,
 	const PreparedSaveLoadCallbacks& preparedCallbacks)
 {
+	File::ResourceLookupScope resourceLookup;
 	stopMusic();
 
 	gameManager->initAllTime();
@@ -12127,6 +12273,8 @@ bool ScriptAPI::loadCurrentGame(
 	}
 	std::string tempNpcName = gameManager->global.data.npcName;
 	std::string tempObjName = gameManager->global.data.objName;
+	const bool savedRainShow = gameManager->global.data.rainShow;
+	const std::string savedRainFile = gameManager->global.data.rainFile;
 	if ((!tempNpcName.empty() &&
 			!SaveFileManager::IsSafeEntityListFileName(tempNpcName)) ||
 		(!tempObjName.empty() &&
@@ -12170,6 +12318,10 @@ bool ScriptAPI::loadCurrentGame(
 	}
 	gameManager->global.data.npcName = tempNpcName;
 	gameManager->global.data.objName = tempObjName;
+	// Loading a map stops its rain; a full save load must restore the saved
+	// rain settings before rebuilding Weather below.
+	gameManager->global.data.rainShow = savedRainShow;
+	gameManager->global.data.rainFile = savedRainFile;
 	std::string auxiliaryFailureReason;
 	if (!gameManager->traps.load(&auxiliaryFailureReason))
 	{
@@ -12208,19 +12360,17 @@ bool ScriptAPI::loadCurrentGame(
 			return false;
 		}
 	}
-	// Memo data is optional. Normalize the scratch generation after loading so
-	// the published current save matches the in-memory memo state.
-	if (!gameManager->memo.load(true))
+	// Only legacy or damaged optional memo data needs normalization.
+	bool memoNeedsNormalization = false;
+	if (!gameManager->memo.load(true, &memoNeedsNormalization))
 	{
 		GameLog::write(
 			"ScriptAPI: ignored unreadable optional memo data\n");
 		gameManager->memo.clear();
 	}
-	if (!gameManager->memo.save())
+	if (memoNeedsNormalization && !gameManager->memo.save())
 	{
-		gameManager->setLastLoadFailureMessage(
-			u8"无法修复可选的事件记录数据");
-		return false;
+		GameLog::write("ScriptAPI: could not normalize optional memo data\n");
 	}
 
 	std::string playerFailureReason;
@@ -12271,7 +12421,9 @@ bool ScriptAPI::loadCurrentGame(
 		GameLog::write(
 			"ScriptAPI: ignored incompatible magic data: %s\n",
 			auxiliaryFailureReason.c_str());
-		gameManager->magicManager.clearMagicList();
+		// Defer attribute/equipment reconstruction until Goods has loaded, just
+		// as on the successful Magic load path.
+		gameManager->magicManager.freeResource();
 		if (!gameManager->magicManager.save(
 				gameManager->global.data.characterIndex))
 		{

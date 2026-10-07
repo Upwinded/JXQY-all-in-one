@@ -7,6 +7,9 @@
 #include "TimeStopUpdateGate.h"
 #include "../GameManager/GameManager.h"
 #include "../../File/File.h"
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+#include "../../GameplayAutomation/GameplayAutomationSession.h"
+#endif
 #include <algorithm>
 #include <cctype>
 #include <climits>
@@ -616,15 +619,16 @@ std::vector<std::shared_ptr<NPC>> NPCManager::findNPC(int launcherKind)
 
 std::vector<std::shared_ptr<NPC>> NPCManager::findNPC(const std::string & npcName)
 {
+	const std::string targetName = gm->global.resolveScriptCharacterName(npcName);
 	std::vector<std::shared_ptr<NPC>> result;
 	result.resize(0);
-	if (gm->player != nullptr && npcName == gm->player->npcName)
+	if (gm->player != nullptr && targetName == gm->player->npcName)
 	{
 		result.push_back(gm->player);
 	}
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
-		if (npcList[i] != nullptr && npcList[i]->npcName == npcName)
+		if (npcList[i] != nullptr && npcList[i]->npcName == targetName)
 		{
 			result.push_back(npcList[i]);
 		}
@@ -765,7 +769,7 @@ std::shared_ptr<NPC> NPCManager::findNearestScriptViewNPC(Point pos, int radius)
 		if (npcList[i] == nullptr || !npcList[i]->isVisibleForRuntime() || !npcList[i]->isInteractive()) { continue; }
 		int tempDistance = Map::calDistance(pos, npcList[i]->getPosition());
 		bool dialogRadiusLarger = (npcList[i]->dialogRadius >= tempDistance);
-		if ((gm->map->canSee(pos, npcList[i]->getPosition()) && tempDistance <= radius) || dialogRadiusLarger)
+		if (tempDistance <= radius || dialogRadiusLarger)
 		{
 			if (tempDistance < distance || (dialogRadiusLarger && temp < 0))
 			{
@@ -792,7 +796,7 @@ std::vector<std::shared_ptr<NPC>> NPCManager::findRadiusScriptViewNPC(Point pos,
 		if (npcList[i] == nullptr || !npcList[i]->isVisibleForRuntime() || !npcList[i]->isInteractive()) { continue; }
 		int tempDistance = Map::calDistance(pos, npcList[i]->getPosition());
 		bool dialogRadiusLarger = (npcList[i]->dialogRadius >= tempDistance);
-		if ((gm->map->canSee(pos, npcList[i]->getPosition()) && tempDistance <= radius) || dialogRadiusLarger)
+		if (tempDistance <= radius || dialogRadiusLarger)
 		{
 			ret.push_back(npcList[i]);
 		}
@@ -1298,6 +1302,21 @@ bool NPCManager::scheduleBattleAction(std::shared_ptr<NPC> npc)
 	{
 		return false;
 	}
+	if (npc->kind == nkPartner)
+	{
+		const bool hasAttackMagic = std::any_of(npc->attackOptions.begin(), npc->attackOptions.end(),
+			[](const NPCAttackOption& option)
+			{
+				return option.magic != nullptr && option.magic->loadSucceeded;
+			})
+			|| (npc->npcMagic != nullptr && npc->npcMagic->loadSucceeded)
+			|| (npc->npcMagic2 != nullptr && npc->npcMagic2->loadSucceeded);
+		if (!npc->canDoAction(acAttack) || !hasAttackMagic)
+		{
+			npc->clearCombatTargetMemory();
+			return false;
+		}
+	}
 	// Owner following outranks target acquisition once a partner falls too far
 	// behind. Clearing combat state here also lets walk/run retarget to the player
 	// during the same movement step instead of reacquiring an enemy first.
@@ -1710,6 +1729,10 @@ void NPCManager::deleteNPC(int idx)
 
 void NPCManager::deleteNPC(std::string nName)
 {
+	if (gm != nullptr)
+	{
+		nName = gm->global.resolveScriptCharacterName(nName);
+	}
 	std::vector<std::shared_ptr<NPC>> newList;
 	newList.resize(0);
 	for (size_t i = 0; i < npcList.size(); i++)
@@ -1893,6 +1916,11 @@ std::size_t NPCManager::PreparedLoad::npcCount() const noexcept
 	return preparedNpcCount;
 }
 
+bool NPCManager::PreparedLoad::needsNormalization() const noexcept
+{
+	return normalizationRequired;
+}
+
 const std::string& NPCManager::PreparedLoad::sourcePath() const noexcept
 {
 	return resolvedSourcePath;
@@ -1922,6 +1950,7 @@ bool NPCManager::prepareParsedLoad(
 			PreparedLoad candidate;
 			candidate.parsedIni = std::move(parsedIni);
 			candidate.preparedNpcCount = 0;
+			candidate.normalizationRequired = true;
 			candidate.resolvedSourcePath = sourcePath;
 			preparedLoad = std::move(candidate);
 			return true;
@@ -2000,6 +2029,7 @@ bool NPCManager::prepareParsedLoad(
 	PreparedLoad candidate;
 	candidate.parsedIni = std::move(parsedIni);
 	candidate.preparedNpcCount = static_cast<size_t>(count);
+	candidate.normalizationRequired = !declaredCountIsValid || count != declaredCount;
 	candidate.resolvedSourcePath = sourcePath;
 	preparedLoad = std::move(candidate);
 	return true;
@@ -2068,6 +2098,7 @@ bool NPCManager::commitPreparedLoad(
 	const std::function<bool()>& preparationCheckpoint,
 	bool randomOne)
 {
+	File::ResourceLookupScope resourceLookup;
 	if (!preparedLoad.isValid() ||
 		gm == nullptr ||
 		gm->player == nullptr ||
@@ -2305,6 +2336,12 @@ void NPCManager::onUpdate()
 		if (npcList[i] != nullptr && npcList[i]->isVisibleByVariable)
 		{
 			unsigned int ret = npcList[i]->getResult();
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+			if (ret & (erRunDeathScript | erLifeExhaust))
+			{
+				GameplayAutomationSession::targetDefeated(npcList[i]);
+			}
+#endif
 			if (ret & erRunDeathScript)
 			{
 				EventInfo eventInfo;

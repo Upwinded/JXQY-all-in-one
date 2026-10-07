@@ -193,9 +193,25 @@ void Panel::initFromIni(INIReader & ini)
 	}
 	impImage = loadRes(impName);
 	stretch = ini.GetBoolean("Init", "Stretch", stretch);
+	nineSlice = std::max(0, static_cast<int>(ini.GetInteger("Init", "NineSlice", 0)));
+	nineSliceWidth = std::max(0, static_cast<int>(ini.GetInteger("Init", "NineSliceWidth", nineSlice)));
 	keepAspect = ini.GetBoolean("Init", "KeepAspect", keepAspect);
 	fadeMirroredBars = ini.GetBoolean(
 		"Init", "FadeMirroredBars", fadeMirroredBars);
+	if (ini.GetBoolean("Init", "FitToWindow", false))
+	{
+		int windowWidth = 0, windowHeight = 0;
+		engine->getWindowSize(windowWidth, windowHeight);
+		const int margin = std::max(0, static_cast<int>(ini.GetInteger("Init", "WindowMargin", 24)));
+		const int verticalMargin = std::max(0, static_cast<int>(ini.GetInteger("Init", "WindowVerticalMargin", 128)));
+		if (rect.w > 0 && rect.h > 0 && windowWidth > margin && windowHeight > verticalMargin)
+		{
+			const double fit = std::min({ 1.0, static_cast<double>(windowWidth - margin) / rect.w,
+				static_cast<double>(windowHeight - verticalMargin) / rect.h });
+			rect.w = std::max(1, static_cast<int>(std::lround(rect.w * fit)));
+			rect.h = std::max(1, static_cast<int>(std::lround(rect.h * fit)));
+		}
+	}
 	setAlign();
 }
 

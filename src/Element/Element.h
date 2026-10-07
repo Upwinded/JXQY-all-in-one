@@ -22,6 +22,9 @@ using PElement = std::shared_ptr<Element>;
 
 class Element : public std::enable_shared_from_this<Element>
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
 	friend class CoreLifecycleTestAccess;
 	friend class GamepadEssentialUITestAccess;
 	friend class GamepadRPGMenuActionsTestAccess;
@@ -233,7 +236,6 @@ private:
 	void cancelAllPointerInteractionsTree();
 	void runningElementClearAllTouch();
 	void drawSelf();
-	void drawAll();
 	void update();
 	void updateAll();
 
@@ -267,6 +269,8 @@ public:
 	virtual void initFromIni(std::string fileName) {};
 
 	bool isDragging();
+	// Draw the current scene without updating it or dispatching input.
+	void drawAll();
 
 protected:
 	virtual void onEvent() {};

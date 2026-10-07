@@ -56,6 +56,7 @@ void YesNo::init()
 
 void YesNo::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	focusManager.clear();
 	yes = nullptr;
 	no = nullptr;
@@ -148,7 +149,7 @@ void YesNo::onDrawEnd()
 		{ InputAction::Cancel, "否/返回" }
 	};
 	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+		engine, engine->inputActions(), items, controllerPromptTextureCache);
 }
 
 void YesNo::onRun()

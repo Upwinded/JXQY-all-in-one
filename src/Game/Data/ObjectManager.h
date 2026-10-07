@@ -32,10 +32,12 @@ public:
 
 	bool isPrepared() const noexcept;
 	std::size_t objectCount() const noexcept;
+	bool needsNormalization() const noexcept;
 
 private:
 	std::shared_ptr<INIReader> reader;
 	int count = 0;
+	bool normalizationRequired = false;
 
 	friend class ObjectManager;
 };

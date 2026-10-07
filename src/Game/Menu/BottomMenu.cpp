@@ -3,6 +3,7 @@
 #include "../../libconvert/libconvert.h"
 #include "../GameManager/GameManager.h"
 #include "../Data/Global.h"
+#include "MenuResource.h"
 
 #include <algorithm>
 #include <optional>
@@ -126,6 +127,7 @@ void BottomMenu::updateMagicItem(int index)
 		if (magicItem[index] != nullptr)
 		{
 			int listIndex = gm->magicManager.bottomIndex(index);
+			MenuResource::updateMagicCooldown(magicItem[index], gm->magicManager, listIndex);
 
 			magicItem[index]->impImage = nullptr;
 
@@ -141,6 +143,17 @@ void BottomMenu::updateMagicItem(int index)
 		}
 	}
 	refreshControllerTransferHighlight();
+}
+
+void BottomMenu::onUpdate()
+{
+	if (visible && gm != nullptr)
+	{
+		for (int i = 0; i < MAGIC_TOOLBAR_COUNT; ++i)
+		{
+			MenuResource::updateMagicCooldown(magicItem[i], gm->magicManager, gm->magicManager.bottomIndex(i));
+		}
+	}
 }
 
 void BottomMenu::init()
@@ -189,6 +202,16 @@ void BottomMenu::init()
 
 	setChildRectReferToParent();
 
+	if (gm->global.feature.qingyuUi)
+	{
+		for (int i = 0; i < 8; ++i)
+		{
+			if (auto shortcut = getComponentByName<Label>("key" + std::to_string(i)))
+			{
+				shortcut->setPriority(std::min<int>(shortcut->getPriority(), epItem - 1));
+			}
+		}
+	}
 	if (!GameManager::getInstance()->global.feature.topButtonsLayout && subMenus.empty())
 	{
 		columnMenu = std::make_shared<ColumnMenu>();
@@ -213,6 +236,16 @@ void BottomMenu::onEvent()
 		}
 		int ret = goodsItem[i]->getResult();
 		int listIndex = gm->goodsManager.bottomIndex(i);
+#ifndef __MOBILE__
+		if (gm->global.feature.qingyuUi && (ret & erClick)
+			&& gm->goodsManager.goodsListExists(listIndex))
+		{
+			gm->menu->showGoodsToolTip(getMySharedPtr(),
+				gm->goodsManager.goodsList[listIndex].goods, goodsItem[i], true);
+			goodsItem[i]->resetHint();
+			continue;
+		}
+#endif
 		if (ret & erShowHint)
 		{
 			if (gm->goodsManager.goodsListExists(listIndex))

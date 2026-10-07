@@ -45,6 +45,7 @@ void Item::initFromIni(INIReader & ini)
 	stretch = ini.GetBoolean("Init", "Stretch", stretch);
 	keepAspect = ini.GetBoolean("Init", "KeepAspect", keepAspect);
 	centerImage = ini.GetBoolean("Init", "CenterImage", centerImage);
+	drawSlot = ini.GetBoolean("Init", "DrawSlot", false);
 	frameIndex = ini.GetInteger("Init", "Frame", frameIndex);
 	std::string impName = ini.Get("Init", "Image", "");
 	if (impName.empty())
@@ -80,6 +81,7 @@ void Item::resetHint()
 void Item::freeResource()
 {
 	transferSelected = false;
+	cooldownFraction = 0.0f;
 	impImage = nullptr;
 	backImage[0] = nullptr;
 	backImage[1] = nullptr;
@@ -103,7 +105,7 @@ void Item::drawItemStr()
 		int textWidth = 0;
 		int textHeight = 0;
 		engine->getImageSize(strImage, textWidth, textHeight);
-		if (backImage[0] != nullptr && textWidth > 0 && textHeight > 0)
+		if ((backImage[0] != nullptr || drawSlot) && textWidth > 0 && textHeight > 0)
 		{
 			engine->drawImage(strImage, rect.x + rect.w - textWidth, rect.y + rect.h - textHeight);
 		}
@@ -197,6 +199,12 @@ void Item::onDraw()
 	}
 
 	_shared_imp currentBackImage = nullptr;
+	if (drawSlot)
+	{
+		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 151, 134, 96, 255);
+		Rect inner = { rect.x + 1, rect.y + 1, std::max(0, rect.w - 2), std::max(0, rect.h - 2) };
+		engine->fillRect(inner.x, inner.y, inner.w, inner.h, 213, 216, 191, 255);
+	}
 	if (touchingID != TOUCH_UNTOUCHEDID && backImage[1] != nullptr)
 	{
 		currentBackImage = backImage[1];
@@ -249,7 +257,14 @@ void Item::onDraw()
 			}
 		}
 	}
-	drawItemStr();
+	if (cooldownFraction > 0.0f)
+	{
+		drawCooldown(rect);
+	}
+	else
+	{
+		drawItemStr();
+	}
 	if (transferSelected && rect.w >= 4 && rect.h >= 4)
 	{
 		constexpr int TransferBorderWidth = 3;
@@ -291,6 +306,33 @@ void Item::onDraw()
 		engine->fillRect(rect.x + rect.w - FocusInset - FocusBorderWidth,
 			rect.y + FocusInset, FocusBorderWidth, focusHeight,
 			FocusRed, FocusGreen, FocusBlue, FocusAlpha);
+	}
+}
+
+void Item::drawCooldown(const Rect& destination)
+{
+	if (cooldownFraction <= 0.0f || destination.w <= 0 || destination.h <= 0)
+	{
+		return;
+	}
+	const int height = static_cast<int>(std::ceil(destination.h * std::min(1.0f, cooldownFraction)));
+	engine->fillRect(destination.x, destination.y + destination.h - height, destination.w, height, 0, 0, 0, 170);
+	if (strImage == nullptr && !str.empty())
+	{
+		strImage = engine->createText(str, fontSize, color);
+	}
+	int width = 0, textHeight = 0;
+	engine->getImageSize(strImage, width, textHeight);
+	if (width > 0 && textHeight > 0)
+	{
+		const double scale = std::min({ 1.0, static_cast<double>(destination.w) / width,
+			static_cast<double>(destination.h) / textHeight });
+		width = std::max(1, static_cast<int>(width * scale));
+		textHeight = std::max(1, static_cast<int>(textHeight * scale));
+		Rect textRect{ destination.x + (destination.w - width) / 2,
+			destination.y + (destination.h - textHeight) / 2, width, textHeight };
+		engine->fillRect(textRect.x, textRect.y, width, textHeight, 0, 0, 0, 170);
+		engine->drawImage(strImage, nullptr, &textRect);
 	}
 }
 

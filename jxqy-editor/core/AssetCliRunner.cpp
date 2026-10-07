@@ -23,8 +23,9 @@ int migrationExitCode(MigrationResult result)
 
 QString normalizeCommand(QString command)
 {
-    if (command == "--migrate-assets")
-        return "migrate-assets";
+    if (command == "--convert-assets" ||
+        command == "migrate-assets" || command == "--migrate-assets")
+        return "convert-assets";
     if (command == "--validate-scripts")
         return "validate-scripts";
     if (command == "--publish-update-catalog")
@@ -111,7 +112,7 @@ std::optional<bool> parseBooleanOptionValue(const QString& value)
     return std::nullopt;
 }
 
-// migrate-assets accepts value-less flags and key/value options. Unknown
+// convert-assets accepts value-less flags and key/value options. Unknown
 // options are rejected with a usage error so callers do not silently get a
 // standalone pack when they expected a mod profile.
 bool applyMigrateOptions(const QStringList& arguments, int startIndex,
@@ -460,7 +461,7 @@ bool AssetCliRunner::shouldHandle(const QStringList& arguments)
         return false;
 
     QString command = normalizeCommand(arguments.value(1));
-    return command == "migrate-assets" ||
+    return command == "convert-assets" ||
         command == "validate-scripts" ||
         command == "export-resource-package" ||
         command == "export-common-package" ||
@@ -484,11 +485,11 @@ int AssetCliRunner::run(const QStringList& arguments, FILE* stdoutFile, FILE* st
     QTextStream out(stdoutFile);
     QTextStream err(stderrFile);
 
-    if (command == "migrate-assets")
+    if (command == "convert-assets")
     {
         if (arguments.size() < 4)
         {
-            err << "Error: migrate-assets requires <sourceDir> and <outputDir>\n\n";
+            err << "Error: convert-assets requires <sourceDir> and <outputDir>\n\n";
             return printUsage(appName, stdoutFile, 2);
         }
 
@@ -514,7 +515,7 @@ int AssetCliRunner::run(const QStringList& arguments, FILE* stdoutFile, FILE* st
                 out.flush();
             });
 
-        out << "\n--- Migration Summary ---\n";
+        out << "\n--- Asset Conversion Summary ---\n";
         out << "Resource types: " << report.selectedResourceTypes.join(", ") << "\n";
         out << "Complete project: " << (report.completeProject ? "yes" : "no") << "\n";
         out << "Resource domains:\n";
@@ -741,8 +742,7 @@ int AssetCliRunner::printUsage(const QString& appName, FILE* outputFile, int exi
     QTextStream out(outputFile);
     out << "Usage:\n";
     out << "  " << appName << " --help\n";
-    out << "  " << appName << " migrate-assets <sourceDir> <outputDir> [options]\n";
-    out << "  " << appName << " --migrate-assets <sourceDir> <outputDir> [options]\n";
+    out << "  " << appName << " convert-assets <sourceDir> <outputDir> [options]\n";
     out << "  " << appName << " validate-scripts <assetsDir>\n";
     out << "  " << appName << " --validate-scripts <assetsDir>\n";
     out << "  " << appName << " export-resource-package <resourceDir> <outputZip>\n";
@@ -750,11 +750,12 @@ int AssetCliRunner::printUsage(const QString& appName, FILE* outputFile, int exi
     out << "  " << appName << " publish-update-catalog <templateCatalog> <artifactRoot> <outputCatalog>\n";
     out << "\n";
     out << "Commands:\n";
-    out << "  migrate-assets    Migrate legacy JX assets to C++ runtime format\n";
+    out << "  convert-assets    Convert legacy JX assets to C++ runtime format\n";
     out << "  validate-scripts  Check converted script syntax with the embedded Lua parser\n";
     out << "  export-resource-package  Export one resource package as ZIP plus a catalog fragment\n";
     out << "  export-common-package  Export common as ZIP plus a [Common] catalog fragment\n";
     out << "  publish-update-catalog  Hash artifacts and write one canonical catalog\n";
+    out << "\nConversion command aliases: --convert-assets, migrate-assets, --migrate-assets\n";
     out << "\n";
     out << "Options:\n";
     out << "  --image-category <id>  Override a legacy image category; may be repeated\n";
@@ -765,7 +766,7 @@ int AssetCliRunner::printUsage(const QString& appName, FILE* outputFile, int exi
     out << "  --crop-transparent <b> Request transparent crop: true, false, 1, or 0\n";
     out << "  --no-crop-transparent  Legacy alias that disables eligible cropping\n";
     out << "  --no-mod-profile       Do not write game_profile.ini for the converted mod\n";
-    out << "  --resource-type <type> Migrate all, scripts, maps, images, or audio\n";
+    out << "  --resource-type <type> Convert all, scripts, maps, images, or audio\n";
     out << "                         Repeat for multiple domains; defaults to all\n";
     out << "  --scripts-only         Legacy alias for --resource-type scripts\n";
     out << "  --images-only          Legacy image-subtree mode; requires --include-prefix\n";
@@ -789,8 +790,8 @@ int AssetCliRunner::printUsage(const QString& appName, FILE* outputFile, int exi
     out << "  --source-encoding <e>  Source text encoding: gbk or utf8; defaults to gbk\n";
     out << "\n";
     out << "Exit codes:\n";
-    out << "  0  Success — migration completed, no errors recorded\n";
-    out << "  1  Partial — migration completed with warnings\n";
+    out << "  0  Success — conversion completed, no errors recorded\n";
+    out << "  1  Partial — conversion completed with warnings\n";
     out << "  2  Failed or usage error\n";
     out.flush();
     return exitCode;

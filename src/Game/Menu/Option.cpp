@@ -35,7 +35,7 @@ bool isPresentedCheckBoxOption(
 	{
 		return false;
 	}
-	return hasButtonImage(checkBox)
+	return hasButtonImage(checkBox) || checkBox->hasText()
 		|| (isFocusableElement(labelBackground)
 			&& labelBackground->impImage != nullptr);
 }
@@ -213,9 +213,11 @@ void Option::init()
 
 void Option::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	focusManager.clear();
 	touchControlsButton = nullptr;
 	cheatSettingsButton = nullptr;
+	themeButton = nullptr;
 	cheatPanelTitle = nullptr;
 	cheatResultLabel = nullptr;
 	cheatModeButton = nullptr;
@@ -332,6 +334,8 @@ void Option::configureFocus(const std::string& preferredFocusId)
 			return false;
 		});
 
+	addRow("ui-theme", themeButton,
+		[this]() { toggleThemeOption(); }, consumeHorizontalNavigation);
 	const std::vector<std::string> focusOrder = focusManager.addLinearGroup(
 		"option-rows",
 		UIFocusLinearAxis::Vertical,
@@ -783,7 +787,7 @@ void Option::onDrawEnd()
 			cheatPanelVisible ? "返回选项" : "返回" }
 	};
 	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+		engine, engine->inputActions(), items, controllerPromptTextureCache);
 }
 
 void Option::onRun()
@@ -805,6 +809,11 @@ void Option::onRun()
 
 void Option::onChildCallBack(PElement child)
 {
+	if (child == themeButton && child->getResult(erClick))
+	{
+		toggleThemeOption();
+		return;
+	}
 	if (child == touchControlsButton && child->getResult(erClick))
 	{
 		toggleTouchControlsOption();
@@ -892,6 +901,41 @@ void Option::createFooterOptions()
 	}
 	layoutFooterOptions();
 	syncTouchControlsOption();
+	if (themeButton == nullptr
+		&& File::fileExist("ini\\ui\\qingyu\\theme.ini")
+		&& File::fileExist("asf\\ui\\qingyu\\panel.png"))
+	{
+		themeButton = std::make_shared<FlatTextButton>();
+		themeButton->name = "themeButton";
+		themeButton->setFontSize(16);
+		themeButton->setUTF8Str(Config::useQingyuUi ? u8"界面：青玉 · 重进游戏生效" : u8"界面：原版 · 重进游戏生效");
+		int footerBottom = rect.y;
+		for (const auto& button : { touchControlsButton, cheatSettingsButton })
+		{
+			if (button) footerBottom = std::max(footerBottom, button->rect.y + button->rect.h);
+		}
+		themeButton->rect = { rect.x + (rect.w - 280) / 2, footerBottom + 8, 280, 30 };
+		int windowWidth = 0, windowHeight = 0;
+		engine->getWindowSize(windowWidth, windowHeight);
+		// Full-height YYCS options have room beside the tall return button.
+		if (themeButton->rect.y + themeButton->rect.h > windowHeight - 8 && rtnBtn
+			&& rtnBtn->rect.x - rect.x >= themeButton->rect.w + 16)
+		{
+			themeButton->rect.x = rtnBtn->rect.x - themeButton->rect.w - 16;
+			themeButton->rect.y = rtnBtn->rect.y + (rtnBtn->rect.h - themeButton->rect.h) / 2;
+		}
+		addChild(themeButton);
+	}
+}
+
+void Option::toggleThemeOption()
+{
+	Config::useQingyuUi = !Config::useQingyuUi;
+	Config::save();
+	if (themeButton != nullptr)
+	{
+		themeButton->setUTF8Str(Config::useQingyuUi ? u8"界面：青玉 · 重进游戏生效" : u8"界面：原版 · 重进游戏生效");
+	}
 }
 
 void Option::layoutFooterOptions()

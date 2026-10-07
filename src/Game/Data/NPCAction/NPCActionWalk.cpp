@@ -275,6 +275,11 @@ void NPCActionWalk::processStepIn()
         return;
     }
 
+    if (_npc->finishScriptMoveAtOccupiedDestination())
+    {
+        return;
+    }
+
     result = handleBattleStepIn(player);
     if (result == StepResult::Terminated)
     {
@@ -393,6 +398,12 @@ StepResult NPCActionWalk::handleFollowerStepIn(bool& canWalkNextStep)
         // 追击模式：尝试执行战斗动作
         if (_npc->isFollowAttack(fnpc) && _npc->kind != nkPartner)
         {
+            if (!_npc->isAIEnabled())
+            {
+                // Finish an issued path without choosing a new chase or attack.
+                canWalkNextStep = false;
+                return StepResult::Continue;
+            }
             if (!_npc->isCombatTargetValid(fnpc))
             {
                 _npc->stepList.resize(0);

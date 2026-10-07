@@ -1,7 +1,6 @@
 #include "VideoPlayer.h"
 #include "../Engine/Engine.h"
 #include "ComponentRegistry.h"
-#include "../Game/Data/MediaPathResolver.h"
 #include "../Game/GameTypes.h"
 #include "../Game/Menu/UIFocusManager.h"
 
@@ -14,11 +13,6 @@ namespace
 		return true;
 	}();
 
-std::string resolveVideoFileName(const std::string& fileName)
-{
-	return resolveMediaAssetPath(VIDEO_FOLDER, fileName,
-		{ ".avi", ".mp4", ".wmv", ".mpg", ".mpeg" });
-}
 }
 
 VideoPlayer::VideoPlayer()
@@ -44,7 +38,7 @@ VideoPlayer::~VideoPlayer()
 
 VideoPlayer::VideoPlayer(const std::string & fileName) : VideoPlayer()
 {
-	videoFileName = resolveVideoFileName(fileName);
+	videoFileName = fileName;
 }
 
 void VideoPlayer::reopenVideo(const std::string& fileName, int vloop)
@@ -54,7 +48,7 @@ void VideoPlayer::reopenVideo(const std::string& fileName, int vloop)
 		engine->freeVideo(v);
 		v = nullptr;
 	}
-	videoFileName = resolveVideoFileName(fileName);
+	videoFileName = fileName;
 	v = engine->loadVideo(videoFileName);
 	loop = vloop;
 	engine->setVideoLoop(v, vloop);
@@ -134,7 +128,6 @@ bool VideoPlayer::onInitial()
 		engine->freeVideo(v);
 		v = nullptr;
 	}
-	videoFileName = resolveVideoFileName(videoFileName);
 	v = engine->loadVideo(videoFileName);
 	if (v == nullptr)
 	{

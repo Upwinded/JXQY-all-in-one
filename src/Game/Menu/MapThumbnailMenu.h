@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Component/Component.h"
 #include "ControllerFocusParticipant.h"
+#include "ControllerPromptPresenter.h"
 
 class MapThumbnailMenuTestAccess;
 class GamepadWorldRuntimeTestAccess;
@@ -59,9 +60,9 @@ private:
 	std::shared_ptr<ImageContainer> thumbnailContainer = nullptr;
 	std::shared_ptr<Label> mapNameLabel = nullptr;
 	std::shared_ptr<Button> closeButton = nullptr;
-	std::string currentMapName;
 	float controllerCursorNormalizedX = 0.5f;
 	float controllerCursorNormalizedY = 0.5f;
 	bool controllerCursorActive = false;
 	bool controllerFocusActive = false;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 };

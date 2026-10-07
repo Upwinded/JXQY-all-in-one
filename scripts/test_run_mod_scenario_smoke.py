@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from subprocess import CompletedProcess
 
 from run_mod_scenario_smoke import (
     SavedGoodsSlotsExpectation,
@@ -24,6 +26,7 @@ from run_mod_scenario_smoke import (
     resource_pack_path,
     run_scenario,
     scenario_log_path,
+    scenario_save_root,
     select_scenarios,
 )
 
@@ -43,7 +46,7 @@ class SavedGoodsSlotsTests(unittest.TestCase):
             ),
         )
 
-    def test_check_saved_goods_slots_uses_discovered_pack_path(self) -> None:
+    def test_check_saved_goods_slots_uses_explicit_save_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             assets_root = Path(temp_dir)
             write_text(
@@ -73,8 +76,7 @@ class SavedGoodsSlotsTests(unittest.TestCase):
 
             self.assertTrue(
                 check_saved_goods_slots(
-                    assets_root,
-                    "XJXQY_TEST_MOD",
+                    assets_root / "custom_test_pack" / "save",
                     (
                         SavedGoodsSlotsExpectation(
                             9,
@@ -111,8 +113,7 @@ class SavedGoodsSlotsTests(unittest.TestCase):
             with redirect_stderr(stderr):
                 self.assertFalse(
                     check_saved_goods_slots(
-                        assets_root,
-                        "XJXQY_TEST_MOD",
+                        assets_root / "xjxqy_test_mod" / "save",
                         (
                             SavedGoodsSlotsExpectation(
                                 9,
@@ -124,6 +125,40 @@ class SavedGoodsSlotsTests(unittest.TestCase):
                     )
                 )
             self.assertIn("expected 1 slots", stderr.getvalue())
+
+
+    def test_run_scenario_isolates_state_and_checks_actual_saved_namespace(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            logs = root / "logs"
+            logs.mkdir()
+            scenario = Scenario("Scenario.goods", "goods", 1, "ready", True, 0, 30,
+                tuple(), (SavedGoodsSlotsExpectation(9, "item.ini", 1, 1),))
+            states: list[Path] = []
+
+            def fake_process(command: list[str], **kwargs: object) -> CompletedProcess[str]:
+                state = Path(command[command.index("--user-data-root") + 1])
+                self.assertEqual(state.parent, logs)
+                self.assertNotIn(state, states)
+                self.assertEqual(list(state.iterdir()), [])
+                states.append(state)
+                if len(states) == 1:
+                    write_text(state / "save" / "实际存档身份" / "game" / "goods9.ini",
+                        "[Head]\nCount=1\n[1]\nIniFile=item.ini\nNumber=1\n")
+                return CompletedProcess(command, 0, "", "")
+
+            with patch("run_mod_scenario_smoke.subprocess.run", side_effect=fake_process):
+                with redirect_stdout(StringIO()):
+                    self.assertEqual(run_scenario(root, root / "game.exe", root / "assets",
+                        "MOD", logs, 30, scenario, False, False), 0)
+                    # The first run's valid result must not satisfy a later run with no output.
+                    with self.assertRaisesRegex(ValueError, "got 0"):
+                        run_scenario(root, root / "game.exe", root / "assets",
+                            "MOD", logs, 30, scenario, False, False)
+            self.assertFalse((root / "save").exists())
+            write_text(states[0] / "save" / "second" / "game" / "goods9.ini", "")
+            with self.assertRaisesRegex(ValueError, "got 2"):
+                scenario_save_root(states[0])
 
 
 class InitialSaveSeedTests(unittest.TestCase):

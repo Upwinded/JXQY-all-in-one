@@ -17,7 +17,7 @@
 
 namespace EditorRun
 {
-// Each sink call appends the complete batch and makes it durable before
+// Each sink call appends the complete batch and flushes the stream before
 // returning true. Batches contain one or more complete LF-terminated records.
 using RuntimeTraceBatchSink =
 	std::function<bool(std::string_view batch)>;
@@ -55,11 +55,11 @@ enum class RuntimeTraceEnqueueResult
 	Failed
 };
 
-// Owns one bounded producer queue and one background durable batch writer.
+// Owns one bounded producer queue and one background batch writer.
 // The producer-side lifecycle validator prevents records that the editor
 // consumer would necessarily reject. session.start is written synchronously
 // by create(); finish() drains the queue, emits trace.dropped when needed,
-// writes session.finish durably, and joins the worker before returning. Every
+// flushes session.finish, and joins the worker before returning. Every
 // sink call obeys both configured serialized-byte and record-count limits.
 class RuntimeTraceWriter final
 {
@@ -79,6 +79,9 @@ public:
 
 	RuntimeTraceEnqueueResult enqueue(
 		RuntimeTraceEvent event);
+	// IDs belong to the trace session, which can outlive a Script instance.
+	// Returns zero only when the exact JSON integer range is exhausted.
+	std::uint64_t allocateExecutionId() noexcept;
 	bool finish(RuntimeTraceSessionFinishStatus status);
 
 	bool valid() const noexcept;
@@ -121,6 +124,7 @@ private:
 	std::uint64_t pendingDroppedSourceLines = 0;
 	std::uint64_t totalDroppedSourceLines = 0;
 	std::uint64_t nextSequence = 1;
+	std::uint64_t nextExecutionId = 1;
 	std::uint64_t emitted = 0;
 	RuntimeTraceWriterError writerError =
 		RuntimeTraceWriterError::None;

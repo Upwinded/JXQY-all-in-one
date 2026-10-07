@@ -31,19 +31,27 @@ public:
 	void clearMagicList();
 	void refreshPlayerMagicAttributes();
 	bool hasActiveReplaceMagicList() const { return isInReplaceMagicList; }
-	void replaceMagicList(const std::string& replacementList);
+	void replaceMagicList(const std::string& replacementList, const std::string& sourceIdentity = "");
 	void stopReplaceMagicList();
-	int primaryFreeIndex() const;
+	int primaryFreeIndex(bool talent = false) const;
 	bool primaryMagicListExists(int index) const;
 	void addPracticeExp(int addexp);
 	bool addPracticeExperienceToNextLevel();
 	void addUseExp(std::shared_ptr<Effect> e, int addexp);
 	void addHitExp(std::shared_ptr<Effect> e, int targetLevel);
+	void saveExperienceOwner(INIReader& ini, const std::string& section, const MagicExperienceOwner& owner);
+	MagicExperienceOwner loadExperienceOwner(const INIReader& ini, const std::string& section);
 	void addKillExp(std::shared_ptr<Effect> e, double scaledAutomaticExperience);
+	void addKillExp(
+		std::shared_ptr<Effect> e,
+		double automaticExperience,
+		float practiceFraction,
+		float useFraction);
 	void recordCurrentUseMagic(int listIndex);
+	void finishMagicUse(const std::shared_ptr<Magic>& sourceMagic, UTime coldTime, bool recordCurrentUse);
 	void addMagicExp(const std::string & magicName, int addexp);
 	void addMagic(const std::string & magicName);
-	MagicInfo* addPrimaryMagic(const std::string& magicName, bool showMessage, bool refreshAttributes);
+	MagicInfo* addPrimaryMagic(const std::string& magicName, bool showMessage, bool refreshAttributes, bool talent = false);
 	MagicInfo* addEquipmentMagic(const std::string& magicName, bool showMessage, bool refreshAttributes);
 	void deleteMagic(const std::string & magicName);
 	void deletePrimaryMagic(const std::string& magicName);
@@ -88,11 +96,16 @@ private:
 	float practiceKillExperienceFraction = 1.0f;
 	float currentUseKillExperienceFraction = 1.0f;
 	bool usesConfiguredExperienceRules = false;
-	std::string currentUseMagicFile;
+	std::weak_ptr<Magic> currentUseMagic;
 
 	std::vector<MagicInfo>& primaryMagicList();
 	const std::vector<MagicInfo>& primaryMagicList() const;
 	void addUseExperience(const std::string& magicFile, int addexp);
+	void addUseExperience(MagicInfo& info, int addexp);
+	MagicInfo* findExperienceOwner(const MagicExperienceOwner& owner,
+		std::string* listKey = nullptr, int* slot = nullptr);
+	bool tryAdvanceMagicLevel(MagicInfo& info);
+	void addTalentJumpRadius(const MagicInfo& info);
 	void loadExperienceRules();
 	int hitExperienceForTargetLevel(int targetLevel) const;
 };

@@ -2,6 +2,7 @@
 #include "../../Engine/Engine.h"
 #include "../GameManager/GameManager.h"
 #include "MinimapToggleButton.h"
+#include "MenuResource.h"
 
 SkillsPanel::SkillsPanel()
 {
@@ -128,6 +129,16 @@ void SkillsPanel::onDraw()
 
 void SkillsPanel::onUpdate()
 {
+	if (visible && gm != nullptr)
+	{
+		for (int i = 0; i < SKILL_PANEL_SKILL_COUNT; ++i)
+		{
+			if (skillBtn[i] != nullptr)
+			{
+				MenuResource::updateMagicCooldown(skillBtn[i]->drawItem, gm->magicManager, gm->magicManager.bottomIndex(i));
+			}
+		}
+	}
 	if (rightJumpBtn && rightJumpBtn->isDragging())
 	{
 		if (!_jumpBtnDagging)

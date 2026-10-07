@@ -40,7 +40,7 @@ void NPCActionSit::update(UTime frameTime)
                 _npc->beginStand();
                 return;
             }
-            else if (player->thew < SIT_THEW_COST)
+            else if (!player->hasUnlimitedCheatResources() && player->thew < SIT_THEW_COST)
             {
                 gm->showMessage("体力不足!");
                 _npc->beginStand();
@@ -48,7 +48,7 @@ void NPCActionSit::update(UTime frameTime)
             }
             else
             {
-                player->thew -= SIT_THEW_COST;
+                player->addThew(-SIT_THEW_COST);
                 player->addMana(convert_max((int)round(SIT_MANA_ADD_RATE * player->info.manaMax), SIT_THEW_COST));
                 if (player->mana == player->info.manaMax)
                 {
@@ -70,7 +70,7 @@ void NPCActionSit::update(UTime frameTime)
                 _npc->beginStand();
                 return;
             }
-            else if (player->thew < SIT_THEW_COST)
+            else if (!player->hasUnlimitedCheatResources() && player->thew < SIT_THEW_COST)
             {
                 gm->showMessage("体力不足!");
                 _npc->beginStand();
@@ -78,7 +78,7 @@ void NPCActionSit::update(UTime frameTime)
             }
             else
             {
-                player->thew -= SIT_THEW_COST;
+                player->addThew(-SIT_THEW_COST);
                 player->addMana(convert_max((int)round(SIT_MANA_ADD_RATE * player->info.manaMax), SIT_THEW_COST));
                 if (player->mana == player->info.manaMax)
                 {

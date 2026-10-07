@@ -2,12 +2,6 @@
 
 #include "../File/File.h"
 
-#if defined(_WIN32)
-#include <io.h>
-#else
-#include <unistd.h>
-#endif
-
 namespace
 {
 #if defined(JXQY_ENABLE_TEST_HOOKS)
@@ -19,23 +13,6 @@ std::mutex
 EditorRun::RuntimeTraceFileSinkDestructorTestHook
 	g_runtimeTraceFileSinkDestructorTestHook;
 #endif
-
-bool flushRuntimeTraceFile(std::FILE* file)
-{
-	if (file == nullptr || std::fflush(file) != 0)
-	{
-		return false;
-	}
-#if defined(_WIN32)
-	const int descriptor = _fileno(file);
-	return descriptor >= 0 &&
-		_commit(descriptor) == 0;
-#else
-	const int descriptor = fileno(file);
-	return descriptor >= 0 &&
-		fsync(descriptor) == 0;
-#endif
-}
 
 #if defined(JXQY_ENABLE_TEST_HOOKS)
 void invokeRuntimeTraceFileSinkWriteTestHook()
@@ -123,12 +100,7 @@ RuntimeTraceFileSink::open()
 			state->path,
 			state->generation,
 			state->file,
-			state->parentToken) ||
-		!File::editorRunRuntimeTraceHandleIsCurrent(
-			state->file,
-			state->parentToken,
-			state->path,
-			state->generation))
+			state->parentToken))
 	{
 		state->close();
 		return {};
@@ -219,13 +191,8 @@ bool RuntimeTraceFileSink::appendBatchAndFlush(
 	std::lock_guard<std::mutex> lock(
 		handleState->mutex);
 	if (!layoutUse.valid() ||
-		handleState->generation !=
-			expectedGeneration ||
-		!File::editorRunRuntimeTraceHandleIsCurrent(
-			handleState->file,
-			handleState->parentToken,
-			handleState->path,
-			handleState->generation))
+		handleState->generation != expectedGeneration ||
+		handleState->file == nullptr)
 	{
 		handleState->closeUnlocked();
 		return false;
@@ -233,15 +200,6 @@ bool RuntimeTraceFileSink::appendBatchAndFlush(
 #if defined(JXQY_ENABLE_TEST_HOOKS)
 	invokeRuntimeTraceFileSinkWriteTestHook();
 #endif
-	if (!File::editorRunRuntimeTraceHandleIsCurrent(
-			handleState->file,
-			handleState->parentToken,
-			handleState->path,
-			handleState->generation))
-	{
-		handleState->closeUnlocked();
-		return false;
-	}
 	const std::size_t written = std::fwrite(
 		batch.data(),
 		1,
@@ -249,12 +207,7 @@ bool RuntimeTraceFileSink::appendBatchAndFlush(
 		handleState->file);
 	const bool succeeded =
 		written == batch.size() &&
-		flushRuntimeTraceFile(handleState->file) &&
-		File::editorRunRuntimeTraceHandleIsCurrent(
-			handleState->file,
-			handleState->parentToken,
-			handleState->path,
-			handleState->generation);
+		std::fflush(handleState->file) == 0;
 	if (!succeeded)
 	{
 		handleState->closeUnlocked();

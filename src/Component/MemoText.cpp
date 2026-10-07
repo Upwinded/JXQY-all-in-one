@@ -41,6 +41,8 @@ void MemoText::initFromIni(INIReader & ini)
 	rect.h = ini.GetInteger("Init", "Height", rect.h);
 	name = ini.Get("Init", "Name", name);
 	fontSize = ini.GetInteger("Init", "Font", fontSize);
+	lineSize = ini.GetInteger("Init", "LineSize", lineSize);
+	fitLines = ini.GetBoolean("Init", "FitLines", false);
 	color = ini.GetColor("Init", "Color", color);
 	for (size_t i = 0; i < MEMO_LINE; i++)
 	{
@@ -50,6 +52,18 @@ void MemoText::initFromIni(INIReader & ini)
 		mstr[i]->rect.h = lineSize;
 		mstr[i]->fontSize = fontSize;
 		mstr[i]->color = color;
+		mstr[i]->autoShrink = fitLines;
+		mstr[i]->minimumFontSize = 12;
+	}
+}
+
+void MemoText::onSetChildRect()
+{
+	if (!fitLines) return;
+	const int rowHeight = rect.h / MEMO_LINE;
+	for (size_t i = 0; i < mstr.size(); ++i)
+	{
+		mstr[i]->rect = { rect.x, rect.y + static_cast<int>(i) * rowHeight, rect.w, rowHeight };
 	}
 }
 
@@ -62,4 +76,3 @@ void MemoText::freeResource()
 	mstr.resize(0);
 	removeAllChild();
 }
-

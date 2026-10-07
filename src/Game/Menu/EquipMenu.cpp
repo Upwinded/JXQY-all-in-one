@@ -35,6 +35,60 @@ EquipMenu::~EquipMenu()
 	freeResource();
 }
 
+void EquipMenu::showAttributes(bool value)
+{
+	if (!equipmentTab || !attributesTab) return;
+	deactivateControllerFocus();
+	if (gm && gm->menu) gm->menu->cancelControllerInteraction();
+	showingAttributes = value;
+	equipmentTab->checked = !value;
+	attributesTab->checked = value;
+	for (const auto& entry : componentMap)
+	{
+		const auto& key = entry.first;
+		if (key.rfind("detail", 0) == 0)
+		{
+			entry.second->visible = entry.second->activated = value;
+		}
+		else if (key.rfind("item", 0) == 0 || key.rfind("part", 0) == 0 || key.rfind("lab", 0) == 0)
+		{
+			entry.second->visible = entry.second->activated = !value;
+		}
+	}
+	updateAttributes();
+}
+
+void EquipMenu::updateAttributes()
+{
+	if (!showingAttributes || !gm || !gm->player) return;
+	const auto& player = gm->player;
+	std::vector<std::string> values = {
+		convert::formatString(u8"攻击  %d", player->getAttack()),
+		convert::formatString(u8"防御  %d", player->getDefend()),
+		convert::formatString(u8"附加攻击一  %d", player->getAttack2()),
+		convert::formatString(u8"附加防御一  %d", player->getDefend2()),
+		convert::formatString(u8"附加攻击二  %d", player->getAttack3()),
+		convert::formatString(u8"附加防御二  %d", player->getDefend3()),
+		convert::formatString(u8"身法  %d", player->getEvade()),
+		convert::formatString(u8"医术  %d", player->leechcraft),
+		convert::formatString(u8"跳跃距离  %d", player->jumpRadius),
+		convert::formatString(u8"移速倍率  %.2f", player->getMoveSpeedFold()),
+		convert::formatString(u8"银两  %d", player->money) };
+	if (gm->global.feature.rageSystem)
+	{
+		values.push_back(convert::formatString(u8"怒气  %d / %d", player->rage, player->rageMax));
+		values.push_back(convert::formatString(u8"暴击概率  %.1f%%", player->getCriticalChancePercent()));
+		values.push_back(convert::formatString(u8"暴击增伤  %d%%", player->getCriticalDamagePercent()));
+	}
+	for (int index = 0; index < 14; ++index)
+	{
+		if (auto label = getComponentByName<Label>("detail" + std::to_string(index)))
+		{
+			label->setStr(index < static_cast<int>(values.size()) ? values[index] : "");
+		}
+	}
+}
+
 void EquipMenu::updateGoods()
 {
 	updatePanelImage();
@@ -230,6 +284,10 @@ int EquipMenu::getNewSwordPartnerIndex(const std::string& partnerName) const
 
 void EquipMenu::updatePlayerNameDisplay()
 {
+	if (auto playerName = getComponentByName<Label>("playerName"))
+	{
+		playerName->setStr(gm->player->npcName);
+	}
 	if (gm == nullptr || !gm->global.feature.equipPlayerNameImages || playerNameImages.empty())
 	{
 		return;
@@ -346,6 +404,10 @@ void EquipMenu::onEvent()
 
 	updateDataBindings();
 	updatePlayerNameDisplay();
+	if (equipmentTab && equipmentTab->getResult(erClick)) showAttributes(false);
+	if (attributesTab && attributesTab->getResult(erClick)) showAttributes(true);
+	updateAttributes();
+	if (showingAttributes) return;
 	updateMagicDisplay();
 	if (gm != nullptr && gm->menu != nullptr
 		&& gm->menu->controllerTransfers().active()
@@ -360,6 +422,16 @@ void EquipMenu::onEvent()
 
 		unsigned int ret = item[i]->getResult();
 		int listIndex = gm->goodsManager.equipIndex(static_cast<int>(i));
+#ifndef __MOBILE__
+		if (gm->global.feature.qingyuUi && (ret & erClick)
+			&& gm->goodsManager.goodsListExists(listIndex))
+		{
+			gm->menu->showGoodsToolTip(getMySharedPtr(),
+				gm->goodsManager.goodsList[listIndex].goods, item[i], true);
+			item[i]->resetHint();
+			continue;
+		}
+#endif
 		if (ret & erShowHint)
 		{
 			if (gm->goodsManager.goodsListExists(listIndex))
@@ -508,6 +580,9 @@ void EquipMenu::init()
 
 	image = getComponentByName<ImageContainer>("image");
 	title = getComponentByName<ImageContainer>("title");
+	equipmentTab = getComponentByName<CheckBox>("equipmentTab");
+	attributesTab = getComponentByName<CheckBox>("attributesTab");
+	if (!attributesTab) showingAttributes = false;
 	magicScrollbar = getComponentByName<Scrollbar>("magicScrollbar");
 	playerNameImages.clear();
 	for (int i = 0; i < 4; i++)
@@ -561,10 +636,14 @@ void EquipMenu::init()
 	configureControllerFocus();
 	updatePlayerNameDisplay();
 	updateMagicDisplay();
+	showAttributes(showingAttributes);
 }
 
 void EquipMenu::freeResource()
 {
+	tabFocused = false;
+	equipmentTab = nullptr;
+	attributesTab = nullptr;
 	// The router borrows both slot controllers. Detach it before clearing the
 	// borrowed targets so an active target can still be deactivated safely.
 	controllerPaneRouter.clear();
@@ -605,7 +684,7 @@ void EquipMenu::configureControllerFocus()
 			ControllerSlotDomain::PlayerEquipment);
 	equipmentBinding.grid.focusIdPrefix = "equipment-item-";
 	equipmentBinding.grid.items = std::move(equipmentItems);
-	equipmentBinding.grid.fixedColumnCount = 3;
+	equipmentBinding.grid.fixedColumnCount = equipmentTab ? 4 : 3;
 	equipmentBinding.grid.resolveLogicalIndex = [this](int visibleIndex)
 	{
 		if (gm == nullptr || visibleIndex < 0 || visibleIndex >= GOODS_BODY_COUNT)
@@ -662,6 +741,7 @@ void EquipMenu::configureControllerFocus()
 
 void EquipMenu::configureEquipmentControllerNeighbours()
 {
+	if (equipmentTab) return;
 	auto connect = [this](int from, UIFocusDirection direction, int to)
 	{
 		equipmentSlotController.setNeighbour(from, direction, to);
@@ -727,6 +807,8 @@ bool EquipMenu::activateControllerFocus(ControllerFocusTarget target)
 
 bool EquipMenu::focusControllerEquipment()
 {
+	if (showingAttributes) return focusControllerElement(attributesTab);
+	tabFocused = false;
 	return controllerPaneRouter.activatePane(EquipmentControllerPaneId);
 }
 
@@ -737,27 +819,46 @@ bool EquipMenu::focusControllerMagicList()
 
 bool EquipMenu::isControllerFocusActive() const
 {
-	return controllerPaneRouter.isActive();
+	return tabFocused || controllerPaneRouter.isActive();
 }
 
 void EquipMenu::deactivateControllerFocus()
 {
+	tabFocused = false;
+	if (equipmentTab) equipmentTab->setFocused(false);
+	if (attributesTab) attributesTab->setFocused(false);
 	controllerPaneRouter.deactivate();
 	hideControllerDetails();
 }
 
 PElement EquipMenu::controllerFocusedElement() const
 {
+	if (tabFocused) return showingAttributes ? attributesTab : equipmentTab;
 	return controllerPaneRouter.controllerFocusedElement();
 }
 
 std::vector<PElement> EquipMenu::controllerFocusCandidates() const
 {
-	return controllerPaneRouter.controllerFocusCandidates();
+	auto candidates = showingAttributes ? std::vector<PElement>{} : controllerPaneRouter.controllerFocusCandidates();
+	if (equipmentTab && attributesTab)
+	{
+		candidates.push_back(equipmentTab);
+		candidates.push_back(attributesTab);
+	}
+	return candidates;
 }
 
 bool EquipMenu::focusControllerElement(const PElement& element)
 {
+	if (element && element->visible && element->activated && (element == equipmentTab || element == attributesTab))
+	{
+		showAttributes(element == attributesTab);
+		tabFocused = true;
+		element->setFocused(true);
+		return true;
+	}
+	if (showingAttributes) return false;
+	deactivateControllerFocus();
 	hideControllerDetails();
 	return controllerPaneRouter.focusControllerElement(element);
 }
@@ -774,6 +875,7 @@ bool EquipMenu::controllerFocusElementMatchesTarget(
 	if (target == ControllerFocusTarget::Default
 		|| target == ControllerFocusTarget::PlayerEquipment)
 	{
+		if (element && (element == equipmentTab || element == attributesTab)) return true;
 		return contains(equipmentSlotController.controllerFocusCandidates());
 	}
 	if (target == ControllerFocusTarget::MagicList)
@@ -876,5 +978,27 @@ void EquipMenu::refreshControllerTransferHighlight()
 
 bool EquipMenu::onHandleUIAction(UIAction action)
 {
+	if (equipmentTab && attributesTab)
+	{
+		if (action == UIAction::Cancel && showingAttributes)
+		{
+			return focusControllerElement(equipmentTab);
+		}
+		if (tabFocused)
+		{
+			if (action == UIAction::NavigateLeft || action == UIAction::NavigateRight)
+				return focusControllerElement(showingAttributes ? equipmentTab : attributesTab);
+			if (action == UIAction::Confirm || action == UIAction::NavigateDown)
+			{
+				if (showingAttributes) return true;
+				deactivateControllerFocus();
+				return focusControllerEquipment();
+			}
+			return false;
+		}
+		if (action == UIAction::NavigateUp && equipmentSlotController.isActive()
+			&& equipmentSlotController.focusedVisibleIndex() < 4)
+			return focusControllerElement(equipmentTab);
+	}
 	return controllerPaneRouter.handleAction(action);
 }

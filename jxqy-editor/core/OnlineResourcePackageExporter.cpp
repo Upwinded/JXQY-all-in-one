@@ -330,6 +330,11 @@ bool createResourceCatalogBytes(
     catalog.setInteger("Catalog", "SchemaVersion", 1);
     const std::string section =
         "Resource." + profile.id.trimmed().toUtf8().toStdString();
+    if (!profile.installDirectory.trimmed().isEmpty())
+    {
+        catalog.set(section, "InstallDirectory",
+            profile.installDirectory.trimmed().toUtf8().toStdString());
+    }
     if (!profile.name.trimmed().isEmpty())
     {
         catalog.set(

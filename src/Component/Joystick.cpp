@@ -46,13 +46,16 @@ void Joystick::updateMovementState()
 	if (touchPosition.x <= OutRange || touchPosition.y <= OutRange)
 	{
 		movementState = MobileJoystickMovementState::Idle;
+		runExitCandidateBeginTime.reset();
 		return;
 	}
 	movementState = getMobileJoystickMovementState(
 		movementState,
 		touchPosition.x - rect.w / 2,
 		touchPosition.y - rect.h / 2,
-		roundRange);
+		roundRange,
+		getTime(),
+		runExitCandidateBeginTime);
 }
 
 int Joystick::distanceToCenter()
@@ -66,6 +69,7 @@ void Joystick::resetInput()
 {
 	touchPosition = { OutRange, OutRange };
 	movementState = MobileJoystickMovementState::Idle;
+	runExitCandidateBeginTime.reset();
 }
 
 bool Joystick::mouseInRect(int x, int y)

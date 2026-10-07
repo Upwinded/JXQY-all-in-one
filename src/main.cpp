@@ -14,6 +14,7 @@
 #endif
 
 #include "Game/Game.h"
+#include "GameplayAutomation/GameplayAutomationSession.h"
 #include "File/log.h"
 #include "File/File.h"
 #include "Launch/GameLaunchArguments.h"
@@ -22,6 +23,7 @@
 
 #include <iostream>
 #include <string>
+#include <cwctype>
 
 #if defined(__MOBILE__) || defined(__ANDROID__) || \
 	(defined(__APPLE__) && TARGET_OS_IOS)
@@ -71,6 +73,46 @@ int main(int argc, char* argv[])
 #endif
 
 	const GameLaunch::LegacyArguments& legacy = launch.legacy;
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	if (!legacy.automationPipeName.empty())
+	{
+		try
+		{
+			auto canonical = [](const std::string& text)
+			{
+				auto path = std::filesystem::weakly_canonical(std::filesystem::u8path(text));
+#if defined(_WIN32)
+				auto native = path.native();
+				for (auto& character : native) character = std::towlower(character);
+				path = native;
+#endif
+				return path;
+			};
+			const auto root = canonical(legacy.userDataRootPath);
+			const auto normalRoot = canonical(File::getUserDataRoot());
+			bool isolated = root != normalRoot && root.has_parent_path() && root != root.root_path();
+			const auto assetsPath = legacy.assetsPath.empty() ? File::getDefaultAssetsCollectionRoot() : legacy.assetsPath;
+			if (!assetsPath.empty())
+			{
+				const auto assets = canonical(assetsPath);
+				const auto relative = root.lexically_relative(assets);
+				isolated = isolated && root != assets.parent_path()
+					&& (relative.empty() || *relative.begin() == "..");
+			}
+			if (!isolated) throw std::runtime_error("Automation requires a separate user data directory");
+		}
+		catch (const std::exception& error)
+		{
+			std::cerr << error.what() << "\n";
+			return CommandLineUsageExitCode;
+		}
+	}
+	if (legacy.automationLocalDate.year != 0 &&
+		!NewYearPeriod::setAutomationLocalDate(legacy.automationLocalDate))
+	{
+		return CommandLineUsageExitCode;
+	}
+#endif
 	if (!File::configureUserDataRoot(
 			legacy.userDataRootPath,
 			legacy.assetsPath))
@@ -124,6 +166,10 @@ int main(int argc, char* argv[])
 		std::cout << "NewGame.Script=" << manifest.newGameScript << "\n";
 		return 0;
 	}
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	// The trace writer must outlive every game object that refers to it.
+	std::unique_ptr<GameplayAutomationSession> automation;
+#endif
 	Game game;
 	game.setAssetsArg(legacy.assetsPath);
 	game.setResourcePackIdArg(legacy.resourcePackId);
@@ -145,6 +191,21 @@ int main(int argc, char* argv[])
 		legacy.exitAfterNewGameScript);
 	game.setPostNewGameAutomationWaitMilliseconds(
 		legacy.postNewGameAutomationWaitMilliseconds);
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+    if (!legacy.automationPipeName.empty())
+    {
+        try
+        {
+            automation = std::make_unique<GameplayAutomationSession>(
+                legacy.automationPipeName, std::filesystem::u8path(File::getUserDataRoot()));
+        }
+        catch (const std::exception& error)
+        {
+            std::cerr << "Automation setup failed: " << error.what() << "\n";
+            return CommandLineUsageExitCode;
+        }
+    }
+#endif
     auto ret = game.run();
 #if TARGET_OS_IOS
     exit(ret);

@@ -3,7 +3,6 @@
 #include "../File/log.h"
 #include "../libconvert/libconvert.h"
 #include "ComponentRegistry.h"
-#include "../Engine/AudioDecodeSafety.h"
 #include "../Game/Data/MediaPathResolver.h"
 
 namespace
@@ -36,22 +35,11 @@ void Button::playSound(int index)
 		return;
 	}
 
-#ifdef SOUND_DYNAMIC_LOAD
 	if (sound[index].empty())
 	{
 		return;
 	}
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	if (File::readFile(sound[index], s, len,
-		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)) &&
-		s != nullptr && len > 0)
-	{
-		engine->playSound(s, len);
-	}
-#else
-	engine->playSound(sound[index]);
-#endif // SOUND_DYNAMIC_LOAD
+	engine->playCachedSoundFile(sound[index]);
 	
 }
 
@@ -115,6 +103,16 @@ void Button::onClick()
 
 void Button::onDraw()
 {
+	if (flat)
+	{
+		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 171, 146, 93, 255);
+		if (rect.w > 2 && rect.h > 2)
+		{
+			engine->fillRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, 44, 84, 70, 255);
+		}
+		drawFocusBorder();
+		return;
+	}
 	draw();
 	drawFocusBorder();
 }
@@ -183,15 +181,7 @@ void Button::freeSound()
 {
 	for (size_t i = 0; i < 3; i++)
 	{
-#ifdef SOUND_DYNAMIC_LOAD
 		sound[i] = "";
-#else
-		if (sound[i] != nullptr)
-		{
-			engine->freeMusic(sound[i]);
-			sound[i] = nullptr;
-		}
-#endif
 	}
 }
 
@@ -208,6 +198,7 @@ void Button::initFromIni(INIReader & ini)
 	freeResource();
 	animateFrames = false;
 	hoverSoundEnabled = ini.GetBoolean("Init", "HoverSound", true);
+	flat = ini.GetBoolean("Init", "Flat", false);
 	kind = ini.Get("Init", "Kind", kind);
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
@@ -256,7 +247,7 @@ void Button::initFromIni(INIReader & ini)
 			loadSound(soundName, 1);
 		}
 	}
-	else
+	else if (!impName.empty())
 	{
 		GameLog::write("Button:%s,%s image file error\n", ini.fileName.c_str(), impName.c_str());
 	}
@@ -275,24 +266,9 @@ void Button::loadSound(const std::string & fileName, int index)
 	{
 		return;
 	}
-	std::string soundPath = resolveSoundAssetPath(fileName);
-#ifdef SOUND_DYNAMIC_LOAD
+	std::string soundPath = buildSoundAssetPath(fileName);
 	sound[index] = soundPath;
-#else
-	std::unique_ptr<char[]> s;
-	int len = 0;
-	if (File::readFile(soundPath, s, len,
-		static_cast<int>(AudioDecodeSafety::MaxEncodedAudioBytes)) &&
-		s != nullptr && len > 0)
-	{
-		if (sound[index] != nullptr)
-		{
-			engine->freeMusic(sound[index]);
-			sound[index] = nullptr;
-		}
-		sound[index] = engine->loadSound(s, len);
-	}
-#endif // SOUND_DYNAMIC_LOAD
+	engine->preloadCachedSoundFile(soundPath);
 }
 
 void Button::setRectFromImage()

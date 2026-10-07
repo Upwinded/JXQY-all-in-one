@@ -41,6 +41,10 @@ struct SemanticVersionParseResult
 
 SemanticVersionParseResult parseSemanticVersion(std::string_view text);
 
+// Legacy resource versions allow leading zeros and omitted minor/patch parts.
+// Engine versions continue to use the strict SemVer parser above.
+SemanticVersionParseResult parseResourceVersion(std::string_view text);
+
 // Returns -1, 0, or 1. Build identifiers do not affect precedence.
 int compareSemanticVersionPrecedence(const SemanticVersion& left,
 	const SemanticVersion& right) noexcept;

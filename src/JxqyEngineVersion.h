@@ -12,6 +12,8 @@ inline constexpr char EngineVersion[] =
 // Display-only release stage. Keep empty for a stable release; changing this
 // label does not change update ordering.
 inline constexpr char ReleaseStage[] = "Preview";
+// Raise independently of EngineVersion when older saves become incompatible.
+inline constexpr char MinimumCompatibleSaveEngineVersion[] = "1.1.0";
 
 #if defined(__ANDROID__)
 inline constexpr char ProgramUpdateTarget[] = "android";

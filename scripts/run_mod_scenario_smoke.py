@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -494,30 +495,21 @@ def ensure_initial_save_seed(assets_root: Path, resource_id: str) -> None:
 
 
 def check_saved_goods_slots(
-    assets_root: Path,
-    resource_id: str,
+    save_root: Path,
     expectations: tuple[SavedGoodsSlotsExpectation, ...],
-    previous_file_states: dict[Path, tuple[int, int, int]] | None = None,
 ) -> bool:
     ok = True
-    pack_root = resource_pack_path(assets_root, resource_id)
     for expectation in expectations:
         path = resolve_contained_path(
-            pack_root,
-            f"save/game/goods{expectation.index}.ini",
+            save_root,
+            f"game/goods{expectation.index}.ini",
             "saved goods result",
+            reject_links=True,
         )
         if not path.exists():
             print(f"FAIL saved goods check: missing {path}", file=sys.stderr)
             ok = False
             continue
-        if previous_file_states is not None:
-            stat = path.stat()
-            current_state = (stat.st_ctime_ns, stat.st_mtime_ns, stat.st_size)
-            if previous_file_states.get(path) == current_state:
-                print(f"FAIL saved goods check: stale pre-run file {path}", file=sys.stderr)
-                ok = False
-                continue
         parser = load_ini(path)
         matching_slots = 0
         bad_number_slots: list[str] = []
@@ -548,21 +540,18 @@ def check_saved_goods_slots(
     return ok
 
 
-def expected_saved_goods_file_states(
-    pack_root: Path,
-    expectations: tuple[SavedGoodsSlotsExpectation, ...],
-) -> dict[Path, tuple[int, int, int]]:
-    result: dict[Path, tuple[int, int, int]] = {}
-    for expectation in expectations:
-        path = resolve_contained_path(
-            pack_root,
-            f"save/game/goods{expectation.index}.ini",
-            "saved goods result",
-        )
-        if path.exists():
-            stat = path.stat()
-            result[path] = (stat.st_ctime_ns, stat.st_mtime_ns, stat.st_size)
-    return result
+def scenario_save_root(user_data_root: Path) -> Path:
+    # Each process gets a new state directory. Discover its actual namespace;
+    # the runtime also resolves namespace collisions, so do not duplicate that policy.
+    game_directories = list(user_data_root.glob("save/*/game"))
+    if len(game_directories) != 1:
+        raise ValueError(f"expected one saved game directory in {user_data_root}, got {len(game_directories)}")
+    return resolve_contained_path(
+        user_data_root,
+        game_directories[0].parent.relative_to(user_data_root).as_posix(),
+        "scenario save namespace",
+        reject_links=True,
+    )
 
 
 def is_link_or_junction(path: Path) -> bool:
@@ -701,16 +690,16 @@ def run_scenario(
     if log_path.exists():
         log_path.unlink()
 
-    pack_root = resource_pack_path(assets_root, resource_id)
-    previous_saved_goods_states = expected_saved_goods_file_states(
-        pack_root,
-        scenario.expected_saved_goods_slots,
-    )
+    # Retain isolated output with the log for inspection, without writing to player saves.
+    # A fresh directory per run also prevents stale saved results from passing a check.
+    user_data_root = Path(tempfile.mkdtemp(prefix=f"{scenario.name}-state-", dir=log_dir)).resolve()
 
     command = [
         str(executable),
         "--assets",
         str(assets_root),
+        "--user-data-root",
+        str(user_data_root),
         "--resource-id",
         resource_id,
         "--skip-startup-video",
@@ -726,7 +715,7 @@ def run_scenario(
     for name, value in scenario.expected_variables:
         command.extend(["--expect-int", f"{name}={value}"])
 
-    print(f"RUN {scenario.section} choice={scenario.choice} log={log_path}")
+    print(f"RUN {scenario.section} choice={scenario.choice} log={log_path} state={user_data_root}")
     completed = subprocess.run(
         command,
         cwd=repo_root,
@@ -749,10 +738,8 @@ def run_scenario(
         return completed.returncode
 
     if scenario.expected_saved_goods_slots and not check_saved_goods_slots(
-        assets_root,
-        resource_id,
+        scenario_save_root(user_data_root),
         scenario.expected_saved_goods_slots,
-        previous_saved_goods_states,
     ):
         print(log_tail(log_path), file=sys.stderr)
         return 1

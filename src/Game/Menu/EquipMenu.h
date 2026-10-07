@@ -27,6 +27,8 @@ public:
 	void updateMagicDisplay();
 	void updateMagicDisplay(int index);
 	void updatePanelImage();
+	void showAttributes(bool value);
+	bool isShowingAttributes() const { return showingAttributes; }
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;
 	bool focusControllerEquipment();
@@ -45,6 +47,11 @@ public:
 	int getPartIndex(const std::string & part);
 
 private:
+	bool showingAttributes = false;
+	bool tabFocused = false;
+	std::shared_ptr<CheckBox> equipmentTab;
+	std::shared_ptr<CheckBox> attributesTab;
+	void updateAttributes();
 	std::vector<std::string> magicDisplayIniFile;
 	std::vector<std::string> newSwordPartnerNames;
 	int loadedPanelIndex = -1;

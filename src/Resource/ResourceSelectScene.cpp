@@ -126,15 +126,16 @@ constexpr const char* EmptyResourceListPrimary = u8"未发现可用资源包";
 constexpr const char* ExternalResourceCollectionInstruction =
 	u8"可选，外部 MOD 读取：Android 11+ 需所有文件访问权限";
 constexpr const char* ResourcePackageImportInstruction =
-	u8"可导入完整资源包、common 或增量包，安装到应用专属目录";
+	u8"下载完整游戏包或增量补丁包后导入，会覆盖现有资源";
 constexpr const char* CheatHelpText =
-	u8"进入游戏后，可打开“系统 → 选项 → 作弊设置”；纯触屏和桌面触屏均可直接操作。\n"
-	u8"键盘仍可按 Shift+F12 开关作弊模式，再使用：\n"
-	u8"Shift+Q：补满生命、内力和体力\n"
-	u8"Shift+W：当前修炼武功提升 1 级（最高 10 级）\n"
-	u8"Shift+E：角色提升 1 级\n"
-	u8"Shift+R：增加 100000 两银子\n"
-	u8"再次按 Shift+F12 可关闭作弊模式。";
+	u8"游戏内：系统 → 选项 → 作弊设置\n"
+	u8"触屏可直接操作；键盘快捷键如下：\n"
+	u8"Shift+F12：开启 / 关闭作弊\n"
+	u8"Shift+T：切换无敌（免伤、内力/体力不减）\n"
+	u8"Shift+Q：补满生命、内力、体力\n"
+	u8"Shift+W：修炼武功升1级，最高10级\n"
+	u8"Shift+E：角色升1级\n"
+	u8"Shift+R：增加100000两银子";
 
 bool isPlainDirectory(const std::filesystem::path& path);
 
@@ -1088,17 +1089,7 @@ bool startDesktopProgramUpdater(
 
 bool isSafeResourceDirectoryName(const std::string& name)
 {
-	if (name.empty() || name.size() > 200 || name == "." || name == ".." ||
-		name.find('/') != std::string::npos ||
-		name.find('\\') != std::string::npos ||
-		!ResourcePathSafety::isSafeVirtualResourcePath(name))
-	{
-		return false;
-	}
-	const std::string folded = foldAscii(name);
-	return folded != ".jxqy-update" && folded != "common" &&
-		folded != "save" && folded != ".git" &&
-		folded != ".jxqy_editor";
+	return ResourcePathSafety::isSafeInstallDirectoryName(name);
 }
 
 std::string formatByteCount(std::uint64_t bytes)
@@ -1335,6 +1326,7 @@ ResourceSelectScene::~ResourceSelectScene()
 
 void ResourceSelectScene::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	if (resourceInstallRunner != nullptr)
 	{
 		resourceInstallRunner->requestCancellation();
@@ -1356,6 +1348,10 @@ void ResourceSelectScene::freeResource()
 	onlineActionButton = nullptr;
 	resourceRemoveButton = nullptr;
 	saveManagementButton = nullptr;
+	saveExportButton = nullptr;
+	saveImportButton = nullptr;
+	saveFileSelection.reset();
+	pendingSavePackage.reset();
 	displaySettingsButton = nullptr;
 	for (auto& button : displaySettingsPreviousButtons)
 	{
@@ -1645,6 +1641,21 @@ void ResourceSelectScene::createControls()
 	resourceInstallNextPageButton->activated = false;
 	addChild(resourceInstallNextPageButton);
 
+	saveExportButton = std::make_shared<FlatTextButton>();
+	saveImportButton = std::make_shared<FlatTextButton>();
+	saveExportButton->name = "resource-select-save-export";
+	saveImportButton->name = "resource-select-save-import";
+	saveExportButton->setUTF8Str(u8"导出存档");
+	saveImportButton->setUTF8Str(u8"导入存档");
+	for (const auto& button : { saveExportButton, saveImportButton })
+	{
+		button->setFontSize(18);
+		button->setStyle(makeHeaderActionButtonStyle());
+		button->visible = false;
+		button->activated = false;
+		addChild(button);
+	}
+
 	if (externalResourceToggleAvailable())
 	{
 		// 移动端：用开关按钮启用固定外部资源目录（需"所有文件访问权限"）。
@@ -1820,6 +1831,14 @@ void ResourceSelectScene::rebuildResourceEntries()
 				entry.onlineAvailable = true;
 				entry.onlineVersion = online->second.versionText;
 				entry.releaseNotes = online->second.releaseNotes;
+				const ModRelease::SemanticVersionParseResult localVersion =
+					ModRelease::parseSemanticVersion(entry.localVersion);
+				const ModRelease::SemanticVersionParseResult onlineVersion =
+					ModRelease::parseSemanticVersion(entry.onlineVersion);
+				entry.localVersionNewerThanOnline =
+					localVersion.succeeded() && onlineVersion.succeeded() &&
+					ModRelease::compareSemanticVersionPrecedence(
+						localVersion.version, onlineVersion.version) > 0;
 				const OnlineUpdate::ResourceDownloadPlan plan =
 					OnlineUpdate::planResourceDownload(
 						onlineCatalog,
@@ -1987,6 +2006,8 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 	selectedDetails.onlineVersionMatches = !entry.isOnlineOnly() &&
 		!entry.localVersion.empty() &&
 		entry.localVersion == entry.onlineVersion;
+	selectedDetails.localVersionNewerThanOnline =
+		entry.localVersionNewerThanOnline;
 	selectedDetails.hasPendingOnlineArtifacts =
 		entry.hasPendingOnlineArtifacts;
 	selectedDetails.requiresNewerEngine = entry.requiresNewerEngine;
@@ -2040,6 +2061,10 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 		if (entry.requiresNewerEngine)
 		{
 			selectedDetails.runStatus += u8"；需要先更新主程序";
+		}
+		else if (entry.localVersionNewerThanOnline)
+		{
+			selectedDetails.runStatus += u8"；本地版本较新";
 		}
 		else if (entry.hasPendingOnlineArtifacts)
 		{
@@ -2527,7 +2552,7 @@ void ResourceSelectScene::refreshCheckUpdatesButton()
 	{
 		return;
 	}
-	const bool compact = panelWidth < HeaderActionCompactPanelWidth;
+	const bool compact = getExitButtonRect().w < HeaderActionButtonWidth;
 	checkUpdatesButton->setFontSize(compact
 		? HeaderActionCompactFontSize : HeaderActionFontSize);
 	checkUpdatesButton->activated =
@@ -2592,8 +2617,8 @@ void ResourceSelectScene::refreshProgramActionButton()
 		return;
 	}
 
-	const bool compact = panelWidth < HeaderActionCompactPanelWidth;
-	programActionButton->setFontSize(compact
+	const bool compact = panelWidth < HeaderActionCompactPanelWidth || compactMobileLayout;
+	programActionButton->setFontSize(getExitButtonRect().w < HeaderActionButtonWidth
 		? HeaderActionCompactFontSize : HeaderActionFontSize);
 	const OnlineUpdate::ProgramUpdateCheck update =
 		OnlineUpdate::checkProgramUpdate(
@@ -2659,6 +2684,8 @@ void ResourceSelectScene::refreshOnlineActionButton()
 		onlineActionButton->setUTF8Str(
 			selectedDetails.onlineOnly
 				? u8"下载此游戏"
+				: selectedDetails.localVersionNewerThanOnline
+					? u8"使用线上版本"
 				: selectedDetails.hasPendingOnlineArtifacts
 					? u8"继续更新"
 				: selectedDetails.onlineVersionMatches
@@ -3144,8 +3171,16 @@ bool ResourceSelectScene::buildResourceImportConfirmation(
 			errorText = u8"无法读取应用专属资源目录";
 			return false;
 		}
-		const std::string baseName = isSafeResourceDirectoryName(package.gameId)
-			? package.gameId : std::string("resource");
+		if (!package.installDirectory.empty() &&
+			!isSafeResourceDirectoryName(package.installDirectory))
+		{
+			errorText = u8"资源包声明的安装目录名不安全";
+			return false;
+		}
+		const std::string baseName = !package.installDirectory.empty()
+			? package.installDirectory
+			: (isSafeResourceDirectoryName(package.gameId)
+				? package.gameId : std::string("resource"));
 		targetDirectoryName = baseName;
 		for (int suffix = 2;
 			occupiedNames.find(foldAscii(targetDirectoryName)) !=
@@ -3443,8 +3478,9 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 			JxqyBuildVersion::EngineVersion,
 			installedState.artifacts,
 			requestedDownloadMode);
-	if (forceReinstallIfCurrent && requestedVersionMatches && plan.succeeded() &&
-		plan.downloadOrder.empty())
+	if (forceReinstallIfCurrent && plan.succeeded() &&
+		(selectedEntry.localVersionNewerThanOnline ||
+			(requestedVersionMatches && plan.downloadOrder.empty())))
 	{
 		requestedDownloadMode =
 			OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage;
@@ -3662,11 +3698,14 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		}
 		else
 		{
-			std::string baseName;
+			std::string baseName = package->installDirectory;
 			try
 			{
-				baseName = std::filesystem::u8path(
-					package->artifactPath).stem().generic_u8string();
+				if (baseName.empty())
+				{
+					baseName = std::filesystem::u8path(
+						package->artifactPath).stem().generic_u8string();
+				}
 			}
 			catch (const std::exception&)
 			{
@@ -3832,13 +3871,25 @@ void ResourceSelectScene::beginSaveManagement()
 	resourceInstallOperation = ResourceInstallOperation::SaveManagement;
 	saveNamespaceEntries = ResourceManager::instance().listSaveNamespaces();
 	selectedSaveNamespaceIndex = 0;
+	const auto& packs = ResourceManager::instance().getDiscoveredPacks();
+	if (selectedDetails.localPackIndex >= 0 && selectedDetails.localPackIndex < static_cast<int>(packs.size()))
+	{
+		const auto& saveNamespace = packs[selectedDetails.localPackIndex].effectiveSaveNamespace;
+		for (int index = 0; index < static_cast<int>(saveNamespaceEntries.size()); ++index)
+		{
+			if (OnlineUpdate::foldGameId(saveNamespaceEntries[index].saveNamespace) == OnlineUpdate::foldGameId(saveNamespace))
+			{
+				selectedSaveNamespaceIndex = index;
+				break;
+			}
+		}
+	}
 	resourceInstallDialogMessage.clear();
 	resourceInstallDialogState = ResourceInstallDialogState::BrowsingSaves;
 	setMainControlsAvailable(false);
 	refreshResourceInstallDialogControls();
-	semanticFocusVisible = saveNamespaceEntries.empty()
-		? focusManager.focusNode("install-secondary")
-		: focusManager.focusNode("install-primary");
+	semanticFocusVisible = focusManager.focusNode("save-export") ||
+		focusManager.focusNode("save-import") || focusManager.focusNode("install-secondary");
 	updateFocusPresentation();
 }
 
@@ -3927,6 +3978,17 @@ void ResourceSelectScene::executeSaveRemoval()
 
 void ResourceSelectScene::activateResourceDialogPrimary()
 {
+	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport)
+	{
+		selectSaveFile(true);
+		return;
+	}
+	if (resourceInstallDialogState == ResourceInstallDialogState::ConfirmingSaveImport)
+	{
+		saveTransferAction = SaveTransferAction::Import;
+		startSaveTransfer("");
+		return;
+	}
 	if (resourceInstallDialogState ==
 		ResourceInstallDialogState::ChoosingImportType)
 	{
@@ -3997,12 +4059,28 @@ void ResourceSelectScene::activateResourceDialogPrimary()
 	else if (resourceInstallDialogState == ResourceInstallDialogState::Failed ||
 		resourceInstallDialogState == ResourceInstallDialogState::Completed)
 	{
-		dismissResourceInstallDialog();
+		if (resourceInstallOperation == ResourceInstallOperation::SaveTransfer)
+			activateResourceDialogSecondary();
+		else dismissResourceInstallDialog();
 	}
 }
 
 void ResourceSelectScene::activateResourceDialogSecondary()
 {
+	if (resourceInstallDialogState == ResourceInstallDialogState::SelectingSaveFile ||
+		resourceInstallDialogState == ResourceInstallDialogState::TransferringSaves) return;
+	if (resourceInstallOperation == ResourceInstallOperation::SaveTransfer)
+	{
+		pendingSavePackage.reset();
+		resourceInstallDialogMessage.clear();
+		resourceInstallOperation = ResourceInstallOperation::SaveManagement;
+		resourceInstallDialogState = ResourceInstallDialogState::BrowsingSaves;
+		refreshResourceInstallDialogControls();
+		semanticFocusVisible = focusManager.focusNode(saveTransferAction == SaveTransferAction::Export
+			? "save-export" : "save-import") || focusManager.focusNode("install-secondary");
+		updateFocusPresentation();
+		return;
+	}
 	if (resourceInstallDialogState ==
 		ResourceInstallDialogState::ChoosingImportType)
 	{
@@ -4979,6 +5057,11 @@ void ResourceSelectScene::pollResourceInstall()
 void ResourceSelectScene::finishResourceInstall(
 	const GameLoading::ExclusiveLoadingCompletion& completion)
 {
+	if (resourceInstallWorkerResult && resourceInstallWorkerResult->operation == ResourceInstallOperation::SaveTransfer)
+	{
+		finishSaveTransfer(completion);
+		return;
+	}
 	if (resourceInstallWorkerResult == nullptr)
 	{
 		resourceInstallDialogState = ResourceInstallDialogState::Failed;
@@ -5444,12 +5527,15 @@ void ResourceSelectScene::dismissResourceInstallDialog()
 		updateFocusPresentation();
 		return;
 	}
+	const bool returningFromSaves = resourceInstallOperation == ResourceInstallOperation::SaveManagement ||
+		resourceInstallOperation == ResourceInstallOperation::SaveTransfer;
 	resourceInstallDialogState = ResourceInstallDialogState::Hidden;
 	resourceInstallOperation = ResourceInstallOperation::OnlineDownload;
 	pendingResourceInstall = {};
 	resourcePackageImportKind = ResourcePackageImportKind::Full;
 	pendingImportedPackage = {};
 	pendingProgramPackagePath.clear();
+	pendingSavePackage.reset();
 	resourceInstallDialogMessage.clear();
 	resourceInstallConfirmationPage = 0;
 	pendingDownloadUsesMeteredNetwork = false;
@@ -5458,7 +5544,7 @@ void ResourceSelectScene::dismissResourceInstallDialog()
 	resourceInstallWorkerResult.reset();
 	refreshResourceInstallDialogControls();
 	setMainControlsAvailable(true);
-	semanticFocusVisible = focusManager.focusNode("resource-list");
+	semanticFocusVisible = focusManager.focusNode(returningFromSaves ? "save-management" : "resource-list");
 	updateFocusPresentation();
 }
 
@@ -5484,6 +5570,27 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 		button->visible = visible;
 		button->activated = activated;
 	};
+	if (saveExportButton && saveImportButton)
+	{
+		bool browsing = resourceInstallDialogState == ResourceInstallDialogState::BrowsingSaves;
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+		// SDL's current document dialogs support macOS, but not iOS.
+		browsing = false;
+#endif
+		const bool hasSavedSlot = selectedSaveNamespaceIndex >= 0 &&
+			selectedSaveNamespaceIndex < static_cast<int>(saveNamespaceEntries.size()) &&
+			saveNamespaceEntries[selectedSaveNamespaceIndex].saveSlotCount > 0;
+		setButtonAvailability(saveExportButton, browsing, browsing && hasSavedSlot);
+		setButtonAvailability(saveImportButton, browsing, browsing);
+		Rect area = getResourceInstallPrimaryButtonRect();
+		area.y = getResourceInstallPreviousPageButtonRect().y - 48;
+		area.h = 36;
+		const Rect dialog = getResourceInstallDialogRect();
+		area.x = dialog.x + dialog.w / 2 - 6 - area.w;
+		saveExportButton->rect = area;
+		area.x = dialog.x + dialog.w / 2 + 6;
+		saveImportButton->rect = area;
+	}
 	bool primaryVisible = false;
 	bool primaryActivated = false;
 	bool secondaryVisible = false;
@@ -5492,6 +5599,9 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 	bool previousActivated = false;
 	bool nextVisible = false;
 	bool nextActivated = false;
+	resourceInstallPreviousPageButton->setFontSize(
+		resourceInstallDialogState == ResourceInstallDialogState::ChoosingImportType
+			? 19 : 16);
 	if (resourceInstallDialogState == ResourceInstallDialogState::Hidden)
 	{
 		setButtonAvailability(
@@ -5606,10 +5716,10 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 	else if (resourceInstallDialogState ==
 		ResourceInstallDialogState::BrowsingSaves)
 	{
-		resourceInstallPrimaryButton->setUTF8Str(u8"删除此存档");
+		resourceInstallPrimaryButton->setUTF8Str(u8"删除全部存档");
 		resourceInstallSecondaryButton->setUTF8Str(u8"关闭");
-		resourceInstallPreviousPageButton->setUTF8Str(u8"上一个");
-		resourceInstallNextPageButton->setUTF8Str(u8"下一个");
+		resourceInstallPreviousPageButton->setUTF8Str(u8"上一游戏");
+		resourceInstallNextPageButton->setUTF8Str(u8"下一游戏");
 		primaryVisible = true;
 		primaryActivated = !saveNamespaceEntries.empty();
 		secondaryVisible = true;
@@ -5629,6 +5739,27 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 		primaryActivated = true;
 		secondaryVisible = true;
 		secondaryActivated = true;
+	}
+	else if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport ||
+		resourceInstallDialogState == ResourceInstallDialogState::ConfirmingSaveImport)
+	{
+		const bool exporting = resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport;
+		resourceInstallPrimaryButton->setUTF8Str(exporting ? u8"导出存档"
+			: saveImportWillOverwrite ? u8"确认覆盖并导入" : u8"确认导入");
+		resourceInstallSecondaryButton->setUTF8Str(u8"返回");
+		resourceInstallPreviousPageButton->setUTF8Str(u8"上一档位");
+		resourceInstallNextPageButton->setUTF8Str(u8"下一档位");
+		primaryVisible = secondaryVisible = secondaryActivated = true;
+		primaryActivated = !exporting || !saveExportSlots.empty();
+		previousVisible = nextVisible = exporting ? saveExportSlots.size() > 1
+			: pendingSavePackage && pendingSavePackage->slots().size() == 1;
+		previousActivated = nextActivated = previousVisible;
+	}
+	else if (resourceInstallDialogState == ResourceInstallDialogState::SelectingSaveFile ||
+		resourceInstallDialogState == ResourceInstallDialogState::TransferringSaves)
+	{
+		// The system picker owns cancellation. An import already applying to a
+		// slot finishes before this dialog can be closed.
 	}
 	else if (resourceInstallDialogState ==
 		ResourceInstallDialogState::Downloading)
@@ -5683,7 +5814,8 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 	}
 	else
 	{
-		resourceInstallPrimaryButton->setUTF8Str(u8"关闭");
+		resourceInstallPrimaryButton->setUTF8Str(resourceInstallOperation == ResourceInstallOperation::SaveTransfer
+			? u8"返回存档管理" : u8"关闭");
 		primaryVisible = true;
 		primaryActivated = true;
 	}
@@ -5707,6 +5839,20 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 
 void ResourceSelectScene::moveResourceInstallConfirmationPage(int offset)
 {
+	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport && !saveExportSlots.empty())
+	{
+		selectedTransferSlot = (selectedTransferSlot + offset + static_cast<int>(saveExportSlots.size())) % static_cast<int>(saveExportSlots.size());
+		refreshResourceInstallDialogControls();
+		return;
+	}
+	if (resourceInstallDialogState == ResourceInstallDialogState::ConfirmingSaveImport &&
+		pendingSavePackage && pendingSavePackage->slots().size() == 1)
+	{
+		selectedTransferSlot = (selectedTransferSlot - 1 + offset + SavePackage::AutomaticSlot) % SavePackage::AutomaticSlot + 1;
+		saveImportWillOverwrite = saveImportOverwrites();
+		refreshResourceInstallDialogControls();
+		return;
+	}
 	if (offset == 0)
 	{
 		return;
@@ -5731,11 +5877,17 @@ void ResourceSelectScene::moveResourceInstallConfirmationPage(int offset)
 	{
 		if (!saveNamespaceEntries.empty())
 		{
+			const auto focused = focusManager.getFocusedElement();
 			selectedSaveNamespaceIndex = std::clamp(
 				selectedSaveNamespaceIndex + offset,
 				0,
 				static_cast<int>(saveNamespaceEntries.size()) - 1);
 			refreshResourceInstallDialogControls();
+			if (focused == resourceInstallPreviousPageButton && !focused->activated)
+				focusManager.focusNode("install-next");
+			else if (focused == resourceInstallNextPageButton && !focused->activated)
+				focusManager.focusNode("install-previous");
+			updateFocusPresentation();
 		}
 		return;
 	}
@@ -5773,6 +5925,15 @@ bool ResourceSelectScene::onInitial()
 	return true;
 }
 
+void ResourceSelectScene::onRun()
+{
+	// Ignore pointer input queued while resources and scene controls loaded,
+	// before the selection page could be seen. Keep window/lifecycle events.
+	SDL_PumpEvents();
+	SDL_FlushEvents(SDL_EVENT_MOUSE_MOTION, SDL_EVENT_MOUSE_WHEEL);
+	SDL_FlushEvents(SDL_EVENT_FINGER_DOWN, SDL_EVENT_FINGER_CANCELED);
+}
+
 void ResourceSelectScene::configureFocus()
 {
 	focusManager.clear();
@@ -5780,6 +5941,21 @@ void ResourceSelectScene::configureFocus()
 	{
 		return;
 	}
+	focusManager.addLinearGroup("save-transfer-actions", UIFocusLinearAxis::Horizontal,
+		{
+			{ "save-export", saveExportButton, [this]() { chooseSaveExport(); }, {}, {},
+				[this](UIFocusDirection direction)
+				{
+					return direction == UIFocusDirection::Down &&
+						(focusManager.focusNode("install-previous") || focusManager.focusNode("install-primary"));
+				} },
+			{ "save-import", saveImportButton, [this]() { selectSaveFile(false); }, {}, {},
+				[this](UIFocusDirection direction)
+				{
+					return direction == UIFocusDirection::Down &&
+						(focusManager.focusNode("install-next") || focusManager.focusNode("install-secondary"));
+				} }
+		}, false);
 	focusManager.addNode(
 		"resource-list",
 		resourceList,
@@ -5856,7 +6032,7 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Down)
 			{
-				return programActionButton != nullptr &&
+				return !compactMobileLayout && programActionButton != nullptr &&
 						programActionButton->visible &&
 						programActionButton->activated
 					? focusManager.focusNode("program-action")
@@ -5864,6 +6040,7 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Right)
 			{
+				if (compactMobileLayout && displaySettingsButton == nullptr && focusManager.focusNode("program-action")) return true;
 				return displaySettingsButton != nullptr
 					? focusManager.focusNode("display-settings")
 					: focusManager.focusNode("check-updates");
@@ -5902,6 +6079,7 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Right)
 			{
+				if (compactMobileLayout && focusManager.focusNode("program-action")) return true;
 				return focusManager.focusNode("check-updates");
 			}
 			if (direction == UIFocusDirection::Down)
@@ -5920,6 +6098,7 @@ void ResourceSelectScene::configureFocus()
 		{
 			if (direction == UIFocusDirection::Left)
 			{
+				if (compactMobileLayout && focusManager.focusNode("program-action")) return true;
 				return displaySettingsButton != nullptr
 					? focusManager.focusNode("display-settings")
 					: focusManager.focusNode("save-management");
@@ -5930,7 +6109,7 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Down)
 			{
-				return programActionButton != nullptr &&
+				return !compactMobileLayout && programActionButton != nullptr &&
 						programActionButton->visible &&
 						programActionButton->activated
 					? focusManager.focusNode("program-action")
@@ -5946,6 +6125,7 @@ void ResourceSelectScene::configureFocus()
 		UIFocusManager::ActionHandler(),
 		[this](UIFocusDirection direction)
 		{
+			if (compactMobileLayout && direction == UIFocusDirection::Up) return true;
 			if (direction == UIFocusDirection::Down)
 			{
 				return focusManager.focusNode("resource-list");
@@ -5957,6 +6137,7 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Left)
 			{
+				if (compactMobileLayout && focusManager.focusNode("display-settings")) return true;
 				return focusManager.focusNode("save-management");
 			}
 			return false;
@@ -6060,6 +6241,8 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Up)
 			{
+				if (resourceInstallDialogState == ResourceInstallDialogState::BrowsingSaves)
+					return focusManager.focusNode("install-previous") || focusManager.focusNode("save-export");
 				return focusManager.focusNode("install-previous");
 			}
 			return false;
@@ -6078,6 +6261,8 @@ void ResourceSelectScene::configureFocus()
 			}
 			if (direction == UIFocusDirection::Up)
 			{
+				if (resourceInstallDialogState == ResourceInstallDialogState::BrowsingSaves)
+					return focusManager.focusNode("install-next") || focusManager.focusNode("save-import");
 				return focusManager.focusNode("install-next");
 			}
 			return false;
@@ -6090,6 +6275,8 @@ void ResourceSelectScene::configureFocus()
 		UIFocusManager::ActionHandler(),
 		[this](UIFocusDirection direction)
 		{
+			if (direction == UIFocusDirection::Up && resourceInstallDialogState == ResourceInstallDialogState::BrowsingSaves)
+				return focusManager.focusNode("save-export");
 			if (direction == UIFocusDirection::Right)
 			{
 				return focusManager.focusNode("install-next");
@@ -6108,6 +6295,8 @@ void ResourceSelectScene::configureFocus()
 		UIFocusManager::ActionHandler(),
 		[this](UIFocusDirection direction)
 		{
+			if (direction == UIFocusDirection::Up && resourceInstallDialogState == ResourceInstallDialogState::BrowsingSaves)
+				return focusManager.focusNode("save-import");
 			if (direction == UIFocusDirection::Left)
 			{
 				return focusManager.focusNode("install-previous");
@@ -6490,7 +6679,8 @@ void ResourceSelectScene::confirmSelection()
 		beginResourceDownloadConfirmation();
 		return;
 	}
-	if (entry.onlineAvailable && beginResourceDownloadConfirmation(true))
+	if (entry.onlineAvailable && !entry.localVersionNewerThanOnline &&
+		beginResourceDownloadConfirmation(true))
 	{
 		return;
 	}
@@ -7031,8 +7221,8 @@ void ResourceSelectScene::updateLayout(int width, int height)
 	const int packCount = std::max(
 		1, static_cast<int>(visibleResourceCount));
 	compactVerticalLayout = height < 520;
-	compactMobileLayout = compactVerticalLayout &&
-		mobileResourceSelectUiEnabled();
+	// Short desktop windows need the same contained cards and footer as mobile.
+	compactMobileLayout = compactVerticalLayout;
 	const int resourcePackItemHeight = compactMobileLayout
 		? CompactMobileResourcePackItemHeight : ResourcePackItemHeight;
 	const int desiredListHeight = packCount * resourcePackItemHeight;
@@ -7069,7 +7259,8 @@ void ResourceSelectScene::updateLayout(int width, int height)
 	// panel frame visible while giving the list the remaining height; compact
 	// mobile cards then expose several games without reducing their text size.
 	const int verticalMargin = height < 520 ? 3 : 48;
-	const int maximumPanelHeight = std::max(1, height - verticalMargin * 2);
+	const int availableHeight = displaySettingsVisible ? getDialogAvailableHeight() : height;
+	const int maximumPanelHeight = std::max(1, availableHeight - verticalMargin * 2);
 	const int minimumPanelHeight = std::min(
 		minimumContentHeight + reservedFooterHeight,
 		maximumPanelHeight);
@@ -7082,7 +7273,7 @@ void ResourceSelectScene::updateLayout(int width, int height)
 			availableContentHeight - narrowDetailHeight - detailGap);
 
 	panelX = (width - panelWidth) / 2;
-	panelY = std::max(verticalMargin, (height - panelHeight) / 2);
+	panelY = std::max(verticalMargin, (availableHeight - panelHeight) / 2);
 	startX = panelX + panelPadding;
 	startY = panelY + (compactMobileLayout
 		? CompactMobilePanelListTopOffset : PanelListTopOffset);
@@ -7091,7 +7282,7 @@ void ResourceSelectScene::updateLayout(int width, int height)
 
 void ResourceSelectScene::updateControlLayout()
 {
-	const bool compactHeader = panelWidth < HeaderActionCompactPanelWidth;
+	const bool compactHeader = getExitButtonRect().w < HeaderActionButtonWidth;
 	const int headerFontSize = compactHeader
 		? HeaderActionCompactFontSize : HeaderActionFontSize;
 	if (exitButton != nullptr)
@@ -7251,10 +7442,12 @@ void ResourceSelectScene::updateControlLayout()
 Rect ResourceSelectScene::getExitButtonRect() const
 {
 	int buttonWidth = HeaderActionButtonWidth;
-	if (panelWidth < HeaderActionCompactPanelWidth)
+	const bool extraProgramAction = compactMobileLayout && displaySettingsButton != nullptr &&
+		programActionButton != nullptr && programActionButton->visible;
+	if (panelWidth < HeaderActionCompactPanelWidth || extraProgramAction)
 	{
 		buttonWidth = HeaderActionCompactButtonWidth;
-		constexpr int buttonCount = 5;
+		const int buttonCount = extraProgramAction ? 6 : 5;
 		const int gap = 6;
 		const int availableWidth = std::max(
 			1, panelWidth - panelPadding * 2 - gap * (buttonCount - 1));
@@ -7282,7 +7475,7 @@ Rect ResourceSelectScene::getCheckUpdatesButtonRect() const
 {
 	Rect buttonRect = getExitButtonRect();
 	const int gap = panelWidth < HeaderActionCompactPanelWidth ? 6 : 10;
-	const int checkButtonWidth = panelWidth < HeaderActionCompactPanelWidth
+	const int checkButtonWidth = panelWidth < HeaderActionCompactPanelWidth || compactMobileLayout
 		? buttonRect.w : HeaderCheckUpdatesButtonWidth;
 	buttonRect.x -= checkButtonWidth + gap;
 	buttonRect.w = checkButtonWidth;
@@ -7295,6 +7488,8 @@ Rect ResourceSelectScene::getDisplaySettingsButtonRect() const
 	Rect buttonRect = getExitButtonRect();
 	const int gap = panelWidth < HeaderActionCompactPanelWidth ? 6 : 10;
 	buttonRect.x = checkButtonRect.x - buttonRect.w - gap;
+	if (compactMobileLayout && programActionButton != nullptr && programActionButton->visible)
+		buttonRect.x -= buttonRect.w + gap;
 	return buttonRect;
 }
 
@@ -7343,27 +7538,24 @@ Rect ResourceSelectScene::getDisplaySettingsRowValueRect(int row) const
 
 Rect ResourceSelectScene::getDisplaySettingsPreviousButtonRect(int row) const
 {
-	const int labelWidth = std::min(170, contentWidth * 34 / 100);
+	const int labelWidth = std::min(170, contentWidth * 28 / 100);
+	const int firstRow = panelHeight < 400 ? 86 : DisplaySettingsFirstRowTopOffset;
+	const int rowHeight = std::min(DisplaySettingsRowHeight,
+		std::max(30, (getDisplaySettingsApplyButtonRect().y - panelY - firstRow - 28) / DisplaySettingsRowCount));
 	return
 	{
 		panelX + panelPadding + labelWidth,
-		panelY + DisplaySettingsFirstRowTopOffset +
-			row * DisplaySettingsRowHeight,
+		panelY + firstRow + row * rowHeight,
 		DisplaySettingsArrowButtonSize,
-		DisplaySettingsArrowButtonSize
+		std::min(DisplaySettingsArrowButtonSize, rowHeight - 6)
 	};
 }
 
 Rect ResourceSelectScene::getDisplaySettingsNextButtonRect(int row) const
 {
-	return
-	{
-		panelX + panelWidth - panelPadding - DisplaySettingsArrowButtonSize,
-		panelY + DisplaySettingsFirstRowTopOffset +
-			row * DisplaySettingsRowHeight,
-		DisplaySettingsArrowButtonSize,
-		DisplaySettingsArrowButtonSize
-	};
+	Rect result = getDisplaySettingsPreviousButtonRect(row);
+	result.x = panelX + panelWidth - panelPadding - DisplaySettingsArrowButtonSize;
+	return result;
 }
 
 Rect ResourceSelectScene::getDisplaySettingsApplyButtonRect() const
@@ -7472,14 +7664,20 @@ Rect ResourceSelectScene::getResourceRemoveButtonRect() const
 	return buttonRect;
 }
 
+int ResourceSelectScene::getDialogAvailableHeight() const
+{
+	return shouldShowControllerPrompts() ? ControllerPromptPresenter::bottomBarOptions(engine).y : rect.h;
+}
+
 Rect ResourceSelectScene::getCheatHelpDialogRect() const
 {
 	const int dialogWidth = std::max(1, std::min(620, rect.w - 24));
-	const int dialogHeight = std::max(1, std::min(360, rect.h - 24));
+	const int availableHeight = getDialogAvailableHeight();
+	const int dialogHeight = std::max(1, std::min(360, availableHeight - 24));
 	return
 	{
 		(rect.w - dialogWidth) / 2,
-		(rect.h - dialogHeight) / 2,
+		(availableHeight - dialogHeight) / 2,
 		dialogWidth,
 		dialogHeight
 	};
@@ -7502,11 +7700,12 @@ Rect ResourceSelectScene::getCheatHelpCloseButtonRect() const
 Rect ResourceSelectScene::getExternalResourceDialogRect() const
 {
 	const int dialogWidth = std::max(1, std::min(620, rect.w - 24));
-	const int dialogHeight = std::max(1, std::min(330, rect.h - 24));
+	const int availableHeight = getDialogAvailableHeight();
+	const int dialogHeight = std::max(1, std::min(330, availableHeight - 24));
 	return
 	{
 		(rect.w - dialogWidth) / 2,
-		(rect.h - dialogHeight) / 2,
+		(availableHeight - dialogHeight) / 2,
 		dialogWidth,
 		dialogHeight
 	};
@@ -7539,11 +7738,12 @@ Rect ResourceSelectScene::getExternalResourceCancelButtonRect() const
 Rect ResourceSelectScene::getResourceInstallDialogRect() const
 {
 	const int dialogWidth = std::max(1, std::min(660, rect.w - 24));
-	const int dialogHeight = std::max(1, std::min(440, rect.h - 24));
+	const int availableHeight = getDialogAvailableHeight();
+	const int dialogHeight = std::max(1, std::min(440, availableHeight - 24));
 	return
 	{
 		(rect.w - dialogWidth) / 2,
-		(rect.h - dialogHeight) / 2,
+		(availableHeight - dialogHeight) / 2,
 		dialogWidth,
 		dialogHeight
 	};
@@ -7854,6 +8054,7 @@ void ResourceSelectScene::performExternalRescan()
 
 void ResourceSelectScene::onDraw()
 {
+	pollSaveFileSelection();
 	pollOnlineCatalogCheck();
 	presentPendingProgramUpdateDialog();
 	pollResourcePackageImportSelection();
@@ -7897,17 +8098,25 @@ void ResourceSelectScene::onDraw()
 	}
 }
 
+bool ResourceSelectScene::shouldShowControllerPrompts() const
+{
+	return visible && engine != nullptr
+		&& Element::isCurrentRunOwner(this)
+		&& semanticFocusVisible && !keyboardSemanticFocus
+		&& shouldPresentGamepadFocus(engine);
+}
+
 void ResourceSelectScene::onDrawEnd()
 {
-	if (!visible || engine == nullptr
-		|| !Element::isCurrentRunOwner(this)
-		|| !semanticFocusVisible || keyboardSemanticFocus)
+	if (!shouldShowControllerPrompts())
 	{
 		return;
 	}
 	using GameInput::InputAction;
 	const bool resourceInstallDialogVisible =
 		resourceInstallDialogState != ResourceInstallDialogState::Hidden;
+	if (resourceInstallDialogState == ResourceInstallDialogState::SelectingSaveFile ||
+		resourceInstallDialogState == ResourceInstallDialogState::TransferringSaves) return;
 	std::vector<ControllerPromptItem> items;
 	if (cheatHelpVisible)
 	{
@@ -7961,8 +8170,30 @@ void ResourceSelectScene::onDrawEnd()
 			{ InputAction::Cancel, "退出" }
 		};
 	}
-	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+	ControllerPromptPresenter::draw(
+		engine, engine->inputActions(), items, controllerPromptOptions(), controllerPromptTextureCache);
+}
+
+ControllerPromptDrawOptions ResourceSelectScene::controllerPromptOptions() const
+{
+	auto options = ControllerPromptPresenter::bottomBarOptions(engine);
+	if (!cheatHelpVisible && !displaySettingsVisible && !externalResourceDialogVisible &&
+		resourceInstallDialogState == ResourceInstallDialogState::Hidden)
+	{
+		// Share the existing credits area instead of shrinking the resource list
+		// or painting a window-bottom overlay across the external-link buttons.
+		const Rect footer = getCreditsTextAreaRect();
+		options.x = footer.x;
+		options.y = footer.y;
+		options.width = footer.w;
+		options.height = footer.h;
+		if (compactMobileLayout)
+		{
+			options.fontSize = 12;
+			options.verticalPadding = 2;
+		}
+	}
+	return options;
 }
 
 void ResourceSelectScene::drawBackground(int width, int height)
@@ -8043,31 +8274,34 @@ void ResourceSelectScene::drawPanel()
 			0xFFD8C59A,
 			versionLaneWidth,
 			10);
-		const Rect creditsRect = getCreditsTextAreaRect();
-		drawCenteredText(
-			u8"引擎作者：Upwinded",
-			centerX,
-			creditsRect.y,
-			11,
-			0xFFD8C59A,
-			creditsRect.w,
-			10);
-		drawCenteredText(
-			u8"感谢：偶像（Weyl、BT、scarsty、SB500）、小试刀剑",
-			centerX,
-			creditsRect.y + 10,
-			11,
-			0xFFB9AA87,
-			creditsRect.w,
-			10);
-		drawCenteredText(
-			u8"铁血丹心论坛、剑侠情缘贴吧",
-			centerX,
-			creditsRect.y + 20,
-			11,
-			0xFFB9AA87,
-			creditsRect.w,
-			10);
+		if (!shouldShowControllerPrompts())
+		{
+			const Rect creditsRect = getCreditsTextAreaRect();
+			drawCenteredText(
+				u8"引擎作者：Upwinded",
+				centerX,
+				creditsRect.y,
+				11,
+				0xFFD8C59A,
+				creditsRect.w,
+				10);
+			drawCenteredText(
+				u8"感谢：偶像（Weyl、BT、scarsty、SB500）、小试刀剑",
+				centerX,
+				creditsRect.y + 10,
+				11,
+				0xFFB9AA87,
+				creditsRect.w,
+				10);
+			drawCenteredText(
+				u8"铁血丹心论坛、剑侠情缘贴吧",
+				centerX,
+				creditsRect.y + 20,
+				11,
+				0xFFB9AA87,
+				creditsRect.w,
+				10);
+		}
 	}
 	else
 	{
@@ -8093,30 +8327,33 @@ void ResourceSelectScene::drawPanel()
 			panelWidth < HeaderActionCompactPanelWidth),
 			titleCenterX, panelY + HeaderSubtitleTopOffset, 16,
 			0xFFFFFFFF, titleMaximumWidth, 14);
-		const int authorOffset = hasExternalResourceControls
-			? 98 - compactFooterShift
-			: 136;
-		const int specialThanksOffset = hasExternalResourceControls
-			? 79 - compactFooterShift
-			: 111;
-		const int communityThanksOffset = hasExternalResourceControls
-			? 62 - compactFooterShift
-			: 91;
-		drawCenteredText("引擎作者：Upwinded", centerX,
-			panelY + panelHeight - authorOffset,
-			hasExternalResourceControls ? 18 : 20,
-			0xFFD8C59A, contentWidth,
-			hasExternalResourceControls ? 14 : 16);
-		drawCenteredText("特别感谢：偶像（Weyl、BT、scarsty、SB500）、小试刀剑",
-			centerX, panelY + panelHeight - specialThanksOffset,
-			hasExternalResourceControls ? 14 : 16,
-			0xFFB9AA87, contentWidth,
-			14);
-		drawCenteredText("铁血丹心论坛、剑侠情缘贴吧",
-			centerX, panelY + panelHeight - communityThanksOffset,
-			hasExternalResourceControls ? 14 : 16,
-			0xFFB9AA87, contentWidth,
-			14);
+		if (!shouldShowControllerPrompts())
+		{
+			const int authorOffset = hasExternalResourceControls
+				? 98 - compactFooterShift
+				: 136;
+			const int specialThanksOffset = hasExternalResourceControls
+				? 79 - compactFooterShift
+				: 111;
+			const int communityThanksOffset = hasExternalResourceControls
+				? 62 - compactFooterShift
+				: 91;
+			drawCenteredText("引擎作者：Upwinded", centerX,
+				panelY + panelHeight - authorOffset,
+				hasExternalResourceControls ? 18 : 20,
+				0xFFD8C59A, contentWidth,
+				hasExternalResourceControls ? 14 : 16);
+			drawCenteredText("特别感谢：偶像（Weyl、BT、scarsty、SB500）、小试刀剑",
+				centerX, panelY + panelHeight - specialThanksOffset,
+				hasExternalResourceControls ? 14 : 16,
+				0xFFB9AA87, contentWidth,
+				14);
+			drawCenteredText("铁血丹心论坛、剑侠情缘贴吧",
+				centerX, panelY + panelHeight - communityThanksOffset,
+				hasExternalResourceControls ? 14 : 16,
+				0xFFB9AA87, contentWidth,
+				14);
+		}
 		if (enableExternalButton != nullptr)
 		{
 			const Rect pathHintRect = getExternalResourcePathHintRect();
@@ -8211,7 +8448,7 @@ void ResourceSelectScene::drawDisplaySettingsPage()
 		u8"点击“应用”后立即生效；窗口模式也可直接拖动窗口得到自定义尺寸",
 		panelX + panelWidth / 2, panelY + 58,
 		16, 0xFFD8C59A, contentWidth, 14);
-	engine->fillRect(panelX + panelPadding, panelY + 91,
+	engine->fillRect(panelX + panelPadding, panelY + (panelHeight < 400 ? 78 : 91),
 		contentWidth, 1, 216, 184, 112, 120);
 
 	std::array<std::string, DisplaySettingsRowCount> labels =
@@ -8282,13 +8519,15 @@ void ResourceSelectScene::drawDisplaySettingsPage()
 		const Rect valueRect = getDisplaySettingsRowValueRect(row);
 		const int labelX = panelX + panelPadding;
 		const int labelWidth = std::max(1, previous.x - labelX - 12);
-		drawTextLine(labels[row], labelX, previous.y + 9,
-			18, 0xFFD8C59A, labelWidth, 14);
+		const int fontSize = previous.h < 36 ? 14 : 17;
+		const int textY = previous.y + (previous.h - fontSize) / 2;
+		drawTextLine(labels[row], labelX, textY,
+			fontSize, 0xFFD8C59A, labelWidth, 14);
 		engine->fillRect(valueRect.x, valueRect.y,
 			valueRect.w, valueRect.h, 12, 10, 9, 150);
 		drawCenteredText(values[row],
-			valueRect.x + valueRect.w / 2, valueRect.y + 9,
-			17, 0xFFFFFFFF, valueRect.w - 10, 13);
+			valueRect.x + valueRect.w / 2, textY,
+			fontSize, 0xFFFFFFFF, valueRect.w - 10, 13);
 	}
 
 	if (!displaySettingsStatusText.empty())
@@ -8434,6 +8673,12 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		{
 			title = u8"确认重新下载此游戏";
 		}
+		else if (pendingResourceInstall.requestedResourceInstalled &&
+			pendingResourceInstall.requestedDownloadMode ==
+				OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage)
+		{
+			title = u8"确认使用线上版本";
+		}
 		else
 		{
 			title = resourceUpdatePromptedByEntry
@@ -8442,6 +8687,16 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		break;
 	case ResourceInstallDialogState::BrowsingSaves:
 		title = u8"存档管理";
+		break;
+	case ResourceInstallDialogState::ChoosingSaveExport:
+		title = u8"导出存档";
+		break;
+	case ResourceInstallDialogState::ConfirmingSaveImport:
+		title = u8"导入存档";
+		break;
+	case ResourceInstallDialogState::SelectingSaveFile:
+	case ResourceInstallDialogState::TransferringSaves:
+		title = u8"存档传输";
 		break;
 	case ResourceInstallDialogState::ConfirmingSaveRemoval:
 		title = u8"确认删除存档";
@@ -8466,7 +8721,11 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			? u8"主程序准备完成" : u8"资源准备完成";
 		break;
 	case ResourceInstallDialogState::Completed:
-		if (resourceInstallOperation ==
+		if (resourceInstallOperation == ResourceInstallOperation::SaveTransfer)
+		{
+			title = u8"存档操作完成";
+		}
+		else if (resourceInstallOperation ==
 			ResourceInstallOperation::SaveManagement)
 		{
 			title = u8"存档删除完成";
@@ -8487,7 +8746,11 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		}
 		break;
 	case ResourceInstallDialogState::Failed:
-		if (resourceInstallOperation ==
+		if (resourceInstallOperation == ResourceInstallOperation::SaveTransfer)
+		{
+			title = u8"存档操作未完成";
+		}
+		else if (resourceInstallOperation ==
 			ResourceInstallOperation::ProgramDownload)
 		{
 			title = u8"主程序处理失败";
@@ -8531,10 +8794,8 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			dialog.y + 82,
 			21, 0xFFFFE7B0, dialog.w - 48, 16);
 		drawWrappedDescription(
-			u8"完整包：导入游戏、MOD、ResourceOnly 资源或 common，"
-			u8"程序会自动识别。\n\n"
-			u8"增量包：覆盖到本机唯一的同 Game.Id 可写基包。"
-			u8"不要求与线上目录一致，导入错误可重新导入修复。",
+			u8"请先下载完整游戏包或增量补丁包，再选择对应类型导入。\n\n"
+			u8"导入会覆盖现有资源。",
 			{ dialog.x + 36, dialog.y + 122,
 				std::max(1, dialog.w - 72),
 				std::max(1,
@@ -8578,7 +8839,10 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				dialog.x + 22, dialog.y + 62, 16, 0xFFFFFFFF,
 				std::max(1, dialog.w - 44), 14);
 			int lineY = dialog.y + 92;
-			const int maximumVisibleEntries = dialog.h < 360 ? 3 : 6;
+			const int choiceHintY = getResourceInstallPreviousPageButtonRect().y - 26;
+			const int lineCount = std::max(1, (choiceHintY - lineY - 4) / 24);
+			const int maximumVisibleEntries = static_cast<int>(pendingResourceRemoval.entries.size()) > lineCount
+				? lineCount - 1 : lineCount;
 			const int visibleCount = std::min(
 				static_cast<int>(pendingResourceRemoval.entries.size()),
 				maximumVisibleEntries);
@@ -8613,13 +8877,14 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			drawCenteredText(
 				u8"必须手动选择一项，程序不会替你决定是否保留存档。",
 				dialog.x + dialog.w / 2,
-				getResourceInstallPreviousPageButtonRect().y - 26,
+				choiceHintY,
 				14, 0xFFBFE2B4, dialog.w - 40, 13);
 			return;
 		}
 		if (resourceInstallOperation ==
 			ResourceInstallOperation::ProgramDownload)
 		{
+			const bool compactDialog = dialog.h < 340;
 			const ResourceInstallConfirmationItem* item =
 				pendingResourceInstall.items.empty()
 					? nullptr : &pendingResourceInstall.items.front();
@@ -8635,19 +8900,23 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 						u8"当前版本不低于线上版本，无需更新；仅在你主动确认时重装线上版本。"),
 				dialog.x + 22, dialog.y + 62, 15, 0xFFFFFFFF,
 				std::max(1, dialog.w - 44), 14);
-			int lineY = dialog.y + 96;
+			int lineY = dialog.y + (compactDialog ? 84 : 96);
 			drawTextLine(
-				u8"当前：" + std::string(JxqyBuildVersion::EngineVersion),
+				u8"当前：" + std::string(JxqyBuildVersion::EngineVersion) +
+					(compactDialog && item != nullptr ? u8" → 线上：" + valueOrUndeclared(item->version) : std::string()),
 				dialog.x + 26, lineY, 14, 0xFFD8C59A,
 				std::max(1, dialog.w - 52), 14);
 			lineY += 22;
 			if (item != nullptr)
 			{
-				drawTextLine(
-					u8"线上：" + valueOrUndeclared(item->version),
-					dialog.x + 26, lineY, 14, 0xFFFFD39A,
-					std::max(1, dialog.w - 52), 14);
-				lineY += 22;
+				if (!compactDialog)
+				{
+					drawTextLine(
+						u8"线上：" + valueOrUndeclared(item->version),
+						dialog.x + 26, lineY, 14, 0xFFFFD39A,
+						std::max(1, dialog.w - 52), 14);
+					lineY += 22;
+				}
 				drawTextLine(
 					u8"平台：" + programTargetDisplayName(
 						pendingResourceInstall.requestedGameId),
@@ -8656,12 +8925,12 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				lineY += 22;
 			}
 			drawTextLine(
-				u8"下载：" + formatByteCount(
+				std::string(compactDialog && pendingDownloadUsesMeteredNetwork ? u8"移动数据：" : u8"下载：") + formatByteCount(
 					pendingResourceInstall.totalDownloadBytes),
 				dialog.x + 26, lineY, 14, 0xFFB9AA87,
 				std::max(1, dialog.w - 52), 14);
 			lineY += 24;
-			if (pendingDownloadUsesMeteredNetwork)
+			if (pendingDownloadUsesMeteredNetwork && !compactDialog)
 			{
 				drawTextLine(
 					u8"当前为移动网络，本次下载会使用 " +
@@ -8672,10 +8941,13 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 					std::max(1, dialog.w - 52), 14);
 				lineY += 22;
 			}
-			drawTextLine(u8"主要更新：",
-				dialog.x + 26, lineY, 14, 0xFFFFD39A,
-				std::max(1, dialog.w - 52), 14);
-			lineY += 20;
+			if (!compactDialog)
+			{
+				drawTextLine(u8"主要更新：",
+					dialog.x + 26, lineY, 14, 0xFFFFD39A,
+					std::max(1, dialog.w - 52), 14);
+				lineY += 20;
+			}
 			const int footerY = getResourceInstallPrimaryButtonRect().y - 28;
 			drawWrappedDescription(
 				item == nullptr || item->releaseNotes.empty()
@@ -8870,12 +9142,59 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		return;
 	}
 
+	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport ||
+		resourceInstallDialogState == ResourceInstallDialogState::ConfirmingSaveImport)
+	{
+		const bool exporting = resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport;
+		drawCenteredText(saveTransferGame.name, dialog.x + dialog.w / 2,
+			dialog.y + 60, 18, 0xFFFFE7B0, dialog.w - 56, 14);
+		const auto drawLine = [&](const std::string& text, int row, unsigned int color = 0xFFFFFFFF)
+		{
+			drawTextLine(text, dialog.x + 28, dialog.y + 84 + row * 22,
+				15, color, dialog.w - 56, 13);
+		};
+		if (exporting)
+		{
+			drawLine(saveExportSlots.empty() ? u8"没有可导出的完整存档。"
+				: SavePackage::slotLabel(saveExportSlots[selectedTransferSlot]), 0);
+			if (!saveExportSlots.empty()) drawLine(u8"包含档位文件及对应截图。", 1);
+		}
+		else if (pendingSavePackage)
+		{
+			const auto& slots = pendingSavePackage->slots();
+			std::string source = u8"来源：";
+			for (std::size_t index = 0; index < slots.size(); ++index)
+			{
+				if (index != 0) source += u8"、";
+				source += slots[index].index == SavePackage::AutomaticSlot ? u8"自动" : std::to_string(slots[index].index);
+			}
+			drawLine(source, 0);
+			const bool sameVersions = std::all_of(slots.begin(), slots.end(), [&](const SavePackage::Slot& slot)
+			{
+				return slot.engineVersion == slots.front().engineVersion && slot.resourceVersion == slots.front().resourceVersion;
+			});
+			drawLine(sameVersions ? u8"引擎 " + slots.front().engineVersion + u8" / 资源 " + slots.front().resourceVersion
+				: std::string(u8"各档位保存版本不同，均可兼容。"), 1);
+			drawLine(u8"目标：" + (selectedTransferSlot == SavePackage::AllSlots
+				? std::string(u8"按原档位编号导入") : SavePackage::slotLabel(selectedTransferSlot)), 2);
+			drawLine(saveImportWillOverwrite ? u8"目标已有存档，确认后覆盖。" : u8"目标为空，可直接导入。",
+				3, saveImportWillOverwrite ? 0xFFFFB0A0 : 0xFFD8C59A);
+		}
+		return;
+	}
+	if (resourceInstallDialogState == ResourceInstallDialogState::SelectingSaveFile ||
+		resourceInstallDialogState == ResourceInstallDialogState::TransferringSaves)
+	{
+		drawWrappedDescription(resourceInstallDialogMessage,
+			{ dialog.x + 28, dialog.y + 80, dialog.w - 56, dialog.h - 110 }, 18, 0xFFFFFFFF);
+		return;
+	}
 	if (resourceInstallDialogState == ResourceInstallDialogState::BrowsingSaves)
 	{
 		if (saveNamespaceEntries.empty())
 		{
 			drawCenteredText(
-				u8"没有可清理的游戏存档。",
+				saveImportButton->visible ? u8"暂无游戏存档，可从其他设备导入。" : u8"暂无游戏存档。",
 				dialog.x + dialog.w / 2,
 				dialog.y + 112,
 				18, 0xFFFFFFFF, dialog.w - 48, 14);
@@ -8886,26 +9205,21 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		const std::string displayName = info.resourceName.empty()
 			? std::string(u8"已删除或未识别的游戏") : info.resourceName;
 		drawCenteredText(displayName,
-			dialog.x + dialog.w / 2, dialog.y + 76,
-			22, 0xFFFFE7B0, dialog.w - 48, 14);
+			dialog.x + dialog.w / 2, dialog.y + 60,
+			20, 0xFFFFE7B0, dialog.w - 48, 14);
 		drawCenteredText(
 			u8"存档目录：" + info.saveNamespace,
-			dialog.x + dialog.w / 2, dialog.y + 116,
-			16, 0xFFD8C59A, dialog.w - 48, 14);
+			dialog.x + dialog.w / 2, dialog.y + 86,
+			14, 0xFFD8C59A, dialog.w - 48, 14);
 		drawCenteredText(
-			u8"存档槽：" + std::to_string(info.saveSlotCount) +
+			std::to_string(selectedSaveNamespaceIndex + 1) + "/" + std::to_string(saveNamespaceEntries.size()) +
+				u8"  ·  存档槽：" + std::to_string(info.saveSlotCount) +
 				u8"    占用：" +
 				(info.bytes == std::numeric_limits<std::uint64_t>::max()
 					? std::string(u8"大小未知")
 					: formatByteCount(info.bytes)),
-			dialog.x + dialog.w / 2, dialog.y + 148,
-			16, 0xFFB9AA87, dialog.w - 48, 14);
-		drawCenteredText(
-			u8"第 " + std::to_string(selectedSaveNamespaceIndex + 1) +
-				u8" / " + std::to_string(saveNamespaceEntries.size()) + u8" 项",
-			dialog.x + dialog.w / 2,
-			getResourceInstallPreviousPageButtonRect().y - 24,
-			14, 0xFFB9AA87, dialog.w - 40, 13);
+			dialog.x + dialog.w / 2, dialog.y + 108,
+			14, 0xFFB9AA87, dialog.w - 48, 14);
 		return;
 	}
 
@@ -8919,8 +9233,8 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			const ResourceManager::SaveNamespaceInfo& info =
 				saveNamespaceEntries[selectedSaveNamespaceIndex];
 			drawWrappedDescription(
-				u8"将永久删除存档目录“" + info.saveNamespace +
-					u8"”。资源文件、其他游戏存档和全局设置不会被删除。",
+				u8"将永久删除“" + (info.resourceName.empty() ? info.saveNamespace : info.resourceName) +
+					u8"”的全部手动、自动存档及运行记录。\n资源文件和其他游戏存档保留。",
 				{ dialog.x + 32, dialog.y + 88,
 					std::max(1, dialog.w - 64), 120 },
 				18, 0xFFFFB0A0);
@@ -9355,6 +9669,16 @@ void ResourceSelectScene::onChildCallBack(PElement child)
 	{
 		return;
 	}
+	if (child == saveExportButton)
+	{
+		chooseSaveExport();
+		return;
+	}
+	if (child == saveImportButton)
+	{
+		selectSaveFile(false);
+		return;
+	}
 	if (child == exitButton)
 	{
 		stop(erExit);
@@ -9522,6 +9846,8 @@ bool ResourceSelectScene::onHandleEvent(AEvent& event)
 bool ResourceSelectScene::onHandleUIAction(UIAction action)
 {
 	keyboardSemanticFocus = dispatchingKeyboardUIAction;
+	if (resourceInstallDialogState == ResourceInstallDialogState::SelectingSaveFile ||
+		resourceInstallDialogState == ResourceInstallDialogState::TransferringSaves) return true;
 	if (resourcePackageImportSelectionPending)
 	{
 		return true;
@@ -9569,7 +9895,9 @@ bool ResourceSelectScene::onHandleUIAction(UIAction action)
 		if (resourceInstallDialogState ==
 				ResourceInstallDialogState::Confirming ||
 			resourceInstallDialogState ==
-				ResourceInstallDialogState::BrowsingSaves)
+				ResourceInstallDialogState::BrowsingSaves ||
+			resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport ||
+			resourceInstallDialogState == ResourceInstallDialogState::ConfirmingSaveImport)
 		{
 			if (action == UIAction::PagePrevious ||
 				action == UIAction::PanelPrevious)

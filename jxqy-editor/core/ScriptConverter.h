@@ -56,6 +56,7 @@ public:
     static bool isIniFile(const std::string& content);
     static bool detectAndConvertEncoding(std::string& content);
     static const std::set<std::string>& runtimeApiNames();
+    static bool isSupportedRuntimeApi(const std::string& name);
 
 private:
     std::vector<std::string> splitLines(const std::string& content);

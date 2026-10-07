@@ -1,9 +1,11 @@
 #include "../Game/Data/Map.h"
 #include "../File/File.h"
+#include "../Image/SafeImageDecoder.h"
 #include "MapV3ContractFixture.h"
 #include "TestTemporaryDirectory.h"
 
 #include <cstring>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -107,6 +109,64 @@ bool check(bool condition, const char* message)
 		std::cerr << "FAILED: " << message << '\n';
 	}
 	return condition;
+}
+
+bool checkConvertedArenaMap(const std::string& root)
+{
+	File::setActiveResourceRoot(root);
+	const std::string path = u8"map/map_066_比武台.tmx";
+	bool ok = true;
+	for (int reload = 0; reload < 2; ++reload)
+	{
+		Map map;
+		if (!check(map.load(path) && map.data != nullptr && map.mapMpc != nullptr,
+			"real converted TMX loads through production Map including image preparation"))
+		{
+			return false;
+		}
+		ok = check(map.data->head.width == 32 && map.data->head.height == 79,
+			"real converted arena dimensions are preserved") && ok;
+		int obstacles = 0;
+		int traps = 0;
+		int visuals = 0;
+		for (const auto& row : map.data->tile)
+		{
+			for (const auto& tile : row)
+			{
+				obstacles += tile.obstacle == 0x80;
+				traps += tile.trap == 1;
+				for (const auto& layer : tile.layer)
+				{
+					if (layer.mpc == 0)
+						continue;
+					++visuals;
+					const auto& image = map.mapMpc->mpc[layer.mpc - 1].img;
+					ok = check(image != nullptr && layer.frame < image->frame.size(),
+						"each actual TMX cell resolves to a loaded IMG frame") && ok;
+				}
+			}
+		}
+		int packages = 0;
+		int frames = 0;
+		for (const auto& entry : map.mapMpc->mpc)
+		{
+			if (entry.img == nullptr)
+				continue;
+			++packages;
+			for (const auto& frame : entry.img->frame)
+			{
+				SDL_Surface* surface = SafeImageDecoder::loadSurface(frame.data.get(), frame.dataLen);
+				ok = check(surface != nullptr, "every real TMX tile decodes through production SDL image loader") && ok;
+				if (surface != nullptr)
+					SDL_DestroySurface(surface);
+				++frames;
+			}
+		}
+		ok = check(obstacles == 964 && traps == 8 && visuals == 1282 && packages == 6 && frames == 1282,
+			"real TMX obstacle/trap/visual/package/frame inventory matches released XML") && ok;
+	}
+	std::cout << "TMX arena: two fresh Map instances, 1282 frames decoded each, 964 obstacles and 8 traps\n";
+	return ok;
 }
 
 }
@@ -400,6 +460,11 @@ bool runMapV3RuntimeTests()
 			ok;
 	}
 
+	if (const char* convertedRoot = std::getenv("JXQY_TEST_TMX_RESOURCE_ROOT"))
+	{
+		ok = checkConvertedArenaMap(convertedRoot) && ok;
+		File::setActiveResourceRoot(resourceRoot.string());
+	}
 	std::filesystem::remove_all(resourceRoot, errorCode);
 	return ok;
 }

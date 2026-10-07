@@ -45,6 +45,7 @@ struct HeldEditorRunLog
     std::intptr_t parentToken = -1;
     std::string path;
     uint64_t generation = 0;
+    bool failed = false;
 
     ~HeldEditorRunLog()
     {
@@ -70,6 +71,15 @@ void closeHeldEditorRunLogUnlocked()
     g_editorRunLog.parentToken = -1;
     g_editorRunLog.path.clear();
     g_editorRunLog.generation = 0;
+    g_editorRunLog.failed = false;
+}
+
+void disableHeldEditorRunLogUnlocked(const std::string& path, uint64_t generation)
+{
+    closeHeldEditorRunLogUnlocked();
+    g_editorRunLog.path = path;
+    g_editorRunLog.generation = generation;
+    g_editorRunLog.failed = true;
 }
 
 void closeHeldEditorRunLog()
@@ -94,15 +104,6 @@ void invokeEditorRunLogWriteTestHook()
 }
 #endif
 
-bool heldEditorRunLogMatchesCurrentPath(
-    std::FILE* file,
-    const std::string& fileName)
-{
-    return File::editorRunLogHandleIsCurrent(
-        file, g_editorRunLog.parentToken,
-        fileName, g_editorRunLog.generation);
-}
-
 bool openHeldEditorRunLog(
     const std::string& fileName,
     uint64_t generation)
@@ -116,12 +117,6 @@ bool openHeldEditorRunLog(
     }
     g_editorRunLog.path = fileName;
     g_editorRunLog.generation = generation;
-    if (!heldEditorRunLogMatchesCurrentPath(
-            g_editorRunLog.file, fileName))
-    {
-        closeHeldEditorRunLogUnlocked();
-        return false;
-    }
     return true;
 }
 
@@ -140,73 +135,32 @@ bool appendHeldEditorRunLog(const std::string& fileName,
         return false;
     }
 
-    const auto snapshotIsCurrent =
-        [&fileName, generation]()
-        {
-            std::string currentPath;
-            uint64_t currentGeneration = 0;
-            return File::getEditorRunLogPath(
-                    currentPath, currentGeneration) ==
-                    File::EditorRunFileLayoutState::Valid &&
-                currentPath == fileName &&
-                currentGeneration == generation;
-        };
-    if (!snapshotIsCurrent())
-    {
-        return false;
-    }
-
     std::lock_guard<std::mutex> lock(g_editorRunLog.mutex);
-    if (g_editorRunLog.file != nullptr &&
-        (g_editorRunLog.path != fileName ||
-         g_editorRunLog.generation != generation))
+    if (g_editorRunLog.path != fileName ||
+        g_editorRunLog.generation != generation)
     {
         closeHeldEditorRunLogUnlocked();
     }
-    if (g_editorRunLog.file != nullptr &&
-        !heldEditorRunLogMatchesCurrentPath(
-            g_editorRunLog.file, fileName))
+    if (g_editorRunLog.failed)
     {
-        // Keep the verified descriptor and parent anchor on POSIX while the
-        // lexical leaf is displaced. Writes remain suppressed, and restoring
-        // the exact inode lets the held logger resume without reopening an
-        // untrusted existing leaf.
         return false;
     }
     if (g_editorRunLog.file == nullptr &&
-        (!snapshotIsCurrent() ||
-         !openHeldEditorRunLog(fileName, generation) ||
-         !snapshotIsCurrent()))
+        !openHeldEditorRunLog(fileName, generation))
     {
-        closeHeldEditorRunLogUnlocked();
-        return false;
-    }
-
-    if (!snapshotIsCurrent() ||
-        !heldEditorRunLogMatchesCurrentPath(
-            g_editorRunLog.file, fileName))
-    {
+        disableHeldEditorRunLogUnlocked(fileName, generation);
         return false;
     }
 #if defined(JXQY_ENABLE_TEST_HOOKS)
     invokeEditorRunLogWriteTestHook();
 #endif
-    if (!snapshotIsCurrent() ||
-        !heldEditorRunLogMatchesCurrentPath(
-            g_editorRunLog.file, fileName))
-    {
-        return false;
-    }
     const std::size_t written = std::fwrite(
         info.data(), 1, info.size(), g_editorRunLog.file);
     const bool succeeded = written == info.size() &&
-        std::fflush(g_editorRunLog.file) == 0 &&
-        snapshotIsCurrent() &&
-        heldEditorRunLogMatchesCurrentPath(
-            g_editorRunLog.file, fileName);
+        std::fflush(g_editorRunLog.file) == 0;
     if (!succeeded)
     {
-        closeHeldEditorRunLogUnlocked();
+        disableHeldEditorRunLogUnlocked(fileName, generation);
     }
     return succeeded;
 }
@@ -239,8 +193,7 @@ namespace GameLog
 void editorRunFileLayoutGenerationChanged(uint64_t generation)
 {
     std::lock_guard<std::mutex> lock(g_editorRunLog.mutex);
-    if (g_editorRunLog.file != nullptr &&
-        g_editorRunLog.generation < generation)
+    if (g_editorRunLog.generation < generation)
     {
         closeHeldEditorRunLogUnlocked();
     }

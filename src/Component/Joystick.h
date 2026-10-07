@@ -16,6 +16,7 @@ protected:
 private:
 	bool useStaticImages = false;
 	MobileJoystickMovementState movementState = MobileJoystickMovementState::Idle;
+	std::optional<uint64_t> runExitCandidateBeginTime;
 	void updateMovementState();
 public:
 	std::vector<int> getDirectionList();

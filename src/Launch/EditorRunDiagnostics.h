@@ -33,7 +33,7 @@ struct DiagnosticEvent
 
 // The sink must append and flush the complete JSONL line before returning
 // true. DiagnosticsWriter serializes concurrent callers and only advances the
-// sequence after the sink confirms that the line is durable.
+// sequence after the sink confirms that the line was written and flushed.
 using DiagnosticLineSink =
 	std::function<bool(std::string_view line)>;
 

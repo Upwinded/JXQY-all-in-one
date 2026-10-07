@@ -92,6 +92,7 @@ public:
 
     bool loadFromFile(const std::string& fileName);
     bool loadFromBuffer(const uint8_t* data, size_t length, bool forceLegacyGbkStrings = false);
+    bool createEmptyMap(int32_t width, int32_t height);
 
     bool saveToFile(const std::string& fileName) const;
     std::vector<uint8_t> saveToBuffer() const;

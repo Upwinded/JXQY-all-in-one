@@ -1,6 +1,7 @@
 #include "ImageContainer.h"
 #include "../Engine/Engine.h"
 #include "ComponentRegistry.h"
+#include <algorithm>
 
 namespace
 {
@@ -36,6 +37,7 @@ void ImageContainer::freeResource()
 	cachedCropRect = { 0, 0, 0, 0 };
 	cachedCropValid = false;
 	frameIndex = -1;
+	nineSlice = nineSliceWidth = 0;
 	removeAllChild();
 }
 
@@ -55,6 +57,8 @@ void ImageContainer::initFromIni(INIReader& ini)
 	cropContent = ini.GetBoolean("Init", "CropContent", false);
 	cropBlack = ini.GetBoolean("Init", "CropBlack", false);
 	frameIndex = ini.GetInteger("Init", "Frame", -1);
+	nineSlice = std::max(0, static_cast<int>(ini.GetInteger("Init", "NineSlice", 0)));
+	nineSliceWidth = std::max(0, static_cast<int>(ini.GetInteger("Init", "NineSliceWidth", nineSlice)));
 	std::string impName = ini.Get("Init", "Image", "");
 	if (impName.empty())
 	{
@@ -95,6 +99,28 @@ bool ImageContainer::drawImagetoRect(
 	}
 
 	Rect sourceRect = { 0, 0, sourceWidth, sourceHeight };
+	if (nineSlice > 0 && destinationRect.w > 0 && destinationRect.h > 0)
+	{
+		const int sourceBorder = std::min({ nineSlice, sourceWidth / 2, sourceHeight / 2 });
+		const int border = std::min({ nineSliceWidth, destinationRect.w / 2, destinationRect.h / 2 });
+		const int sourceX[] = { 0, sourceBorder, sourceWidth - sourceBorder, sourceWidth };
+		const int sourceY[] = { 0, sourceBorder, sourceHeight - sourceBorder, sourceHeight };
+		const int targetX[] = { 0, border, destinationRect.w - border, destinationRect.w };
+		const int targetY[] = { 0, border, destinationRect.h - border, destinationRect.h };
+		for (int row = 0; row < 3; ++row)
+		{
+			for (int column = 0; column < 3; ++column)
+			{
+				Rect source{ sourceX[column], sourceY[row], sourceX[column + 1] - sourceX[column], sourceY[row + 1] - sourceY[row] };
+				Rect target{ destinationRect.x + targetX[column], destinationRect.y + targetY[row], targetX[column + 1] - targetX[column], targetY[row + 1] - targetY[row] };
+				if (source.w > 0 && source.h > 0 && target.w > 0 && target.h > 0)
+				{
+					engine->drawImage(image, &source, &target);
+				}
+			}
+		}
+		return true;
+	}
 	if (cropContent)
 	{
 		if (cachedCropImage != image)

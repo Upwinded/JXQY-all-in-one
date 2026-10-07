@@ -240,7 +240,7 @@ bool writerLifecycleTest()
 			SessionId, sink, options);
 	bool ok = check(
 		writer != nullptr,
-		"writer durably starts") ;
+		"writer starts and flushes") ;
 	if (writer == nullptr)
 	{
 		return false;
@@ -266,7 +266,7 @@ bool writerLifecycleTest()
 			EditorRun::
 				RuntimeTraceSessionFinishStatus::
 					Completed),
-		"writer drains and durably finishes") && ok;
+		"writer drains and flushes before finishing") && ok;
 	{
 		std::lock_guard<std::mutex> lock(sinkMutex);
 		ok = check(
@@ -653,6 +653,38 @@ bool writerLifecycleValidationTest()
 		"writer rejects a consumer-invalid execution lifecycle");
 }
 
+bool writerExecutionIdTest()
+{
+	auto writer = EditorRun::RuntimeTraceWriter::create(
+		SessionId, [](std::string_view)
+		{
+			return true;
+		});
+	if (!check(writer != nullptr, "execution ID fixture starts"))
+	{
+		return false;
+	}
+	using EnqueueResult = EditorRun::RuntimeTraceEnqueueResult;
+	bool ok = check(
+		writer->enqueue(scriptStartEvent(41)) == EnqueueResult::Enqueued &&
+		writer->enqueue(scriptFinishEvent(41)) == EnqueueResult::Enqueued,
+		"explicit execution IDs remain accepted");
+	const std::uint64_t executionId = writer->allocateExecutionId();
+	ok = check(
+		executionId == 42 &&
+		writer->enqueue(scriptStartEvent(executionId)) == EnqueueResult::Enqueued &&
+		writer->enqueue(scriptFinishEvent(executionId)) == EnqueueResult::Enqueued,
+		"allocated execution IDs continue after explicit execution IDs") && ok;
+	ok = check(
+		writer->enqueue(scriptStartEvent(41)) == EnqueueResult::Invalid &&
+		writer->error() == EditorRun::RuntimeTraceWriterError::InvalidExecutionLifecycle,
+		"a completed execution ID cannot be reused") && ok;
+	ok = check(
+		!writer->finish(EditorRun::RuntimeTraceSessionFinishStatus::Completed),
+		"duplicate execution IDs leave the trace incomplete") && ok;
+	return ok;
+}
+
 bool writerActualBatchLimitsTest()
 {
 	EditorRun::RuntimeTraceVariableChangeEvent variable;
@@ -822,6 +854,7 @@ int main()
 	ok = writerQueueSaturationStaysIncompleteTest() && ok;
 	ok = writerRejectedEventStaysIncompleteTest() && ok;
 	ok = writerLifecycleValidationTest() && ok;
+	ok = writerExecutionIdTest() && ok;
 	ok = writerActualBatchLimitsTest() && ok;
 	return ok ? 0 : 1;
 }

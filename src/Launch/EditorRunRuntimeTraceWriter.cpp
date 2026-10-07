@@ -230,6 +230,16 @@ RuntimeTraceEnqueueResult RuntimeTraceWriter::enqueue(
 	return RuntimeTraceEnqueueResult::Enqueued;
 }
 
+std::uint64_t RuntimeTraceWriter::allocateExecutionId() noexcept
+{
+	std::lock_guard<std::mutex> lock(mutex);
+	if (nextExecutionId > RuntimeTraceMaximumExactJsonInteger)
+	{
+		return 0;
+	}
+	return nextExecutionId++;
+}
+
 bool RuntimeTraceWriter::finish(
 	RuntimeTraceSessionFinishStatus status)
 {
@@ -460,6 +470,8 @@ void RuntimeTraceWriter::commitLifecycleLocked(
 				executionStates.emplace(
 					payload.executionId,
 					true);
+				nextExecutionId = (std::max)(
+					nextExecutionId, payload.executionId + 1);
 			}
 			else if constexpr (std::is_same_v<
 					Payload,
@@ -609,16 +621,7 @@ void RuntimeTraceWriter::workerMain()
 			}
 			record.event = std::move(event);
 			std::string line;
-			if (!serializeRuntimeTraceRecord(
-					record, line).succeeded())
-			{
-				std::lock_guard<std::mutex> lock(
-					mutex);
-				setErrorLocked(
-					RuntimeTraceWriterError::
-						InvalidEvent);
-				return;
-			}
+			detail::serializeValidatedRuntimeTraceRecord(record, line);
 			serializedLines.push_back(
 				std::move(line));
 		}

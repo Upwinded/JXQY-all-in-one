@@ -589,6 +589,21 @@ void MapFileEditor::clear()
     lastError.clear();
 }
 
+bool MapFileEditor::createEmptyMap(int32_t width, int32_t height)
+{
+    // Match the runtime MAP allocation limits before constructing the grid.
+    if (width <= 0 || height <= 0 || width > 2048 || height > 2048 ||
+        static_cast<int64_t>(width) * height > 1024 * 1024)
+    {
+        lastError = "Invalid map dimensions";
+        return false;
+    }
+    clear();
+    resizeMap(width, height, MapTileData());
+    loaded = true;
+    return true;
+}
+
 bool MapFileEditor::isLoaded() const
 {
     return loaded;

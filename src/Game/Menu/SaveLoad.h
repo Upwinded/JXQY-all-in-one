@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Component/Component.h"
 #include "../GameTypes.h"
+#include "ControllerPromptPresenter.h"
 #include "UIFocusManager.h"
 
 class GamepadEssentialUITestAccess;
@@ -19,6 +20,7 @@ private:
 	bool save = true;
 	bool load = true;
 	UIFocusManager focusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 
 public:
 	int index = -1;

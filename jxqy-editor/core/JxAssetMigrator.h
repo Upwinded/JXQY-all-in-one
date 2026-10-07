@@ -229,7 +229,8 @@ private:
     bool processTextFile(const QString& sourcePath, const QString& outputPath, const QString& relativePath,
         const AssetMigrationOptions& options, AssetMigrationReport& report);
     bool processMapFile(const QString& sourcePath, const QString& outputPath, const QString& relativePath,
-        const AssetMigrationOptions& options, AssetMigrationReport& report);
+        const AssetMigrationOptions& options, AssetMigrationReport& report,
+        const QString& sourceRoot, const QString& outputRoot);
     bool processRawCopyFile(const QString& sourcePath, const QString& outputPath, AssetMigrationReport& report);
     bool processRuntimeJpegFile(const QString& sourcePath,
         const QString& outputPath, const QString& relativePath,
@@ -241,21 +242,11 @@ private:
     std::string rewriteLegacyJxReferences(const std::string& content, const QString& relativePath) const;
     std::string rewriteMapNameIniToIdentity(const std::string& content) const;
     std::string normalizeObjectResourceIni(const std::string& content, const QString& relativePath) const;
-    std::string applyUiDefaults(const std::string& content, const QString& relativePath,
-        const AssetMigrationOptions& options) const;
     std::string replacePlayMusicWavWithMp3(const std::string& content) const;
 
     bool writeModProfileFile(const QString& outputDir, const AssetMigrationOptions& options,
         AssetMigrationReport& report);
-    void ensureMoneyDropScripts(
-        const QString& outputDir,
-        AssetMigrationReport& report);
-    void ensureKnownScriptLocations(
-        const QString& outputDir,
-        AssetMigrationReport& report);
-    void ensureChooseMenuFiles(const QString& outputDir, const QString& uiBaseRoot,
-        const AssetMigrationOptions& options, AssetMigrationReport& report);
-    bool alignUiPresentationWithBase(const QString& outputDir, const QString& uiBaseRoot,
+    void ensureChooseMenuDefinition(const QString& outputDir, const QString& uiBaseRoot,
         AssetMigrationReport& report);
     void convertTalkDatToTalkIndex(const QString& inputDir, const QString& outputDir,
         const AssetMigrationOptions& options, AssetMigrationReport& report, const LogCallback& logCallback);

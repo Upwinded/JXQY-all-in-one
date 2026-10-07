@@ -2,6 +2,7 @@
 #include "../../Component/Component.h"
 #include "../GameTypes.h"
 #include "../Data/GoodsManager.h"
+#include "ControllerPromptPresenter.h"
 #include "SlotGridController.h"
 #include <memory>
 #include <vector>
@@ -17,6 +18,9 @@ enum BuySellType
 class BuySellMenu :
 	public ConfigDrivenPanel
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
 	friend class UIFocusTestAccess;
 public:
 	BuySellMenu();
@@ -63,6 +67,7 @@ private:
 	SlotGridController shopSlotGridController;
 	SlotGridController playerSlotGridController;
 	ControllerPaneRouter controllerPaneRouter;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 	bool saveNumberValidList();
 	bool buyOneFromShopSlot(int shopIndex);
 	void configureControllerFocus();

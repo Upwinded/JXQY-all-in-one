@@ -5,6 +5,7 @@
 #include "../Engine/Engine.h"
 #include "../libconvert/libconvert.h"
 #include "ComponentRegistry.h"
+#include "TextLayout.h"
 #include <regex>
 
 namespace
@@ -208,12 +209,7 @@ void TalkLabel::drawItemStr()
 std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 {
 	std::string text = tString;
-	convert::replaceAllString(text, "<Enter>", "<enter>");
-	convert::replaceAllString(text, "\r\n", "<enter>");
-	convert::replaceAllString(text, "\r", "<enter>");
-	convert::replaceAllString(text, "\n", "<enter>");
-	
-	std::regex reg(R"(<(enter|color=[^>]+)>)", std::regex::icase);
+	std::regex reg(R"(<(enter|color=[^>]+)>|\r\n|\r|\n)", std::regex::icase);
 	std::sregex_iterator end;
 	
 	std::vector<TalkString> result;
@@ -228,10 +224,9 @@ std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 	int column = 0;
 	int row = 0;
 	unsigned int col = color;
+	unsigned int rangeDefaultColor = color;
+	bool rangeDefaultActive = false;
 	size_t pos = 0;
-	
-	std::regex regColor(R"(color=([0-9]+),([0-9]+),([0-9]+))", std::regex::icase);
-	std::regex regColorAlpha(R"(color=([0-9]+),([0-9]+),([0-9]+),([0-9]+))", std::regex::icase);
 	
 	auto advanceLine = [&]()
 	{
@@ -282,65 +277,29 @@ std::vector<TalkString> TalkLabel::splitTalkString(const std::string & tString)
 		std::string tag = convert::lowerCase(match[1].str());
 		if (tag == "enter")
 		{
+			column = 0;
+			row = 0;
+			pageIndex++;
+		}
+		else if (tag.empty())
+		{
 			advanceLine();
 		}
-		else if (tag == "color=red")
+		else if (tag == "color=beginrangedefault")
 		{
-			col = 0xFFFF0000;
+			rangeDefaultColor = col;
+			rangeDefaultActive = true;
 		}
-		else if (tag == "color=green")
+		else if (tag == "color=endrangedefault")
 		{
-			col = 0xFF00FF00;
-		}
-		else if (tag == "color=blue")
-		{
-			col = 0xFF0000FF;
-		}
-		else if (tag == "color=yellow")
-		{
-			col = 0xFFFFFF00;
-		}
-		else if (tag == "color=white")
-		{
-			col = 0xFFFFFFFF;
-		}
-		else if (tag == "color=black")
-		{
-			col = 0xFF000000;
-		}
-		else if (tag == "color=default")
-		{
-			col = color;
+			rangeDefaultActive = false;
 		}
 		else
 		{
-			std::smatch colorMatch;
-			if (std::regex_match(tag, colorMatch, regColorAlpha))
-			{
-				int r = 0;
-				int g = 0;
-				int b = 0;
-				int a = 0;
-				if (convert::parseInteger(colorMatch[1].str(), r) &&
-					convert::parseInteger(colorMatch[2].str(), g) &&
-					convert::parseInteger(colorMatch[3].str(), b) &&
-					convert::parseInteger(colorMatch[4].str(), a))
-				{
-					col = ((a & 0xFF) << 24) | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
-				}
-			}
-			else if (std::regex_match(tag, colorMatch, regColor))
-			{
-				int r = 0;
-				int g = 0;
-				int b = 0;
-				if (convert::parseInteger(colorMatch[1].str(), r) &&
-					convert::parseInteger(colorMatch[2].str(), g) &&
-					convert::parseInteger(colorMatch[3].str(), b))
-				{
-					col = 0xFF000000 | ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
-				}
-			}
+			(void)TextLayout::parseColorTagValue(
+				std::string_view(tag).substr(6),
+				rangeDefaultActive ? rangeDefaultColor : color,
+				col);
 		}
 		
 		pos = match.position() + match.length();

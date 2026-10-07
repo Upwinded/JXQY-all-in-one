@@ -425,7 +425,7 @@ QVector<ApiInfo> buildScriptApiList()
 
     addApi("SetNpcClickScript(name, scriptFile)",
         QCoreApplication::translate("ScriptApiList", "设置NPC点击脚本"),
-        QCoreApplication::translate("ScriptApiList", "SetNpcClickScript(name, scriptFile)\n设置指定NPC被点击时触发的脚本\n参数:\n  name (string) - NPC名称\n  scriptFile (string) - 脚本文件路径\n示例: SetNpcClickScript(\"npc01\", \"npc/click.txt\")"));
+        QCoreApplication::translate("ScriptApiList", "SetNpcClickScript(name, scriptFile)\n普通动作配置设置指定NPC的点击脚本；XJXQY动作配置异步执行该脚本并保留NPC对话绑定\n参数:\n  name (string) - NPC名称\n  scriptFile (string) - 脚本文件路径\n示例: SetNpcClickScript(\"npc01\", \"npc/click.txt\")"));
 
     addApi("MergeNpc(fileName)",
         QCoreApplication::translate("ScriptApiList", "合并NPC数据"),

@@ -29,6 +29,7 @@ void PracticeMenu::updateMagic()
 
 	magic->impImage = nullptr;
 	int practiceIndex = gm->magicManager.practiceIndex();
+	MenuResource::updateMagicCooldown(magic, gm->magicManager, practiceIndex);
 
 	if (gm->magicManager.magicListExists(practiceIndex))
 	{
@@ -71,6 +72,18 @@ void PracticeMenu::updateLevel()
 	else
 	{
 		if (level) level->setStr("");
+	}
+}
+
+void PracticeMenu::onUpdate()
+{
+	if (visible && gm != nullptr)
+	{
+		// Hits and script rewards can change this entry without upgrading it.
+		// Refresh text only; rebuilding the item would restart its icon animation.
+		updateExp();
+		updateLevel();
+		MenuResource::updateMagicCooldown(magic, gm->magicManager, gm->magicManager.practiceIndex());
 	}
 }
 
@@ -152,6 +165,7 @@ void PracticeMenu::init()
 	if (intro)
 	{
 		intro->autoNextLine = true;
+		intro->setColorTagsEnabled(true);
 	}
 	if (magic)
 	{

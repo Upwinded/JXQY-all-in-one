@@ -103,6 +103,9 @@ bool dispatchUIActionWithFocusRecovery(
 
 class UIFocusManager
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
 public:
 	using ActionHandler = std::function<void()>;
 	using NavigationHandler = std::function<bool(UIFocusDirection)>;

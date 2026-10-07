@@ -1,3 +1,4 @@
+#include "../Game/Data/CollisionDetector.h"
 #include "../Game/Data/NPCManager.h"
 #include "../Game/Data/Magic.h"
 #include "../Game/Data/Map.h"
@@ -8,6 +9,7 @@
 #include "TestTemporaryDirectory.h"
 
 #include <climits>
+#include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -18,11 +20,37 @@
 bool runGambleMenuRuntimeTests();
 bool runMagicDerivedRuntimeTests();
 bool runMagicExperienceTests();
+bool runReplacementExperienceOwnershipTests();
 bool runEffectRuntimePersistenceTests();
 bool runNpcRuntimePersistenceTests();
 bool runObjectAnimationRuntimeTests();
 bool runMediaRuntimeTests();
 bool runCoreLifecycleTests();
+bool runScriptMovementRuntimeTests();
+bool runCurrentModCompatibilityTests();
+bool runQingyuUiTests();
+bool runSaveWriteSharingRuntimeTests();
+bool runSaveStabilityTests();
+bool runXiaoxiangMissingObjectRouteTests();
+bool runXiaoxiangTournamentRouteTests();
+bool runXiaoxiangPrisonEndingTests();
+bool runXiaoxiangCompanionHistoryTests(int requestedLoadMode = -1);
+bool runXiaoxiangLegacyEntranceTests();
+bool runMoonlightTrapRouteTests();
+bool runMoonlightDepartureTests();
+bool runNewSwordBoatRouteTests();
+bool runNewSwordYangYingRouteTests();
+bool runMoonlightEndingTwoRouteTests();
+bool runSwordTwoPartnerDepartureTests();
+bool runSwordTwoHistoricalScriptTests();
+bool runBilibiliStoryFeedbackTests();
+bool runMergedEntitySaveTests();
+bool runProductionAttackFileRuntimeTests();
+bool runFullAttackSaveRuntimeTests();
+bool runEquipmentReplacementSaveRuntimeTests();
+bool runDynamicMagicListSaveRuntimeTests();
+bool runFullExperienceSaveRuntimeTests();
+bool runCharacterCasterSaveRuntimeTests();
 bool runUIFocusTests();
 bool runMapThumbnailControllerTests();
 bool runPartnerEquipmentTransferTests();
@@ -35,6 +63,27 @@ bool runMobileExternalInputRuntimeTests();
 bool runScriptEngineRuntimeTests();
 bool runEditorRunSceneRuntimeTests();
 bool runMapV3RuntimeTests();
+
+class ProjectileCollisionTestAccess
+{
+public:
+	static void beginFrame(EffectManager& manager)
+	{
+		manager.onPreTreatment();
+	}
+
+	static void update(Effect& effect)
+	{
+		effect.onUpdate();
+	}
+
+	static void advance(Effect& effect, UTime milliseconds)
+	{
+		effect.frameTime = milliseconds;
+		effect.setTime(effect.getTime() + milliseconds);
+		effect.onUpdate();
+	}
+};
 
 namespace
 {
@@ -113,7 +162,31 @@ private:
 
 bool testModeUsesProductionResources(const std::string& mode)
 {
-	return mode == "--core-lifecycle" ||
+	return mode == "--core-lifecycle" || mode == "--gameplay-automation" ||
+		mode == "--save-write-sharing" ||
+		mode == "--save-stability" ||
+		mode == "--xiaoxiang-missing-object-routes" ||
+		mode == "--xiaoxiang-tournament-routes" ||
+		mode == "--xiaoxiang-prison-ending" ||
+		mode == "--xiaoxiang-companion-history" ||
+		mode == "--xiaoxiang-companion-history-sync" ||
+		mode == "--xiaoxiang-companion-history-async" ||
+		mode == "--xiaoxiang-legacy-entrances" ||
+		mode == "--moonlight-trap-routes" ||
+		mode == "--moonlight-departure" ||
+		mode == "--new-sword-boat-routes" ||
+		mode == "--new-sword-yang-ying-routes" ||
+		mode == "--moonlight-ending-two-routes" ||
+		mode == "--sword-two-partner-departures" ||
+		mode == "--sword-two-historical-scripts" ||
+		mode == "--bilibili-story-feedback" ||
+		mode == "--merged-entity-save" ||
+		mode == "--production-attack-files" ||
+		mode == "--full-attack-save" ||
+		mode == "--equipment-replacement-save" ||
+		mode == "--dynamic-magic-list-save" ||
+		mode == "--full-experience-save" ||
+		mode == "--character-caster-save" ||
 		mode == "--ui-focus" ||
 		mode == "--gamepad-world-runtime" ||
 		mode == "--gamepad-essential-ui" ||
@@ -232,6 +305,18 @@ bool runMapObstacleSemanticsTest()
 		{ INT_MAX, INT_MAX }, { INT_MIN, INT_MIN });
 	ok = check(saturatedTilePosition.x == INT_MAX && saturatedTilePosition.y == INT_MAX,
 		"map tile projection saturates extreme pixel coordinates") && ok;
+	for (const Point origin : { Point{ 2, 2 }, Point{ 2, 3 } })
+	{
+		for (int direction = 0; direction < 8; ++direction)
+		{
+			const Point destination = Map::getSubPoint(origin, direction);
+			const Point projected = Map::getTilePosition(destination, origin);
+			const auto steps = map.getPassPath(origin, destination, projected, destination);
+			ok = check(!steps.empty() && steps.front() == origin &&
+				steps.size() == (direction % 2 == 0 ? 3 : 1),
+				"all eight ray directions retain their endpoint and corner checks") && ok;
+		}
+	}
 
 	auto verifyTile = [&](uint8_t obstacle, bool walk, bool jump,
 		bool magic, bool sight, const char* label) {
@@ -260,6 +345,28 @@ bool runMapObstacleSemanticsTest()
 	for (auto& row : map.data->tile)
 		for (MapTile& tile : row)
 			tile.obstacle = 0;
+	map.data->tile[1][1].obstacle = 0x60;
+	map.data->tile[2][1].obstacle = 0x60;
+	map.data->tile[3][0].obstacle = 0x60;
+	ok = check(map.getJumpPath({ 2, 0 }, { 0, 4 }) == Point{ 0, 4 },
+		"southwest jump crosses transparent fencing and reaches its walkable landing") && ok;
+	Map fence;
+	fence.data = std::make_shared<MapData>();
+	fence.data->head.width = 5;
+	fence.data->head.height = 9;
+	fence.data->tile.assign(9, std::vector<MapTile>(5));
+	fence.dataMap.tile.assign(9, std::vector<DataTile>(5));
+	for (auto& row : fence.data->tile)
+		for (MapTile& tile : row)
+			tile.obstacle = 0x40;
+	for (const Point point : { Point{ 4, 0 }, Point{ 3, 1 }, Point{ 3, 2 }, Point{ 2, 3 },
+		Point{ 2, 4 }, Point{ 1, 5 }, Point{ 1, 6 }, Point{ 0, 7 }, Point{ 0, 8 } })
+		fence.data->tile[point.y][point.x].obstacle = point.y == 0 || point.y == 3 || point.y == 8 ? 0 : 0x60;
+	ok = check(fence.getJumpPath({ 4, 0 }, { 0, 8 }) == Point{ 0, 8 },
+		"southwest fence jump retains its ray beside jump-blocking terrain") && ok;
+	for (auto& row : map.data->tile)
+		for (MapTile& tile : row)
+			tile.obstacle = 0;
 	const Point from = { 0, 2 };
 	const Point to = { 4, 2 };
 	map.data->tile[2][2].obstacle = 0x01;
@@ -277,6 +384,114 @@ bool runMapObstacleSemanticsTest()
 	map.data->tile[to.y][to.x].obstacle = 0x80;
 	ok = check(map.canSee(from, to),
 		"an opaque target tile does not hide the entity occupying that tile") && ok;
+
+	map.data->head.width = 32;
+	map.data->head.height = 64;
+	map.data->tile.assign(64, std::vector<MapTile>(32));
+	map.dataMap.tile.assign(64, std::vector<DataTile>(32));
+	for (int y = 0; y < map.data->head.height; ++y)
+	{
+		map.data->tile[y][16].obstacle = 0x80;
+	}
+	const Point radiusPathStart = { 10, 32 };
+	const Point radiusPathTarget = { 18, 32 };
+	const auto reachableRadiusPath = map.getRadiusPath(
+		radiusPathStart, radiusPathTarget, 3, 8);
+	ok = check(
+		!reachableRadiusPath.empty()
+			&& reachableRadiusPath.size() == 5
+			&& Map::calDistance(
+				reachableRadiusPath.back(), radiusPathTarget) <= 3
+			&& reachableRadiusPath.back().x < 16,
+		"radius path reaches the closest valid tile without crossing a disconnected wall") && ok;
+	const auto unreachableRadiusPath = map.getRadiusPath(
+		radiusPathStart, radiusPathTarget, 1, 8);
+	ok = check(unreachableRadiusPath.empty(),
+		"radius path remains empty when every candidate is disconnected") && ok;
+	return ok;
+}
+
+bool runNonCombatPartnerTargetingTest()
+{
+	GameManager gameManager;
+	gameManager.global.data.NPCAI = true;
+	gameManager.global.data.PartnerCombat = true;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 32;
+	gameManager.map->data->head.height = 32;
+	gameManager.map->data->tile.assign(32, std::vector<MapTile>(32));
+	gameManager.player->setPosition({ 5, 7 }, false);
+	auto partner = std::make_shared<NPC>();
+	auto enemy = std::make_shared<NPC>();
+	partner->kind = nkPartner;
+	partner->relation = nrFriendly;
+	partner->visionRadius = 10;
+	partner->attackLevel = 1;
+	partner->setPosition({ 6, 7 }, false);
+	enemy->kind = nkBattle;
+	enemy->relation = nrHostile;
+	enemy->life = 100;
+	enemy->setPosition({ 9, 7 }, false);
+	gameManager.npcManager->npcList = { partner, enemy };
+	gameManager.map->createDataMap();
+	NPCActionRes action = makeActionWithDirections(8);
+	action.imagePackage->interval = 100;
+	action.imagePackage->frame.resize(8);
+	partner->res.stand = action;
+	partner->res.walk = action;
+	partner->res.run = action;
+	partner->res.attack = action;
+	partner->setTime(1000);
+	bool ok = check(!gameManager.npcManager->scheduleBattleAction(partner)
+		&& partner->currentCombatTarget.expired() && partner->isStanding(),
+		"ordinary partner without attack magic stays with the player instead of approaching an enemy");
+	partner->clearCombatTargetMemory();
+	partner->stopMovement();
+	partner->currentCombatTarget = enemy;
+	partner->fightState.set(true);
+	gameManager.npcManager->scheduleBattleAction(partner);
+	ok = check(partner->currentCombatTarget.expired() && !partner->fightState.get(),
+		"non-combat partner releases stale combat targeting") && ok;
+	partner->stopMovement();
+	gameManager.player->setPosition({ 5, 15 }, false);
+	partner->nextFollowCheckTime = 1;
+	partner->actionManager->update(1);
+	ok = check((partner->isWalking() || partner->isRunning())
+		&& partner->currentCombatTarget.expired(),
+		"non-combat partner still follows a moving player with partner combat enabled") && ok;
+	partner->stopMovement();
+	gameManager.player->setPosition({ 5, 7 }, false);
+	auto magic = std::make_shared<Magic>();
+	magic->loadSucceeded = true;
+	magic->level[1].moveKind = mmkPoint;
+	magic->level[1].lifeFrame = 100;
+	NPCAttackOption option;
+	option.magic = magic;
+	option.moveKind = mmkPoint;
+	option.configuredUseDistance = 1;
+	option.hasExplicitUseDistance = true;
+	partner->attackOptions.push_back(option);
+	ok = check(gameManager.npcManager->scheduleBattleAction(partner)
+		&& partner->currentCombatTarget.lock() == enemy,
+		"equipped combat partner can still acquire and approach an enemy") && ok;
+	partner->stopMovement();
+	partner->clearCombatTargetMemory();
+	partner->res.attack = NPCActionRes();
+	ok = check(!gameManager.npcManager->scheduleBattleAction(partner)
+		&& partner->currentCombatTarget.expired(),
+		"partner without an attack animation does not chase with unused attack magic") && ok;
+	partner->res.attack = action;
+	partner->attackOptions.clear();
+	for (const bool secondary : { false, true })
+	{
+		partner->stopMovement();
+		partner->clearCombatTargetMemory();
+		partner->npcMagic = secondary ? nullptr : magic;
+		partner->npcMagic2 = secondary ? magic : nullptr;
+		ok = check(gameManager.npcManager->scheduleBattleAction(partner)
+			&& partner->currentCombatTarget.lock() == enemy,
+			"legacy primary and secondary attack magic retain partner combat") && ok;
+	}
 	return ok;
 }
 
@@ -362,7 +577,699 @@ bool runPartnerCombatOwnerLeashTest()
 	return ok;
 }
 
+bool runFollowerAttackAIGateTest()
+{
+	bool ok = true;
+	for (const bool running : { false, true })
+	{
+		// Positive control, global DisableNpcAI, and the per-NPC disable flag.
+		for (const int disableMode : { 0, 1, 2 })
+		{
+			GameManager gameManager;
+			gameManager.global.data.NPCAI = true;
+			gameManager.map->data = std::make_shared<MapData>();
+			gameManager.map->data->head.width = 16;
+			gameManager.map->data->head.height = 16;
+			gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
+			gameManager.player->setPosition({ 14, 14 }, false);
+			auto follower = std::make_shared<NPC>();
+			auto target = std::make_shared<NPC>();
+			follower->kind = nkBattle;
+			follower->relation = nrHostile;
+			follower->stopFindingTarget = 1;
+			follower->followNPC = "AI_GATE_TARGET";
+			follower->setPosition({ 3, 7 }, false);
+			follower->visionRadius = 10;
+			follower->attackLevel = 1;
+			follower->idle = 0;
+			target->kind = nkBattle;
+			target->relation = nrFriendly;
+			target->npcName = "AI_GATE_TARGET";
+			target->life = 100;
+			target->setPosition({ 5, 7 }, false);
+			gameManager.npcManager->npcList = { follower, target };
+			gameManager.map->createDataMap();
+
+			NPCActionRes action = makeActionWithDirections(8);
+			action.imagePackage->interval = 100;
+			action.imagePackage->frame.resize(8);
+			follower->res.stand = action;
+			follower->res.walk = action;
+			follower->res.run = action;
+			follower->res.attack = action;
+			auto magic = std::make_shared<Magic>();
+			magic->iniName = "ai-gate-attack.ini";
+			magic->loadSucceeded = true;
+			magic->level[1].moveKind = mmkPoint;
+			magic->level[1].lifeFrame = 100;
+			NPCAttackOption option;
+			option.magic = magic;
+			option.moveKind = mmkPoint;
+			option.configuredUseDistance = 1;
+			option.hasExplicitUseDistance = true;
+			follower->attackOptions.push_back(option);
+			follower->setTime(1000);
+			if (running)
+			{
+				follower->beginRun({ 4, 7 });
+			}
+			else
+			{
+				follower->beginWalk({ 4, 7 });
+			}
+			const bool moveStarted = running ? follower->isRunning() : follower->isWalking();
+			ok = check(moveStarted && follower->stepLastTime > 0,
+				"AI gate fixture starts a real walk/run step") && ok;
+			if (!moveStarted || follower->stepLastTime == 0)
+			{
+				continue;
+			}
+			if (disableMode == 1)
+			{
+				gameManager.scriptAPI.disableNPCAI();
+			}
+			else if (disableMode == 2)
+			{
+				follower->setAIDisabled(true);
+			}
+			const UTime elapsed = follower->stepLastTime * 2;
+			follower->setTime(follower->getTime() + elapsed);
+			follower->actionManager->update(elapsed);
+			const std::string caseName = std::string(running ? "run" : "walk")
+				+ " follower AI mode " + std::to_string(disableMode);
+			ok = check(follower->getPosition() == Point{ 4, 7 }
+				&& follower->isAttacking() == (disableMode == 0),
+				(caseName + " completes the step and starts a new attack only while AI is enabled").c_str()) && ok;
+			if (disableMode != 0)
+			{
+				ok = check(follower->isStanding() && follower->stepList.empty(),
+					(caseName + " does not extend the completed path to chase the target").c_str()) && ok;
+				// Explicit scripted attacks remain allowed with autonomous AI off.
+				follower->beginAttack(target->getPosition(), target);
+			}
+			gameManager.scriptAPI.disableNPCAI();
+			ok = check(follower->isAttacking(),
+				"disabling AI does not cancel an already prepared or explicit attack") && ok;
+			const UTime attackDuration = follower->actionLastTime;
+			follower->setTime(follower->getTime() + attackDuration);
+			follower->actionManager->update(attackDuration);
+			ok = check(follower->isStanding()
+				&& gameManager.effectManager->effectList.size() == 1,
+				"the prepared attack still releases exactly one effect with AI disabled") && ok;
+			if (disableMode != 0)
+			{
+				gameManager.global.data.NPCAI = disableMode != 1;
+				const Point scriptedDestination = { 4, 11 };
+				if (running)
+				{
+					follower->beginRun(scriptedDestination);
+				}
+				else
+				{
+					follower->beginWalk(scriptedDestination);
+				}
+				ok = check(follower->stepList.size() > 1,
+					"AI-disabled scripted movement has multiple planned steps") && ok;
+				for (int step = 0; step < 16 && (follower->isWalking() || follower->isRunning()); ++step)
+				{
+					const UTime stepDuration = follower->stepLastTime * 2;
+					follower->setTime(follower->getTime() + stepDuration);
+					follower->actionManager->update(stepDuration);
+				}
+				ok = check(follower->isStanding()
+					&& follower->getPosition() == scriptedDestination
+					&& gameManager.effectManager->effectList.size() == 1,
+					(caseName + " preserves every explicitly issued movement step without attacking").c_str()) && ok;
+				gameManager.scriptAPI.enableNPCAI();
+				follower->setAIDisabled(false);
+				follower->setPosition({ 4, 7 }, false);
+				follower->nextFollowCheckTime = 1;
+				follower->actionManager->update(1);
+				ok = check(follower->isAttacking(),
+					"reenabling AI permits the hostile follower to attack again") && ok;
+			}
+		}
+	}
+	return ok;
 }
+
+bool runProjectileTilePathTest()
+{
+	GameManager gameManager;
+	auto& map = *gameManager.map;
+	map.data = std::make_shared<MapData>();
+	map.data->head.width = 64;
+	map.data->head.height = 64;
+	map.data->tile.assign(64, std::vector<MapTile>(64));
+	map.createDataMap();
+	bool ok = true;
+	// Recorded desert projectile steps: only the middle trajectory crosses the rock.
+	struct Step
+	{
+		Point from;
+		PointEx fromOffset;
+		Point to;
+		PointEx toOffset;
+		Point direction;
+		std::deque<Point> expected;
+	};
+	const Step steps[] =
+	{
+		{ {29, 30}, {-18.767f, -2.590f}, {28, 31}, {-1.272f, -14.759f}, {-884, 467},
+			{ {29, 30}, {28, 31} } },
+		{ {29, 29}, {0.0f, 0.0f}, {28, 30}, {18.378f, -2.748f}, {-946, 323},
+			{ {29, 29}, {29, 30}, {28, 29}, {28, 30} } },
+		{ {27, 33}, {10.883f, -3.675f}, {26, 35}, {17.753f, -6.248f}, {-696, 717},
+			{ {27, 33}, {27, 34}, {26, 35} } }
+	};
+	for (int reflection = 0; reflection < 4; ++reflection)
+	{
+		auto reflect = [reflection](Point point)
+		{
+			if (reflection & 1) point.x = 63 - point.x - point.y % 2;
+			if (reflection & 2) point.y = 64 - point.y;
+			return point;
+		};
+		for (auto step : steps)
+		{
+			step.from = reflect(step.from);
+			step.to = reflect(step.to);
+			for (auto& point : step.expected) point = reflect(point);
+			const int xSign = (reflection & 1) ? -1 : 1;
+			const int ySign = (reflection & 2) ? -1 : 1;
+			const auto path = map.getPassPathEx(step.from,
+				{step.fromOffset.x * xSign, step.fromOffset.y * ySign}, step.to,
+				{step.toOffset.x * xSign, step.toOffset.y * ySign},
+				{step.direction.x * xSign, step.direction.y * ySign});
+			ok = check(path == step.expected,
+				"projectile path preserves pixel offsets and stops at the actual frame endpoint") && ok;
+		}
+	}
+	const auto& step = steps[0];
+	auto effect = std::make_shared<Effect>();
+	effect->doing = ekFlying;
+	effect->position = step.to;
+	effect->passPath = map.getPassPathEx(step.from, step.fromOffset, step.to, step.toOffset, step.direction);
+	gameManager.effectManager->addEffect(effect);
+	map.data->tile[29][28].obstacle = 0x80;
+	CollisionDetector::detectCollision();
+	ok = check(effect->doing == ekFlying,
+		"nearby rock outside the projectile segment does not cause an explosion") && ok;
+	map.data->tile[step.to.y][step.to.x].obstacle = 0x80;
+	CollisionDetector::detectCollision();
+	ok = check(effect->doing != ekFlying,
+		"rock on the projectile segment still blocks the projectile") && ok;
+	map.data->tile[step.to.y][step.to.x].obstacle = 0;
+	map.data->tile[35][27].obstacle = 0x80;
+	map.data->tile[36][28].obstacle = 0x80;
+	auto target = std::make_shared<NPC>();
+	target->kind = nkBattle;
+	target->relation = nrFriendly;
+	target->radius = 0.4f;
+	target->setPosition({25, 35}, false);
+	gameManager.npcManager->npcList.push_back(target);
+	map.createDataMap();
+	// Exercise real movement, width expansion and collision at different frame durations.
+	for (UTime milliseconds : {1, 8, 16, 17, 33, 50})
+	{
+		gameManager.effectManager->clearEffect();
+		effect = std::make_shared<Effect>();
+		effect->doing = ekFlying;
+		effect->level = 5;
+		effect->magic.level[5].moveKind = mmkSector;
+		effect->magic.attackAll = 1;
+		effect->evade = -1000;
+		effect->lifeTime = 10000;
+		effect->beginTime = 0;
+		effect->setTime(0);
+		effect->speed = 8;
+		effect->position = effect->src = {29, 29};
+		effect->dest = {25, 35};
+		effect->flyingDirection = {-800, 600};
+		gameManager.effectManager->addEffect(effect);
+		for (int frame = 0; frame < 2000 && effect->doing == ekFlying; ++frame)
+		{
+			ProjectileCollisionTestAccess::advance(*effect, milliseconds);
+			CollisionDetector::detectCollision();
+		}
+		const bool reachedTarget = Map::getTileDistance(effect->position, effect->offset,
+			target->getPosition(), target->getOffset()) <= 0.66f;
+		if (!reachedTarget)
+		{
+			std::cerr << "Projectile stopped at " << effect->position.x << ',' << effect->position.y
+				<< " with frame duration " << milliseconds << " ms\n";
+		}
+		ok = check(reachedTarget,
+			"center projectile crosses the rock gap and reaches the target at every frame duration") && ok;
+	}
+	return ok;
+}
+
+bool runNeutralProjectileCollisionTest()
+{
+	GameManager gameManager;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 12;
+	gameManager.map->data->head.height = 12;
+	gameManager.map->data->tile.assign(12, std::vector<MapTile>(12));
+	auto caster = std::make_shared<NPC>();
+	caster->kind = nkBattle;
+	caster->setPosition({ 2, 2 }, false);
+	auto target = std::make_shared<NPC>();
+	target->setPosition({ 5, 5 }, false);
+	gameManager.npcManager->npcList = { caster, target };
+	gameManager.map->createDataMap();
+
+	auto verifyCollision = [&](int kind, int relation, int casterRelation,
+		int attackAll, uint8_t obstacle, bool expectedExplosion, const char* description)
+	{
+		target->kind = kind;
+		target->relation = relation;
+		target->life = 100;
+		target->lifeMax = 100;
+		caster->relation = casterRelation;
+		gameManager.map->data->tile[5][5].obstacle = obstacle;
+		gameManager.effectManager->effectList.clear();
+		auto effect = std::make_shared<Effect>();
+		effect->doing = ekFlying;
+		effect->position = { 5, 5 };
+		effect->user = caster;
+		effect->launcherKind = lkEnemy;
+		effect->magic.attackAll = attackAll;
+		effect->evade = -1000; // Misses still distinguish collision from damage.
+		effect->width = 0.5f;
+		effect->lifeTime = 1;
+		gameManager.effectManager->effectList.push_back(effect);
+		CollisionDetector::detectCollision();
+		return check(effect->doing == (expectedExplosion ? ekExploding : ekFlying)
+			&& target->life == 100, description);
+	};
+
+	bool ok = verifyCollision(nkNormal, nrFriendly, nrHostile, 0, 0, false,
+		"ordinary spectator does not stop hostile projectile on clear tile");
+	ok = verifyCollision(nkBattle, nrNeutral, nrFriendly, 0, 0, false,
+		"neutral fighter does not stop friendly projectile on clear tile") && ok;
+	ok = verifyCollision(nkBattle, nrNeutral, nrHostile, 0, 0, false,
+		"neutral fighter does not stop hostile projectile on clear tile") && ok;
+	ok = verifyCollision(nkBattle, nrNeutral, nrHostile, 1, 0, true,
+		"AttackAll projectile collides with neutral fighter before missed damage") && ok;
+	ok = verifyCollision(nkBattle, nrNeutral, nrNone, 0, 0, true,
+		"None-relation caster projectile collides with neutral fighter") && ok;
+	ok = verifyCollision(nkNormal, nrFriendly, nrHostile, 1, 0, false,
+		"AttackAll still excludes ordinary spectator from character collision") && ok;
+	ok = verifyCollision(nkBattle, nrNeutral, nrHostile, 0, 0x02, true,
+		"blocked tile explodes hostile projectile while neutral fighter remains untouched") && ok;
+	return ok;
+}
+
+bool runSweptProjectileCollisionTest()
+{
+	GameManager gameManager;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 12;
+	gameManager.map->data->head.height = 12;
+	gameManager.map->data->tile.assign(12, std::vector<MapTile>(12));
+	gameManager.map->createDataMap();
+
+	auto target = std::make_shared<NPC>();
+	target->kind = nkBattle;
+	target->relation = nrHostile;
+	target->radius = 0.4f;
+	gameManager.npcManager->npcList.push_back(target);
+	target->setPosition({ 5, 5 }, false);
+	gameManager.map->createDataMap();
+
+	auto makeEffect = []()
+	{
+		auto effect = std::make_shared<Effect>();
+		effect->doing = ekFlying;
+		effect->magic.attackAll = 1;
+		effect->evade = -1000;
+		effect->width = 0.5f;
+		effect->lifeTime = 1;
+		return effect;
+	};
+
+	auto crossingEffect = makeEffect();
+	crossingEffect->collisionSweepStartPosition = { 2, 5 };
+	crossingEffect->collisionSweepStartOffset = { 0.0f, 0.0f };
+	crossingEffect->collisionSweepInitialized = true;
+	crossingEffect->position = { 8, 5 };
+	crossingEffect->offset = { 0.0f, 0.0f };
+	crossingEffect->passPath =
+	{
+		{ 3, 5 }, { 4, 5 }, { 5, 5 },
+		{ 6, 5 }, { 7, 5 }, { 8, 5 }
+	};
+	gameManager.effectManager->effectList.push_back(crossingEffect);
+	CollisionDetector::detectCollision();
+	bool ok = check(
+		crossingEffect->doing == ekExploding,
+		"path-cell broad phase detects an NPC crossed between frame endpoints");
+	const float crossingCollisionDistance = Map::getTileDistance(
+		crossingEffect->position,
+		crossingEffect->offset,
+		target->getPosition(),
+		target->getOffset());
+	ok = check(
+		std::abs(crossingCollisionDistance -
+			(crossingEffect->width * 0.5f + target->radius)) <= 0.02f &&
+		crossingEffect->position != Point{ 8, 5 },
+		"swept NPC collision resolves at the first contact position") && ok;
+	gameManager.effectManager->effectList.clear();
+
+	auto passThroughEffect = makeEffect();
+	passThroughEffect->magic.passThrough = 1;
+	passThroughEffect->magic.passThroughWithDestroyEffect = 1;
+	passThroughEffect->collisionSweepStartPosition = { 2, 5 };
+	passThroughEffect->collisionSweepStartOffset = { 0.0f, 0.0f };
+	passThroughEffect->collisionSweepInitialized = true;
+	passThroughEffect->position = { 8, 5 };
+	passThroughEffect->offset = { 0.0f, 0.0f };
+	passThroughEffect->passPath = crossingEffect->passPath;
+	gameManager.effectManager->effectList.push_back(passThroughEffect);
+	CollisionDetector::detectCollision();
+	auto passThroughHitEffect =
+		gameManager.effectManager->effectList.size() == 2
+		? gameManager.effectManager->effectList.back()
+		: nullptr;
+	ok = check(
+		passThroughEffect->position == Point{ 8, 5 } &&
+		passThroughEffect->offset == PointEx{ 0.0f, 0.0f } &&
+		passThroughHitEffect != nullptr &&
+		std::abs(Map::getTileDistance(
+			passThroughHitEffect->position,
+			passThroughHitEffect->offset,
+			target->getPosition(),
+			target->getOffset()) -
+			(passThroughEffect->width * 0.5f + target->radius)) <= 0.02f,
+		"pass-through projectile keeps its frame endpoint and places the hit visual at first contact") && ok;
+	gameManager.effectManager->effectList.clear();
+
+	auto nearMissEffect = makeEffect();
+	nearMissEffect->collisionSweepStartPosition = { 2, 3 };
+	nearMissEffect->collisionSweepStartOffset = { 0.0f, 0.0f };
+	nearMissEffect->collisionSweepInitialized = true;
+	nearMissEffect->position = { 8, 3 };
+	nearMissEffect->offset = { 0.0f, 0.0f };
+	ok = check(
+		!CollisionDetector::detectCollision(target, nearMissEffect),
+		"swept projectile does not hit an NPC outside the combined radius") && ok;
+
+	auto newEffect = makeEffect();
+	newEffect->position = { 8, 5 };
+	newEffect->offset = { 0.0f, 0.0f };
+	ok = check(
+		!CollisionDetector::detectCollision(target, newEffect),
+		"new projectile without a frame start uses endpoint collision only") && ok;
+	return ok;
+}
+
+bool runSweptProjectileInteractionTest()
+{
+	GameManager gameManager;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 12;
+	gameManager.map->data->head.height = 12;
+	gameManager.map->data->tile.assign(12, std::vector<MapTile>(12));
+	gameManager.map->createDataMap();
+
+	auto makeProjectile = [](
+		Point start,
+		Point end,
+		int launcherKind)
+	{
+		auto effect = std::make_shared<Effect>();
+		effect->doing = ekFlying;
+		effect->launcherKind = launcherKind;
+		effect->width = 0.1f;
+		effect->lifeTime = 1;
+		effect->magic.passThroughWall = 1;
+		effect->collisionSweepStartPosition = start;
+		effect->collisionSweepStartOffset = { 0.0f, 0.0f };
+		effect->collisionSweepInitialized = true;
+		effect->position = end;
+		effect->offset = { 0.0f, 0.0f };
+		return effect;
+	};
+
+	auto orderedDiscard = makeProjectile({ 1, 8 }, { 9, 8 }, lkFriend);
+	orderedDiscard->magic.discardOppositeMagic = 1;
+	auto laterTarget = makeProjectile({ 7, 8 }, { 7, 8 }, lkEnemy);
+	auto earlierTarget = makeProjectile({ 3, 8 }, { 3, 8 }, lkEnemy);
+	gameManager.effectManager->effectList =
+	{
+		orderedDiscard,
+		laterTarget,
+		earlierTarget
+	};
+	CollisionDetector::detectCollision();
+	bool ok = check(
+		orderedDiscard->doing == ekHiding &&
+		earlierTarget->doing == ekHiding &&
+		laterTarget->doing == ekFlying,
+		"projectile collisions resolve by sweep time before target index");
+
+	auto tiedDiscard = makeProjectile({ 1, 4 }, { 9, 4 }, lkFriend);
+	tiedDiscard->magic.discardOppositeMagic = 1;
+	auto firstTiedTarget = makeProjectile({ 5, 4 }, { 5, 4 }, lkEnemy);
+	auto secondTiedTarget = makeProjectile({ 5, 4 }, { 5, 4 }, lkEnemy);
+	gameManager.effectManager->effectList =
+	{
+		tiedDiscard,
+		firstTiedTarget,
+		secondTiedTarget
+	};
+	CollisionDetector::detectCollision();
+	ok = check(
+		tiedDiscard->doing == ekHiding &&
+		firstTiedTarget->doing == ekHiding &&
+		secondTiedTarget->doing == ekFlying,
+		"equal-time projectile collisions resolve by snapshot index") && ok;
+
+	auto exchange = makeProjectile({ 2, 10 }, { 8, 10 }, lkFriend);
+	exchange->magic.exchangeUser = 1;
+	exchange->flyingDirection = { 1000, 0 };
+	exchange->speed = 32;
+	auto reflected = makeProjectile({ 8, 10 }, { 2, 10 }, lkEnemy);
+	reflected->flyingDirection = { 0, 1000 };
+	reflected->speed = 16;
+	const Point reflectedEndPosition = reflected->position;
+	const PointEx reflectedEndOffset = reflected->offset;
+	gameManager.effectManager->effectList = { exchange, reflected };
+	CollisionDetector::detectCollision();
+	const Point reflectedCollisionPosition = reflected->position;
+	const PointEx reflectedCollisionOffset = reflected->offset;
+	const float projectileCollisionDistance = Map::getTileDistance(
+		exchange->position,
+		exchange->offset,
+		reflected->position,
+		reflected->offset);
+	ok = check(
+		exchange->doing == ekHiding &&
+		reflected->doing == ekFlying &&
+		reflected->launcherKind == lkFriend &&
+		(reflected->position != reflectedEndPosition ||
+			reflected->offset != reflectedEndOffset) &&
+		std::abs(projectileCollisionDistance -
+			(exchange->width + reflected->width) * 0.5f) <= 0.02f &&
+		reflected->src == reflected->position &&
+		reflected->srcOffset == reflected->offset,
+		"exchange starts the new trajectory at the swept contact position") && ok;
+	reflected->updateEffectPosition(40, (float)reflected->speed);
+	ok = check(
+		reflected->position != reflectedCollisionPosition ||
+		reflected->offset != reflectedCollisionOffset,
+		"exchanged projectile moves along its new trajectory on the next update") && ok;
+
+	auto delayedDiscard = makeProjectile({ 5, 6 }, { 5, 6 }, lkFriend);
+	delayedDiscard->magic.discardOppositeMagic = 1;
+	auto newbornTarget = makeProjectile({ 5, 6 }, { 5, 6 }, lkEnemy);
+	gameManager.effectManager->effectList.clear();
+	gameManager.effectManager->addEffect(delayedDiscard);
+	gameManager.effectManager->addEffect(newbornTarget);
+	CollisionDetector::detectCollision();
+	ok = check(
+		delayedDiscard->doing == ekFlying && newbornTarget->doing == ekFlying,
+		"projectiles created in the current frame do not collide") && ok;
+	ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+	CollisionDetector::detectCollision();
+	ok = check(
+		delayedDiscard->doing == ekHiding && newbornTarget->doing == ekHiding,
+		"projectiles created in the previous frame can collide") && ok;
+	return ok;
+}
+
+bool runProjectileCreationFrameTest()
+{
+	GameManager gameManager;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 16;
+	gameManager.map->data->head.height = 16;
+	gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
+	gameManager.map->createDataMap();
+
+	auto makePointMagic = [](const std::string& name)
+	{
+		auto magic = std::make_shared<Magic>();
+		magic->iniName = name;
+		magic->loadSucceeded = true;
+		magic->passThroughWall = 1;
+		magic->level[1].moveKind = mmkPoint;
+		magic->level[1].lifeFrame = 100;
+		return magic;
+	};
+	auto makePassiveProjectile = []()
+	{
+		auto effect = std::make_shared<Effect>();
+		effect->doing = ekFlying;
+		effect->launcherKind = lkEnemy;
+		effect->width = 0.1f;
+		effect->lifeTime = 1;
+		effect->magic.passThroughWall = 1;
+		effect->collisionSweepStartPosition = { 5, 5 };
+		effect->collisionSweepStartOffset = { 0.0f, 0.0f };
+		effect->collisionSweepInitialized = true;
+		effect->position = { 5, 5 };
+		effect->offset = { 0.0f, 0.0f };
+		return effect;
+	};
+
+	bool ok = true;
+	auto verifyDeferredCollision = [&](
+		const std::shared_ptr<Effect>& createdEffect,
+		const char* creationMessage,
+		const char* currentFrameMessage,
+		const char* nextFrameMessage)
+	{
+		bool scenarioOk = check(
+			createdEffect != nullptr &&
+			createdEffect->projectileCollisionCreationFrame ==
+				gameManager.effectManager->getProjectileCollisionFrame(),
+			creationMessage);
+		if (createdEffect == nullptr)
+		{
+			gameManager.effectManager->freeResource();
+			return false;
+		}
+
+		createdEffect->doing = ekFlying;
+		createdEffect->width = 0.1f;
+		createdEffect->lifeTime = 1;
+		createdEffect->magic.discardOppositeMagic = 1;
+		createdEffect->magic.passThroughWall = 1;
+		createdEffect->collisionSweepStartPosition = { 5, 5 };
+		createdEffect->collisionSweepStartOffset = { 0.0f, 0.0f };
+		createdEffect->collisionSweepInitialized = true;
+		createdEffect->position = { 5, 5 };
+		createdEffect->offset = { 0.0f, 0.0f };
+		auto passiveEffect = makePassiveProjectile();
+		gameManager.effectManager->effectList.push_back(passiveEffect);
+
+		CollisionDetector::detectCollision();
+		scenarioOk = check(
+			createdEffect->doing == ekFlying &&
+			passiveEffect->doing == ekFlying,
+			currentFrameMessage) && scenarioOk;
+
+		ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+		CollisionDetector::detectCollision();
+		scenarioOk = check(
+			createdEffect->doing == ekHiding &&
+			passiveEffect->doing == ekHiding,
+			nextFrameMessage) && scenarioOk;
+		gameManager.effectManager->freeResource();
+		return scenarioOk;
+	};
+
+	ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+	auto delayedMagic = makePointMagic("deferred_collision_delayed.ini");
+	delayedMagic->discardOppositeMagic = 1;
+	gameManager.effectManager->addDelayedMagic(
+		delayedMagic,
+		gameManager.player,
+		{ 5, 5 },
+		{ 5, 5 },
+		1,
+		lkFriend,
+		nullptr,
+		0);
+	gameManager.effectManager->onUpdate();
+	auto delayedEffect = gameManager.effectManager->effectList.empty()
+		? nullptr
+		: gameManager.effectManager->effectList.back();
+	ok = verifyDeferredCollision(
+		delayedEffect,
+		"delayed magic records its collision creation frame",
+		"delayed magic does not collide in its creation frame",
+		"delayed magic collides in the next frame") && ok;
+
+	ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+	auto flyChildMagic = makePointMagic("deferred_collision_fly_child.ini");
+	flyChildMagic->discardOppositeMagic = 1;
+	auto flyParentMagic = makePointMagic("deferred_collision_fly_parent.ini");
+	flyParentMagic->level[1].moveKind = mmkSelf;
+	flyParentMagic->linkedLevel[1].flyMagic = flyChildMagic;
+	flyParentMagic->linkedLevel[1].flyInterval = 0;
+	auto flyParentEffect = std::make_shared<Effect>();
+	flyParentEffect->level = 1;
+	flyParentEffect->user = gameManager.player;
+	flyParentEffect->launcherKind = lkFriend;
+	flyParentEffect->position = { 4, 5 };
+	flyParentEffect->dest = { 5, 5 };
+	flyParentEffect->initFromMagic(flyParentMagic);
+	flyParentEffect->doing = ekFlying;
+	flyParentEffect->lifeTime = 100000;
+	ProjectileCollisionTestAccess::update(*flyParentEffect);
+	auto flyChildEffect = gameManager.effectManager->effectList.empty()
+		? nullptr
+		: gameManager.effectManager->effectList.back();
+	ok = verifyDeferredCollision(
+		flyChildEffect,
+		"flying derived magic records its collision creation frame",
+		"flying derived magic does not collide in its creation frame",
+		"flying derived magic collides in the next frame") && ok;
+
+	ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+	auto explodeChildMagic = makePointMagic("deferred_collision_explode_child.ini");
+	explodeChildMagic->discardOppositeMagic = 1;
+	auto collisionMagic = makePointMagic("deferred_collision_parent.ini");
+	collisionMagic->level[1].moveKind = mmkFly;
+	collisionMagic->attackAll = 1;
+	collisionMagic->explodeMagicsByLevel[1] = explodeChildMagic;
+	auto collisionEffect = std::make_shared<Effect>();
+	collisionEffect->level = 1;
+	collisionEffect->user = gameManager.player;
+	collisionEffect->launcherKind = lkFriend;
+	collisionEffect->position = { 6, 6 };
+	collisionEffect->src = collisionEffect->position;
+	collisionEffect->initFromMagic(collisionMagic);
+	collisionEffect->doing = ekFlying;
+	collisionEffect->lifeTime = 100000;
+	auto collisionTarget = std::make_shared<NPC>();
+	collisionTarget->kind = nkBattle;
+	collisionTarget->relation = nrHostile;
+	collisionTarget->radius = 0.4f;
+	collisionTarget->setPosition(collisionEffect->position, false);
+	gameManager.npcManager->npcList.push_back(collisionTarget);
+	const bool collisionTriggered =
+		CollisionDetector::detectCollision(collisionTarget, collisionEffect);
+	auto collisionChildEffect = gameManager.effectManager->effectList.empty()
+		? nullptr
+		: gameManager.effectManager->effectList.back();
+	ok = check(collisionTriggered,
+		"NPC collision callback creates its linked projectile") && ok;
+	ok = verifyDeferredCollision(
+		collisionChildEffect,
+		"collision-created magic records its collision creation frame",
+		"collision-created magic does not collide in its creation frame",
+		"collision-created magic collides in the next frame") && ok;
+	return ok;
+}
+
+}
+
+bool runGameplayAutomationRuntimeTests();
 
 int main(int argc, char** argv)
 {
@@ -372,6 +1279,7 @@ int main(int argc, char** argv)
 		const std::string mode = argv[1];
 		if (mode == "--magic-derived" ||
 			mode == "--magic-experience" ||
+			mode == "--replacement-experience" ||
 			mode == "--effect-persistence" ||
 			mode == "--map-thumbnail-controller" ||
 			mode == "--partner-equipment-transfer" ||
@@ -403,6 +1311,14 @@ int main(int argc, char** argv)
 	{
 		return runGambleMenuRuntimeTests() ? 0 : 1;
 	}
+	if (argc > 1 && std::string(argv[1]) == "--gameplay-automation")
+	{
+		return runGameplayAutomationRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--script-movement")
+	{
+		return runScriptMovementRuntimeTests() ? 0 : 1;
+	}
 	if (argc > 1 && std::string(argv[1]) == "--magic-derived")
 	{
 		return runMagicDerivedRuntimeTests() ? 0 : 1;
@@ -410,6 +1326,10 @@ int main(int argc, char** argv)
 	if (argc > 1 && std::string(argv[1]) == "--magic-experience")
 	{
 		return runMagicExperienceTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--replacement-experience")
+	{
+		return runReplacementExperienceOwnershipTests() ? 0 : 1;
 	}
 	if (argc > 1 && std::string(argv[1]) == "--effect-persistence")
 	{
@@ -430,6 +1350,110 @@ int main(int argc, char** argv)
 	if (argc > 1 && std::string(argv[1]) == "--core-lifecycle")
 	{
 		return runCoreLifecycleTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--current-mod-compatibility")
+	{
+		return runCurrentModCompatibilityTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--qingyu-ui")
+	{
+		return runQingyuUiTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--save-write-sharing")
+	{
+		return runSaveWriteSharingRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--save-stability")
+	{
+		return runSaveStabilityTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-missing-object-routes")
+	{
+		return runXiaoxiangMissingObjectRouteTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-tournament-routes")
+	{
+		return runXiaoxiangTournamentRouteTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-prison-ending")
+	{
+		return runXiaoxiangPrisonEndingTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-companion-history")
+	{
+		return runXiaoxiangCompanionHistoryTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-companion-history-sync")
+	{
+		return runXiaoxiangCompanionHistoryTests(0) ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-companion-history-async")
+	{
+		return runXiaoxiangCompanionHistoryTests(1) ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--xiaoxiang-legacy-entrances")
+	{
+		return runXiaoxiangLegacyEntranceTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--moonlight-trap-routes")
+	{
+		return runMoonlightTrapRouteTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--moonlight-departure")
+	{
+		return runMoonlightDepartureTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--new-sword-boat-routes")
+	{
+		return runNewSwordBoatRouteTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--new-sword-yang-ying-routes")
+	{
+		return runNewSwordYangYingRouteTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--moonlight-ending-two-routes")
+	{
+		return runMoonlightEndingTwoRouteTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--sword-two-partner-departures")
+	{
+		return runSwordTwoPartnerDepartureTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--sword-two-historical-scripts")
+	{
+		return runSwordTwoHistoricalScriptTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--bilibili-story-feedback")
+	{
+		return runBilibiliStoryFeedbackTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--merged-entity-save")
+	{
+		return runMergedEntitySaveTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--production-attack-files")
+	{
+		return runProductionAttackFileRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--full-attack-save")
+	{
+		return runFullAttackSaveRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--equipment-replacement-save")
+	{
+		return runEquipmentReplacementSaveRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--dynamic-magic-list-save")
+	{
+		return runDynamicMagicListSaveRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--full-experience-save")
+	{
+		return runFullExperienceSaveRuntimeTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--character-caster-save")
+	{
+		return runCharacterCasterSaveRuntimeTests() ? 0 : 1;
 	}
 	if (argc > 1 && std::string(argv[1]) == "--ui-focus")
 	{
@@ -484,8 +1508,13 @@ int main(int argc, char** argv)
 	{
 		std::cerr << "Unknown test mode: " << argv[1] << '\n'
 			<< "Expected one of: --gamble-menu, --magic-derived, "
-				"--effect-persistence, --npc-persistence, --object-animation, "
-				"--media-runtime, --core-lifecycle, --script-engine-runtime, "
+				"--effect-persistence, --npc-persistence, --object-animation, --current-mod-compatibility, "
+				"--media-runtime, --core-lifecycle, --save-write-sharing, --xiaoxiang-missing-object-routes, --xiaoxiang-tournament-routes, --xiaoxiang-prison-ending, --xiaoxiang-companion-history, --xiaoxiang-companion-history-sync, --xiaoxiang-companion-history-async, --xiaoxiang-legacy-entrances, --production-attack-files, --full-attack-save, --script-engine-runtime, "
+				"--merged-entity-save, "
+				"--equipment-replacement-save, "
+				"--dynamic-magic-list-save, "
+				"--full-experience-save, "
+				"--character-caster-save, "
 				"--editor-run-scene-runtime, "
 				"--ui-focus, --map-thumbnail-controller, "
 				"--partner-equipment-transfer, --world-interaction-runtime, "
@@ -501,7 +1530,14 @@ int main(int argc, char** argv)
 
 	ok = runParasiticIntervalDefaultTest() && ok;
 	ok = runMapObstacleSemanticsTest() && ok;
+	ok = runNonCombatPartnerTargetingTest() && ok;
 	ok = runPartnerCombatOwnerLeashTest() && ok;
+	ok = runFollowerAttackAIGateTest() && ok;
+	ok = runProjectileTilePathTest() && ok;
+	ok = runNeutralProjectileCollisionTest() && ok;
+	ok = runSweptProjectileCollisionTest() && ok;
+	ok = runSweptProjectileInteractionTest() && ok;
+	ok = runProjectileCreationFrameTest() && ok;
 
 	ok = check(NPCManager::getLauncherHitPriority(nrFriendly, 0, nrHostile, 0) == 0,
 		"friendly projectile hits hostile target") && ok;

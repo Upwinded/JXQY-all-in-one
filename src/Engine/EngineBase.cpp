@@ -1,3 +1,4 @@
+#include "../GameplayAutomation/GameplayAutomationSession.h"
 #include <algorithm>
 #include <map>
 #include <iostream>
@@ -5,6 +6,7 @@
 #include <cerrno>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <new>
 #include <limits>
 #include <stdexcept>
@@ -23,6 +25,7 @@
 #include "../Image/SafeImageDecoder.h"
 #include "../Image/PngImageEncoder.h"
 #include "../Input/PhysicalInputManager.h"
+#include "../Game/Data/MediaPathResolver.h"
 
 #ifdef __ANDROID__
 #include "../File/INIReader.h"
@@ -703,8 +706,10 @@ float getChannelGain(const AudioChannel* channel)
 	float gain = channel->volume;
 	if (channel->music != nullptr && channel->music->positional)
 	{
-		float distance = std::sqrt(channel->positionX * channel->positionX + channel->positionY * channel->positionY);
-		gain *= 1.0f / (1.0f + distance / 5000.0f);
+		// Match the former FMOD inverse rolloff: min=0.5, max=5000,
+		// with the source one unit below the listener.
+		float distance = std::sqrt(channel->positionX * channel->positionX + channel->positionY * channel->positionY + 1.0f);
+		gain *= 0.5f / std::clamp(distance, 0.5f, 5000.0f);
 	}
 	return (std::max)(0.0f, gain);
 }
@@ -1214,8 +1219,16 @@ int EngineBase::getRand(int max, int min)
 	}
 
 	// 线程局部存储：每个线程独立维护随机引擎和分布
-	static thread_local std::random_device rd;          // 硬件熵源（真随机种子）
-	static thread_local std::mt19937 mtEngine(rd());     // Mersenne Twister 引擎
+	static thread_local std::mt19937 mtEngine([]
+	{
+#ifdef JXQY_ENABLE_TEST_HOOKS
+		if (const char* seed = std::getenv("JXQY_TEST_RANDOM_SEED"))
+		{
+			return static_cast<std::mt19937::result_type>(std::stoul(seed));
+		}
+#endif
+		return static_cast<std::mt19937::result_type>(std::random_device{}());
+	}());
 	std::uniform_int_distribution<int> dist(min, max);
 
 	return dist(mtEngine);
@@ -3617,6 +3630,15 @@ void EngineBase::handleEvent()
 	timer.setPaused(true);
 	while (SDL_PollEvent(&e))
 	{
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+		// Release automation before the same physical event can queue a player action.
+		if (e.type == SDL_EVENT_KEY_DOWN || e.type == SDL_EVENT_MOUSE_BUTTON_DOWN
+			|| e.type == SDL_EVENT_FINGER_DOWN
+			|| (e.type == SDL_EVENT_MOUSE_WHEEL && (e.wheel.x != 0 || e.wheel.y != 0)))
+		{
+			GameplayAutomationSession::manualInput();
+		}
+#endif
 		if (physicalInputManager->processEvent(e))
 		{
 			continue;
@@ -3819,6 +3841,21 @@ void EngineBase::handleEvent()
 	// Apply the latest state before polling controller state for this frame.
 	applyPhysicalInputLifecycleRequest();
 	physicalInputManager->update(SDL_GetTicks());
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	if (physicalInputManager->isInputContextActive())
+	{
+		for (std::size_t index = 0; index < GameInput::InputActionCount; ++index)
+		{
+			const auto action = static_cast<GameInput::InputAction>(index);
+			if (physicalInputManager->wasActionPressed(action)
+				|| (action == GameInput::InputAction::Move && physicalInputManager->isActionDown(action)))
+			{
+				GameplayAutomationSession::manualInput();
+				break;
+			}
+		}
+	}
+#endif
 //#ifndef __MOBILE__
 	int tempX = -1, tempY = -1;
 	float mX, mY;
@@ -5354,34 +5391,34 @@ void EngineBase::clearAudioChannels()
 	}
 }
 
-_music EngineBase::getCachedActionSound(const std::string& key)
+_music EngineBase::getCachedSound(const std::string& key)
 {
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
-	auto cached = actionSoundCache.find(key);
-	return cached == actionSoundCache.end() ? nullptr : cached->second;
+	auto cached = soundCache.find(key);
+	return cached == soundCache.end() ? nullptr : cached->second;
 }
 
-_music EngineBase::cacheActionSound(const std::string& key, _music music)
+_music EngineBase::cacheSound(const std::string& key, _music music)
 {
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
 	if (key.empty() || music == nullptr || music->decodedByteCount == 0)
 	{
 		return nullptr;
 	}
-	auto cached = actionSoundCache.find(key);
-	if (cached != actionSoundCache.end())
+	auto cached = soundCache.find(key);
+	if (cached != soundCache.end())
 	{
 		return cached->second;
 	}
-	if (actionSoundCacheBytes > ActionSoundCacheLimitBytes ||
+	if (soundCacheBytes > CachedSoundLimitBytes ||
 		music->decodedByteCount >
-			ActionSoundCacheLimitBytes - actionSoundCacheBytes)
+			CachedSoundLimitBytes - soundCacheBytes)
 	{
 		return nullptr;
 	}
 	try
 	{
-		actionSoundCache.emplace(key, music);
+		soundCache.emplace(key, music);
 	}
 	catch (const std::bad_alloc&)
 	{
@@ -5391,33 +5428,33 @@ _music EngineBase::cacheActionSound(const std::string& key, _music music)
 	{
 		return nullptr;
 	}
-	actionSoundCacheBytes += music->decodedByteCount;
+	soundCacheBytes += music->decodedByteCount;
 	return music;
 }
 
-void EngineBase::clearActionSoundCache()
+void EngineBase::clearSoundCache()
 {
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
-	for (auto& cached : actionSoundCache)
+	for (auto& cached : soundCache)
 	{
 		if (cached.second != nullptr)
 		{
 			freeMusic(cached.second);
 		}
 	}
-	actionSoundCache.clear();
-	actionSoundCacheBytes = 0;
+	soundCache.clear();
+	soundCacheBytes = 0;
 }
 
-void EngineBase::setActionSoundCacheScope(const std::string& scope)
+void EngineBase::setSoundCacheScope(const std::string& scope)
 {
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
-	if (scope == actionSoundCacheScope)
+	if (scope == soundCacheScope)
 	{
 		return;
 	}
-	clearActionSoundCache();
-	actionSoundCacheScope = scope;
+	clearSoundCache();
+	soundCacheScope = scope;
 }
 
 void EngineBase::destroySoundSystem()
@@ -5433,7 +5470,7 @@ void EngineBase::destroySoundSystem()
 		}
 	}
 	soundList.resize(0);
-	clearActionSoundCache();
+	clearSoundCache();
 	clearAudioChannels();
 	if (sdlMixer != nullptr)
 	{
@@ -5833,13 +5870,14 @@ int EngineBase::openVideoFile(_video video)
 	{
 		return result;
 	}
-	if (!File::fileExist(video->fileName))
+	const std::string resolvedFileName = File::getAssetsName(video->fileName);
+	if (resolvedFileName.empty())
 	{
 		return result;
 	}
 
-	setMediaStream(&video->videoStream, video->fileName, AVMEDIA_TYPE_VIDEO);
-	setMediaStream(&video->audioStream, video->fileName, AVMEDIA_TYPE_AUDIO);
+	setMediaStream(&video->videoStream, resolvedFileName, AVMEDIA_TYPE_VIDEO);
+	setMediaStream(&video->audioStream, resolvedFileName, AVMEDIA_TYPE_AUDIO);
 	if (video->videoStream.exists)
 	{
 		video->pixelFormat = video->videoStream.codecCtx->pix_fmt;
@@ -5927,27 +5965,19 @@ int64_t EngineBase::seek_packet(void *opaque, int64_t offset, int whence)
 	return SDL_SeekIO(mediaStream->rWops, offset, sdlWhence);
 }
 
-void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName, AVMediaType mediaType)
+void EngineBase::setMediaStream(MediaStream * mediaStream, const std::string& fileName, AVMediaType mediaType)
 {
 	if (mediaStream == nullptr)
-	{
-		return;
-	}
-	auto newFileName = fileName;
-
-	if (!File::fileExist(newFileName))
 	{
 		return;
 	}
     int ret = 0;
 
 #if defined(__ANDROID__) || defined(__APPLE__)
-	convert::replaceAllString(newFileName, "\\", "/");
-	std::string resolvedFileName = File::getAssetsName(newFileName);
-	auto *pFile = SDL_IOFromFile(resolvedFileName.c_str(), "rb");
+	auto *pFile = SDL_IOFromFile(fileName.c_str(), "rb");
 	if (!pFile)
 	{
-		GameLog::write("video %s open error: Cannot open input file\n", resolvedFileName.c_str());
+		GameLog::write("video %s open error: Cannot open input file\n", fileName.c_str());
 		return;
 	}
 	mediaStream->rWops = pFile;
@@ -5955,7 +5985,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 	mediaStream->rWops_length = SDL_TellIO(pFile);
 	if (mediaStream->rWops_length < 0)
 	{
-		GameLog::write("video %s open error: Cannot determine input size\n", resolvedFileName.c_str());
+		GameLog::write("video %s open error: Cannot determine input size\n", fileName.c_str());
 		SDL_CloseIO(mediaStream->rWops);
 		mediaStream->rWops = nullptr;
 		return;
@@ -5985,14 +6015,14 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 	mediaStream->formatCtx->flags |= AVFMT_FLAG_CUSTOM_IO;
 	ret = avformat_open_input(&mediaStream->formatCtx, nullptr, nullptr, nullptr);
 #else
-    ret = avformat_open_input(&mediaStream->formatCtx, File::getAssetsName(newFileName).c_str(), nullptr, nullptr);
+    ret = avformat_open_input(&mediaStream->formatCtx, fileName.c_str(), nullptr, nullptr);
 #endif
 	mediaStream->inputOpened = ret == 0;
 	if (ret != 0)
 	{
 		char buf[1024];
 		av_strerror(ret, buf, 1024);
-		GameLog::write("video %s open error: %s\n", File::getAssetsName(newFileName).c_str(), buf);
+		GameLog::write("video %s open error: %s\n", fileName.c_str(), buf);
 	}
 	if (ret == 0)
 	{
@@ -6008,7 +6038,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 					if (codec == nullptr)
 					{
 						GameLog::write("video %s decoder not found: %s\n",
-							File::getAssetsName(newFileName).c_str(),
+							fileName.c_str(),
 							avcodec_get_name(stream->codecpar->codec_id));
 						break;
 					}
@@ -6017,7 +6047,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 					if (codecContext == nullptr)
 					{
 						GameLog::write("video %s decoder context alloc failed: %s\n",
-							File::getAssetsName(newFileName).c_str(),
+							fileName.c_str(),
 							avcodec_get_name(stream->codecpar->codec_id));
 						break;
 					}
@@ -6028,7 +6058,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 						char buf[1024];
 						av_strerror(ret, buf, 1024);
 						GameLog::write("video %s decoder parameter error: %s\n",
-							File::getAssetsName(newFileName).c_str(), buf);
+							fileName.c_str(), buf);
 						avcodec_free_context(&codecContext);
 						break;
 					}
@@ -6050,7 +6080,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 						char buf[1024];
 						av_strerror(ret, buf, 1024);
 						GameLog::write("video %s decoder open error for %s: %s\n",
-							File::getAssetsName(newFileName).c_str(),
+							fileName.c_str(),
 							avcodec_get_name(stream->codecpar->codec_id),
 							buf);
 						avcodec_free_context(&codecContext);
@@ -6087,7 +6117,7 @@ void EngineBase::setMediaStream(MediaStream * mediaStream, std::string& fileName
 		{
 			char buf[1024];
 			av_strerror(ret, buf, 1024);
-			GameLog::write("video %s stream info error: %s\n", File::getAssetsName(newFileName).c_str(), buf);
+			GameLog::write("video %s stream info error: %s\n", fileName.c_str(), buf);
 		}
 	}	
 }
@@ -6932,11 +6962,8 @@ _video EngineBase::loadVideo(const std::string& fileName)
 {
 #ifdef SHF_USE_VIDEO
 	GameLog::write("Open video %s\n", fileName.c_str());
-	if (!File::fileExist(fileName))
-	{
-		GameLog::write("Video:%s not exists\n", fileName.c_str());
-		return nullptr;
-	}
+	const std::string resolvedVideoPath = resolveVideoAssetPath(fileName);
+	if (resolvedVideoPath.empty()) return nullptr;
 
 	auto video = new Video_t;
 	video->videoImage.resize(0);
@@ -6957,7 +6984,7 @@ _video EngineBase::loadVideo(const std::string& fileName)
 	video->soundRate = getVideoSoundRate(video);
 	initVideoTime(video);
 	setVideoTimePaused(video, true);
-	video->fileName = fileName;
+	video->fileName = resolvedVideoPath;
 	setVideoRect((_video)video, nullptr);
 	video->decodeEnd = false;
 	video->videoVolume = 1;
@@ -7374,6 +7401,9 @@ bool EngineBase::canPrepareRenderFrame() const
 
 void EngineBase::frameBegin()
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	GameplayAutomationSession::frameStarted();
+#endif
 	currentFrameReady.store(false);
 	handleEvent();
 	if (!canPrepareRenderFrame())
@@ -7494,7 +7524,10 @@ void EngineBase::displayScreen()
 	{
 		return;
 	}
-	SDL_RenderPresent(activeRenderer);
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+    GameplayAutomationSession::beforePresent(*this);
+#endif
+    SDL_RenderPresent(activeRenderer);
 }
 
 void EngineBase::updateRect(int tempWidth, int tempHeight, Rect & rect)

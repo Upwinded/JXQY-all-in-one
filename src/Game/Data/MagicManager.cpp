@@ -1,17 +1,20 @@
 ﻿#include "MagicManager.h"
 #include "../../File/INIReader.h"
 #include "SaveIniPersistence.h"
+#include "../../GameplayAutomation/GameplayAutomationSession.h"
 #include "DefeatedNpcExperience.h"
 #include "../../libconvert/libconvert.h"
 #include "../../File/log.h"
 #include "../GameManager/GameManager.h"
 #include "../GameManager/SaveFileManager.h"
+#include "../../File/File.h"
 
 #include <algorithm>
 #include <cctype>
 #include <climits>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 
 namespace
 {
@@ -57,9 +60,13 @@ void clearMagicInfo(MagicInfo& info)
 	info.remainColdMilliseconds = 0;
 }
 
-int addExperienceSaturated(int currentExperience, int addedExperience)
+int addExperienceSaturated(const MagicInfo& info, int addedExperience)
 {
-	const int64_t total = static_cast<int64_t>(currentExperience)
+	if (info.magic->definedLearningLevelLimit > 0 && info.level >= info.magic->definedLearningLevelLimit)
+	{
+		return info.exp;
+	}
+	const int64_t total = static_cast<int64_t>(info.exp)
 		+ addedExperience;
 	return static_cast<int>(std::clamp<int64_t>(
 		total,
@@ -83,6 +90,7 @@ std::shared_ptr<Magic> loadMagicResource(
 	magic->initFromIni(magicName);
 	if (magic->loadSucceeded)
 	{
+		magic->experienceOwner = { true, magic };
 		return magic;
 	}
 	GameLog::write(
@@ -129,6 +137,15 @@ bool loadMagicInfoFromIni(INIReader& ini, const std::string& section, MagicInfo&
 	return true;
 }
 
+void saveMagicInfoToIni(INIReader& ini, const std::string& section, const MagicInfo& info)
+{
+	ini.Set(section, "IniFile", info.iniFile);
+	ini.SetInteger(section, "Level", info.level);
+	ini.SetInteger(section, "Exp", info.exp);
+	ini.SetInteger(section, "HideCount", info.hideCount);
+	ini.SetInteger(section, "LastIndexWhenHide", info.lastIndexWhenHide);
+}
+
 int findMagicIndexInList(const std::vector<MagicInfo>& list, const std::string& magicName)
 {
 	for (int i = 0; i < static_cast<int>(list.size()); i++)
@@ -151,6 +168,23 @@ std::string trimString(const std::string& value)
 	}
 	size_t last = value.find_last_not_of(" \t\r\n");
 	return value.substr(first, last - first + 1);
+}
+
+int findMagicIndexInList(const std::vector<MagicInfo>& list, const std::weak_ptr<Magic>& source)
+{
+	const auto magic = source.lock();
+	if (magic == nullptr)
+	{
+		return -1;
+	}
+	for (int i = 0; i < static_cast<int>(list.size()); ++i)
+	{
+		if (magicInfoIsUsable(list[i]) && list[i].magic == magic)
+		{
+			return i;
+		}
+	}
+	return -1;
 }
 
 std::vector<std::string> parseReplaceMagicNames(const std::string& listString)
@@ -292,11 +326,33 @@ bool MagicManager::load(int index, std::string* failureReason)
 			return false;
 		}
 
-		loadedManager.currentUseMagicFile =
+		const std::string currentUseMagicFile =
 			loadedIni->Get("Head", "CurrentUseMagicFile", "");
 		for (const auto& section : loadedIni->GetSectionNames())
 		{
 			int sectionIndex = 0;
+			const std::string replacementPrefix = "replacementlist";
+			if (section.compare(0, replacementPrefix.size(), replacementPrefix) == 0
+				&& parsePositiveSectionIndex(section.substr(replacementPrefix.size()), sectionIndex))
+			{
+				const std::string key = loadedIni->Get(section, "Key", "");
+				if (key.empty())
+				{
+					GameLog::write("MagicManager: skip replacement list without a key %s\n", section.c_str());
+					continue;
+				}
+				auto& list = loadedManager.replaceMagicListCache[key];
+				list.resize(static_cast<size_t>(loadedManager.listLength()));
+				for (size_t i = 0; i < list.size(); ++i)
+				{
+					const std::string itemSection = section + ":" + std::to_string(i + 1);
+					if (loadedIni->HasSection(itemSection))
+					{
+						loadMagicInfoFromIni(*loadedIni, itemSection, list[i], 1);
+					}
+				}
+				continue;
+			}
 			if (!parsePositiveSectionIndex(section, sectionIndex))
 			{
 				continue;
@@ -331,20 +387,21 @@ bool MagicManager::load(int index, std::string* failureReason)
 					1);
 			}
 		}
-		const int currentUseIndex = findMagicIndexInList(
-			loadedManager.magicList,
-			loadedManager.currentUseMagicFile);
-		if (currentUseIndex < 0 ||
-			!loadedManager.isBottomIndex(currentUseIndex))
+		const long savedCurrentUseIndex = loadedIni->GetInteger("Head", "CurrentUseMagicIndex", -1);
+		const int currentUseIndex = savedCurrentUseIndex >= 0 && savedCurrentUseIndex <= loadedManager.listLength()
+			? static_cast<int>(savedCurrentUseIndex) - 1
+			: findMagicIndexInList(loadedManager.magicList, currentUseMagicFile);
+		if (loadedManager.isBottomIndex(currentUseIndex) && loadedManager.magicListExists(currentUseIndex))
 		{
-			loadedManager.currentUseMagicFile.clear();
+			loadedManager.recordCurrentUseMagic(currentUseIndex);
 		}
 	}
 
 	freeResource();
 	magicList = std::move(loadedManager.magicList);
 	hiddenMagicList = std::move(loadedManager.hiddenMagicList);
-	currentUseMagicFile = std::move(loadedManager.currentUseMagicFile);
+	replaceMagicListCache = std::move(loadedManager.replaceMagicListCache);
+	currentUseMagic = std::move(loadedManager.currentUseMagic);
 	hitExperienceLevelFactor = loadedManager.hitExperienceLevelFactor;
 	practiceKillExperienceFraction =
 		loadedManager.practiceKillExperienceFraction;
@@ -352,7 +409,9 @@ bool MagicManager::load(int index, std::string* failureReason)
 		loadedManager.currentUseKillExperienceFraction;
 	usesConfiguredExperienceRules =
 		loadedManager.usesConfiguredExperienceRules;
-	refreshPlayerMagicAttributes();
+	// Character load/rollback also replaces Goods next. Its final refresh must
+	// see both saved lists; outgoing equipment can otherwise clamp the loaded
+	// attributes or grant its magic into the incoming character's list.
 	return true;
 }
 
@@ -361,20 +420,22 @@ bool MagicManager::save(int index)
 	INIReader ini;
 	std::string section = "Head";
 	ini.SetInteger(section, "Count", 0);
-	ini.Set(section, "CurrentUseMagicFile", currentUseMagicFile);
 	int count = 0;
 	const auto& listToSave = isInReplaceMagicList ? replaceMagicListBackup : magicList;
+	const int currentUseIndex = findMagicIndexInList(magicList, currentUseMagic);
+	// Loading ends the form. Keep the selected toolbar slot in the primary list
+	// without changing the active form's experience target while saving.
+	const bool hasSavedSelection = currentUseIndex >= 0 && isBottomIndex(currentUseIndex)
+		&& currentUseIndex < static_cast<int>(listToSave.size()) && magicInfoIsUsable(listToSave[currentUseIndex]);
+	ini.Set(section, "CurrentUseMagicFile", hasSavedSelection ? listToSave[currentUseIndex].iniFile : "");
+	ini.SetInteger(section, "CurrentUseMagicIndex", hasSavedSelection ? currentUseIndex + 1 : 0);
 	for (size_t i = 0; i < listToSave.size(); i++)
 	{
 		if (magicInfoIsUsable(listToSave[i]))
 		{
 			count++;
 			section = convert::formatString("%d", i + 1);
-			ini.Set(section, "IniFile", listToSave[i].iniFile);
-			ini.SetInteger(section, "Level", listToSave[i].level);
-			ini.SetInteger(section, "Exp", listToSave[i].exp);
-			ini.SetInteger(section, "HideCount", listToSave[i].hideCount);
-			ini.SetInteger(section, "LastIndexWhenHide", listToSave[i].lastIndexWhenHide);
+			saveMagicInfoToIni(ini, section, listToSave[i]);
 		}
 	}
 	for (size_t i = 0; i < hiddenMagicList.size(); i++)
@@ -382,11 +443,24 @@ bool MagicManager::save(int index)
 		if (magicInfoIsUsable(hiddenMagicList[i]))
 		{
 			section = convert::formatString("%d", hideStartIndex() + static_cast<int>(i) + 1);
-			ini.Set(section, "IniFile", hiddenMagicList[i].iniFile);
-			ini.SetInteger(section, "Level", hiddenMagicList[i].level);
-			ini.SetInteger(section, "Exp", hiddenMagicList[i].exp);
-			ini.SetInteger(section, "HideCount", hiddenMagicList[i].hideCount);
-			ini.SetInteger(section, "LastIndexWhenHide", hiddenMagicList[i].lastIndexWhenHide);
+			saveMagicInfoToIni(ini, section, hiddenMagicList[i]);
+		}
+	}
+	// A transformation ends on load, but its learned progress must survive.
+	// Keep caches in the same character file/generation as the primary list.
+	size_t replacementIndex = 0;
+	for (const auto& cached : replaceMagicListCache)
+	{
+		const std::string listSection = "ReplacementList" + std::to_string(++replacementIndex);
+		ini.Set(listSection, "Key", cached.first);
+		const auto& list = isInReplaceMagicList && cached.first == currentReplaceMagicListKey
+			? magicList : cached.second;
+		for (size_t i = 0; i < list.size(); ++i)
+		{
+			if (magicInfoIsUsable(list[i]))
+			{
+				saveMagicInfoToIni(ini, listSection + ":" + std::to_string(i + 1), list[i]);
+			}
 		}
 	}
 	section = "Head";
@@ -422,7 +496,7 @@ void MagicManager::freeResource()
 		clearMagicInfo(hiddenMagicList[i]);
 	}
 	attackMagicList.clear();
-	currentUseMagicFile.clear();
+	currentUseMagic.reset();
 }
 
 void MagicManager::clearMagicList()
@@ -435,7 +509,7 @@ void MagicManager::clearMagicList()
 	currentReplaceMagicListKey.clear();
 	replaceMagicListBackup.clear();
 	replaceMagicListCache.clear();
-	currentUseMagicFile.clear();
+	currentUseMagic.reset();
 	for (size_t i = 0; i < magicList.size(); i++)
 	{
 		clearMagicInfo(magicList[i]);
@@ -458,11 +532,25 @@ void MagicManager::refreshPlayerMagicAttributes()
 	gm->player->limitAttribute();
 }
 
-void MagicManager::replaceMagicList(const std::string& replacementList)
+void MagicManager::replaceMagicList(const std::string& replacementList, const std::string& sourceIdentity)
 {
 	if (replacementList.empty())
 	{
 		return;
+	}
+	const auto names = parseReplaceMagicNames(replacementList);
+	std::string replacementKey = replacementList;
+	if (!sourceIdentity.empty())
+	{
+		// Published player forms identify progress by character, source magic name
+		// and parsed files. This is an INI value, not a path to an external file.
+		replacementKey = sourceIdentity + "_";
+		for (size_t i = 0; i < names.size(); ++i)
+		{
+			if (i > 0) replacementKey += "_";
+			replacementKey += names[i];
+		}
+		replacementKey += ".ini";
 	}
 	if (!isInReplaceMagicList)
 	{
@@ -471,14 +559,15 @@ void MagicManager::replaceMagicList(const std::string& replacementList)
 	else
 	{
 		replaceMagicListCache[currentReplaceMagicListKey] = magicList;
-		if (currentReplaceMagicListKey == replacementList)
+		if (currentReplaceMagicListKey == replacementKey)
 		{
 			return;
 		}
 	}
 
-	currentReplaceMagicListKey = replacementList;
-	auto cacheIter = replaceMagicListCache.find(replacementList);
+	const int currentUseIndex = findMagicIndexInList(magicList, currentUseMagic);
+	currentReplaceMagicListKey = replacementKey;
+	auto cacheIter = replaceMagicListCache.find(replacementKey);
 	if (cacheIter != replaceMagicListCache.end())
 	{
 		magicList = cacheIter->second;
@@ -486,7 +575,6 @@ void MagicManager::replaceMagicList(const std::string& replacementList)
 	else
 	{
 		std::vector<MagicInfo> replacementListData(static_cast<size_t>(listLength()), MagicInfo());
-		auto names = parseReplaceMagicNames(replacementList);
 		size_t nameIndex = 0;
 		for (int i = bottomBegin(); i <= bottomEnd() && i < listLength() && nameIndex < names.size(); i++)
 		{
@@ -498,17 +586,28 @@ void MagicManager::replaceMagicList(const std::string& replacementList)
 			replacementListData[static_cast<size_t>(i)] = makeReplacementMagicInfo(names[nameIndex]);
 			nameIndex++;
 		}
-		replaceMagicListCache[replacementList] = replacementListData;
+		replaceMagicListCache[replacementKey] = replacementListData;
 		magicList = replacementListData;
 	}
 	isInReplaceMagicList = true;
+	currentUseMagic.reset();
+	recordCurrentUseMagic(currentUseIndex);
 	refreshPlayerMagicAttributes();
 	updateMenu();
 }
 
-int MagicManager::primaryFreeIndex() const
+int MagicManager::primaryFreeIndex(bool talent) const
 {
 	const auto& primaryList = primaryMagicList();
+	if (talent && gm != nullptr && gm->global.magicLayout.talentBegin >= 0)
+	{
+		for (int i = gm->global.magicLayout.talentBegin;
+			i <= gm->global.magicLayout.talentEnd && i < static_cast<int>(primaryList.size()); ++i)
+		{
+			if (primaryList[static_cast<size_t>(i)].iniFile.empty()) return i;
+		}
+		return -1;
+	}
 	for (int i = storeBegin(); i <= storeEnd() && i < static_cast<int>(primaryList.size()); i++)
 	{
 		if (primaryList[static_cast<size_t>(i)].iniFile.empty())
@@ -543,13 +642,63 @@ void MagicManager::stopReplaceMagicList()
 	{
 		return;
 	}
+	const int currentUseIndex = findMagicIndexInList(magicList, currentUseMagic);
 	replaceMagicListCache[currentReplaceMagicListKey] = magicList;
 	magicList = replaceMagicListBackup;
 	replaceMagicListBackup.clear();
 	currentReplaceMagicListKey.clear();
 	isInReplaceMagicList = false;
+	currentUseMagic.reset();
+	recordCurrentUseMagic(currentUseIndex);
 	refreshPlayerMagicAttributes();
 	updateMenu();
+}
+
+void MagicManager::addTalentJumpRadius(const MagicInfo& info)
+{
+	if (gm == nullptr || gm->player == nullptr || !gm->global.feature.separateTalentSlots
+		|| gm->global.magicLayout.talentBegin < 0 || info.magic == nullptr)
+	{
+		return;
+	}
+	const auto& layout = gm->global.magicLayout;
+	const auto& primary = primaryMagicList();
+	bool talent = false;
+	for (int i = layout.talentBegin; i <= layout.talentEnd && i < static_cast<int>(primary.size()); ++i)
+	{
+		if (&primary[i] == &info) talent = true;
+	}
+	if (!talent && info.lastIndexWhenHide >= layout.talentBegin && info.lastIndexWhenHide <= layout.talentEnd)
+	{
+		talent = std::any_of(hiddenMagicList.begin(), hiddenMagicList.end(),
+			[&](const MagicInfo& hidden) { return &hidden == &info; });
+	}
+	if (talent)
+	{
+		const int64_t radius = static_cast<int64_t>(gm->player->jumpRadius) + info.magic->level[info.level].jumpRadius;
+		gm->player->jumpRadius = static_cast<int>(std::clamp<int64_t>(radius, INT_MIN, INT_MAX));
+	}
+}
+
+bool MagicManager::tryAdvanceMagicLevel(MagicInfo& info)
+{
+	bool leveledUp = false;
+	const int levelLimit = info.magic->definedLearningLevelLimit > 0
+		? std::min(MAGIC_MAX_LEVEL, info.magic->definedLearningLevelLimit) : MAGIC_MAX_LEVEL;
+	while (info.level < levelLimit)
+	{
+		const int levelUpExperience =
+			info.magic->level[info.level].levelupExp;
+		// 零或负门槛只停止升级，不截断已累计的经验。
+		if (levelUpExperience <= 0 || info.exp < levelUpExperience)
+		{
+			break;
+		}
+		info.level++;
+		addTalentJumpRadius(info);
+		leveledUp = true;
+	}
+	return leveledUp;
 }
 
 void MagicManager::addPracticeExp(int addexp)
@@ -558,16 +707,10 @@ void MagicManager::addPracticeExp(int addexp)
 	if (magicListExists(index))
 	{
 		magicList[index].exp = addExperienceSaturated(
-			magicList[index].exp,
+			magicList[index],
 			addexp);
 		gm->menu->practiceMenu->updateExp();
-		bool lup = false;
-		while (magicList[index].level < MAGIC_MAX_LEVEL && magicList[index].exp >= magicList[index].magic->level[magicList[index].level].levelupExp)
-		{
-			magicList[index].level++;
-			lup = true;
-		}
-		if (lup)
+		if (tryAdvanceMagicLevel(magicList[index]))
 		{
 			refreshPlayerMagicAttributes();
 			gm->menu->practiceMenu->updateExp();
@@ -587,7 +730,8 @@ bool MagicManager::addPracticeExperienceToNextLevel()
 
 	MagicInfo& info = magicList[static_cast<std::size_t>(index)];
 	if (info.magic == nullptr || info.level < 1 ||
-		info.level >= MAGIC_MAX_LEVEL)
+		info.level >= MAGIC_MAX_LEVEL ||
+		(info.magic->definedLearningLevelLimit > 0 && info.level >= info.magic->definedLearningLevelLimit))
 	{
 		return false;
 	}
@@ -612,6 +756,15 @@ void MagicManager::addUseExp(std::shared_ptr<Effect> e, int addexp)
 	{
 		return;
 	}
+	const auto owner = Magic::getExperienceOwner(e->magicDispatchContext);
+	if (owner.assigned)
+	{
+		if (auto* info = findExperienceOwner(owner))
+		{
+			addUseExperience(*info, addexp);
+		}
+		return;
+	}
 	const std::string& experienceMagicFile = e->magic.experienceOwnerMagicFile.empty()
 		? e->magic.iniName
 		: e->magic.experienceOwnerMagicFile;
@@ -625,25 +778,103 @@ void MagicManager::addUseExperience(const std::string& magicFile, int addexp)
 		if (magicInfoIsUsable(magicList[i])
 			&& equalsMagicFileName(magicList[i].iniFile, magicFile))
 		{
-			magicList[i].exp = addExperienceSaturated(
-				magicList[i].exp,
-				addexp);
-			bool lup = false;
-			while (magicList[i].level < MAGIC_MAX_LEVEL && magicList[i].exp >= magicList[i].magic->level[magicList[i].level].levelupExp)
-			{
-				magicList[i].level++;
-				lup = true;
-			}
-			if (lup)
-			{
-				refreshPlayerMagicAttributes();
-				gm->menu->practiceMenu->updateExp();
-				gm->menu->practiceMenu->updateLevel();
-				gm->showMessage(convert::formatString("%s的等级提升了！", magicList[i].magic->name.c_str(), magicList[i].level));
-			}
+			addUseExperience(magicList[i], addexp);
 			break;
 		}
 	}
+}
+
+void MagicManager::addUseExperience(MagicInfo& info, int addexp)
+{
+	info.exp = addExperienceSaturated(info, addexp);
+	if (tryAdvanceMagicLevel(info))
+	{
+		refreshPlayerMagicAttributes();
+		if (gm != nullptr && gm->menu != nullptr && gm->menu->practiceMenu != nullptr)
+		{
+			gm->menu->practiceMenu->updateExp();
+			gm->menu->practiceMenu->updateLevel();
+		}
+		if (gm != nullptr)
+		{
+			gm->showMessage(convert::formatString("%s的等级提升了！", info.magic->name.c_str(), info.level));
+		}
+	}
+}
+
+MagicInfo* MagicManager::findExperienceOwner(const MagicExperienceOwner& owner, std::string* listKey, int* slot)
+{
+	const auto source = owner.magic.lock();
+	if (!owner.assigned || source == nullptr)
+	{
+		return nullptr;
+	}
+	const auto find = [&](std::vector<MagicInfo>& list, const std::string& key) -> MagicInfo*
+	{
+		for (size_t i = 0; i < list.size(); ++i)
+		{
+			if (magicInfoIsUsable(list[i]) && list[i].magic == source)
+			{
+				if (listKey != nullptr) *listKey = key;
+				if (slot != nullptr) *slot = static_cast<int>(i + 1);
+				return &list[i];
+			}
+		}
+		return nullptr;
+	};
+	// The active vector is authoritative; its cache may still contain an old
+	// value copy of the same learned object until the next list switch.
+	if (auto* info = find(magicList, isInReplaceMagicList ? "replacement:" + currentReplaceMagicListKey : "primary")) return info;
+	if (auto* info = find(hiddenMagicList, "hidden")) return info;
+	if (auto* info = find(replaceMagicListBackup, "primary")) return info;
+	for (auto& cached : replaceMagicListCache)
+	{
+		if (isInReplaceMagicList && cached.first == currentReplaceMagicListKey) continue;
+		if (auto* info = find(cached.second, "replacement:" + cached.first)) return info;
+	}
+	return nullptr;
+}
+
+void MagicManager::saveExperienceOwner(INIReader& ini, const std::string& section, const MagicExperienceOwner& owner)
+{
+	ini.SetBoolean(section, "ExperienceOwnerKnown", owner.assigned);
+	std::string key;
+	int slot = 0;
+	const auto* info = findExperienceOwner(owner, &key, &slot);
+	ini.Set(section, "ExperienceOwnerList", key);
+	ini.SetInteger(section, "ExperienceOwnerSlot", slot);
+	ini.Set(section, "ExperienceOwnerEntryFile", info != nullptr ? info->iniFile : "");
+	ini.SetInteger(section, "ExperienceOwnerCharacter", gm->global.data.characterIndex);
+}
+
+MagicExperienceOwner MagicManager::loadExperienceOwner(const INIReader& ini, const std::string& section)
+{
+	MagicExperienceOwner owner;
+	owner.assigned = ini.GetBoolean(section, "ExperienceOwnerKnown", false);
+	if (!owner.assigned || ini.GetInteger(section, "ExperienceOwnerCharacter", INT_MIN) != gm->global.data.characterIndex)
+	{
+		return owner;
+	}
+	const std::string key = ini.Get(section, "ExperienceOwnerList", "");
+	const long slot = ini.GetInteger(section, "ExperienceOwnerSlot", 0);
+	const std::vector<MagicInfo>* list = nullptr;
+	if (key == "primary") list = &primaryMagicList();
+	else if (key == "hidden") list = &hiddenMagicList;
+	else if (key.compare(0, 12, "replacement:") == 0)
+	{
+		const std::string replacement = key.substr(12);
+		if (isInReplaceMagicList && replacement == currentReplaceMagicListKey) list = &magicList;
+		else if (auto it = replaceMagicListCache.find(replacement); it != replaceMagicListCache.end()) list = &it->second;
+	}
+	if (list != nullptr && slot > 0 && static_cast<size_t>(slot) <= list->size())
+	{
+		const auto& info = (*list)[static_cast<size_t>(slot - 1)];
+		if (magicInfoIsUsable(info) && equalsMagicFileName(info.iniFile, ini.Get(section, "ExperienceOwnerEntryFile", "")))
+		{
+			owner.magic = info.magic;
+		}
+	}
+	return owner;
 }
 
 void MagicManager::addHitExp(std::shared_ptr<Effect> e, int targetLevel)
@@ -653,6 +884,11 @@ void MagicManager::addHitExp(std::shared_ptr<Effect> e, int targetLevel)
 		return;
 	}
 	const int hitExperience = hitExperienceForTargetLevel(targetLevel);
+	if (Magic::getExperienceOwner(e->magicDispatchContext).assigned)
+	{
+		addUseExp(e, hitExperience);
+		return;
+	}
 	const std::string& experienceMagicFile = e->magic.experienceOwnerMagicFile.empty()
 		? e->magic.iniName
 		: e->magic.experienceOwnerMagicFile;
@@ -660,9 +896,9 @@ void MagicManager::addHitExp(std::shared_ptr<Effect> e, int targetLevel)
 	{
 		addUseExperience(experienceMagicFile, hitExperience);
 	}
-	else if (!currentUseMagicFile.empty())
+	else if (auto* info = findExperienceOwner({ true, currentUseMagic }))
 	{
-		addUseExperience(currentUseMagicFile, hitExperience);
+		addUseExperience(*info, hitExperience);
 	}
 }
 
@@ -679,15 +915,28 @@ void MagicManager::addKillExp(
 		return;
 	}
 
-	addPracticeExp(floorAutomaticExperience(
+	addKillExp(
+		e,
 		scaledExperience,
-		practiceKillExperienceFraction));
-	if (!currentUseMagicFile.empty())
+		practiceKillExperienceFraction,
+		currentUseKillExperienceFraction);
+}
+
+void MagicManager::addKillExp(
+	std::shared_ptr<Effect> e,
+	double automaticExperience,
+	float practiceFraction,
+	float useFraction)
+{
+	addPracticeExp(floorAutomaticExperience(
+		automaticExperience,
+		practiceFraction));
+	if (auto* info = findExperienceOwner({ true, currentUseMagic }))
 	{
-		addUseExperience(currentUseMagicFile,
+		addUseExperience(*info,
 			floorAutomaticExperience(
-				scaledExperience,
-				currentUseKillExperienceFraction));
+				automaticExperience,
+				useFraction));
 	}
 }
 
@@ -697,7 +946,42 @@ void MagicManager::recordCurrentUseMagic(int listIndex)
 	{
 		return;
 	}
-	currentUseMagicFile = magicList[static_cast<size_t>(listIndex)].iniFile;
+	const auto& selectedMagic = magicList[static_cast<size_t>(listIndex)].magic;
+	currentUseMagic = selectedMagic->disableUse == 0 ? selectedMagic : nullptr;
+}
+
+void MagicManager::finishMagicUse(const std::shared_ptr<Magic>& sourceMagic, UTime coldTime, bool recordCurrentUse)
+{
+	if (sourceMagic == nullptr)
+	{
+		return;
+	}
+	// Entries can move or be backed up while the cast animation is running.
+	// Match the learned object, not a slot or another list's same-named magic.
+	const auto update = [&](std::vector<MagicInfo>& list)
+	{
+		for (auto& info : list)
+		{
+			if (info.magic == sourceMagic)
+			{
+				info.remainColdMilliseconds = coldTime;
+				if (recordCurrentUse)
+				{
+					currentUseMagic = sourceMagic->disableUse == 0 ? sourceMagic : nullptr;
+				}
+			}
+		}
+	};
+	update(magicList);
+	update(hiddenMagicList);
+	update(replaceMagicListBackup);
+	for (auto& cached : replaceMagicListCache)
+	{
+		update(cached.second);
+	}
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	GameplayAutomationSession::skillUsed(sourceMagic);
+#endif
 }
 
 void MagicManager::addMagicExp(const std::string & magicName, int addexp)
@@ -705,14 +989,8 @@ void MagicManager::addMagicExp(const std::string & magicName, int addexp)
 	MagicInfo * m = findPrimaryMagic(magicName);
 	if (m != nullptr)
 	{
-		m->exp = addExperienceSaturated(m->exp, addexp);
-		bool lup = false;
-		while (m->level < MAGIC_MAX_LEVEL && m->exp >= m->magic->level[m->level].levelupExp)
-		{
-			m->level++;
-			lup = true;
-		}
-		if (lup)
+		m->exp = addExperienceSaturated(*m, addexp);
+		if (tryAdvanceMagicLevel(*m))
 		{
 			refreshPlayerMagicAttributes();
 		}
@@ -724,19 +1002,41 @@ void MagicManager::addMagic(const std::string & magicName)
 	addPrimaryMagic(magicName, true, true);
 }
 
-MagicInfo* MagicManager::addPrimaryMagic(const std::string& magicName, bool showMessage, bool refreshAttributes)
+MagicInfo* MagicManager::addPrimaryMagic(const std::string& magicName, bool showMessage, bool refreshAttributes, bool talent)
 {
 	if (magicName.empty())
 	{
 		return nullptr;
 	}
-	MagicInfo* existingMagic = findPrimaryMagic(magicName);
+	if (talent && gm != nullptr && gm->global.feature.separateTalentSlots && gm->global.magicLayout.talentBegin < 0)
+	{
+		GameLog::write("MagicManager: unavailable talent slots for %s\n", magicName.c_str());
+		return nullptr;
+	}
+	MagicInfo* existingMagic = nullptr;
+	if (talent && gm != nullptr && gm->global.magicLayout.talentBegin >= 0)
+	{
+		auto& list = primaryMagicList();
+		for (int i = gm->global.magicLayout.talentBegin;
+			i <= gm->global.magicLayout.talentEnd && i < static_cast<int>(list.size()); ++i)
+		{
+			if (magicInfoIsUsable(list[i]) && equalsMagicFileName(list[i].iniFile, magicName))
+			{
+				existingMagic = &list[i];
+				break;
+			}
+		}
+	}
+	else
+	{
+		existingMagic = findPrimaryMagic(magicName);
+	}
 	if (existingMagic != nullptr)
 	{
 		return existingMagic;
 	}
 
-	int index = primaryFreeIndex();
+	int index = primaryFreeIndex(talent);
 	if (index < 0)
 	{
 		return nullptr;
@@ -756,6 +1056,7 @@ MagicInfo* MagicManager::addPrimaryMagic(const std::string& magicName, bool show
 	info.lastIndexWhenHide = 0;
 	info.remainColdMilliseconds = 0;
 	info.magic = magic;
+	addTalentJumpRadius(info);
 	if (refreshAttributes)
 	{
 		refreshPlayerMagicAttributes();
@@ -794,9 +1095,10 @@ void MagicManager::deletePrimaryMagic(const std::string& magicName)
 	MagicInfo * m = findPrimaryMagic(magicName);
 	if (m != nullptr)
 	{
-		if (equalsMagicFileName(currentUseMagicFile, magicName))
+		const auto* current = findExperienceOwner({ true, currentUseMagic });
+		if (current != nullptr && equalsMagicFileName(current->iniFile, magicName))
 		{
-			currentUseMagicFile.clear();
+			currentUseMagic.reset();
 		}
 		clearMagicInfo(*m);
 		refreshPlayerMagicAttributes();
@@ -806,7 +1108,7 @@ void MagicManager::deletePrimaryMagic(const std::string& magicName)
 
 void MagicManager::clearPrimaryMagicList()
 {
-	currentUseMagicFile.clear();
+	currentUseMagic.reset();
 	auto& primaryList = primaryMagicList();
 	for (size_t i = 0; i < primaryList.size(); i++)
 	{
@@ -879,9 +1181,9 @@ MagicInfo* MagicManager::setMagicHidden(const std::string& magicName, bool hidde
 			info.hideCount = 1;
 			return nullptr;
 		}
-		if (equalsMagicFileName(currentUseMagicFile, magicName))
+		if (currentUseMagic.lock() == info.magic)
 		{
-			currentUseMagicFile.clear();
+			currentUseMagic.reset();
 		}
 
 		MagicInfo movedInfo = info;
@@ -933,6 +1235,12 @@ MagicInfo* MagicManager::setMagicHidden(const std::string& magicName, bool hidde
 		&& primaryList[movedInfo.lastIndexWhenHide].iniFile.empty())
 	{
 		targetIndex = movedInfo.lastIndexWhenHide;
+	}
+	else if (gm != nullptr && gm->global.magicLayout.talentBegin >= 0
+		&& movedInfo.lastIndexWhenHide >= gm->global.magicLayout.talentBegin
+		&& movedInfo.lastIndexWhenHide <= gm->global.magicLayout.talentEnd)
+	{
+		targetIndex = primaryFreeIndex(true);
 	}
 	else
 	{
@@ -1064,10 +1372,10 @@ void MagicManager::exchange(int index1, int index2)
 	if (index1 >= 0 && index2 >= 0 && index1 < listLength() && index2 < listLength())
 	{
 		if (isBottomIndex(index1) != isBottomIndex(index2)
-			&& (equalsMagicFileName(currentUseMagicFile, magicList[index1].iniFile)
-				|| equalsMagicFileName(currentUseMagicFile, magicList[index2].iniFile)))
+			&& (currentUseMagic.lock() == magicList[index1].magic
+				|| currentUseMagic.lock() == magicList[index2].magic))
 		{
-			currentUseMagicFile.clear();
+			currentUseMagic.reset();
 		}
 		MagicInfo tempInfo = magicList[index1];
 		magicList[index1] = magicList[index2];
@@ -1097,8 +1405,46 @@ void MagicManager::configureLayout()
 	}
 	magicList.assign(static_cast<size_t>(length), MagicInfo());
 	hiddenMagicList.assign(static_cast<size_t>(length), MagicInfo());
-	currentUseMagicFile.clear();
+	currentUseMagic.reset();
 	loadExperienceRules();
+}
+
+namespace
+{
+bool tryParseMagicExperienceRules(
+	const char* data,
+	int size,
+	int& hitExperienceLevelFactor,
+	float& practiceKillExperienceFraction,
+	float& currentUseKillExperienceFraction)
+{
+	if (data == nullptr || size <= 0)
+	{
+		return false;
+	}
+	std::unique_ptr<char[]> buffer(new char[static_cast<size_t>(size) + 1]);
+	std::memcpy(buffer.get(), data, static_cast<size_t>(size));
+	buffer[static_cast<size_t>(size)] = '\0';
+	const INIReader ini(buffer);
+	if (ini.ParseError() != 0)
+	{
+		return false;
+	}
+
+	const long hitLevelFactor = ini.GetInteger("HitMagicExp", "LevelFactor", -1);
+	const float practiceFraction = ini.GetReal("XiuLianMagicExp", "Fraction", -1.0f);
+	const float currentUseFraction = ini.GetReal("UseMagicExp", "Fraction", -1.0f);
+	if (hitLevelFactor < 0 || hitLevelFactor > INT_MAX
+		|| practiceFraction < 0.0f || currentUseFraction < 0.0f)
+	{
+		return false;
+	}
+
+	hitExperienceLevelFactor = static_cast<int>(hitLevelFactor);
+	practiceKillExperienceFraction = practiceFraction;
+	currentUseKillExperienceFraction = currentUseFraction;
+	return true;
+}
 }
 
 void MagicManager::loadExperienceRules()
@@ -1108,25 +1454,29 @@ void MagicManager::loadExperienceRules()
 	currentUseKillExperienceFraction = 1.0f;
 	usesConfiguredExperienceRules = false;
 
-	INIReader ini("ini\\level\\MagicExp.ini");
-	if (ini.ParseError() != 0)
+	// 沿资源根链（当前包 → 依赖包声明序 → common）取第一个三键齐全的完整
+	// 配置；MOD 自带的旧格式 [Exp] 表不构成配置，自动继承基底包的规则。
+	int hitLevelFactor = 0;
+	float practiceFraction = 1.0f;
+	float useFraction = 1.0f;
+	const bool configured = File::visitReadableResources(
+		{std::string("ini\\level\\MagicExp.ini")},
+		[&](const std::string&, std::unique_ptr<char[]>& data, int size)
+		{
+			return tryParseMagicExperienceRules(
+				data.get(),
+				size,
+				hitLevelFactor,
+				practiceFraction,
+				useFraction);
+		});
+	if (configured)
 	{
-		return;
+		hitExperienceLevelFactor = hitLevelFactor;
+		practiceKillExperienceFraction = practiceFraction;
+		currentUseKillExperienceFraction = useFraction;
+		usesConfiguredExperienceRules = true;
 	}
-
-	const long hitLevelFactor = ini.GetInteger("HitMagicExp", "LevelFactor", -1);
-	const float practiceFraction = ini.GetReal("XiuLianMagicExp", "Fraction", -1.0f);
-	const float currentUseFraction = ini.GetReal("UseMagicExp", "Fraction", -1.0f);
-	if (hitLevelFactor < 0 || hitLevelFactor > INT_MAX
-		|| practiceFraction < 0.0f || currentUseFraction < 0.0f)
-	{
-		return;
-	}
-
-	hitExperienceLevelFactor = static_cast<int>(hitLevelFactor);
-	practiceKillExperienceFraction = practiceFraction;
-	currentUseKillExperienceFraction = currentUseFraction;
-	usesConfiguredExperienceRules = true;
 }
 
 int MagicManager::hitExperienceForTargetLevel(int targetLevel) const

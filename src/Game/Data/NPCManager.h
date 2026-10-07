@@ -20,12 +20,14 @@ public:
 	public:
 		bool isValid() const noexcept;
 		std::size_t npcCount() const noexcept;
+		bool needsNormalization() const noexcept;
 		const std::string& sourcePath() const noexcept;
 
 	private:
 		friend class NPCManager;
 		std::shared_ptr<INIReader> parsedIni;
 		std::size_t preparedNpcCount = 0;
+		bool normalizationRequired = false;
 		std::string resolvedSourcePath;
 	};
 

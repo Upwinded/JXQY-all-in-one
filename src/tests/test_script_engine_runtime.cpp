@@ -940,6 +940,17 @@ bool runRuntimeTraceInstrumentationTests()
 		ok;
 	Element::resetApplicationQuitState();
 
+	for (int instance = 0; instance < 2; ++instance)
+	{
+		Script replacement(ScriptLibraryProfile::EditorRunSafe, writer.get());
+		ok = check(
+			replacement.runResolvedTraceScriptSource(
+				traceSource("script/common/recreated.lua", "local loaded = true\n"))
+				.succeeded() && writer->valid() &&
+				replacement.currentExecutionId() == 0,
+			"successive Script instances share the writer's execution ID sequence") && ok;
+	}
+
 	ok = check(
 		writer->finish(
 			EditorRun::RuntimeTraceSessionFinishStatus::
@@ -990,6 +1001,12 @@ bool runRuntimeTraceInstrumentationTests()
 				std::string::npos,
 			"script.finish distinguishes empty success, load error, runtime error, and quit abort") &&
 			ok;
+		ok = check(
+			substringCount(trace, "\"eventType\":\"script.start\"") == 8 &&
+			substringCount(trace, "\"eventType\":\"script.finish\"") == 8 &&
+			trace.find("\"executionId\":7,\"status\":\"completed\"") != std::string::npos &&
+			trace.find("\"executionId\":8,\"status\":\"completed\"") != std::string::npos,
+			"trace remains complete after two Script instances are created and destroyed") && ok;
 	}
 
 	Script noWriter(
@@ -1006,6 +1023,235 @@ bool runRuntimeTraceInstrumentationTests()
 		ok;
 	return ok;
 }
+
+bool runGoodsUseWithoutMenusTests()
+{
+	bool ok = true;
+	for (bool keepMenuController : { true, false })
+	{
+		GameManager gameManager;
+		ok = check(gameManager.menu != nullptr &&
+			gameManager.menu->goodsMenu == nullptr &&
+			gameManager.menu->bottomMenu == nullptr &&
+			gameManager.menu->equipMenu == nullptr,
+			"goods-use regression starts before inventory menus are created") && ok;
+		if (!keepMenuController)
+		{
+			gameManager.menu.reset();
+		}
+		auto& manager = gameManager.goodsManager;
+		for (int itemIndex : { manager.storeBegin(), manager.bottomBegin() })
+		{
+			auto& item = manager.goodsList[itemIndex];
+			item.iniFile = "menu_absent_drug.ini";
+			item.number = 2;
+			item.goods = std::make_shared<Goods>();
+			item.goods->kind = gkDrug;
+			item.goods->life = 15;
+			item.goods->coldMilliSeconds = 100;
+			gameManager.player->lifeMax = 100;
+			gameManager.player->life = 20;
+			ok = check(manager.useItem(itemIndex) && item.number == 1 &&
+				item.remainColdMilliseconds == 100 && gameManager.player->life == 35,
+				"using a store or bottom-slot drug without menus preserves effect, count and cooldown") && ok;
+			item.remainColdMilliseconds = 0;
+			ok = check(manager.useItem(itemIndex) && item.iniFile.empty() &&
+				item.goods == nullptr && gameManager.player->life == 50,
+				"using the last drug without menus clears the slot after applying its effect") && ok;
+
+			item.iniFile = "menu_absent_equipment.ini";
+			item.number = 1;
+			item.goods = std::make_shared<Goods>();
+			item.goods->kind = gkEquipment;
+			item.goods->part = "HaNd";
+			item.goods->attack = 7;
+			const auto incomingEquipment = item.goods;
+			auto& equipped = manager.goodsList[manager.equipIndex(4)];
+			equipped.iniFile = "menu_absent_previous_equipment.ini";
+			equipped.number = 1;
+			equipped.goods = std::make_shared<Goods>(*incomingEquipment);
+			equipped.goods->attack = 3;
+			const auto previousEquipment = equipped.goods;
+			manager.refreshEquipmentEffects();
+			const int previousAttack = gameManager.player->getAttack();
+			ok = check(manager.useItem(itemIndex) &&
+				equipped.goods == incomingEquipment && item.goods == previousEquipment &&
+				gameManager.player->getAttack() == previousAttack + 4,
+				"equipping from store or bottom slots without menus swaps equipment and recalculates attributes") && ok;
+			item.clear();
+			equipped.clear();
+			manager.refreshEquipmentEffects();
+		}
+	}
+	return ok;
+}
+}
+
+bool runScriptPlayerNameTests(GameManager& gameManager)
+{
+	const auto previousGlobal = gameManager.global;
+	const auto previousNpcs = gameManager.npcManager->npcList;
+	const auto previousPlayerName = gameManager.player->npcName;
+	const auto previousPosition = gameManager.player->getPosition();
+	const int previousState = gameManager.player->state;
+	const std::string profileText = u8"[Game]\nId=NAME_TEST\n[Script]\nPlayerName=杨影枫\nNpcActionProfile=YYCS\nNpcRuntimeProfile=Trilogy\n";
+	ResourceManifest profile;
+	bool ok = check(profile.loadFromBuffer(profileText.data(), static_cast<int>(profileText.size())),
+		"player-name profile loads without a new required field");
+	gameManager.global.applyResourceManifestFeatures(profile);
+	gameManager.player->npcName = u8"杨影枫";
+	gameManager.npcManager->npcList.clear();
+	ScriptEngineRuntimeTestAccess::execute(gameManager.script,
+		"assign('PlayerName',99); assign('playername',77); setnpcpos('#name',4,5); getnpcstate('#name','MapX','NameTargetX')");
+	ok = check(gameManager.player->getPosition() == Point{4,5}
+		&& gameManager.varList.getInteger("NameTargetX") == 4
+		&& gameManager.varList.getInteger("PlayerName") == 99
+		&& gameManager.varList.getInteger("playername") == 77,
+		"configured #name finds the actual protagonist without aliasing script variables") && ok;
+
+	auto protagonist = std::make_shared<RecordingNPC>();
+	auto duplicate = std::make_shared<RecordingNPC>();
+	protagonist->npcName = duplicate->npcName = u8"杨影枫";
+	protagonist->kind = duplicate->kind = nkNormal;
+	protagonist->setPosition({1,1}, false);
+	duplicate->setPosition({2,2}, false);
+	gameManager.npcManager->npcList = {protagonist, duplicate};
+	gameManager.player->npcName = u8"纳兰真";
+	gameManager.player->setPosition({7,8}, false);
+	ScriptEngineRuntimeTestAccess::execute(gameManager.script,
+		"setnpcpos('#name',4,53); setnpckind('#name',3); setnpcscript('#name','#name.lua'); "
+		"getnpcstate('#name','MapX','NameTargetX'); npcgoto('#name',6,7)");
+	ok = check(protagonist->getPosition() == Point{4,53}
+		&& protagonist->kind == nkPartner && duplicate->kind == nkPartner
+		&& duplicate->getPosition() == Point{2,2}
+		&& protagonist->scriptFile == "#name.lua"
+		&& protagonist->recordedDestination == Point{6,7}
+		&& gameManager.player->getPosition() == Point{7,8}
+		&& gameManager.varList.getInteger("NameTargetX") == 4,
+		"after switching heroine, #name finds the protagonist NPC and preserves first-target and file-name rules") && ok;
+	ScriptEngineRuntimeTestAccess::execute(gameManager.script, "delnpc('#name')");
+	ok = check(gameManager.npcManager->npcList == std::vector<std::shared_ptr<NPC>>{protagonist, duplicate},
+		"#name cleanup preserves matching partners") && ok;
+	ScriptEngineRuntimeTestAccess::execute(gameManager.script, "setnpckind('#name',0); delnpc('#name')");
+	ok = check(gameManager.npcManager->npcList.empty()
+		&& gameManager.player->npcName == u8"纳兰真",
+		"#name deletion removes matching NPCs without deleting the current player") && ok;
+	gameManager.player->npcName = u8"杨影枫";
+	ScriptEngineRuntimeTestAccess::execute(gameManager.script, "delnpc('#name'); setnpcpos('#name',8,9)");
+	ok = check(gameManager.player->getPosition() == Point{8,9},
+		"switching back keeps the protagonist addressable and immune to DelNpc") && ok;
+	ScriptEngineRuntimeTestAccess::execute(gameManager.script, "setnpcpos('#Name',10,11)");
+	ok = check(gameManager.player->getPosition() == Point{8,9}, "name token case is exact") && ok;
+	gameManager.global.applyResourceManifestFeatures(ResourceManifest::createDefault(""));
+	protagonist->npcName = "#name";
+	gameManager.npcManager->npcList = {protagonist};
+	ok = check(gameManager.npcManager->findNPC("#name") == std::vector<std::shared_ptr<NPC>>{protagonist},
+		"unconfigured resources retain literal NPC lookup instead of inheriting another game's name") && ok;
+	gameManager.npcManager->npcList = previousNpcs;
+	gameManager.player->npcName = previousPlayerName;
+	gameManager.player->setPosition(previousPosition, false);
+	gameManager.player->state = previousState;
+	gameManager.global = previousGlobal;
+	return ok;
+}
+
+bool runPlayerForcedMovementUpdateTests()
+{
+	class FrameSteppedPlayer : public Player
+	{
+	public:
+		using Element::onUpdate;
+		void advance(UTime elapsed)
+		{
+			setTime(getTime() + elapsed);
+			frameTime = elapsed;
+			onUpdate();
+		}
+	};
+
+	GameManager gameManager;
+	applyOriginalBehavior(gameManager.global, GAME_YYCS);
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 16;
+	gameManager.map->data->head.height = 16;
+	gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
+	gameManager.map->createDataMap();
+	bool ok = true;
+	for (bool forced : { false, true })
+	{
+		float actionFrameProgress = 0.0f;
+		for (int placementMode : { 0, 1, 2 })
+		{
+			const bool scriptPlacement = placementMode != 0;
+			auto player = std::make_shared<FrameSteppedPlayer>();
+			gameManager.player = player;
+			player->npcName = "forced-movement-player";
+			player->life = 100;
+			player->lifeMax = 100;
+			player->info.lifeMax = 100;
+			player->fightState.set(true);
+			player->setPosition({ 5, 6 }, false);
+			player->res.magic.imagePackage = std::make_shared<IMPImage>();
+			player->res.magic.imagePackage->directions = 1;
+			player->res.magic.imagePackage->interval = 100;
+			player->res.magic.imagePackage->frame.resize(1);
+			if (forced)
+			{
+				player->beginMagicForcedMove(
+					{ 7, 6 }, 64.0f, {}, nullptr, 1, lkEnemy, 0, 7, 0, 0);
+			}
+			else
+			{
+				Effect effect;
+				effect.magic.bounce = 120;
+				effect.flyingDirection = { 1, 0 };
+				player->applyBounceFromEffect(effect);
+			}
+			ok = check(!player->canDoAction(acMagic),
+				"active player forced movement rejects casting") && ok;
+			if (scriptPlacement)
+			{
+				if (placementMode == 1)
+				{
+					gameManager.scriptAPI.setPlayerPosition(5, 6);
+				}
+				else
+				{
+					gameManager.scriptAPI.setPlayerPosition("forced-movement-player", 5, 6);
+				}
+				ok = check(player->actionManager->getCurrentActionType() == acStand
+					&& (forced ? player->isMagicForcedMoving() : player->isBouncing())
+					&& player->life == 100,
+					"SetPlayerPos preserves forced movement without prematurely applying end damage") && ok;
+			}
+			player->advance(16);
+			const float progress = forced
+				? player->magicForcedMove.movedProjectedDistance
+				: 120.0f - player->bounceVelocity;
+			ok = check(progress > 0.0f,
+				"player forced movement progresses after action replacement as well as in its action") && ok;
+			if (scriptPlacement)
+			{
+				ok = check(progress == actionFrameProgress,
+					"stand fallback advances player forced movement exactly once per frame") && ok;
+			}
+			else
+			{
+				actionFrameProgress = progress;
+			}
+			for (int frame = 0; frame < 200; ++frame)
+			{
+				player->advance(16);
+			}
+			ok = check(!player->isBouncing() && !player->isMagicForcedMoving()
+				&& player->canDoAction(acMagic),
+				"player forced movement finishes and allows casting after script placement") && ok;
+			// Player::addLife applies the existing 0.8 damage rate: round(7 * 0.8) = 6.
+			ok = check(!forced || (player->getPosition() == Point{ 7, 6 } && player->life == 94),
+				"player forced movement reaches its destination and applies end damage exactly once") && ok;
+		}
+	}
+	return ok;
 }
 
 bool runScriptEngineRuntimeTests()
@@ -1024,6 +1270,8 @@ bool runScriptEngineRuntimeTests()
 	ok = runScriptLibraryProfileTests() && ok;
 	ok = runExactScriptDiagnosticTests() && ok;
 	ok = runRuntimeTraceInstrumentationTests() && ok;
+	ok = runGoodsUseWithoutMenusTests() && ok;
+	ok = runPlayerForcedMovementUpdateTests() && ok;
 	Script script;
 
 	for (int index = 0; index < 4096; index++)
@@ -1064,6 +1312,42 @@ bool runScriptEngineRuntimeTests()
 	gameManager.map->data->head.height = 8;
 	gameManager.map->data->tile.assign(8, std::vector<MapTile>(8));
 	gameManager.map->createDataMap();
+	ok = runScriptPlayerNameTests(gameManager) && ok;
+	const int outputVariableResult = ScriptEngineRuntimeTestAccess::execute(
+		script,
+		"assign('Exp',42); assign('exp',17); "
+		"assign('Space',99); assign('MagicSpace',99); "
+		"assign('Weapon',99); assign('PlayerLife',-1); "
+		"getexp('Exp'); checkfreegoodsspace('Space'); "
+		"checkfreemagicspace('MagicSpace'); isequipweapon('Weapon'); "
+		"getplayerstate('Life','PlayerLife'); "
+		"assert(getvar('Exp') == getplayerexp()); "
+		"assert(getvar('exp') == 17); "
+		"assert(getvar('Space') == hasgoodsfreespace()); "
+		"assert(getvar('MagicSpace') == hasmagicfreespace()); "
+		"assert(getvar('Weapon') == 0 or getvar('Weapon') == 1)");
+	ok = check(outputVariableResult == LUA_OK &&
+		gameManager.varList.getInteger("PlayerLife") == gameManager.player->life,
+		"converted output arguments write exact-case variable names through real Lua APIs") && ok;
+	const int quotedCounterResult = ScriptEngineRuntimeTestAccess::execute(
+		script,
+		"assign('CuiYanMen2DiZi',0); assign('cuiyanmen2dizi',19); "
+		"for i = 1, 6 do add('CuiYanMen2DiZi',1) end; "
+		"assert(getvar('CuiYanMen2DiZi') == 6); "
+		"assert(getvar('cuiyanmen2dizi') == 19); "
+		"assert(getvar('$CuiYanMen2DiZi') == 0)");
+	ok = check(quotedCounterResult == LUA_OK,
+		"repaired JXQY2 quoted variables accumulate in the same exact name read by story conditions") && ok;
+	const int keepVariableResult = ScriptEngineRuntimeTestAccess::execute(
+		script,
+		"assign('Kept',121); clearallvar('Exp','exp','Kept'); "
+		"assert(getvar('exp') == 17 and getvar('Kept') == 121); "
+		"assert(getvar('Space') == 0 and getvar('Weapon') == 0); "
+		"clearallvars('Kept'); "
+		"assert(getvar('exp') == 0 and getvar('Kept') == 121); "
+		"clearallvar()");
+	ok = check(keepVariableResult == LUA_OK,
+		"converted keep lists and ClearAllVars alias retain names rather than their values") && ok;
 	gameManager.memo.clear();
 	const int goodsQueryIndex = gameManager.goodsManager.storeBegin();
 	const GoodsInfo savedGoodsQueryInfo =
@@ -1076,7 +1360,7 @@ bool runScriptEngineRuntimeTests()
 	ScriptEngineRuntimeTestAccess::execute(
 		script, "getgoodsnumbyname('casepotion')");
 	ok = check(gameManager.varList.getInteger("GoodsNum") == 3,
-		"GetGoodsNumByName preserves the YYCS/XJXQY case-insensitive display-name lookup") && ok;
+		"GetGoodsNumByName uses the C++ case-insensitive display-name lookup") && ok;
 	gameManager.goodsManager.goodsList[goodsQueryIndex] = savedGoodsQueryInfo;
 	const int secondGoodsQueryIndex = goodsQueryIndex + 1;
 	const GoodsInfo savedSecondGoodsQueryInfo =
@@ -1091,6 +1375,31 @@ bool runScriptEngineRuntimeTests()
 		script, u8"getgoodsnum('goods-e12-银丝草.ini')");
 	ok = check(gameManager.varList.getInteger("GoodsNum") == 12,
 		"GetGoodsNum aggregates a YYCS quest item across separate inventory slots") && ok;
+	gameManager.goodsManager.goodsList[goodsQueryIndex].goods =
+		std::make_shared<Goods>();
+	gameManager.goodsManager.goodsList[goodsQueryIndex].goods->name = "CasePotion";
+	gameManager.goodsManager.goodsList[secondGoodsQueryIndex].goods =
+		gameManager.goodsManager.goodsList[goodsQueryIndex].goods;
+	const int goodsDeletionResult = ScriptEngineRuntimeTestAccess::execute(
+		script,
+		u8"delgoods('GOODS-E12-银丝草.INI'); "
+		"delgoodbyname('casepotion',6); getgoodsnumbyname('CasePotion'); "
+		"assert(getvar('GoodsNum') == 5); "
+		"delgoodbyname('CasePotion'); getgoodsnumbyname('casepotion'); "
+		"assert(getvar('GoodsNum') == 0)");
+	ok = check(goodsDeletionResult == LUA_OK,
+		"DelGoods removes one item, while DelGoodByName spans slots and defaults to all") && ok;
+	GoodsInfo& equipProbe = gameManager.goodsManager.goodsList[goodsQueryIndex];
+	equipProbe.iniFile = "equip_command_drug_probe.ini";
+	equipProbe.number = 2;
+	equipProbe.goods = std::make_shared<Goods>();
+	equipProbe.goods->kind = gkDrug;
+	const std::string equipProbeScript =
+		"equipgoods(" + std::to_string(goodsQueryIndex + 1) + ",999)";
+	const int equipProbeResult = ScriptEngineRuntimeTestAccess::execute(
+		script, equipProbeScript);
+	ok = check(equipProbeResult == LUA_OK && equipProbe.number == 1,
+		"characterization: EquipGoods currently consumes a non-equipment drug regardless of part") && ok;
 	gameManager.goodsManager.goodsList[goodsQueryIndex] = savedGoodsQueryInfo;
 	gameManager.goodsManager.goodsList[secondGoodsQueryIndex] =
 		savedSecondGoodsQueryInfo;
@@ -1129,6 +1438,16 @@ bool runScriptEngineRuntimeTests()
 		"end");
 	ok = check(signedRandomResult == LUA_OK,
 		"GetRandNum preserves the YYCS/XJXQY signed inclusive range") && ok;
+	const int randomBoundaryResult = ScriptEngineRuntimeTestAccess::execute(script,
+		"getrandnum('RandomCase',7,7,0); getrandnum('randomcase',-7,-7); "
+		"getrandnum('reversed_random',9,4); "
+		"getrandnum('maximum_random',2147483647,2147483647); "
+		"getrandnum('minimum_random',-2147483648,-2147483648); "
+		"assert(getvar('RandomCase') == 7 and getvar('randomcase') == -7); "
+		"assert(getvar('reversed_random') >= 4 and getvar('reversed_random') <= 9); "
+		"assert(getvar('maximum_random') == 2147483647 and getvar('minimum_random') == -2147483648)");
+	ok = check(randomBoundaryResult == LUA_OK,
+		"GetRandNum keeps case-sensitive output names, extra-argument compatibility, and safe integer endpoints") && ok;
 	ScriptEngineRuntimeTestAccess::registerQuitRequester(script);
 	gameManager.varList.setInteger("after_generic_quit", 0);
 	const int genericQuitResult = ScriptEngineRuntimeTestAccess::execute(script,
@@ -1138,6 +1457,31 @@ bool runScriptEngineRuntimeTests()
 		ScriptEngineRuntimeTestAccess::stackTop(script) == 0,
 		"application quit from any blocking Lua API aborts the remaining chunk") && ok;
 	Element::resetApplicationQuitState();
+
+	const bool savedUseWav = gameManager.global.useWav;
+	for (const bool useWav : { false, true })
+	{
+		gameManager.global.useWav = useWav;
+		gameManager.global.data.bgmName = "existing-theme.mp3";
+		ScriptEngineRuntimeTestAccess::setCurrentBgmName(gameManager, "existing-theme.mp3");
+		const int missingMusicArgument = ScriptEngineRuntimeTestAccess::execute(script, "playmusic()");
+		ok = check(missingMusicArgument == LUA_OK
+			&& gameManager.global.data.bgmName == "existing-theme.mp3"
+			&& ScriptEngineRuntimeTestAccess::currentBgmName(gameManager) == "existing-theme.mp3",
+			"PlayMusic without arguments preserves the current BGM") && ok;
+		const int emptyMusicArgument = ScriptEngineRuntimeTestAccess::execute(script, "playmusic('')");
+		ok = check(emptyMusicArgument == LUA_OK
+			&& gameManager.global.data.bgmName.empty()
+			&& ScriptEngineRuntimeTestAccess::currentBgmName(gameManager).empty(),
+			"PlayMusic with an empty filename clears BGM without inventing an extension") && ok;
+		gameManager.global.data.bgmName.clear();
+		ScriptEngineRuntimeTestAccess::setCurrentBgmName(gameManager, "previous-map.mp3");
+		gameManager.scriptAPI.playMusic(gameManager.global.data.bgmName);
+		ok = check(gameManager.global.data.bgmName.empty()
+			&& ScriptEngineRuntimeTestAccess::currentBgmName(gameManager).empty(),
+			"restoring an empty saved BGM clears the previous map's music state") && ok;
+	}
+	gameManager.global.useWav = savedUseWav;
 
 	gameManager.varList.setInteger("after_movie_quit", 0);
 	gameManager.global.data.bgmName = "existing-theme.mp3";
@@ -1202,14 +1546,35 @@ bool runScriptEngineRuntimeTests()
 	const int savedStateEvade = gameManager.player->evade;
 	const NPCEquipmentAttributes savedEquipmentAttributes =
 		gameManager.player->equipmentAttributes;
+	const auto savedStateGoods = gameManager.goodsManager.goodsList;
+	const auto savedStateMagics = gameManager.magicManager.magicList;
+	for (auto& item : gameManager.goodsManager.goodsList)
+	{
+		item.clear();
+	}
+	for (auto& item : gameManager.magicManager.magicList)
+	{
+		item = {};
+	}
 	const auto savedWeakMagic = gameManager.player->weakMagic;
 	const auto savedMorphMagic = gameManager.player->morphMagic;
 	gameManager.player->attack = 100;
 	gameManager.player->defend = 80;
 	gameManager.player->evade = 60;
-	gameManager.player->equipmentAttributes.attack = 20;
-	gameManager.player->equipmentAttributes.defend = 20;
-	gameManager.player->equipmentAttributes.evade = 20;
+	// NPC template equipment is not the player's live inventory.
+	gameManager.player->equipmentAttributes.attack = 900;
+	gameManager.player->equipmentAttributes.defend = 900;
+	gameManager.player->equipmentAttributes.evade = 900;
+	auto& stateEquipment = gameManager.goodsManager.goodsList[gameManager.goodsManager.equipIndex(4)];
+	stateEquipment.iniFile = "script_state_equipment.ini";
+	stateEquipment.number = 1;
+	stateEquipment.goods = std::make_shared<Goods>();
+	stateEquipment.goods->kind = gkEquipment;
+	stateEquipment.goods->part = "Hand";
+	stateEquipment.goods->attack = 20;
+	stateEquipment.goods->defend = 20;
+	stateEquipment.goods->evade = 20;
+	gameManager.goodsManager.refreshEquipmentEffects();
 	gameManager.player->weakMagic = std::make_shared<Magic>();
 	gameManager.player->weakMagic->weakAttackPercent = 25;
 	gameManager.player->weakMagic->weakDefendPercent = 10;
@@ -1227,10 +1592,46 @@ bool runScriptEngineRuntimeTests()
 		gameManager.varList.getInteger("script_defend") == 90 &&
 		gameManager.varList.getInteger("script_evade") == 80,
 		"GetPlayerState matches YYCS/XJXQY base attributes: weak applies to attack/defend and morph is excluded") && ok;
+	auto& stateMagic = gameManager.magicManager.magicList[0];
+	stateMagic.iniFile = "script_state_passive.ini";
+	stateMagic.level = 1;
+	stateMagic.magic = std::make_shared<Magic>();
+	stateMagic.magic->level[1].attack = 4;
+	stateMagic.magic->level[1].defend = 10;
+	stateMagic.magic->level[1].evade = 5;
+	gameManager.player->calInfo();
+	const auto readStateAttributes = [&]()
+	{
+		ScriptEngineRuntimeTestAccess::execute(script,
+			"getplayerstate('Attack', 'script_attack'); "
+			"getplayerstate('Defend', 'script_defend'); "
+			"getplayerstate('Evade', 'script_evade')");
+	};
+	readStateAttributes();
+	ok = check(gameManager.varList.getInteger("script_attack") == 93 &&
+		gameManager.varList.getInteger("script_defend") == 99 &&
+		gameManager.varList.getInteger("script_evade") == 85,
+		"GetPlayerState includes live equipment and learned passive attributes before weak modifiers") && ok;
+	stateEquipment.clear();
+	gameManager.goodsManager.refreshEquipmentEffects();
+	readStateAttributes();
+	ok = check(gameManager.varList.getInteger("script_attack") == 78 &&
+		gameManager.varList.getInteger("script_defend") == 81 &&
+		gameManager.varList.getInteger("script_evade") == 65,
+		"GetPlayerState follows equipment removal without retaining NPC template bonuses") && ok;
+	stateMagic = {};
+	gameManager.player->calInfo();
+	readStateAttributes();
+	ok = check(gameManager.varList.getInteger("script_attack") == 75 &&
+		gameManager.varList.getInteger("script_defend") == 72 &&
+		gameManager.varList.getInteger("script_evade") == 60,
+		"GetPlayerState follows passive removal and still excludes morph bonuses") && ok;
 	gameManager.player->attack = savedAttack;
 	gameManager.player->defend = savedDefend;
 	gameManager.player->evade = savedStateEvade;
 	gameManager.player->equipmentAttributes = savedEquipmentAttributes;
+	gameManager.goodsManager.goodsList = savedStateGoods;
+	gameManager.magicManager.magicList = savedStateMagics;
 	gameManager.player->weakMagic = savedWeakMagic;
 	gameManager.player->morphMagic = savedMorphMagic;
 	gameManager.player->calInfo();
@@ -1371,6 +1772,39 @@ bool runScriptEngineRuntimeTests()
 	auto recordingNPC = std::make_shared<RecordingNPC>();
 	recordingNPC->npcMagic = std::make_shared<Magic>();
 	gameManager.scriptNPC = recordingNPC;
+	const bool savedCanRun = gameManager.player->canRun;
+	const bool savedCanJump = gameManager.player->canJump;
+	const bool savedCanFight = gameManager.player->canFight;
+	const bool savedNpcAI = gameManager.global.data.NPCAI;
+	const bool savedActionCanInput = gameManager.global.data.canInput;
+	const bool savedActionFightState = gameManager.player->fightState.get();
+	gameManager.player->fightState.set(true);
+	const int disableActionsResult = ScriptEngineRuntimeTestAccess::execute(script,
+		"disablerun(); disablejump(); disablefight(); disableinput(); disablenpcai()");
+	ok = check(disableActionsResult == LUA_OK
+		&& !gameManager.player->canRun && !gameManager.player->canJump
+		&& !gameManager.player->canFight && !gameManager.global.data.canInput
+		&& !gameManager.global.data.NPCAI && !recordingNPC->isAIEnabled()
+		&& !recordingNPC->isAIDisabled && gameManager.player->fightState.get(),
+		"global Lua action restrictions do not overwrite the local NPC flag or current fight stance") && ok;
+	ScriptEngineRuntimeTestAccess::execute(script, "disablenpcai(''); enablenpcai()");
+	ok = check(gameManager.global.data.NPCAI && recordingNPC->isAIDisabled
+		&& !recordingNPC->isAIEnabled() && !gameManager.player->canFight
+		&& !gameManager.global.data.canInput,
+		"global EnableNpcAI preserves a separately disabled current-script NPC and other action restrictions") && ok;
+	const int enableActionsResult = ScriptEngineRuntimeTestAccess::execute(script,
+		"enablerun(); enablejump(); enablefight(); enableinput(); enablenpcai('')");
+	ok = check(enableActionsResult == LUA_OK
+		&& gameManager.player->canRun && gameManager.player->canJump
+		&& gameManager.player->canFight && gameManager.global.data.canInput
+		&& recordingNPC->isAIEnabled() && !recordingNPC->isAIDisabled,
+		"Lua Enable commands restore their independent action permissions") && ok;
+	gameManager.player->canRun = savedCanRun;
+	gameManager.player->canJump = savedCanJump;
+	gameManager.player->canFight = savedCanFight;
+	gameManager.player->fightState.set(savedActionFightState);
+	gameManager.global.data.NPCAI = savedNpcAI;
+	gameManager.global.data.canInput = savedActionCanInput;
 
 	applyOriginalBehavior(gameManager.global, GAME_JXQY2);
 	recordingNPC->resetRecording();
@@ -1504,7 +1938,22 @@ bool runScriptEngineRuntimeTests()
 	const bool savedPlayerKindCanInput = gameManager.global.data.canInput;
 	const bool savedPlayerKindCameraFollowPlayer = gameManager.camera->followPlayer;
 	auto savedPlayerKindCameraTarget = gameManager.camera->followNPC;
+	const Point savedSceneCameraPosition = gameManager.camera->position;
+	const PointEx savedSceneCameraOffset = gameManager.camera->offset;
+	const PointEx savedSceneCameraDifference = gameManager.camera->differencePosition;
 	firstNamedNPC->kind = nkPlayer;
+	gameManager.camera->differencePosition = { 3.0f, 4.0f };
+	const int mapPositionResult = ScriptEngineRuntimeTestAccess::execute(script, "setmappos(2,3)");
+	ok = check(mapPositionResult == LUA_OK && !gameManager.camera->followPlayer
+		&& gameManager.camera->differencePosition.x == 0.0f
+		&& gameManager.camera->differencePosition.y == 0.0f,
+		"SetMapPos switches to a fixed map view and clears camera motion delta") && ok;
+	const int playerSceneResult = ScriptEngineRuntimeTestAccess::execute(script, "setplayerscn()");
+	ok = check(playerSceneResult == LUA_OK && gameManager.camera->followPlayer
+		&& gameManager.camera->followNPC.lock() == firstNamedNPC
+		&& gameManager.camera->differencePosition.x == 0.0f
+		&& gameManager.camera->differencePosition.y == 0.0f,
+		"SetPlayerScn restores the player-kind follow target through the Lua wrapper") && ok;
 	firstNamedNPC->fightState.set(true);
 	gameManager.player->fightState.set(true);
 	gameManager.scriptAPI.talk("__missing_player_kind_talk_section__");
@@ -1557,6 +2006,9 @@ bool runScriptEngineRuntimeTests()
 	gameManager.global.data.canInput = savedPlayerKindCanInput;
 	gameManager.camera->followPlayer = savedPlayerKindCameraFollowPlayer;
 	gameManager.camera->followNPC = savedPlayerKindCameraTarget;
+	gameManager.camera->position = savedSceneCameraPosition;
+	gameManager.camera->offset = savedSceneCameraOffset;
+	gameManager.camera->differencePosition = savedSceneCameraDifference;
 	firstNamedNPC->resetRecording();
 	const int savedPlayerKind = gameManager.player->kind;
 	const int savedPlayerRelation = gameManager.player->relation;
@@ -2099,6 +2551,18 @@ bool runScriptEngineRuntimeTests()
 		&& secondNamedNPC->kind == nkNormal
 		&& secondNamedNPC->relation == nrNeutral,
 		"JXQY2 singular named NPC extensions keep their command-specific target contract") && ok;
+	const auto savedClickProfile = gameManager.global.npcActionProfile;
+	gameManager.global.npcActionProfile = ScriptNpcActionProfile::Xjxqy;
+	const auto clickTaskCount = gameManager.scriptTaskList.size();
+	gameManager.scriptAPI.setNpcClickScript("duplicate-special-target", "xjxqy-movement-click.lua");
+	ok = check(firstNamedNPC->scriptFile == "first-click.lua"
+		&& secondNamedNPC->scriptFile == "second-old-click.lua"
+		&& gameManager.scriptTaskList.size() == clickTaskCount + 1
+		&& gameManager.scriptTaskList.back().scriptName == "xjxqy-movement-click.lua"
+		&& gameManager.scriptTaskList.back().type == stScript,
+		"XJXQY queues its click movement script while preserving both NPC dialogue bindings") && ok;
+	gameManager.scriptTaskList.pop_back();
+	gameManager.global.npcActionProfile = savedClickProfile;
 	gameManager.scriptAPI.showNpc("duplicate-special-target", 1);
 	ok = check(!secondNamedNPC->scriptHidden
 		&& secondNamedNPC->isVisibleForRuntime()
@@ -2198,9 +2662,8 @@ bool runScriptEngineRuntimeTests()
 	sameNamePartner->kind = nkPartner;
 	gameManager.npcManager->npcList.push_back(sameNamePartner);
 	gameManager.scriptAPI.deleteNPC("duplicate-special-target");
-	ok = check(gameManager.npcManager->npcList.size() == 1
-		&& gameManager.npcManager->npcList.front() == sameNamePartner,
-		"DelNpc removes every matching ordinary NPC but preserves a same-name partner") && ok;
+	ok = check(gameManager.npcManager->npcList == std::vector<std::shared_ptr<NPC>>{sameNamePartner},
+		"DelNpc removes matching ordinary NPCs and preserves a same-name partner") && ok;
 	gameManager.npcManager->npcList = std::move(savedNpcList);
 
 	auto forcedSpecialNPC = std::make_shared<InMemorySpecialActionNPC>();
@@ -2306,6 +2769,10 @@ bool runScriptEngineRuntimeTests()
 		"the replacement one-shot completes through its normal action logic on the next frame") && ok;
 
 	auto attackingOverlayNPC = std::make_shared<InMemorySpecialActionNPC>();
+	// A successful attack needs a usable skill as well as an animation. This
+	// fixture tests overlay takeover, not an actor with no available attack.
+	attackingOverlayNPC->npcMagic = std::make_shared<Magic>();
+	attackingOverlayNPC->npcMagic->loadSucceeded = true;
 	attackingOverlayNPC->res.attack.imagePackage = std::make_shared<IMPImage>();
 	attackingOverlayNPC->res.attack.imagePackage->directions = 8;
 	attackingOverlayNPC->res.attack.imagePackage->interval = 100;
@@ -2538,27 +3005,34 @@ bool runScriptEngineRuntimeTests()
 	gameManager.player->deathScript = savedPlayerDeathScript;
 	gameManager.player->result = savedPlayerResult;
 
+	GameManager titleGameManager;
+	titleGameManager.varList.ensureInitialized();
 	for (std::size_t index = 0; index < MaxParallelScriptStates; index++)
 	{
-		ok = check(gameManager.addScriptTask(parallelTask),
-			"parallel script tasks can be queued again after player-death cleanup") && ok;
+		ok = check(titleGameManager.addScriptTask(parallelTask),
+			"parallel script tasks are queued in the active world before title exit") && ok;
 	}
-	ok = check(gameManager.addScriptTask(interactionTask),
-		"interaction tasks can be queued again after player-death cleanup") && ok;
-	gameManager.scriptAPI.returnToTitle();
+	ok = check(titleGameManager.addScriptTask(interactionTask),
+		"an interaction task is queued alongside parallel scripts before title exit") && ok;
+	const int returnToTitleResult = ScriptEngineRuntimeTestAccess::execute(
+		script,
+		"returntotitle(); assign('after_return_to_title', 7); returntotitle(123);");
+	ok = check(returnToTitleResult == LUA_OK &&
+		titleGameManager.varList.getInteger("after_return_to_title") == 7,
+		"ReturnToTitle requests scene exit without implicitly terminating the current script, and ignores extra arguments") && ok;
 	const std::size_t remainingParallelTasks = static_cast<std::size_t>(
 		std::count_if(
-			gameManager.scriptTaskList.begin(),
-			gameManager.scriptTaskList.end(),
+			titleGameManager.scriptTaskList.begin(),
+			titleGameManager.scriptTaskList.end(),
 			[](const ScriptTask& task)
 			{
 				return task.type == stScript;
 			}));
 	ok = check(remainingParallelTasks == 0
-		&& gameManager.scriptTaskList.size() == 1
-		&& gameManager.scriptTaskList.front().type == stTraps
-		&& gameManager.result == erOK
-		&& !ScriptEngineRuntimeTestAccess::isLogicRunning(gameManager),
+		&& titleGameManager.scriptTaskList.size() == 1
+		&& titleGameManager.scriptTaskList.front().type == stTraps
+		&& titleGameManager.result == erOK
+		&& !ScriptEngineRuntimeTestAccess::isLogicRunning(titleGameManager),
 		"ReturnToTitle clears YYCS/XJXQY parallel scripts before leaving the game") && ok;
 
 	return ok;

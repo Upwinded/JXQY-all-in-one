@@ -20,7 +20,11 @@ enum MusicType
 
 class Engine final : private EngineBase
 {
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+	friend class GameplayAutomationTestAccess;
+#endif
 	friend class CoreLifecycleTestAccess;
+	friend class GamepadEssentialUITestAccess;
 	friend class GamepadWorldRuntimeTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
 	friend bool runMediaRuntimeTests();
@@ -266,8 +270,9 @@ private:
 	_channel channelBGM = nullptr;
 	_music talk = nullptr;
 	_channel channelTalk = nullptr;
+	_music getOrLoadCachedSoundFile(const std::string& fileName, bool& cached);
 #if defined(JXQY_ENABLE_TEST_HOOKS)
-	std::size_t actionSoundDecodeCountForTests = 0;
+	std::size_t cachedSoundDecodeCountForTests = 0;
 #endif
 public:
 
@@ -298,6 +303,7 @@ public:
 	_channel playSound(_music music, float x, float y, float volume);
 	_channel playSound(_music music, float x, float y);
 	_channel playSound(_music music);
+	bool preloadCachedSoundFile(const std::string& fileName);
 	_channel playCachedSoundFile(const std::string& fileName,
 		float x = 0.0f, float y = 0.0f, float volume = -1.0f);
 	void stopAllSounds();

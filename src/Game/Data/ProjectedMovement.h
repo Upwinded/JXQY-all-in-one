@@ -68,6 +68,12 @@ inline PointEx getEffectProjectedMovementVector(Point flyingDirection)
 	};
 }
 
+inline float getEffectProjectedMovementAngle(Point flyingDirection)
+{
+	PointEx movementVector = getEffectProjectedMovementVector(flyingDirection);
+	return std::atan2(-movementVector.x, movementVector.y);
+}
+
 inline PointEx advanceProjectedMovement(PointEx currentOffset, PointEx remainingOffset, float stepLength)
 {
 	float remainingLength = getProjectedMovementLength(remainingOffset);

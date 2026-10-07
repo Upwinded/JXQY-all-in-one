@@ -1,11 +1,13 @@
 #include "../Engine/Engine.h"
 #include "../File/File.h"
 #include "../Game/Data/Goods.h"
+#include "../Game/Data/BuySellInventory.h"
 #include "../Game/Data/Magic.h"
 #include "../Game/Data/MobileTouchInteraction.h"
 #include "../Game/Data/NPC.h"
 #include "../Game/Data/Object.h"
 #include "../Game/GameManager/GameManager.h"
+#include "../Game/GameManager/SaveFileManager.h"
 #include "../Game/Menu/BottomMenu.h"
 #include "../Game/Menu/BuySellMenu.h"
 #include "../Game/Menu/ControllerFocusParticipant.h"
@@ -395,6 +397,38 @@ class ImmediateStopSystem : public System
 private:
 	void onRun() override
 	{
+		stop(erOK);
+	}
+};
+
+class ScriptTransactionShop : public BuySellMenu
+{
+public:
+	std::function<void()> transact;
+	int opened = 0;
+	void rightClickItem(size_t visibleIndex = 0)
+	{
+		if (visibleIndex >= item.size() || item[visibleIndex] == nullptr)
+		{
+			return;
+		}
+		const auto bounds = item[visibleIndex]->rect;
+		const int x = bounds.x + bounds.w / 2;
+		const int y = bounds.y + bounds.h / 2;
+		AEvent queued;
+		while (engine->getEvent(queued) > 0) {}
+		engine->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID, x, y, false));
+		engine->pushEvent(AEvent(ET_MOUSEDOWN, MBC_MOUSE_RIGHT, x, y, false));
+		GamepadRPGMenuActionsTestAccess::dispatchElementEvents(*this);
+		engine->pushEvent(AEvent(ET_MOUSEUP, MBC_MOUSE_RIGHT, x, y, false));
+		GamepadRPGMenuActionsTestAccess::dispatchElementEvents(*this);
+	}
+
+private:
+	void onRun() override
+	{
+		++opened;
+		transact();
 		stop(erOK);
 	}
 };
@@ -1399,6 +1433,353 @@ bool testBuySellTransactions(
 	buySellMenu.handleUIAction(UIAction::Cancel);
 	buySellMenu.visible = false;
 	gameManager.goodsManager.clearItem();
+	resourceManager.setActiveResourcePackById(resourcePack.id);
+	return ok;
+}
+
+bool testScriptShopTransactions(
+	const ResourcePackExpectation& resourcePack,
+	ResourceManager& resourceManager,
+	GameManager& gameManager,
+	const std::filesystem::path& fixtureRoot)
+{
+	bool ok = true;
+	const auto previousShop = gameManager.menu->buySellMenu;
+	auto shop = std::make_shared<ScriptTransactionShop>();
+	gameManager.menu->buySellMenu = shop;
+	SaveFileManager::CurrentPathScope currentPath("save/shop_contracts_" + resourcePack.id);
+	gameManager.varList.ensureInitialized();
+	const auto verify = [&](bool condition, const std::string& message)
+	{
+		ok = checkPack(condition, resourcePack, "script shop: " + message) && ok;
+	};
+	const auto run = [&](const std::string& source, int expectedOpens = 1)
+	{
+		const int openedBefore = shop->opened;
+		gameManager.varList.setInteger("ShopCallReturned", 0);
+		const std::string script = source + "assign(\"ShopCallReturned\",1);";
+		auto bytes = std::make_unique<char[]>(script.size());
+		std::copy(script.begin(), script.end(), bytes.get());
+		verify(gameManager.script.runScript(bytes, static_cast<int>(script.size())) == LUA_OK
+			&& gameManager.varList.getInteger("ShopCallReturned") == 1,
+			"native Lua continues after the shop call: " + source);
+		verify(shop->opened == openedBefore + expectedOpens && !shop->visible,
+			"shop call has the expected modal count: " + source);
+	};
+	const auto read = [](const std::string& path)
+	{
+		std::unique_ptr<char[]> bytes;
+		const int length = File::readFile(path, bytes);
+		return length > 0 && bytes ? std::string(bytes.get(), length) : std::string();
+	};
+	verify(currentPath.valid(), "uses an isolated save generation");
+	gameManager.scriptNPC.reset();
+	gameManager.goodsManager.clearItem();
+	const std::string list = resourcePack.gameType == GAME_JXQY2
+		? u8"5-中都-药铺老板.ini" : u8"低级药品.ini";
+	BuySellInventoryData productionInventory;
+	verify(BuySellInventory::parseText(read("ini/buy/" + list), productionInventory)
+		&& !productionInventory.numberValid && !productionInventory.items.empty(),
+		"actual pharmacy table declares unlimited stock");
+	gameManager.player->money = 1000000;
+	int purchases = 0;
+	shop->transact = [&]()
+	{
+		verify(!shop->numberValid && shop->canSellSelfGoods, "SellGoods respects the table stock policy");
+		if (shop->goodsList[0].goods == nullptr)
+		{
+			verify(false, "actual first pharmacy item loads");
+			return;
+		}
+		const int stock = shop->goodsList[0].number;
+		const int price = shop->goodsList[0].goods->getBuyPrice(shop->buyPercent);
+		const int money = gameManager.player->money;
+		if (shop->opened == 1)
+		{
+			shop->rightClickItem();
+			shop->rightClickItem();
+		}
+		else
+		{
+			shop->handleUIAction(UIAction::Confirm);
+			shop->handleUIAction(UIAction::Confirm);
+		}
+		purchases += 2;
+		verify(gameManager.player->money == money - price * 2
+			&& gameManager.goodsManager.getItemNum(productionInventory.items[0].iniFile) == purchases
+			&& shop->goodsList[0].number == stock && !shop->goodsList[0].iniFile.empty(),
+			"two purchases charge the real price without exhausting an unlimited item");
+	};
+	run("sellgoods(\"" + list + "\");");
+	run("sellgoods(\"" + list + "\", 1);");
+	verify(!File::fileExist(SaveFileManager::CurrentPath() + list),
+		"closing an unlimited shop does not write a finite-stock override");
+	if (resourcePack.gameType == GAME_XJXQY)
+	{
+		for (const std::string table : { u8"buy7级武器.ini", u8"buy过年5级武器.ini" })
+		{
+			const int declaredCount = table == u8"buy7级武器.ini" ? 11 : 16;
+			shop->transact = [&]()
+			{
+				int loadedCount = 0;
+				for (const auto& goods : shop->goodsList)
+				{
+					loadedCount += goods.goods != nullptr;
+				}
+				verify(loadedCount == declaredCount - 1 && !shop->numberValid,
+					"actual incomplete weapon table keeps every defined item and its stock policy");
+				const int money = gameManager.player->money;
+				if (shop->scrollbar != nullptr && shop->scrollbar->lineSize > 0)
+				{
+					shop->scrollbar->setPosition((declaredCount - 1) / shop->scrollbar->lineSize);
+					shop->updateGoods();
+					const size_t visibleIndex = (declaredCount - 1) % shop->scrollbar->lineSize;
+					verify(visibleIndex < shop->item.size() && shop->item[visibleIndex] != nullptr
+						&& shop->item[visibleIndex]->dragIndex == declaredCount - 1,
+						"pointer probe addresses the real empty final weapon slot");
+					shop->rightClickItem(visibleIndex);
+				}
+				else
+				{
+					verify(false, "weapon table has a scrollable shop grid");
+				}
+				verify(shop->goodsList[declaredCount - 1].iniFile.empty()
+					&& gameManager.player->money == money,
+					"missing final weapon section is empty and cannot charge money");
+			};
+			run("sellgoods(\"" + table + "\");");
+		}
+	}
+
+	if (resourcePack.id == "XINYUE_WUHEN_3_0")
+	{
+		shop->transact = [&]()
+		{
+			verify(!shop->numberValid && shop->goodsList[0].goods != nullptr
+				&& shop->goodsList[0].iniFile == u8"重铸的剑中之剑.ini"
+				&& shop->goodsList[29].iniFile.empty(),
+				"actual BOM-prefixed special shop opens with its valid items and empty final slot");
+		};
+		run(u8"buygoods(\"特卖.ini\");");
+	}
+	const std::string productionRoot = resourceManager.getActiveResourceRoot();
+	File::setActiveResourceRoot(fixtureRoot.generic_string());
+	File::setResourceFallbackRoots({ productionRoot });
+	BuySellInventoryData finiteInventory;
+	finiteInventory.count = 1;
+	finiteInventory.numberValid = true;
+	finiteInventory.buyPercent = 150;
+	finiteInventory.recyclePercent = 50;
+	finiteInventory.items.push_back({ ShopGoodsFile, 2 });
+	const std::string finiteText = BuySellInventory::serializeText(finiteInventory);
+	const std::string finiteFile = "script-shop-finite.ini";
+	verify(File::writeFileChecked("ini/buy/" + finiteFile, finiteText.data(),
+		static_cast<int>(finiteText.size())), "writes the isolated finite shop fixture");
+	gameManager.goodsManager.clearItem();
+	gameManager.player->money = 1000;
+	const auto sellFixtureItem = [&]()
+	{
+		for (int index = gameManager.goodsManager.storeBegin(); index < gameManager.goodsManager.storeEnd(); ++index)
+		{
+			if (gameManager.goodsManager.goodsList[index].iniFile == ShopGoodsFile)
+			{
+				shop->sellOneFromPlayerSlot(index);
+				return;
+			}
+		}
+	};
+	shop->transact = [&]()
+	{
+		verify(shop->numberValid && shop->goodsList[0].number == 2
+			&& shop->buyPercent == 150 && shop->recyclePercent == 50,
+			"finite shop loads stock and both price percentages");
+		shop->handleUIAction(UIAction::Confirm);
+		verify(gameManager.player->money == 850 && shop->goodsList[0].number == 1,
+			"finite purchase decrements stock and charges 150 percent");
+		sellFixtureItem();
+		verify(gameManager.player->money == 870 && shop->goodsList[0].number == 2,
+			"selling returns one unit and pays 50 percent of SellPrice");
+		shop->handleUIAction(UIAction::Confirm);
+	};
+	run("sellgoods(\"" + finiteFile + "\");");
+	BuySellInventoryData savedInventory;
+	verify(BuySellInventory::parseText(read(SaveFileManager::CurrentPath() + finiteFile), savedInventory)
+		&& savedInventory.items.size() == 1 && savedInventory.items[0].number == 1
+		&& savedInventory.buyPercent == 150 && savedInventory.recyclePercent == 50,
+		"closing writes the remaining stock and preserves both prices");
+	shop->transact = [&]()
+	{
+		verify(shop->numberValid && !shop->canSellSelfGoods && shop->goodsList[0].number == 1,
+			"BuyGoodsOnly reopens saved stock ahead of the resource table");
+		const int money = gameManager.player->money;
+		sellFixtureItem();
+		verify(gameManager.player->money == money && shop->goodsList[0].number == 1,
+			"BuyGoodsOnly rejects selling without changing money or stock");
+		shop->handleUIAction(UIAction::Confirm);
+		shop->handleUIAction(UIAction::Confirm);
+		verify(gameManager.player->money == money - 150 && shop->goodsList[0].number == 0,
+			"last finite unit can be bought once and then remains sold out");
+	};
+	run("buygoodsonly(\"" + finiteFile + "\");");
+	shop->transact = [&]()
+	{
+		verify(shop->numberValid && shop->goodsList[0].number == 0 && shop->canSellSelfGoods,
+			"BuyGoods retains the sold-out entry after another close and reopen");
+	};
+	run("buygoods(\"" + finiteFile + "\");");
+
+	auto owner = std::make_shared<NPC>();
+	owner->buyIniString = BuySellInventory::encodeString(finiteText);
+	gameManager.scriptNPC = owner;
+	shop->transact = [&]()
+	{
+		verify(shop->numberValid && shop->goodsList[0].number == 2,
+			"argument-free SellGoods loads the script NPC inventory");
+		shop->handleUIAction(UIAction::Confirm);
+	};
+	run("sellgoods();");
+	std::string ownerText;
+	verify(BuySellInventory::decodeString(owner->buyIniString, ownerText)
+		&& BuySellInventory::parseText(ownerText, savedInventory)
+		&& savedInventory.items.size() == 1 && savedInventory.items[0].number == 1,
+		"closing updates the NPC-owned encoded inventory");
+	gameManager.scriptNPC.reset();
+	shop->transact = [&]()
+	{
+		verify(shop->bsKind == bsSell && shop->goodsList[0].iniFile.empty(),
+			"argument-free ownerless SellGoods keeps the empty resale shop");
+		const int money = gameManager.player->money;
+		sellFixtureItem();
+		verify(gameManager.player->money == money + ShopGoodsSellPrice
+			&& shop->goodsList[0].number == 1, "ownerless resale still accepts old goods");
+	};
+	run("sellgoods();");
+	const std::string pawnFile = "script-shop-empty-pawn.ini";
+	const std::string emptyPawn = "[Header]\nCount=0\n";
+	verify(File::writeFileChecked("ini/buy/" + pawnFile, emptyPawn.data(),
+		static_cast<int>(emptyPawn.size())), "writes an empty pawnshop with the production Count=0 format");
+	shop->transact = [&]()
+	{
+		verify(shop->bsKind == bsSell && shop->numberValid && shop->goodsList[0].iniFile.empty(),
+			"empty named pawnshop retains finite resale mode");
+		const int money = gameManager.player->money;
+		sellFixtureItem();
+		shop->handleUIAction(UIAction::Confirm);
+		shop->handleUIAction(UIAction::Confirm);
+		verify(gameManager.player->money == money + ShopGoodsSellPrice - ShopGoodsCost
+			&& shop->goodsList[0].iniFile.empty(),
+			"one pawned item can be bought back once but cannot become unlimited stock");
+	};
+	run("sellgoods(\"" + pawnFile + "\");");
+	shop->transact = [&]()
+	{
+		verify(shop->bsKind == bsSell && shop->numberValid && shop->goodsList[0].iniFile.empty(),
+			"pawnshop stays finite and empty after saving and reopening");
+	};
+	run("sellgoods(\"" + pawnFile + "\");");
+	const std::string invalidText = "[Header\nCount=1\n";
+	BuySellInventoryData invalidInventory;
+	verify(!BuySellInventory::parseText(invalidText, invalidInventory),
+		"invalid shop fixture is rejected by the existing parser");
+	const auto writeInventory = [&](const std::string& path, const std::string& text)
+	{
+		verify(File::writeFileChecked(path, text.data(), static_cast<int>(text.size())),
+			"writes isolated inventory: " + path);
+	};
+	const std::string legacyTable = "script-shop-legacy.ini";
+	writeInventory("ini/buy/" + legacyTable,
+		std::string("\xEF\xBB\xBF// Legacy shop\n[hEaD]\ncOuNt=3\nUnknownOption=ignored\n"
+			"[1]\niNiFiLe=") + ShopGoodsFile + "\n[2]\nNumber=7\n");
+	shop->transact = [&]()
+	{
+		verify(shop->bsKind == bsBuy && !shop->numberValid
+			&& shop->buyPercent == 100 && shop->recyclePercent == 100
+			&& shop->goodsList[0].goods != nullptr && shop->goodsList[0].number == 1
+			&& shop->goodsList[1].iniFile.empty() && shop->goodsList[2].iniFile.empty(),
+			"legacy header, mixed-case keys, comments, defaults and missing item sections remain usable");
+	};
+	for (const std::string command : { "buygoods", "buygoodsonly", "sellgoods" })
+	{
+		run(command + "(\"" + legacyTable + "\");");
+	}
+	const std::string defaultCountTable = "script-shop-default-count.ini";
+	for (const std::string countLine : { "", "Count=invalid\n", "Count=-1\n" })
+	{
+		writeInventory("ini/buy/" + defaultCountTable, "[Header]\n" + countLine);
+		for (const std::string command : { "buygoods", "buygoodsonly", "sellgoods" })
+		{
+			shop->transact = [&]()
+			{
+				verify(shop->goodsList[0].iniFile.empty()
+					&& shop->bsKind == (command == "sellgoods" ? bsSell : bsBuy),
+					"missing or invalid Count retains the existing empty-shop default");
+			};
+			run(command + "(\"" + defaultCountTable + "\");");
+		}
+	}
+	writeInventory("ini/buy/script-shop-invalid.ini", invalidText);
+	writeInventory("ini/buy/script-shop-empty-file.ini", "");
+	writeInventory("ini/buy/script-shop-bad-saved.ini", finiteText);
+	writeInventory(SaveFileManager::CurrentPath() + "script-shop-bad-saved.ini", invalidText);
+	shop->transact = []() {};
+	const auto rejectInventory = [&](const std::string& table)
+	{
+		for (const std::string command : { "buygoods", "buygoodsonly", "sellgoods" })
+		{
+			const auto goodsParent = gameManager.menu->goodsMenu->parent;
+			const bool goodsVisible = gameManager.menu->goodsMenu->visible;
+			const auto goodsFocus = gameManager.menu->goodsMenu->controllerFocusedElement();
+			const bool canInput = gameManager.global.data.canInput;
+			const int money = gameManager.player->money;
+			const int quantity = gameManager.goodsManager.getItemNum(ShopGoodsFile);
+			const std::string savedText = read(SaveFileManager::CurrentPath() + table);
+			const bool savedExists = File::fileExist(SaveFileManager::CurrentPath() + table);
+			run(command + "(\"" + table + "\");", 0);
+			verify(gameManager.menu->goodsMenu->parent == goodsParent
+				&& gameManager.menu->goodsMenu->visible == goodsVisible
+				&& gameManager.menu->goodsMenu->controllerFocusedElement() == goodsFocus
+				&& gameManager.global.data.canInput == canInput
+				&& gameManager.player->money == money
+				&& gameManager.goodsManager.getItemNum(ShopGoodsFile) == quantity
+				&& read(SaveFileManager::CurrentPath() + table) == savedText
+				&& File::fileExist(SaveFileManager::CurrentPath() + table) == savedExists,
+				"failed shop preserves inventory panel, focus, input, money, goods and saved bytes");
+		}
+	};
+	verify(!File::fileExist("ini/buy/script-shop-missing.ini")
+		&& !File::fileExist(SaveFileManager::CurrentPath() + "script-shop-missing.ini"),
+		"missing table has neither resource nor saved inventory");
+	rejectInventory("script-shop-missing.ini");
+	rejectInventory("script-shop-invalid.ini");
+	rejectInventory("script-shop-empty-file.ini");
+	rejectInventory("script-shop-bad-saved.ini");
+	if (resourcePack.id == "JIANGHU_YUCHEN_1_03")
+	{
+		verify(!File::fileExist(u8"ini/buy/商店.ini"), "production vendor table is absent from active roots");
+		rejectInventory(u8"商店.ini");
+	}
+	// A saved table or NPC inventory can be sufficient without a resource table.
+	writeInventory(SaveFileManager::CurrentPath() + "script-shop-saved-only.ini", finiteText);
+	shop->transact = [&]()
+	{
+		verify(shop->numberValid && shop->goodsList[0].number == 2,
+			"valid saved inventory opens after failed calls without a resource table");
+	};
+	run("buygoods(\"script-shop-saved-only.ini\");");
+	owner->buyIniString = BuySellInventory::encodeString(finiteText);
+	gameManager.scriptNPC = owner;
+	run("sellgoods(\"script-shop-missing.ini\");");
+	owner->buyIniString = "!invalid-base64!";
+	owner->buyIniFile = "script-shop-saved-only.ini";
+	run("buygoods();");
+	verify(owner->buyIniString == "!invalid-base64!",
+		"fallback file inventory does not overwrite invalid NPC encoded data");
+	owner->buyIniFile = "script-shop-missing.ini";
+	shop->transact = []() {};
+	run("sellgoods();", 0);
+	gameManager.scriptNPC.reset();
+	gameManager.goodsManager.clearItem();
+	gameManager.menu->buySellMenu = previousShop;
 	resourceManager.setActiveResourcePackById(resourcePack.id);
 	return ok;
 }
@@ -5087,6 +5468,8 @@ bool runGamepadRPGMenuActionTests()
 #endif
 			ok = testVisibleMenuCrossNavigation(
 				resourcePack, gameManager) && ok;
+			ok = testScriptShopTransactions(
+				resourcePack, resourceManager, gameManager, fixtureRoot) && ok;
 		}
 		ok = videoSubsystemIsStopped(
 			resourcePack.id

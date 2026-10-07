@@ -3,7 +3,6 @@
 #include "../../Launch/EditorRunRuntimeTraceWriter.h"
 #include "../GameManager/SaveFileManager.h"
 
-#include <algorithm>
 #include <charconv>
 #include <cmath>
 #include <iomanip>
@@ -18,19 +17,6 @@
 
 namespace
 {
-std::string normalizedVariableName(std::string name)
-{
-	for (char& character : name)
-	{
-		if (character >= 'A' && character <= 'Z')
-		{
-			character = static_cast<char>(
-				character + ('a' - 'A'));
-		}
-	}
-	return name;
-}
-
 std::map<std::string, std::string> variableSnapshot(
 	const std::shared_ptr<INIReader>& ini)
 {
@@ -54,22 +40,8 @@ bool variablePresent(
 	const std::shared_ptr<INIReader>& ini,
 	const std::string& name)
 {
-	if (ini == nullptr)
-	{
-		return false;
-	}
-	const std::string normalizedName =
-		normalizedVariableName(name);
-	const std::vector<std::string> keys =
-		ini->GetSectionKeys(VARIABLE_SECTION);
-	return std::any_of(
-		keys.cbegin(),
-		keys.cend(),
-		[&normalizedName](const std::string& key)
-		{
-			return normalizedVariableName(key) ==
-				normalizedName;
-		});
+	return ini != nullptr &&
+		ini->HasKey(VARIABLE_SECTION, name);
 }
 
 std::optional<std::string> canonicalRealValue(float value)
@@ -169,7 +141,11 @@ bool VariableList::load(std::string* failureReason)
 		SaveFileManager::CurrentPath() + VARIABLE_INI;
 	std::shared_ptr<INIReader> loadedIni;
 	const SaveIniPersistence::ReadStatus status =
-		SaveIniPersistence::read(fileName, loadedIni);
+		SaveIniPersistence::read(
+			fileName,
+			loadedIni,
+			SaveIniPersistence::MaximumFileBytes,
+			IniKeyCaseSensitivity::Sensitive);
 	if (status == SaveIniPersistence::ReadStatus::Unreadable ||
 		status == SaveIniPersistence::ReadStatus::Malformed ||
 		(status == SaveIniPersistence::ReadStatus::Loaded &&
@@ -185,7 +161,8 @@ bool VariableList::load(std::string* failureReason)
 	}
 	if (loadedIni == nullptr)
 	{
-		loadedIni = std::make_shared<INIReader>();
+		loadedIni = std::make_shared<INIReader>(
+			IniKeyCaseSensitivity::Sensitive);
 	}
 
 	const std::map<std::string, std::string> before =
@@ -222,7 +199,8 @@ void VariableList::ensureInitialized()
 {
 	if (ini == nullptr)
 	{
-		ini = std::make_shared<INIReader>();
+		ini = std::make_shared<INIReader>(
+			IniKeyCaseSensitivity::Sensitive);
 	}
 }
 
@@ -250,7 +228,8 @@ void VariableList::clearExcept(const std::vector<std::string>& keepNames)
 		}
 	}
 
-	ini = std::make_shared<INIReader>();
+	ini = std::make_shared<INIReader>(
+		IniKeyCaseSensitivity::Sensitive);
 	for (const auto& item : keptValues)
 	{
 		ini->SetInteger(VARIABLE_SECTION, item.first, item.second);
@@ -329,7 +308,7 @@ void VariableList::set(const std::string & name, std::string & value)
 	const std::string afterValue =
 		ini->Get(VARIABLE_SECTION, name, "");
 	enqueueChange(
-		normalizedVariableName(name),
+		name,
 		EditorRun::RuntimeTraceVariableValueType::String,
 		beforeValue,
 		afterValue,
@@ -364,7 +343,7 @@ void VariableList::setInteger(const std::string & name, int value)
 			name,
 			0));
 	enqueueChange(
-		normalizedVariableName(name),
+		name,
 		EditorRun::RuntimeTraceVariableValueType::Integer,
 		std::to_string(beforeValue),
 		std::to_string(afterValue),
@@ -406,7 +385,7 @@ void VariableList::setReal(const std::string & name, float value)
 	if (beforeCanonical && afterCanonical)
 	{
 		enqueueChange(
-			normalizedVariableName(name),
+			name,
 			EditorRun::RuntimeTraceVariableValueType::Real,
 			*beforeCanonical,
 			*afterCanonical,
@@ -440,7 +419,7 @@ void VariableList::setBoolean(const std::string & name, bool value)
 		name,
 		false);
 	enqueueChange(
-		normalizedVariableName(name),
+		name,
 		EditorRun::RuntimeTraceVariableValueType::Boolean,
 		beforeValue ? "true" : "false",
 		afterValue ? "true" : "false",

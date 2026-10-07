@@ -1,6 +1,6 @@
+#include "../../GameplayAutomation/GameplayAutomationSession.h"
 #include "GameManager.h"
 #include "../../Engine/Engine.h"
-#include "RuntimeSaveGenerationPolicy.h"
 #include "ScriptRuntimeState.h"
 #include "../Data/TimeStopUpdateGate.h"
 #include "../../File/File.h"
@@ -53,8 +53,7 @@ NPCActionType getInteractionMoveAction(std::shared_ptr<Player> player, bool runn
 	if (running
 		&& player != nullptr
 		&& player->canRun
-		&& (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN)
-			|| player->thew > MIN_THEW_LIMIT_TO_RUN))
+		&& player->canPayRunThewCost())
 	{
 		return acRun;
 	}
@@ -105,6 +104,9 @@ int GameManager::getBindValue(const std::string& bindPath)
 	if (bindPath == "player.info.attack") return player->info.attack;
 	if (bindPath == "player.info.defend") return player->info.defend;
 	if (bindPath == "player.info.evade") return player->info.evade;
+	if (bindPath == "player.effectiveAttack") return player->getAttack();
+	if (bindPath == "player.effectiveDefend") return player->getDefend();
+	if (bindPath == "player.effectiveEvade") return player->getEvade();
 	if (bindPath == "player.life") return player->life;
 	if (bindPath == "player.info.lifeMax") return player->info.lifeMax;
 	if (bindPath == "player.thew") return player->thew;
@@ -122,7 +124,13 @@ GameManager * GameManager::this_ = nullptr;
 
 
 GameManager::GameManager() :
-	GameManager(ScriptLibraryProfile::Full, nullptr)
+	GameManager(ScriptLibraryProfile::Full,
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+        GameplayAutomationSession::traceWriter()
+#else
+        nullptr
+#endif
+    )
 {
 }
 
@@ -480,6 +488,9 @@ EditorRun::SceneApplicationResult GameManager::applyEditorRunSceneTarget()
 			playerInitializationFailure.c_str());
 	}
 
+	// Entry scripts and later NPC choices also write variables when the
+	// descriptor does not supply any initial integer variables.
+	varList.ensureInitialized();
 	bool editorRunWorldMutationStarted = false;
 	EditorRun::SceneApplicationCallbacks callbacks;
 	callbacks.setIntegerVariable =
@@ -1131,9 +1142,8 @@ void GameManager::setLastLoadFailureMessage(std::string message)
 	lastLoadFailureMessage = std::move(message);
 }
 
-bool GameManager::writeSaveGenerationDraft(
-	const std::string& generationDirectory,
-	const SaveGenerationLimits& copyLimits,
+bool GameManager::writeCurrentSave(
+	Global& savedGlobal,
 	const std::function<bool()>& ownerCheckpoint)
 {
 	const ResourcePathSafety::StrictRelativePathResult mapPath =
@@ -1164,45 +1174,52 @@ bool GameManager::writeSaveGenerationDraft(
 			global.data.objName.c_str());
 		return false;
 	}
-	if (!File::recoverDirectoryCopy(SAVE_CURRENT_FOLDER))
+	// A script can clear a list name and then create new entities. Give only
+	// nonempty persistent lists a snapshot name; do not rename the live world
+	// until the current state has been written successfully.
+	std::vector<std::string> occupiedNames;
+	const auto allocateListName = [&](const char* prefix, const char* extension)
 	{
-		GameLog::write(
-			"GameManager: can not recover current save generation\n");
-		return false;
-	}
-	const bool draftReady =
-		SaveFileManager::CopySaveGenerationWithinLimits(
-		SAVE_CURRENT_FOLDER,
-		generationDirectory,
-		copyLimits,
-		{ SAVE_LIST_FILE },
-		[ownerCheckpoint]()
+		if (occupiedNames.empty())
 		{
-			return !ownerCheckpointCanContinue(
-				ownerCheckpoint);
-		});
-	if (!draftReady)
+			occupiedNames = File::listFiles(SAVE_CURRENT_FOLDER);
+			occupiedNames.push_back(savedGlobal.data.npcName);
+			occupiedNames.push_back(savedGlobal.data.objName);
+		}
+		for (std::size_t index = 0; index <= occupiedNames.size(); ++index)
+		{
+			const std::string candidate = std::string(prefix) + std::to_string(index) + extension;
+			if (std::all_of(occupiedNames.begin(), occupiedNames.end(), [&](const std::string& existing)
+				{
+					return SaveFileManager::AreEntityListFileNamesDistinct(candidate, existing);
+				}))
+			{
+				occupiedNames.push_back(candidate);
+				return candidate;
+			}
+		}
+		return std::string();
+	};
+	if (savedGlobal.data.npcName.empty() &&
+		std::any_of(npcManager->npcList.begin(), npcManager->npcList.end(), [](const std::shared_ptr<NPC>& npc)
+		{
+			return NPCManager::shouldPersistNPC(npc) && npc->kind != nkPartner && npc->kind != nkPlayer;
+		}))
 	{
-		GameLog::write(
-			"GameManager: can not prepare save draft generation %s\n",
-			generationDirectory.c_str());
-		return false;
+		savedGlobal.data.npcName = allocateListName("runtime-npcs-", ".npc");
+	}
+	if (savedGlobal.data.objName.empty() && !objectManager->objectList.empty())
+	{
+		savedGlobal.data.objName = allocateListName("runtime-objects-", ".obj");
 	}
 
 	bool saved = false;
 	{
-		SaveFileManager::CurrentPathScope draftPath(
-			generationDirectory);
-		if (!draftPath.valid())
-		{
-			GameLog::write(
-				"GameManager: invalid save draft generation path %s\n",
-				generationDirectory.c_str());
-			return false;
-		}
+		SaveFileManager::CurrentPathScope currentPath(SAVE_CURRENT_FOLDER);
+		if (!currentPath.valid()) return false;
 
 		saved = true;
-		saved = global.save() && saved;
+		saved = savedGlobal.save() && saved;
 		saved = varList.save() && saved;
 		saved = memo.save() && saved;
 		saved = traps.save() && saved;
@@ -1233,9 +1250,9 @@ bool GameManager::writeSaveGenerationDraft(
 		}
 
 		saved = npcManager->save(
-			global.data.npcName) && saved;
+			savedGlobal.data.npcName) && saved;
 		saved = objectManager->save(
-			global.data.objName) && saved;
+			savedGlobal.data.objName) && saved;
 		if (!ownerCheckpointCanContinue(
 				ownerCheckpoint))
 		{
@@ -1248,84 +1265,48 @@ bool GameManager::writeSaveGenerationDraft(
 		ownerCheckpointCanContinue(ownerCheckpoint);
 }
 
-bool GameManager::saveGame(int index)
+bool GameManager::saveGame(int index, const std::function<bool()>& ownerCheckpoint)
 {
+	if (index > 7) return false;
 	if (engine == nullptr || !engine->isMainThread())
 	{
 		GameLog::write(
 			"GameManager: save commit must run on the SDL main thread\n");
 		return false;
 	}
+	const auto saveStarted = std::chrono::steady_clock::now();
+	auto phaseStarted = saveStarted;
+	const auto logSavePhase = [&](const char* phase)
+	{
+		const auto now = std::chrono::steady_clock::now();
+		GameLog::write("Save timing: slot=%d phase=%s elapsed_ms=%lld total_ms=%lld",
+			index, phase,
+			static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(now - phaseStarted).count()),
+			static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(now - saveStarted).count()));
+		phaseStarted = now;
+	};
 	SaveFileManager::OperationScope saveOperation;
-	const std::string draftDirectory =
-		"save\\game_build\\";
-	const SaveGenerationPreflightPolicy policy =
-		createRuntimeSaveGenerationPolicy(
-			*this,
-			RuntimeSaveGenerationPolicyMode::GeneratedSave);
-	if (!SaveFileManager::RecoverInterruptedSaveOperations())
+	if (!ownerCheckpointCanContinue(ownerCheckpoint)) return false;
+	const auto cancellationRequested = [&ownerCheckpoint]()
 	{
-		GameLog::write(
-			"GameManager: one or more save directories could not be recovered; continuing with unaffected slots\n");
-	}
-	SaveFileManager::ScratchGenerationScope draftCleanup(
-		draftDirectory);
-	if (!draftCleanup.valid())
+		return !ownerCheckpointCanContinue(ownerCheckpoint);
+	};
+	Global savedGlobal = global;
+	if (!writeCurrentSave(savedGlobal, ownerCheckpoint))
 	{
-		GameLog::write(
-			"GameManager: invalid save draft cleanup path\n");
+		GameLog::write("GameManager: current save writing failed; slot copy skipped\n");
 		return false;
 	}
-	if (!writeSaveGenerationDraft(
-			draftDirectory,
-			policy.limits))
-	{
-		GameLog::write("GameManager: save generation failed; slot publication skipped\n");
-		return false;
-	}
-
-	// Keep save/game aligned with the live world before attempting the optional
-	// manual or auto slot. The two directory publications are independently
-	// atomic; publishing the slot first could leave a new slot paired with an
-	// old current generation when the second publication fails.
-	const SaveGenerationResult currentPublication =
-		SaveFileManager::PublishPreparedSaveGeneration(
-			draftDirectory,
-			SAVE_CURRENT_FOLDER,
-			policy.limits,
-			{ SAVE_LIST_FILE });
-	if (!currentPublication.succeeded())
-	{
-		GameLog::write(
-			"GameManager: current save publication failed error=%s path=%s\n",
-			SaveFileManager::DescribeSaveGenerationError(
-				currentPublication.error),
-			currentPublication.errorPath.c_str());
-		return false;
-	}
-
+	logSavePhase("write-current");
+	global.data.npcName.swap(savedGlobal.data.npcName);
+	global.data.objName.swap(savedGlobal.data.objName);
 	if (index != 0)
 	{
-		const std::string secondaryDirectory =
-			index > 0
-				? convert::formatString(
-					SAVE_FOLDER, index)
-				: std::string(SAVE_AUTO_FOLDER);
-		const SaveGenerationResult slotPublication =
-			SaveFileManager::PublishPreparedSaveGeneration(
-				draftDirectory,
-				secondaryDirectory,
-				policy.limits,
-				{ SAVE_LIST_FILE });
-		if (!slotPublication.succeeded())
-		{
-			GameLog::write(
-				"GameManager: slot save publication failed error=%s path=%s\n",
-				SaveFileManager::DescribeSaveGenerationError(
-					slotPublication.error),
-				slotPublication.errorPath.c_str());
-			return false;
-		}
+		const bool saved = index > 0
+			? SaveFileManager::CopySaveFileTo(index, cancellationRequested)
+			: SaveFileManager::CopySaveFileToAuto(cancellationRequested);
+		logSavePhase("write-slot");
+		if (!saved) return false;
 	}
 	return true;
 }
@@ -1970,6 +1951,9 @@ void GameManager::runObjScript(std::shared_ptr<Object> obj, const std::string& s
 		inEvent = true;
 		effectManager->disableAllEffect();
 		scriptType = stObject;
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+		GameplayAutomationSession::interactionStarted(obj);
+#endif
 		runScript(scriptFileToRun);
 		scriptType = stNone;
 		inEvent = false;
@@ -2014,6 +1998,9 @@ void GameManager::runNPCScript(std::shared_ptr<NPC> npc, const std::string& scri
 		inEvent = true;
 		effectManager->disableAllEffect();
 		scriptType = stNPC;
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+		GameplayAutomationSession::interactionStarted(npc);
+#endif
 		runScript(scriptFileToRun);
 		scriptType = stNone;
 		inEvent = false;
@@ -2508,7 +2495,7 @@ void GameManager::onDraw()
 	map->drawMap();
 	if (global.data.scriptShowMapPos && player != nullptr)
 	{
-		Point position = player->getPosition();
+		Point position = getMousePoint();
 		engine->drawText(convert::formatString("Map: %d, %d", position.x, position.y), 8, 8, 18, 0xD0FFFFFF);
 	}
 }
@@ -2695,6 +2682,10 @@ bool GameManager::onHandleEvent(AEvent & e)
 		{
 			performCheatAction(CheatAction::AddMoney);
 		}
+		else if (e.eventData == KEY_T && usesCheatShortcutModifiers)
+		{
+			performCheatAction(CheatAction::ToggleInvincibility);
+		}
 	}
 	return false;
 }
@@ -2746,8 +2737,14 @@ GameManager::CheatOperationResult GameManager::performCheatAction(
 	{
 	case CheatAction::ToggleInvincibility:
 		cheatInvincibilityEnabled = !cheatInvincibilityEnabled;
+		if (cheatInvincibilityEnabled)
+		{
+			player->clearAbnormalState();
+			player->disableMoveMilliseconds = 0;
+			player->disableSkillMilliseconds = 0;
+		}
 		return completeCheatOperation(true,
-			cheatInvincibilityEnabled ? "无敌模式已开启" : "无敌模式已关闭");
+			cheatInvincibilityEnabled ? "已开启无敌：免伤、免异常状态，内力、体力不消耗" : "无敌模式已关闭");
 	case CheatAction::RestorePlayerResources:
 		player->fullMana();
 		player->fullLife();

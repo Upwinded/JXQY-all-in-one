@@ -4,6 +4,10 @@
 class Dialog :
 	public ConfigDrivenPanel
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
+	friend class CoreLifecycleTestAccess;
 public:
 	Dialog();
 	virtual ~Dialog();

@@ -1509,6 +1509,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		}
 
 		importedResourcePackage->gameId = manifest.id;
+		importedResourcePackage->installDirectory = manifest.installDirectory;
 		importedResourcePackage->displayName = manifest.name;
 		importedResourcePackage->author = manifest.author;
 		importedResourcePackage->displayVersion =

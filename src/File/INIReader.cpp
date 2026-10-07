@@ -166,11 +166,15 @@ std::string normalizeIniTextEncoding(const char* data, size_t length)
 }
 
 
-INIReader::INIReader()
+INIReader::INIReader(IniKeyCaseSensitivity sensitivity)
+	: keyCaseSensitivity(sensitivity)
 {
 }
 
-INIReader::INIReader(const std::string& filename)
+INIReader::INIReader(
+	const std::string& filename,
+	IniKeyCaseSensitivity sensitivity)
+	: keyCaseSensitivity(sensitivity)
 {
 	fileName = filename;
 	std::unique_ptr<char[]> s;
@@ -198,7 +202,10 @@ INIReader::INIReader(const std::string& filename)
     _error = ini_parse_string(content.c_str(), ValueHandler, this);
 }
 
-INIReader::INIReader(const std::unique_ptr<char[]>& s)
+INIReader::INIReader(
+	const std::unique_ptr<char[]>& s,
+	IniKeyCaseSensitivity sensitivity)
+	: keyCaseSensitivity(sensitivity)
 {
 	_error = -1;
 	if (s != nullptr)
@@ -225,7 +232,7 @@ int INIReader::ParseError() const
 std::string INIReader::Get(const std::string& section, const std::string& name, const std::string& default_value) const
 {
 	std::string s = toLowerAscii(section);
-	std::string sn = toLowerAscii(name);
+	std::string sn = normalizeKeyName(name);
 
 	auto sec = map.sections.find(s);
 	if (sec != map.sections.end())
@@ -243,7 +250,7 @@ void INIReader::Set(const std::string& section, const std::string& name,
 	const std::string& value)
 {
 	std::string s = toLowerAscii(section);
-	std::string sn = toLowerAscii(name);
+	std::string sn = normalizeKeyName(name);
 
 	auto sec = map.sections.find(s);
 	if (sec == map.sections.end())
@@ -262,7 +269,7 @@ void INIReader::Set(const std::string& section, const std::string& name,
 void INIReader::Remove(const std::string& section, const std::string& name)
 {
 	std::string normalizedSection = toLowerAscii(section);
-	std::string normalizedName = toLowerAscii(name);
+	std::string normalizedName = normalizeKeyName(name);
 
 	auto sectionIterator = map.sections.find(normalizedSection);
 	if (sectionIterator == map.sections.end())
@@ -276,6 +283,21 @@ void INIReader::Remove(const std::string& section, const std::string& name)
 bool INIReader::HasSection(const std::string& section) const
 {
 	return map.sections.find(toLowerAscii(section)) != map.sections.end();
+}
+
+bool INIReader::HasKey(
+	const std::string& section,
+	const std::string& name) const
+{
+	const auto sectionIterator =
+		map.sections.find(toLowerAscii(section));
+	if (sectionIterator == map.sections.end())
+	{
+		return false;
+	}
+	return sectionIterator->second.keys.find(
+		normalizeKeyName(name)) !=
+		sectionIterator->second.keys.end();
 }
 
 std::vector<std::string> INIReader::GetSectionNames() const
@@ -408,6 +430,10 @@ uint32_t INIReader::GetColor(const std::string & section, const std::string & na
 UTime INIReader::GetTime(const std::string& section, const std::string& name, UTime default_value) const
 {
 	std::string valstr = Get(section, name, "");
+	if (valstr.empty())
+	{
+		return default_value;
+	}
 	try
 	{
 		return (UTime)std::stoll(valstr, nullptr, 0);
@@ -421,6 +447,10 @@ UTime INIReader::GetTime(const std::string& section, const std::string& name, UT
 long INIReader::GetInteger(const std::string& section, const std::string& name, long default_value) const
 {
 	std::string valstr = Get(section, name, "");
+	if (valstr.empty())
+	{
+		return default_value;
+	}
 	try
 	{
 		return std::stol(valstr, nullptr, 0);
@@ -434,6 +464,10 @@ long INIReader::GetInteger(const std::string& section, const std::string& name, 
 float INIReader::GetReal(const std::string& section, const std::string& name, float default_value) const
 {
 	std::string valstr = Get(section, name, "");
+	if (valstr.empty())
+	{
+		return default_value;
+	}
 	try
 	{
 		return std::stod(valstr);
@@ -493,9 +527,11 @@ bool INIReader::saveToFile(const std::string & filename)
 	SDL_CloseIO(fp);*/
 }
 
-std::string INIReader::MakeKey(const std::string& section, const std::string& name)
+std::string INIReader::normalizeKeyName(const std::string& name) const
 {
-	return toLowerAscii(section + "=" + name);
+	return keyCaseSensitivity == IniKeyCaseSensitivity::Sensitive
+		? name
+		: toLowerAscii(name);
 }
 
 int INIReader::ValueHandler(void* user, const char* section, const char* name,

@@ -26,6 +26,10 @@
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #endif
+#if defined(__ANDROID__)
+#include <jni.h>
+#include "PackagedAssetDirectories.h"
+#endif
 
 namespace
 {
@@ -80,10 +84,11 @@ bool resolveCollectionRoot(
 	std::string& resolvedRoot)
 {
 	resolvedRoot = normalizeRootPath(requestedRoot);
-#if defined(__ANDROID__) || \
-	(defined(__APPLE__) && TARGET_OS_IOS)
+#if defined(__ANDROID__)
 	return true;
 #else
+	// iOS directory enumeration resolves relative paths against writable
+	// storage. Keep the bundle's filesystem root absolute, as on desktop.
 	if (resolvedRoot.empty())
 	{
 		return false;
@@ -876,6 +881,62 @@ listPackagedCatalogChildDirectories(
 	{
 		return result;
 	}
+
+#if defined(__ANDROID__)
+	if (path.empty())
+	{
+		auto* environment = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
+		if (environment == nullptr)
+		{
+			return result;
+		}
+		if (environment->PushLocalFrame(4) != 0)
+		{
+			environment->ExceptionClear();
+			return result;
+		}
+		const auto releaseFrame = [](JNIEnv* activeEnvironment)
+		{
+			if (activeEnvironment->ExceptionCheck())
+			{
+				activeEnvironment->ExceptionClear();
+			}
+			activeEnvironment->PopLocalFrame(nullptr);
+		};
+		std::unique_ptr<JNIEnv, decltype(releaseFrame)> localFrame(
+			environment, releaseFrame);
+		jobject activity = static_cast<jobject>(SDL_GetAndroidActivity());
+		if (activity == nullptr) return result;
+		jclass activityClass = environment->GetObjectClass(activity);
+		if (activityClass == nullptr) return result;
+		jmethodID getPackagePath = environment->GetMethodID(
+			activityClass, "getPackageCodePath", "()Ljava/lang/String;");
+		if (getPackagePath == nullptr) return result;
+		auto packagePath = static_cast<jstring>(
+			environment->CallObjectMethod(activity, getPackagePath));
+		if (packagePath == nullptr || environment->ExceptionCheck()) return result;
+		const char* characters = environment->GetStringUTFChars(packagePath, nullptr);
+		if (characters == nullptr) return result;
+		const auto releaseCharacters = [&](const char* value)
+		{
+			environment->ReleaseStringUTFChars(packagePath, value);
+		};
+		std::unique_ptr<const char, decltype(releaseCharacters)> packageFilename(
+			characters, releaseCharacters);
+		try
+		{
+			return RuntimeResource::listApkAssetDirectories(packageFilename.get());
+		}
+		catch (const std::bad_alloc&)
+		{
+			return result;
+		}
+		catch (const std::length_error&)
+		{
+			return result;
+		}
+	}
+#endif
 
 	PackagedCatalogDirectoryListContext context;
 	if (!SDL_EnumerateDirectory(

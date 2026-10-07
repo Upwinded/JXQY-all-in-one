@@ -1,5 +1,6 @@
 #pragma once
 #include "../../Element/Element.h"
+#include "../Menu/ControllerPromptPresenter.h"
 
 #include <array>
 #include <cstdint>
@@ -21,6 +22,9 @@ struct GamepadAxisState;
 class GameController :
 	public Element
 {
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
 	friend class GamepadWorldRuntimeTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
 public:
@@ -46,7 +50,7 @@ public:
 	void setTouchControlsVisible(bool visible);
 	void toggleTouchControls();
 	bool areTouchControlsVisible() const { return touchControlsVisible; }
-	void cancelControllerWorldInteraction();
+	void cancelControllerWorldInteraction(bool stopCurrentMovement = true);
 	void cancelTouchControlInput();
 	bool synchronizeInputLifecycle();
 	void processPhysicalInputFrame();
@@ -80,6 +84,7 @@ private:
 	bool mouseWorldInputSuppressedUntilRelease = false;
 	std::weak_ptr<GameElement> controllerFocusedTarget;
 	std::set<EventTouchID> virtualControlPointerTransactions;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 	struct FastInteractionPressBinding
 	{
 		std::weak_ptr<GameElement> target;

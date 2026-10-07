@@ -370,9 +370,97 @@ int Game::run()
 		return -1;
 	}
 
+	auto& resourceManager = ResourceManager::instance();
+	bool bundledFontInstalled = false;
+	const auto installGameFont = [&resourceManager, &bundledFontInstalled](bool preferActiveResource)
+	{
+		std::unique_ptr<char[]> fontData;
+		int fontLength = 0;
+		if (preferActiveResource && resourceManager.hasActiveResourceRoot() &&
+			File::readActiveResourceFile(
+				GameFontPath, fontData, fontLength) &&
+			fontData != nullptr && fontLength > 0)
+		{
+			Engine::getInstance()->setFontFromMem(fontData, fontLength);
+			GameLog::write("Game: loaded active resource font\n");
+			return true;
+		}
+		if (bundledFontInstalled)
+		{
+			return true;
+		}
+		fontData.reset();
+		fontLength = 0;
+		if (File::readBundledApplicationFile(
+				EngineFontPath, fontData, fontLength) &&
+			fontData != nullptr && fontLength > 0)
+		{
+			Engine::getInstance()->setFontFromMem(fontData, fontLength);
+			bundledFontInstalled = true;
+			GameLog::write("Game: loaded bundled engine font\n");
+			return true;
+		}
+		GameLog::write(
+			"Game: engine font is unavailable (%s); continuing without a font\n",
+			EngineFontPath);
+		return false;
+	};
+
+	if (!editorRunMode)
+	{
+		installGameFont(false);
+		auto* engine = Engine::getInstance();
+		while (engine->isMainThread() && !engine->isApplicationQuitRequested())
+		{
+			engine->frameBegin();
+			AEvent event;
+			while (engine->getEvent(event) > 0)
+			{
+				if (event.eventType == ET_WINDOWCLOSE || event.eventType == ET_QUIT)
+				{
+					engine->requestApplicationQuit();
+					return erExit;
+				}
+			}
+			if (!engine->isFrameReady())
+			{
+				engine->delay(16);
+				continue;
+			}
+			engine->getWindowSize(w, h);
+			engine->fillRect(0, 0, w, h, 18, 14, 12, 255);
+			const auto drawCenteredText = [engine, w](
+				const std::string& text, int y, int size, unsigned int color)
+			{
+				auto image = engine->createText(text, size, color);
+				int textWidth = 0;
+				int textHeight = 0;
+				if (engine->getImageSize(image, textWidth, textHeight))
+				{
+					engine->drawImage(image, (w - textWidth) / 2, y);
+				}
+			};
+			drawCenteredText(u8"剑侠情缘", h / 2 - 56, 32, 0xFFD8B870);
+			drawCenteredText(u8"正在加载资源…", h / 2 + 12, 24, 0xFFF1E5CC);
+			if (!engine->isFrameReady())
+			{
+				continue;
+			}
+			engine->frameEnd();
+			if (engine->isApplicationActive() && !engine->isApplicationQuitRequested())
+			{
+				GameLog::write("Game: resource scan screen submitted\n");
+				break;
+			}
+		}
+		if (engine->isApplicationQuitRequested())
+		{
+			return erExit;
+		}
+	}
+
 	// 初始化资源管理器：扫描资源包、读取 manifest、确定 active resource root。
 	GameLog::write("Init ResourceManager\n");
-	auto& resourceManager = ResourceManager::instance();
 	if (!resourceManager.initialize(assetsArg))
 	{
 		GameLog::write("ResourceManager: initialization did not produce a runnable resource state\n");
@@ -398,35 +486,6 @@ int Game::run()
 				"ResourceManager: continuing without the requested pack; available routing remains active\n");
 		}
 	}
-
-	const auto installGameFont = [&resourceManager](bool preferActiveResource)
-	{
-		std::unique_ptr<char[]> fontData;
-		int fontLength = 0;
-		if (preferActiveResource && resourceManager.hasActiveResourceRoot() &&
-			File::readActiveResourceFile(
-				GameFontPath, fontData, fontLength) &&
-			fontData != nullptr && fontLength > 0)
-		{
-			Engine::getInstance()->setFontFromMem(fontData, fontLength);
-			GameLog::write("Game: loaded active resource font\n");
-			return true;
-		}
-		fontData.reset();
-		fontLength = 0;
-		if (File::readBundledApplicationFile(
-				EngineFontPath, fontData, fontLength) &&
-			fontData != nullptr && fontLength > 0)
-		{
-			Engine::getInstance()->setFontFromMem(fontData, fontLength);
-			GameLog::write("Game: loaded bundled engine font\n");
-			return true;
-		}
-		GameLog::write(
-			"Game: engine font is unavailable (%s); continuing without a font\n",
-			EngineFontPath);
-		return false;
-	};
 
 	GameLog::write("Init Game Font\n");
 	installGameFont(resourceManager.hasActiveResourceRoot());

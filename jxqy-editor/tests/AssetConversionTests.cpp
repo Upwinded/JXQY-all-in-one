@@ -501,6 +501,198 @@ bool testLegacyMapGbkStringsThatLookLikeUtf8()
               "legacy GBK MPC name is decoded even when bytes look like UTF-8");
 }
 
+bool testTiledMapMigration()
+{
+    QTemporaryDir temporary;
+    const QDir source(temporary.filePath("source"));
+    const QDir output(temporary.filePath("output"));
+    QImage picture(64, 48, QImage::Format_ARGB32);
+    picture.fill(QColor(20, 80, 160, 128));
+    QDir().mkpath(source.filePath("map/tiles"));
+    if (!check(picture.save(source.filePath("map/tiles/tile.png")), "write TMX tile image"))
+        return false;
+
+    const QString xml = QString::fromUtf8(R"(<map orientation="staggered" staggeraxis="y" staggerindex="odd" width="3" height="1" tilewidth="64" tileheight="32">
+<tileset firstgid="1" name="T"><tile id="4"><image source="tiles/7.png"/></tile></tileset>
+<tileset firstgid="10" name="O"><tile id="9"><image source="tiles/障.png"/></tile></tileset>
+<tileset firstgid="30" name="visual" tilecount="1"><tileoffset x="-3" y="-13"/><tile id="9"><image source="tiles/tile.png" width="64" height="48"/></tile></tileset>
+<layer name="1" width="3" height="1"><data encoding="csv">39,0,39</data></layer>
+<layer name="2" width="3" height="1"><data encoding="csv">0,39,0</data></layer>
+<layer name="O" width="3" height="1"><data encoding="csv">19,0,0</data></layer>
+<layer name="T" width="3" height="1"><data encoding="csv">0,5,0</data></layer>
+</map>)");
+    if (!check(writeUtf8TextFile(source.filePath("map/场景.tmx"), xml), "write TMX fixture"))
+        return false;
+    AssetMigrationOptions options;
+    options.resourceTypes = {AssetResourceType::Maps};
+    options.writeModProfile = false;
+    AssetMigrationReport report;
+    JxAssetMigrator migrator;
+    if (!check(migrator.migrate(source.path(), output.path(), options, report) == MigrationResult::Success,
+               "convert TMX using normal map migration") ||
+        !check(report.convertedMaps == 1, "TMX is converted, not raw-byte-copy"))
+        return false;
+    MapFileEditor map;
+    if (!check(map.loadFromFile(output.filePath("map/场景.tmx").toStdString()),
+               "MAP V3 reloads under original TMX filename"))
+        return false;
+    bool ok = check(map.getWidth() == 3 && map.getHeight() == 1, "TMX dimensions preserved") &&
+        check(map.getTile(0, 0).obstacle == 0x80 && map.getTile(1, 0).trap == 7,
+              "TMX O/T use firstgid plus sparse ID and image basename") &&
+        check(map.getTile(0, 0).layer[0].mpc == 1 && map.getTile(1, 0).layer[1].mpc == 1 &&
+              map.getTile(1, 0).layer[0].mpc == 0, "TMX layers and empty cells preserved");
+    IMPImageFile image;
+    const QString packagePath = QString::fromStdString(map.getMpcPath() + map.getMpcInfo(0).name);
+    if (!check(image.load(output.filePath(packagePath).toStdString()), "load generated TMX IMG package"))
+        return false;
+    int x = 0;
+    int y = 0;
+    image.getFrameOffset(0, &x, &y);
+    ok = check(x == 35 && y == 45, "TMX image anchor matches MG rectangle and tileoffset") && ok;
+    ok = check(image.getFrameImage(0) == picture, "TMX image pixels and alpha preserved") && ok;
+    ok = check(report.managedOutputSha256.contains(packagePath), "generated TMX image is managed output") && ok;
+    const QByteArray savedMap = readRawFile(output.filePath("map/场景.tmx"));
+    const QByteArray savedImage = readRawFile(output.filePath(packagePath));
+    if (!writeUtf8TextFile(temporary.filePath("outside.tsx"), "<tileset name=\"outside\"/>"))
+        return false;
+    const QStringList invalidInputs = {
+        QString(xml).replace("39,0,39", "39,0"),
+        QString(xml).replace("39,0,39", "2147483687,0,39"),
+        QString(xml).replace("tiles/tile.png", "tiles/missing.png"),
+        QString(xml).replace("tiles/7.png", "tiles/256.png"),
+        QString(xml).replace("width=\"3\" height=\"1\" tilewidth", "width=\"999999\" height=\"1\" tilewidth"),
+        QString(xml).replace("<tile id=\"9\"><image source=\"tiles/tile.png\" width=\"64\" height=\"48\"/></tile>",
+                             "<image source=\"tiles/tile.png\" width=\"64\" height=\"48\"/>"),
+        QString(xml).replace("</map>", "<layer name=\"H\"><data encoding=\"csv\">1,0,0</data></layer></map>"),
+        QString(xml).replace("</map>", "<objectgroup><object id=\"1\"/></objectgroup></map>"),
+        QString(xml).replace("</map>", "<group/></map>"),
+        QString(xml).replace("</map>", "<tileset firstgid=\"300\" source=\"../../outside.tsx\"/></map>"),
+        QString(xml).replace("</tileset>", "<tile id=\"9\"><animation/></tile></tileset>")
+    };
+    for (int i = 0; i < invalidInputs.size(); ++i)
+    {
+        if (!writeUtf8TextFile(source.filePath("map/场景.tmx"), invalidInputs[i]))
+            return false;
+        AssetMigrationReport failed;
+        ok = check(migrator.migrate(source.path(), output.path(), options, failed) == MigrationResult::Failed,
+                   QStringLiteral("TMX invalid/unsupported variant %1 fails explicitly").arg(i)) && ok;
+        ok = check(readRawFile(output.filePath("map/场景.tmx")) == savedMap &&
+                   readRawFile(output.filePath(packagePath)) == savedImage,
+                   "TMX conversion failure preserves published map and images") && ok;
+    }
+    const QString unknownMarkers = QString(xml).replace(
+        "19,0,0", "999,0,0").replace("0,5,0", "0,998,0");
+    writeUtf8TextFile(source.filePath("map/场景.tmx"), unknownMarkers);
+    AssetMigrationReport tolerant;
+    ok = check(migrator.migrate(source.path(), output.path(), options, tolerant) == MigrationResult::Partial &&
+               tolerant.warningCount == 2, "unmapped O/T warn and use zero instead of rejecting map") && ok;
+    MapFileEditor tolerantMap;
+    ok = check(tolerantMap.loadFromFile(output.filePath("map/场景.tmx").toStdString()) &&
+               tolerantMap.getTile(0, 0).obstacle == 0 && tolerantMap.getTile(1, 0).trap == 0,
+               "unmapped markers have MG FixError values") && ok;
+    writeUtf8TextFile(source.filePath("map/场景.tmx"), xml);
+    AssetMigrationReport restored;
+    ok = check(migrator.migrate(source.path(), output.path(), options, restored) == MigrationResult::Success,
+               "repeat TMX conversion succeeds deterministically") && ok;
+    ok = check(readRawFile(output.filePath("map/场景.tmx")) == savedMap &&
+               readRawFile(output.filePath(packagePath)) == savedImage, "repeated TMX conversion is byte stable") && ok;
+    AssetMigrationReport reimported;
+    const QDir reimport(temporary.filePath("reimport"));
+    ok = check(migrator.migrate(output.path(), reimport.path(), options, reimported) == MigrationResult::Success &&
+               readRawFile(reimport.filePath("map/场景.tmx")) == savedMap &&
+               readRawFile(reimport.filePath(packagePath)) == savedImage,
+               "already-converted .tmx and image packages can be migrated again") && ok;
+    const QByteArray editedPackage = savedImage + "user edit";
+    if (!writeRawFile(output.filePath(packagePath), editedPackage))
+        return false;
+    AssetMigrationReport protectedOutput;
+    ok = check(migrator.migrate(source.path(), output.path(), options, protectedOutput) == MigrationResult::Failed &&
+               readRawFile(output.filePath(packagePath)) == editedPackage &&
+               readRawFile(output.filePath("map/场景.tmx")) == savedMap,
+               "TMX generated package edits are protected by normal managed-output checks") && ok;
+    if (!writeRawFile(output.filePath(packagePath), savedImage))
+        return false;
+    QDir().mkpath(source.filePath("map/场景.tmx.tiles"));
+    if (!check(writeUtf8TextFile(source.filePath("map/场景.tmx.tiles/000.img"), "source collision"),
+               "write generated-path collision fixture"))
+        return false;
+    AssetMigrationReport collision;
+    ok = check(migrator.migrate(source.path(), output.path(), options, collision) == MigrationResult::Failed &&
+               readRawFile(output.filePath(packagePath)) == savedImage,
+               "TMX generated namespace cannot overwrite a source asset") && ok;
+    return ok;
+}
+
+bool testTiledMapExternalTilesetAndFramePacking()
+{
+    QTemporaryDir temporary;
+    const QDir source(temporary.filePath("source"));
+    const QDir output(temporary.filePath("output"));
+    QDir().mkpath(source.filePath("map/tiles"));
+    QImage picture(2, 3, QImage::Format_ARGB32);
+    picture.fill(Qt::red);
+    if (!picture.save(source.filePath("map/tile.png")))
+        return false;
+    QString tileset = "<tileset name=\"visual\" tilecount=\"1\"><tileoffset x=\"4\" y=\"5\"/>";
+    QStringList cells;
+    for (int index = 0; index < 257; ++index)
+    {
+        tileset += QStringLiteral("<tile id=\"%1\"><image source=\"../tile.png\"/></tile>").arg(index * 3);
+        cells.append(QString::number(100 + index * 3));
+    }
+    tileset += "</tileset>";
+    QStringList obstacles;
+    for (int index = 0; index < 257; ++index)
+        obstacles.append(QString::number(index < 4 ? 20 + index : 0));
+    const QString xml = QStringLiteral(
+        "<map orientation=\"staggered\" staggeraxis=\"y\" staggerindex=\"odd\" width=\"257\" height=\"1\" tilewidth=\"64\" tileheight=\"32\">"
+        "<tileset firstgid=\"20\" name=\"O\">"
+        "<tile id=\"0\"><image source=\"跳透.png\"/></tile><tile id=\"1\"><image source=\"跳障.png\"/></tile>"
+        "<tile id=\"2\"><image source=\"透.png\"/></tile><tile id=\"3\"><image source=\"障.png\"/></tile></tileset>"
+        "<tileset firstgid=\"100\" source=\"tiles/visual.tsx\"/>"
+        "<layer name=\"1\"><data encoding=\"csv\">%1</data></layer>"
+        "<layer name=\"O\"><data encoding=\"csv\">%2</data></layer></map>").arg(cells.join(','), obstacles.join(','));
+    if (!writeUtf8TextFile(source.filePath("map/tiles/visual.tsx"), tileset) ||
+        !writeUtf8TextFile(source.filePath("map/bulk.tmx"), xml))
+        return false;
+    AssetMigrationOptions options;
+    options.resourceTypes = {AssetResourceType::Maps};
+    options.writeModProfile = false;
+    AssetMigrationReport report;
+    JxAssetMigrator migrator;
+    MapFileEditor map;
+    if (!check(migrator.migrate(source.path(), output.path(), options, report) == MigrationResult::Success &&
+               map.loadFromFile(output.filePath("map/bulk.tmx").toStdString()), "external TSX converts to MAP V3"))
+        return false;
+    bool ok = check(map.getUsedMpcCount() == 2, "257 GIDs split across two IMG packages");
+    ok = check(map.getTile(0, 0).obstacle == 0x60 && map.getTile(1, 0).obstacle == 0xa0 &&
+               map.getTile(2, 0).obstacle == 0x40 && map.getTile(3, 0).obstacle == 0x80,
+               "all four published MG obstacle labels map to their original bytes") && ok;
+    for (int index : {0, 255, 256})
+    {
+        const auto layer = map.getTile(index, 0).layer[0];
+        ok = check(layer.mpc == index / 256 + 1 && layer.frame == index % 256,
+                   "TMX package/frame indices cross the 8-bit boundary correctly") && ok;
+    }
+    for (int packageIndex = 0; packageIndex < 2; ++packageIndex)
+    {
+        const QString relative = QString::fromStdString(map.getMpcPath() + map.getMpcInfo(packageIndex).name);
+        IMPImageFile package;
+        if (!check(package.load(output.filePath(relative).toStdString()), "reload split TMX IMG"))
+            return false;
+        ok = check(package.getImageCount() == (packageIndex == 0 ? 256 : 1), "split IMG frame counts are exact") && ok;
+        for (int index = 0; index < package.getImageCount(); ++index)
+        {
+            int x = 0;
+            int y = 0;
+            package.getFrameOffset(index, &x, &y);
+            ok = check(package.getFrameImage(index) == picture && x == 28 && y == -18,
+                       "every external TSX frame retains pixels and offset") && ok;
+        }
+    }
+    return ok;
+}
+
 bool testMapConverterWritesVersion3()
 {
     QTemporaryDir temporaryDirectory;
@@ -939,6 +1131,31 @@ bool testScriptLegacySpellingAliases()
         check(!hasUnsupportedApi, "legacy spelling aliases are supported runtime APIs");
 }
 
+bool testScriptLegacyNumericCondition()
+{
+    ScriptConverter converter;
+    const std::string converted = converter.convertScript(
+        "If($Event == $2040) @End;\n"
+        "If($Event <> $0) @End;\n"
+        "If($Event >= $-1) @End;\n"
+        "If($Event == $Other2040) @End;\n"
+        "If($Event == $other2040) @End;\n"
+        "Assign($2040,7);\nAdd($Event,$2040);\nSay(\"$2040\");\n"
+        "@End:\nReturn;\n");
+    return check(converted.find("getvar(\"Event\") == 2040") != std::string::npos &&
+                     converted.find("getvar(\"Event\") ~= 0") != std::string::npos &&
+                     converted.find("getvar(\"Event\") >= -1") != std::string::npos,
+                 "legacy If treats a dollar-prefixed integer RHS as the C# numeric constant") &&
+        check(converted.find("getvar(\"Other2040\")") != std::string::npos &&
+                  converted.find("getvar(\"other2040\")") != std::string::npos &&
+                  converted.find("assign(\"2040\",7)") != std::string::npos &&
+                  converted.find("add(\"Event\",getvar(\"2040\"))") != std::string::npos &&
+                  converted.find("say(\"$2040\")") != std::string::npos,
+              "numeric If compatibility preserves named variables, case and other argument positions") &&
+        check(LuaScriptSyntaxValidator::validateScriptContent("numeric-condition.txt", converted).message.isEmpty(),
+              "numeric If compatibility emits valid Lua");
+}
+
 bool testScriptDiagnostics()
 {
     ScriptConverter converter;
@@ -1021,7 +1238,17 @@ bool testScriptOriginalCompatibilityCommands()
         "SetPartnerLevel(\"Partner\", 45);\n"
         "PlayerAddEmotion(1);\n"
         "PlayerAddJustice(-1);\n"
-        "Memo(\"note\");\n");
+        "Memo(\"note\");\n"
+        "Memo(\"123\");\n"
+        "MeMo(\"-2\");\n"
+        "Memo(\"1e3\");\n"
+        "Memo(\"0x10\");\n"
+        "Memo(\" 42 \" );\n"
+        "Memo(\"Case Sensitive\");\n"
+        "Memo(123);\n"
+        "Memo(\"\");\n"
+        "AddToMemo(123);\n"
+        "DelMemo(\"123\");\n");
 
     bool hasUnsupportedApi = false;
     for (const ScriptConversionDiagnostic& diagnostic : converter.getDiagnostics())
@@ -1036,8 +1263,19 @@ bool testScriptOriginalCompatibilityCommands()
               "PlayerAddEmotion compatibility command") &&
         check(converted.find("playeraddjustice(-1)") != std::string::npos,
               "PlayerAddJustice compatibility command") &&
-        check(converted.find("addtomemo(\"note\")") != std::string::npos,
-              "Memo alias remains AddToMemo") &&
+        check(converted.find("  memo(\"note\");") != std::string::npos &&
+              converted.find("  memo(\"123\");") != std::string::npos &&
+              converted.find("  memo(\"-2\");") != std::string::npos &&
+              converted.find("  memo(\"1e3\");") != std::string::npos &&
+              converted.find("  memo(\"0x10\");") != std::string::npos &&
+              converted.find("  memo(\" 42 \");") != std::string::npos &&
+              converted.find("  memo(\"Case Sensitive\");") != std::string::npos &&
+              converted.find("  memo(123);") != std::string::npos &&
+              converted.find("  memo(\"\");") != std::string::npos,
+              "Memo keeps literal text separate from AddToMemo index lookup") &&
+        check(converted.find("  addtomemo(123);") != std::string::npos &&
+              converted.find("  delmemo(\"123\");") != std::string::npos,
+              "memo index lookup and literal deletion retain their own commands") &&
         check(!hasUnsupportedApi, "original compatibility commands are supported runtime APIs");
 }
 
@@ -1108,6 +1346,19 @@ bool testJxqy2ProductionScriptTypoRepairs()
         "Return;;\n"
         "If($DuanJiaZhuangClose,1) @Talk1;\n"
         "ShowMessage((\"长安西郊\");\n"
+        "SetMapTrap(1\"地图陷阱1.txt\");\n"
+        "SetMapTrap(-2\"negative.txt\");\n"
+        "SetMapTrap(3,\"1\\\"literal.txt\");\n"
+        "Say(\"1\\\"quoted\\\"text\");\n"
+        "SetObjScript(\"\"\"关宝箱.txt\");\n"
+        "SetNpcScript(\"守卫\" \"后续.txt\" \"场景.npc\");\n"
+        "ClearAllVar(\"AdjacentCase\"\"adjacentCase\");\n"
+        "Add(\"$CuiYanMen2DiZi\",1);\n"
+        "Assign(\"$QuotedFlag\",2);\n"
+        "Add(\"Case\",1);\nAdd(\"case\",2);\n"
+        "GetExp(\"$QuotedExp\");\n"
+        "ClearAllVar(\"$Case\",\"case\");\n"
+        "Say(\"$Price\");\n"
         "Retuen;\n");
     LuaScriptSyntaxIssue syntaxIssue = LuaScriptSyntaxValidator::validateScriptContent(
         "jxqy2-production-typos.txt", converted);
@@ -1131,6 +1382,25 @@ bool testJxqy2ProductionScriptTypoRepairs()
               "repair JXQY2 comma equality condition") &&
         check(converted.find("showmessage(\"长安西郊\");") != std::string::npos,
               "repair duplicated opening parenthesis in JXQY2 message call") &&
+        check(converted.find("setmaptrap(1,\"地图陷阱1.txt\");") != std::string::npos &&
+                  converted.find("setmaptrap(-2,\"negative.txt\");") != std::string::npos,
+              "repair missing comma between integer and quoted script argument") &&
+        check(converted.find("setmaptrap(3,\"1\\\"literal.txt\");") != std::string::npos &&
+                  converted.find("say(\"1\\\"quoted\\\"text\");") != std::string::npos,
+              "missing comma repair leaves quoted numeric text and escaped quotes intact") &&
+        check(converted.find("setobjscript(\"\",\"关宝箱.txt\");") != std::string::npos &&
+                  converted.find("setnpcscript(\"守卫\",\"后续.txt\",\"场景.npc\");") != std::string::npos &&
+                  converted.find("clearallvar(\"AdjacentCase\",\"adjacentCase\");") != std::string::npos,
+              "C# adjacent quoted arguments retain empty owners, multiple strings and variable case") &&
+        check(converted.find("add(\"CuiYanMen2DiZi\",1);") != std::string::npos &&
+                  converted.find("assign(\"QuotedFlag\",2);") != std::string::npos &&
+                  converted.find("getexp(\"QuotedExp\");") != std::string::npos &&
+                  converted.find("clearallvar(\"Case\",\"case\");") != std::string::npos,
+              "strip quoted dollar prefix only in variable-name argument positions") &&
+        check(converted.find("add(\"Case\",1);") != std::string::npos &&
+                  converted.find("add(\"case\",2);") != std::string::npos &&
+                  converted.find("say(\"$Price\");") != std::string::npos,
+              "variable normalization preserves case and literal dialogue dollar signs") &&
         check(converted.find("goto __jx_script_return") != std::string::npos,
               "repair Return double semicolon and Retuen spelling") &&
         check(converter.getDiagnostics().empty(),
@@ -1484,12 +1754,66 @@ bool testMigrationPreservesLegacyScriptDocumentation()
               "legacy script documentation is transcoded but not rewritten as Lua");
 }
 
-bool testMigrationRestoresKnownScriptLocations()
+bool testScriptOutputVariableMigration()
+{
+    QTemporaryDir sourceDir;
+    QTemporaryDir outputDir;
+    QDir source(sourceDir.path());
+    const QString path = QStringLiteral("script/common/output-variables.txt");
+    if (!check(sourceDir.isValid() && outputDir.isValid() &&
+            source.mkpath("script/common") &&
+            writeUtf8TextFile(source.filePath(path),
+                "GetExp($Exp);\nGetExp(getvar(\"exp\"));\n"
+                "CheckFreeGoodsSpace($Space);\n"
+                "CheckFreeMagicSpace(getvar(\"MagicSpace\"));\n"
+                "IsEquipWeapon($Weapon);\n"
+                "GetPlayerState(Life,$PlayerLife);\n"
+                "GetPlayerState(\"Mana\",getvar(\"PlayerMana\"));\n"
+                "ClearAllVar($Exp,$exp,\"Kept\");\n"
+                "ClearAllVars(getvar(\"Other\"));\n"
+                "Add($Exp,$Delta);\nUnknownCall(1);\n"),
+            "write output-variable migration fixture"))
+    {
+        return false;
+    }
+
+    AssetMigrationOptions options;
+    options.resourceTypes = {AssetResourceType::Scripts};
+    options.convertScript = true;
+    options.sourceEncoding = "utf8";
+    options.writeModProfile = false;
+    AssetMigrationReport report;
+    JxAssetMigrator migrator;
+    const MigrationResult result = migrator.migrate(
+        sourceDir.path(), outputDir.path(), options, report);
+    const QString converted = readUtf8TextFile(QDir(outputDir.path()).filePath(path));
+    const QStringList expected = {
+        "getexp(\"Exp\");", "getexp(\"exp\");",
+        "checkfreegoodsspace(\"Space\");",
+        "checkfreemagicspace(\"MagicSpace\");",
+        "isequipweapon(\"Weapon\");",
+        "getplayerstate(\"Life\",\"PlayerLife\");",
+        "getplayerstate(\"Mana\",\"PlayerMana\");",
+        "clearallvar(\"Exp\",\"exp\",\"Kept\");",
+        "clearallvars(\"Other\");", "add(\"Exp\",getvar(\"Delta\"));"
+    };
+    bool ok = true;
+    for (const QString& call : expected)
+        ok = check(converted.contains(call), qPrintable(call)) && ok;
+    return check(result == MigrationResult::Partial && report.errorCount == 0 &&
+            report.scriptSyntaxErrors.isEmpty(),
+            "output-variable migration emits valid Lua and retains unknown API warning") &&
+        check(report.unsupportedScriptApis.size() == 1 &&
+            report.unsupportedScriptApis.front().startsWith("unknowncall:"),
+            "migration shares the canonical and alias API catalog with the converter") && ok;
+}
+
+bool testMigrationPreservesResourceScriptLocationsAndMovieNames()
 {
     QTemporaryDir sourceDir;
     QTemporaryDir outputDir;
     if (!check(sourceDir.isValid() && outputDir.isValid(),
-            "create known orphan script migration temp dirs"))
+            "create resource script preservation temp dirs"))
     {
         return false;
     }
@@ -1505,19 +1829,19 @@ bool testMigrationRestoresKnownScriptLocations()
             source.mkpath(secondEndingFolder) &&
             writeUtf8TextFile(
                 source.filePath(orphanFolder + "/1f66fded.txt"),
-                "Say(\"xjxqy restored\");\n") &&
+                "Say(\"orphan one\");\n") &&
             writeUtf8TextFile(
                 source.filePath(orphanFolder + "/6DA90A79.txt"),
-                "Say(\"yycs restored\");\n") &&
+                "Say(\"orphan two\");\n") &&
             writeUtf8TextFile(
                 source.filePath(endingFolder + "/月眉儿之死.txt"),
-                "Say(\"ending restored\");\n"
+                "Say(\"ending content\");\n"
                 "PlayMovie(\"logo.avi\");\n") &&
             writeUtf8TextFile(
                 source.filePath(
                     secondEndingFolder + "/纳兰潜凛死亡.txt"),
                 "PlayMovie(\"logo.avi\");\n"),
-            "write known orphan script migration fixtures"))
+            "write resource script preservation fixtures"))
     {
         return false;
     }
@@ -1531,47 +1855,51 @@ bool testMigrationRestoresKnownScriptLocations()
     const MigrationResult result = migrator.migrate(
         sourceDir.path(), outputDir.path(), options, report);
     QDir output(outputDir.path());
-    const QString xjxqyScript = readUtf8TextFile(output.filePath(
-        QString::fromUtf8(
-            "script/map/map101_天王帮大殿/杨瑛对话.txt")));
-    const QString yycsScript = readUtf8TextFile(output.filePath(
-        QString::fromUtf8(
-            "script/map/map_033_落叶谷(破坏后)/孟知秋临终对话.txt")));
-    const QString endingScript = readUtf8TextFile(output.filePath(
-        QString::fromUtf8(
-            "script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt")));
+    const QStringList resourceOnlyPaths = {
+        QString::fromUtf8("script/map/map101_天王帮大殿/杨瑛对话.txt"),
+        QString::fromUtf8("script/map/map_033_落叶谷(破坏后)/孟知秋临终对话.txt"),
+        QString::fromUtf8("script/map/map_002_凌绝峰峰顶/结局三_月眉儿战败.txt")
+    };
     const QString originalEndingScript = readUtf8TextFile(output.filePath(
         QString::fromUtf8(
             "script/map/map_002_凌绝峰峰顶/月眉儿之死.txt")));
     const QString secondEndingScript = readUtf8TextFile(output.filePath(
         QString::fromUtf8(
             "script/map/map_026_摘星楼地下/纳兰潜凛死亡.txt")));
-    const int restoredOutcomeCount = static_cast<int>(std::count_if(
-        report.fileOutcomes.cbegin(),
-        report.fileOutcomes.cend(),
-        [](const AssetMigrationFileOutcome& outcome)
-        {
-            return outcome.action == AssetMigrationFileAction::Convert &&
-                outcome.reason ==
-                    QStringLiteral("restored-known-script-location");
-        }));
+    bool ok = check(result == MigrationResult::Success,
+        "resource script conversion succeeds");
+    ok = check(readUtf8TextFile(output.filePath(orphanFolder + "/1f66fded.txt"))
+                    .contains("say(\"orphan one\");") &&
+                readUtf8TextFile(output.filePath(orphanFolder + "/6da90a79.txt"))
+                    .contains("say(\"orphan two\");"),
+        "conversion preserves orphan scripts at their source locations") && ok;
+    for (const QString& path : resourceOnlyPaths)
+    {
+        ok = check(!QFileInfo::exists(output.filePath(path)),
+            "conversion does not synthesize game-specific story bindings") && ok;
+    }
+    ok = check(originalEndingScript.contains("playmovie(\"logo.avi\");") &&
+                   secondEndingScript.contains("playmovie(\"logo.avi\");"),
+        "conversion preserves source movie names even at known ending paths") && ok;
 
-    return check(result == MigrationResult::Success,
-                 "known orphan script migration succeeds") &&
-        check(xjxqyScript.contains("say(\"xjxqy restored\");"),
-              "migration restores the XJXQY Yang Ying script") &&
-        check(yycsScript.contains("say(\"yycs restored\");"),
-              "migration restores the YYCS Meng Zhiqiu script") &&
-        check(endingScript.contains("say(\"ending restored\");"),
-              "migration restores the YYCS third-ending death-script alias") &&
-        check(endingScript.contains("playmovie(\"logo.wmv\");") &&
-                  originalEndingScript.contains(
-                      "playmovie(\"logo.wmv\");") &&
-                  secondEndingScript.contains(
-                      "playmovie(\"logo.wmv\");"),
-              "migration keeps YYCS ending scripts on the packaged logo movie") &&
-        check(restoredOutcomeCount == 3,
-              "migration reports all restored known script locations");
+    // Resource-side fixes are ordinary inputs, not converter-owned substitutions.
+    const QString patchedPath = resourceOnlyPaths.back();
+    if (!check(writeUtf8TextFile(source.filePath(patchedPath),
+            "Assign($Ending,3);\nPlayMovie(\"logo.wmv\");\n"),
+            "write an explicitly maintained resource script"))
+    {
+        return false;
+    }
+    QTemporaryDir patchedOutputDir;
+    AssetMigrationReport patchedReport;
+    const MigrationResult patchedResult = migrator.migrate(
+        sourceDir.path(), patchedOutputDir.path(), options, patchedReport);
+    const QString patchedText = readUtf8TextFile(
+        QDir(patchedOutputDir.path()).filePath(patchedPath));
+    return check(patchedResult == MigrationResult::Success &&
+            patchedText.contains("assign(\"Ending\",3);") &&
+            patchedText.contains("playmovie(\"logo.wmv\");"),
+        "conversion retains resource-side fixes and variable spelling") && ok;
 }
 
 bool testMigrationSkipsLegacySourceControlMetadata()
@@ -6226,7 +6554,168 @@ bool testMigrationRejectsInheritedProfileWithoutDependency()
     return ok;
 }
 
-bool testMigrationAddsUiWindowDefaults()
+bool testMigrationPreservesExplicitUiPresentation()
+{
+    const QStringList paths = {
+        "ini/ui/dialog/label.ini", "ini/ui/choose/label.ini",
+        "ini/ui/choose/btna.ini", "ini/ui/choose/btnb.ini",
+        "ini/ui/message/window.ini", "ini/ui/message/label.ini",
+        "ini/ui/dialog/window.ini", "ini/ui/choose/window.ini",
+        "ini/ui/top/window.ini", "ini/ui/top/btnstate.ini",
+        "ini/ui/goods/window.ini", "ini/ui/memo/window.ini",
+        "ini/ui/magic/window.ini", "ini/ui/bottom/window.ini",
+        "ini/ui/option/window.ini", "ini/ui/littlemap/window.ini",
+        "ini/ui/saveload/window.ini", "ini/ui/column/window.ini",
+        "ini/ui/system/window.ini", "ini/ui/title/window.ini",
+        "ini/ui/title/window1.ini", "ini/ui/yesno/window.ini",
+        "ini/ui/timer/window.ini", "ini/ui/tooltip/window.ini",
+        "ini/ui/buysell/window.ini", "ini/ui/equip/window.ini",
+        "ini/ui/state/window.ini", "ini/ui/xiulian/window.ini",
+        "ini/ui/littlegame/window.ini", "ini/ui/mapthumbnail/window.ini",
+        "ini/ui/title/initbtn.ini", "ini/ui/title/loadbtn.ini",
+        "ini/ui/title/teambtn.ini", "ini/ui/title/exitbtn.ini",
+        "ini/ui/title/initbtn1.ini", "ini/ui/title/loadbtn1.ini",
+        "ini/ui/title/teambtn1.ini", "ini/ui/title/exitbtn1.ini"
+    };
+    const QString explicitContent = QString::fromUtf8(
+        "[Init]\nName=自定义界面\nLeft=11\nTop=13\nWidth=123\nHeight=57\n"
+        "Font=23\nColor=11,22,33,144\nCharactersPerLine=9\nLineHeight=25\n"
+        "LineCount=2\nAlign=alCenter\nAlignX=17\nAlignY=-19\n"
+        "Scale=1.5\nStretch=false\nKeepAspect=false\nFadeMirroredBars=false\n"
+        "ScaleChildren=false\nCenterChildren=true\n");
+    const QString sparseContent = QString::fromUtf8(
+        "[Init]\nName=原始界面\nLeft=17\nTop=21\nWidth=128\nHeight=64\n"
+        "; 保留未识别字段及原始排版\nCustomLayout = 9\n");
+    bool ok = true;
+    for (const QString& content : {explicitContent, sparseContent})
+    {
+        QTemporaryDir sourceDir;
+        if (!check(sourceDir.isValid(), "create explicit UI source fixture"))
+            return false;
+        const QDir source(sourceDir.path());
+        for (const QString& path : paths)
+        {
+            if (!check(source.mkpath(QFileInfo(path).path()) &&
+                    writeUtf8TextFile(source.filePath(path), content),
+                    "write explicit UI presentation fixture"))
+            {
+                return false;
+            }
+        }
+
+        for (const QString& profile : {QString("jxqy2"), QString("xjxqy"), QString("yycs")})
+        {
+            QTemporaryDir outputDir;
+            if (!check(outputDir.isValid(), "create explicit UI output fixture"))
+                return false;
+            AssetMigrationOptions options;
+            options.resourceTypes = {AssetResourceType::All};
+            options.sourceEncoding = "utf8";
+            options.convertScript = false;
+            options.writeModProfile = false;
+            options.uiProfile = profile;
+            AssetMigrationReport report;
+            JxAssetMigrator migrator;
+            const MigrationResult result = migrator.migrate(
+                sourceDir.path(), outputDir.path(), options, report);
+            ok = check(result == MigrationResult::Success,
+                "explicit UI conversion succeeds for each legacy profile") && ok;
+            for (const QString& path : paths)
+            {
+                ok = check(readUtf8TextFile(QDir(outputDir.path()).filePath(path)) == content,
+                    qPrintable(QString("conversion preserves explicit UI fields: %1/%2")
+                        .arg(profile, path))) && ok;
+            }
+        }
+    }
+    return ok;
+}
+
+bool testMigrationBuildsChooseDefinitionFromSuppliedLayout()
+{
+    bool ok = true;
+    for (const QString& profile : {QString("jxqy2"), QString("xjxqy"), QString("yycs")})
+    {
+        for (int variant = 0; variant < 3; ++variant)
+        {
+            QTemporaryDir sourceDir;
+            QTemporaryDir outputDir;
+            const QDir source(sourceDir.path());
+            const QString content = QString::fromUtf8(
+                "[Init]\nName=自定义选项\nLeft=9\nTop=7\nWidth=219\nHeight=31\n"
+                "Font=23\nColor=15,26,37,188\nCustomSpacing=4\n");
+            bool fixtureReady = check(sourceDir.isValid() && outputDir.isValid() &&
+                    source.mkpath("ini/ui/choose"),
+                "create data-supplied choice fixture");
+            for (const QString& file : {QString("window.ini"), QString("label.ini"),
+                     QString("btna.ini"), QString("btnb.ini")})
+            {
+                if (variant > 0 && file == "btna.ini")
+                    continue;
+                fixtureReady = check(writeUtf8TextFile(source.filePath("ini/ui/choose/" + file), content),
+                    "write source choice layout") && fixtureReady;
+            }
+            const QString menuPath = "ini/ui/choose/choose.menu.ini";
+            const QString suppliedMenu = "[menu]\nname=CustomChoice\nwindow=custom.ini\n";
+            if (variant == 2)
+                fixtureReady = check(writeUtf8TextFile(source.filePath(menuPath), suppliedMenu),
+                    "write explicit custom choice definition") && fixtureReady;
+            if (!fixtureReady)
+                return false;
+            AssetMigrationOptions options;
+            options.convertScript = false;
+            options.writeModProfile = false;
+            options.sourceEncoding = "utf8";
+            options.uiProfile = profile;
+            AssetMigrationReport report;
+            JxAssetMigrator migrator;
+            const MigrationResult result = migrator.migrate(
+                sourceDir.path(), outputDir.path(), options, report);
+            const QDir output(outputDir.path());
+            const QString menu = readUtf8TextFile(output.filePath(menuPath));
+            const int generatedFiles = static_cast<int>(std::count_if(
+                report.fileOutcomes.cbegin(), report.fileOutcomes.cend(),
+                [](const AssetMigrationFileOutcome& outcome)
+                {
+                    return outcome.sourcePath == QStringLiteral("<generated:choose-menu>") &&
+                        outcome.action == AssetMigrationFileAction::Convert &&
+                        !outcome.outputSha256.isEmpty();
+                }));
+            ok = check(result == (variant == 1 ? MigrationResult::Partial : MigrationResult::Success) &&
+                    report.errorCount == 0,
+                "choice conversion does not reject other source content") && ok;
+            if (variant == 0)
+            {
+                ok = check(menu.contains("name=ChooseMenu") && menu.contains("name=selectA") &&
+                        menu.contains("name=selectB") && report.warningCount == 0 && generatedFiles == 1,
+                    "complete layout generates only a structural choice definition") && ok;
+            }
+            else if (variant == 1)
+            {
+                ok = check(!QFileInfo::exists(output.filePath(menuPath)) && report.warningCount > 0 &&
+                        report.logLines.join('\n').contains("ini/ui/choose/btna.ini"),
+                    "missing layout is diagnosed without inventing a menu") && ok;
+            }
+            else
+            {
+                ok = check(menu == suppliedMenu && report.warningCount == 0,
+                    "custom choice definition is preserved without imposing standard component files") && ok;
+            }
+            for (const QString& file : {QString("window.ini"), QString("label.ini"),
+                     QString("btna.ini"), QString("btnb.ini")})
+            {
+                const QString outputPath = output.filePath("ini/ui/choose/" + file);
+                ok = check(variant > 0 && file == "btna.ini"
+                        ? !QFileInfo::exists(outputPath)
+                        : readUtf8TextFile(outputPath) == content,
+                    "choice layout is preserved or remains absent for every profile") && ok;
+            }
+        }
+    }
+    return ok;
+}
+
+bool testMigrationPreservesUiAndSupplementalFiles()
 {
     QTemporaryDir sourceDir;
     QTemporaryDir outputDir;
@@ -6263,10 +6752,10 @@ bool testMigrationAddsUiWindowDefaults()
                "[Init]\nLeft=46\nTop=32\nWidth=135\nHeight=50\nFont=20\nColor=155,34,22\n"),
                "write YYCS message label fixture") && ok;
     ok = check(writeUtf8TextFile(source.filePath("ini/ui/title/initbtn.ini"),
-               "[Init]\nKind=TrackBtn\nImage=InitBtn.asf\nSound=menu.wav\n"),
+               "[Init]\nKind=TrackBtn\nImage=initbtn.asf\nSound=menu.wav\n"),
                "write title init button fixture") && ok;
     ok = check(writeUtf8TextFile(source.filePath("ini/ui/title/loadbtn.ini"),
-               "[Init]\nKind=TrackBtn\nImage=LoadBtn.asf\nStretch=custom\n"),
+               "[Init]\nKind=TrackBtn\nImage=loadbtn.asf\nStretch=custom\n"),
                "write title load button fixture") && ok;
     ok = check(writeUtf8TextFile(source.filePath("ini/ui/title/window.ini"),
                "[Init]\nWidth=640\nHeight=480\nBitmap=title.png\n"
@@ -6302,22 +6791,10 @@ bool testMigrationAddsUiWindowDefaults()
     AssetMigrationReport report;
     JxAssetMigrator migrator;
     MigrationResult result = migrator.migrate(sourceDir.path(), outputDir.path(), options, report);
-    ok = check(result == MigrationResult::Success, "UI window defaults migration succeeds") && ok;
+    ok = check(result == MigrationResult::Partial && report.errorCount == 0,
+               "dialog-only source is published with a missing-layout warning") && ok;
 
     QDir output(outputDir.path());
-    const QString dialogText = readUtf8TextFile(output.filePath("ini/ui/dialog/window.ini"));
-    const QString optionText = readUtf8TextFile(output.filePath("ini/ui/option/window.ini"));
-    const QString systemText = readUtf8TextFile(output.filePath("ini/ui/system/window.ini"));
-    const QString messageWindowText = readUtf8TextFile(
-        output.filePath("ini/ui/message/window.ini"));
-    const QString messageLabelText = readUtf8TextFile(
-        output.filePath("ini/ui/message/label.ini"));
-    const QString titleInitText = readUtf8TextFile(output.filePath("ini/ui/title/initbtn.ini"));
-    const QString titleLoadText = readUtf8TextFile(output.filePath("ini/ui/title/loadbtn.ini"));
-    const QString titleWindowText = readUtf8TextFile(output.filePath("ini/ui/title/window.ini"));
-    const QString topWindowText = readUtf8TextFile(output.filePath("ini/ui/top/window.ini"));
-    const QString topButtonText = readUtf8TextFile(output.filePath("ini/ui/top/btnstate.ini"));
-    const QString yesNoText = readUtf8TextFile(output.filePath("ini/ui/yesno/window.ini"));
     const QString chooseMenuText = readUtf8TextFile(output.filePath("ini/ui/choose/choose.menu.ini"));
     const QString chooseWindowText = readUtf8TextFile(output.filePath("ini/ui/choose/window.ini"));
     const QString chooseLabelText = readUtf8TextFile(output.filePath("ini/ui/choose/label.ini"));
@@ -6325,29 +6802,20 @@ bool testMigrationAddsUiWindowDefaults()
     const QString chooseButtonBText = readUtf8TextFile(output.filePath("ini/ui/choose/btnB.ini"));
     const QString yycsProfileText = readUtf8TextFile(
         output.filePath("game_profile.ini"));
-    const std::vector<std::pair<int, int>> yycsMoneyRanges = {
-        {10, 40},
-        {50, 80},
-        {90, 120},
-        {131, 159},
-        {170, 200},
-        {210, 240},
-        {250, 280}
-    };
-    bool yycsMoneyScriptsMatch = true;
-    for (std::size_t index = 0; index < yycsMoneyRanges.size(); ++index)
+    const QString moneyScript = readUtf8TextFile(output.filePath(
+        QString::fromUtf8("script/common/4级钱.txt")));
+    bool moneyScriptsPreserved = moneyScript.contains(QString::fromUtf8(
+        "playsound(\"物-银子.wav\");")) &&
+        moneyScript.contains("addrandmoney(131,159);") &&
+        moneyScript.contains("delcurobj();");
+    for (int level = 1; level <= 7; ++level)
     {
-        const QString scriptText = readUtf8TextFile(
-            output.filePath(QString::fromUtf8(
-                "script/common/%1级钱.txt").arg(index + 1)));
-        const auto [minimumMoney, maximumMoney] = yycsMoneyRanges[index];
-        yycsMoneyScriptsMatch = yycsMoneyScriptsMatch &&
-            scriptText.contains(QString::fromUtf8(
-                "playsound(\"物-银子.wav\");")) &&
-            scriptText.contains(QStringLiteral("addrandmoney(%1,%2);")
-                .arg(minimumMoney)
-                .arg(maximumMoney)) &&
-            scriptText.contains(QStringLiteral("delcurobj();"));
+        if (level != 4)
+        {
+            moneyScriptsPreserved = !QFileInfo::exists(output.filePath(
+                QString::fromUtf8("script/common/%1级钱.txt").arg(level))) &&
+                moneyScriptsPreserved;
+        }
     }
     const int generatedChooseOutcomeCount =
         static_cast<int>(
@@ -6384,57 +6852,24 @@ bool testMigrationAddsUiWindowDefaults()
                         !outcome.outputSha256.isEmpty();
                 }));
 
-    ok = check(dialogText.contains("Align=alBottomCenter"), "dialog window gets bottom-center align") && ok;
-    ok = check(dialogText.contains("AlignX=-45"), "dialog window gets AlignX") && ok;
-    ok = check(dialogText.contains("AlignY=-100"), "dialog window gets AlignY") && ok;
-    ok = check(optionText.contains("Align=alCenter"), "option window keeps existing align") && ok;
-    ok = check(optionText.contains("Stretch=false"), "option window gets non-stretch default") && ok;
-    ok = check(systemText.contains("Align=custom"), "system window keeps explicit align") && ok;
-    ok = check(!systemText.contains("Align=alCenter"), "system window does not overwrite explicit align") && ok;
-    ok = check(messageWindowText.contains("Align=alBottomCenter") &&
-               messageWindowText.contains("AlignX=-10") &&
-               messageWindowText.contains("AlignY=-71") &&
-               messageLabelText.contains("Left=46") &&
-               messageLabelText.contains("Top=32") &&
-               messageLabelText.contains("Width=148") &&
-               messageLabelText.contains("Height=50") &&
-               messageLabelText.contains("Font=20") &&
-               messageLabelText.contains("Color=155,34,22,204"),
-               "YYCS message migration keeps the message panel above the bottom menu") && ok;
-    ok = check(titleInitText.contains("Stretch=true"), "title button gets stretch default") && ok;
-    ok = check(titleLoadText.contains("Stretch=custom"), "title button keeps explicit stretch") && ok;
-    ok = check(!titleLoadText.contains("Stretch=true"), "title button does not duplicate stretch default") && ok;
-    ok = check(titleWindowText.contains("Align=alClient") &&
-               titleWindowText.contains("Stretch=true") &&
-               titleWindowText.contains("KeepAspect=true") &&
-               titleWindowText.contains("FadeMirroredBars=true") &&
-               !titleWindowText.contains("ScaleChildren=false") &&
-               !titleWindowText.contains("CenterChildren=true"),
-               "title background and 640x480 controls migrate with one aspect-fit transform") && ok;
-    ok = check(topWindowText.contains("Align=alTopCenter") &&
-               topWindowText.contains("Scale=1.5") &&
-               topWindowText.contains("Stretch=true") &&
-               topButtonText.contains("Stretch=true"),
-               "YYCS top menu and button images migrate with the requested 1.5-times scale") && ok;
-    ok = check(yesNoText.contains("Align=alCenter") &&
-               yesNoText.contains("AlignX=0") &&
-               yesNoText.contains("AlignY=0"),
-               "YYCS yes/no window defaults to the viewport center") && ok;
-    ok = check(chooseMenuText.contains("name=ChooseMenu"),
-               "migration generates a local choose menu when the source only has dialog UI") && ok;
-    ok = check(chooseWindowText.contains("Image=panel.asf") &&
-               chooseWindowText.contains("AlignY=-100"),
-               "generated choose window keeps the source dialog image and UI-family offset") && ok;
-    ok = check(chooseButtonText.contains("Font=17") &&
-               chooseButtonText.contains("NormalColor=0,0,180") &&
-               chooseLabelText.contains("Left=25") &&
-               chooseLabelText.contains("Width=300") &&
-               chooseButtonText.contains("Top=30") &&
-               chooseButtonBText.contains("Top=54"),
-               "generated compact YYCS choices fit the source dialog panel") && ok;
+    for (const QString& path : {
+             QString("ini/ui/dialog/window.ini"), QString("ini/ui/option/window.ini"),
+             QString("ini/ui/system/window.ini"), QString("ini/ui/message/window.ini"),
+             QString("ini/ui/message/label.ini"), QString("ini/ui/title/initbtn.ini"),
+             QString("ini/ui/title/loadbtn.ini"), QString("ini/ui/title/window.ini"),
+             QString("ini/ui/top/window.ini"), QString("ini/ui/top/btnstate.ini"),
+             QString("ini/ui/yesno/window.ini")})
+    {
+        ok = check(readUtf8TextFile(output.filePath(path)) ==
+                readUtf8TextFile(source.filePath(path)),
+            qPrintable(QString("conversion retains source UI content: %1").arg(path))) && ok;
+    }
+    ok = check(chooseMenuText.isEmpty() && chooseWindowText.isEmpty() && chooseLabelText.isEmpty() &&
+                   chooseButtonText.isEmpty() && chooseButtonBText.isEmpty() && report.warningCount > 0,
+               "dialog-only source reports missing choice layout without synthesizing it") && ok;
     ok = check(
-        generatedChooseOutcomeCount == 5,
-        "migration report lists all five generated choose-menu files with published digests") &&
+        generatedChooseOutcomeCount == 0,
+        "migration report does not claim generated choice files without source layout") &&
         ok;
     ok = check(
         yycsProfileText.contains(
@@ -6442,8 +6877,8 @@ bool testMigrationAddsUiWindowDefaults()
         "YYCS migration writes the original title-theme name and relies on runtime format fallback") &&
         ok;
     ok = check(
-        yycsMoneyScriptsMatch && generatedMoneyScriptOutcomeCount == 6,
-        "YYCS migration restores missing JxqyHD money-drop scripts without overwriting an existing resource value") &&
+        moneyScriptsPreserved && generatedMoneyScriptOutcomeCount == 0,
+        "conversion preserves supplied rewards and does not generate missing money scripts") &&
         ok;
 
     QTemporaryDir inheritedUiCollectionDir;
@@ -6551,27 +6986,23 @@ bool testMigrationAddsUiWindowDefaults()
         }));
     ok = check(
         inheritedUiResult == MigrationResult::Success &&
-            inheritedDialogText.contains("Left=0") &&
-            inheritedDialogText.contains("Top=0") &&
-            inheritedDialogText.contains("Width=438") &&
-            inheritedDialogText.contains("Height=123") &&
-            inheritedDialogText.contains("AlignX=0") &&
-            inheritedDialogText.contains("AlignY=-85"),
-        "MOD migration aligns presentation fields with the independent UI base instead of the first content base") && ok;
+            inheritedDialogText.contains("Left=100") &&
+            inheritedDialogText.contains("Top=295") &&
+            inheritedDialogText.contains("Width=350") &&
+            inheritedDialogText.contains("Height=85"),
+        "UI fallback does not overwrite supplied local window geometry") && ok;
     ok = check(
-        inheritedChooseFileCount == 5 &&
-            inheritedChooseLabelText.contains("Name=ChooseLabel") &&
-            inheritedChooseLabelText.contains("Left=65") &&
-            inheritedChooseLabelText.contains("Font=18"),
-        "missing MOD choice UI inherits the base menu instead of generating a stale local layout") && ok;
+        inheritedChooseFileCount == 0 && inheritedChooseLabelText.isEmpty() &&
+            !QFileInfo::exists(inheritedUiOutputDirectory.filePath("ini/ui/choose/choose.menu.ini")),
+        "choice UI fallback remains a resource dependency without copying base files locally") && ok;
     ok = check(
-        inheritedStateImageText.contains("Left=0") &&
-            inheritedStateImageText.contains("Top=0") &&
-            inheritedStateImageText.contains("Width=320") &&
-            inheritedStateImageText.contains("Height=480") &&
+        inheritedStateImageText.contains("Left=8") &&
+            inheritedStateImageText.contains("Top=9") &&
+            inheritedStateImageText.contains("Width=280") &&
+            inheritedStateImageText.contains("Height=360") &&
             inheritedStateImageText.contains("Image=asf\\ui\\common\\custom-panel.asf") &&
             inheritedPortraitText.contains("1=custom-face.asf"),
-        "UI-base alignment preserves MOD-specific images and portrait content") && ok;
+        "UI fallback preserves local layout, images and portrait content") && ok;
 
     QTemporaryDir blockedChooseSourceDir;
     QTemporaryDir blockedChooseOutputDir;
@@ -6585,19 +7016,21 @@ bool testMigrationAddsUiWindowDefaults()
     QDir blockedChooseSource(
         blockedChooseSourceDir.path());
     ok = check(
-        blockedChooseSource.mkpath(
-            "ini/ui/dialog") &&
+        blockedChooseSource.mkpath("ini/ui/dialog") &&
+            blockedChooseSource.mkpath("ini/ui/choose/choose.menu.ini") &&
             writeUtf8TextFile(
                 blockedChooseSource.filePath(
                     "ini/ui/dialog/window.ini"),
-                "[Init]\nImage=panel.asf\n") &&
-            writeRawFile(
-                blockedChooseSource.filePath(
-                    "ini/ui/choose"),
-                QByteArray(
-                    "source-file-blocks-generated-directory")),
+                "[Init]\nImage=panel.asf\n"),
         "write generated choose-menu failure fixture") &&
         ok;
+    for (const QString& file : {QString("window.ini"), QString("label.ini"),
+             QString("btna.ini"), QString("btnb.ini")})
+    {
+        ok = check(writeUtf8TextFile(blockedChooseSource.filePath("ini/ui/choose/" + file),
+                "[Init]\nLeft=4\nTop=7\nWidth=140\nHeight=30\n"),
+            "write layout for blocked definition output") && ok;
+    }
     if (!ok)
         return false;
 
@@ -6628,12 +7061,12 @@ bool testMigrationAddsUiWindowDefaults()
     ok = check(
         blockedChooseResult ==
                 MigrationResult::Failed &&
-            failedChooseOutcomeCount == 5 &&
+            failedChooseOutcomeCount == 1 &&
             blockedChooseReport.
                 resourceDomains.value(
                     QStringLiteral("other")).
-                failedFiles >= 5,
-        "each blocked generated choose-menu file is listed as a failed output") &&
+                failedFiles >= 1,
+        "blocked choice definition is recorded as a failed output") &&
         ok;
 
     QTemporaryDir mixedTypeSourceDir;
@@ -6669,7 +7102,7 @@ bool testMigrationAddsUiWindowDefaults()
     ok = check(writeRawFile(mixedTypeSource.filePath("asf/ui/dialog/panel.asf"), mixedPanelAsf) &&
             writeUtf8TextFile(mixedTypeSource.filePath("asf/ui/top/window.asf"), "top") &&
             writeUtf8TextFile(mixedTypeSource.filePath("ini/ui/dialog/window.ini"),
-                "[Init]\nName=DialogWindow\nImage=asf\\ui\\dialog\\panel.asf\nWidth=350\nHeight=85\nAlign=alBottomCenter\n") &&
+                "[Init]\nName=DialogWindow\nImage=asf\\ui\\dialog\\panel.asf\nWidth=350\nHeight=85\nAlign=alBottomCenter\nAlignX=-45\nAlignY=-100\n") &&
             writeUtf8TextFile(mixedTypeSource.filePath("ini/ui/top/window.ini"),
                 "[Init]\nName=TopWindow\nImage=asf\\ui\\top\\window.asf\n") &&
             writeUtf8TextFile(mixedTypeSource.filePath("ini/ui/choose/label.ini"),
@@ -6690,8 +7123,8 @@ bool testMigrationAddsUiWindowDefaults()
     AssetMigrationReport mixedTypeReport;
     MigrationResult mixedTypeResult = migrator.migrate(
         mixedTypeSourceDir.path(), mixedTypeOutputDir.path(), mixedTypeOptions, mixedTypeReport);
-    ok = check(mixedTypeResult == MigrationResult::Success,
-               "type-0 pack with independent ASF UI migration succeeds") && ok;
+    ok = check(mixedTypeResult == MigrationResult::Partial && mixedTypeReport.errorCount == 0,
+               "mixed-profile source remains publishable with its missing choice panel") && ok;
 
     QDir mixedTypeOutput(mixedTypeOutputDir.path());
     const QString mixedDialogText = readUtf8TextFile(
@@ -6708,26 +7141,20 @@ bool testMigrationAddsUiWindowDefaults()
         mixedTypeOutput.filePath("game_profile.ini"));
     ok = check(mixedDialogText.contains("AlignX=-45") &&
                mixedDialogText.contains("AlignY=-100"),
-               "source UI assets override JXQY2 content-base alignment defaults") && ok;
-    ok = check(mixedChooseText.contains("asf\\ui\\dialog\\panel.asf") &&
-               mixedChooseText.contains("AlignY=-62") &&
-               mixedChooseText.contains("Width=438") &&
-               mixedChooseText.contains("Height=123") &&
-               mixedChooseText.contains("Left=0") &&
-               mixedChooseText.contains("Top=0") &&
-               mixedChooseText.contains("AlignX=-1"),
-               "generated choose window preserves the dialog top with native panel geometry") && ok;
+               "mixed-profile conversion preserves the supplied local alignment") && ok;
+    ok = check(mixedChooseText.isEmpty() && mixedTypeReport.warningCount > 0,
+               "missing choice panel is not inferred from dialog image geometry") && ok;
     ok = check(mixedChooseButtonText.contains("Font=18") &&
                mixedChooseButtonText.contains("Top=52") &&
-               mixedChooseButtonText.contains("Height=22") &&
-               mixedChooseButtonBText.contains("Top=74") &&
-               mixedChooseButtonBText.contains("Height=22") &&
+               mixedChooseButtonText.contains("Height=28") &&
+               mixedChooseButtonBText.contains("Top=82") &&
+               mixedChooseButtonBText.contains("Height=28") &&
                !mixedChooseButtonText.contains("Font=14"),
-               "native YYCS choice rows follow the dialog's 22-pixel line spacing") && ok;
+               "existing choice rows retain their supplied spacing and height") && ok;
     ok = check(mixedChooseLabelText.contains("Left=65") &&
-               mixedChooseLabelText.contains("Top=30") &&
+               mixedChooseLabelText.contains("Top=26") &&
                mixedChooseLabelText.contains("Width=310"),
-               "generated native-width UI aligns its prompt with the dialog first line") && ok;
+               "existing choice label retains its supplied position") && ok;
     ok = check(mixedProfileText.contains("DependencyId=JXQY2,YYCS") &&
                mixedProfileText.contains("TextEncodingConverted=1") &&
                mixedProfileText.contains("[UI]") &&
@@ -6767,8 +7194,8 @@ bool testMigrationAddsUiWindowDefaults()
     AssetMigrationReport jxqy2Report;
     const MigrationResult jxqy2Result = migrator.migrate(
         jxqy2SourceDir.path(), jxqy2OutputDir.path(), jxqy2Options, jxqy2Report);
-    ok = check(jxqy2Result == MigrationResult::Success,
-               "JXQY2 choose-style migration succeeds") && ok;
+    ok = check(jxqy2Result == MigrationResult::Partial && jxqy2Report.errorCount == 0,
+               "JXQY2 source remains publishable with missing choice layout") && ok;
     const QDir jxqy2Output(jxqy2OutputDir.path());
     const QString jxqy2ChooseLabelText = readUtf8TextFile(
         jxqy2Output.filePath("ini/ui/choose/label.ini"));
@@ -6780,25 +7207,15 @@ bool testMigrationAddsUiWindowDefaults()
         jxqy2Output.filePath("ini/ui/title/window.ini"));
     const QString jxqy2ProfileText = readUtf8TextFile(
         jxqy2Output.filePath("game_profile.ini"));
-    ok = check(jxqy2ChooseLabelText.contains("Font=17") &&
-               jxqy2ChooseLabelText.contains("Color=40,32,24") &&
-               jxqy2ChooseLabelText.contains("Left=36") &&
-               jxqy2ChooseLabelText.contains("Top=18") &&
-               jxqy2ChooseLabelText.contains("Width=384"),
-               "JXQY2 choose title uses readable dark text on the stone panel") && ok;
-    ok = check(jxqy2ChooseButtonText.contains("Top=52") &&
-               jxqy2ChooseButtonText.contains("NormalColor=30,65,145,230"),
-               "JXQY2 choose options use the coordinated spacing and color scheme") && ok;
-    ok = check(jxqy2YesNoText.contains("Align=alCenter") &&
-               jxqy2YesNoText.contains("AlignX=0") &&
-               jxqy2YesNoText.contains("AlignY=0"),
-               "JXQY2 yes/no window defaults to the viewport center") && ok;
-    ok = check(jxqy2TitleWindowText.contains("Align=alClient") &&
-               jxqy2TitleWindowText.contains("Stretch=true") &&
-               jxqy2TitleWindowText.contains("KeepAspect=true") &&
-               !jxqy2TitleWindowText.contains("ScaleChildren=false") &&
-               !jxqy2TitleWindowText.contains("CenterChildren=true"),
-               "JXQY2 title migrates with the shared 640x480 aspect-fit policy") && ok;
+    ok = check(jxqy2ChooseLabelText.isEmpty() && jxqy2ChooseButtonText.isEmpty() &&
+                   jxqy2Report.warningCount > 0,
+               "missing choice text configuration is not supplied by game profile defaults") && ok;
+    ok = check(jxqy2YesNoText == readUtf8TextFile(
+                   jxqy2Source.filePath("ini/ui/yesno/window.ini")),
+               "JXQY2 yes/no configuration retains its source fields") && ok;
+    ok = check(jxqy2TitleWindowText == readUtf8TextFile(
+                   jxqy2Source.filePath("ini/ui/title/window.ini")),
+               "JXQY2 title conversion retains child layout fields") && ok;
     ok = check(jxqy2ProfileText.contains("Music=ks64.mp3"),
                "JXQY2 migration keeps its title-theme default") && ok;
 
@@ -6840,18 +7257,12 @@ bool testMigrationAddsUiWindowDefaults()
         QDir(xjxqyOutputDir.path()).filePath("ini/ui/title/window1.ini"));
     const QString xjxqyProfileText = readUtf8TextFile(
         QDir(xjxqyOutputDir.path()).filePath("game_profile.ini"));
-    ok = check(xjxqyTopText.contains("Align=alBottomCenter"),
-               "XJXQY top window gets bottom-center align") && ok;
-    ok = check(xjxqyTopText.contains("AlignX=-274"),
-               "XJXQY top window gets profile AlignX") && ok;
-    ok = check(xjxqyTopText.contains("AlignY=-13"),
-               "XJXQY top window gets profile AlignY") && ok;
-    ok = check(xjxqyTitleWindowText.contains("Align=alClient") &&
-               xjxqyTitleWindowText.contains("Stretch=true") &&
-               xjxqyTitleWindowText.contains("KeepAspect=true") &&
-               !xjxqyTitleWindowText.contains("ScaleChildren=false") &&
-               !xjxqyTitleWindowText.contains("CenterChildren=true"),
-               "XJXQY alternate title keeps its 640x480 composition aspect ratio") && ok;
+    ok = check(xjxqyTopText == readUtf8TextFile(
+                   xjxqySource.filePath("ini/ui/top/window.ini")),
+               "XJXQY top conversion retains source placement") && ok;
+    ok = check(xjxqyTitleWindowText == readUtf8TextFile(
+                   xjxqySource.filePath("ini/ui/title/window1.ini")),
+               "alternate title conversion retains child layout fields") && ok;
     ok = check(xjxqyProfileText.contains(
                    QString::fromUtf8("Music=情缘之伴奏.mp3")),
                "XJXQY migration writes its title-theme default") && ok;
@@ -7031,7 +7442,9 @@ bool testMigrationLowercasesResourceNamesAndReferences()
                        "PlaySound(\"Battle_Sound\");\n"
                        "PlayRandomMusic(\"Track_A\",\"Track_B\",\"Track_C\");\n"
                        "AddOneMagic(\"PlayerA\",\"Player-Magic-Test.INI\");\n"
-                       "GetPlayerMagicLevel(\"Player-Magic-Test.INI\",\"Level\");\n"),
+                       "GetPlayerMagicLevel(\"Player-Magic-Test.INI\",\"Level\");\n"
+                       "Assign($Result,0);\n"
+                       "GetRandNum($result,0,1);\n"),
                "write lowercase resource migration fixtures"))
     {
         return false;
@@ -7083,12 +7496,14 @@ bool testMigrationLowercasesResourceNamesAndReferences()
     ok = check(scriptText.contains("\"Keep INTRO.MPC Text\"") &&
                    scriptText.contains("\"Keep FILE.INI Text\"") &&
                    scriptText.contains("\"PlayerA\"") &&
-                   scriptText.contains("\"Level\""),
+                   scriptText.contains("\"Level\"") &&
+                   scriptText.contains("assign(\"Result\",0)") &&
+                   scriptText.contains("getrandnum(\"result\",0,1)"),
                "script dialogue, names and output variables preserve case") && ok;
     return ok;
 }
 
-bool testMigrationHandlesKnownMoonShadowMoveScreenAnomalies()
+bool testMigrationPreservesUnresolvedMoveScreenArguments()
 {
     QTemporaryDir sourceDir;
     QTemporaryDir outputDir;
@@ -7143,20 +7558,20 @@ bool testMigrationHandlesKnownMoonShadowMoveScreenAnomalies()
     const QString preservedTwoArgumentCall = readUtf8TextFile(
         output.filePath(
             missingSpeedDirectory + QString::fromUtf8("/事件71_1.txt")));
-    const QString repairedPunctuationTypo = readUtf8TextFile(
+    const QString preservedPunctuationTypo = readUtf8TextFile(
         output.filePath(
             punctuationTypoDirectory +
             QString::fromUtf8("/结局2紫轩死亡.txt")));
 
     bool ok = true;
     ok = check(result == MigrationResult::Success,
-               "known MoonShadow MoveScreen repair migration succeeds") && ok;
+               "unresolved MoveScreen argument conversion succeeds") && ok;
     ok = check(preservedTwoArgumentCall.contains("movescreen(5,50);") &&
                    !preservedTwoArgumentCall.contains("movescreen(5,50,1);"),
                "migration preserves an unresolved two-argument MoveScreen without inventing a speed") && ok;
-    ok = check(repairedPunctuationTypo.contains("movescreen(1,80,1);") &&
-                   !repairedPunctuationTypo.contains("movescreen(1.80,1);"),
-               "migration repairs the punctuation typo using the symmetric branch") && ok;
+    ok = check(preservedPunctuationTypo.contains("movescreen(1,80,1);") &&
+                   preservedPunctuationTypo.contains("movescreen(1.80,1);"),
+               "conversion preserves ambiguous punctuation for resource-side review") && ok;
     return ok;
 }
 
@@ -7349,7 +7764,7 @@ bool testMigrationRejectsUnknownOption()
     ok = check(exitCode == 2, "unknown migrate-assets option returns a usage error") && ok;
     ok = check(errors.contains("Unknown option"), "usage error identifies an unknown option") && ok;
     ok = check(errors.contains("--unknown-option-for-test"), "usage error identifies the supplied option") && ok;
-    ok = check(!output.contains("Migration Summary"), "usage error stops before migration") && ok;
+    ok = check(!output.contains("Asset Conversion Summary"), "usage error stops before conversion") && ok;
     ok = check(!QFileInfo::exists(QDir(outputDir).filePath(".jxqy_asset_migration_marker")),
                "usage error leaves the output directory untouched") && ok;
 
@@ -7840,6 +8255,58 @@ int runCliCapture(const QStringList& arguments, QString& capturedStdout, QString
     std::fclose(outFile);
     std::fclose(errFile);
     return exitCode;
+}
+
+bool testAssetConversionCommandAliases()
+{
+    QTemporaryDir rootDirectory;
+    if (!check(rootDirectory.isValid(), "create conversion alias temp root"))
+        return false;
+    QDir root(rootDirectory.path());
+    if (!check(root.mkpath("source/script") &&
+                   writeUtf8TextFile(root.filePath("source/script/main.txt"),
+                       "Assign($Case,1);\nAssign($case,2);\n"),
+               "write conversion alias script fixture"))
+        return false;
+
+    bool ok = true;
+    QString output;
+    QString errors;
+    ok = check(runCliCapture({"jxqy-editor-cli", "--help"}, output, errors) == 0 &&
+                   output.contains("convert-assets <sourceDir> <outputDir>") &&
+                   output.contains("Conversion command aliases:") &&
+                   errors.isEmpty(),
+               "help presents conversion as one command with compatibility aliases") && ok;
+    const QStringList commands = {
+        "convert-assets", "--convert-assets", "migrate-assets", "--migrate-assets"
+    };
+    QByteArray expectedScript;
+    for (const QString& command : commands)
+    {
+        const QStringList arguments = {
+            "jxqy-editor-cli", command, root.filePath("source"),
+            root.filePath("output"), "--resource-type", "scripts",
+            "--source-encoding", "utf8"
+        };
+        ok = check(AssetCliRunner::shouldHandle(arguments),
+                   "GUI dispatcher recognizes every conversion alias") && ok;
+        ok = check(runCliCapture(arguments, output, errors) == 0 &&
+                       output.contains("Asset Conversion Summary") && errors.isEmpty(),
+                   "every alias runs the same conversion pipeline") && ok;
+        const QByteArray script = readRawFile(root.filePath("output/script/main.txt"));
+        if (expectedScript.isEmpty())
+            expectedScript = script;
+        ok = check(!script.isEmpty() && script == expectedScript &&
+                       script.contains("assign(\"Case\",1)") &&
+                       script.contains("assign(\"case\",2)"),
+                   "aliases preserve exact variable names and identical script bytes") && ok;
+        ok = check(readUtf8TextFile(root.filePath("output/migration_report.txt"))
+                       .startsWith("JX legacy assets conversion report") &&
+                       readRawFile(root.filePath("output/.jxqy_asset_migration_marker"))
+                           .contains("jxqy-editor-asset-migration-output"),
+                   "conversion terminology retains existing report and output marker identities") && ok;
+    }
+    return ok;
 }
 
 bool testMigrationCliResourceTypes()
@@ -9353,7 +9820,8 @@ int main(int argc, char* argv[])
     if (qEnvironmentVariableIsSet(
             "JXQY_MIGRATION_CLI_INPUT_BOUNDARY_TEST_ONLY"))
     {
-        return testMigrationRejectsUnknownOption() &&
+        return testAssetConversionCommandAliases() &&
+                testMigrationRejectsUnknownOption() &&
                 testMigrationIsolatedFromExternalAssets()
             ? 0
             : 1;
@@ -9387,12 +9855,15 @@ int main(int argc, char* argv[])
     ok = testMapFixedStringsSaveUtf8() && ok;
     ok = testLegacyMapGbkStringsThatLookLikeUtf8() && ok;
     ok = testMapConverterWritesVersion3() && ok;
+    ok = testTiledMapMigration() && ok;
+    ok = testTiledMapExternalTilesetAndFramePacking() && ok;
     ok = testMapMigrationUsesVersionContract() && ok;
     ok = testMapMigrationRejectsUnsupportedAndMalformedVersions() && ok;
     ok = testMapFileEditorTransactionalOpaqueAndSafePaths() && ok;
     ok = testScriptAliases() && ok;
     ok = testScriptLegacySpellingAliases() && ok;
     ok = testScriptDiagnostics() && ok;
+    ok = testScriptLegacyNumericCondition() && ok;
     ok = testScriptGambleOutputVariable() && ok;
     ok = testScriptLegacyWildcardArguments() && ok;
     ok = testScriptOriginalCompatibilityCommands() && ok;
@@ -9406,7 +9877,8 @@ int main(int argc, char* argv[])
     ok = testLuaScriptSyntaxValidator() && ok;
     ok = testLuaScriptSyntaxValidatorSkipsLegacyDialogueAndDocs() && ok;
     ok = testMigrationPreservesLegacyScriptDocumentation() && ok;
-    ok = testMigrationRestoresKnownScriptLocations() && ok;
+    ok = testScriptOutputVariableMigration() && ok;
+    ok = testMigrationPreservesResourceScriptLocationsAndMovieNames() && ok;
     ok = testMigrationSkipsLegacySourceControlMetadata() && ok;
     ok = testMigrationSkipsLegacyNonRuntimeFiles() && ok;
     ok = testMigrationMapsLegacyNewGameSaveTemplate() && ok;
@@ -9422,15 +9894,18 @@ int main(int argc, char* argv[])
     ok = testMigrationQuarantinesOnlyInvalidLuaScripts() && ok;
     ok = testMigrationPublishFaultMatrix() && ok;
     ok = testMigrationRejectsInheritedProfileWithoutDependency() && ok;
-    ok = testMigrationAddsUiWindowDefaults() && ok;
+    ok = testMigrationPreservesExplicitUiPresentation() && ok;
+    ok = testMigrationBuildsChooseDefinitionFromSuppliedLayout() && ok;
+    ok = testMigrationPreservesUiAndSupplementalFiles() && ok;
     ok = testMigrationNormalizesRuntimeEntryJpegs() && ok;
     ok = testMigrationNormalizesObjectAnimationResource() && ok;
     ok = testMigrationLowercasesResourceNamesAndReferences() && ok;
-    ok = testMigrationHandlesKnownMoonShadowMoveScreenAnomalies() && ok;
+    ok = testMigrationPreservesUnresolvedMoveScreenArguments() && ok;
     ok = testMigrationSourceEncodingOptionPreservesChineseText() && ok;
     ok = testMigrationConvertsDropObjectNamesAndReferencesFromGbk() && ok;
     ok = testMigrationRejectsUnknownOption() && ok;
     ok = testMigrationIsolatedFromExternalAssets() && ok;
+    ok = testAssetConversionCommandAliases() && ok;
     ok = testMigrationCliResourceTypes() && ok;
     ok = testMigrationCliImagePolicyOptions() && ok;
     ok = testAssetCliValidateScriptsReportsFailures() && ok;

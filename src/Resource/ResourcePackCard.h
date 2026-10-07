@@ -56,6 +56,8 @@ private:
 	std::shared_ptr<FlatTextButton> descriptionButton;
 	_shared_image normalFrameImage = nullptr;
 	_shared_image selectedFrameImage = nullptr;
+	CachedTextTexture onlineOnlyBadgeTextTexture;
+	CachedTextTexture recentSelectionBadgeTextTexture;
 	bool selected = false;
 	bool descriptionActionRequested = false;
 	bool onlineOnlyBadgeVisible = false;

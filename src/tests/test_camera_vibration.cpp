@@ -17,6 +17,41 @@ bool check(bool condition, const char* message)
 int main()
 {
 	bool ok = true;
+	ok = check(Camera::clampHorizontalWorldPosition(0.0f, 20, 120, 1366) == 640.0f
+		&& Camera::clampHorizontalWorldPosition(2000.0f, 20, 120, 1280) == 640.0f,
+		"narrow multi-row maps center their half-tile-inset terrain width") && ok;
+	ok = check(Camera::clampHorizontalWorldPosition(-100.0f, 40, 120, 1280) == 672.0f
+		&& Camera::clampHorizontalWorldPosition(3000.0f, 40, 120, 1280) == 1888.0f,
+		"wide maps leave half a tile inside both horizontal pixel edges") && ok;
+	ok = check(Camera::clampHorizontalWorldPosition(900.25f, 40, 120, 1365) == 900.25f
+		&& Camera::clampHorizontalWorldPosition(-100.0f, 40, 120, 1365) == 714.5f,
+		"odd viewport widths retain subpixel bounds and unconstrained movement") && ok;
+	ok = check(Camera::clampHorizontalWorldPosition(3000.0f, 20, 120, 1215) == 640.5f
+		&& Camera::clampHorizontalWorldPosition(3000.0f, 20, 1, 1366) == 608.0f,
+		"near-fit maps still scroll and single-row maps remain centered by columns") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(-100.0f, 120, 720) == 376.0f
+		&& Camera::clampVerticalWorldPosition(3000.0f, 120, 720) == 1528.0f,
+		"720-pixel viewport leaves half a tile inside the top and bottom edges") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(-100.0f, 120, 768) == 400.0f
+		&& Camera::clampVerticalWorldPosition(3000.0f, 120, 768) == 1504.0f,
+		"768-pixel viewport leaves half a tile inside the top and bottom edges") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(900.25f, 120, 721) == 900.25f
+		&& Camera::clampVerticalWorldPosition(-100.0f, 120, 721) == 376.5f
+		&& Camera::clampVerticalWorldPosition(3000.0f, 120, 721) == 1527.5f,
+		"odd viewport heights preserve subpixel bounds and unconstrained movement") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(3000.0f, 121, 720) == 1544.0f,
+		"odd map row counts use the same half-tile inset") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(-100.0f, 50, 751) == 391.5f
+		&& Camera::clampVerticalWorldPosition(3000.0f, 50, 751) == 392.5f,
+		"maps just larger than the viewport can scroll to their pixel boundary") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(-100.0f, 43, 720) == 336.0f
+		&& Camera::clampVerticalWorldPosition(3000.0f, 46, 688) == 360.0f
+		&& Camera::clampVerticalWorldPosition(3000.0f, 45, 736) == 352.0f
+		&& Camera::clampVerticalWorldPosition(-100.0f, 1, 720) == 0.0f,
+		"small, exact-fit and single-row maps center their rendered bounds") && ok;
+	ok = check(Camera::clampVerticalWorldPosition(336.0f, 90, 720) == 376.0f
+		&& Camera::clampVerticalWorldPosition(376.25f, 90, 720) == 376.25f,
+		"Jianmenguan cannot expose the negative world coordinates above its background") && ok;
 
 	ok = check(Camera::resolveVibrationDegree(0, 0) == 0, "zero request does not start vibration") && ok;
 	ok = check(Camera::resolveVibrationDegree(5, 0) == 5, "zero request does not cancel active vibration") && ok;

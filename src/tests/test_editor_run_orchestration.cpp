@@ -438,13 +438,23 @@ bool runOutputProbeFailureTest()
 	{
 		Fixture fixture;
 		fixture.diagnosticsOpen = false;
+		fixture.logWritable = false;
+		fixture.runtimeTraceOpen = false;
+		fixture.game.failure = EditorRun::GameFailure::EngineInitialization;
+		ok = check(fixture.run() == 69 && hasCall(fixture, "run_game") &&
+			!fixture.runGameObservedRuntimeTraceWriter && fixture.resetCount == 1,
+			"unavailable auxiliary outputs preserve the actual engine failure") && ok;
+	}
+	{
+		Fixture fixture;
+		fixture.diagnosticsOpen = false;
 		ok = check(
-			fixture.run() == 68,
-			"diagnostics open failure returns 68") && ok;
+			fixture.run() == 0,
+			"diagnostics open failure preserves the successful game result") && ok;
 		ok = check(
-			!hasCall(fixture, "probe_log") &&
-				!hasCall(fixture, "run_game"),
-			"diagnostics open failure stops before log and game") && ok;
+			hasCall(fixture, "probe_log") &&
+				hasCall(fixture, "run_game"),
+			"diagnostics open failure continues through log and game") && ok;
 		ok = check(
 			fixture.resetCount == 1 &&
 				!fixture.standardError.empty(),
@@ -454,12 +464,12 @@ bool runOutputProbeFailureTest()
 		Fixture fixture;
 		fixture.failDiagnosticWrite = 1;
 		ok = check(
-			fixture.run() == 68,
-			"initial diagnostic flush failure returns 68") && ok;
+			fixture.run() == 0,
+			"initial diagnostic flush failure preserves the successful game result") && ok;
 		ok = check(
-			!hasCall(fixture, "probe_log") &&
-				!hasCall(fixture, "run_game"),
-			"initial diagnostic failure stops before log and game") && ok;
+			hasCall(fixture, "probe_log") &&
+				hasCall(fixture, "run_game"),
+			"initial diagnostic failure continues through log and game") && ok;
 		ok = check(
 			fixture.resetCount == 1 &&
 				!fixture.standardError.empty(),
@@ -469,11 +479,11 @@ bool runOutputProbeFailureTest()
 		Fixture fixture;
 		fixture.logWritable = false;
 		ok = check(
-			fixture.run() == 68,
-			"log writability failure returns 68") && ok;
+			fixture.run() == 0,
+			"log writability failure preserves the successful game result") && ok;
 		ok = check(
-			!hasCall(fixture, "run_game"),
-			"log writability failure stops before game initialization") && ok;
+			hasCall(fixture, "run_game"),
+			"log writability failure continues into game initialization") && ok;
 		ok = check(
 			hasCall(
 				fixture,
@@ -487,11 +497,11 @@ bool runOutputProbeFailureTest()
 		Fixture fixture;
 		fixture.runtimeTraceOpen = false;
 		ok = check(
-			fixture.run() == 68,
-			"runtime trace open failure returns 68") && ok;
+			fixture.run() == 0,
+			"runtime trace open failure preserves the successful game result") && ok;
 		ok = check(
-			!hasCall(fixture, "run_game"),
-			"runtime trace open failure stops before game initialization") &&
+			hasCall(fixture, "run_game"),
+			"runtime trace open failure continues into game initialization") &&
 			ok;
 		ok = check(
 			hasCall(
@@ -504,20 +514,20 @@ bool runOutputProbeFailureTest()
 		Fixture fixture;
 		fixture.failRuntimeTraceWrite = 1;
 		ok = check(
-			fixture.run() == 68,
-			"session.start trace flush failure returns 68") &&
+			fixture.run() == 0,
+			"session.start trace flush failure preserves the successful game result") &&
 			ok;
 		ok = check(
-			!hasCall(fixture, "run_game"),
-			"trace start failure stops before game initialization") &&
+			hasCall(fixture, "run_game"),
+			"trace start failure continues into game initialization") &&
 			ok;
 	}
 	{
 		Fixture fixture;
 		fixture.failRuntimeTraceWrite = 2;
 		ok = check(
-			fixture.run() == 68,
-			"terminal trace flush failure returns 68 after successful game") &&
+			fixture.run() == 0,
+			"terminal trace flush failure preserves the successful game result") &&
 			ok;
 		ok = check(
 			hasCall(fixture, "run_game") &&
@@ -531,8 +541,8 @@ bool runOutputProbeFailureTest()
 		Fixture fixture;
 		fixture.failDiagnosticWrite = 2;
 		ok = check(
-			fixture.run() == 68,
-			"completion diagnostic flush failure returns 68") && ok;
+			fixture.run() == 0,
+			"completion diagnostic flush failure preserves the successful game result") && ok;
 		ok = check(
 			hasCall(fixture, "run_game"),
 			"completion diagnostic failure occurs after the game") && ok;
@@ -556,10 +566,6 @@ bool runThrowingCallbackTest()
 		{ "prepare_resources", false },
 		{ "install_resources", false },
 		{ "install_file_layout", false },
-		{ "open_diagnostics", true },
-		{ "diagnostic_write", true },
-		{ "probe_log", true },
-		{ "open_runtime_trace", true },
 		{ "run_game", true },
 		{ "reset_file_layout", true }
 	};
@@ -608,12 +614,23 @@ bool runThrowingCallbackTest()
 		}
 	}
 
+	for (const char* stage : { "open_diagnostics", "diagnostic_write",
+		"probe_log", "open_runtime_trace", "runtime_trace_write" })
+	{
+		Fixture fixture;
+		fixture.throwStage = stage;
+		ok = check(fixture.run() == 0 && hasCall(fixture, "run_game") &&
+			fixture.resetCount == 1 && !fixture.standardError.empty() &&
+			!fixture.diagnosticsAlive && !fixture.runtimeTraceAlive,
+			std::string(stage) + " failure releases outputs and preserves game success") && ok;
+	}
+
 	Fixture stderrFixture;
 	stderrFixture.logWritable = false;
 	stderrFixture.throwStage = "write_standard_error";
 	ok = check(
-		stderrFixture.run() == 68,
-		"throwing stderr sink cannot escape stable exit 68") && ok;
+		stderrFixture.run() == 0,
+		"throwing stderr sink preserves game success") && ok;
 	ok = check(
 		stderrFixture.resetCount == 1 &&
 			hasCall(

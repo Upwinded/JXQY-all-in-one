@@ -253,8 +253,6 @@ RoutedResourcePath formalResourceReadRoute(
 std::string pathToUtf8String(const std::filesystem::path& path);
 std::filesystem::path installedIdentityPath(
 	const std::string& identity);
-bool installedEditorRunFileLayoutIsCurrent(
-	const InstalledEditorRunFileLayout& layout);
 
 std::string normalizeRoot(std::string root)
 {
@@ -422,9 +420,7 @@ File::EditorRunFileLayoutState getInstalledEditorRunFileLayout(
 		return File::EditorRunFileLayoutState::NotInstalled;
 	}
 	layout = *g_editorRunFileLayout;
-	return installedEditorRunFileLayoutIsCurrent(layout)
-		? File::EditorRunFileLayoutState::Valid
-		: File::EditorRunFileLayoutState::Invalid;
+	return File::EditorRunFileLayoutState::Valid;
 }
 
 bool editorRunRoutingSnapshotIsCurrent(
@@ -1594,6 +1590,21 @@ bool pathIsRegularFile(const std::string& fullPath)
 #endif
 }
 
+struct ResourceDirectoryLookup
+{
+	bool valid = false;
+	bool aliasesValid = true;
+	std::unordered_map<std::string, std::filesystem::path> names;
+	std::unordered_map<std::string, std::vector<std::filesystem::path>> aliases;
+};
+
+thread_local unsigned int g_resourceLookupDepth = 0;
+thread_local std::unordered_map<std::string, ResourceDirectoryLookup>
+	g_resourceDirectoryLookups;
+
+const ResourceDirectoryLookup& resourceDirectoryLookup(
+	const std::filesystem::path& directory);
+
 std::string resolveCaseInsensitiveExistingPath(const std::string& fullPath)
 {
 	if (fullPath.empty() || !isValidUtf8(fullPath) || pathExists(fullPath))
@@ -1636,6 +1647,17 @@ std::string resolveCaseInsensitiveExistingPath(const std::string& fullPath)
 			}
 
 			std::string requestedKey = toLowerAscii(component.u8string());
+			if (g_resourceLookupDepth != 0)
+			{
+				const auto& lookup = resourceDirectoryLookup(currentPath);
+				const auto found = lookup.names.find(requestedKey);
+				if (!lookup.valid || found == lookup.names.end() || found->second.empty())
+				{
+					return "";
+				}
+				currentPath = found->second;
+				continue;
+			}
 			std::filesystem::path matchedPath;
 			std::filesystem::directory_iterator iterator(currentPath, errorCode);
 			std::filesystem::directory_iterator end;
@@ -1680,7 +1702,9 @@ bool isImagePackagePath(const std::string& fullPath)
 {
 	std::string normalized = toLowerAscii(fullPath);
 	convert::replaceAllString(normalized, "\\", "/");
-	if (normalized.find("/asf/") == std::string::npos &&
+	if (normalized.compare(0, 4, "asf/") != 0 &&
+		normalized.compare(0, 4, "mpc/") != 0 &&
+		normalized.find("/asf/") == std::string::npos &&
 		normalized.find("/mpc/") == std::string::npos)
 	{
 		return false;
@@ -2371,7 +2395,8 @@ bool openChildFileNoFollow(
 	bool createIfMissing,
 	bool requestDelete,
 	NativeFileHandle& file,
-	bool* created = nullptr)
+	bool* created = nullptr,
+	PhysicalPathIdentity* openedIdentity = nullptr)
 {
 	file.reset();
 	if (created != nullptr)
@@ -2402,6 +2427,7 @@ bool openChildFileNoFollow(
 	}
 	HANDLE handle = INVALID_HANDLE_VALUE;
 	ULONG_PTR information = 0;
+	NTSTATUS openStatus = 0;
 	if (!ntOpenRelative(
 			parent.get(),
 			std::filesystem::u8path(childName).wstring(),
@@ -2413,8 +2439,13 @@ bool openChildFileNoFollow(
 				FILE_SYNCHRONOUS_IO_NONALERT,
 			FILE_ATTRIBUTE_NORMAL,
 			handle,
-			&information))
+			&information, &openStatus))
 	{
+		if (requestDelete)
+		{
+			GameLog::write("Delete open failed at %s status=0x%08lx\n",
+				childName.c_str(), static_cast<unsigned long>(openStatus));
+		}
 		return false;
 	}
 	file.reset(handle);
@@ -2460,6 +2491,10 @@ bool openChildFileNoFollow(
 	{
 		file.reset();
 		return false;
+	}
+	if (openedIdentity != nullptr)
+	{
+		*openedIdentity = identity;
 	}
 	return true;
 }
@@ -2606,6 +2641,8 @@ std::vector<std::string> listNativeDirectoryNames(
 	{
 		return names;
 	}
+	invokeEditorRunFileOperationTestHook(
+		File::EditorRunFileOperationPhase::BeforeResourceDirectoryEnumeration);
 #if defined(_WIN32)
 	const DWORD required = GetFinalPathNameByHandleW(
 		directory.get(), nullptr, 0,
@@ -2714,12 +2751,22 @@ std::vector<std::string> listNativeDirectoryNames(
 	return names;
 }
 
+const ResourceDirectoryLookup& nativeResourceDirectoryLookup(
+	const NativeDirectoryHandle& directory);
+
 std::string uniqueCaseInsensitiveNativeChild(
 	const NativeDirectoryHandle& directory,
 	const std::string& requestedName)
 {
 	const std::string requestedKey =
 		toLowerAscii(requestedName);
+	if (g_resourceLookupDepth != 0)
+	{
+		const auto& lookup = nativeResourceDirectoryLookup(directory);
+		const auto found = lookup.names.find(requestedKey);
+		return lookup.valid && found != lookup.names.end()
+			? found->second.u8string() : std::string();
+	}
 	std::string match;
 	for (const std::string& name :
 		listNativeDirectoryNames(directory))
@@ -3117,20 +3164,6 @@ bool normalizeEditorRunOutputPath(const std::string& value,
 			return false;
 		}
 
-		std::error_code errorCode;
-		const std::filesystem::file_status status =
-			std::filesystem::symlink_status(lexicalPath, errorCode);
-		if (!errorCode && status.type() != std::filesystem::file_type::not_found)
-		{
-			// The held editor-run logger creates this leaf exclusively on first
-			// use. Reusing an existing file cannot prove it is not a hard-link.
-			return false;
-		}
-		if (errorCode != std::errc::no_such_file_or_directory && errorCode)
-		{
-			return false;
-		}
-
 		normalizedValue = pathToUtf8String(resolvedPath);
 		normalizedParentValue = normalizeRoot(pathToUtf8String(canonicalParent));
 		return !normalizedValue.empty() && !normalizedParentValue.empty();
@@ -3149,116 +3182,6 @@ std::filesystem::path installedIdentityPath(const std::string& identity)
 		path = path.parent_path();
 	}
 	return path.lexically_normal();
-}
-
-bool currentDirectoryMatchesInstalledIdentity(
-	const std::string& identityPath,
-	const PhysicalPathIdentity& installedIdentity)
-{
-	if (identityPath.empty() || !isValidUtf8(identityPath) ||
-		!installedIdentity.valid)
-	{
-		return false;
-	}
-	try
-	{
-		const std::filesystem::path installedPath =
-			installedIdentityPath(identityPath);
-		const NoFollowPathInformation information =
-			inspectPathNoFollow(installedPath);
-		if (information.kind != NoFollowPathKind::Directory ||
-			!physicalPathIdentitiesEqual(
-				information.identity, installedIdentity))
-		{
-			return false;
-		}
-		std::error_code errorCode;
-		const std::filesystem::path currentPath =
-			std::filesystem::canonical(installedPath, errorCode);
-		return !errorCode && !currentPath.empty() &&
-			hostPathsEqual(installedPath, currentPath);
-	}
-	catch (const std::exception&)
-	{
-		return false;
-	}
-}
-
-bool currentEditorRunOutputPathMatchesInstalledIdentity(
-	const InstalledEditorRunFileLayout& layout,
-	const std::string& outputPathValue,
-	const std::string& parentPathValue,
-	const PhysicalPathIdentity& parentIdentity)
-{
-	if (!currentDirectoryMatchesInstalledIdentity(
-			parentPathValue, parentIdentity))
-	{
-		return false;
-	}
-	try
-	{
-		const std::filesystem::path outputPath =
-			std::filesystem::u8path(outputPathValue).lexically_normal();
-		const std::filesystem::path diagnosticsPath =
-			installedIdentityPath(layout.diagnosticsRoot);
-		if (!hostPathContains(diagnosticsPath, outputPath) ||
-			hostPathsEqual(diagnosticsPath, outputPath))
-		{
-			return false;
-		}
-
-		std::error_code errorCode;
-		const std::filesystem::file_status status =
-			std::filesystem::symlink_status(outputPath, errorCode);
-		if (errorCode == std::errc::no_such_file_or_directory ||
-			(!errorCode && status.type() == std::filesystem::file_type::not_found))
-		{
-			return true;
-		}
-		if (errorCode || std::filesystem::is_symlink(status) ||
-			!std::filesystem::is_regular_file(status))
-		{
-			return false;
-		}
-		const std::uintmax_t linkCount =
-			std::filesystem::hard_link_count(outputPath, errorCode);
-		if (errorCode || linkCount != 1)
-		{
-			return false;
-		}
-		const std::filesystem::path currentPath =
-			std::filesystem::canonical(outputPath, errorCode);
-		return !errorCode && !currentPath.empty() &&
-			hostPathsEqual(outputPath, currentPath);
-	}
-	catch (const std::exception&)
-	{
-		return false;
-	}
-}
-
-bool installedEditorRunFileLayoutIsCurrent(
-	const InstalledEditorRunFileLayout& layout)
-{
-	return currentDirectoryMatchesInstalledIdentity(
-			layout.overlayRoot, layout.overlayIdentity) &&
-		currentDirectoryMatchesInstalledIdentity(
-			layout.isolatedSaveRoot, layout.isolatedSaveIdentity) &&
-		currentDirectoryMatchesInstalledIdentity(
-			layout.applicationStateRoot, layout.applicationStateIdentity) &&
-		currentDirectoryMatchesInstalledIdentity(
-			layout.diagnosticsRoot, layout.diagnosticsIdentity) &&
-		currentEditorRunOutputPathMatchesInstalledIdentity(
-			layout, layout.diagnosticsPath,
-			layout.diagnosticsParentPath,
-			layout.diagnosticsParentIdentity) &&
-		currentEditorRunOutputPathMatchesInstalledIdentity(
-			layout, layout.logPath, layout.logParentPath,
-			layout.logParentIdentity) &&
-		currentEditorRunOutputPathMatchesInstalledIdentity(
-			layout, layout.runtimeTracePath,
-			layout.runtimeTraceParentPath,
-			layout.runtimeTraceParentIdentity);
 }
 
 bool validateEditorRunFileLayout(
@@ -3711,13 +3634,6 @@ bool openEditorRunExactOutput(
 		close(descriptor);
 		return false;
 	}
-	if (fsync(descriptor) != 0 ||
-		fsync(parent.get()) != 0)
-	{
-		std::fclose(file);
-		file = nullptr;
-		return false;
-	}
 	parentToken = static_cast<std::intptr_t>(
 		parent.release());
 #endif
@@ -3809,6 +3725,90 @@ bool asciiStemEndsWithIconSuffix(const std::string& fileStem)
 	return character < 0x80 && std::tolower(character) == 's';
 }
 
+std::string resourceAliasKey(const std::string& name)
+{
+	return extractStableResourceAliasPrefix(fileStemFromName(name)) + "\n" +
+		fileExtensionFromName(name) +
+		(asciiStemEndsWithIconSuffix(fileStemFromName(name)) ? "\n1" : "\n0");
+}
+
+const ResourceDirectoryLookup& resourceDirectoryLookup(
+	const std::filesystem::path& directory)
+{
+	const std::string key = std::filesystem::absolute(directory).lexically_normal().u8string();
+	const auto inserted = g_resourceDirectoryLookups.try_emplace(key);
+	auto& lookup = inserted.first->second;
+	if (!inserted.second)
+	{
+		return lookup;
+	}
+	std::error_code errorCode;
+	std::filesystem::directory_iterator iterator(directory, errorCode);
+	const std::filesystem::directory_iterator end;
+	while (!errorCode && iterator != end)
+	{
+		const auto& path = iterator->path();
+		const std::string name = path.filename().u8string();
+		const auto named = lookup.names.emplace(toLowerAscii(name), path);
+		if (!named.second)
+		{
+			named.first->second.clear();
+		}
+		std::error_code typeError;
+		if (iterator->is_regular_file(typeError))
+		{
+			if (!extractStableResourceAliasPrefix(name).empty())
+			{
+				lookup.aliases[resourceAliasKey(name)].push_back(path);
+			}
+		}
+		if (typeError)
+		{
+			lookup.aliasesValid = false;
+		}
+		iterator.increment(errorCode);
+	}
+	lookup.valid = !errorCode;
+	return lookup;
+}
+
+const ResourceDirectoryLookup& nativeResourceDirectoryLookup(
+	const NativeDirectoryHandle& directory)
+{
+	PhysicalPathIdentity identity;
+	if (!nativeHandleInformation(directory.get(), true, identity))
+	{
+		static const ResourceDirectoryLookup unavailable;
+		return unavailable;
+	}
+	const std::string key = "native:" + std::to_string(identity.deviceOrVolume) + ":" +
+		std::to_string(identity.nodeLow) + ":" + std::to_string(identity.nodeHigh);
+	const auto inserted = g_resourceDirectoryLookups.try_emplace(key);
+	auto& lookup = inserted.first->second;
+	if (!inserted.second)
+	{
+		return lookup;
+	}
+	for (const auto& name : listNativeDirectoryNames(directory, &lookup.valid))
+	{
+		const auto path = std::filesystem::u8path(name);
+		const auto named = lookup.names.emplace(toLowerAscii(name), path);
+		if (!named.second)
+		{
+			named.first->second.clear();
+		}
+		if (!extractStableResourceAliasPrefix(name).empty())
+		{
+			NativeFileHandle file;
+			if (openChildFileNoFollow(directory, name, false, false, false, false, file))
+			{
+				lookup.aliases[resourceAliasKey(name)].push_back(path);
+			}
+		}
+	}
+	return lookup;
+}
+
 std::string resolveUniqueImagePackageAlias(const std::string& fullPath)
 {
 	if (!isImagePackagePath(fullPath) || !isValidUtf8(fullPath))
@@ -3836,7 +3836,30 @@ std::string resolveUniqueImagePackageAlias(const std::string& fullPath)
 		}
 
 		bool requestedIconSuffix = asciiStemEndsWithIconSuffix(requestedStem);
-		std::vector<std::filesystem::path> matches;
+		const std::string requestedKey = toLowerAscii(requestedFileName);
+		if (g_resourceLookupDepth != 0)
+		{
+			const auto& lookup = resourceDirectoryLookup(parentPath);
+			const auto found = lookup.aliases.find(resourceAliasKey(requestedFileName));
+			if (!lookup.valid || !lookup.aliasesValid || found == lookup.aliases.end())
+			{
+				return "";
+			}
+			std::filesystem::path match;
+			for (const auto& candidate : found->second)
+			{
+				if (toLowerAscii(candidate.filename().u8string()) != requestedKey)
+				{
+					if (!match.empty())
+					{
+						return "";
+					}
+					match = candidate;
+				}
+			}
+			return pathToUtf8String(match);
+		}
+		std::filesystem::path match;
 		std::filesystem::directory_iterator iterator(parentPath, errorCode);
 		std::filesystem::directory_iterator end;
 		while (!errorCode && iterator != end)
@@ -3849,25 +3872,30 @@ std::string resolveUniqueImagePackageAlias(const std::string& fullPath)
 			if (regularFile)
 			{
 				std::string candidateName = pathToUtf8String(iterator->path().filename());
+				// A dot terminates this prefix, so the extension need not be parsed first.
 				if (!candidateName.empty() &&
-					toLowerAscii(candidateName) != toLowerAscii(requestedFileName) &&
+					extractStableResourceAliasPrefix(candidateName) == requestedPrefix &&
+					toLowerAscii(candidateName) != requestedKey &&
 					fileExtensionFromName(candidateName) == requestedExtension)
 				{
 					std::string candidateStem = fileStemFromName(candidateName);
-					if (asciiStemEndsWithIconSuffix(candidateStem) == requestedIconSuffix &&
-						extractStableResourceAliasPrefix(candidateStem) == requestedPrefix)
+					if (asciiStemEndsWithIconSuffix(candidateStem) == requestedIconSuffix)
 					{
-						matches.push_back(iterator->path());
+						if (!match.empty())
+						{
+							return "";
+						}
+						match = iterator->path();
 					}
 				}
 			}
 			iterator.increment(errorCode);
 		}
-		if (errorCode || matches.size() != 1)
+		if (errorCode || match.empty())
 		{
 			return "";
 		}
-		return pathToUtf8String(matches.front());
+		return pathToUtf8String(match);
 	}
 	catch (const std::exception&)
 	{
@@ -3931,12 +3959,34 @@ std::string resolveAnchoredImagePackageAlias(
 
 	const bool requestedIconSuffix =
 		asciiStemEndsWithIconSuffix(requestedStem);
-	std::vector<std::string> matches;
+	const std::string requestedKey = toLowerAscii(requestedFileName);
+	if (g_resourceLookupDepth != 0)
+	{
+		const auto& lookup = nativeResourceDirectoryLookup(parent);
+		const auto found = lookup.aliases.find(resourceAliasKey(requestedFileName));
+		if (!lookup.valid || found == lookup.aliases.end())
+		{
+			return "";
+		}
+		std::string match;
+		for (const auto& candidate : found->second)
+		{
+			if (toLowerAscii(candidate.u8string()) != requestedKey)
+			{
+				if (!match.empty()) return "";
+				match = candidate.u8string();
+			}
+		}
+		if (match.empty() || !editorRunRouteIsCurrent(route)) return "";
+		resolvedParentComponents.push_back(match);
+		return joinRelativeComponents(resolvedParentComponents);
+	}
+	std::string match;
 	for (const std::string& candidateName :
 		listNativeDirectoryNames(parent))
 	{
-		if (toLowerAscii(candidateName) ==
-				toLowerAscii(requestedFileName) ||
+		if (extractStableResourceAliasPrefix(candidateName) != requestedPrefix ||
+			toLowerAscii(candidateName) == requestedKey ||
 			fileExtensionFromName(candidateName) !=
 				requestedExtension)
 		{
@@ -3944,10 +3994,7 @@ std::string resolveAnchoredImagePackageAlias(
 		}
 		const std::string candidateStem =
 			fileStemFromName(candidateName);
-		if (asciiStemEndsWithIconSuffix(candidateStem) !=
-				requestedIconSuffix ||
-			extractStableResourceAliasPrefix(candidateStem) !=
-				requestedPrefix)
+		if (asciiStemEndsWithIconSuffix(candidateStem) != requestedIconSuffix)
 		{
 			continue;
 		}
@@ -3956,15 +4003,19 @@ std::string resolveAnchoredImagePackageAlias(
 				parent, candidateName, false, false,
 				false, false, candidate))
 		{
-			matches.push_back(candidateName);
+			if (!match.empty())
+			{
+				return "";
+			}
+			match = candidateName;
 		}
 	}
-	if (matches.size() != 1 ||
+	if (match.empty() ||
 		!editorRunRouteIsCurrent(route))
 	{
 		return "";
 	}
-	resolvedParentComponents.push_back(matches.front());
+	resolvedParentComponents.push_back(match);
 	return joinRelativeComponents(resolvedParentComponents);
 }
 
@@ -4658,8 +4709,10 @@ std::string transactionLeaf(
 
 NoFollowPathInformation inspectNativeChildNoFollow(
 	const NativeDirectoryHandle& parent,
-	const std::string& leaf)
+	const std::string& leaf,
+	std::int32_t* nativeStatus = nullptr)
 {
+	if (nativeStatus != nullptr) *nativeStatus = 0;
 	NoFollowPathInformation result;
 	if (!parent.valid() || leaf.empty())
 	{
@@ -4679,6 +4732,7 @@ NoFollowPathInformation inspectNativeChildNoFollow(
 			FILE_ATTRIBUTE_NORMAL,
 			handle, nullptr, &status))
 	{
+		if (nativeStatus != nullptr) *nativeStatus = static_cast<std::int32_t>(status);
 		const NTSTATUS nameNotFound =
 			static_cast<NTSTATUS>(0xC0000034u);
 		const NTSTATUS pathNotFound =
@@ -5090,11 +5144,25 @@ bool removeNativeRegularFile(
 		return false;
 	}
 #if defined(_WIN32)
-	FILE_DISPOSITION_INFO disposition = {};
-	disposition.DeleteFile = TRUE;
-	const bool removed = SetFileInformationByHandle(
-		file.get(), FileDispositionInfo,
+	// Remove the name when our handle closes, even if another shared-delete
+	// reader still holds the old contents. Legacy deletion leaves DELETE_PENDING
+	// in that case, preventing the direct copy from recreating this file.
+	FILE_DISPOSITION_INFO_EX disposition = {};
+	disposition.Flags = FILE_DISPOSITION_FLAG_DELETE | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS;
+	bool removed = SetFileInformationByHandle(file.get(), FileDispositionInfoEx,
 		&disposition, sizeof(disposition)) != 0;
+	if (!removed)
+	{
+		const DWORD error = GetLastError();
+		if (error == ERROR_INVALID_PARAMETER || error == ERROR_NOT_SUPPORTED || error == ERROR_INVALID_FUNCTION)
+		{
+			FILE_DISPOSITION_INFO legacyDisposition = {};
+			legacyDisposition.DeleteFile = TRUE;
+			removed = SetFileInformationByHandle(file.get(), FileDispositionInfo,
+				&legacyDisposition, sizeof(legacyDisposition)) != 0;
+		}
+	}
+	if (!removed) GameLog::write("Delete disposition failed at %s error=%lu\n", leaf.c_str(), GetLastError());
 	file.reset();
 #else
 	const NoFollowPathInformation current =
@@ -5107,10 +5175,14 @@ bool removeNativeRegularFile(
 		unlinkat(parent.get(), leaf.c_str(), 0) == 0;
 	file.reset();
 #endif
-	return removed &&
-		inspectNativeChildNoFollow(parent, leaf).kind ==
-			NoFollowPathKind::Missing &&
-		routingIsCurrent();
+	std::int32_t nativeStatus = 0;
+	const auto remaining = inspectNativeChildNoFollow(parent, leaf, &nativeStatus);
+	if (remaining.kind != NoFollowPathKind::Missing)
+	{
+		GameLog::write("Delete verification failed at %s removed=%d kind=%d status=0x%08lx\n",
+			leaf.c_str(), removed, static_cast<int>(remaining.kind), static_cast<unsigned long>(nativeStatus));
+	}
+	return removed && remaining.kind == NoFollowPathKind::Missing && routingIsCurrent();
 }
 
 bool openAnchoredRouteDirectory(
@@ -5160,14 +5232,60 @@ bool removePathRecursively(const std::filesystem::path& path)
 	return true;
 }
 
-bool renamePath(const std::filesystem::path& source, const std::filesystem::path& destination)
+bool renamePath(const std::filesystem::path& source, const std::filesystem::path& destination,
+	const std::function<bool()>& retryIsSafe)
 {
 	std::error_code errorCode;
-	std::filesystem::rename(source, destination, errorCode);
+	int retries = 0;
+	for (;;)
+	{
+		std::filesystem::rename(source, destination, errorCode);
+		if (!errorCode)
+		{
+			if (retries > 0)
+			{
+				GameLog::write("Transaction rename recovered after %d retries: %s -> %s\n",
+					retries, pathToUtf8String(source).c_str(), pathToUtf8String(destination).c_str());
+			}
+			return true;
+		}
+		invokeEditorRunFileOperationTestHook(
+			File::EditorRunFileOperationPhase::AfterTransactionRenameFailure);
+#if defined(_WIN32)
+		// Short-lived Windows sharing refusals have been observed during save
+		// publication. Do not retry other errors or a changed transaction.
+		if (retries >= 4 || errorCode.category() != std::system_category() ||
+			(errorCode.value() != ERROR_ACCESS_DENIED && errorCode.value() != ERROR_SHARING_VIOLATION))
+		{
+			break;
+		}
+		Sleep(10);
+		if (!retryIsSafe || !retryIsSafe())
+		{
+			break;
+		}
+		++retries;
+#else
+		(void)retryIsSafe;
+		break;
+#endif
+	}
 	if (errorCode)
 	{
-		GameLog::write("Can not rename transaction path %s -> %s\n",
-			pathToUtf8String(source).c_str(), pathToUtf8String(destination).c_str());
+#if defined(_WIN32)
+		const DWORD sourceAttributes = GetFileAttributesW(source.c_str());
+		const DWORD sourceError = sourceAttributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : ERROR_SUCCESS;
+		const DWORD destinationAttributes = GetFileAttributesW(destination.c_str());
+		const DWORD destinationError = destinationAttributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : ERROR_SUCCESS;
+#endif
+		GameLog::write("Can not rename transaction path %s -> %s error=%d category=%s message=%s\n",
+			pathToUtf8String(source).c_str(), pathToUtf8String(destination).c_str(),
+			errorCode.value(), errorCode.category().name(), errorCode.message().c_str());
+		GameLog::write("Transaction rename stopped after %d retries\n", retries);
+#if defined(_WIN32)
+		GameLog::write("Transaction rename failure state: source_attributes=0x%08lx source_error=%lu destination_attributes=0x%08lx destination_error=%lu thread=%lu\n",
+			sourceAttributes, sourceError, destinationAttributes, destinationError, GetCurrentThreadId());
+#endif
 		return false;
 	}
 	return true;
@@ -5239,18 +5357,16 @@ bool writeRelativeFileNoFollow(
 	if (!openChildFileNoFollow(
 			parent, leaf, true,
 			mode == CheckedWriteMode::Append,
-			true, true, file, &created))
+			true, true, file, &created, writtenIdentity))
 	{
 		return false;
 	}
-	PhysicalPathIdentity initialIdentity;
-	std::uintmax_t initialLinkCount = 0;
-	if (!nativeHandleInformation(
-			file.get(), false, initialIdentity,
-			&initialLinkCount) ||
-		initialLinkCount != 1 ||
-		!routingIsCurrent())
+	if (!routingIsCurrent())
 	{
+		if (writtenIdentity != nullptr)
+		{
+			*writtenIdentity = {};
+		}
 #if defined(_WIN32)
 		if (created)
 		{
@@ -5324,16 +5440,7 @@ bool writeRelativeFileNoFollow(
 #endif
 	}
 
-	PhysicalPathIdentity finalIdentity;
-	std::uintmax_t finalLinkCount = 0;
-	succeeded = succeeded &&
-		nativeHandleInformation(
-			file.get(), false, finalIdentity,
-			&finalLinkCount) &&
-		finalLinkCount == 1 &&
-		physicalPathIdentitiesEqual(
-			initialIdentity, finalIdentity) &&
-		routingIsCurrent();
+	succeeded = succeeded && routingIsCurrent();
 	if (!succeeded && created)
 	{
 #if defined(_WIN32)
@@ -5346,9 +5453,9 @@ bool writeRelativeFileNoFollow(
 		unlinkat(parent.get(), leaf.c_str(), 0);
 #endif
 	}
-	if (succeeded && writtenIdentity != nullptr)
+	if (!succeeded && writtenIdentity != nullptr)
 	{
-		*writtenIdentity = finalIdentity;
+		*writtenIdentity = {};
 	}
 	return succeeded;
 }
@@ -5732,7 +5839,8 @@ bool writeFileNoFollow(
 	return succeeded;
 }
 
-bool writeFullFileChecked(const std::filesystem::path& path, const void* data, int length)
+bool writeFullFileChecked(const std::filesystem::path& path, const void* data, int length,
+	const std::function<bool()>& retryIsSafe = {})
 {
 	if (length < 0 || (data == nullptr && length > 0))
 	{
@@ -5744,9 +5852,82 @@ bool writeFullFileChecked(const std::filesystem::path& path, const void* data, i
 		return false;
 	}
 
+#if defined(_WIN32)
+	// Keep the first open's existing exclusive/truncating semantics. Only a
+	// failed sharing open may be retried, before any truncation or data write.
+	invokeEditorRunFileOperationTestHook(File::EditorRunFileOperationPhase::BeforeCheckedWriteOpen);
+	NativeFileHandle file(CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr,
+		CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+	DWORD openError = file.valid() ? ERROR_SUCCESS : GetLastError();
+	NoFollowPathInformation originalParent;
+	NoFollowPathInformation originalFile;
+	if (openError == ERROR_SHARING_VIOLATION && retryIsSafe)
+	{
+		originalParent = inspectPathNoFollow(path.parent_path());
+		originalFile = inspectPathNoFollow(path);
+	}
+	NativeDirectoryHandle parent;
+	int retries = 0;
+	while (!file.valid())
+	{
+		invokeEditorRunFileOperationTestHook(File::EditorRunFileOperationPhase::AfterCheckedWriteOpenFailure);
+		if (openError != ERROR_SHARING_VIOLATION || retries >= 4 || !retryIsSafe ||
+			originalParent.kind != NoFollowPathKind::Directory ||
+			(originalFile.kind != NoFollowPathKind::Missing &&
+				(originalFile.kind != NoFollowPathKind::RegularFile || originalFile.linkCount != 1))) break;
+		Sleep(10);
+		if (!retryIsSafe() || !openAbsoluteDirectoryNoFollow(path.parent_path(), originalParent.identity, parent)) break;
+		const auto currentFile = inspectPathNoFollow(path);
+		if (currentFile.kind != originalFile.kind ||
+			(originalFile.kind == NoFollowPathKind::RegularFile &&
+				(currentFile.linkCount != 1 || !physicalPathIdentitiesEqual(currentFile.identity, originalFile.identity)))) break;
+		++retries;
+		// Never use CREATE_ALWAYS on a retry: verify the opened identity before
+		// truncating, including a replacement between the path check and open.
+		invokeEditorRunFileOperationTestHook(File::EditorRunFileOperationPhase::BeforeCheckedWriteOpen);
+		file.reset(CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr,
+			originalFile.kind == NoFollowPathKind::Missing ? CREATE_NEW : OPEN_EXISTING,
+			FILE_ATTRIBUTE_NORMAL | FILE_FLAG_OPEN_REPARSE_POINT, nullptr));
+		openError = file.valid() ? ERROR_SUCCESS : GetLastError();
+		if (file.valid())
+		{
+			PhysicalPathIdentity openedIdentity;
+			if (!nativeHandleInformation(file.get(), false, openedIdentity) || openedIdentity.linkCount != 1 || !retryIsSafe() ||
+				!physicalPathIdentitiesEqual(inspectPathNoFollow(path.parent_path()).identity, originalParent.identity) ||
+				(originalFile.kind == NoFollowPathKind::RegularFile &&
+					!physicalPathIdentitiesEqual(openedIdentity, originalFile.identity))) return false;
+			if (!SetEndOfFile(file.get()))
+			{
+				GameLog::write("Can not truncate file %s error=%lu\n", fullPath.c_str(), GetLastError());
+				return false;
+			}
+		}
+	}
+	if (!file.valid())
+	{
+		GameLog::write("Can not open file(wb) %s error=%lu retries=%d\n", fullPath.c_str(), openError, retries);
+		return false;
+	}
+	DWORD written = 0;
+	const bool succeeded = length == 0 ||
+		(WriteFile(file.get(), data, static_cast<DWORD>(length), &written, nullptr) != 0 && written == static_cast<DWORD>(length));
+	const DWORD writeError = succeeded ? ERROR_SUCCESS : GetLastError();
+	const bool closed = CloseHandle(file.release()) != 0;
+	if (!succeeded || !closed)
+	{
+		GameLog::write("Can not complete file write %s error=%lu close_ok=%d\n", fullPath.c_str(), writeError, closed);
+		return false;
+	}
+	if (retries > 0) GameLog::write("Checked write recovered after %d retries: %s\n", retries, fullPath.c_str());
+	return true;
+#else
+	(void)retryIsSafe;
+	invokeEditorRunFileOperationTestHook(File::EditorRunFileOperationPhase::BeforeCheckedWriteOpen);
 	SDL_IOStream* stream = SDL_IOFromFile(fullPath.c_str(), "wb");
 	if (stream == nullptr)
 	{
+		invokeEditorRunFileOperationTestHook(
+			File::EditorRunFileOperationPhase::AfterCheckedWriteOpenFailure);
 		GameLog::write("Can not open file(wb) %s\n", fullPath.c_str());
 		return false;
 	}
@@ -5757,6 +5938,7 @@ bool writeFullFileChecked(const std::filesystem::path& path, const void* data, i
 		succeeded = false;
 	}
 	return succeeded;
+#endif
 }
 
 bool writeRoutedFileChecked(
@@ -6457,8 +6639,13 @@ bool removeTransactionPathRecursively(
 
 bool renameTransactionPath(const DirectoryCopyTransactionPaths& paths,
 	const std::filesystem::path& source,
-	const std::filesystem::path& destination)
+	const std::filesystem::path& destination,
+	const std::function<bool()>& cancellationIsRequested = {})
 {
+	if (cancellationIsRequested && cancellationIsRequested())
+	{
+		return false;
+	}
 	if (paths.anchored)
 	{
 		const std::string sourceLeaf =
@@ -6671,8 +6858,24 @@ bool renameTransactionPath(const DirectoryCopyTransactionPaths& paths,
 	{
 		return false;
 	}
+	const auto retryIsSafe = [&]()
+	{
+		if ((cancellationIsRequested && cancellationIsRequested()) ||
+			!directoryCopyRoutingIsCurrent(paths))
+		{
+			return false;
+		}
+		const NoFollowPathInformation currentSource = inspectPathNoFollow(source);
+		return currentSource.kind == sourceInformation.kind &&
+			physicalPathIdentitiesEqual(currentSource.identity, sourceInformation.identity) &&
+			(currentSource.kind != NoFollowPathKind::RegularFile || currentSource.linkCount == 1) &&
+			inspectPathNoFollow(destination).kind == NoFollowPathKind::Missing &&
+			(currentSource.kind != NoFollowPathKind::Directory ||
+				transactionDirectoryTreeIsSafe(paths, source)) &&
+			directoryCopyRoutingIsCurrent(paths);
+	};
 	if (!directoryCopyRoutingIsCurrent(paths) ||
-		!renamePath(source, destination))
+		!renamePath(source, destination, retryIsSafe))
 	{
 		return false;
 	}
@@ -7070,7 +7273,7 @@ bool publishStagedDirectoryTransaction(
 	if (hadDestination &&
 		!renameTransactionPath(
 			paths, paths.destination,
-			paths.backup))
+			paths.backup, cancellationIsRequested))
 	{
 		(void)rollbackUnpublishedStaging();
 		return failTransaction("destination backup");
@@ -7134,7 +7337,7 @@ bool publishStagedDirectoryTransaction(
 		failBeforePublish ||
 		!renameTransactionPath(
 			paths, paths.staging,
-			paths.destination))
+			paths.destination, cancellationIsRequested))
 	{
 		const bool backupRestored = restoreBackup();
 		const bool stagingRestored =
@@ -7225,11 +7428,6 @@ bool installEditorRunFileLayoutImplementation(
 	InstalledEditorRunFileLayout normalizedLayout;
 	if (!validateEditorRunFileLayout(
 			layout, proof, normalizedLayout))
-	{
-		return false;
-	}
-	if (!installedEditorRunFileLayoutIsCurrent(
-			normalizedLayout))
 	{
 		return false;
 	}
@@ -8154,7 +8352,12 @@ bool File::writeFileChecked(const std::string& fileName, const void* s, int len)
 				route, routingState, routingGeneration,
 				s, len, CheckedWriteMode::Truncate);
 		}
-		return writeFullFileChecked(std::filesystem::u8path(newFileName), s, len);
+		return writeFullFileChecked(std::filesystem::u8path(newFileName), s, len, [&]()
+		{
+			const auto currentRoute = buildWriteRoute(fileName);
+			return editorRunRoutingSnapshotIsCurrent(routingState, routingGeneration) &&
+				currentRoute.root == route.root && currentRoute.relativePath == route.relativePath;
+		});
 	}
 	catch (const std::exception&)
 	{
@@ -8517,6 +8720,128 @@ bool File::clearDirectoryFiles(const std::string& directoryName)
 	return ok;
 }
 
+bool File::overwriteDirectoryFiles(const std::string& srcDirectoryName,
+    const std::string& dstDirectoryName,
+    const std::vector<std::string>& excludedFileNames,
+    const std::function<bool()>& cancellationRequested,
+    const DirectoryCopyLimits& limits)
+{
+	if (!isSafeResourcePath(srcDirectoryName) || !isSafeResourcePath(dstDirectoryName))
+	{
+		return false;
+	}
+	std::lock_guard<std::mutex> lock(g_directoryCopyMutex);
+	try
+	{
+		DirectoryCopyTransactionPaths sourcePaths;
+		DirectoryCopyTransactionPaths paths;
+		const bool sourceIsSave = isSavePath(srcDirectoryName);
+		if (!getDirectoryCopyTransactionPaths(dstDirectoryName, paths) ||
+			(sourceIsSave &&
+				(!getDirectoryCopyTransactionPaths(srcDirectoryName, sourcePaths) ||
+				 !setDirectoryPromotionSourcePath(sourcePaths, paths))) ||
+			(cancellationRequested && cancellationRequested()))
+		{
+			return false;
+		}
+		NativeDirectoryHandle parent;
+		if (!(paths.anchored
+			? duplicateNativeDirectoryHandle(paths.parentHandle.get(), parent)
+			: openAbsoluteDirectoryNoFollow(paths.parent, paths.parentIdentity, parent)))
+		{
+			return false;
+		}
+		NativeDirectoryHandle source;
+		NativeDirectoryHandle destination;
+		if ((sourceIsSave &&
+				!openChildDirectoryNoFollow(parent, paths.sourceLeaf, false, source)) ||
+			!openChildDirectoryNoFollow(parent, paths.destinationLeaf, true, destination) ||
+			!directoryCopyRoutingIsCurrent(paths))
+		{
+			return false;
+		}
+		// Held directory handles anchor child operations; the loop only checks
+		// whether this installed routing generation is still active.
+		const auto routingIsCurrent = [&paths]()
+		{
+			std::lock_guard<std::mutex> layoutLock(g_editorRunFileLayoutMutex);
+			return g_editorRunFileLayoutGeneration == paths.routingGeneration;
+		};
+		bool listed = false;
+		std::vector<std::string> sourceFiles;
+		if (sourceIsSave)
+		{
+			sourceFiles = listNativeDirectoryNames(source, &listed);
+		}
+		else
+		{
+			// Initial saves use the same MOD/dependency precedence as normal reads.
+			// These roots may be read-only; never resolve them as write routes.
+			for (const auto& route : buildReadRoutes(srcDirectoryName))
+			{
+				const auto sourcePath = std::filesystem::u8path(
+					makeFullPath(route.root, route.relativePath)).lexically_normal();
+				std::error_code error;
+				if (hostPathsEqual(sourcePath, paths.destination) ||
+					std::filesystem::equivalent(sourcePath, paths.destination, error)) return false;
+			}
+			listed = listFilesRejectingCaseCollisions(srcDirectoryName, sourceFiles);
+		}
+		if (!listed) return false;
+		if (limits.maximumFileCount > 0 && sourceFiles.size() > limits.maximumFileCount) return false;
+		std::vector<std::string> keys;
+		for (const auto& name : sourceFiles)
+		{
+			if (!isValidUtf8(name)) return false;
+			keys.push_back(normalizeFileNameKey(name));
+		}
+		std::sort(keys.begin(), keys.end());
+		if (std::adjacent_find(keys.begin(), keys.end()) != keys.end()) return false;
+		const auto destinationFiles = listNativeDirectoryNames(destination, &listed);
+		if (!listed) return false;
+		for (const auto& name : destinationFiles)
+		{
+			if ((cancellationRequested && cancellationRequested()) ||
+				!removeNativeRegularFile(destination, name, routingIsCurrent))
+			{
+				GameLog::write("Direct directory clear failed at %s\n", name.c_str());
+				return false;
+			}
+		}
+		std::uint64_t copiedBytes = 0;
+		for (const auto& name : sourceFiles)
+		{
+			if (isExcludedFileName(name, excludedFileNames)) continue;
+			NativeFileHandle file;
+			std::unique_ptr<char[]> data;
+			int length = 0;
+			const int maximumBytes = limits.maximumSingleFileBytes > 0
+				? limits.maximumSingleFileBytes : INT_MAX - 1;
+			if ((cancellationRequested && cancellationRequested()) ||
+				!routingIsCurrent() ||
+				!(sourceIsSave
+					? (openChildFileNoFollow(source, name, false, false, false, false, file) &&
+						readNativeFileBounded(file, data, length, maximumBytes))
+					: readFile(joinFullPath(srcDirectoryName, name),
+						data, length, maximumBytes)) ||
+				(limits.maximumTotalBytes > 0 &&
+					static_cast<std::uint64_t>(length) > limits.maximumTotalBytes - copiedBytes) ||
+				!writeRelativeFileNoFollow(destination, name, routingIsCurrent,
+					data.get(), length, CheckedWriteMode::Truncate))
+			{
+				GameLog::write("Direct directory copy failed at %s\n", name.c_str());
+				return false;
+			}
+			copiedBytes += static_cast<std::uint64_t>(length);
+		}
+		return directoryCopyRoutingIsCurrent(paths);
+	}
+	catch (const std::exception&)
+	{
+		return false;
+	}
+}
+
 bool File::copyDirectoryFiles(const std::string& srcDirectoryName,
     const std::string& dstDirectoryName,
     const std::vector<std::string>& excludedFileNames,
@@ -8685,8 +9010,10 @@ bool File::copyDirectoryFiles(const std::string& srcDirectoryName,
 		cancellationIsRequested,
 		[&paths]()
 		{
-			return removeTransactionPathRecursively(
-				paths, paths.staging);
+			return transactionPathMatchesIdentity(
+					paths, paths.staging, NoFollowPathKind::Directory, paths.stagingIdentity) &&
+				removeTransactionPathRecursively(
+					paths, paths.staging);
 		});
 }
 
@@ -8819,7 +9146,7 @@ bool File::promotePreparedScratchDirectory(
 				paths.sourceIdentity);
 	};
 	if (!renameTransactionPath(
-			paths, paths.source, paths.staging))
+			paths, paths.source, paths.staging, cancellationIsRequested))
 	{
 		return failTransaction("source staging rename");
 	}
@@ -8932,20 +9259,36 @@ std::string File::getAssetsName(const std::string& fileName)
     return firstCandidate;
 }
 
+File::ResourceLookupScope::ResourceLookupScope()
+{
+	++g_resourceLookupDepth;
+}
+
+File::ResourceLookupScope::~ResourceLookupScope()
+{
+	if (--g_resourceLookupDepth == 0)
+	{
+		g_resourceDirectoryLookups.clear();
+	}
+}
+
 void File::setAssetsCollectionRoot(const std::string& root)
 {
+	g_resourceDirectoryLookups.clear();
     std::lock_guard<std::mutex> lock(g_formalResourceRoutingMutex);
     g_assetsCollectionRoot = normalizeRoot(root);
 }
 
 void File::setActiveResourceRoot(const std::string& root)
 {
+	g_resourceDirectoryLookups.clear();
     std::lock_guard<std::mutex> lock(g_formalResourceRoutingMutex);
     g_activeResourceRoot = normalizeRoot(root);
 }
 
 void File::setCommonResourceRoot(const std::string& root)
 {
+	g_resourceDirectoryLookups.clear();
     std::lock_guard<std::mutex> lock(g_formalResourceRoutingMutex);
     g_commonResourceRoot = normalizeRoot(root);
 	g_commonResourceFallbackRoots.clear();
@@ -8954,6 +9297,7 @@ void File::setCommonResourceRoot(const std::string& root)
 void File::setCommonResourceFallbackRoots(
 	const std::vector<std::string>& roots)
 {
+	g_resourceDirectoryLookups.clear();
 	std::lock_guard<std::mutex> lock(g_formalResourceRoutingMutex);
 	g_commonResourceFallbackRoots.clear();
 	for (const std::string& root : roots)
@@ -8972,6 +9316,7 @@ void File::setCommonResourceFallbackRoots(
 
 void File::setResourceFallbackRoots(const std::vector<std::string>& roots)
 {
+	g_resourceDirectoryLookups.clear();
     std::lock_guard<std::mutex> lock(g_formalResourceRoutingMutex);
     g_resourceFallbackRoots.clear();
     for (const auto& root : roots)
@@ -8989,6 +9334,7 @@ void File::setUiResourceFallbackRoots(const std::vector<std::string>& roots,
     bool preferLocal,
     const std::string& commonRoot)
 {
+	g_resourceDirectoryLookups.clear();
     std::lock_guard<std::mutex> lock(g_formalResourceRoutingMutex);
     g_uiResourceFallbackRoots.clear();
     g_uiCommonResourceRoot = normalizeRoot(commonRoot);

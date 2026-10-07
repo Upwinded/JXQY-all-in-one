@@ -298,6 +298,13 @@ typedef int (* AppEventHandler)(SDL_Event* e);
 
 class EngineBase
 {
+#if defined(JXQY_ENABLE_TEST_HOOKS)
+	friend class GameplayAutomationTestAccess;
+#endif
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	friend class GameplayAutomationSession;
+#endif
+	friend class CoreLifecycleTestAccess;
 	friend bool runMediaRuntimeTests();
 	friend class GamepadWorldRuntimeTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
@@ -680,23 +687,23 @@ private:
 
 	// ponytail: fixed cache budget; add eviction only if profiling shows that
 	// frequently reused sounds arrive after the cache has filled.
-	static constexpr std::size_t ActionSoundCacheLimitBytes =
+	static constexpr std::size_t CachedSoundLimitBytes =
 		16ULL * 1024ULL * 1024ULL;
 	static std::vector<SoundAutoRelease_t> soundList;
 	std::vector<AudioChannelSlot> channelSlots;
-	std::unordered_map<std::string, _music> actionSoundCache;
-	std::size_t actionSoundCacheBytes = 0;
-	std::string actionSoundCacheScope;
+	std::unordered_map<std::string, _music> soundCache;
+	std::size_t soundCacheBytes = 0;
+	std::string soundCacheScope;
 #endif
 
 protected:
 	_music createMusic(const std::unique_ptr<char[]>& data, int size, bool loop, bool music3d, unsigned char priority = 128);
 	void freeMusic(_music music);
 #ifdef SHF_USE_AUDIO
-	_music getCachedActionSound(const std::string& key);
-	_music cacheActionSound(const std::string& key, _music music);
-	void setActionSoundCacheScope(const std::string& scope);
-	void clearActionSoundCache();
+	_music getCachedSound(const std::string& key);
+	_music cacheSound(const std::string& key, _music music);
+	void setSoundCacheScope(const std::string& scope);
+	void clearSoundCache();
 #endif
 	//以中心位置播放音乐
 	_channel playMusic(_music music, float volume);
@@ -734,7 +741,7 @@ private:
 	int openVideoFile(_video video);
 	static int read_packet(void *opaque, uint8_t *buf, int buf_size);
 	static int64_t seek_packet(void *opaque, int64_t offset, int whence);
-	void setMediaStream(MediaStream * mediaStream, std::string& fileName, AVMediaType mediaType);
+	void setMediaStream(MediaStream * mediaStream, const std::string& fileName, AVMediaType mediaType);
 	float initVideoTime(_video video);
 	void setVideoTimePaused(_video video, bool paused);
 	float setVideoTime(_video video, float time);

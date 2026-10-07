@@ -12,6 +12,8 @@ public:
 	bool canShowHint = false;
 	bool showHint = false;
 	bool centerImage = false;
+	bool drawSlot = false;
+	float cooldownFraction = 0.0f;
 	int fontSize = 18;
 
 	_shared_image strImage = nullptr;
@@ -25,7 +27,7 @@ public:
 	void resetHint();
 	void setTransferSelected(bool value) { transferSelected = value; }
 	bool isTransferSelected() const { return transferSelected; }
-	const std::string & getStr() { return str; }
+	const std::string & getStr() const { return str; }
 protected:
 	std::string str = "";
 	bool transferSelected = false;
@@ -46,4 +48,5 @@ protected:
 	virtual void onClick();
 public:
 	virtual void onDraw();
+	void drawCooldown(const Rect& destination);
 };

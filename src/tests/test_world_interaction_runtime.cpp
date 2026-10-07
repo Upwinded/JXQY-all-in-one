@@ -470,6 +470,12 @@ bool runExplicitQueueTests()
 	ok = check(gameManager.queueNPCAttackInteraction(hostileNPC, true)
 		&& isQueuedFor(player, hostileNPC, ndAttack, acWalk, false),
 		"running request downgrades to walk when stamina is insufficient") && ok;
+
+	player.cancelQueuedInteraction(false);
+	player.thew = RUN_THEW_COST;
+	ok = check(gameManager.queueNPCAttackInteraction(hostileNPC, true)
+		&& isQueuedFor(player, hostileNPC, ndAttack, acRun, false),
+		"running interaction did not resume at the exact stamina cost") && ok;
 	return ok;
 }
 
@@ -659,19 +665,52 @@ bool runInteractionOcclusionBoundaryTests()
 	npcs = gameManager.npcManager->
 		findRadiusScriptViewNPC(PlayerPosition, 4);
 	ok = check(
-		std::find(objects.begin(), objects.end(), object) == objects.end()
-			&& std::find(npcs.begin(), npcs.end(), npc) == npcs.end(),
-		"opaque terrain between the actor and an interactable still blocks quick selection")
+		!gameManager.map->canSee(PlayerPosition, targetPosition)
+			&& std::find(objects.begin(), objects.end(), object) != objects.end()
+			&& std::find(npcs.begin(), npcs.end(), npc) != npcs.end()
+			&& gameManager.objectManager->findNearestScriptViewObj(PlayerPosition, 4) == object
+			&& gameManager.npcManager->findNearestScriptViewNPC(PlayerPosition, 4) == npc,
+		"scripted interaction selection uses range even behind opaque terrain")
 		&& ok;
+	auto candidates = gameManager.findWorldInteractionCandidates(
+		WorldInteractionIntent::Primary, 4, 2);
+	ok = check(candidates.size() == 2,
+		"controller interaction includes occluded NPC and Object inside search range") && ok;
+	ok = check(gameManager.findWorldInteractionCandidates(
+			WorldInteractionIntent::Primary, 3, 2).empty(),
+		"occluded scripted targets still obey the search radius") && ok;
+
+	npc->kind = nkBattle;
+	npc->relation = nrHostile;
+	ok = check(WorldInteractionResolver::isNPCValidForIntent(
+			npc, WorldInteractionIntent::Attack, gameManager.player)
+			&& gameManager.findWorldInteractionCandidates(
+				WorldInteractionIntent::Attack, 4, 2).empty(),
+		"attack selection still requires line of sight") && ok;
+	npc->kind = nkNormal;
+	npc->relation = nrFriendly;
+	npc->dialogRadius = 4;
+	ok = check(gameManager.queueNPCTalkInteraction(npc),
+		"occluded NPC within dialog radius accepts normal talk input") && ok;
+	gameManager.inEvent = true;
+	WorldInteractionRuntimeTestAccess::processQueuedAction(*gameManager.player);
+	ok = check(gameManager.scriptTaskList.size() == 1
+			&& gameManager.scriptTaskList[0].npc == npc
+			&& gameManager.player->getPosition() == PlayerPosition
+			&& gameManager.player->isStanding(),
+		"normal talk executes within dialog radius without a sight check or movement") && ok;
+	gameManager.inEvent = false;
+	npc->dialogRadius = 1;
 
 	blockMovementAround(*gameManager.map, targetPosition);
 	const auto fastSelectionNPCs = gameManager.npcManager->
 		findRadiusFastSelectionNPC(PlayerPosition, 4);
 	ok = check(
 		std::find(
-			fastSelectionNPCs.begin(), fastSelectionNPCs.end(), npc) ==
-			fastSelectionNPCs.end(),
-		"an enclosed scripted NPC remains outside reachable fast selection")
+			fastSelectionNPCs.begin(), fastSelectionNPCs.end(), npc) !=
+			fastSelectionNPCs.end()
+			&& gameManager.map->getRadiusPath(PlayerPosition, targetPosition, 1).empty(),
+		"range selection does not make an enclosed NPC reachable for talk")
 		&& ok;
 	return ok;
 }
@@ -850,7 +889,7 @@ bool runYYCSWudangGuestApproachTests()
 			&& ok;
 		if (owner != nullptr && guest != nullptr)
 		{
-			const auto lineOfSightCandidates =
+			const auto rangeCandidates =
 				gameManager.npcManager->findRadiusScriptViewNPC(
 					playerPosition,
 					GameController::FastInteractionTileDistance);
@@ -866,9 +905,9 @@ bool runYYCSWudangGuestApproachTests()
 				Map::calDistance(playerPosition, guest->getPosition()) ==
 					GameController::FastInteractionTileDistance &&
 				std::find(
-					lineOfSightCandidates.begin(),
-					lineOfSightCandidates.end(),
-					guest) == lineOfSightCandidates.end() &&
+					rangeCandidates.begin(),
+					rangeCandidates.end(),
+					guest) != rangeCandidates.end() &&
 				std::find(
 					oldRadiusFastSelectionCandidates.begin(),
 					oldRadiusFastSelectionCandidates.end(),

@@ -1,4 +1,5 @@
 #include "CheckBox.h"
+#include <algorithm>
 #include "../Engine/Engine.h"
 #include "../File/log.h"
 #include "ComponentRegistry.h"
@@ -56,12 +57,33 @@ void CheckBox::initFromIni(INIReader & ini)
 
 	std::string soundName = ini.Get("Init", "Sound", "");
 	loadSound(soundName, 1);
+	textLabel.fontSize = ini.GetInteger("Init", "Font", 18);
+	textLabel.autoShrink = true;
+	textLabel.horizontalAlignment = TextHorizontalAlignment::Center;
+	textLabel.verticalAlignment = TextVerticalAlignment::Center;
+	textLabel.setStr(ini.Get("Init", "Text", ""));
 
 	impImage = nullptr;
 }
 
 void CheckBox::onDraw()
 {
+	if (!textLabel.getStr().empty())
+	{
+		const bool highlighted = checked || isFocused() || touchingID != TOUCH_UNTOUCHEDID;
+		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 154, 128, 76, 255);
+		engine->fillRect(rect.x + 1, rect.y + 1, std::max(0, rect.w - 2), std::max(0, rect.h - 2),
+			highlighted ? 36 : 238, highlighted ? 77 : 227, highlighted ? 67 : 197, 255);
+		if (image[0] != nullptr)
+		{
+			engine->drawImage(IMP::loadImageForTime(image[highlighted && image[2] ? 2 : 0], getTime()), nullptr, &rect);
+		}
+		textLabel.rect = { rect.x + 4, rect.y + 2, std::max(1, rect.w - 8), std::max(1, rect.h - 4) };
+		textLabel.color = highlighted ? 0xFFF8E8BC : 0xFF234F43;
+		textLabel.onDraw();
+		drawFocusBorder();
+		return;
+	}
 	int xOffset, yOffset;
 	_shared_image img = nullptr;
 	if (!checked)

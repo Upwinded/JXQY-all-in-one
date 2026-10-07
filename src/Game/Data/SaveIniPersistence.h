@@ -23,7 +23,9 @@ enum class ReadStatus
 inline ReadStatus read(
 	const std::string& fileName,
 	std::shared_ptr<INIReader>& reader,
-	int maximumBytes = MaximumFileBytes)
+	int maximumBytes = MaximumFileBytes,
+	IniKeyCaseSensitivity keyCaseSensitivity =
+		IniKeyCaseSensitivity::Insensitive)
 {
 	reader = nullptr;
 	if (!File::fileExist(fileName))
@@ -47,7 +49,9 @@ inline ReadStatus read(
 		return ReadStatus::Malformed;
 	}
 
-	auto parsed = std::make_shared<INIReader>(data);
+	auto parsed = std::make_shared<INIReader>(
+		data,
+		keyCaseSensitivity);
 	if (parsed->ParseError() != 0)
 	{
 		return ReadStatus::Malformed;

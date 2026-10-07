@@ -88,7 +88,16 @@ void NPCActionAttack::enter()
 
     if (player && (_attackType == NPCActionType::acAttack2 || _attackType == NPCActionType::acSpecialAttack))
     {
-        player->prepareSpecialAttackMagicForAction(_attackDest, _target.lock());
+        _specialAttackMagic = player->prepareSpecialAttackMagicForAction(_attackDest, _target.lock());
+        // The practice magic adds an attack; it does not replace the primary attack.
+        // Preserve its animation choice while preparing the primary magic separately.
+        _npc->prepareAttackMagicForAction(_attackDest, _target.lock(), _npc->attackReleaseMode);
+    }
+    else if (!player && _npc->hasPreparedAttackMagic)
+    {
+        // Normal NPC attack admission already selected this magic. Keep it
+        // through the animation instead of making a second random selection.
+        _actionMagic = _npc->preparedAttackMagic;
     }
     else
     {
@@ -118,21 +127,15 @@ void NPCActionAttack::update(UTime frameTime)
             _attackDone = true;
             Player* player = dynamic_cast<Player*>(_npc);
             auto targetPtr = _target.lock();
-            if (player && (_attackType == NPCActionType::acAttack2 || _attackType == NPCActionType::acSpecialAttack))
+            released = _npc->releasePreparedAttackMagic(_attackDest, targetPtr);
+            if (!released)
             {
-                released = player->releasePreparedSpecialAttackMagic(_attackDest, targetPtr);
-                if (!released)
-                {
-                    released = player->doSpecialAttack(_attackDest, targetPtr);
-                }
+                released = _npc->doAttack(_attackDest, targetPtr, _npc->attackReleaseMode);
             }
-            else
+            if (player && _specialAttackMagic != nullptr)
             {
-                released = _npc->releasePreparedAttackMagic(_attackDest, targetPtr);
-                if (!released)
-                {
-                    released = _npc->doAttack(_attackDest, targetPtr, _npc->attackReleaseMode);
-                }
+                player->setPreparedAttackMagic(_specialAttackMagic, false);
+                released = player->releasePreparedSpecialAttackMagic(_attackDest, targetPtr) || released;
             }
         }
         if (released)

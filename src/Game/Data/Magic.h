@@ -28,6 +28,7 @@ enum MagicMoveKind
 	mmkSummon = 22,
 	mmkTimeStop = 23,
 	mmkVMove = 24,
+	mmkWarningRegion = 999,
 };
 
 enum MagicSpecialKind
@@ -75,6 +76,11 @@ enum MagicRegion
 };
 
 class Magic;
+struct MagicExperienceOwner
+{
+	bool assigned = false;
+	std::weak_ptr<Magic> magic;
+};
 struct MagicDispatchContext;
 struct MagicLoadContext;
 
@@ -138,6 +144,7 @@ struct MagicLevel
 	int defend2 = 0;
 	int defend3 = 0;
 	int evade = 0;
+	int jumpRadius = 0;
 	int addThewRestorePercent = 0;
 	int addManaRestorePercent = 0;
 	int addLifeRestorePercent = 0;
@@ -195,6 +202,7 @@ public:
 	virtual ~Magic();
 
 	void reset();
+	bool hasPositionCastLimit(int level) const;
 	void initFromIni(const std::string& fileName);
 	void initFromIni(const std::string & fileName, bool loadLinkedMagic);
 	static std::vector<std::shared_ptr<Effect>> addEffect(
@@ -226,7 +234,8 @@ public:
 	static std::vector<std::shared_ptr<Effect>> addVTypeEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	static std::vector<std::shared_ptr<Effect>> addRegionFileEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	static std::vector<std::shared_ptr<Effect>> addSelfEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, int specialKind);
-	static std::vector<std::shared_ptr<Effect>> addFullScreenEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
+	static std::vector<std::shared_ptr<Effect>> addFullScreenEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher,
+		std::shared_ptr<MagicDispatchContext> dispatchContext = nullptr);
 	static std::vector<std::shared_ptr<Effect>> addFollowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, std::shared_ptr<GameElement> target);
 	static std::vector<std::shared_ptr<Effect>> addThrowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
 	static std::vector<std::shared_ptr<Effect>> addThrowExplodeEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher);
@@ -245,6 +254,7 @@ public:
 		std::shared_ptr<MagicDispatchContext> dispatchContext = nullptr);
 	static std::shared_ptr<MagicDispatchContext> createRootDispatchContext(
 		const std::shared_ptr<Magic>& magic);
+	static MagicExperienceOwner getExperienceOwner(const std::shared_ptr<MagicDispatchContext>& context);
 	static std::shared_ptr<MagicDispatchContext> createDerivedDispatchContext(
 		const std::shared_ptr<MagicDispatchContext>& parentContext,
 		const std::shared_ptr<Magic>& childMagic,
@@ -335,6 +345,7 @@ public:
 
 	std::string iniName = "";
 	std::string experienceOwnerMagicFile = "";
+	MagicExperienceOwner experienceOwner;
 	bool loadSucceeded = false;
 	std::string name = "";
 	std::string type = "";
@@ -390,6 +401,8 @@ public:
 	bool regionFileLoaded = false;
 	unsigned int keepMilliseconds = 0;
 	int maxLevel = 0;
+	// Zero preserves legacy learning; this is separate from target-control MaxLevel.
+	int definedLearningLevelLimit = 0;
 	std::string goodsName = "";
 	std::string npcFile = "";
 	std::string npcIni = "";

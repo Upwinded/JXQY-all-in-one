@@ -136,10 +136,10 @@ void ControllerHelpOverlay::onDraw()
 	const int contentLeft = outerMargin + std::max(14, outerMargin / 2);
 	const int contentTop = outerMargin + titleFontSize + lineHeight * 2;
 
-	engine->drawText("手柄操作说明", contentLeft,
+	headerAndFooterTextTextures[0].draw(engine, "手柄操作说明", contentLeft,
 		outerMargin + std::max(10, outerMargin / 3),
 		titleFontSize, TitleColor);
-	engine->drawText("游戏已暂停", contentLeft,
+	headerAndFooterTextTextures[1].draw(engine, "游戏已暂停", contentLeft,
 		outerMargin + std::max(10, outerMargin / 3) + titleFontSize + 4,
 		std::max(12, textFontSize), MutedTextColor);
 
@@ -156,24 +156,25 @@ void ControllerHelpOverlay::onDraw()
 		const int columnGap = std::max(20, windowWidth / 28);
 		const int columnWidth = std::max(
 			1, (windowWidth - contentLeft * 2 - columnGap) / 2);
-		drawSection("世界场景", worldHelpLines(),
+		drawSection("世界场景", worldHelpLines(), worldHelpTextTextures,
 			contentLeft, contentTop, textFontSize, lineHeight, TextColor);
-		drawSection("菜单与剧情", menuHelpLines(),
+		drawSection("菜单与剧情", menuHelpLines(), menuHelpTextTextures,
 			contentLeft + columnWidth + columnGap,
 			contentTop, textFontSize, lineHeight, TextColor);
 	}
 	else
 	{
-		drawSection("世界场景", worldHelpLines(),
+		drawSection("世界场景", worldHelpLines(), worldHelpTextTextures,
 			contentLeft, contentTop, textFontSize, lineHeight, TextColor);
 		const int secondSectionY = contentTop
 			+ lineHeight * (static_cast<int>(worldHelpLines().size()) + 2);
-		drawSection("菜单与剧情", menuHelpLines(),
+		drawSection("菜单与剧情", menuHelpLines(), menuHelpTextTextures,
 			contentLeft, secondSectionY, textFontSize, lineHeight, TextColor);
 	}
 
 	const std::string footer = "按任意键、手柄按钮或轻触屏幕关闭说明";
-	engine->drawText(
+	headerAndFooterTextTextures[2].draw(
+		engine,
 		footer,
 		contentLeft,
 		std::max(contentTop, windowHeight - outerMargin - lineHeight - 6),
@@ -189,6 +190,7 @@ void ControllerHelpOverlay::onWindowResize(int width, int height)
 void ControllerHelpOverlay::drawSection(
 	const std::string& title,
 	const std::vector<HelpLine>& lines,
+	std::vector<CachedTextTexture>& textTextures,
 	int x,
 	int y,
 	int fontSize,
@@ -199,11 +201,13 @@ void ControllerHelpOverlay::drawSection(
 	{
 		return;
 	}
-	engine->drawText(title, x, y, fontSize + 2, SectionColor);
+	textTextures.resize(lines.size() + 1);
+	textTextures[0].draw(engine, title, x, y, fontSize + 2, SectionColor);
 	int lineY = y + lineHeight;
-	for (const HelpLine& line : lines)
+	for (std::size_t index = 0; index < lines.size(); ++index)
 	{
-		engine->drawText(formatLine(line), x, lineY, fontSize, textColor);
+		textTextures[index + 1].draw(
+			engine, formatLine(lines[index]), x, lineY, fontSize, textColor);
 		lineY += lineHeight;
 	}
 }

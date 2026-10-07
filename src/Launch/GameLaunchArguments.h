@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../Game/Data/NewYearPeriod.h"
+
 #include <string>
 #include <utility>
 #include <vector>
@@ -37,6 +39,10 @@ struct LegacyArguments
 	// and ScriptAPI __automation_* consumers remain inert, unless this
 	// process-owned capability is explicitly enabled at launch.
 	bool automationHooksEnabled = false;
+	std::string automationPipeName;
+#if defined(JXQY_ENABLE_AUTOMATION_HOOKS)
+	NewYearPeriod::LocalDate automationLocalDate;
+#endif
 	// New-game automation is an explicit three-stage plan:
 	//   autoStartNewGame enters the new-game flow;
 	//   postNewGameAutomationWaitMilliseconds keeps real map updates running

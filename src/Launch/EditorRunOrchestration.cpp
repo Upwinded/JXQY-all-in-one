@@ -120,14 +120,25 @@ bool callbacksAreComplete(
 }
 
 bool writeDiagnostic(
-	EditorRun::DiagnosticsWriter& writer,
+	std::unique_ptr<EditorRun::DiagnosticsWriter>& writer,
 	const EditorRun::DiagnosticEvent& event,
 	const EditorRun::OrchestrationCallbacks& callbacks)
 {
-	if (writer.write(event))
+	if (!writer)
 	{
-		return true;
+		return false;
 	}
+	try
+	{
+		if (writer->write(event))
+		{
+			return true;
+		}
+	}
+	catch (...)
+	{
+	}
+	writer.reset();
 	writeStandardError(
 		callbacks,
 		"editor_run.diagnostics.write_failed",
@@ -217,32 +228,42 @@ int runWithInstalledFileLayout(
 	const EditorRun::PreparedResourcePhase& prepared,
 	const EditorRun::OrchestrationCallbacks& callbacks)
 {
-	EditorRun::DiagnosticLineSink diagnosticSink =
-		callbacks.openDiagnostics();
-	if (!diagnosticSink)
+	EditorRun::DiagnosticLineSink diagnosticSink;
+	try
 	{
-		writeStandardError(
-			callbacks,
-			"editor_run.diagnostics.open_failed",
-			"Failed to create the exact diagnostics output");
-		return exitCode(ProcessExitCode::Preparation);
+		diagnosticSink = callbacks.openDiagnostics();
 	}
-
-	EditorRun::DiagnosticsWriter diagnostics(
-		session.descriptor.sessionId,
-		std::move(diagnosticSink));
+	catch (...)
+	{
+	}
+	std::unique_ptr<EditorRun::DiagnosticsWriter> diagnostics;
+	if (diagnosticSink)
+	{
+		diagnostics = std::make_unique<EditorRun::DiagnosticsWriter>(
+			session.descriptor.sessionId, std::move(diagnosticSink));
+	}
+	else
+	{
+		writeStandardError(callbacks, "editor_run.diagnostics.open_failed",
+			"Could not open diagnostics output");
+	}
 	EditorRun::DiagnosticEvent starting;
 	starting.severity = EditorRun::DiagnosticSeverity::Info;
 	starting.code = "editor_run.session.starting";
 	starting.message =
 		"Editor-run routing is ready; runtime initialization is starting";
 	starting.target = session.descriptor.target.sceneId;
-	if (!writeDiagnostic(diagnostics, starting, callbacks))
-	{
-		return exitCode(ProcessExitCode::Preparation);
-	}
+	(void)writeDiagnostic(diagnostics, starting, callbacks);
 
-	if (!callbacks.probeLog())
+	bool logWritable = false;
+	try
+	{
+		logWritable = callbacks.probeLog();
+	}
+	catch (...)
+	{
+	}
+	if (!logWritable)
 	{
 		EditorRun::DiagnosticEvent event;
 		event.severity = EditorRun::DiagnosticSeverity::Error;
@@ -251,11 +272,16 @@ int runWithInstalledFileLayout(
 		event.target = session.descriptor.target.sceneId;
 		writeStandardError(callbacks, event.code, event.message);
 		(void)writeDiagnostic(diagnostics, event, callbacks);
-		return exitCode(ProcessExitCode::Preparation);
 	}
 
-	EditorRun::RuntimeTraceBatchSink traceSink =
-		callbacks.openRuntimeTrace();
+	EditorRun::RuntimeTraceBatchSink traceSink;
+	try
+	{
+		traceSink = callbacks.openRuntimeTrace();
+	}
+	catch (...)
+	{
+	}
 	std::unique_ptr<EditorRun::RuntimeTraceWriter>
 		runtimeTraceWriter =
 			EditorRun::RuntimeTraceWriter::create(
@@ -269,14 +295,13 @@ int runWithInstalledFileLayout(
 		event.code =
 			"editor_run.trace.open_failed";
 		event.message =
-			"Failed to create and durably start the exact runtime trace";
+			"Failed to create and start the exact runtime trace";
 		event.target =
 			session.descriptor.target.sceneId;
 		writeStandardError(
 			callbacks, event.code, event.message);
 		(void)writeDiagnostic(
 			diagnostics, event, callbacks);
-		return exitCode(ProcessExitCode::Preparation);
 	}
 
 	const EditorRun::GameResult gameResult =
@@ -285,7 +310,7 @@ int runWithInstalledFileLayout(
 			prepared,
 			runtimeTraceWriter.get());
 	const bool traceFinished =
-		runtimeTraceWriter->finish(
+		!runtimeTraceWriter || runtimeTraceWriter->finish(
 			traceFinishStatus(gameResult.failure));
 	if (gameResult.failure != EditorRun::GameFailure::None)
 	{
@@ -339,7 +364,6 @@ int runWithInstalledFileLayout(
 			callbacks, event.code, event.message);
 		(void)writeDiagnostic(
 			diagnostics, event, callbacks);
-		return exitCode(ProcessExitCode::Preparation);
 	}
 
 	EditorRun::DiagnosticEvent completed;
@@ -347,10 +371,7 @@ int runWithInstalledFileLayout(
 	completed.code = "editor_run.session.completed";
 	completed.message = "Editor-run ended normally";
 	completed.target = session.descriptor.target.sceneId;
-	if (!writeDiagnostic(diagnostics, completed, callbacks))
-	{
-		return exitCode(ProcessExitCode::Preparation);
-	}
+	(void)writeDiagnostic(diagnostics, completed, callbacks);
 	return exitCode(ProcessExitCode::Success);
 }
 }

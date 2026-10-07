@@ -1155,6 +1155,14 @@ RuntimeTraceValidationResult serializeRuntimeTraceRecord(
 	{
 		return validation;
 	}
+	detail::serializeValidatedRuntimeTraceRecord(record, output);
+	return {};
+}
+
+void detail::serializeValidatedRuntimeTraceRecord(
+	const RuntimeTraceRecord& record, std::string& output)
+{
+	output.clear();
 	output.reserve(
 		256 + runtimeTraceEventRetainedBytes(
 			record.event));
@@ -1332,7 +1340,6 @@ RuntimeTraceValidationResult serializeRuntimeTraceRecord(
 		},
 		record.event.payload);
 	output.append("}\n");
-	return {};
 }
 
 std::string runtimeTraceSha256Hex(

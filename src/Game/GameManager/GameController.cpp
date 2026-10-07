@@ -123,6 +123,7 @@ bool GameController::shouldUpdateChild(PElement child)
 	}
 void GameController::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	virtualControlPointerTransactions.clear();
 	mouseWorldInputSuppressedUntilRelease = false;
 
@@ -406,7 +407,7 @@ void GameController::handlePhysicalSkill(
 	{
 		return;
 	}
-	gm->player->cancelQueuedInteraction();
+	gm->player->cancelQueuedInteraction(false, false);
 
 	NextAction action;
 	action.action = acMagic;
@@ -830,7 +831,7 @@ void GameController::cancelPendingControllerInteraction(bool clearTarget)
 	}
 }
 
-void GameController::cancelControllerWorldInteraction()
+void GameController::cancelControllerWorldInteraction(bool stopCurrentMovement)
 {
 	// A menu transition invalidates any contact that started in the world or
 	// virtual controls. Cancel it without callbacks before an in-tree modal can
@@ -838,7 +839,7 @@ void GameController::cancelControllerWorldInteraction()
 	resetTouchControlsInputState();
 	if (gm != nullptr && gm->player != nullptr)
 	{
-		gm->player->cancelQueuedInteraction(false);
+		gm->player->cancelQueuedInteraction(false, stopCurrentMovement);
 	}
 	controllerFocusedTarget.reset();
 	MouseAlreadyDown = false;
@@ -886,8 +887,7 @@ void GameController::validateControllerFocusedTarget()
 		// world-input frame that has a controller focus.
 		const Point actorPosition = actionActor->getPosition();
 		valid = Map::calDistance(actorPosition, targetPosition)
-				<= KeyboardAutoInteractionTileDistance
-			&& gm->map->canSee(actorPosition, targetPosition);
+				<= KeyboardAutoInteractionTileDistance;
 	}
 	if (!valid)
 	{
@@ -1146,10 +1146,7 @@ void GameController::onChildCallBack(PElement child)
 						if (tempNPC != nullptr)
 						{
 							const bool canRunToTarget = gm->player->canRun
-								&& (gm->player->thew > (int)round(
-									(float)gm->player->info.thewMax
-									* MIN_THEW_RATE_TO_RUN)
-									|| gm->player->thew > MIN_THEW_LIMIT_TO_RUN);
+								&& gm->player->canPayRunThewCost();
 							act.action = canRunToTarget ? acRun : acWalk;
 							act.destKind = ndAttack;
 							act.dest = tempNPC->getPosition();
@@ -1213,7 +1210,8 @@ void GameController::onChildCallBack(PElement child)
 						break;
 					}
 					NextAction act;
-					if (gm->player->canRun && (gm->player->thew > (int)round((float)gm->player->info.thewMax * MIN_THEW_RATE_TO_RUN) || gm->player->thew > MIN_THEW_LIMIT_TO_RUN))
+					if (gm->player->canRun
+						&& gm->player->canPayRunThewCost())
 					{
 						act.action = acRun;
 					}
@@ -1536,7 +1534,9 @@ void GameController::processPhysicalInputFrame()
 	if (gm != nullptr && gm->menu != nullptr
 		&& (gm->inEvent || !gm->global.data.canInput))
 	{
-		gm->menu->cancelControllerInteraction();
+		// Script-opened shops still own live UI hints while world input is blocked.
+		// Context transitions clear stale hints; only cancel slot transfers here.
+		gm->menu->controllerTransfers().cancel();
 	}
 	const bool semanticInputBlocked = isFrameSemanticInputBlocked();
 	const bool worldInputContextEnabled = canHandleWorldInput();
@@ -1619,7 +1619,8 @@ void GameController::onDrawEnd()
 	ControllerPromptPresenter::drawBottomBar(
 		engine,
 		engine->inputActions(),
-		ControllerPromptPresenter::worldPromptItems());
+		ControllerPromptPresenter::worldPromptItems(),
+		controllerPromptTextureCache);
 }
 
 void GameController::onPreviewPointerEvent(AEvent& event)
@@ -2003,7 +2004,8 @@ bool GameController::onHandleEvent(AEvent & e)
 		if (actionActor != nullptr && actionActor->nowAction != acDeath && actionActor->nowAction != acHide)
 		{
 			NextAction act;
-			if (!player->isControllingCharacter() && player->canRun && (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN) || player->thew > MIN_THEW_LIMIT_TO_RUN))
+			if (!player->isControllingCharacter() && player->canRun
+				&& player->canPayRunThewCost())
 			{
 				act.action = acRun;
 			}

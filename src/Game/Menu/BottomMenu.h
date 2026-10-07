@@ -59,6 +59,7 @@ private:
 	static constexpr int MagicControllerPaneId = 1;
 
 	virtual void onEvent() override;
+	void onUpdate() override;
 	virtual bool onHandleUIAction(UIAction action) override;
 	bool focusSpatialControllerCandidate(
 		UIFocusDirection direction,

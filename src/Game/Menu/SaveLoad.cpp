@@ -36,6 +36,7 @@ void SaveLoad::init()
 	if (snap)
 	{
 		snap->stretch = true;
+		snap->cropContent = true;
 	}
 	if (!save && saveBtn)
 	{
@@ -290,6 +291,7 @@ void SaveLoad::onEvent()
 
 void SaveLoad::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	focusManager.clear();
 	snap = nullptr;
 	saveBtn = nullptr;
@@ -336,7 +338,7 @@ void SaveLoad::onDrawEnd()
 		{ InputAction::Cancel, "返回" }
 	};
 	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items);
+		engine, engine->inputActions(), items, controllerPromptTextureCache);
 }
 
 void SaveLoad::onRun()

@@ -463,8 +463,8 @@ QString BatchConvertWindow::legacyImageConversionSummary(
     }
 
     if (categories.isEmpty())
-        return tr("所有旧图片类别均按原字节迁移；map/unknown 只迁移");
-    return tr("转换为 IMP/IMG：%1；map/unknown 只迁移")
+        return tr("所有旧图片类别均按原字节复制；map/unknown 始终原样保留");
+    return tr("转换为 IMP/IMG：%1；map/unknown 原样保留")
         .arg(categories.join(tr("、")));
 }
 
@@ -618,7 +618,7 @@ void BatchConvertWindow::onStartConvert()
     migrationOptions.sourceEncoding = selectedSourceEncoding;
 
     // 仅继承类型（modType < 0）需要内容依赖来继承 Game.Type；显式 Type=0..3
-    // （包括独立的 Type=3 MOD）允许 DependencyId 为空，与核心迁移器语义一致。
+    // （包括独立的 Type=3 MOD）允许 DependencyId 为空，与核心转换流程语义一致。
     const bool migrationDependencyRequired =
         migrationOptions.modType < 0;
     if (migrationDependencyRequired && migrationDependencyIds.isEmpty())

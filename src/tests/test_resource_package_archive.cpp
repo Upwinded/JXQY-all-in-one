@@ -469,6 +469,7 @@ void testImportedResourcePackage(const TemporaryTree& tree)
 		"[Game]\n"
 		"Id=IMPORTED_GAME\n"
 		"Name=Imported Game\n"
+		"InstallDirectory=imported_game\n"
 		"Author=Importer\n"
 		"Version=1.2.3\n"
 		"\n"
@@ -498,6 +499,7 @@ void testImportedResourcePackage(const TemporaryTree& tree)
 		!result.package.common &&
 		!result.package.resourceOnly &&
 		result.package.displayName == "Imported Game" &&
+		result.package.installDirectory == "imported_game" &&
 		result.package.author == "Importer" &&
 		result.package.displayVersion == "1.2.3" &&
 		result.package.minimumEngineVersion == "2.0.0" &&

@@ -8,7 +8,7 @@ class Goods;
 class NPC;
 
 class PartnerEquipMenu :
-	public Panel,
+	public ConfigDrivenPanel,
 	public ControllerTransferParticipant
 {
 public:

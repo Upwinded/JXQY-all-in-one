@@ -32,7 +32,8 @@ void ControllerPromptPresenter::draw(
 	Engine* engine,
 	const GameInput::PhysicalInputManager& inputManager,
 	const std::vector<ControllerPromptItem>& items,
-	const ControllerPromptDrawOptions& options)
+	const ControllerPromptDrawOptions& options,
+	ControllerPromptTextureCache& textureCache)
 {
 	if (engine == nullptr || !shouldPresentGamepadFocus(engine)
 		|| options.width <= 0 || options.height <= 0 || options.fontSize <= 0)
@@ -44,6 +45,7 @@ void ControllerPromptPresenter::draw(
 		items, captureTheme(inputManager), options);
 	if (promptLayout.lines.empty())
 	{
+		textureCache.itemTextTextures.clear();
 		return;
 	}
 
@@ -69,6 +71,7 @@ void ControllerPromptPresenter::draw(
 		std::max(0, options.horizontalPadding),
 		0,
 		std::max(0, (options.width - 1) / 2));
+	std::size_t textTextureIndex = 0;
 	for (const ControllerPromptLayoutLine& line : promptLayout.lines)
 	{
 		int textX = options.x + std::max(
@@ -77,15 +80,22 @@ void ControllerPromptPresenter::draw(
 		textX = std::max(textX, options.x + horizontalPadding);
 		for (const std::string& item : line.items)
 		{
-			engine->drawText(
+			if (textTextureIndex >= textureCache.itemTextTextures.size())
+			{
+				textureCache.itemTextTextures.emplace_back();
+			}
+			textureCache.itemTextTextures[textTextureIndex].draw(
+				engine,
 				item,
 				textX,
 				textY,
 				promptLayout.fontSize,
 				options.textColor);
+			textTextureIndex++;
 			textX += estimateTextWidth(item, promptLayout.fontSize)
 				+ promptLayout.itemGap;
 		}
 		textY += promptLayout.lineHeight;
 	}
+	textureCache.itemTextTextures.resize(textTextureIndex);
 }

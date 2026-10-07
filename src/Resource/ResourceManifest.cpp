@@ -116,6 +116,7 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 
 	id = ini.get("Game", "Id", id);
 	name = ini.get("Game", "Name", name);
+	installDirectory = trimAscii(ini.get("Game", "InstallDirectory", ""));
 	author = trimAscii(ini.get("Game", "Author", author));
 	releaseMetadata.displayVersion =
 		trimAscii(ini.get("Game", "Version", ""));
@@ -250,6 +251,7 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 		}
 	}
 
+	scriptPlayerName = trimAscii(ini.get("Script", "PlayerName", ""));
 	npcActionProfileDefined =
 		hasIniKey(ini, "Script", "NpcActionProfile");
 	if (npcActionProfileDefined)
@@ -333,8 +335,15 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 		}
 	}
 
+	levelUpMessageDefined = hasIniKey(ini, "LevelUp", "Message");
 	levelUpMessage = ini.get(
-		"LevelUp", "Message", levelUpMessage);
+		"LevelUp", "Message", "{name}的等级得到提升！");
+	levelUpEffectMode = toLowerAscii(trimAscii(
+		ini.get("LevelUp", "EffectMode", "Append"))) == "replace"
+		? LevelUpEffectMode::Replace : LevelUpEffectMode::Append;
+	levelUpEffectsResolved = false;
+	levelUpMaleEffectCandidates.clear();
+	levelUpFemaleEffectCandidates.clear();
 	levelUpRandomEffects.clear();
 	for (std::string effect : splitCommaSeparated(
 		ini.get("LevelUp", "RandomEffects", "")))
@@ -375,6 +384,8 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 
 	saveNamespace =
 		ini.get("Save", "Namespace", saveNamespace);
+	minimumCompatibleSaveResourceVersion = trimAscii(
+		ini.get("Save", "MinimumCompatibleResourceVersion", "1.0.0"));
 
 	releaseMetadata.releaseDate =
 		trimAscii(ini.get("Release", "Date", ""));
@@ -516,6 +527,16 @@ ResourceManifest ResourceManifest::createDefault(const std::string& root)
 bool ResourceManifest::isValid() const
 {
 	return !trimAscii(id).empty();
+}
+
+std::vector<std::string> ResourceManifest::getLevelUpEffectCandidates(int sex) const
+{
+	if (levelUpEffectsResolved)
+	{
+		return sex == 2 ? levelUpFemaleEffectCandidates : levelUpMaleEffectCandidates;
+	}
+	const std::string& effect = sex == 2 ? levelUpFemaleEffect : levelUpMaleEffect;
+	return effect.empty() ? levelUpRandomEffects : std::vector<std::string>{ effect };
 }
 
 bool ResourceManifest::isBaseGame() const

@@ -769,6 +769,13 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 
 		ResourcePackage package;
 		package.gameId = gameId;
+		package.installDirectory = trimAscii(ini.get(section, "InstallDirectory", ""));
+		if (!package.installDirectory.empty() &&
+			!ResourcePathSafety::isSafeInstallDirectoryName(package.installDirectory))
+		{
+			appendIssue(result, CatalogParseError::UnsafeArtifactPath,
+				section, "InstallDirectory", package.installDirectory);
+		}
 		package.displayName = trimAscii(ini.get(section, "Name", ""));
 		if (!package.displayName.empty() &&
 			!isValidDisplayText(package.displayName, 256))

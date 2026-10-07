@@ -2,6 +2,7 @@
 #include "../../Engine/Engine.h"
 #include "BuySellMenu.h"
 #include "../GameManager/GameManager.h"
+#include "../../Component/TextLayout.h"
 
 #include <algorithm>
 
@@ -82,18 +83,18 @@ void appendType2Attribute(std::string& text, const std::string& name, int value)
 	}
 }
 
-std::string buildType2GoodsAttributeText(const Goods& goods)
+std::string buildType2GoodsAttributeText(const Goods& goods, bool qingyu)
 {
 	std::string text;
 	appendType2Attribute(text, "命", goods.life);
 	appendType2Attribute(text, "体", goods.thew);
 	appendType2Attribute(text, "气", goods.mana);
 	appendType2Attribute(text, "攻", goods.attack);
-	appendType2Attribute(text, "攻2 ", goods.attack2);
-	appendType2Attribute(text, "攻3 ", goods.attack3);
+	appendType2Attribute(text, qingyu ? "附加攻击一 " : "攻2 ", goods.attack2);
+	appendType2Attribute(text, qingyu ? "附加攻击二 " : "攻3 ", goods.attack3);
 	appendType2Attribute(text, "防", goods.defend);
-	appendType2Attribute(text, "防2", goods.defend2);
-	appendType2Attribute(text, "防3", goods.defend3);
+	appendType2Attribute(text, qingyu ? "附加防御一 " : "防2", goods.defend2);
+	appendType2Attribute(text, qingyu ? "附加防御二 " : "防3", goods.defend3);
 	appendType2Attribute(text, "捷", goods.evade);
 	appendType2Attribute(text, "命", goods.lifeMax);
 	appendType2Attribute(text, "体", goods.thewMax);
@@ -116,7 +117,7 @@ ToolTip::~ToolTip()
 	freeResource();
 }
 
-void ToolTip::setGoods(std::shared_ptr<Goods> goods)
+void ToolTip::setGoods(std::shared_ptr<Goods> goods, bool selling)
 {
 	if (goods == nullptr)
 	{
@@ -143,18 +144,30 @@ void ToolTip::setGoods(std::shared_ptr<Goods> goods)
 	auto buySellMenu = BuySellMenu::getInstance();
 	if (buySellMenu != nullptr && buySellMenu->visible)
 	{
-		if (buySellMenu->bsKind == bsSell)
+		if (selling)
 		{
-			costLabel = "回收价格： ";
+			costLabel = "卖出价： ";
 			price = goods->getSellPrice(buySellMenu->recyclePercent);
 		}
 		else
 		{
+			costLabel = "买入价： ";
 			price = goods->getBuyPrice(buySellMenu->buyPercent);
 		}
 	}
 	std::string costStr = costLabel;
 	costStr += convert::formatString("%d", price);
+	if (selling && buySellMenu != nullptr && buySellMenu->visible)
+	{
+		if (buySellMenu->bsKind != bsSell && !buySellMenu->canSellSelfGoods)
+		{
+			costStr = "当前只能购买";
+		}
+		else if (price <= 0)
+		{
+			costStr = "不可出售";
+		}
+	}
 	if (cost)
 	{
 		if (layoutProfile == LayoutProfile::Xjxqy)
@@ -165,7 +178,7 @@ void ToolTip::setGoods(std::shared_ptr<Goods> goods)
 	}
 
 	std::string detailText;
-	if (layoutProfile == LayoutProfile::Xjxqy)
+	if (layoutProfile == LayoutProfile::Xjxqy || layoutProfile == LayoutProfile::Qingyu)
 	{
 		std::string userRestriction = goods->userRestrictionText();
 		if (!userRestriction.empty())
@@ -179,9 +192,9 @@ void ToolTip::setGoods(std::shared_ptr<Goods> goods)
 		}
 	}
 	std::string attributeText;
-	if (layoutProfile == LayoutProfile::Xjxqy)
+	if (layoutProfile == LayoutProfile::Xjxqy || layoutProfile == LayoutProfile::Qingyu)
 	{
-		attributeText = buildType2GoodsAttributeText(*goods);
+		attributeText = buildType2GoodsAttributeText(*goods, layoutProfile == LayoutProfile::Qingyu);
 	}
 	else if (layoutProfile == LayoutProfile::Yycs)
 	{
@@ -251,6 +264,7 @@ void ToolTip::setMagic(std::shared_ptr<Magic> magic, int level)
 	std::shared_ptr<Label> targetIntro = magicIntro != nullptr ? magicIntro : intro2;
 	if (targetIntro)
 	{
+		targetIntro->setColorTagsEnabled(true);
 		if (layoutProfile == LayoutProfile::Xjxqy)
 		{
 			targetIntro->color = 0xDCFFFFFF;
@@ -268,7 +282,7 @@ void ToolTip::showForOwner(PElement ownerElement)
 
 void ToolTip::placeNearElement(const PElement& anchorElement)
 {
-	if (layoutProfile != LayoutProfile::Xjxqy || anchorElement == nullptr)
+	if ((layoutProfile != LayoutProfile::Xjxqy && layoutProfile != LayoutProfile::Qingyu) || anchorElement == nullptr)
 	{
 		return;
 	}
@@ -286,11 +300,17 @@ void ToolTip::placeNearElement(const PElement& anchorElement)
 	int newY = anchorRect.y;
 	newX = std::max(0, std::min(newX, windowWidth - rect.w));
 	newY = std::max(0, std::min(newY, windowHeight - rect.h));
+	if (body)
+	{
+		const int maximumY = std::max(0, windowHeight - 108 - rect.h);
+		newY = std::clamp(newY, std::min(80, maximumY), maximumY);
+	}
 	offsetRectTree(newX - rect.x, newY - rect.y);
 }
 
 void ToolTip::hide()
 {
+	if (expanded) return;
 	visible = false;
 	owner.reset();
 }
@@ -311,6 +331,10 @@ void ToolTip::init()
 			layoutProfile = LayoutProfile::Xjxqy;
 		}
 	}
+	if (gameManager != nullptr && gameManager->global.feature.qingyuUi)
+	{
+		layoutProfile = LayoutProfile::Qingyu;
+	}
 	loadMenuDefinition("ini\\ui\\tooltip\\tooltip.menu.ini");
 
 	image = getComponentByName<ImageContainer>("image");
@@ -319,11 +343,12 @@ void ToolTip::init()
 	magicIntro = getComponentByName<Label>("magicIntro");
 	name = getComponentByName<Label>("name");
 	cost = getComponentByName<Label>("cost");
+	body = getComponentByName<MemoText>("body");
 
 	if (image) image->stretch = true;
 	if (name) name->autoShrink = true;
 	if (cost) cost->autoNextLine = true;
-	if (intro1) intro1->autoNextLine = layoutProfile == LayoutProfile::Xjxqy;
+	if (intro1) intro1->autoNextLine = layoutProfile == LayoutProfile::Xjxqy || layoutProfile == LayoutProfile::Qingyu;
 	if (intro2) intro2->autoNextLine = true;
 	if (magicIntro) magicIntro->autoNextLine = true;
 	if (layoutProfile == LayoutProfile::Jxqy2)
@@ -359,6 +384,16 @@ void ToolTip::init()
 	if (intro2) intro2LayoutRect = intro2->rect;
 
 	setChildRectReferToParent();
+	needEvents = body != nullptr;
+	coverMouse = false;
+	detailFocus.setInputAwarePresentation();
+	detailFocus.addVisualSpatialGroup("item-details", {
+		{ "previous", getComponentByName("previous"), [this]() { turnPage(UIAction::PagePrevious); } },
+		{ "next", getComponentByName("next"), [this]() { turnPage(UIAction::PageNext); } },
+		{ "back", getComponentByName("back"), [this]() { logicRunning = false; } } });
+	detailFocus.setDefaultFocus("back");
+	detailFocus.setCancelHandler([this]() { logicRunning = false; });
+	updatePage();
 }
 
 void ToolTip::clearContent()
@@ -376,12 +411,142 @@ void ToolTip::clearContent()
 
 void ToolTip::finishContentLayout()
 {
-	if (layoutProfile != LayoutProfile::Xjxqy)
+	if (body && !body->mstr.empty())
+	{
+		lines.clear();
+		std::string text = intro1 ? intro1->getStr() : "";
+		appendDetailLine(text, intro2 ? intro2->getStr() : "");
+		for (const auto& line : TextLayout::wrapColorTaggedUtf8Text(text,
+			TextLayout::charactersPerLineForWidth(body->mstr.front()->rect.w, body->fontSize), body->color))
+		{
+			std::string formatted;
+			for (const auto& run : line)
+			{
+				formatted += convert::formatString("<color=%u,%u,%u,%u>",
+					(run.color >> 16) & 0xFFU, (run.color >> 8) & 0xFFU,
+					run.color & 0xFFU, (run.color >> 24) & 0xFFU) + run.text;
+			}
+			lines.push_back(std::move(formatted));
+		}
+		page = 0;
+		updatePage();
+		placeNearMouse();
+		return;
+	}
+	if (layoutProfile != LayoutProfile::Xjxqy && layoutProfile != LayoutProfile::Qingyu)
 	{
 		return;
 	}
 	reflowXjxqy();
 	placeNearMouse();
+}
+
+void ToolTip::updatePage()
+{
+	if (!body || body->mstr.empty()) return;
+	if (intro1) intro1->visible = false;
+	if (intro2) intro2->visible = false;
+	const int count = static_cast<int>(body->mstr.size());
+	const int pages = std::max(1, (static_cast<int>(lines.size()) + count - 1) / count);
+	page = std::clamp(page, 0, pages - 1);
+	for (int row = 0; row < count; ++row)
+	{
+		const int index = page * count + row;
+		body->mstr[row]->setColorTagsEnabled(true);
+		body->mstr[row]->setStr(index < static_cast<int>(lines.size()) ? lines[index] : "");
+	}
+	if (auto label = getComponentByName<Label>("page"))
+		label->setStr(convert::formatString("%d / %d", page + 1, pages));
+	if (auto button = getComponentByName("previous")) button->visible = button->activated = expanded && page > 0;
+	if (auto button = getComponentByName("next")) button->visible = button->activated = expanded && page + 1 < pages;
+	if (auto button = getComponentByName("back")) button->visible = button->activated = expanded;
+	if (auto hint = getComponentByName<Label>("hint"))
+	{
+		hint->visible = !expanded;
+		hint->setStr(pages > 1 ? "滚轮 / 翻页键：翻阅说明" : "点击物品查看完整说明");
+	}
+}
+
+bool ToolTip::turnPage(UIAction action)
+{
+	if (!visible || !body || body->mstr.empty()
+		|| (action != UIAction::PagePrevious && action != UIAction::PageNext)
+		|| lines.size() <= body->mstr.size()) return false;
+	page += action == UIAction::PageNext ? 1 : -1;
+	updatePage();
+	return true;
+}
+
+void ToolTip::runDetails()
+{
+	if (!body) return;
+	expanded = true;
+	updatePage();
+	int width = 0, height = 0;
+	engine->getWindowSize(width, height);
+	offsetRectTree((width - rect.w) / 2 - rect.x, std::max(0, (height - rect.h) / 2 - 14) - rect.y);
+	detailFocus.focusDefault();
+	run();
+	expanded = false;
+	detailFocus.suspendFocus();
+	updatePage();
+	hide();
+}
+
+void ToolTip::onEvent()
+{
+	if (!expanded) return;
+	if (auto button = getComponentByName<FlatTextButton>("previous"))
+		if (button->getResult(erClick)) turnPage(UIAction::PagePrevious);
+	if (auto button = getComponentByName<FlatTextButton>("next"))
+		if (button->getResult(erClick)) turnPage(UIAction::PageNext);
+	if (auto button = getComponentByName<FlatTextButton>("back"))
+		if (button->getResult(erClick)) logicRunning = false;
+}
+
+void ToolTip::onRun()
+{
+	if (expanded)
+	{
+		visible = true;
+		detailFocus.focusDefault();
+	}
+}
+
+bool ToolTip::onHandleEvent(AEvent& event)
+{
+	if (event.eventType == ET_MOUSEWHEEL && event.eventData != 0
+		&& turnPage(event.eventData > 0 ? UIAction::PageNext : UIAction::PagePrevious)) return true;
+	return expanded && dispatchKeyboardUIAction(event, *this);
+}
+
+bool ToolTip::onHandleUIAction(UIAction action)
+{
+	return turnPage(action) || (expanded && detailFocus.handleAction(action));
+}
+
+void ToolTip::onWindowResize(int width, int height)
+{
+	const auto previousOwner = owner;
+	const std::string title = name ? name->getStr() : "";
+	const std::string price = cost ? cost->getStr() : "";
+	const std::string attributes = intro1 ? intro1->getStr() : "";
+	const std::string description = intro2 ? intro2->getStr() : "";
+	const int previousPage = page;
+	ConfigDrivenPanel::onWindowResize(width, height);
+	owner = previousOwner;
+	if (name) name->setStr(title);
+	if (cost) cost->setStr(price);
+	if (intro1) intro1->setStr(attributes);
+	if (intro2) intro2->setStr(description);
+	finishContentLayout();
+	page = previousPage;
+	updatePage();
+	if (expanded)
+	{
+		offsetRectTree((width - rect.w) / 2 - rect.x, std::max(0, (height - rect.h) / 2 - 14) - rect.y);
+		detailFocus.focusDefault();
+	}
 }
 
 void ToolTip::reflowXjxqy()
@@ -447,6 +612,11 @@ void ToolTip::placeNearMouse()
 	}
 	newX = std::max(0, newX);
 	newY = std::max(0, newY);
+	if (body)
+	{
+		const int maximumY = std::max(0, windowHeight - 108 - rect.h);
+		newY = std::clamp(newY, std::min(80, maximumY), maximumY);
+	}
 
 	offsetRectTree(newX - rect.x, newY - rect.y);
 }
@@ -470,7 +640,7 @@ void ToolTip::onDraw()
 
 void ToolTip::onUpdate()
 {
-	if (!visible)
+	if (!visible || expanded)
 	{
 		return;
 	}
@@ -489,6 +659,8 @@ void ToolTip::freeResource()
 	intro2 = nullptr;
 	magicIntro = nullptr;
 	image = nullptr;
+	body = nullptr;
+	detailFocus.clear();
 	owner.reset();
 	ConfigDrivenPanel::freeResource();
 }

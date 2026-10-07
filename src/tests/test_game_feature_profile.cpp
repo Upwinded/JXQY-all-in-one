@@ -1,9 +1,13 @@
 #include "../Game/Data/Global.h"
 #include "../Game/Data/DefeatedNpcExperience.h"
+#include "../Game/Config/Config.h"
 #include "../Resource/ResourceManifest.h"
 
 #include <iostream>
 #include <string>
+
+// This profile-only target runs without the engine configuration implementation.
+bool Config::useQingyuUi = false;
 
 namespace
 {
@@ -37,6 +41,12 @@ int main()
 		"resource behavior starts from stable universal defaults") && ok;
 	ok = check(!global.feature.rageSystem,
 		"unconfigured resources do not enable the MG-only rage system") && ok;
+	ok = check(!global.feature.separateTalentSlots,
+		"unconfigured resources retain their existing magic capacity") && ok;
+	ok = check(!global.feature.magicLevelLimitFromDefinition,
+		"unconfigured resources retain their existing magic level rules") && ok;
+	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,
+		"unconfigured resources keep their existing NPC attack protocol") && ok;
 
 	ResourceManifest yycsUi;
 	yycsUi.uiProfile = "YYCS";
@@ -47,6 +57,8 @@ int main()
 		"UI.Profile applies a coherent YYCS layout bundle") && ok;
 	ok = check(!global.feature.magicTriggerAtAnimationEnd && global.feature.lumAsBrightness,
 		"UI.Profile does not replace JXQY2 gameplay and rendering behavior defaults") && ok;
+	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,
+		"the YYCS layout does not enable a native combat protocol for dependent MODs") && ok;
 
 	const std::string overrideText =
 		"[Game]\n"
@@ -59,7 +71,10 @@ int main()
 		"[Features]\n"
 		"TopButtonsLayout=0\n"
 		"MagicTriggerAtAnimationEnd=1\n"
-		"RageSystem=1\n";
+		"NativeNpcAttackAtAnimationEnd=1\n"
+		"RageSystem=1\n"
+		"SeparateTalentSlots=1\n"
+		"MagicLevelLimitFromDefinition=1\n";
 	ResourceManifest explicitOverrides;
 	ok = check(explicitOverrides.loadFromBuffer(overrideText.c_str(), (int)overrideText.size()),
 		"feature override manifest parses") && ok;
@@ -68,8 +83,14 @@ int main()
 		"explicit disabled feature overrides UI.Profile default") && ok;
 	ok = check(global.feature.magicTriggerAtAnimationEnd,
 		"explicit enabled feature overrides the universal default") && ok;
+	ok = check(global.feature.nativeNpcAttackAtAnimationEnd,
+		"the native NPC attack protocol is explicitly enabled through the generic feature parser") && ok;
 	ok = check(global.feature.rageSystem,
 		"explicit manifest feature enables the MG-only rage system") && ok;
+	ok = check(global.feature.separateTalentSlots,
+		"the generic manifest feature parser enables separate talent slots") && ok;
+	ok = check(global.feature.magicLevelLimitFromDefinition,
+		"the generic manifest feature parser enables a declared magic level limit") && ok;
 	ok = check(global.feature.extendedInventoryLayout,
 		"absent feature keeps UI.Profile-derived default") && ok;
 
@@ -80,6 +101,10 @@ int main()
 	independentBehavior.features["magictriggeratanimationend"] = true;
 	independentBehavior.features["lumasbrightness"] = false;
 	global.applyResourceManifestFeatures(independentBehavior);
+	ok = check(!global.feature.separateTalentSlots,
+		"switching resources does not leak the talent capacity into another game") && ok;
+	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,
+		"switching resource profiles resets the native NPC protocol instead of leaking into another game") && ok;
 	ok = check(!global.feature.topButtonsLayout &&
 		global.feature.menuResourceProfile == mrpDefault,
 		"JXQY2 UI.Profile selects only the JXQY2 layout bundle") && ok;
@@ -123,6 +148,27 @@ int main()
 		calculateDefeatedNpcBaseExperience(
 			jxqy2Experience, 9, 8, 0, 0, false) == 0,
 		"zero-exp hostile battle NPCs use the level formula while other zero-exp NPCs stay unrewarded") && ok;
+	bool levelProductFallbackUsed = false;
+	ok = check(
+		calculateDefeatedNpcBaseExperience(
+			jxqy2Experience, 9, 8, 0, 0, true,
+			&levelProductFallbackUsed) == 72 &&
+			levelProductFallbackUsed &&
+		calculateDefeatedNpcBaseExperience(
+			jxqy2Experience, 9, 8, 100, 0, true,
+			&levelProductFallbackUsed) == 100 &&
+			!levelProductFallbackUsed &&
+		calculateDefeatedNpcBaseExperience(
+			jxqy2Experience, 9, 8, 0, 0, false,
+			&levelProductFallbackUsed) == 0 &&
+			!levelProductFallbackUsed,
+		"the level-product fallback flag marks only zero-exp hostile battle NPCs in stored mode") && ok;
+	ok = check(
+		FallbackPracticeKillFraction > 0.2221f &&
+			FallbackPracticeKillFraction < 0.2223f &&
+			FallbackUseKillFraction > 0.0332f &&
+			FallbackUseKillFraction < 0.0334f,
+		"fallback magic fractions mirror the reference Yueying kill rules") && ok;
 
 	ResourceManifest yycsExperience;
 	yycsExperience.type = GAME_YYCS;
@@ -140,6 +186,12 @@ int main()
 			58,
 			yycsExperience.resolvedExperienceMultiplier())) == 174,
 		"YYCS experience bonus is added after the recipient and defeated levels") && ok;
+	ok = check(
+		calculateDefeatedNpcBaseExperience(
+			yycsExperience, 9, 8, 0, 0, true,
+			&levelProductFallbackUsed) == 72 &&
+			!levelProductFallbackUsed,
+		"the level-product fallback flag stays clear for packs whose primary mode is the level formula") && ok;
 
 	ResourceManifest xjxqyExperience;
 	xjxqyExperience.type = GAME_XJXQY;
@@ -221,6 +273,7 @@ int main()
 		"PartnerFollowRadius=4\n"
 		"PartnerFollowRunRadius=7\n\n"
 		"[Script]\n"
+		u8"PlayerName=  杨影枫  \n"
 		"NpcActionProfile=Legacy\n"
 		"NpcRuntimeProfile=Legacy\n"
 		"SpecialActionMode=Replace\n"
@@ -231,6 +284,7 @@ int main()
 		explicitBehavior.loadFromBuffer(
 			explicitBehaviorText.c_str(),
 			static_cast<int>(explicitBehaviorText.size())) &&
+		explicitBehavior.scriptPlayerName == u8"杨影枫" &&
 		explicitBehavior.resolvedLevelUpThresholdMode() ==
 			LevelUpThresholdMode::GreaterThanOrEqual &&
 		explicitBehavior.resolvedPartnerFollowRadius() == 4 &&
@@ -246,6 +300,11 @@ int main()
 		"resource configuration overrides every gameplay and script compatibility default") && ok;
 	global.applyResourceManifestFeatures(explicitBehavior);
 	ok = check(
+		global.scriptPlayerName == u8"杨影枫" &&
+		global.resolveScriptCharacterName("#name") == u8"杨影枫" &&
+		global.resolveScriptCharacterName("#Name") == "#Name" &&
+		global.resolveScriptCharacterName("#name.lua") == "#name.lua" &&
+		global.resolveScriptText(u8"#name：你好，#name！") == u8"杨影枫：你好，杨影枫！" &&
 		global.partnerFollowRadius == 4 &&
 		global.partnerFollowRunRadius == 7 &&
 		global.levelUpThresholdMode ==
@@ -256,6 +315,13 @@ int main()
 		global.addLifeMode == ScriptAddLifeMode::PlayerRules &&
 		!global.feature.rainSceneTint,
 		"explicit resource behavior is independent from Game.Type") && ok;
+	const std::string unnamedText = "[Game]\nId=UNNAMED\n[Script]\nPlayerName=\n";
+	ok = check(explicitBehavior.loadFromBuffer(unnamedText.data(), static_cast<int>(unnamedText.size()))
+		&& explicitBehavior.scriptPlayerName.empty(), "empty player name is optional and clears a reused manifest") && ok;
+	global.applyResourceManifestFeatures(explicitBehavior);
+	ok = check(global.resolveScriptText("#name") == "#name"
+		&& global.resolveScriptCharacterName("#name") == "#name",
+		"switching resources clears the configured name without tightening load rules") && ok;
 
 	const std::string levelUpText =
 		"[Game]\nId=LEVEL_UP_TEST\nType=2\n\n"
@@ -276,6 +342,23 @@ int main()
 		levelUpManifest.levelUpMaleEffect == "male.ini" &&
 		levelUpManifest.levelUpFemaleEffect == "female.ini",
 		"level-up message and effect Magic files parse from the resource manifest") && ok;
+	ok = check(levelUpManifest.levelUpMessageDefined &&
+		levelUpManifest.levelUpEffectMode == LevelUpEffectMode::Append &&
+		levelUpManifest.getLevelUpEffectCandidates(0) == std::vector<std::string>{ "male.ini" } &&
+		levelUpManifest.getLevelUpEffectCandidates(2) == std::vector<std::string>{ "female.ini" },
+		"level-up defaults to append and chooses the local definition for the player's sex") && ok;
+	const std::string emptyLevelUpText =
+		"[Game]\nId=EMPTY_LEVEL_UP\n[LevelUp]\nEffectMode=rEpLaCe\nRandomEffects=\nMaleEffect=\n";
+	ok = check(
+		levelUpManifest.loadFromBuffer(emptyLevelUpText.data(),
+			static_cast<int>(emptyLevelUpText.size())) &&
+			!levelUpManifest.levelUpMessageDefined &&
+			levelUpManifest.levelUpMessage == "{name}的等级得到提升！" &&
+			levelUpManifest.levelUpEffectMode == LevelUpEffectMode::Replace &&
+			levelUpManifest.levelUpRandomEffects.empty() &&
+			levelUpManifest.levelUpMaleEffect.empty() &&
+			levelUpManifest.getLevelUpEffectCandidates(2).empty(),
+		"effect mode is case insensitive and reloading clears prior local effects") && ok;
 
 	return ok ? 0 : 1;
 }

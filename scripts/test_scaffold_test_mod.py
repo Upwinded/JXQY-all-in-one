@@ -190,6 +190,39 @@ def make_minimal_assets(root: Path) -> Path:
     return assets_root
 
 
+def test_magic_scenario_release_timing() -> None:
+    for make_script in (
+        make_magic_lifecycle_script,
+        scaffold_module.make_magic_self_special_script,
+        make_magic_trail_script,
+        make_time_stop_visual_repro_script,
+        make_equipment_trigger_script,
+        scaffold_module.make_magic_collision_script,
+    ):
+        lines = make_script().splitlines()
+        expected_wait = scaffold_module.wait_for_magic_action()
+        for index, line in enumerate(lines):
+            if not line.startswith('usemagic('):
+                continue
+            if 'mod_test_magic_self_clear_abnormal.ini' in line:
+                assert lines[index + 1] == 'sleep(160);', 'instant cures retain their immediate contract'
+            else:
+                start = index + (2 if 'mod_test_magic_time_stop' in line else 1)
+                assert lines[start:start + len(expected_wait)] == expected_wait
+
+    shield = scaffold_module.make_magic_self_special_script()
+    assert shield.count('addnpcproperty("MOD_TEST_COLLISION_CASTER", "Attack", 200);') == 2
+    assert shield.count('npcusemagic("MOD_TEST_COLLISION_CASTER", "mod_test_magic_equipment_power.ini", 33, 11, 1);') == 2
+    assert 'getvar("mod_test_magic_self_block_life_after_damage") < getvar("mod_test_magic_self_block_life_after_shield")' in shield
+    expiry = shield.index('until getvar("mod_test_magic_self_shield_count_after") == 0')
+    assert shield.index('"mod_test_magic_self_block_life_after_shield"') < expiry
+    assert expiry < shield.rindex('npcusemagic("MOD_TEST_COLLISION_CASTER"')
+    retries = shield.index('for attempt = 1, 5 do')
+    assert expiry < retries < shield.rindex('npcusemagic("MOD_TEST_COLLISION_CASTER"')
+    assert 'then break end' in shield[retries:shield.index('assign("mod_test_magic_self_block_damage_ok", 0);')]
+    assert 'SELF_SHIELD_CONTROL life=' in shield
+
+
 def test_ordered_multiple_dependency_ids() -> None:
     assert parse_dependency_ids("JXQY2, YYCS, jxqy2") == ["JXQY2", "YYCS"]
 
@@ -265,7 +298,7 @@ def test_goods_lifecycle_display_name_case_contract() -> None:
 
     scenarios_ini = make_scenarios_ini()
     for expected_variable in [
-        "mod_test_goods_lifecycle_name_case_upper=0",
+        "mod_test_goods_lifecycle_name_case_upper=1",
         "mod_test_goods_lifecycle_name_case_exact=1",
         "mod_test_goods_lifecycle_name_case_after_delete=0",
     ]:
@@ -275,6 +308,56 @@ def test_goods_lifecycle_display_name_case_contract() -> None:
     case_path = "ini/goods/mod_test_goods_lifecycle_case.ini"
     if case_path not in generated_files:
         raise AssertionError(f"scenario files: missing {case_path}")
+
+
+def test_goods_lifecycle_bound_release_contract() -> None:
+    script = make_goods_lifecycle_script()
+    scenarios = make_scenarios_ini()
+    for stage, expected_count in [("one", 1), ("two", 1), ("missing", 0)]:
+        assert_contains(
+            script,
+            "\n".join([
+                "cleareffect();",
+                'usemagic("mod_test_magic_goods_bound.ini", 34, 16);',
+                *scaffold_module.wait_for_magic_action(),
+                f'geteffectstate("mod_test_magic_goods_bound.ini", "ProjectileCount", "mod_test_goods_lifecycle_bound_effect_after_{stage}");',
+                'getgoodsnum("mod_test_goods_bound_ammo.ini");',
+            ]),
+            f"goods-bound Magic observes a fresh release before checking {stage}",
+        )
+        assert_contains(scenarios,
+            f"mod_test_goods_lifecycle_bound_effect_after_{stage}={expected_count}",
+            "goods-bound Magic verifies projectiles as well as ammunition")
+
+
+def test_region_vtype_release_and_damage_contract() -> None:
+    script = scaffold_module.make_magic_region_vtype_script()
+    assert_contains(script, "\n".join([
+        'usemagic("mod_test_magic_region_vtype.ini", 34, 16);',
+        *scaffold_module.wait_for_magic_action(),
+        'geteffectstate("mod_test_magic_region_vtype.ini", "Count", "mod_test_magic_region_vtype_effect_count");',
+    ]), "V-type samples effects only after normal release")
+    assert_contains(scaffold_module.make_magic_region_vtype_ini(), "Effect=5", "V-type damage fixture")
+    assert_contains(script, 'getvar("mod_test_magic_region_vtype_hit_life") == 99994',
+        "V-type expects the fixture damage with the XJXQY minimum of five")
+    assert_contains(script, 'getvar("mod_test_magic_region_vtype_safe_life") == 99999',
+        "V-type retains its uninjured out-of-shape target check")
+
+
+def test_change_hit_threshold_and_reset_contract() -> None:
+    script = scaffold_module.make_magic_change_hit_script()
+    cast_and_wait = "\n".join([
+        'usemagic("mod_test_magic_change_hit_base.ini", 34, 16);',
+        *scaffold_module.wait_for_magic_action(),
+    ])
+    if script.count(cast_and_wait) != 4:
+        raise AssertionError("change-hit scenario must release all four normal UseMagic actions")
+    for current, previous in [("after1", "before"), ("after2", "after1"), ("after4", "after3")]:
+        assert_contains(script,
+            f'getvar("mod_test_magic_change_hit_life_{current}") <= getvar("mod_test_magic_change_hit_life_{previous}") - 10 and getvar("mod_test_magic_change_hit_life_{current}") > getvar("mod_test_magic_change_hit_life_{previous}") - 80',
+            "normal hits must not accidentally pass with powered-up damage")
+    assert_contains(scaffold_module.make_scenarios_ini(), "mod_test_magic_change_hit_reset=1",
+        "change-hit scenario checks the count consumption through the next actual cast")
 
 
 def test_script_return_api_map_boundary_contract() -> None:
@@ -1123,6 +1206,13 @@ def test_video_background_continuity_contract() -> None:
 
 def test_magic_critical_feedback_contract() -> None:
     script = scaffold_module.make_magic_critical_feedback_script().lower()
+    for cast, delay in [
+        ('usemagic("mod_test_magic_critical_buff.ini", 34, 20);', 'sleep(220);'),
+        ('usemagic("mod_test_magic_critical_strike.ini", 36, 20);', 'sleep(320);'),
+    ]:
+        assert_contains(script, "\n".join([
+            cast, *scaffold_module.wait_for_magic_action(), delay,
+        ]).lower(), "critical scenario waits for normal release")
     for required_line in [
         'assign("mod_test_magic_critical_feedback_ready", 1);',
         "setplayerlevel(1);",
@@ -1134,6 +1224,10 @@ def test_magic_critical_feedback_contract() -> None:
         'usemagic("mod_test_magic_critical_strike.ini", 36, 20);',
         'assign("mod_test_magic_critical_total_damage", getvar("mod_test_magic_critical_initial_life") - getvar("mod_test_magic_critical_final_life"));',
         'getvar("mod_test_magic_critical_total_damage") == 1200',
+        'getnpcstate("mod_test_critical_target", "life", "mod_test_magic_critical_hit_before");',
+        'getnpcstate("mod_test_critical_target", "life", "mod_test_magic_critical_hit_after");',
+        'if getvar("mod_test_magic_critical_hit_before") - getvar("mod_test_magic_critical_hit_after") == 200 then assign("mod_test_magic_critical_hit_count", getvar("mod_test_magic_critical_hit_count") + 1) end',
+        'getvar("mod_test_magic_critical_hit_count") == 6',
         'assign("mod_test_magic_critical_feedback_pass", 1)',
         'mg 暴击检查：目标头顶应显示橙色文字‘暴击 200’',
     ]:
@@ -1172,6 +1266,7 @@ def test_magic_critical_feedback_contract() -> None:
         "Smoke=0",
         "EntryScript=mod_test_magic_critical_feedback.txt",
         "mod_test_magic_critical_feedback_pass=1",
+        "ExpectVariablesExtra=mod_test_magic_critical_hit_count=6",
         "temporary explicit RageSystem=1 profile activation",
     ]:
         assert_contains(scenarios_ini, required_line, "MG critical feedback scenario metadata")
@@ -1303,6 +1398,15 @@ def test_magic_summon_maxcount_replacement_contract() -> None:
 
 def test_magic_vibrating_screen_contract() -> None:
     script = make_magic_summon_body_script().lower()
+    for cast in [
+        'usemagic("mod_test_magic_body_medium.ini", 38, 20);',
+        'usemagic("mod_test_magic_revive_body.ini", 36, 22);',
+    ]:
+        assert_contains(script, "\n".join([
+            cast,
+            *scaffold_module.wait_for_magic_action(),
+            'sleep(200);',
+        ]).lower(), "body scenario must sample after normal release")
     assert_contains(
         script,
         'getmagicstate("mod_test_magic_body_medium.ini", "vibratingscreen", "mod_test_magic_body_vibrating");',
@@ -1893,7 +1997,7 @@ def test_magic_carry_user_hidden_contract() -> None:
         'assign("mod_test_magic_carry_user_hidden_contract", 1);',
         'if getvar("mod_test_magic_carry_user4_hide_hidden_seen") == 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
         'if getvar("mod_test_magic_carry_user4_hide_restored") == 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
-        'if getvar("mod_test_magic_carry_user4_hide_exploding_hidden_seen") ~= 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
+        'if getvar("mod_test_magic_carry_user4_hide_exploding_hidden_seen") == 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
         'if getvar("mod_test_magic_carry_user1_hide_hidden_seen") == 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
         'if getvar("mod_test_magic_carry_user1_hide_exploding_hidden_seen") == 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
         'if getvar("mod_test_magic_carry_user1_hide_player_moved") == 0 then assign("mod_test_magic_carry_user_hidden_contract", 0) end',
@@ -1924,7 +2028,7 @@ def test_magic_carry_user_hidden_contract() -> None:
     scenarios_ini = make_scenarios_ini()
     for expected_variable in [
         "mod_test_magic_carry_user4_hide_hidden_seen=1",
-        "mod_test_magic_carry_user4_hide_exploding_hidden_seen=0",
+        "mod_test_magic_carry_user4_hide_exploding_hidden_seen=1",
         "mod_test_magic_carry_user4_hide_restored=1",
         "mod_test_magic_carry_user1_hide_hidden_seen=1",
         "mod_test_magic_carry_user1_hide_exploding_hidden_seen=1",
@@ -1953,6 +2057,62 @@ def test_magic_carry_user_hidden_contract() -> None:
             raise AssertionError(f"scenario files: missing {required_path}")
 
 
+def test_magic_collision_animation_overlap() -> None:
+    script = make_magic_collision_script()
+    exchange = script.split('displaymessage("正在测试交换施法者");', 1)[1]
+    exchange = exchange.split('displaymessage("正在测试武功状态持续时间");', 1)[0]
+    assert_contains(
+        exchange,
+        '\n'.join([
+            'usemagic("mod_test_magic_exchange.ini", 34, 19);',
+            *scaffold_module.wait_for_magic_action(),
+            'npcusemagic("MOD_TEST_COLLISION_CASTER", "mod_test_magic_collision_peer.ini", 34, 19, 1);',
+        ]),
+        "exchange launches the NPC projectile after the normal player animation",
+    )
+    assert_contains(scaffold_module.make_magic_status_duration_short_freeze_ini(),
+                    "SpecialKindMilliSeconds=2400", "freeze outlasts the second casting animation")
+    assert_contains(script, 'getvar("mod_test_magic_status_freeze_short_ms") > 1600',
+                    "freeze overlap needs a live initial status")
+    assert_contains(script, 'getvar("mod_test_magic_status_freeze_long_effect_count") > 0',
+                    "freeze overlap requires the second spell to have actually appeared")
+    assert_contains(script,
+                    'getvar("mod_test_magic_status_freeze_preserved_ms") < getvar("mod_test_magic_status_freeze_short_ms")',
+                    "second hit must not extend the initial freeze")
+    if "timing_probe_" in script or "_PROBE i=" in script:
+        raise AssertionError("temporary collision timing probes leaked into generated resources")
+
+
+def test_magic_discard_collision_window() -> None:
+    script = make_magic_collision_script()
+    assert 'addmagic("mod_test_magic_discard_control.ini");' not in script.split('displaymessage("正在测试丢弃对立目标");', 1)[0]
+    stage = script.split('displaymessage("正在测试丢弃对立目标");', 1)[1]
+    stage = stage.split('displaymessage("正在测试交换施法者");', 1)[0]
+    for magic_file in ("mod_test_magic_discard_control.ini", "mod_test_magic_discard.ini"):
+        assert_contains(stage, '\n'.join([
+            f'usemagic("{magic_file}", 34, 19);',
+            *scaffold_module.wait_for_magic_action(),
+            'npcusemagic("MOD_TEST_COLLISION_CASTER", "mod_test_magic_collision_peer.ini", 34, 19, 1);',
+            'setnpcpos("MOD_TEST_COLLISION_CASTER", 36, 22);',
+            'setplayerpos(36,24);',
+        ]), "discard/control use the same launch order without character targets on the lane")
+    assert stage.count('sleep(100);') == 2
+    assert 'sleep(1600);' not in stage
+    assert_contains(stage, 'delmagic("mod_test_magic_discard.ini");\naddmagic("mod_test_magic_discard_control.ini");',
+                    "discard control borrows a learned-magic slot")
+    assert_contains(stage, 'delmagic("mod_test_magic_discard_control.ini");\naddmagic("mod_test_magic_discard.ini");',
+                    "discard positive fixture regains the same slot")
+    for variable in ("mod_test_magic_discard_pair_ready", "mod_test_magic_discard_control_pair_ready",
+                     "mod_test_magic_discard_control_survived", "mod_test_magic_status_petrify_learned"):
+        assert_contains(make_scenarios_ini(), variable + "=1", "discard overlap/control expectation")
+    assert_contains(stage, 'getvar("mod_test_magic_discard_control_survived") == 1 and',
+                    "positive discard result requires a successful negative control")
+    control = scaffold_module.make_magic_discard_control_ini()
+    assert control.replace("MOD_TEST_DISCARD_CONTROL", "MOD_TEST_DISCARD_OPPOSITE").replace(
+        "DiscardOppositeMagic=0", "DiscardOppositeMagic=1") == scaffold_module.make_magic_discard_ini()
+    assert scenario_files()["ini/magic/mod_test_magic_discard_control.ini"] == control
+
+
 def test_magic_forced_handoff_contract() -> None:
     script = make_magic_collision_script().lower()
     for required_call in [
@@ -1976,6 +2136,18 @@ def test_magic_forced_handoff_contract() -> None:
         'if getvar("mod_test_magic_forced_handoff_forced_raw") == 1 and getvar("mod_test_magic_forced_handoff_action_raw") == 26 then assign("mod_test_magic_forced_handoff_action_forced", 1) end',
     ]:
         assert_contains(script, required_call, "magic_collision forced-handoff contract")
+
+    handoff = script.split('displaymessage("正在测试强制移动交接");', 1)[1].split(
+        'displaymessage("正在测试弹飞接触伤害");', 1)[0]
+    assert_contains(handoff, "\n".join([
+        'usemagic("mod_test_magic_bounce_handoff.ini", 34, 16);',
+        *[line.lower() for line in scaffold_module.wait_for_magic_action()],
+        'for i = 1, 160 do',
+        'sleep(10);',
+        'getnpcstate("mod_test_collision_target", "isbouncing", "mod_test_magic_forced_handoff_bounce_raw");',
+    ]), "sample the short bounce window after the normal first cast")
+    assert handoff.count('usemagic(') == 2
+    assert 'npcusemagic(' not in handoff
 
     bounce_ini = make_magic_bounce_handoff_ini()
     for required_line in [
@@ -2072,6 +2244,11 @@ def test_magic_pass_through_wall_contract() -> None:
 
 def test_magic_post_cast_child_chain_contract() -> None:
     script = make_magic_post_cast_script().lower()
+    assert_contains(script, "\n".join([
+        'usemagic("mod_test_magic_post_cast_parent.ini", 36, 20);',
+        *scaffold_module.wait_for_magic_action(),
+        'getplayerstate("IsMagicForcedMoving", "mod_test_magic_post_cast_jump_active");',
+    ]).lower(), "post-cast movement must be sampled after normal release")
     for required_call in [
         'addmagic("mod_test_magic_post_cast_parent.ini");',
         "addevade(200);",
@@ -3167,8 +3344,35 @@ def test_magic_morph_replace_primary_list_contract() -> None:
             raise AssertionError(f"scenario files: missing {required_path}")
 
 
+def test_magic_temp_relation_timing_contract() -> None:
+    script = scaffold_module.make_magic_temp_relation_script()
+    wait = "\n".join(scaffold_module.wait_for_magic_action())
+    assert script.count('usemagic("mod_test_magic_temp_relation.ini", 34, 16);\n' + wait) == 2
+    for variable in ("flipped", "second_active"):
+        assert f'assign("mod_test_magic_temp_relation_{variable}", 1); break end' in script
+    assert_contains(script, '\n'.join([
+        'npcusemagic("MOD_TEST_COLLISION_CASTER", "mod_test_magic_temp_relation.ini", 34, 16, 1);',
+        'for i = 1, 16 do',
+        'sleep(10);',
+    ]), "observe cancellation before natural expiry")
+    assert 'sleep(2200);' in script
+    assert_contains(script,
+        'if getvar("mod_test_magic_temp_relation_player_life_after") < getvar("mod_test_magic_temp_relation_player_life_before") and ',
+        "require an actual player hit before accepting relation immunity")
+    assert 'ChangeToFriendMilliseconds=1600' in scaffold_module.make_magic_temp_relation_ini()
+
+
 def test_magic_control_death_cleanup_contract() -> None:
     script = make_magic_transport_control_script().lower()
+    wait = "\n".join(line.lower() for line in scaffold_module.wait_for_magic_action())
+    for magic, field in [
+        ("transport", 'getplayerstate("istransporting", "mod_test_magic_transport_active");'),
+        ("control", 'getplayerstate("iscontrollingcharacter", "mod_test_magic_control_active");'),
+        ("control", 'getplayerstate("iscontrollingcharacter", "mod_test_magic_control_death_active");'),
+    ]:
+        destination = "36, 20"
+        assert_contains(script, f'usemagic("mod_test_magic_{magic}.ini", {destination});\n{wait}\n{field}',
+                        "observe transport/control after the normal cast releases")
     for required_call in [
         'addmagic("mod_test_magic_control.ini");',
         'setmagiclevel("mod_test_magic_control.ini", 1);',
@@ -3289,6 +3493,14 @@ def test_magic_control_runtime_relation_contract() -> None:
 
 def test_time_stop_visual_repro_contract() -> None:
     script = make_time_stop_visual_repro_script().lower()
+    assert 'local automatic = getvar("mod_test_auto_scenario_used") == 32;' in script
+    assert script.index('local automatic') < script.index('loadgame(0);')
+    frozen = script.index('assign("mod_test_time_stop_position_frozen", 0);')
+    thaw = script.index('if automatic then')
+    assert frozen < thaw < script.index('until getvar("mod_test_time_stop_remaining") == 0')
+    for field in ('mapx', 'mapy', 'offx', 'offy'):
+        assert f'getvar("mod_test_time_stop_before_{field}") == getvar("mod_test_time_stop_after_{field}")' in script
+        assert f'getvar("mod_test_time_stop_before_{field}") ~= getvar("mod_test_time_stop_resumed_{field}")' in script
     for required_call in [
         'displaymessage("时间停止画面复现开始");',
         'assign("mod_test_time_stop_visual_repro_ready", 1);',
@@ -3354,6 +3566,13 @@ def test_time_stop_visual_repro_contract() -> None:
         "EntryScript=mod_test_time_stop_visual_repro.txt",
         "mod_test_time_stop_visual_repro_ready=1",
         "mod_test_time_stop_visual_repro_cast=1",
+        "mod_test_time_stop_cast_started=1",
+        "mod_test_time_stop_active_before=1",
+        "mod_test_time_stop_active_after=1",
+        "mod_test_time_stop_walking=1",
+        "mod_test_time_stop_position_frozen=1",
+        "mod_test_time_stop_remaining=0",
+        "mod_test_time_stop_position_resumed=1",
         "visible window or computer-use inspection for animation-frame acceptance",
     ]:
         assert_contains(scenarios_ini, expected_line, "time-stop visual scenario metadata")
@@ -4058,7 +4277,7 @@ def test_message_and_trilogy_tooltip_layout_contract() -> None:
         ):
             raise AssertionError(f"YYCS tooltip component exceeds background: {component_name}")
 
-    for pack_name in ("月眉儿外传1.053", "江湖余尘1.03", "江湖余尘二", "潇湘行1.022"):
+    for pack_name in ("月眉儿外传", "江湖余尘", "江湖余尘二", "潇湘行"):
         local_tooltip_root = REPO_ROOT / "assets" / pack_name / "ini" / "ui"
         local_window_parser = read_ini(local_tooltip_root / "tooltip" / "window.ini")
         if get_value(local_window_parser, "Init", "Align").lower() != "altopcenter":

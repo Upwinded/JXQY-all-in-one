@@ -14,6 +14,7 @@
 #include "../Engine/WindowTypes.h"
 #include "ResourceManager.h"
 #include "ResourcePackList.h"
+#include "../Game/Menu/ControllerPromptPresenter.h"
 #include "../Game/Menu/UIFocusManager.h"
 #include "../Game/Loading/ExclusiveLoadingRunner.h"
 #include "../Update/HttpsDownload.h"
@@ -21,6 +22,9 @@
 #include "../Update/ResourceDownloadPreparation.h"
 #include "../Update/ResourceInstallTransaction.h"
 #include "../Update/ResourcePackageArchive.h"
+#include "../Game/GameManager/SavePackage.h"
+
+struct SaveFileSelection;
 
 class GamepadEssentialUITestAccess;
 class GamepadSurfaceContractTestAccess;
@@ -70,7 +74,8 @@ private:
 		ResourceImport,
 		ProgramDownload,
 		ResourceRemoval,
-		SaveManagement
+		SaveManagement,
+		SaveTransfer
 	};
 
 	enum class ResourceInstallProgressStage
@@ -114,6 +119,7 @@ private:
 		std::string programFailureMessage;
 		bool programReady = false;
 		OnlineUpdate::ResourceInstallTransactionResult transaction;
+		SavePackage::Package savePackage;
 	};
 
 	enum class ResourceInstallDialogState
@@ -123,6 +129,10 @@ private:
 		Confirming,
 		BrowsingSaves,
 		ConfirmingSaveRemoval,
+		ChoosingSaveExport,
+		ConfirmingSaveImport,
+		SelectingSaveFile,
+		TransferringSaves,
 		Downloading,
 		Cancelling,
 		ReadyToRestart,
@@ -131,6 +141,7 @@ private:
 	};
 
 	virtual bool onInitial();
+	void onRun() override;
 	virtual void onDraw();
 	virtual void onDrawEnd() override;
 	virtual void onExit();
@@ -170,6 +181,15 @@ private:
 	void beginProgramDownloadConfirmation();
 	void beginResourceRemovalConfirmation();
 	void beginSaveManagement();
+	void chooseSaveExport();
+	void selectSaveFile(bool exporting);
+	void pollSaveFileSelection();
+	void startSaveTransfer(const std::string& path);
+	void finishSaveTransfer(const GameLoading::ExclusiveLoadingCompletion& completion);
+	bool resolveSaveTransferGame(const std::string& saveNamespace,
+		const std::string& gameId = "");
+	std::filesystem::path saveTransferRoot() const;
+	bool saveImportOverwrites() const;
 	void executeResourceRemoval();
 	void executeSaveRemoval();
 	void activateResourceDialogPrimary();
@@ -197,6 +217,8 @@ private:
 	bool restoreSemanticFocus();
 	void updateFocusPresentation();
 	void synchronizeSemanticFocusWithInput();
+	bool shouldShowControllerPrompts() const;
+	ControllerPromptDrawOptions controllerPromptOptions() const;
 	void loadSceneImages();
 	void updateLayout(int width, int height);
 	void updateControlLayout();
@@ -230,6 +252,7 @@ private:
 	Rect getDisplaySettingsApplyButtonRect() const;
 	Rect getDisplaySettingsDefaultButtonRect() const;
 	Rect getDisplaySettingsBackButtonRect() const;
+	int getDialogAvailableHeight() const;
 	Rect getCheatHelpDialogRect() const;
 	Rect getCheatHelpCloseButtonRect() const;
 	Rect getExternalResourceDialogRect() const;
@@ -296,6 +319,7 @@ private:
 		bool onlineAvailable = false;
 		bool onlineOnly = false;
 		bool onlineVersionMatches = false;
+		bool localVersionNewerThanOnline = false;
 		bool hasPendingOnlineArtifacts = false;
 		bool requiresNewerEngine = false;
 		bool wasRecentlySelected = false;
@@ -314,6 +338,7 @@ private:
 		std::string releaseNotes;
 		std::string configurationErrorText;
 		bool onlineAvailable = false;
+		bool localVersionNewerThanOnline = false;
 		bool hasPendingOnlineArtifacts = false;
 		bool requiresNewerEngine = false;
 		bool wasRecentlySelected = false;
@@ -354,6 +379,8 @@ private:
 	std::shared_ptr<FlatTextButton> onlineActionButton;
 	std::shared_ptr<FlatTextButton> resourceRemoveButton;
 	std::shared_ptr<FlatTextButton> saveManagementButton;
+	std::shared_ptr<FlatTextButton> saveExportButton;
+	std::shared_ptr<FlatTextButton> saveImportButton;
 	std::shared_ptr<FlatTextButton> displaySettingsButton;
 	std::array<std::shared_ptr<FlatTextButton>, 4>
 		displaySettingsPreviousButtons;
@@ -372,6 +399,7 @@ private:
 	std::shared_ptr<FlatTextButton> enableExternalButton;
 	std::vector<std::shared_ptr<FlatTextButton>> externalLinkButtons;
 	UIFocusManager focusManager;
+	ControllerPromptTextureCache controllerPromptTextureCache;
 	int startY = 120;
 	int startX = 80;
 	int contentWidth = 0;
@@ -421,6 +449,19 @@ private:
 		ResourceManager::ResourceRemovalSavePolicy::Unselected;
 	std::vector<ResourceManager::SaveNamespaceInfo> saveNamespaceEntries;
 	int selectedSaveNamespaceIndex = 0;
+	enum class SaveTransferAction
+	{
+		Inspect,
+		Export,
+		Import
+	};
+	SaveTransferAction saveTransferAction = SaveTransferAction::Inspect;
+	SavePackage::GameIdentity saveTransferGame;
+	std::shared_ptr<SavePackage::Package> pendingSavePackage;
+	std::shared_ptr<SaveFileSelection> saveFileSelection;
+	std::vector<int> saveExportSlots;
+	int selectedTransferSlot = 0;
+	bool saveImportWillOverwrite = false;
 	std::unique_ptr<GameLoading::ExclusiveLoadingRunner>
 		resourceInstallRunner;
 	std::shared_ptr<ResourceInstallWorkerResult>

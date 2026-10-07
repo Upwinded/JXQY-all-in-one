@@ -71,7 +71,7 @@ ANDROID_ASSET_EXCLUDES = {
 }
 FORMAL_INITIAL_SAVE_TEMPLATES = {
     "jxqy2/ini/save/game.ini",
-    "新月无痕3.0/ini/save/game.ini",
+    "新月无痕/ini/save/game.ini",
 }
 MINIZ_RUNTIME_SOURCES = (
     "ThirdParty/miniz/miniz.c",
@@ -200,6 +200,10 @@ def check_android_asset_exclusion_contract(root: Path, errors: list[str]) -> Non
         "debug {",
         "androidAssetExcludes.each { pattern ->",
         "release {",
+        "fullyRelease {",
+        "initWith release",
+        "matchingFallbacks = ['release']",
+        "debuggable false",
         "def variantAssetExcludes = androidAssetExcludes.toList()",
         "def isReleaseVariant = variant.buildType == 'release'",
         "keepOnlyReleaseBootstrapAssets(",
@@ -703,7 +707,8 @@ def check_application_identity_contract(root: Path, errors: list[str]) -> None:
         f'def displayName = "{DISPLAY_NAME}";',
         f'def applicationIdentifier = "{ANDROID_APPLICATION_ID}";',
         'resValue "string", "app_name", displayName',
-        'def outputAPKName = "${artifactName}_${variant.name}_v${appVersion}.apk";',
+        "def outputVariantName = variant.buildType == 'fullyRelease' ? 'fully-release' : variant.name",
+        'def outputAPKName = "${artifactName}_${outputVariantName}_v${appVersion}.apk";',
     )
     for expected in android_expected_values:
         if expected not in android_gradle_text:
@@ -1094,7 +1099,7 @@ def main() -> int:
             '"JXQY_ANDROID_STORE_PASSWORD"',
             '"JXQY_ANDROID_KEY_ALIAS"',
             '"JXQY_ANDROID_KEY_PASSWORD"',
-            '"jxqy-all-in-one-android-universal-{version}.apk"',
+            '"jxqy-all-in-one-android-universal{suffix}-{version}.apk"',
             'EXPECTED_ABIS = {"arm64-v8a", "x86_64"}',
         ):
             if expected not in android_packaging:

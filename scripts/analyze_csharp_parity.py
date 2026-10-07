@@ -440,9 +440,12 @@ def scan_resource_script_calls(root: Path, max_examples: int) -> list[dict[str, 
                 item["count"] = int(item["count"]) + 1
                 examples = item["examples"]
                 if isinstance(examples, list) and len(examples) < max_examples:
+                    # Assets can live outside the checkout through a junction
+                    # or an explicit --assets-root. Keep that location usable.
+                    location = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
                     examples.append(
                         {
-                            "file": str(path.relative_to(REPO_ROOT)).replace("\\", "/"),
+                            "file": location.as_posix(),
                             "line": line_no,
                         }
                     )

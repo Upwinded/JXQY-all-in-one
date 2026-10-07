@@ -15,6 +15,7 @@ public:
 	unsigned int selColor = 0xFFE6C864;
 	int itemHeight = 0;
 	int itemCount = 0;
+	bool fitItems = false;
 	std::string soundName = "";
 	std::vector<std::string> itemName;
 	std::vector<std::shared_ptr<Button>> itemButton;
@@ -28,4 +29,3 @@ private:
 	virtual void onEvent();
 	virtual void onSetChildRect() override;
 };
-

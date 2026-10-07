@@ -53,7 +53,8 @@ std::unique_ptr<char[]> makeNullTerminatedBuffer(const std::string& text)
 
 std::string normalizeLegacySlashComments(std::string text)
 {
-	size_t lineStart = 0;
+	// INIReader removes the UTF-8 BOM later; skip it when recognizing the first comment.
+	size_t lineStart = text.compare(0, 3, "\xEF\xBB\xBF") == 0 ? 3 : 0;
 	while (lineStart < text.size())
 	{
 		const size_t lineEnd = text.find('\n', lineStart);

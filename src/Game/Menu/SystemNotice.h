@@ -4,12 +4,19 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 class SystemNotice :
 	public Element
 {
+	friend class CoreLifecycleTestAccess;
 public:
-	SystemNotice();
+	enum class Mode
+	{
+		SingleNotice,
+		ScriptMessages
+	};
+	explicit SystemNotice(Mode mode = Mode::SingleNotice);
 	virtual ~SystemNotice();
 
 	void showMessage(
@@ -27,6 +34,15 @@ private:
 
 	void updateLayout(int width, int height);
 	void refreshTextImage();
+	void refreshMessageText();
+	struct TimedMessage
+	{
+		std::string text;
+		UTime beginTime;
+		UTime duration;
+	};
+	Mode mode;
+	std::vector<TimedMessage> messages;
 
 	std::unique_ptr<char[]> fontData;
 	int fontLength = 0;

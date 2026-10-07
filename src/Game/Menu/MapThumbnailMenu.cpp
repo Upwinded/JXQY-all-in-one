@@ -85,21 +85,10 @@ void MapThumbnailMenu::forceRegenerate()
 
 void MapThumbnailMenu::updateThumbnail()
 {
-	if (gm->map != nullptr)
+	if (thumbnailContainer)
 	{
-		if (currentMapName != gm->global.data.mapName)
-		{
-			gm->map->generateThumbnail();
-			currentMapName = gm->global.data.mapName;
-		}
-
-		auto thumbnail = gm->map->getThumbnailImage();
-		if (thumbnailContainer && thumbnail)
-		{
-			thumbnailContainer->impImage = thumbnail;
-		}
+		thumbnailContainer->impImage = gm->map ? gm->map->getThumbnailImage() : nullptr;
 	}
-
 }
 
 void MapThumbnailMenu::setControllerVisible(bool newVisible)
@@ -201,7 +190,7 @@ bool MapThumbnailMenu::thumbnailPixelToTile(int x, int y, Point& tile)
 	{
 		int tilePixelWidth = mapWidth * TILE_WIDTH;
 		int tilePixelHeight = (mapHeight - 1) * TILE_HEIGHT / 2;
-		sourceRect = { TILE_WIDTH, TILE_HEIGHT, tilePixelWidth - TILE_WIDTH / 2, tilePixelHeight - TILE_HEIGHT / 2 };
+		sourceRect = { TILE_WIDTH, TILE_HEIGHT, tilePixelWidth, tilePixelHeight + TILE_HEIGHT / 2 };
 	}
 	if (sourceRect.w <= 0 || sourceRect.h <= 0 || thumbnailContainer->rect.w <= 0 || thumbnailContainer->rect.h <= 0)
 	{
@@ -383,7 +372,8 @@ void MapThumbnailMenu::onUpdate()
 		return;
 	}
 
-	if (thumbnailContainer && (thumbnailContainer->impImage == nullptr || currentMapName != gm->global.data.mapName))
+	if (thumbnailContainer && thumbnailContainer->impImage !=
+		(gm->map ? gm->map->getThumbnailImage() : nullptr))
 	{
 		updateThumbnail();
 	}
@@ -429,7 +419,8 @@ void MapThumbnailMenu::onDrawEnd()
 	promptOptions.itemGap = std::max(8,
 		static_cast<int>(std::round(12.0f * scaleX)));
 	ControllerPromptPresenter::draw(
-		engine, engine->inputActions(), mapControllerPromptItems(), promptOptions);
+		engine, engine->inputActions(), mapControllerPromptItems(), promptOptions,
+		controllerPromptTextureCache);
 }
 
 void MapThumbnailMenu::onWindowResize(int width, int height)
@@ -497,6 +488,10 @@ Rect MapThumbnailMenu::expandAndClampRect(Rect target, int marginX, int marginY,
 
 void MapThumbnailMenu::adjustThumbnailContainerRect()
 {
+	if (gm != nullptr && gm->global.feature.qingyuUi)
+	{
+		return;
+	}
 	if (thumbnailContainer == nullptr || gm == nullptr)
 	{
 		return;
@@ -636,7 +631,7 @@ Point MapThumbnailMenu::tileToThumbnailPixel(Point tile, PointEx offset)
 	{
 		int tilePixelWidth = mapWidth * TILE_WIDTH;
 		int tilePixelHeight = (mapHeight - 1) * TILE_HEIGHT / 2;
-		sourceRect = { paddingX, paddingY, tilePixelWidth - TILE_WIDTH / 2, tilePixelHeight - TILE_HEIGHT / 2 };
+		sourceRect = { paddingX, paddingY, tilePixelWidth, tilePixelHeight + TILE_HEIGHT / 2 };
 	}
 
 	if (sourceRect.w <= 0 || sourceRect.h <= 0)
@@ -686,7 +681,11 @@ float MapThumbnailMenu::getMarkerEdgeAlpha(int pixelX, int pixelY) const
 		return 0.0f;
 	}
 
-	const Rect& bounds = thumbnailContainer->rect;
+	Rect& bounds = thumbnailContainer->rect;
+	if (gm != nullptr && gm->map != nullptr && !gm->map->getThumbnailImage())
+	{
+		return bounds.PointInRect(pixelX, pixelY) ? 1.0f : 0.0f;
+	}
 	const float featherX = std::max(1.0f,
 		static_cast<float>(bounds.w) * MapThumbnailStyle::FeatherPixels / MapThumbnailStyle::CanvasWidth);
 	const float featherY = std::max(1.0f,
@@ -792,10 +791,10 @@ void MapThumbnailMenu::drawEntityMarkers()
 
 void MapThumbnailMenu::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	clearControllerCursor();
 	thumbnailContainer = nullptr;
 	mapNameLabel = nullptr;
 	closeButton = nullptr;
-	currentMapName.clear();
 	ConfigDrivenPanel::freeResource();
 }

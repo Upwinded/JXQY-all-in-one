@@ -260,6 +260,8 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTrace.cpp" />
     <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceFile.cpp" />
     <ClCompile Include="..\..\src\Launch\EditorRunRuntimeTraceWriter.cpp" />
+    <ClCompile Include="..\..\src\GameplayAutomation\AutomationPipe.cpp" />
+    <ClCompile Include="..\..\src\GameplayAutomation\GameplayAutomationSession.cpp" />
     <ClCompile Include="..\..\src\Launch\EditorRunSceneApplication.cpp" />
     <ClCompile Include="..\..\src\Launch\GameLaunchArguments.cpp" />
     <ClCompile Include="..\..\src\Game\Config\Config.cpp" />
@@ -314,6 +316,7 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClCompile Include="..\..\src\Game\GameManager\MenuController.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\RuntimeSaveGenerationPolicy.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\SaveFileManager.cpp" />
+    <ClCompile Include="..\..\src\Game\GameManager\SavePackage.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\SaveGeneration.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\ScriptRuntimeState.cpp" />
     <ClCompile Include="..\..\src\Game\GameManager\WorldInteractionResolver.cpp" />
@@ -376,6 +379,7 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClCompile Include="..\..\src\Resource\ResourcePackCard.cpp" />
     <ClCompile Include="..\..\src\Resource\ResourcePackList.cpp" />
     <ClCompile Include="..\..\src\Resource\ResourceSelectScene.cpp" />
+    <ClCompile Include="..\..\src\Resource\ResourceSelectSceneSaveTransfer.cpp" />
     <ClCompile Include="..\..\src\Update\HttpsDownload.cpp" />
     <ClCompile Include="..\..\src\Update\OnlineUpdateCatalog.cpp" />
     <ClCompile Include="..\..\src\Update\ResourcePackageArchive.cpp" />
@@ -527,6 +531,7 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClInclude Include="..\..\src\Game\GameManager\GameManager.h" />
     <ClInclude Include="..\..\src\Game\GameManager\MenuController.h" />
     <ClInclude Include="..\..\src\Game\GameManager\SaveFileManager.h" />
+    <ClInclude Include="..\..\src\Game\GameManager\SavePackage.h" />
     <ClInclude Include="..\..\src\Game\GameManager\WorldInteractionResolver.h" />
     <ClInclude Include="..\..\src\Game\GameTypes.h" />
     <ClInclude Include="..\..\src\Game\Menu\BottomMenu.h" />

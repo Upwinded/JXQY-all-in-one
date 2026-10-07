@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../Component/Label.h"
 #include "../../Input/ControllerBindingCatalog.h"
 #include "../../Input/PhysicalInputManager.h"
 #include "UIFocusManager.h"
@@ -62,6 +63,11 @@ struct ControllerPromptLayout
 	int lineHeight = 0;
 	int contentHeight = 0;
 	bool truncated = false;
+};
+
+struct ControllerPromptTextureCache
+{
+	std::vector<CachedTextTexture> itemTextTextures;
 };
 
 enum class ControllerPromptOwnerPolicy
@@ -281,16 +287,18 @@ public:
 	static void drawBottomBar(
 		Engine* engine,
 		const GameInput::PhysicalInputManager& inputManager,
-		const std::vector<ControllerPromptItem>& items)
+		const std::vector<ControllerPromptItem>& items,
+		ControllerPromptTextureCache& textureCache)
 	{
-		draw(engine, inputManager, items, bottomBarOptions(engine));
+		draw(engine, inputManager, items, bottomBarOptions(engine), textureCache);
 	}
 
 	static void draw(
 		Engine* engine,
 		const GameInput::PhysicalInputManager& inputManager,
 		const std::vector<ControllerPromptItem>& items,
-		const ControllerPromptDrawOptions& options);
+		const ControllerPromptDrawOptions& options,
+		ControllerPromptTextureCache& textureCache);
 
 private:
 	static std::string controlTokenLabel(

@@ -1,9 +1,11 @@
 #pragma once
 #include "Effect.h"
+#include <cstdint>
 #include <vector>
 #include "CollisionDetector.h"
 
 class MagicDerivedRuntimeTestAccess;
+class ProjectileCollisionTestAccess;
 
 class EffectManager :
 	public Element
@@ -46,6 +48,13 @@ public:
 	size_t getPendingDelayedMagicCount() const { return delayedMagicList.size(); }
 	std::shared_ptr<GameElement> getPendingTrailMagicUser(size_t index) const;
 	std::shared_ptr<GameElement> getPendingDelayedMagicUser(size_t index) const;
+	std::shared_ptr<NPC> captureCasterSnapshot(const std::shared_ptr<NPC>& caster) const;
+	void replaceCasterReferences(const std::shared_ptr<GameElement>& caster,
+		const std::shared_ptr<GameElement>& replacement);
+	std::uint64_t getProjectileCollisionFrame() const
+	{
+		return projectileCollisionFrame;
+	}
 
 	void disableAllEffect();
 	bool hasSolidEffectAt(Point position) const;
@@ -61,9 +70,11 @@ public:
 
 protected:
 	virtual bool shouldUpdateChild(PElement child) override;
+	virtual void onPreTreatment() override;
 
 private:
 	friend class MagicDerivedRuntimeTestAccess;
+	friend class ProjectileCollisionTestAccess;
 
 	struct TrailMagicInfo
 	{
@@ -97,6 +108,7 @@ private:
 	std::weak_ptr<Effect> timeStopperEffect;
 	std::vector<TrailMagicInfo> trailMagicList;
 	std::vector<DelayedMagicInfo> delayedMagicList;
+	std::uint64_t projectileCollisionFrame = 0;
 
 	bool isTimeStopperCandidate(std::shared_ptr<Effect> effect) const;
 	void updateTrailMagic();

@@ -39,7 +39,7 @@ public:
 		RuntimeTraceFileSink&&) = delete;
 
 	bool valid();
-	// Performs exactly one fwrite and one durable flush for the complete batch.
+	// Writes and flushes the complete batch through the opened file handle.
 	bool appendBatchAndFlush(std::string_view batch);
 	RuntimeTraceBatchSink batchSink();
 #if defined(JXQY_ENABLE_TEST_HOOKS)

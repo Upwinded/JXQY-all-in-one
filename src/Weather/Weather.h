@@ -48,9 +48,7 @@ private:
 	void resetDay();
 
 	bool fadding = false;
-	bool isSleeping = false;
 	bool isFadeIn = false;
-	UTime sleepLastTime = 0;
 	UTime fadeBeginTime = 0;
 	const unsigned int fadeLastTime = 500;
 
@@ -122,7 +120,6 @@ public:
 	void fadeInEx();
 	void fadeIn();
 	void fadeOut();
-	void sleep(unsigned int t);
 
 	void setFadeLum(unsigned char l);
 

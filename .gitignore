@@ -492,7 +492,13 @@ google-services.json
 xcuserstate/
 xcuserdata/
 
-macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/
+macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/*
+!macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcshareddata/
+macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcshareddata/*
+!macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcshareddata/WorkspaceSettings.xcsettings
+!macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/
+macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/*
+!macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved
 macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcuserstate/
 macos_ios/jxqy/jxqy.xcodeproj/project.xcworkspace/xcuserdata/
 macos_ios/jxqy/jxqy.xcodeproj/xcuserdata/

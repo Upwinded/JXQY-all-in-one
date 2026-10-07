@@ -23,6 +23,11 @@ std::size_t PreparedObjectLoad::objectCount() const noexcept
 		: 0;
 }
 
+bool PreparedObjectLoad::needsNormalization() const noexcept
+{
+	return normalizationRequired;
+}
+
 ObjectManager::ObjectManager()
 {
 	setPriority(epGameManager);
@@ -83,7 +88,7 @@ std::shared_ptr<Object> ObjectManager::findNearestScriptViewObj(Point pos, int r
 		if (tempObj != nullptr && tempObj->canSelectForInteraction())
 		{
 			auto tempDistance = gm->map->calDistance(tempObj->position, pos);
-			if (tempDistance < distance && gm->map->canSee(pos, tempObj->position))
+			if (tempDistance < distance)
 			{
 				distance = tempDistance;
 				tempIdx = i;
@@ -109,7 +114,7 @@ std::vector<std::shared_ptr<Object>> ObjectManager::findRadiusScriptViewObj(Poin
 
 		auto tempDistance = Map::calDistance(pos, objectList[i]->position);
 
-		if (objectList[i]->canSelectForInteraction() && gm->map->canSee(pos, objectList[i]->position) && tempDistance <= radius)
+		if (objectList[i]->canSelectForInteraction() && tempDistance <= radius)
 		{
 			ret.push_back(objectList[i]);
 		}
@@ -209,11 +214,16 @@ std::shared_ptr<Object> ObjectManager::addObject(std::string iniName, int x, int
 		return nullptr;
 	}
 	obj->initFromIni(&ini, "Init");
-	obj->setPosition({ x, y });
+	obj->position = { x, y };
 	obj->direction = dir;
 	obj->setOffset(objOffset);
     objectList.push_back(obj);
 	addChild(obj);
+	// New objects need an index entry even when their template position is unchanged.
+	if (gm != nullptr && gm->map != nullptr)
+	{
+		gm->map->addObjectToDataMap(obj->getPosition(), obj);
+	}
 	return obj;
 }
 
@@ -456,6 +466,7 @@ bool ObjectManager::prepareLoad(
 				loadedPath.c_str());
 			preparedLoad.reader = std::move(reader);
 			preparedLoad.count = 0;
+			preparedLoad.normalizationRequired = true;
 			return true;
 		}
 		GameLog::write("ObjectManager: invalid object list %s\n", loadedPath.c_str());
@@ -503,6 +514,7 @@ bool ObjectManager::prepareLoad(
 
 	preparedLoad.reader = std::move(reader);
 	preparedLoad.count = count;
+	preparedLoad.normalizationRequired = !declaredCountIsValid || count != declaredCount;
 	return true;
 }
 

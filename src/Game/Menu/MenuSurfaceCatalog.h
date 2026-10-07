@@ -332,14 +332,14 @@ namespace MenuSurfaceCatalog
 			FocusPolicy::None, DefaultFocusPolicy::None,
 			FocusRestorePolicy::None,
 			ControllerInteractionKind::Passive,
-			"cxx:SystemNotice; runtime:MenuController::showSystemNotice" },
+			"cxx:SystemNotice,ScriptMessages; runtime:MenuController::showSystemNotice; script:ShowSystemMsg,TalkSelfTip" },
 		{ SurfaceId::Message, "message",
 			SurfaceScope::Overlay, ModalKind::PassiveOverlay,
 			WorldPointerPolicy::PassThrough, WorldSemanticPolicy::Allow,
 			FocusPolicy::None, DefaultFocusPolicy::None,
 			FocusRestorePolicy::None,
 			ControllerInteractionKind::Passive,
-			"cxx:MsgBox; aggregate:ini/ui/message/*.menu.ini; script:*Message,TalkSelfTip" },
+			"cxx:MsgBox; aggregate:ini/ui/message/*.menu.ini; script:ShowMessage,DisplayMessage,Message,MessageBox" },
 		{ SurfaceId::Timer, "timer",
 			SurfaceScope::Overlay, ModalKind::PassiveOverlay,
 			WorldPointerPolicy::PassThrough, WorldSemanticPolicy::Allow,
@@ -391,7 +391,7 @@ namespace MenuSurfaceCatalog
 		SurfaceId surfaceId;
 	};
 
-	inline constexpr std::array<TypeBinding, 37> kTypeBindings =
+	inline constexpr std::array<TypeBinding, 38> kTypeBindings =
 	{{
 		{ "ResourceSelectScene", SurfaceId::StartupResourceSelect },
 		{ "Title", SurfaceId::StartupTitle },
@@ -423,6 +423,7 @@ namespace MenuSurfaceCatalog
 		{ "PartnerHeadMenu", SurfaceId::PartnerHead },
 		{ "MapThumbnailMenu", SurfaceId::MapThumbnail },
 		{ "SystemNotice", SurfaceId::SystemNotice },
+		{ "ScriptMessages", SurfaceId::SystemNotice },
 		{ "MsgBox", SurfaceId::Message },
 		{ "TimerMenu", SurfaceId::Timer },
 		{ "ToolTip", SurfaceId::Tooltip },
@@ -495,12 +496,12 @@ namespace MenuSurfaceCatalog
 		{ "ShowStealWin", "choice" },
 		{ "ShowGiveGoodsWin", "exempt:no-interface-created" },
 		{ "ShowMessage", "message" },
-		{ "ShowSystemMsg", "message" },
+		{ "ShowSystemMsg", "system-notice" },
 		{ "DisplayMessage", "message" },
 		{ "MessageBox", "message" },
 		{ "Message", "message" },
-		{ "ShowSystemMessage", "message" },
-		{ "TalkSelfTip", "message" },
+		{ "ShowSystemMessage", "system-notice" },
+		{ "TalkSelfTip", "system-notice" },
 		{ "BuyGoods", "buy-sell" },
 		{ "BuyGoodsOnly", "buy-sell" },
 		{ "SellGoods", "buy-sell" },

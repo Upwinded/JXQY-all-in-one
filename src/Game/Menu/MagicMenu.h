@@ -24,6 +24,12 @@ public:
 
 	void updateMagic();
 	void updateMagic(int index);
+	void showTalents(bool value);
+	bool isShowingTalents() const { return showingTalents; }
+	bool showDetails(int listIndex);
+	void closeDetails();
+	bool isShowingDetails() const { return showingDetails; }
+	bool assignDetailedMagic(bool practice);
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;
 	bool focusControllerDefault();
@@ -37,6 +43,27 @@ public:
 	void cancelControllerInteraction();
 
 private:
+	bool showingDetails = false;
+	bool detailFocused = false;
+	std::string detailedMagicFile;
+	int detailPage = 0;
+	std::string detailContent;
+	int detailWidth = 0;
+	std::vector<std::string> detailLines;
+	UIFocusManager detailFocus;
+	std::shared_ptr<MemoText> detailText;
+	void updateDetails();
+	void changeDetailPage(int direction);
+	void configureDetailFocus();
+	void setDetailVisibility();
+	int detailedMagicIndex() const;
+	bool showingTalents = false;
+	bool tabFocused = false;
+	std::shared_ptr<CheckBox> magicTab;
+	std::shared_ptr<CheckBox> talentTab;
+	int displayBegin() const;
+	int displayCount() const;
+	bool isDisplayIndex(int index) const;
 	int position = -1;
 	SlotInteractionController slotController;
 	void configureControllerFocus();
@@ -44,6 +71,7 @@ private:
 	void showControllerItemDetails(int visibleIndex);
 	void hideControllerItemDetails();
 	int getControllerItemIndex(int visibleIndex) const;
+	void onUpdate() override;
 	void onEvent() override;
 	bool onHandleUIAction(UIAction action) override;
 

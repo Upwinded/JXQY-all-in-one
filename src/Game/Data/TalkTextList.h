@@ -3,6 +3,7 @@
 #include <vector>
 #include <regex>
 #include "../../File/File.h"
+#include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
 
 struct TalkTextDetail
@@ -15,11 +16,30 @@ struct TalkTextDetail
 class TalkTextList
 {
 public:
-	void load(const std::string& fileName = "talkindex.txt")
+	void load(const std::string& fileName = "")
 	{
 		list.clear();
 		std::unique_ptr<char[]> s;
-		int len = File::readFile(fileName, s);
+		int len = 0;
+		if (!fileName.empty())
+		{
+			len = File::readFile(fileName, s);
+		}
+		else
+		{
+			// Keep overlay/MOD precedence before choosing a path within each root.
+			File::visitReadableResources({ "script/common/talkindex.txt", "talkindex.txt" },
+				[&](const std::string& path, std::unique_ptr<char[]>& data, int length)
+				{
+					s = std::move(data);
+					len = length;
+					if (path == "talkindex.txt")
+					{
+						GameLog::write("TalkTextList: using legacy table %s", path.c_str());
+					}
+					return true;
+				});
+		}
 		if (s == nullptr || len <= 0)
 		{
 			return;
@@ -29,6 +49,10 @@ public:
 		std::regex reg(R"(^\[(\d+),(\d+)\](.*)$)");
 		for (auto& line : lines)
 		{
+			if (!line.empty() && line.back() == '\r')
+			{
+				line.pop_back();
+			}
 			std::smatch match;
 			if (!std::regex_search(line, match, reg))
 			{

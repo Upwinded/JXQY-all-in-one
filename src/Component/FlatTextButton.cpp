@@ -40,6 +40,24 @@ FlatTextButton::~FlatTextButton()
 {
 }
 
+void FlatTextButton::initFromIni(INIReader& ini)
+{
+	TextButton::initFromIni(ini);
+	const auto readBackground = [&ini](const char* key, FlatButtonVisual& visual)
+	{
+		const auto& old = visual.background;
+		const unsigned int fallback = (static_cast<unsigned int>(old.alpha) << 24)
+			| (old.red << 16) | (old.green << 8) | old.blue;
+		const unsigned int color = ini.GetColor("Init", key, fallback);
+		visual.background = { static_cast<uint8_t>(color >> 16), static_cast<uint8_t>(color >> 8),
+			static_cast<uint8_t>(color), static_cast<uint8_t>(color >> 24) };
+		visual.textColor = ini.GetColor("Init", "Color", visual.textColor);
+	};
+	readBackground("BackgroundColor", style.normal);
+	readBackground("HoverBackgroundColor", style.hovered);
+	readBackground("PressedBackgroundColor", style.pressed);
+}
+
 void FlatTextButton::setStyle(const FlatTextButtonStyle& value)
 {
 	style = value;
@@ -84,6 +102,7 @@ void FlatTextButton::onDraw()
 		std::max(0, rect.h - borderThickness * 2)
 	};
 	fillRectangle(engine, backgroundRect, visual->background);
+	if (image[0] != nullptr) Button::draw();
 
 	const int textPadding = std::max(0, style.textPadding);
 	label.rect =

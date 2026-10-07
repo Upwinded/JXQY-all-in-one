@@ -27,6 +27,14 @@ namespace
 {
 constexpr UTime RunThewLowMessageCooldownMilliseconds = 3500;
 
+void updatePlayerStateMenu()
+{
+	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
+	{
+		gm->menu->stateMenu->updateLabel();
+	}
+}
+
 int addRepeatedSaturated(int current, int value, int count)
 {
 	if (count <= 0)
@@ -295,23 +303,30 @@ void Player::updateLevel()
 	}
 	else
 	{
-		attack += levelList[level].attack - levelList[level - 1].attack;
-		attack2 += levelList[level].attack2 - levelList[level - 1].attack2;
-		attack3 += levelList[level].attack3 - levelList[level - 1].attack3;
-		defend += levelList[level].defend - levelList[level - 1].defend;
-		defend2 += levelList[level].defend2 - levelList[level - 1].defend2;
-		defend3 += levelList[level].defend3 - levelList[level - 1].defend3;
-		evade += levelList[level].evade - levelList[level - 1].evade;
-		lifeMax += levelList[level].lifeMax - levelList[level - 1].lifeMax;
-		thewMax += levelList[level].thewMax - levelList[level - 1].thewMax;
-		manaMax += levelList[level].manaMax - levelList[level - 1].manaMax;
+		const auto increaseAttribute = [](int& value, int next, int previous)
+		{
+			const int64_t increase = std::max<int64_t>(0,
+				static_cast<int64_t>(next) - previous);
+			value = static_cast<int>(std::min<int64_t>(INT_MAX,
+				static_cast<int64_t>(value) + increase));
+		};
+		increaseAttribute(attack, levelList[level].attack, levelList[level - 1].attack);
+		increaseAttribute(attack2, levelList[level].attack2, levelList[level - 1].attack2);
+		increaseAttribute(attack3, levelList[level].attack3, levelList[level - 1].attack3);
+		increaseAttribute(defend, levelList[level].defend, levelList[level - 1].defend);
+		increaseAttribute(defend2, levelList[level].defend2, levelList[level - 1].defend2);
+		increaseAttribute(defend3, levelList[level].defend3, levelList[level - 1].defend3);
+		increaseAttribute(evade, levelList[level].evade, levelList[level - 1].evade);
+		increaseAttribute(lifeMax, levelList[level].lifeMax, levelList[level - 1].lifeMax);
+		increaseAttribute(thewMax, levelList[level].thewMax, levelList[level - 1].thewMax);
+		increaseAttribute(manaMax, levelList[level].manaMax, levelList[level - 1].manaMax);
 		levelUpExp = levelList[level].levelUpExp;
 		level++;
 		calInfo();
 		fullLife();
 		fullThew();
 		fullMana();
-		gm->menu->stateMenu->updateLabel();
+		updatePlayerStateMenu();
 	}
 }
 
@@ -346,7 +361,7 @@ void Player::setLevel(int lvl)
 	fullLife();
 	fullThew();
 	fullMana();
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 }
 
 void Player::fullLife()
@@ -361,22 +376,31 @@ void Player::fullLife()
 	{
 		life = info.lifeMax;
 	}
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
+}
+
+bool Player::hasUnlimitedCheatResources() const
+{
+	return gm != nullptr && gm->shouldProtectPlayerFromCheatDamage();
+}
+
+bool Player::canPayRunThewCost() const
+{
+	return (gm != nullptr && gm->inEvent)
+		|| ignoresRunThewCost()
+		|| thew >= RUN_THEW_COST;
 }
 
 void Player::fullThew()
 {
 	thew = info.thewMax;
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 }
 
 void Player::fullMana()
 {
 	mana = info.manaMax;
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 }
 
 void Player::addLifeMax(int value)
@@ -384,10 +408,7 @@ void Player::addLifeMax(int value)
 	lifeMax = std::max(1, lifeMax + value);
 	calInfo();
 	limitAttribute();
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
 }
 
 void Player::addThewMax(int value)
@@ -395,10 +416,7 @@ void Player::addThewMax(int value)
 	thewMax = std::max(1, thewMax + value);
 	calInfo();
 	limitAttribute();
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
 }
 
 void Player::addManaMax(int value)
@@ -406,10 +424,7 @@ void Player::addManaMax(int value)
 	manaMax = std::max(1, manaMax + value);
 	calInfo();
 	limitAttribute();
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
 }
 
 void Player::addLife(int value)
@@ -423,9 +438,9 @@ void Player::addLife(int value)
     {
         value = (int)round(value * DAMAGE_RATE);
     }
-	life += value;
+	life = addRepeatedSaturated(life, value, 1);
 	limitAttribute();
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 	if (life <= 0)
 	{
 		beginDie();
@@ -434,23 +449,31 @@ void Player::addLife(int value)
 
 void Player::addLifeWithoutDeath(int value)
 {
-	life = std::max(0, life + value);
+	life = std::max(0, addRepeatedSaturated(life, value, 1));
 	limitAttribute();
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 }
 
 void Player::addThew(int value)
 {
-	thew += value;
+	if (value < 0 && hasUnlimitedCheatResources())
+	{
+		return;
+	}
+	thew = addRepeatedSaturated(thew, value, 1);
 	limitAttribute();
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 }
 
 void Player::addMana(int value)
 {
-	mana += value;
+	if (value < 0 && hasUnlimitedCheatResources())
+	{
+		return;
+	}
+	mana = addRepeatedSaturated(mana, value, 1);
 	limitAttribute();
-	gm->menu->stateMenu->updateLabel();
+	updatePlayerStateMenu();
 }
 
 void Player::addAttack(int value, int type)
@@ -472,10 +495,7 @@ void Player::addAttack(int value, int type)
 		return;
 	}
 	calInfo();
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
 }
 
 void Player::addDefend(int value, int type)
@@ -499,27 +519,29 @@ void Player::addDefend(int value, int type)
 	}
 	*target = std::max(0, *target + value);
 	calInfo();
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
 }
 
 void Player::addEvade(int value)
 {
 	evade = std::max(0, evade + value);
 	calInfo();
-	if (gm != nullptr && gm->menu != nullptr && gm->menu->stateMenu != nullptr)
-	{
-		gm->menu->stateMenu->updateLabel();
-	}
+	updatePlayerStateMenu();
+}
+
+void Player::setMoney(std::int64_t value)
+{
+	money = static_cast<int>(std::clamp<std::int64_t>(value, 0, INT_MAX));
 }
 
 void Player::addMoney(int value)
 {
 	const int64_t updatedMoney = static_cast<int64_t>(money) + value;
-	money = static_cast<int>(std::clamp<int64_t>(updatedMoney, INT_MIN, INT_MAX));
-	gm->menu->goodsMenu->updateMoney();
+	setMoney(updatedMoney);
+	if (gm != nullptr && gm->menu != nullptr && gm->menu->goodsMenu != nullptr)
+	{
+		gm->menu->goodsMenu->updateMoney();
+	}
 }
 
 void Player::setRage(int value)
@@ -631,16 +653,16 @@ std::shared_ptr<Magic> Player::resolveMagicReplacement(std::shared_ptr<Magic> ma
 	{
 		return magic;
 	}
-	return replacement;
+	// Keep the learned origin per cast; the shared replacement resource may be
+	// used by another list's same-named entry before this projectile hits.
+	auto prepared = std::make_shared<Magic>(*replacement);
+	prepared->experienceOwner = magic->experienceOwner;
+	return prepared;
 }
 
 bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool showMessage)
 {
 	if (magic == nullptr || level < 1 || level > MAGIC_MAX_LEVEL)
-	{
-		return false;
-	}
-	if (!canUseMagicByState(magic, showMessage))
 	{
 		return false;
 	}
@@ -654,7 +676,8 @@ bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool s
 	}
 
 	auto& levelInfo = magic->level[level];
-	if (mana < levelInfo.manaCost)
+	const bool unlimitedResources = hasUnlimitedCheatResources();
+	if (!unlimitedResources && mana < levelInfo.manaCost)
 	{
 		if (showMessage)
 		{
@@ -662,7 +685,7 @@ bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool s
 		}
 		return false;
 	}
-	if (thew < levelInfo.thewCost)
+	if (!unlimitedResources && thew < levelInfo.thewCost)
 	{
 		if (showMessage)
 		{
@@ -697,8 +720,11 @@ bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool s
 		return false;
 	}
 
-	mana -= levelInfo.manaCost;
-	thew -= levelInfo.thewCost;
+	if (!unlimitedResources)
+	{
+		mana -= levelInfo.manaCost;
+		thew -= levelInfo.thewCost;
+	}
 	life -= levelInfo.lifeCost;
 	limitAttribute();
 	if (!goodsName.empty())
@@ -924,6 +950,12 @@ void Player::updateAction(UTime frameTime)
 
 void Player::onUpdate()
 {
+	if (isImmuneToAbnormalState())
+	{
+		clearAbnormalState();
+		disableMoveMilliseconds = 0;
+		disableSkillMilliseconds = 0;
+	}
 	auto ft = getFrameTime();
 	gm->magicManager.updateColdTimes(ft);
 	gm->goodsManager.updateColdTimes(ft);
@@ -984,6 +1016,10 @@ void Player::onUpdate()
 					return;
 				}
 			}
+			if (poisonedLastTime == 0)
+			{
+				clearPoisonedState();
+			}
 		}
 		else
 		{
@@ -1004,7 +1040,7 @@ void Player::onUpdate()
 	{
 		clearFrozenState();
 		clearImmobilizedState();
-		if (petrifiedLastTime >= ft)
+		if (petrifiedLastTime > ft)
 		{
 			petrifiedLastTime -= ft;
 			setTime(getTime() - ft);
@@ -1021,7 +1057,7 @@ void Player::onUpdate()
 	}
 	else if (immobilized && !isDying())
 	{
-		if (immobilizedLastTime >= ft)
+		if (immobilizedLastTime > ft)
 		{
 			immobilizedLastTime -= ft;
 			setTime(getTime() - ft);
@@ -1046,7 +1082,7 @@ void Player::onUpdate()
 	{
 		if (frozen && !isDying())
 		{
-			if (frozenLastTime >= ft)
+			if (frozenLastTime > ft)
 			{
 				frozenLastTime -= ft;
 				setTime(getTime() - ft / 2);
@@ -1066,6 +1102,14 @@ void Player::onUpdate()
 		}
 
 		updateAction(ft);
+	}
+	if (isBouncing() && actionManager->getCurrentActionType() != acBounce)
+	{
+		updateBounceMovement(ft);
+	}
+	if (isMagicForcedMoving() && actionManager->getCurrentActionType() != acMagicForcedMove)
+	{
+		updateMagicForcedMovement(ft);
 	}
 	updateEquipmentLifeRestore(ft);
 
@@ -1286,6 +1330,7 @@ void Player::hurt(std::shared_ptr<Effect> e)
 	}
 	if (hasActiveSelfMagic(mskBlockDamage))
 	{
+		triggerMagicWhenBeAttacked(*e);
 		return;
 	}
 	int damage = calculateEffectDamage(e);
@@ -1330,6 +1375,7 @@ void Player::hurt(std::shared_ptr<Effect> e)
 			{
 				shieldLife -= damage;
 				damage = 0;
+				triggerMagicWhenBeAttacked(*e);
 				return;
 			}
 		}
@@ -1341,16 +1387,18 @@ void Player::hurt(std::shared_ptr<Effect> e)
 		int restoreDamage = damage > life ? life : damage;
 		applyEffectRestore(e, restoreDamage);
 		recordActualDamageForRage(damage);
-		addLife(-damage);
-		triggerMagicWhenBeAttacked(*e);
-		applyBounceFromEffect(*e);
-		applyBounceFlyFromEffect(*e);
 		if (auto userPtr = e->user.lock(); NPCManager::isManagedEffectCaster(userPtr))
 		{
 			lastCombatTarget = userPtr;
 			lastCombatTargetTime = getTime();
+			lastCombatMagicDirection = { static_cast<float>(e->flyingDirection.x), static_cast<float>(e->flyingDirection.y) };
+			hasLastCombatMagicDirection = !e->flyingDirection.is_zero();
 			rememberCombatTargetPosition(userPtr);
 		}
+		addLife(-damage);
+		triggerMagicWhenBeAttacked(*e);
+		applyBounceFromEffect(*e);
+		applyBounceFlyFromEffect(*e);
 		if (life <= 0)
 		{
 			life = 0;
@@ -1371,9 +1419,16 @@ void Player::hurt(std::shared_ptr<Effect> e)
 			}
 		}
 	}
+	else
+	{
+		// Collision-driven motion is independent of the damage hit roll.
+		applyBounceFromEffect(*e);
+		applyBounceFlyFromEffect(*e);
+		triggerMagicWhenBeAttacked(*e);
+	}
 }
 
-void Player::hurtLife(int damage)
+void Player::hurtLife(int damage, bool ignoreDefense)
 {
 	if (hasActiveSelfMagic(mskBlockDamage))
 	{
@@ -1384,7 +1439,10 @@ void Player::hurtLife(int damage)
 	{
 		return;
 	}
-	damage -= defend;
+	if (!ignoreDefense)
+	{
+		damage -= defend;
+	}
 	for (auto it = shieldEffects.begin(); it != shieldEffects.end(); )
 	{
 		if (auto shield = it->lock())
@@ -1452,6 +1510,15 @@ void Player::addExp(int aExp)
 	if (up)
 	{
 		levelUp();
+		const auto& detail = levelList[level - 1];
+		if (!detail.newMagic.empty())
+		{
+			gm->magicManager.addMagic(detail.newMagic);
+		}
+		if (!detail.newGood.empty())
+		{
+			gm->goodsManager.addItem(detail.newGood, 1);
+		}
 	}		
 }
 
@@ -1487,14 +1554,13 @@ void Player::levelUp()
 {
 	const ResourceManifest& manifest =
 		ResourceManager::instance().getActiveManifest();
-	std::string effectFile = sex == 2
-		? manifest.levelUpFemaleEffect
-		: manifest.levelUpMaleEffect;
-	if (effectFile.empty() && !manifest.levelUpRandomEffects.empty())
+	const auto candidates = manifest.getLevelUpEffectCandidates(sex);
+	std::string effectFile;
+	if (!candidates.empty())
 	{
-		const int effectIndex = engine->getRand(
-			static_cast<int>(manifest.levelUpRandomEffects.size()));
-		effectFile = manifest.levelUpRandomEffects[
+		const int effectIndex = candidates.size() == 1 ? 0 : engine->getRand(
+			static_cast<int>(candidates.size()) - 1);
+		effectFile = candidates[
 			static_cast<std::size_t>(effectIndex)];
 	}
 
@@ -1555,10 +1621,10 @@ bool Player::addNextAction(NextAction& act)
 		{
 			return false;
 		}
-		bool canPayRunThewCost = gm->inEvent || ignoresRunThewCost() || thew >= RUN_THEW_COST;
+		const bool runThewCostPayable = canPayRunThewCost();
 		bool alternateAction = act.action == acAWalk || act.action == acARun;
 		bool runRequested = act.action == acRun || act.action == acARun;
-		if (runRequested && canRun && !canPayRunThewCost)
+		if (runRequested && canRun && !runThewCostPayable)
 		{
 			const UTime now = getTime();
 			if (!runThewLowMessageShown
@@ -1571,17 +1637,16 @@ bool Player::addNextAction(NextAction& act)
 				lastRunThewLowMessageTime = now;
 			}
 		}
-		else if (canPayRunThewCost)
+		else if (runThewCostPayable)
 		{
 			runThewLowMessageShown = false;
 		}
-		const NPCActionType requestedRunAction =
-			alternateAction ? acARun : acRun;
 		bool useRun = shouldUseRunForPlayerMoveIntent(
 			runRequested, walkIsRun,
 			canRun && actionActor != nullptr
-				&& actionActor->canDoAction(requestedRunAction),
-			canPayRunThewCost);
+				&& (actionActor->canDoAction(acRun)
+					|| actionActor->canDoAction(acARun)),
+			runThewCostPayable);
 		act.action = alternateAction
 			? (useRun ? acARun : acAWalk)
 			: (useRun ? acRun : acWalk);
@@ -1589,7 +1654,8 @@ bool Player::addNextAction(NextAction& act)
 
 	// 新动作只替换未完成的严格手柄交互；旧鼠标、触摸交互保持原队列语义。
 	// 必须在动作验证通过后清理，避免无效地面点击丢失原严格交互。
-	cancelQueuedInteraction(true);
+	// 武功由当前步进完成后执行；替换交互目标时不能提前切到站立。
+	cancelQueuedInteraction(true, act.action != acMagic);
 
 	nextAction = std::make_shared<NextAction>();
 	nextAction->action = act.action;
@@ -1602,7 +1668,7 @@ bool Player::addNextAction(NextAction& act)
 	return true;
 }
 
-void Player::cancelQueuedInteraction(bool strictOnly)
+void Player::cancelQueuedInteraction(bool strictOnly, bool stopCurrentMovement)
 {
 	const bool stopPlayerMovement = nextDest != ndNone
 		&& (!strictOnly || nextDestStrictWorldInteraction);
@@ -1626,11 +1692,11 @@ void Player::cancelQueuedInteraction(bool strictOnly)
 	{
 		clearControlledNextAction();
 	}
-	if (stopPlayerMovement)
+	if (stopPlayerMovement && stopCurrentMovement)
 	{
 		stopMovement();
 	}
-	if (stopControlledMovement)
+	if (stopControlledMovement && stopCurrentMovement)
 	{
 		auto controlled = getControlledCharacter();
 		if (controlled != nullptr)
@@ -2151,7 +2217,7 @@ bool Player::resumeStrictQueuedInteraction()
 	}
 
 	bool continueRunning = nextDestRequestedRunning && canRun && canDoAction(acRun)
-		&& (gm->inEvent || ignoresRunThewCost() || thew >= RUN_THEW_COST);
+		&& canPayRunThewCost();
 	if (!continueRunning && !canDoAction(acWalk))
 	{
 		cancelQueuedInteraction(true);
@@ -2167,12 +2233,18 @@ bool Player::resumeStrictQueuedInteraction()
 
 bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 {
+	const NPCActionType moveAction = running ? acRun : acWalk;
+	const bool isSameMoveAction = actionManager->isInAction(moveAction);
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (!isSameMoveAction && currentAction != nullptr && !currentAction->canTransitionTo(moveAction))
+	{
+		return false;
+	}
 	if (isRetarget && getTime() - lastPathFindFailTime < PATH_FIND_FAIL_COOLDOWN)
 	{
 		return false;
 	}
 
-	bool isSameMoveAction = (running && isRunning()) || (!running && isWalking());
 	bool isMoveActionActive = isWalking() || isRunning();
 	int interactionRadius = 0;
 	if (auto targetElement = destGE.lock())
@@ -2206,7 +2278,7 @@ bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 			? Map::calDistance(from, dest) <= interactionRadius
 			: from == dest;
 	};
-	if (isRetarget && isMoveActionActive && !processingStepIn)
+	if ((isRetarget || isSameMoveAction) && isMoveActionActive && !processingStepIn)
 	{
 		Point pathStart = position;
 		std::deque<Point> preservedStepList;
@@ -2281,18 +2353,20 @@ bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 	}
 
 	gm->partnerManager.setPartnersIsBlockingPlayer(false);
+	if (isMoveActionActive)
+	{
+		// Clear the old reservation before replacing the path it belongs to.
+		clearStep();
+	}
 	stepList = tempList;
 	direction = getDirection(stepList[0]);
 
-	if (isRetarget)
+	if (isSameMoveAction && isRetarget)
 	{
-		if (isSameMoveAction)
-		{
-			actionManager->getCurrentAction()->retarget();
-			return true;
-		}
+		actionManager->getCurrentAction()->retarget();
+		return true;
 	}
-	else if (!running)
+	if (!isRetarget && !running)
 	{
 		if (!isWalking() && !isStanding())
 		{
@@ -2440,17 +2514,7 @@ void Player::beginWalk(Point dest)
 
 void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 {
-	if (!canFight || !canDoAction(acMagic) || immobilized || petrified)
-	{
-		return;
-	}
-	if (!canUseMana)
-	{
-		gm->showMessage(MANA_LOW_MSG);
-		return;
-	}
-	clearPreparedMagicAction();
-	if (magicIndex < 0 || magicIndex >= gm->magicManager.bottomCount())
+	if (!canFight || magicIndex < 0 || magicIndex >= gm->magicManager.bottomCount())
 	{
 		return;
 	}
@@ -2461,7 +2525,19 @@ void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 		return;
 	}
 
-	auto& magicInfo = gm->magicManager.magicList[listIndex];
+	const auto& magicInfo = gm->magicManager.magicList[listIndex];
+	// DisableUse belongs to selecting the player's source skill, not to NPC
+	// attacks, scripted dispatch or an equipment-provided replacement skill.
+	if (magicInfo.magic != nullptr && magicInfo.magic->disableUse != 0)
+	{
+		gm->showMessage("该武功不能使用");
+		return;
+	}
+	beginMagic(magicInfo, dest, target, listIndex);
+}
+
+void Player::beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<GameElement> target, int listIndex)
+{
 	if (magicInfo.remainColdMilliseconds > 0)
 	{
 		gm->showMessage("武功尚未冷却");
@@ -2480,11 +2556,41 @@ void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 	{
 		return;
 	}
+	const int level = magicInfo.level;
+	const auto sourceMagic = magicInfo.magic;
+	// A self cure must remain usable while an abnormal state prevents animation.
+	if (preparedMagic->level[level].moveKind == mmkSelf
+		&& preparedMagic->level[level].specialKind == mskClearAbnormalState)
+	{
+		if (tryConsumeMagicCost(preparedMagic, level, true))
+		{
+			playSound(acMagic);
+			revealMagicInvisibilityOnAction();
+			useMagic(preparedMagic, dest, level, target);
+			gm->magicManager.finishMagicUse(sourceMagic, preparedMagic->coldMilliSeconds, listIndex >= 0);
+		}
+		return;
+	}
+	if (!canDoAction(acMagic) || immobilized || petrified)
+	{
+		return;
+	}
+	if (!canUseMana)
+	{
+		gm->showMessage(MANA_LOW_MSG);
+		return;
+	}
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (currentAction != nullptr && !currentAction->canTransitionTo(acMagic))
+	{
+		return;
+	}
 	if (!canActToward(dest, getMagicActionDirectionCount(preparedMagic)))
 	{
 		return;
 	}
-	setPreparedMagicAction(preparedMagic, dest, magicInfo.level, target, listIndex);
+	setPreparedMagicAction(preparedMagic, dest, level, target, listIndex);
+	preparedMagicActionSource = sourceMagic;
 	destGE = target;
 	attackDone = false;
 	magicDest = dest;
@@ -2500,13 +2606,18 @@ void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 
 void Player::beginJump(Point dest)
 {
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (currentAction != nullptr && !currentAction->canTransitionTo(acJump))
+	{
+		return;
+	}
 	if (!canJump || !canDoAction(acJump) || immobilized || petrified)
 	{
 		return;
 	}
 	if (!gm->inEvent)
 	{
-		if (thew < JUMP_THEW_COST)
+		if (!hasUnlimitedCheatResources() && thew < JUMP_THEW_COST)
 		{
 			gm->showMessage(THEW_LOW_MSG);
 			return;
@@ -2516,11 +2627,12 @@ void Player::beginJump(Point dest)
 	{
 		return;
 	}
-	if (!gm->inEvent)
+	if (!gm->inEvent && !hasUnlimitedCheatResources())
 	{
 		thew -= JUMP_THEW_COST;
 	}
-	Point step = gm->map->getJumpPath(position, dest);
+	clearStep();
+	Point step = gm->map->getJumpPath(position, dest, jumpRadius);
 	stepList.resize(1);
 	stepList[0] = step;
 	direction = getDirection(stepList[0]);
@@ -2543,11 +2655,16 @@ void Player::beginRun(Point dest)
 
 void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 {
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (currentAction != nullptr && !currentAction->canTransitionTo(acAttack))
+	{
+		return;
+	}
 	if (!canFight || !canDoAction(acAttack) || immobilized || petrified)
 	{
 		return;
 	}
-	if (thew < ATTACK_THEW_COST)
+	if (!hasUnlimitedCheatResources() && thew < ATTACK_THEW_COST)
 	{
 		gm->showMessage(THEW_LOW_MSG);
 		return;
@@ -2562,7 +2679,10 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	{
 		return;
 	}
-	thew -= ATTACK_THEW_COST;
+	if (!hasUnlimitedCheatResources())
+	{
+		thew -= ATTACK_THEW_COST;
+	}
 	destGE = target;
 	direction = getDirection(dest);
 	attackDone = false;
@@ -2574,7 +2694,8 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 
 void Player::beginHurt(Point dest)
 {
-	if (isHurting() || !canDoAction(acHurt) || !canHurt() || immobilized || petrified)
+	if (invincible > 0 || isImmuneToAbnormalState()
+		|| isHurting() || !canDoAction(acHurt) || !canHurt() || immobilized || petrified)
 	{
 		return;
 	}
@@ -2639,6 +2760,8 @@ void Player::partnerAvoidBlockingPlayer(Point dest)
 	{
 		if (partner->isStanding())
 		{
+			const bool wasBlockingPlayer = partner->isPartnerBlockingPlayer;
+			partner->isPartnerBlockingPlayer = true;
 			if (partner->canDoAction(acRun))
 			{
 				partner->beginRun(dest);
@@ -2651,6 +2774,10 @@ void Player::partnerAvoidBlockingPlayer(Point dest)
 			{
 				isBlocking = true;
 			}
+			else
+			{
+				partner->isPartnerBlockingPlayer = wasBlockingPlayer;
+			}
 		}
 	}
 	if (isBlocking)
@@ -2662,18 +2789,9 @@ void Player::partnerAvoidBlockingPlayer(Point dest)
 
 void Player::limitAttribute()
 {
-	if (life > info.lifeMax)
-	{
-		life = info.lifeMax;
-	}
-	if (thew > info.thewMax)
-	{
-		thew = info.thewMax;
-	}
-	if (mana > info.manaMax)
-	{
-		mana = info.manaMax;
-	}
+	life = std::clamp(life, 0, std::max(0, info.lifeMax));
+	thew = std::clamp(thew, 0, std::max(0, info.thewMax));
+	mana = std::clamp(mana, 0, std::max(0, info.manaMax));
 }
 
 void Player::loadLevel(const std::string& fileName)
@@ -2716,6 +2834,7 @@ void Player::loadLevel(const std::string& fileName)
 		levelList[i].defend3 = ini.GetInteger(section, "Defend3", 0);
 		levelList[i].evade = ini.GetInteger(section, "Evade", 0);
 		levelList[i].newMagic = ini.Get(section, "NewMagic", "");
+		levelList[i].newGood = ini.Get(section, "NewGood", "");
 	}
 
 }
@@ -2850,7 +2969,7 @@ void Player::handleDeath()
 
 void Player::beginDie()
 {
-	if (nowAction == acDeath || nowAction == acHide)
+	if (deathTransitionInProgress || nowAction == acDeath || nowAction == acHide)
 	{
 		return;
 	}
@@ -2858,6 +2977,7 @@ void Player::beginDie()
 	{
 		return;
 	}
+	deathTransitionInProgress = true;
 	if (deathScript != "")
 	{
 		result |= erRunDeathScript;
@@ -2889,7 +3009,13 @@ void Player::beginDie()
 	}
 	shieldEffects.clear();
 
+	const auto currentAction = actionManager->getCurrentAction();
+	if (currentAction == nullptr || currentAction->canTransitionTo(acDeath))
+	{
+		triggerMagicWhenDeath();
+	}
 	actionManager->changeAction(acDeath);
+	deathTransitionInProgress = false;
 }
 
 bool Player::load(int index, std::string* failureReason)
@@ -2979,36 +3105,36 @@ bool Player::loadFromFile(
 	initFromIni(&ini, section);
 
 	magic = ini.GetInteger(section, "Magic", 0);
-	money = ini.GetInteger(section, "Money", 0);
+	setMoney(ini.GetInteger(section, "Money", 0));
 	setRage(gm != nullptr && gm->global.feature.rageSystem
 		? ini.GetInteger(section, "Rage", 0)
 		: 0);
-	std::string isRunDisabledValue = ini.Get(section, "IsRunDisabled", "");
-	if (!isRunDisabledValue.empty())
-	{
-		setRunDisabled(ini.GetBoolean(section, "IsRunDisabled", false));
-	}
-	else
+	std::string canRunValue = ini.Get(section, "CanRun", "");
+	if (!canRunValue.empty())
 	{
 		canRun = ini.GetBoolean(section, "CanRun", true);
 	}
-	std::string isJumpDisabledValue = ini.Get(section, "IsJumpDisabled", "");
-	if (!isJumpDisabledValue.empty())
-	{
-		setJumpDisabled(ini.GetBoolean(section, "IsJumpDisabled", false));
-	}
 	else
+	{
+		setRunDisabled(ini.GetBoolean(section, "IsRunDisabled", false));
+	}
+	std::string canJumpValue = ini.Get(section, "CanJump", "");
+	if (!canJumpValue.empty())
 	{
 		canJump = ini.GetBoolean(section, "CanJump", true);
 	}
-	std::string isFightDisabledValue = ini.Get(section, "IsFightDisabled", "");
-	if (!isFightDisabledValue.empty())
+	else
 	{
-		setFightDisabled(ini.GetBoolean(section, "IsFightDisabled", false));
+		setJumpDisabled(ini.GetBoolean(section, "IsJumpDisabled", false));
+	}
+	std::string canFightValue = ini.Get(section, "CanFight", "");
+	if (!canFightValue.empty())
+	{
+		canFight = ini.GetBoolean(section, "CanFight", true);
 	}
 	else
 	{
-		canFight = ini.GetBoolean(section, "CanFight", true);
+		setFightDisabled(ini.GetBoolean(section, "IsFightDisabled", false));
 	}
 	canUseMana = ini.GetBoolean(section, "CanUseMana", true);
 	walkIsRun = (int)ini.GetInteger(section, "WalkIsRun", 0);
@@ -3048,9 +3174,6 @@ bool Player::save(int index)
 	ini.SetBoolean(section, "CanRun", canRun);
 	ini.SetBoolean(section, "CanJump", canJump);
 	ini.SetBoolean(section, "CanFight", canFight);
-	ini.SetBoolean(section, "IsRunDisabled", isRunDisabled());
-	ini.SetBoolean(section, "IsJumpDisabled", isJumpDisabled());
-	ini.SetBoolean(section, "IsFightDisabled", isFightDisabled());
 	ini.SetBoolean(section, "CanUseMana", canUseMana);
 	ini.SetInteger(section, "WalkIsRun", walkIsRun);
 	ini.SetInteger(section, "Fight", fightState.get() ? 1 : 0);

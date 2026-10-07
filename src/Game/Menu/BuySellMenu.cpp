@@ -24,8 +24,7 @@ void addSaleProceeds(int itemCount, int unitPrice)
 	}
 	const int64_t proceeds = static_cast<int64_t>(itemCount) * unitPrice;
 	const int64_t updatedMoney = static_cast<int64_t>(gm->player->money) + proceeds;
-	gm->player->money = static_cast<int>(
-		std::clamp<int64_t>(updatedMoney, INT_MIN, INT_MAX));
+	gm->player->setMoney(updatedMoney);
 }
 
 int saturatingInventoryCountAdd(int current, int added)
@@ -287,6 +286,27 @@ bool BuySellMenu::sellOneFromPlayerSlot(int playerIndex)
 
 void BuySellMenu::buy(const std::string & list, std::shared_ptr<NPC> owner, bool canSell)
 {
+	BuySellInventoryData inventory;
+	bool loaded = false;
+	if (owner != nullptr && !owner->buyIniString.empty())
+	{
+		std::string decoded;
+		loaded = BuySellInventory::decodeString(owner->buyIniString, decoded)
+			&& BuySellInventory::parseText(decoded, inventory);
+	}
+	const bool ownedByNPC = loaded;
+	if (!loaded && !list.empty())
+	{
+		std::string inventoryText;
+		loaded = readTextFile(resolveBuySellListPath(list), inventoryText)
+			&& BuySellInventory::parseText(inventoryText, inventory);
+	}
+	if (!loaded)
+	{
+		GameLog::write("BuySellMenu::buy skipped: inventory load failed: %s", list.c_str());
+		return;
+	}
+
 	bsKind = bsBuy;
 	if (scrollbar) scrollbar->setPosition(scrollbar->min);
 	for (size_t i = 0; i < item.size(); i++)
@@ -302,30 +322,8 @@ void BuySellMenu::buy(const std::string & list, std::shared_ptr<NPC> owner, bool
 	canSellSelfGoods = canSell;
 	currentListFile = list;
 	currentShopOwner = owner;
-
-	bool loaded = false;
-	if (owner != nullptr && !owner->buyIniString.empty())
-	{
-		std::string decoded;
-		BuySellInventoryData inventory;
-		if (BuySellInventory::decodeString(owner->buyIniString, decoded) &&
-			BuySellInventory::parseText(decoded, inventory))
-		{
-			loadInventoryGoods(inventory, goodsList, currentListCount, numberValid, buyPercent, recyclePercent, true);
-			currentListOwnedByNPC = true;
-			loaded = true;
-		}
-	}
-	if (!loaded)
-	{
-		std::string listName = resolveBuySellListPath(list);
-		std::string inventoryText;
-		BuySellInventoryData inventory;
-		if (readTextFile(listName, inventoryText) && BuySellInventory::parseText(inventoryText, inventory))
-		{
-			loadInventoryGoods(inventory, goodsList, currentListCount, numberValid, buyPercent, recyclePercent, false);
-		}
-	}
+	currentListOwnedByNPC = ownedByNPC;
+	loadInventoryGoods(inventory, goodsList, currentListCount, numberValid, buyPercent, recyclePercent, ownedByNPC);
 	updateGoods();
 	clearButtonChecked();
 	setGoodsButtonChecked();
@@ -349,6 +347,23 @@ void BuySellMenu::buy(const std::string & list, std::shared_ptr<NPC> owner, bool
 
 void BuySellMenu::sell(const std::string & list)
 {
+	std::string inventoryText;
+	BuySellInventoryData inventory;
+	const bool loaded = !list.empty()
+		&& readTextFile(resolveBuySellListPath(list), inventoryText)
+		&& BuySellInventory::parseText(inventoryText, inventory);
+	if (!list.empty() && !loaded)
+	{
+		GameLog::write("BuySellMenu::sell skipped: inventory load failed: %s", list.c_str());
+		return;
+	}
+	// Legacy scripts also use SellGoods for ordinary stocked merchants.
+	// Keep empty pawnshop lists and finite inventories in resale mode.
+	if (loaded && inventory.count > 0 && !inventory.numberValid)
+	{
+		buy(list);
+		return;
+	}
 	bsKind = bsSell;
 	if (scrollbar) scrollbar->setPosition(scrollbar->min);
 	for (size_t i = 0; i < item.size(); i++)
@@ -362,15 +377,9 @@ void BuySellMenu::sell(const std::string & list)
 	addChild(gm->menu->goodsMenu);
 	clearGoodsList();
 	currentListFile = list;
-	if (list != "")
+	if (loaded)
 	{
-		std::string listName = resolveBuySellListPath(list);
-		std::string inventoryText;
-		BuySellInventoryData inventory;
-		if (readTextFile(listName, inventoryText) && BuySellInventory::parseText(inventoryText, inventory))
-		{
-			loadInventoryGoods(inventory, goodsList, currentListCount, numberValid, buyPercent, recyclePercent, true);
-		}
+		loadInventoryGoods(inventory, goodsList, currentListCount, numberValid, buyPercent, recyclePercent, true);
 	}
 	updateGoods();
 	clearButtonChecked();
@@ -687,6 +696,7 @@ void BuySellMenu::onEvent()
 	{
 		return;
 	}
+	updateDataBindings();
 	if (currentDragItem != nullptr)
 	{
 		clearControllerFocus();
@@ -717,6 +727,15 @@ void BuySellMenu::onEvent()
 
 		int listIndex = scrollbar ? scrollbar->position * scrollbar->lineSize + static_cast<int>(i) : -1;
 		unsigned int ret = item[i]->getResult();
+#ifndef __MOBILE__
+		if (gm->global.feature.qingyuUi && (ret & erClick) && listIndex >= 0
+			&& listIndex < BUYSELL_GOODS_COUNT && goodsList[listIndex].goods)
+		{
+			gm->menu->showGoodsToolTip(getMySharedPtr(), goodsList[listIndex].goods, item[i], true);
+			item[i]->resetHint();
+			continue;
+		}
+#endif
 		if (ret & (erClick | erMouseRDown | erDropped))
 		{
 			clearControllerFocus();
@@ -847,6 +866,7 @@ bool BuySellMenu::onHandleUIAction(UIAction action)
 	{
 		return false;
 	}
+	if (gm && gm->menu && gm->menu->toolTip && gm->menu->toolTip->turnPage(action)) return true;
 	if (action == UIAction::Cancel)
 	{
 		clearControllerFocus();
@@ -891,7 +911,8 @@ void BuySellMenu::onDrawEnd()
 	options.y = std::max(0, windowHeight - options.height - 8);
 	options.fontSize = windowWidth < 720 ? 12 : 14;
 	ControllerPromptPresenter::draw(
-		engine, engine->inputActions(), PromptItems, options);
+		engine, engine->inputActions(), PromptItems, options,
+		controllerPromptTextureCache);
 }
 
 void BuySellMenu::onWindowResize(int width, int height)
@@ -1007,6 +1028,7 @@ void BuySellMenu::init()
 
 void BuySellMenu::freeResource()
 {
+	controllerPromptTextureCache.itemTextTextures.clear();
 	controllerPaneRouter.clear();
 	shopSlotGridController.clear();
 	playerSlotGridController.clear();

@@ -31,6 +31,8 @@
 namespace
 {
 constexpr UTime MaximumPersistedDeathActionMilliseconds = 600000;
+constexpr UTime ScriptMoveRetryIntervalMilliseconds = 100;
+constexpr UTime ScriptMoveBlockedTimeoutMilliseconds = 2000;
 constexpr UTime CriticalDamageTipDurationMilliseconds = 600;
 constexpr int CriticalDamageTipFontSize = 20;
 constexpr unsigned int CriticalDamageTipColor = 0xFFFF8C00;
@@ -916,31 +918,22 @@ unsigned int NPC::eventRun()
 void NPC::jumpTo(Point dest)
 {
 	destGE.reset();
+	haveAsyncDest = false;
 	beginJump(dest);
 	eventRun();
 }
 
 void NPC::runTo(Point dest)
 {
-	destGE.reset();
-	if (position == dest)
-	{
-		return;
-	}
-	int dir = getDirection(position, dest);
-	while (position != dest)
-	{
-		beginRun(dest);
-		if (stepList.size() == 0)
-		{
-			break;
-		}
-		eventRun();
-	}
-	direction = dir;
+	moveToForScript(dest, true);
 }
 
 void NPC::goTo(Point dest)
+{
+	moveToForScript(dest, false);
+}
+
+void NPC::moveToForScript(Point dest, bool isRun)
 {
 	destGE.reset();
 	haveAsyncDest = false;
@@ -948,18 +941,119 @@ void NPC::goTo(Point dest)
 	{
 		return;
 	}
-	int dir = getDirection(position, dest);
-	while (position != dest)
+	struct ScriptMoveGuard
 	{
-		beginWalk(dest);
-		if (stepList.size() == 0)
+		std::optional<Point>& destination;
+		std::optional<Point> previousDestination;
+		std::optional<UTime>& retryUntil;
+		std::optional<UTime> previousRetryUntil;
+		~ScriptMoveGuard()
 		{
-			//beginStand();
+			destination = previousDestination;
+			retryUntil = previousRetryUntil;
+		}
+	} guard{ scriptMoveDestination, scriptMoveDestination, scriptMoveRetryUntil, scriptMoveRetryUntil };
+	scriptMoveDestination = dest;
+	scriptMoveRetryUntil.reset();
+	std::optional<UTime> blockedSince;
+	int dir = getDirection(position, dest);
+	while (scriptMoveDestination && position != dest)
+	{
+		if (isDying() || isHiding() || !isVisibleByVariable)
+		{
 			break;
 		}
-		eventRun();
+		if (finishScriptMoveAtOccupiedDestination())
+		{
+			break;
+		}
+		if (isRun)
+		{
+			beginRun(dest);
+		}
+		else
+		{
+			beginWalk(dest);
+		}
+		const Point previousPosition = position;
+		if (!stepList.empty())
+		{
+			if ((eventRun() & (erExit | erInitError)) != 0)
+			{
+				break;
+			}
+			if (position != previousPosition)
+			{
+				blockedSince.reset();
+				continue;
+			}
+		}
+		else if (!canDoAction(isRun ? &res.run : &res.walk)
+			&& !canDoAction(isRun ? &res.arun : &res.awalk))
+		{
+			break;
+		}
+		if (!scriptMoveDestination || isDying() || isHiding() || !isVisibleByVariable)
+		{
+			break;
+		}
+		// Use the game clock so time-stop on this actor cannot freeze the retry budget.
+		const UTime now = gm->getTime();
+		if (!blockedSince)
+		{
+			blockedSince = now;
+		}
+		const UTime blockedTime = now - *blockedSince;
+		if (blockedTime >= ScriptMoveBlockedTimeoutMilliseconds)
+		{
+			GameLog::write("Script movement blocked: %s (%d,%d) -> (%d,%d), %llu ms",
+				npcName.c_str(), position.x, position.y, dest.x, dest.y,
+				static_cast<unsigned long long>(blockedTime));
+			break;
+		}
+		scriptMoveRetryUntil = now + std::min(ScriptMoveRetryIntervalMilliseconds,
+			ScriptMoveBlockedTimeoutMilliseconds - blockedTime);
+		if ((eventRun() & (erExit | erInitError)) != 0)
+		{
+			break;
+		}
+		scriptMoveRetryUntil.reset();
+		if (position != previousPosition)
+		{
+			blockedSince.reset();
+		}
 	}
 	direction = dir;
+}
+
+bool NPC::finishScriptMoveAtOccupiedDestination()
+{
+	if (!scriptMoveDestination || kind == nkFlyingAnimal
+		|| (!isStanding() && !isWalking() && !isRunning())
+		|| (!processingStepIn && (offset.x != 0 || offset.y != 0)))
+	{
+		return false;
+	}
+	const Point destination = *scriptMoveDestination;
+	const int moveDirection = getDirection(position, destination);
+	if (Map::getSubPoint(position, moveDirection) != destination
+		|| !canMoveInDirection(moveDirection, getMoveDirectionCount())
+		|| !hasCharacterObstacleAt(destination, this))
+	{
+		return false;
+	}
+	if (moveDirection % 2 == 0
+		&& (!gm->map->canPass(Map::getSubPoint(position, moveDirection - 1))
+			|| !gm->map->canPass(Map::getSubPoint(position, moveDirection + 1))))
+	{
+		return false;
+	}
+
+	// Synchronous script moves may finish when another character blocks the last
+	// step. Check at a tile center so stopping cannot snap a partially moved actor.
+	beginStand();
+	scriptMoveDestination.reset();
+	return true;
 }
 
 void NPC::goToEx(Point dest)
@@ -1202,27 +1296,42 @@ int NPC::resolveDestinationPathType() const
 
 std::deque<Point> NPC::findPathByType(Point dest, int pathType, bool temporaryDisableRestrict) const
 {
+	return findPathByTypeFrom(position, dest, pathType, temporaryDisableRestrict);
+}
+
+std::deque<Point> NPC::findPathByTypeFrom(Point from, Point dest, int pathType, bool temporaryDisableRestrict) const
+{
 	if (gm == nullptr || gm->map == nullptr)
 	{
 		return {};
 	}
 	if (pathType == nptEnd)
 	{
-		pathType = resolvePathType();
+		// Script moves need enough search budget to reach their destination, including
+		// GotoEx. Keep the actor's ordinary combat/following path mode unchanged.
+		const int resolvedPathType = resolvePathType();
+		if ((scriptMoveDestination || (haveAsyncDest && dest == gotoExDest)) &&
+			(resolvedPathType == nptPathOneStep || resolvedPathType == nptPerfectMaxNpcTry))
+		{
+			return gm->map->findPath(from, dest, getMoveDirectionCount());
+		}
+		// A partner yielding to the player's route needs the player's search budget.
+		pathType = kind == nkPartner && isPartnerBlockingPlayer
+			? nptPerfectMaxPlayerTry : resolvedPathType;
 	}
 
 	switch (pathType)
 	{
 	case nptPathOneStep:
-		return gm->map->traceTowardTarget(position, dest, 10, getMoveDirectionCount());
+		return gm->map->traceTowardTarget(from, dest, 10, getMoveDirectionCount());
 	case nptPathStraightLine:
-		return gm->map->getLinePath(position, dest, 100);
+		return gm->map->getLinePath(from, dest, 100);
 	case nptSimpleMaxNpcTry:
-		return gm->map->findSimplePath(position, dest, getMoveDirectionCount(), getPathSearchMaxTryForPathType(pathType, temporaryDisableRestrict));
+		return gm->map->findSimplePath(from, dest, getMoveDirectionCount(), getPathSearchMaxTryForPathType(pathType, temporaryDisableRestrict));
 	case nptPerfectMaxNpcTry:
 	case nptPerfectMaxPlayerTry:
 	default:
-		return gm->map->findPath(position, dest, getMoveDirectionCount(), getPathSearchMaxTryForPathType(pathType, temporaryDisableRestrict));
+		return gm->map->findPath(from, dest, getMoveDirectionCount(), getPathSearchMaxTryForPathType(pathType, temporaryDisableRestrict));
 	}
 }
 
@@ -1393,7 +1502,9 @@ void NPC::updateEventRunState()
 	}
 
 	if ((eventRunUntilScriptSpecialActionEnds && !scriptSpecialActionOverlayActive)
-		|| (!eventRunUntilScriptSpecialActionEnds && (isStanding() || isDying() || isHiding())))
+		|| (!eventRunUntilScriptSpecialActionEnds
+			&& ((isStanding() && (!scriptMoveRetryUntil || gm->getTime() >= *scriptMoveRetryUntil))
+				|| isDying() || isHiding() || (scriptMoveDestination && !isVisibleByVariable))))
 	{
 		logicRunning = false;
 	}
@@ -2276,6 +2387,7 @@ void NPC::saveToIni(INIReader * ini, const std::string & section)
 	ini->SetInteger(section, "MapY", position.y);
 	ini->SetInteger(section, "Action", strollIntent);
 	ini->SetInteger(section, "WalkSpeed", walkSpeed);
+	ini->SetInteger(section, "JumpRadius", jumpRadius);
 	ini->SetInteger(section, "StandSpeed", standSpeed);
 	if (hasAttackSpeedField)
 	{
@@ -2422,11 +2534,7 @@ void NPC::saveToIni(INIReader * ini, const std::string & section)
 		ini->Remove(section, "Dodge_EndFrame");
 	}
 	ini->SetInteger(section, "Exp", exp);
-	const bool savesExperienceBonus =
-		ResourceManager::instance().getActiveManifest().
-			resolvedDefeatedNpcExperienceMode() ==
-		DefeatedNpcExperienceMode::LevelProductWithBonus;
-	if (savesExperienceBonus && hasExpBonusField)
+	if (hasExpBonusField || expBonus != 0)
 	{
 		ini->SetInteger(section, "ExpBonus", expBonus);
 	}
@@ -2543,6 +2651,31 @@ void NPC::loadSpecialAction(const std::string & fileName)
 void NPC::initRes(const std::string & fileName)
 {
 	loadNpcResFromIni(fileName, res);
+	refreshLoopingActionAnimation();
+}
+
+void NPC::refreshLoopingActionAnimation()
+{
+	// ponytail: One-shot actions need phase-aware refresh; only reset looping animation clocks here.
+	switch (nowAction)
+	{
+	case acStand:
+	case acStand1:
+	case acAStand:
+	case acWalk:
+	case acAWalk:
+	case acRun:
+	case acARun:
+		break;
+	default:
+		return;
+	}
+	if (canDoAction(static_cast<NPCActionType>(nowAction)))
+	{
+		// Refresh only the animation clock, without re-entering movement or changing its path.
+		actionBeginTime = getTime();
+		actionLastTime = getActionTime(nowAction);
+	}
 }
 
 bool NPC::loadNpcResFromIni(const std::string& fileName, NPCRes& targetRes)
@@ -2649,12 +2782,8 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 	{
 		actionRes->imageFile = fileName;
 		actionRes->shadowFile = convert::extractFileName(fileName) + ".shd";
-		actionRes->soundFile = "";
 		loadActionRes(actionRes);
-		if (nowAction == NPCActionType::acStand || nowAction == NPCActionType::acStand1)
-		{
-			beginStand();
-		}
+		refreshLoopingActionAnimation();
 	}
 }
 
@@ -2664,6 +2793,11 @@ void NPC::addLife(int value)
 {
 	if (value < 0 && invincible > 0)
 	{
+		return;
+	}
+	if (value > 0)
+	{
+		life = std::min(getLifeMax(), addRepeatedSaturated(life, value, 1));
 		return;
 	}
 	life += value;
@@ -2684,14 +2818,17 @@ void NPC::addMana(int value)
 	mana += value;
 }
 
-void NPC::hurtLife(int damage)
+void NPC::hurtLife(int damage, bool ignoreDefense)
 {
 	if (hasActiveSelfMagic(mskBlockDamage) || invincible > 0)
 	{
 		return;
 	}
 
-	damage -= defend;
+	if (!ignoreDefense)
+	{
+		damage -= defend;
+	}
 	for (auto it = shieldEffects.begin(); it != shieldEffects.end(); )
 	{
 		if (auto shield = it->lock())
@@ -2826,7 +2963,7 @@ void NPC::applyEffectManaDamage(std::shared_ptr<Effect> effect)
 	{
 		return;
 	}
-	mana -= effect->damageMana;
+	addMana(-effect->damageMana);
 	if (mana < 0)
 	{
 		mana = 0;
@@ -3186,6 +3323,14 @@ bool NPC::canDoAction(NPCActionRes * act)
 
 bool NPC::canDoAction(NPCActionType act)
 {
+	// Hurt must retain its saved movement path until the action manager resumes it.
+	// During recovery the active action changes before nowAction is updated.
+	if (actionManager != nullptr && actionManager->isHurting()
+		&& (act == acWalk || act == acAWalk || act == acRun || act == acARun))
+	{
+		return false;
+	}
+
 	if (isBouncing() || isMagicForcedMoving())
 	{
 		if (!isActionAllowedWhileBouncing(act))
@@ -4216,6 +4361,10 @@ void NPC::finishMagicForcedMove()
 
 void NPC::applyEffectActionLocks(const Effect& effect)
 {
+	if (isImmuneToAbnormalState())
+	{
+		return;
+	}
 	if (effect.magic.disableMoveMilliseconds > 0)
 	{
 		disableMoveMilliseconds = effect.magic.disableMoveMilliseconds;
@@ -4457,7 +4606,7 @@ void NPC::applyTemporaryMagicListReplacement(const Magic& magic)
 		clearTemporaryMagicListReplacement();
 		return;
 	}
-	if (temporaryMagicListReplacement == magic.replaceMagic)
+	if (kind != nkPlayer && temporaryMagicListReplacement == magic.replaceMagic)
 	{
 		return;
 	}
@@ -4466,7 +4615,7 @@ void NPC::applyTemporaryMagicListReplacement(const Magic& magic)
 	{
 		if (gm != nullptr)
 		{
-			gm->magicManager.replaceMagicList(magic.replaceMagic);
+			gm->magicManager.replaceMagicList(magic.replaceMagic, npcName + "_" + magic.name);
 		}
 	}
 	else
@@ -4600,8 +4749,8 @@ void NPC::releaseMagicWhenBeAttacked(std::shared_ptr<Magic> magic, int magicDire
 	case 1:
 		if (!effect.flyingDirection.is_zero())
 		{
-			int moveDirection = getDirection(atan2(effect.flyingDirection.x, -effect.flyingDirection.y));
-			destination = Map::getSubPoint(position, (moveDirection + 4) % 8);
+			int oppositeDirection = getDirection(atan2(effect.flyingDirection.x, -effect.flyingDirection.y));
+			destination = Map::getSubPoint(position, oppositeDirection);
 		}
 		else
 		{
@@ -4676,11 +4825,11 @@ void NPC::triggerMagicWhenDeath()
 		if (hasLastCombatMagicDirection)
 		{
 			int moveDirection = getDirection(atan2(lastCombatMagicDirection.x, -lastCombatMagicDirection.y));
-			destination = Map::getSubPoint(position, (moveDirection + 4) % 8);
+			destination = Map::getSubPoint(position, moveDirection);
 		}
 		else
 		{
-			destination = attacker != nullptr ? attacker->position : Map::getSubPoint(position, direction);
+			destination = Map::getSubPoint(position, direction);
 		}
 		break;
 	case 2:
@@ -4748,6 +4897,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 	}
 	if (hasActiveSelfMagic(mskBlockDamage))
 	{
+		triggerMagicWhenBeAttacked(*e);
 		return;
 	}
 	int damage = calculateEffectDamage(e);
@@ -4787,6 +4937,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 			{
 				shieldLife -= damage;
 				damage = 0;
+				triggerMagicWhenBeAttacked(*e);
 				return;
 			}
 		}
@@ -4797,7 +4948,6 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 
 		int restoreDamage = damage > life ? life : damage;
 		applyEffectRestore(e, restoreDamage);
-		triggerMagicWhenBeAttacked(*e);
 		if (damage >= life)
 		{
 			life = 0;
@@ -4807,11 +4957,13 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 				awardDefeatedNpcExperience(e);
 			}
 			handleDeath();
+			triggerMagicWhenBeAttacked(*e);
 			triggerMagicWhenKillEnemy(*e);
 		}
 		else
 		{
 			addLife(-damage);
+			triggerMagicWhenBeAttacked(*e);
 			applyBounceFromEffect(*e);
 			applyBounceFlyFromEffect(*e);
 			if (!isNotFightBackWhenBeHit() && !(blindMilliseconds > 0 && kind != nkPlayer))
@@ -4843,6 +4995,13 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 				beginHurt(fd);
 			}
 		}
+	}
+	else
+	{
+		// Collision-driven motion is independent of the damage hit roll.
+		applyBounceFromEffect(*e);
+		applyBounceFlyFromEffect(*e);
+		triggerMagicWhenBeAttacked(*e);
 	}
 }
 
@@ -4878,7 +5037,6 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 	}
 	int restoreDamage = damage > life ? life : damage;
 	applyEffectRestore(e, restoreDamage);
-	triggerMagicWhenBeAttacked(*e);
 	if (damage >= life)
 	{
 		life = 0;
@@ -4888,11 +5046,13 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 			awardDefeatedNpcExperience(e);
 		}
 		handleDeath();
+		triggerMagicWhenBeAttacked(*e);
 		triggerMagicWhenKillEnemy(*e);
 	}
 	else
 	{
 		addLife(-damage);
+		triggerMagicWhenBeAttacked(*e);
 		if (!isNotFightBackWhenBeHit() && !(blindMilliseconds > 0 && kind != nkPlayer))
 		{
 			fightState.set(true);
@@ -4908,6 +5068,11 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 
 void NPC::beginJump(Point dest)
 {
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (currentAction != nullptr && !currentAction->canTransitionTo(acJump))
+	{
+		return;
+	}
 	if (!canDoAction(acJump) || immobilized || petrified)
 	{
 		return;
@@ -4916,7 +5081,8 @@ void NPC::beginJump(Point dest)
 	{
 		return;
 	}
-	Point step = gm->map->getJumpPath(position, dest);
+	clearStep();
+	Point step = gm->map->getJumpPath(position, dest, jumpRadius);
 	stepList.resize(1);
 	stepList[0] = step;
 	direction = getDirection(stepList[0]);
@@ -5016,8 +5182,33 @@ void NPC::reloadAction()
 	reloadAction(ajump);
 }
 
+bool NPC::usesNativeAttackProtocol() const
+{
+	return gm != nullptr && gm->global.feature.nativeNpcAttackAtAnimationEnd && kind != nkPlayer
+		&& flyInis.empty() && temporaryMagicListReplacement.empty()
+		&& equipmentFlyIniReplacements.empty() && temporaryFlyIniReplacements.empty()
+		&& equipmentFlyIni2Replacements.empty()
+		&& ((npcMagic != nullptr && npcMagic->loadSucceeded) || (npcMagic2 != nullptr && npcMagic2->loadSucceeded));
+}
+
+std::shared_ptr<Magic> NPC::selectNativeAttackMagicAtRelease()
+{
+	// The published native protocol reads both slots at the release frame.
+	// getRand has inclusive bounds, unlike Random.Next(8) in the reference.
+	auto magic = npcMagic2 != nullptr && npcMagic2->loadSucceeded && engine->getRand(7) == 0 ? npcMagic2 : npcMagic;
+	return magic != nullptr && magic->loadSucceeded ? magic : nullptr;
+}
+
 std::shared_ptr<Magic> NPC::selectAttackMagicForAction(Point dest, std::shared_ptr<GameElement> target, AttackReleaseMode releaseMode)
 {
+	if (usesNativeAttackProtocol())
+	{
+		actionPlan.reset();
+		hasLastUsedAttackOption = false;
+		if (releaseMode != armGroundTarget && !canReleaseCombatAttack(target, releaseMode)) return nullptr;
+		// This is an admission/animation placeholder, not the random choice.
+		return npcMagic != nullptr && npcMagic->loadSucceeded ? npcMagic : npcMagic2;
+	}
 	std::shared_ptr<Magic> selectedMagic = nullptr;
 	int clampedLevel = getClampedAttackLevel();
 	bool canReleaseTargetAttack = canReleaseCombatAttack(target, releaseMode);
@@ -5063,7 +5254,9 @@ std::shared_ptr<Magic> NPC::selectAttackMagicForAction(Point dest, std::shared_p
 			int bestNearCost = INT_MAX;
 			for (const auto& option : attackOptions)
 			{
-				if (option.magic == nullptr || !option.isTargetAttack || !canUseMagicByState(option.magic, false))
+				if (option.magic == nullptr
+					|| (option.moveKind == mmkSelf && !shouldUseSelfBuff(option))
+					|| !canUseMagicByState(option.magic, false))
 				{
 					continue;
 				}
@@ -5171,11 +5364,8 @@ bool NPC::releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, s
 	{
 		return false;
 	}
-	if (!canUseMagicByState(selectedMagic, kind == nkPlayer))
-	{
-		return false;
-	}
-
+	// LifeFullToUse is checked when accepting the action, not again after
+	// its animation or resource costs have changed the caster's life.
 	int launcher = getLauncherKindForNPC(*this);
 
 	int clampedLevel = getClampedAttackLevel();
@@ -5205,6 +5395,7 @@ std::shared_ptr<Magic> NPC::prepareAttackMagicForAction(Point dest, std::shared_
 	auto selectedMagic = selectAttackMagicForAction(dest, target, releaseMode);
 	bool applyAdditionalEffect = hasLastUsedAttackOption && lastUsedAttackOption.useAdditionalEffect;
 	setPreparedAttackMagic(selectedMagic, applyAdditionalEffect);
+	preparedAttackUsesNativeProtocol = hasPreparedAttackMagic && usesNativeAttackProtocol();
 	return selectedMagic;
 }
 
@@ -5216,13 +5407,22 @@ bool NPC::releasePreparedAttackMagic(Point dest, std::shared_ptr<GameElement> ta
 	}
 	auto selectedMagic = preparedAttackMagic;
 	bool applyAdditionalEffect = preparedAttackUsesAdditionalEffect;
+	const bool nativeProtocol = preparedAttackUsesNativeProtocol;
 	clearPreparedAttackMagic();
+	if (nativeProtocol)
+	{
+		// Consume this attack even if a script cleared both slots during its
+		// animation; the action fallback must not perform another random draw.
+		releaseAttackMagic(selectNativeAttackMagicAtRelease(), dest, nullptr, true);
+		return true;
+	}
 	return releaseAttackMagic(selectedMagic, dest, target, applyAdditionalEffect);
 }
 
 void NPC::setPreparedAttackMagic(std::shared_ptr<Magic> magic, bool useAdditionalEffect)
 {
 	preparedAttackMagic = magic;
+	preparedAttackUsesNativeProtocol = false;
 	hasPreparedAttackMagic = magic != nullptr;
 	preparedAttackUsesAdditionalEffect = hasPreparedAttackMagic && useAdditionalEffect;
 }
@@ -5232,11 +5432,13 @@ void NPC::clearPreparedAttackMagic()
 	preparedAttackMagic = nullptr;
 	hasPreparedAttackMagic = false;
 	preparedAttackUsesAdditionalEffect = false;
+	preparedAttackUsesNativeProtocol = false;
 }
 
 void NPC::setPreparedMagicAction(std::shared_ptr<Magic> magic, Point dest, int level, std::shared_ptr<GameElement> target, int listIndex)
 {
 	preparedMagicAction = magic;
+	preparedMagicActionSource = magic;
 	preparedMagicActionDest = dest;
 	preparedMagicActionLevel = level < 1 ? 1 : (level > MAGIC_MAX_LEVEL ? MAGIC_MAX_LEVEL : level);
 	preparedMagicActionListIndex = listIndex;
@@ -5246,6 +5448,7 @@ void NPC::setPreparedMagicAction(std::shared_ptr<Magic> magic, Point dest, int l
 void NPC::clearPreparedMagicAction()
 {
 	preparedMagicAction = nullptr;
+	preparedMagicActionSource = nullptr;
 	preparedMagicActionDest = { 0, 0 };
 	preparedMagicActionLevel = 1;
 	preparedMagicActionListIndex = -1;
@@ -5256,14 +5459,6 @@ bool NPC::canUseMagicByState(std::shared_ptr<Magic> magic, bool showMessage)
 {
 	if (magic == nullptr)
 	{
-		return false;
-	}
-	if (magic->disableUse > 0)
-	{
-		if (showMessage && kind == nkPlayer && gm != nullptr)
-		{
-			gm->showMessage("该武功不能使用");
-		}
 		return false;
 	}
 	if (magic->lifeFullToUse > 0 && life < getLifeMax())
@@ -5348,6 +5543,10 @@ void NPC::removeFirstSummonedNpc(const Magic& magic)
 bool NPC::doAttack(Point dest, std::shared_ptr<GameElement> target, AttackReleaseMode releaseMode)
 {
 	auto selectedMagic = selectAttackMagicForAction(dest, target, releaseMode);
+	if (selectedMagic != nullptr && usesNativeAttackProtocol())
+	{
+		return releaseAttackMagic(selectNativeAttackMagicAtRelease(), dest, nullptr, true);
+	}
 	bool applyAdditionalEffect = hasLastUsedAttackOption && lastUsedAttackOption.useAdditionalEffect;
 	return releaseAttackMagic(selectedMagic, dest, target, applyAdditionalEffect);
 }
@@ -5368,10 +5567,8 @@ void NPC::useMagic(std::shared_ptr<Magic> m, Point dest, int level, std::shared_
 	{
 		return;
 	}
-	if (!canUseMagicByState(m, kind == nkPlayer))
-	{
-		return;
-	}
+	// This is also the direct/script dispatch path. Player selection and normal
+	// action admission are checked by their callers, not during effect release.
 	if (level < 1)
 	{
 		level = 1;
@@ -5670,11 +5867,22 @@ void NPC::beginWalk(Point dest)
 		return;
 	}
 
+	const bool retargetCurrentMove = actionManager->isInAction(acWalk);
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (!retargetCurrentMove && currentAction != nullptr && !currentAction->canTransitionTo(acWalk))
+	{
+		return;
+	}
 	if (lastPathFindFailTime > 0 && getTime() - lastPathFindFailTime < NPC_PATH_FIND_FAIL_COOLDOWN)
 	{
 		return;
 	}
 
+	if (retargetCurrentMove && !processingStepIn)
+	{
+		updateMovePathAfterCurrentStep(dest);
+		return;
+	}
 	auto tempList = findPathByType(dest);
 	if (tempList.size() > 0)
 	{	
@@ -5684,9 +5892,13 @@ void NPC::beginWalk(Point dest)
 			beginStand();
 			return;
 		}
+		if (isWalking() || isRunning())
+		{
+			// Release the old step while its path still identifies the reserved tile.
+			clearStep();
+		}
 		stepList = tempList;
 		direction = getDirection(stepList[0]);
-		
 		actionManager->changeAction(acWalk);
 	}
 	else
@@ -5695,8 +5907,35 @@ void NPC::beginWalk(Point dest)
 	}
 }
 
+void NPC::updateMovePathAfterCurrentStep(Point destination)
+{
+	Point pathStart = position;
+	if (stepState == ssOut && !stepList.empty())
+	{
+		pathStart = stepList.front();
+	}
+	else if (stepState != ssIn)
+	{
+		return;
+	}
+
+	auto path = findPathByTypeFrom(pathStart, destination, nptEnd, false);
+	if (path.empty() && pathStart != destination)
+	{
+		lastPathFindFailTime = getTime();
+		return;
+	}
+	// The current half-step owns its reservation and timing until step-in completes.
+	path.push_front(pathStart);
+	stepList = std::move(path);
+}
+
 void NPC::beginHurt(Point dest)
 {
+	if (invincible > 0 || isImmuneToAbnormalState())
+	{
+		return;
+	}
 	if (immobilized || petrified)
 	{
 		GameLog::write("immobilized or petrified, not hurt %s, %d, %d", name.c_str(), immobilized, petrified);
@@ -5712,7 +5951,7 @@ void NPC::beginHurt(Point dest)
 
 void NPC::beginHurt()
 {
-	if (!canDoAction(acHurt) || immobilized || petrified)
+	if (invincible > 0 || isImmuneToAbnormalState() || !canDoAction(acHurt) || immobilized || petrified)
 	{
 		return;
 	}
@@ -5761,7 +6000,7 @@ void NPC::beginDieScript()
 
 void NPC::beginDie()
 {
-	if (isDying() || isHiding())
+	if (deathTransitionInProgress || isDying() || isHiding())
 	{
 		return;
 	}
@@ -5769,6 +6008,8 @@ void NPC::beginDie()
 	{
 		return;
 	}
+	// Death magic can request death again before the action clears abnormal states.
+	deathTransitionInProgress = true;
 
 	if (auto summonEffect = summonedByMagicEffect.lock())
 	{
@@ -5825,6 +6066,7 @@ void NPC::beginDie()
 		leftMillisecondsToRevive = reviveMilliseconds;
 	}
 	actionManager->forceChangeAction(acDeath);
+	deathTransitionInProgress = false;
 }
 
 bool NPC::updateReviveCountdown(UTime frameTime)
@@ -5930,6 +6172,12 @@ void NPC::clearAbnormalState()
 	clearImmobilizedState();
 }
 
+bool NPC::isImmuneToAbnormalState() const
+{
+	return gm != nullptr && gm->player.get() == this
+		&& gm->shouldProtectPlayerFromCheatDamage();
+}
+
 void NPC::rememberPoisonSource(std::shared_ptr<GameElement> source)
 {
 	poisonedBy = source;
@@ -5945,13 +6193,29 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect)
 
 	const ResourceManifest& manifest =
 		ResourceManager::instance().getActiveManifest();
+	bool usedLevelProductFallback = false;
 	const int baseExperience = calculateDefeatedNpcBaseExperience(
 		manifest,
 		gm->player->level,
 		level,
 		exp,
 		expBonus,
-		kind == nkBattle && relation == nrHostile);
+		kind == nkBattle && relation == nrHostile,
+		&usedLevelProductFallback);
+	if (usedLevelProductFallback)
+	{
+		// 等级乘积兜底整套借用月影规则：人物拿乘积原值，不乘包倍率。
+		gm->player->addExp(baseExperience);
+		if (effect != nullptr)
+		{
+			gm->magicManager.addKillExp(
+				effect,
+				static_cast<double>(baseExperience),
+				FallbackPracticeKillFraction,
+				FallbackUseKillFraction);
+		}
+		return;
+	}
 	const double scaledExperience = scaleAutomaticExperience(
 		baseExperience,
 		manifest.resolvedExperienceMultiplier());
@@ -5992,6 +6256,10 @@ void NPC::rewardPoisonKillExperience()
 
 bool NPC::applyPreDamageMagicStatus(const Effect& effect, int effectLevel)
 {
+	if (isImmuneToAbnormalState())
+	{
+		return false;
+	}
 	effectLevel = clampMagicLevelForNpc(effectLevel);
 	const MagicLevel& levelInfo = effect.magic.level[effectLevel];
 	bool handledSpecialEffect = false;
@@ -6045,6 +6313,10 @@ bool NPC::applyPreDamageMagicStatus(const Effect& effect, int effectLevel)
 
 void NPC::applyAdditionalAttackEffect(const Effect& effect, int effectLevel)
 {
+	if (isImmuneToAbnormalState())
+	{
+		return;
+	}
 	if (effect.additionalEffect == maeNone)
 	{
 		return;
@@ -6097,6 +6369,11 @@ void NPC::applyAdditionalAttackEffect(const Effect& effect, int effectLevel)
 
 void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 {
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (currentAction != nullptr && !currentAction->canTransitionTo(acAttack))
+	{
+		return;
+	}
 	if (!canDoAction(acAttack) || immobilized || petrified)
 	{
 		return;
@@ -6105,9 +6382,16 @@ void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	{
 		return;
 	}
+	const auto releaseMode = (target == nullptr) ? armGroundTarget : armLockedRelease;
+	// Reject unavailable attacks before animation. Otherwise its final-frame
+	// fallback could select a different magic or accept a later life recovery.
+	if (prepareAttackMagicForAction(dest, target, releaseMode) == nullptr)
+	{
+		return;
+	}
 	destGE = target;
 	attackDest = dest;
-	attackReleaseMode = (target == nullptr) ? armGroundTarget : armLockedRelease;
+	attackReleaseMode = releaseMode;
 	direction = getDirection(dest);
 	
 	actionManager->changeAction(acAttack);
@@ -6162,11 +6446,22 @@ void NPC::beginRun(Point dest)
 		return;
 	}
 
+	const bool retargetCurrentMove = actionManager->isInAction(acRun);
+	const auto* currentAction = actionManager->getCurrentAction();
+	if (!retargetCurrentMove && currentAction != nullptr && !currentAction->canTransitionTo(acRun))
+	{
+		return;
+	}
 	if (lastPathFindFailTime > 0 && getTime() - lastPathFindFailTime < NPC_PATH_FIND_FAIL_COOLDOWN)
 	{
 		return;
 	}
 
+	if (retargetCurrentMove && !processingStepIn)
+	{
+		updateMovePathAfterCurrentStep(dest);
+		return;
+	}
 	auto tempList = findPathByType(dest);
 	if (tempList.size() > 0)
 	{
@@ -6176,9 +6471,12 @@ void NPC::beginRun(Point dest)
 			beginStand();
 			return;
 		}
+		if (isWalking() || isRunning())
+		{
+			clearStep();
+		}
 		stepList = tempList;
 		direction = getDirection(stepList[0]);
-		
 		actionManager->changeAction(acRun);
 	}
 	else
@@ -7136,6 +7434,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	//int mapY = 0; //position.y
 	strollIntent = ini->GetInteger(section, "Action", nsiNone);
 	walkSpeed = ini->GetInteger(section, "WalkSpeed", 1);
+	jumpRadius = ini->GetInteger(section, "JumpRadius", 0);
 	if (walkSpeed < 1)
 	{
 		walkSpeed = 1;
@@ -7231,14 +7530,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	signalIndex = ini->GetInteger(section, "SignalIndex", 0);
 	signalType = ini->Get(section, "SignalType", "");
 	resetSignalImage();
-	const ResourceManifest& activeManifest =
-		ResourceManager::instance().getActiveManifest();
-	const bool usesExperienceBonus =
-		activeManifest.resolvedDefeatedNpcExperienceMode() ==
-		DefeatedNpcExperienceMode::LevelProductWithBonus;
-	std::string expBonusText = usesExperienceBonus
-		? ini->Get(section, "ExpBonus", "")
-		: "";
+	std::string expBonusText = ini->Get(section, "ExpBonus", "");
 	life = ini->GetInteger(section, "Life", 0);
 	lifeMax = ini->GetInteger(section, "LifeMax", 0);
 	thew = ini->GetInteger(section, "Thew", 0);
@@ -7259,9 +7551,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	hasDodgeEndFrameField = hasIniKey(ini, section, "Dodge_EndFrame");
 	exp = ini->GetInteger(section, "Exp", 0);
 	hasExpBonusField = !expBonusText.empty();
-	expBonus = usesExperienceBonus
-		? ini->GetInteger(section, "ExpBonus", 0)
-		: 0;
+	expBonus = ini->GetInteger(section, "ExpBonus", 0);
 
 	levelUpExp = ini->GetInteger(section, "LevelUpExp", 0);
 	canLevelUp = ini->GetInteger(section, "CanLevelUp", 0);
@@ -7328,10 +7618,6 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	magicIni = ini->Get(section, "MagicIni", "");
 	magicToUseWhenLifeLowFile = ini->Get(section, "MagicToUseWhenLifeLow", "");
 	lifeLowPercent = ini->GetInteger(section, "LifeLowPercent", 20);
-	if (lifeLowPercent <= 0)
-	{
-		lifeLowPercent = 20;
-	}
 	keepRadiusWhenLifeLow = ini->GetInteger(section, "KeepRadiusWhenLifeLow", 0);
 	keepRadiusWhenFriendDeath = ini->GetInteger(section, "KeepRadiusWhenFriendDeath", 0);
 	magicToUseWhenBeAttackedFile = ini->Get(section, "MagicToUseWhenBeAttacked", "");
@@ -7533,6 +7819,10 @@ void NPC::onUpdate()
 	auto ft = getFrameTime();
 	if (!isVisibleByVariable)
 	{
+		if (scriptMoveDestination)
+		{
+			updateEventRunState();
+		}
 		if (scriptSpecialActionOverlayActive)
 		{
 			pauseScriptSpecialActionUnderlyingAction(ft);
@@ -7628,6 +7918,10 @@ void NPC::onUpdate()
 					return;
 				}
 			}
+			if (poisonedLastTime == 0)
+			{
+				clearPoisonedState();
+			}
 		}
 		else
 		{
@@ -7643,7 +7937,7 @@ void NPC::onUpdate()
 	{
 		clearFrozenState();
 		clearImmobilizedState();
-		if (petrifiedLastTime >= ft)
+		if (petrifiedLastTime > ft)
 		{
 			petrifiedLastTime -= ft;
 			setTime(getTime() - ft);
@@ -7660,7 +7954,7 @@ void NPC::onUpdate()
 	}
 	else if (immobilized && nowAction != acDeath)
 	{
-		if (immobilizedLastTime >= ft)
+		if (immobilizedLastTime > ft)
 		{
 			immobilizedLastTime -= ft;
 			setTime(getTime() - ft);
@@ -7685,7 +7979,7 @@ void NPC::onUpdate()
 	{
 		if (frozen && nowAction != acDeath)
 		{
-			if (frozenLastTime >= ft)
+			if (frozenLastTime > ft)
 			{
 				frozenLastTime -= ft;
 				setTime(getTime() - ft / 2);
@@ -7875,7 +8169,7 @@ void NPC::onMouseLeftDown(int x, int y)
     if (player->nowAction != acDeath && player->nowAction != acHide)
     {
         NextAction act;
-        if (player->canRun && (player->thew > (int)round((float)player->info.thewMax * MIN_THEW_RATE_TO_RUN)  || player->thew > MIN_THEW_LIMIT_TO_RUN))
+        if (player->canRun && player->canPayRunThewCost())
         {
             act.action = acRun;
         }
@@ -8052,6 +8346,12 @@ int NPC::estimatePhysicalReach(const Magic& magic, int level) const
 
 int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 {
+	const int maximumDistance = option.magic != nullptr && option.magic->hasPositionCastLimit(getClampedAttackLevel())
+		? MAGIC_MAX_CAST_DISTANCE : (std::numeric_limits<int>::max)();
+	if (usesNativeAttackProtocol() && !option.hasExplicitUseDistance)
+	{
+		return std::min(attackRadius > 0 ? attackRadius : 1, maximumDistance);
+	}
 	if (option.magic == nullptr)
 	{
 		return attackRadius > 0 ? attackRadius : 1;
@@ -8068,11 +8368,11 @@ int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 		{
 			pointDistance = 1;
 		}
-		if (attackRadius > 0 && pointDistance > attackRadius)
+		if (!option.hasExplicitUseDistance && attackRadius > 0 && pointDistance > attackRadius)
 		{
 			pointDistance = attackRadius;
 		}
-		return pointDistance;
+		return std::min(pointDistance, maximumDistance);
 	}
 
 	int dist = 0;
@@ -8115,19 +8415,12 @@ int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 	{
 		dist = 1;
 	}
-	if (option.moveKind == mmkSelf)
-	{
-		if (dist < visionRadius)
-		{
-			dist = visionRadius;
-		}
-	}
-	else if (attackRadius > 0 && dist > attackRadius)
+	if (!option.hasExplicitUseDistance && attackRadius > 0 && dist > attackRadius)
 	{
 		dist = attackRadius;
 	}
 
-	return dist;
+	return std::min(dist, maximumDistance);
 }
 
 int NPC::getMaxAttackOptionDistance() const
@@ -8139,7 +8432,7 @@ int NPC::getMaxAttackOptionDistance() const
 	int maxDistance = 0;
 	for (const auto& option : attackOptions)
 	{
-		if (option.magic != nullptr && option.isTargetAttack)
+		if (option.magic != nullptr)
 		{
 			int effectiveDistance = calcEffectiveUseDistance(option);
 			if (effectiveDistance > maxDistance)
@@ -8162,9 +8455,25 @@ std::vector<AttackCandidateInfo> NPC::buildAttackCandidates(Point targetPosition
 	bool canSeeTarget = canSee(targetPosition);
 	int currentDistance = gm->map->calDistance(position, targetPosition);
 
+	if (usesNativeAttackProtocol())
+	{
+		// Keep one provisional entry. Native attacks use NPC radius for
+		// positioning and choose the actual slot only after the animation.
+		AttackCandidateInfo info;
+		info.option = attackOptions.front();
+		info.effectiveDistance = calcEffectiveUseDistance(info.option);
+		info.positionValid = true;
+		info.canHitNow = canSeeTarget && currentDistance <= info.effectiveDistance;
+		info.desiredPosition = info.canHitNow ? position : targetPosition;
+		info.desiredPositionCanHit = true;
+		info.moveCost = info.canHitNow ? 0 : currentDistance - info.effectiveDistance;
+		return { info };
+	}
+
 	for (const auto& option : attackOptions)
 	{
-		if (option.magic == nullptr || !option.isTargetAttack)
+		if (option.magic == nullptr
+			|| (option.moveKind == mmkSelf && !shouldUseSelfBuff(option)))
 		{
 			continue;
 		}
@@ -8427,6 +8736,11 @@ bool NPC::canMagicHitTarget(const NPCAttackOption& option, Point casterPosition,
 	}
 
 	int distance = gm->map->calDistance(casterPosition, targetPosition);
+	if (usesNativeAttackProtocol() && !option.hasExplicitUseDistance)
+	{
+		// This is the AI release range, not a claim that the projectile hits.
+		return distance <= effectiveDistance;
+	}
 	if (distance < 1
 		&& option.moveKind != mmkSelf && option.moveKind != mmkPoint && option.moveKind != mmkFullScreen
 		&& option.moveKind != mmkCircle && option.moveKind != mmkHeartCircle && option.moveKind != mmkHelixCircle
@@ -8442,7 +8756,9 @@ bool NPC::canMagicHitTarget(const NPCAttackOption& option, Point casterPosition,
 
 	if (option.moveKind == mmkSelf)
 	{
-		return casterPosition == targetPosition;
+		// The opponent determines when this attack is usable; the effect itself
+		// remains anchored to its caster in Magic::addSelfEffect.
+		return casterPosition == targetPosition || shouldUseSelfBuff(option);
 	}
 
 	if (option.moveKind == mmkPoint)
@@ -8487,21 +8803,15 @@ bool NPC::isTargetValid(std::shared_ptr<GameElement> target) const
 	{
 		return true;
 	}
-	return targetNPC->life > 0 && targetNPC->nowAction != acHide && targetNPC->nowAction != acDeath;
+	// Legacy NPC resources can omit Life and still describe an active fighter.
+	// Match interaction/collision death states while retaining the player guard.
+	return (targetNPC->kind != nkPlayer || targetNPC->life > 0)
+		&& !targetNPC->isHiding() && !targetNPC->isDying();
 }
 
 bool NPC::isCombatTargetValid(std::shared_ptr<GameElement> target) const
 {
-	if (target == nullptr)
-	{
-		return false;
-	}
-	auto targetNPC = std::dynamic_pointer_cast<NPC>(target);
-	if (targetNPC == nullptr)
-	{
-		return true;
-	}
-	return targetNPC->life > 0 && targetNPC->nowAction != acHide && targetNPC->nowAction != acDeath;
+	return target != nullptr && isTargetValid(target);
 }
 
 bool NPC::canAnyAttackOptionHitTarget(Point targetPosition) const
@@ -8707,12 +9017,15 @@ bool NPC::shouldUseSelfBuff(const NPCAttackOption& option) const
 	case mskClearAbnormalState:
 		return frozen || poisoned || petrified || immobilized;
 	default:
-		return false;
+		// Published attack lists also contain morphs, invisibility and ordinary
+		// follow-caster effects. They must not be permanently excluded from AI.
+		return true;
 	}
 }
 
 bool NPC::trySelfBuff()
 {
+	if (usesNativeAttackProtocol()) return false;
 	UTime currentTime = getTime();
 	if (currentTime < nextSelfBuffTime)
 	{
@@ -8728,7 +9041,7 @@ bool NPC::trySelfBuff()
 		{
 			continue;
 		}
-		if (!shouldUseSelfBuff(option))
+		if (!shouldUseSelfBuff(option) || !canUseMagicByState(option.magic, false))
 		{
 			continue;
 		}
@@ -8746,6 +9059,10 @@ bool NPC::trySelfBuff()
 
 bool NPC::isTooCloseForAttackOption(const NPCAttackOption& option, Point casterPosition, Point targetPosition) const
 {
+	if (usesNativeAttackProtocol() && !option.hasExplicitUseDistance)
+	{
+		return gm->map->calDistance(casterPosition, targetPosition) < calcEffectiveUseDistance(option);
+	}
 	if (option.magic == nullptr)
 	{
 		return false;

@@ -263,6 +263,41 @@ bool runPartnerEquipmentTransferTests()
 	partner->thew = 30;
 	partner->mana = 10;
 	gameManager.npcManager->addNPC(partner);
+	ok = check(gameManager.player->sex == 0 && partner->sex == 0,
+		"unspecified actor sex retains its stored zero value") && ok;
+	setPlayerGoods(gameManager.goodsManager.goodsList[vitalityBagIndex],
+		"head_b.ini", 1);
+	auto restrictedGoods = gameManager.goodsManager.goodsList[vitalityBagIndex].goods;
+	for (const auto& user : std::vector<std::shared_ptr<NPC>>{gameManager.player, partner})
+	{
+		for (int actorSex : {0, 1, 2})
+		{
+			user->sex = actorSex;
+			for (int requiredSex : {0, 1, 2})
+			{
+				restrictedGoods->sex = requiredSex;
+				const bool allowed = requiredSex == 0
+					|| requiredSex == (actorSex == 0 ? 1 : actorSex);
+				ok = check(
+					gameManager.goodsManager.canUseGoods(vitalityBagIndex, user) == allowed
+						&& gameManager.goodsManager.canEquipGoodsAt(vitalityBagIndex, 0, user) == allowed
+						&& gameManager.goodsManager.canEquipGoodsAt(restrictedGoods, 0, user) == allowed,
+					"player and partner equipment gates treat zero sex as male and preserve explicit restrictions") && ok;
+			}
+		}
+		user->sex = 0;
+	}
+	restrictedGoods->sex = 2;
+	std::string genderMessage;
+	ok = check(
+		!gameManager.partnerManager.equipOnePlayerGoodsOnPartner(
+			partner, vitalityBagIndex, 0, &genderMessage)
+			&& partner->getEquipmentFileByPartIndex(0).empty()
+			&& gameManager.goodsManager.goodsList[vitalityBagIndex].goods == restrictedGoods
+			&& gameManager.goodsManager.goodsList[vitalityBagIndex].number == 1
+			&& !genderMessage.empty(),
+		"a zero-sex partner rejects female equipment without consuming the source item") && ok;
+	gameManager.goodsManager.goodsList[vitalityBagIndex].clear();
 	partner->setEquipmentFileByPartIndex(0, "vitality_head.ini");
 	ok = check(
 		partner->getLifeMax() == 140 && partner->life == 65

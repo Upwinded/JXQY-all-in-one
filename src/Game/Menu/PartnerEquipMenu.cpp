@@ -35,12 +35,45 @@ PartnerEquipMenu::~PartnerEquipMenu()
 
 void PartnerEquipMenu::init()
 {
+	const auto selectedPartner = partner;
 	freeResource();
+	partner = selectedPartner;
+	if (gm != nullptr && gm->global.feature.qingyuUi
+		&& File::fileExist("ini\\ui\\qingyu\\partner\\partner.menu.ini"))
+	{
+		loadMenuDefinition("ini\\ui\\qingyu\\partner\\partner.menu.ini");
+		partner = selectedPartner;
+		titleLabel = getComponentByName<Label>("titleLabel");
+		attributeLabel = getComponentByName<Label>("attributeLabel");
+		closeButton = getComponentByName<TextButton>("closeButton");
+		for (int i = 0; i < GOODS_BODY_COUNT; ++i)
+		{
+			item[i] = getComponentByName<Item>("item" + std::to_string(i + 1));
+			if (item[i])
+			{
+				item[i]->dragIndex = -1;
+				item[i]->dragType = dtGoods;
+				item[i]->canDrag = false;
+				item[i]->canDrop = item[i]->canShowHint = true;
+			}
+		}
+		setChildRectReferToParent();
+		configureControllerFocus();
+		updateGoods();
+		return;
+	}
 
 	rect = { 0, 0, 300, 360 };
 	align = alRightCenter;
 	alignX = -180;
 	setAlign();
+	if (gm != nullptr && gm->global.feature.qingyuUi)
+	{
+		impImage = loadRes("asf\\ui\\qingyu\\panel.png");
+		nineSlice = 128;
+		nineSliceWidth = 20;
+		stretch = true;
+	}
 
 	makeLabel(titleLabel, { 18, 14, 220, 24 }, 20, 0xFFFFD37F);
 	makeLabel(attributeLabel, { 18, 48, 264, 92 }, 16, 0xFFFFFFFF);
@@ -407,6 +440,24 @@ void PartnerEquipMenu::updateAttributeLabel()
 	{
 		titleLabel->setStr(partner != nullptr ? partner->npcName : "伙伴装备");
 	}
+	if (getComponentByName("partnerlevel"))
+	{
+		if (partner != nullptr)
+		{
+			for (const auto& value : std::vector<std::pair<std::string, std::string>>{
+				{ "level", convert::formatString("等级 %d", partner->level) },
+				{ "life", convert::formatString("生命 %d/%d", partner->life, partner->getLifeMax()) },
+				{ "thew", convert::formatString("体力 %d/%d", partner->thew, partner->getThewMax()) },
+				{ "mana", convert::formatString("内力 %d/%d", partner->mana, partner->getManaMax()) },
+				{ "attack", convert::formatString("攻击 %d", partner->getAttack()) },
+				{ "defend", convert::formatString("防御 %d", partner->getDefend()) },
+				{ "evade", convert::formatString("身法 %d", partner->getEvade()) } })
+			{
+				if (auto label = getComponentByName<Label>("partner" + value.first)) label->setStr(value.second);
+			}
+		}
+		return;
+	}
 	if (attributeLabel == nullptr)
 	{
 		return;
@@ -436,14 +487,15 @@ void PartnerEquipMenu::makeLabel(std::shared_ptr<Label>& label, const Rect& labe
 	label = std::make_shared<Label>();
 	label->rect = labelRect;
 	label->fontSize = fontSize;
-	label->color = color;
+	label->color = gm != nullptr && gm->global.feature.qingyuUi ? 0xFF234F43 : color;
 	label->coverMouse = false;
 	addChild(label);
 }
 
 void PartnerEquipMenu::makeButton(std::shared_ptr<TextButton>& button, const Rect& buttonRect, const std::string& text)
 {
-	button = std::make_shared<TextButton>();
+	button = gm != nullptr && gm->global.feature.qingyuUi
+		? std::make_shared<FlatTextButton>() : std::make_shared<TextButton>();
 	button->rect = buttonRect;
 	button->setFontSize(16);
 	button->setStrColor(0xFFFFFFFF);
@@ -461,6 +513,8 @@ void PartnerEquipMenu::makeItem(std::shared_ptr<Item>& slotItem, const Rect& ite
 	slotItem->canDrop = true;
 	slotItem->canShowHint = true;
 	slotItem->fontSize = 14;
+	slotItem->drawSlot = gm != nullptr && gm->global.feature.qingyuUi;
+	slotItem->centerImage = slotItem->drawSlot;
 	addChild(slotItem);
 }
 
@@ -492,6 +546,14 @@ void PartnerEquipMenu::onEvent()
 		}
 
 		unsigned int ret = item[i]->getResult();
+#ifndef __MOBILE__
+		if (gm->global.feature.qingyuUi && (ret & erClick) && itemGoods[i])
+		{
+			gm->menu->showGoodsToolTip(getMySharedPtr(), itemGoods[i], item[i], true);
+			item[i]->resetHint();
+			continue;
+		}
+#endif
 		if (ret & erShowHint)
 		{
 			if (itemGoods[i] != nullptr)
@@ -584,6 +646,7 @@ bool PartnerEquipMenu::onHandleUIAction(UIAction action)
 	{
 		return false;
 	}
+	if (gm && gm->menu && gm->menu->toolTip && gm->menu->toolTip->turnPage(action)) return true;
 	if (action == UIAction::Cancel)
 	{
 		if (gm != nullptr && gm->menu != nullptr)
@@ -603,6 +666,10 @@ bool PartnerEquipMenu::onHandleUIAction(UIAction action)
 void PartnerEquipMenu::onDraw()
 {
 	if (!visible)
+	{
+		return;
+	}
+	if (gm != nullptr && gm->global.feature.qingyuUi && drawImagetoRect(rect, true))
 	{
 		return;
 	}
@@ -634,7 +701,14 @@ void PartnerEquipMenu::onWindowResize(int width, int height)
 	const int equipmentLogicalIndex =
 		partnerEquipmentSlotController.focusedLogicalIndex();
 	controllerPaneRouter.suspend();
-	Panel::onWindowResize(width, height);
+	if (gm != nullptr && gm->global.feature.qingyuUi)
+	{
+		ConfigDrivenPanel::onWindowResize(width, height);
+	}
+	else
+	{
+		Panel::onWindowResize(width, height);
+	}
 	configureControllerFocus();
 	if (!controllerWasActive || !visible)
 	{
@@ -672,5 +746,5 @@ void PartnerEquipMenu::freeResource()
 		itemGoods[i] = nullptr;
 	}
 	Panel::freeResource();
-	removeAllChild();
+	ConfigDrivenPanel::freeResource();
 }

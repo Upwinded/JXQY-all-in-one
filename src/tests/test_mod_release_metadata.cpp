@@ -3,6 +3,7 @@
 #include "../Resource/ModReleaseAssets.h"
 #include "../Resource/ModReleaseMetadata.h"
 #include "../Resource/SemanticVersion.h"
+#include "../Game/Data/SaveVersionCompatibility.h"
 
 #include <algorithm>
 #include <chrono>
@@ -191,6 +192,66 @@ void testSemanticVersion()
 		requireVersion("1.0.0-184467440737095516160"),
 		requireVersion("1.0.0-184467440737095516161")) < 0,
 		"SemVer compares long numeric prerelease identifiers exactly");
+}
+
+void testSaveResourceVersions()
+{
+	for (const auto& versions : std::vector<std::pair<std::string, std::string>>
+		{ { "1.03", "1.3.0" }, { "1.041", "1.41.0" },
+		  { "1.022", "1.22.0" }, { "1.053", "1.53.0" },
+		  { "1.0", "1.0.0" }, { "3.0", "3.0.0" }, { "1", "1.0.0" } })
+	{
+		const auto legacy = ModRelease::parseResourceVersion(versions.first);
+		const auto strict = ModRelease::parseSemanticVersion(versions.second);
+		expect(legacy.succeeded() && strict.succeeded() &&
+			ModRelease::compareSemanticVersionPrecedence(
+				legacy.version, strict.version) == 0,
+			"resource version compares numeric components: " + versions.first);
+	}
+	for (const char* invalid : { "", "1..0", "1.", "-1.0", "1.2.3.4",
+		"1.03 preview", "1.0/2", "18446744073709551616.0" })
+	{
+		expect(!ModRelease::parseResourceVersion(invalid).succeeded(),
+			std::string("reject invalid resource version: ") + invalid);
+	}
+	expect(!ModRelease::parseSemanticVersion("1.03").succeeded(),
+		"resource version support does not relax engine version syntax");
+	struct VersionCase
+	{
+		const char* saved;
+		const char* current;
+		const char* minimum;
+		bool initialTemplate;
+		const char* error;
+	};
+	for (const auto& versionCase : std::vector<VersionCase>
+	{
+		{ "1.03", "1.03", "1.03", false, "" },
+		{ "1.03", "1.10", "1.02", false, "" },
+		{ "1.0.0", "1.0", "1.0", false, "" },
+		{ "1.0.0", "", "1.0.0", false, "" },
+		{ "1.02", "1.10", "1.03", false, u8"过旧" },
+		{ "1.0.0", "1.03", "1.03", false, u8"过旧" },
+		{ "1.10", "1.03", "1.02", false, u8"更高版本资源包" },
+		{ "invalid", "1.03", "1.03", false, u8"存档资源版本格式错误" },
+		{ "", "1.03", "1.03", false, u8"存档资源版本格式错误" },
+		{ "1.03", "invalid", "1.03", false, u8"配置错误" },
+		{ "1.03", "1.03", "invalid", false, u8"配置错误" },
+		{ "1.03", "1.03", "1.04", false, u8"配置错误" },
+		{ "1.0.0", "1.03", "1.03", true, "" },
+		{ "invalid", "1.03", "1.03", true, "" },
+		{ "1.03", "1.03", "1.04", true, u8"配置错误" },
+	})
+	{
+		std::string error = "stale";
+		const bool accepted = SaveVersionCompatibility::validateResourceVersion(
+			versionCase.saved, versionCase.current, versionCase.minimum,
+			versionCase.initialTemplate, error);
+		expect(accepted == (versionCase.error[0] == '\0') &&
+			(accepted ? error.empty() : error.find(versionCase.error) != std::string::npos),
+			std::string("resource save bounds: ") + versionCase.saved + "/" +
+				versionCase.current + "/" + versionCase.minimum);
+	}
 }
 
 void testMetadataAndCompatibility()
@@ -939,6 +1000,7 @@ int main()
 	}
 
 	testSemanticVersion();
+	testSaveResourceVersions();
 	testMetadataAndCompatibility();
 	testStrictRelativePaths();
 	testRootedReader(temporaryDirectory.path());

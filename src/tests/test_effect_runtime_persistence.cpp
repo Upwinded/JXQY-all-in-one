@@ -359,6 +359,91 @@ bool prepareMagicFixture(const std::filesystem::path& root)
 		&& writeTextFile(root / "ini" / "goods" / "detached_equipment.ini", detachedEquipment);
 }
 
+bool runClearGoodsEquipmentMagicTest(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	if (!check(
+		writeTextFile(root / "ini" / "goods" / "clear_grant.ini",
+			"[Init]\nName=ClearGrant\nKind=1\nPart=Hand\nMagicIniWhenUse=persistence.ini\n") &&
+		writeTextFile(root / "ini" / "goods" / "clear_passive.ini",
+			"[Init]\nName=ClearPassive\nKind=1\nNoNeedToEquip=1\nMagicIniWhenUse=persistence.ini\n"),
+		"write ClearGoods equipment and passive Magic fixtures"))
+	{
+		return false;
+	}
+	bool ok = true;
+	for (bool adjustCurrentValues : { true, false })
+	{
+		for (bool learned : { false, true })
+		{
+			gameManager.goodsManager.freeResource();
+			gameManager.magicManager.freeResource();
+			gameManager.player->resetEquipmentGrantedMagicSync();
+			gameManager.player->calInfo();
+			if (learned)
+			{
+				gameManager.magicManager.addPrimaryMagic("persistence.ini", false, false);
+			}
+			ok = check(
+				gameManager.goodsManager.addItem("clear_grant.ini", 1) &&
+				gameManager.goodsManager.useItem(gameManager.goodsManager.storeBegin()) &&
+				gameManager.goodsManager.addItem("clear_passive.ini", 1),
+				"ClearGoods fixture activates equipped and passive grants") && ok;
+			auto* granted = gameManager.magicManager.findPrimaryMagic("persistence.ini");
+			if (!check(granted != nullptr && granted->hideCount == (learned ? 3 : 2),
+				"equipment grants retain a separate learned Magic reference"))
+			{
+				return false;
+			}
+			granted->level = 3;
+			granted->exp = 47;
+			if (adjustCurrentValues)
+			{
+				gameManager.scriptAPI.clearGoods();
+			}
+			else
+			{
+				gameManager.goodsManager.clearItem(false);
+			}
+			const auto checkCleared = [&]()
+			{
+				const auto* visible = gameManager.magicManager.findPrimaryMagic("persistence.ini");
+				return gameManager.goodsManager.getItemNum("clear_grant.ini") == 0 &&
+					gameManager.goodsManager.getItemNum("clear_passive.ini") == 0 &&
+					(learned
+						? visible != nullptr && visible->hideCount == 1 &&
+							visible->level == 3 && visible->exp == 47
+						: visible == nullptr && gameManager.magicManager.isMagicHidden("persistence.ini"));
+			};
+			ok = check(checkCleared(),
+				"ClearGoods removes both grants but preserves an independently learned Magic") && ok;
+			gameManager.player->calInfo();
+			ok = check(checkCleared(),
+				"repeated attribute recalculation does not restore removed equipment grants") && ok;
+			ok = check(gameManager.magicManager.save(-1) && gameManager.goodsManager.save(-1),
+				"save cleared equipment and retained Magic progress") && ok;
+			gameManager.goodsManager.freeResource();
+			gameManager.magicManager.freeResource();
+			gameManager.player->resetEquipmentGrantedMagicSync();
+			ok = check(gameManager.magicManager.load(-1) && gameManager.goodsManager.load(-1) && checkCleared(),
+				"cleared equipment Magic visibility survives real file readback") && ok;
+			ok = check(gameManager.goodsManager.addItem("clear_grant.ini", 1) &&
+				gameManager.goodsManager.useItem(gameManager.goodsManager.storeBegin()),
+				"equipment can be acquired and equipped again after clearing and readback") && ok;
+			granted = gameManager.magicManager.findPrimaryMagic("persistence.ini");
+			ok = check(granted != nullptr && granted->level == 3 && granted->exp == 47 &&
+				granted->hideCount == (learned ? 2 : 1),
+				"re-equipping restores original progress without a stale equipment reference") && ok;
+		}
+	}
+	gameManager.goodsManager.freeResource();
+	gameManager.magicManager.freeResource();
+	gameManager.player->resetEquipmentGrantedMagicSync();
+	gameManager.player->calInfo();
+	return ok;
+}
+
 bool runMagicManagerLoadCompatibilityTest(
 	GameManager& gameManager,
 	const std::filesystem::path& root)
@@ -437,6 +522,7 @@ bool runMagicManagerLoadCompatibilityTest(
 				replacementBegin + 1),
 		"replacement lists leave missing Magic entries empty while retaining valid entries") && ok;
 	gameManager.magicManager.stopReplaceMagicList();
+	gameManager.magicManager.magicList[0].remainColdMilliseconds = 4321;
 
 	ok = check(
 		gameManager.magicManager.save(-1),
@@ -450,6 +536,12 @@ bool runMagicManagerLoadCompatibilityTest(
 			&& normalizedSave.Get("2", "IniFile", "").empty()
 			&& normalizedSave.Get("3", "IniFile", "").empty(),
 		"normal save output omits skipped Magic records and stale current-use state") && ok;
+	ok = check(
+		!normalizedSave.HasKey("1", "RemainColdMilliseconds") &&
+			gameManager.magicManager.load(-1) &&
+			gameManager.magicManager.magicList[0].remainColdMilliseconds == 0 &&
+			gameManager.magicManager.isMagicHidden("heart.ini"),
+		"Magic save round-trip retains hidden progress but resets transient cooldown") && ok;
 
 	MagicInfo* restoredHidden = gameManager.magicManager.setMagicHidden(
 		"heart.ini", false, false, false);
@@ -462,6 +554,30 @@ bool runMagicManagerLoadCompatibilityTest(
 			&& restoredHidden->hideCount == 1
 			&& restoredHidden->lastIndexWhenHide == 0,
 		"hidden Magic load clamps level and hidden bookkeeping without discarding progress") && ok;
+	const int equipmentSlot = gameManager.goodsManager.equipIndex(4);
+	const GoodsInfo savedEquipment = gameManager.goodsManager.goodsList[equipmentSlot];
+	GoodsInfo& equipment = gameManager.goodsManager.goodsList[equipmentSlot];
+	equipment.iniFile = "detached_equipment.ini";
+	equipment.number = 1;
+	equipment.goods = std::make_shared<Goods>();
+	equipment.goods->initFromIni(equipment.iniFile);
+	equipment.goods->magicIniWhenUse = "persistence.ini";
+	gameManager.player->calInfo();
+	gameManager.magicManager.setMagicHidden("heart.ini", true, false, false);
+	ok = check(
+		gameManager.magicManager.findPrimaryMagic("persistence.ini") != nullptr &&
+			gameManager.magicManager.isMagicHidden("heart.ini"),
+		"ClearMagic characterization starts with visible equipment Magic and hidden progress") && ok;
+	gameManager.scriptAPI.clearMagic();
+	gameManager.player->calInfo();
+	ok = check(
+		gameManager.goodsManager.goodsListExists(equipmentSlot) &&
+			gameManager.magicManager.findPrimaryMagic("persistence.ini") == nullptr &&
+			!gameManager.magicManager.isMagicHidden("heart.ini"),
+		"characterization: ClearMagic removes equipped and hidden Magic without immediate equipment resync") && ok;
+	gameManager.goodsManager.goodsList[equipmentSlot] = savedEquipment;
+	gameManager.player->resetEquipmentGrantedMagicSync();
+	gameManager.player->calInfo();
 
 	std::string magicFailureReason;
 	const std::string mismatchedMagicCount =
@@ -494,6 +610,175 @@ bool runMagicManagerLoadCompatibilityTest(
 	return ok;
 }
 
+bool runReplacementMagicSaveCompatibilityTest(
+	GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	auto& manager = gameManager.magicManager;
+	manager.clearMagicList();
+	const std::string key = "persistence.ini;heart.ini";
+	const int toolbar = manager.bottomBegin();
+	const int practice = manager.practiceIndex();
+	auto* primary = manager.addPrimaryMagic("persistence.ini", false, false);
+	if (!check(primary != nullptr, "prepare replacement-cache primary control")) return false;
+	primary->level = 7;
+	primary->exp = 62;
+	manager.replaceMagicList(key);
+	manager.magicList[toolbar].level = 6;
+	manager.magicList[toolbar].exp = 211;
+	manager.magicList[toolbar].remainColdMilliseconds = 1234;
+	manager.exchange(toolbar, practice);
+	const auto liveMagic = manager.magicList[practice].magic;
+	bool ok = check(manager.save(0) && manager.hasActiveReplaceMagicList()
+		&& manager.magicList[practice].magic == liveMagic
+		&& manager.magicList[practice].remainColdMilliseconds == 1234,
+		"saving an active replacement preserves its live arrangement and cooldown");
+	INIReader activeSave("save\\game\\magic0.ini");
+	const std::string savedSlot = "ReplacementList1:" + std::to_string(practice + 1);
+	ok = check(activeSave.GetInteger("Head", "Count", -1) == 1
+		&& activeSave.Get("ReplacementList1", "Key", "") == key
+		&& activeSave.GetInteger(savedSlot, "Level", 0) == 6
+		&& activeSave.GetInteger(savedSlot, "Exp", 0) == 211
+		&& !activeSave.HasKey(savedSlot, "RemainColdMilliseconds"),
+		"replacement cache sections do not change primary Count or persist cooldown") && ok;
+	manager.replaceMagicList(u8"无");
+	manager.stopReplaceMagicList();
+	ok = check(manager.save(0), "save inactive and empty replacement caches") && ok;
+	INIReader inactiveSave("save\\game\\magic0.ini");
+	ok = check(inactiveSave.Get("ReplacementList2", "Key", "") == u8"无"
+		&& !inactiveSave.HasSection("ReplacementList2:1"),
+		"an explicitly empty replacement has metadata but no fabricated skills") && ok;
+
+	manager.clearMagicList();
+	manager.replaceMagicList(key);
+	manager.magicList[toolbar].level = 2;
+	manager.magicList[toolbar].exp = 13;
+	ok = check(manager.save(1) && manager.load(0) && !manager.hasActiveReplaceMagicList(),
+		"character zero restores independently of character one's active cache") && ok;
+	primary = manager.findPrimaryMagic("persistence.ini");
+	ok = check(primary != nullptr && primary->level == 7 && primary->exp == 62,
+		"cached skills do not overwrite the independent primary skill progress") && ok;
+	manager.replaceMagicList(key);
+	ok = check(manager.magicList[practice].level == 6 && manager.magicList[practice].exp == 211
+		&& manager.magicList[practice].remainColdMilliseconds == 0
+		&& !manager.magicListExists(toolbar),
+		"inactive replacement cache retains its moved practice slot after file readback") && ok;
+	manager.replaceMagicList(u8"无");
+	ok = check(std::none_of(manager.magicList.begin(), manager.magicList.end(),
+		[](const MagicInfo& info) { return info.magic != nullptr; }),
+		"re-entering a saved empty replacement stays empty") && ok;
+	ok = check(manager.load(1), "read the second character file") && ok;
+	manager.replaceMagicList(key);
+	ok = check(manager.magicList[toolbar].level == 2 && manager.magicList[toolbar].exp == 13
+		&& !manager.magicListExists(practice),
+		"second-character progress and arrangement do not inherit the first cache") && ok;
+
+	const auto savePath = root / "save" / EffectPersistenceSaveNamespace / "game" / "magic.ini";
+	const std::string base = "[Head]\nCount=1\n[1]\nIniFile=persistence.ini\nLevel=7\nExp=62\n";
+	const std::string optionalData =
+		"[ReplacementList1]\nDescription=MissingKey\n[ReplacementList1:1]\nIniFile=heart.ini\n"
+		"[ReplacementList4]\nKey=" + key + "\n"
+		"[ReplacementList4:" + std::to_string(toolbar + 1) + "]\n"
+		"IniFile=persistence.ini\nLevel=999\nExp=-1\nHideCount=-1\nLastIndexWhenHide=-1\n"
+		"[ReplacementList4:" + std::to_string(toolbar + 2) + "]\nIniFile=missing.ini\n"
+		"[ReplacementList4:" + std::to_string(toolbar + 3) + "]\nIniFile=heart.ini\n"
+		"[ReplacementList4:2147483647]\nIniFile=heart.ini\n"
+		"[ReplacementList-1]\nKey=ignored\n";
+	ok = check(writeTextFile(savePath, base + optionalData) && manager.load(-1)
+		&& manager.magicList[0].level == 7 && manager.magicList[0].exp == 62,
+		"bad optional cache metadata and resources do not reject or corrupt the base save") && ok;
+	manager.replaceMagicList(key);
+	const auto& bounded = manager.magicList[toolbar];
+	const auto& defaults = manager.magicList[toolbar + 2];
+	ok = check(bounded.level == MAGIC_MAX_LEVEL && bounded.exp == 0 && bounded.hideCount == 1
+		&& bounded.lastIndexWhenHide == 0 && !manager.magicListExists(toolbar + 1)
+		&& defaults.iniFile == "heart.ini" && defaults.level == 1 && defaults.exp == 0,
+		"replacement cache reuses numeric defaults and skips only unusable or out-of-range items") && ok;
+	const auto retainedMagic = bounded.magic;
+	ok = check(writeTextFile(savePath, "[Head\nCount=1\n") && !manager.load(-1)
+		&& manager.hasActiveReplaceMagicList() && manager.magicList[toolbar].magic == retainedMagic,
+		"a failed file load leaves the active replacement state intact") && ok;
+	ok = check(writeTextFile(savePath, base) && manager.load(-1),
+		"a compatible base file without new optional sections still loads") && ok;
+	manager.replaceMagicList(key);
+	ok = check(manager.magicList[toolbar].level == 1 && manager.magicList[toolbar].exp == 0
+		&& manager.magicListExists(toolbar + 1),
+		"loading a file without caches clears the previous character's cached progress") && ok;
+	manager.clearMagicList();
+	std::cout << "Replacement compatibility:\tpassed=" << ok << "\tcharacterFiles=2\temptyCache=1\ttolerantOptionalData=1" << std::endl;
+	return ok;
+}
+
+bool runReplacementMagicIdentityTest(GameManager& gameManager)
+{
+	auto& manager = gameManager.magicManager;
+	auto player = gameManager.player;
+	player->clearMagicRuntimeStates();
+	manager.clearMagicList();
+	const std::string originalName = player->npcName;
+	player->npcName = u8"缓存角色";
+	Magic firstForm;
+	firstForm.name = u8"第一形态";
+	firstForm.replaceMagic = "persistence.ini:2;heart.ini:4;";
+	Magic secondForm = firstForm;
+	secondForm.name = u8"第二形态";
+	const int toolbar = manager.bottomBegin();
+	player->applyTemporaryMorph(firstForm, 1000);
+	if (!check(manager.magicListExists(toolbar), "prepare a real player replacement entry")) return false;
+	manager.magicList[toolbar].level = 3;
+	manager.magicList[toolbar].exp = 71;
+	const auto firstMagic = manager.magicList[toolbar].magic;
+	player->applyTemporaryMorph(secondForm, 1000);
+	bool ok = check(manager.magicList[toolbar].level == 1 && manager.magicList[toolbar].exp == 0
+		&& manager.magicList[toolbar].magic != firstMagic,
+		"different transformation names keep independent progress for the same replacement list");
+	manager.magicList[toolbar].level = 5;
+	manager.magicList[toolbar].exp = 149;
+	const auto secondMagic = manager.magicList[toolbar].magic;
+	player->applyTemporaryMorph(firstForm, 1000);
+	ok = check(manager.magicList[toolbar].level == 3 && manager.magicList[toolbar].exp == 71
+		&& manager.magicList[toolbar].magic == firstMagic,
+		"returning to the first source restores its original learned object and progress") && ok;
+	firstForm.replaceMagic = u8"persistence.ini：9；heart.ini：1";
+	player->applyTemporaryMorph(firstForm, 1000);
+	ok = check(manager.magicList[toolbar].magic == firstMagic && manager.magicList[toolbar].exp == 71,
+		"the same source and parsed file list reuse progress across distance and separator spellings") && ok;
+	player->applyTemporaryMorph(firstForm, 1000);
+	ok = check(manager.magicList[toolbar].magic == firstMagic,
+		"reapplying an unchanged source does not reconstruct its learned objects") && ok;
+	Magic sameNamedSource = firstForm;
+	sameNamedSource.iniName = "another-source-file.ini";
+	player->applyTemporaryMorph(sameNamedSource, 1000);
+	ok = check(manager.magicList[toolbar].magic == firstMagic,
+		"published source identity uses the magic name rather than its definition filename") && ok;
+	player->applyTemporaryMorph(secondForm, 1000);
+	ok = check(manager.magicList[toolbar].magic == secondMagic && manager.magicList[toolbar].exp == 149,
+		"the second source remains independent after reapplying the first") && ok;
+	if (!check(manager.save(2), "save both transformation-source caches in the existing character file")) return false;
+	INIReader sourceSave("save/game/magic2.ini");
+	ok = check(sourceSave.Get("ReplacementList1", "Key", "") == u8"缓存角色_第一形态_persistence.ini_heart.ini.ini"
+		&& sourceSave.Get("ReplacementList2", "Key", "") == u8"缓存角色_第二形态_persistence.ini_heart.ini.ini",
+		"the existing Key field records character and source names with parsed files") && ok;
+	player->clearMagicRuntimeStates();
+	if (!check(manager.load(2), "reload both transformation-source caches")) return false;
+	for (int source = 0; source < 2; ++source)
+	{
+		player->applyTemporaryMorph(source == 0 ? firstForm : secondForm, 1000);
+		ok = check(manager.magicList[toolbar].level == (source == 0 ? 3 : 5)
+			&& manager.magicList[toolbar].exp == (source == 0 ? 71 : 149),
+			"source-specific replacement progress survives actual character-file readback") && ok;
+	}
+	player->npcName = u8"另一角色";
+	player->applyTemporaryMorph(secondForm, 1000);
+	ok = check(manager.magicList[toolbar].level == 1 && manager.magicList[toolbar].exp == 0,
+		"character identity participates in the published replacement-cache identity") && ok;
+	player->clearMagicRuntimeStates();
+	player->npcName = originalName;
+	manager.clearMagicList();
+	std::cout << "Replacement identity:\tsources=2\tcharacters=2\tfileReadback=1\tpassed=" << ok << std::endl;
+	return ok;
+}
+
 bool runGoodsManagerLoadContractTest(
 	GameManager& gameManager,
 	const std::filesystem::path& root)
@@ -514,6 +799,13 @@ bool runGoodsManagerLoadContractTest(
 			gameManager.goodsManager.goodsListExists(slot) &&
 			gameManager.goodsManager.goodsList[slot].number == 2,
 		"valid Goods save data loads into the configured inventory layout");
+	gameManager.goodsManager.goodsList[slot].remainColdMilliseconds = 4321;
+	ok = check(
+		gameManager.goodsManager.save(-1) &&
+			gameManager.goodsManager.load(-1) &&
+			gameManager.goodsManager.goodsList[slot].number == 2 &&
+			gameManager.goodsManager.goodsList[slot].remainColdMilliseconds == 0,
+		"Goods save round-trip retains quantity but resets transient cooldown") && ok;
 	const std::string mismatchedGoodsCount =
 		"[Head]\n"
 		"Count=999\n"
@@ -1431,6 +1723,10 @@ bool runCarryBindingRoundTripTest(GameManager& gameManager)
 		"carry attachment metadata survives a second serialization") && ok;
 	ok = check(gameManager.player->isHiddenByCarryMagic(),
 		"HideUserWhenCarry reverse binding is restored after all NPCs load") && ok;
+	loadedEffect->doing = ekExploding;
+	EffectTestAccess::updateCarryUserPosition(*loadedEffect);
+	ok = check(loadedEffect->carryUserActive && gameManager.player->isHiddenByCarryMagic(),
+		"HideUserWhenCarry keeps CarryUser4 hidden through the explosion until destruction") && ok;
 	loadedEffect->clearCarryUser();
 	INIReader detachedCarryIni;
 	gameManager.effectManager->saveToIni(detachedCarryIni);
@@ -2137,9 +2433,12 @@ bool runEffectRuntimePersistenceTests()
 	ok = runMagicManagerLoadCompatibilityTest(
 		gameManager,
 		root) && ok;
+	ok = runReplacementMagicSaveCompatibilityTest(gameManager, root) && ok;
+	ok = runReplacementMagicIdentityTest(gameManager) && ok;
 	ok = runGoodsManagerLoadContractTest(
 		gameManager,
 		root) && ok;
+	ok = runClearGoodsEquipmentMagicTest(gameManager, root) && ok;
 	ok = runPlayerChangeCorruptTargetRollbackTest(
 		gameManager,
 		root) && ok;

@@ -711,6 +711,28 @@ void testArtifactHashing()
 	expect(!calculateCrc32(nullptr, 1, checksum) && checksum == 0,
 		"invalid CRC32 input does not retain a stale checksum");
 }
+
+void testInstallDirectory()
+{
+	using namespace OnlineUpdate;
+	for (const char* name : { "jianghu_yuchen", u8"江湖余尘" })
+	{
+		const auto result = parseCatalog(validCatalog() +
+			"\n[Resource.NEW_MOD]\nVersion=1.03\nMinimumEngineVersion=1.0.6\n"
+			"Artifact=new-mod-1.03.zip\nSize=1\nCrc32=11111111\nInstallDirectory=" + name + "\n");
+		expect(result.succeeded() &&
+			result.catalog.resourcePackages.at("new_mod").installDirectory == name,
+			"install directory is independent of versioned artifact name");
+	}
+	for (const char* name : { "../escape", "nested/mod", "nested\\mod", "C:mod",
+		".", "..", "CoMmOn", "ENGINE", "save", ".git", ".jxqy-update", "NUL", "mod." })
+	{
+		const auto result = parseCatalog(validCatalog() +
+			"\n[Resource.NEW_MOD]\nVersion=1.03\nMinimumEngineVersion=1.0.6\n"
+			"Artifact=new-mod.zip\nSize=1\nCrc32=11111111\nInstallDirectory=" + name + "\n");
+		expect(!result.succeeded(), std::string("unsafe install directory rejected: ") + name);
+	}
+}
 }
 
 int main()
@@ -724,6 +746,7 @@ int main()
 	testIncrementalChainPlanning();
 	testProgramUpdateCheck();
 	testArtifactHashing();
+	testInstallDirectory();
 	if (failureCount != 0)
 	{
 		std::cerr << failureCount << " online update test(s) failed"

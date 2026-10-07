@@ -24,6 +24,7 @@ struct GameProfile
     // [Game]
     QString id;
     QString name;
+    QString installDirectory;
     QString author;
     ModRelease::ModReleaseMetadata releaseMetadata;
     int type = 0;
@@ -54,6 +55,7 @@ struct GameProfile
     bool magicEffectCalculationModeDefined = false;
 
     // [Script]
+    QString scriptPlayerName;
     ScriptNpcActionProfile npcActionProfile =
         ScriptNpcActionProfile::Legacy;
     bool npcActionProfileDefined = false;
@@ -69,6 +71,8 @@ struct GameProfile
 
     // [LevelUp]
     QString levelUpMessage = QString::fromUtf8("{name}的等级得到提升！");
+    bool levelUpMessageDefined = false;
+    LevelUpEffectMode levelUpEffectMode = LevelUpEffectMode::Append;
     QStringList levelUpRandomEffects;
     QString levelUpMaleEffect;
     QString levelUpFemaleEffect;
@@ -88,6 +92,7 @@ struct GameProfile
 
     // [Save]
     QString saveNamespace;
+    QString minimumCompatibleSaveResourceVersion = "1.0.0";
 
     // [Startup]
     QStringList startupVideos;

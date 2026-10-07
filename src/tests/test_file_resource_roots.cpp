@@ -15,6 +15,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <condition_variable>
 #include <filesystem>
 #include <fstream>
@@ -400,8 +401,7 @@ bool swapDirectoryNames(
 bool runDirectoryReplacementFixture(const std::filesystem::path& installedRoot,
 	const std::filesystem::path& formalTarget,
 	const std::string& fixtureName,
-	const std::function<bool()>& verifyReplacement,
-	bool replacementInvalidatesLayout = true)
+	const std::function<bool()>& verifyReplacement)
 {
 	namespace fs = std::filesystem;
 	bool ok = true;
@@ -442,25 +442,13 @@ bool runDirectoryReplacementFixture(const std::filesystem::path& installedRoot,
 		std::cout << "FIXTURE: executed " << fixtureName << std::endl;
 		std::string editorRunLogPath;
 		std::string editorRunDiagnosticsPath;
-		const File::EditorRunFileLayoutState expectedState =
-			replacementInvalidatesLayout
-				? File::EditorRunFileLayoutState::Invalid
-				: File::EditorRunFileLayoutState::Valid;
 		ok = check(File::hasEditorRunFileLayout() &&
 			File::getEditorRunLogPath(editorRunLogPath) ==
-				expectedState &&
-			File::getEditorRunDiagnosticsPath(
-				editorRunDiagnosticsPath) ==
-				expectedState &&
-			(replacementInvalidatesLayout
-				? editorRunLogPath.empty() &&
-					editorRunDiagnosticsPath.empty()
-				: !editorRunLogPath.empty() &&
-					!editorRunDiagnosticsPath.empty()),
-			fixtureName +
-			(replacementInvalidatesLayout
-				? " invalidates the private output layout"
-				: " leaves the private output layout valid")) && ok;
+				File::EditorRunFileLayoutState::Valid &&
+			File::getEditorRunDiagnosticsPath(editorRunDiagnosticsPath) ==
+				File::EditorRunFileLayoutState::Valid &&
+			!editorRunLogPath.empty() && !editorRunDiagnosticsPath.empty(),
+			fixtureName + " leaves the configured output paths available") && ok;
 		ok = verifyReplacement() && ok;
 
 		errorCode.clear();
@@ -543,14 +531,14 @@ bool runOrdinaryDirectoryReplacementFixture(
 		std::string editorRunDiagnosticsPath;
 		ok = check(File::hasEditorRunFileLayout() &&
 			File::getEditorRunLogPath(editorRunLogPath) ==
-				File::EditorRunFileLayoutState::Invalid &&
-			editorRunLogPath.empty() &&
+				File::EditorRunFileLayoutState::Valid &&
+			!editorRunLogPath.empty() &&
 			File::getEditorRunDiagnosticsPath(
 				editorRunDiagnosticsPath) ==
-				File::EditorRunFileLayoutState::Invalid &&
-			editorRunDiagnosticsPath.empty(),
+				File::EditorRunFileLayoutState::Valid &&
+			!editorRunDiagnosticsPath.empty(),
 			fixtureName +
-			" marks the installed layout invalid by physical directory identity") &&
+			" keeps the configured paths available after directory replacement") &&
 			ok;
 		errorCode.clear();
 		const bool removed = fs::remove(installedRoot, errorCode);
@@ -764,9 +752,77 @@ bool testSafeResourceTextFormatting(const std::filesystem::path& root)
 		talkTextList.list[0].index == 1 && talkTextList.list[0].portraitIndex == 2 &&
 		talkTextList.list[1].index == 5 && talkTextList.list[1].portraitIndex == 6,
 		"talk index loader skips overflowing numeric fields and continues") && ok;
+	writeRawFile(talkIndexPath,
+		"[1,2]first\r\n"
+		u8"[3,4]中文 <color=Red>红字</color>  \r\n"
+		"[5,6]last");
+	talkTextList.load("talkindex-overflow.txt");
+	ok = check(talkTextList.list.size() == 3 &&
+		talkTextList.getText(1) == "first" &&
+		talkTextList.getText(3) == u8"中文 <color=Red>红字</color>  " &&
+		talkTextList.getText(5) == "last",
+		"talk index loader accepts CRLF without losing text, color tags or trailing spaces") && ok;
+	ok = check(talkTextList.getTextDetails(1, 5).size() == 3 &&
+		talkTextList.getTextDetails(2, 5).empty() &&
+		talkTextList.getTextDetails(5, 1).empty(),
+		"talk ranges retain exact-start and reversed-range semantics with CRLF") && ok;
+	writeRawFile(talkIndexPath,
+		"[7503,4]first\n[7574,12]out of order\n[7505,3]later\n"
+		"[21736,0]first duplicate\n[21736,0]second duplicate\n");
+	talkTextList.load("talkindex-overflow.txt");
+	ok = check(talkTextList.getTextDetails(7503, 7505).size() == 1 &&
+		talkTextList.getTextDetail(7505) == nullptr &&
+		talkTextList.getText(21736) == "first duplicate",
+		"line-ending normalization does not sort the historical table or change first-match lookup") && ok;
 	File::setActiveResourceRoot("");
 	File::setAssetsCollectionRoot("");
 	File::setResourceFallbackRoots({});
+	return ok;
+}
+
+bool testTalkIndexResourcePriority(const std::filesystem::path& root)
+{
+	const auto activeRoot = root / "talk-index-mod";
+	const auto dependencyRoot = root / "talk-index-base";
+	const auto canonicalPath = activeRoot / "script/common/talkindex.txt";
+	const auto legacyPath = activeRoot / "talkindex.txt";
+	writeRawFile(dependencyRoot / "script/common/talkindex.txt", "[1,2]base\n");
+	writeRawFile(legacyPath, "[1,3]legacy mod\n");
+	File::setAssetsCollectionRoot("");
+	File::setActiveResourceRoot(activeRoot.string());
+	File::setResourceFallbackRoots({ dependencyRoot.string() });
+	TalkTextList table;
+	table.load();
+	bool ok = check(table.getText(1) == "legacy mod",
+		"a MOD legacy table overrides a dependency canonical table");
+	writeRawFile(canonicalPath, u8"[1,4]当前编辑的正文\r\n[2,5]第二句\n");
+	table.load();
+	ok = check(table.getText(1) == u8"当前编辑的正文" &&
+		table.getTextDetails(1, 2).size() == 2 && table.list.front().portraitIndex == 4,
+		"default numbered talk uses the converter canonical table within the selected root") && ok;
+	writeRawFile(canonicalPath, u8"[1,6]修改后正文\n");
+	table.load();
+	ok = check(table.getText(1) == u8"修改后正文" && table.list.size() == 1,
+		"reloading numbered talk observes canonical edits and clears previous rows") && ok;
+	table.load("talkindex.txt");
+	ok = check(table.getText(1) == "legacy mod",
+		"an explicitly requested table keeps its original path semantics") && ok;
+	writeRawFile(canonicalPath, "");
+	table.load();
+	ok = check(table.list.empty(),
+		"an intentionally empty canonical table does not resurrect legacy dialogue") && ok;
+	std::filesystem::remove(canonicalPath);
+	table.load();
+	ok = check(table.getText(1) == "legacy mod",
+		"missing canonical dialogue falls back to the legacy table") && ok;
+	std::filesystem::remove(legacyPath);
+	table.load();
+	ok = check(table.getText(1) == "base",
+		"missing MOD dialogue falls back to its content dependency") && ok;
+	File::setResourceFallbackRoots({});
+	table.load();
+	ok = check(table.list.empty(), "missing dialogue tables leave no stale dialogue") && ok;
+	File::setActiveResourceRoot("");
 	return ok;
 }
 
@@ -1350,6 +1406,118 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		"editor-run layout installs once after validation") && ok;
 	ok = check(!File::installEditorRunFileLayoutForTests(layout),
 		"editor-run layout rejects repeated installation") && ok;
+	writeRawFile(logPath, "existing-log");
+	int logOpenAttempts = 0;
+	File::setEditorRunFileOperationTestHook([&](File::EditorRunFileOperationPhase phase)
+	{
+		if (phase == File::EditorRunFileOperationPhase::BeforeLogParentOpen) ++logOpenAttempts;
+	});
+	GameLog::write("first unavailable log");
+	GameLog::write("same unavailable log");
+	ok = check(readRawFile(logPath) == "existing-log", "failed log open preserves existing output") && ok;
+	fs::remove(logPath);
+	GameLog::write("no repeated open within this session");
+	ok = check(logOpenAttempts == 1 && !fs::exists(logPath),
+		"a failed log is disabled for the current session even after its path becomes available") && ok;
+	File::setEditorRunFileOperationTestHook({});
+	File::resetEditorRunFileLayout();
+	ok = check(File::installEditorRunFileLayoutForTests(layout) && GameLog::initializeEditorRunLog(),
+		"a new session retries its log normally") && ok;
+	File::resetEditorRunFileLayout();
+	fs::remove(logPath);
+	ok = check(File::installEditorRunFileLayoutForTests(layout), "restore silent routing fixture") && ok;
+
+	// This phase checks unopened log handles later; read the shared routes silently.
+	const auto readAlias = [](const std::string& path)
+	{
+		std::string text;
+		File::visitReadableResources({ path },
+			[&text](const std::string&, const std::unique_ptr<char[]>& data, int length)
+			{
+				text.assign(data.get(), static_cast<std::size_t>(length));
+				return true;
+			});
+		return text;
+	};
+	const fs::path anchoredImages = overlayRoot / "asf" / "goods";
+	writeRawFile(anchoredImages / fs::u8path(u8"anchor001-正确.ASF"), "overlay-alias");
+	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"anchor001-丢失.asf"), "formal-exact");
+	ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
+		"an anchored overlay alias retains priority over a lower-root exact filename") && ok;
+	const fs::path competingAnchoredAlias = anchoredImages / fs::u8path(u8"anchor001-另一.asf");
+	writeRawFile(competingAnchoredAlias, "ambiguous-overlay");
+	ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "formal-exact",
+		"an ambiguous anchored alias still permits the existing lower-root fallback") && ok;
+	fs::remove(competingAnchoredAlias);
+	ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
+		"removing an anchored competing alias restores the overlay match") && ok;
+	const fs::path outsideAliasTarget = root / "outside-alias-target.txt";
+	const fs::path unsafeAnchoredAlias = anchoredImages / fs::u8path(u8"anchor001-外部.asf");
+	writeRawFile(outsideAliasTarget, "must-not-read-outside-alias");
+	std::error_code aliasLinkError;
+	fs::create_hard_link(outsideAliasTarget, unsafeAnchoredAlias, aliasLinkError);
+	ok = check(!aliasLinkError && readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias" &&
+		readRawFile(outsideAliasTarget) == "must-not-read-outside-alias",
+		"an unsafe hard-link alias is not counted as a second valid anchored candidate") && ok;
+	fs::remove(unsafeAnchoredAlias);
+	{
+		File::ResourceLookupScope lookup;
+		int enumerations = 0;
+		File::setEditorRunFileOperationTestHook([&](File::EditorRunFileOperationPhase phase)
+		{
+			if (phase == File::EditorRunFileOperationPhase::BeforeResourceDirectoryEnumeration) ++enumerations;
+		});
+		ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
+			"overlay aliases resolve inside a loading scope") && ok;
+		const int firstEnumerations = enumerations;
+		writeRawFile(anchoredImages / fs::u8path(u8"anchor900-新增.asf"), "next-scope");
+		{
+			File::ResourceLookupScope nestedLookup;
+			ok = check(readAlias(u8"asf/goods/anchor900-丢失.asf").empty() &&
+				readAlias(u8"asf/goods/anchor901-丢失.asf").empty() &&
+				readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias" &&
+				enumerations == firstEnumerations && firstEnumerations > 0,
+				"different missing overlay names and nested loads reuse the same directory index") && ok;
+		}
+		const fs::path exact = anchoredImages / fs::u8path(u8"anchor001-丢失.asf");
+		writeRawFile(exact, "exact-during-scope");
+		ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "exact-during-scope",
+			"a new exact overlay file takes precedence over its cached alias") && ok;
+		fs::remove(exact);
+		File::setEditorRunFileOperationTestHook({});
+	}
+	const fs::path removedExact = anchoredImages / fs::u8path(u8"anchor903-丢失.asf");
+	writeRawFile(removedExact, "temporary-exact");
+	writeRawFile(anchoredImages / fs::u8path(u8"anchor903-正确.asf"), "remaining-alias");
+	{
+		File::ResourceLookupScope lookup;
+		ok = check(readAlias(u8"asf/goods/anchor900-丢失.asf") == "next-scope",
+			"the next overlay loading scope sees new aliases") && ok;
+		fs::remove(removedExact);
+		ok = check(readAlias(u8"asf/goods/anchor903-丢失.asf") == "remaining-alias",
+			"a removed exact name in the snapshot does not count as a competing alias") && ok;
+	}
+	writeRawFile(anchoredImages / fs::u8path(u8"anchor002.part-图标S.ASF"), "anchored-dotted-icon");
+	ok = check(readAlias(u8"asf/goods/anchor002.other-丢失s.asf") == "anchored-dotted-icon",
+		"anchored alias lookup preserves dotted stems, extension case and icon suffixes") && ok;
+	ok = check(File::fileExist(u8"asf/goods/anchor001-丢失.asf") &&
+		File::getAssetsName(u8"asf/goods/anchor001-丢失.asf").empty(),
+		"an anchored alias exists but never exposes a lower-root host path") && ok;
+	for (const auto& extension : { "mpc", "shd", "png" })
+	{
+		const std::string candidate = std::string(u8"mpc/objects/anchor003-正确.") + extension;
+		const std::string requested = std::string(u8"MPC\\objects\\anchor003-丢失.") + extension;
+		writeRawFile(overlayRoot / fs::u8path(candidate), "anchored-image");
+		ok = check(readAlias(requested) == "anchored-image",
+			"root-relative MPC, shadow and PNG aliases retain separator and directory case support") && ok;
+	}
+	writeRawFile(overlayRoot / fs::u8path(u8"nested/asf/goods/anchor004-正确.asf"), "nested-alias");
+	writeRawFile(overlayRoot / fs::u8path(u8"notasf/goods/anchor005-正确.asf"), "not-an-image-directory");
+	writeRawFile(anchoredImages / fs::u8path(u8"anchor006-正确.txt"), "not-an-image-extension");
+	ok = check(readAlias(u8"nested/asf/goods/anchor004-丢失.asf") == "nested-alias" &&
+		readAlias(u8"notasf/goods/anchor005-丢失.asf").empty() &&
+		readAlias(u8"asf/goods/anchor006-丢失.txt").empty(),
+		"alias classification preserves nested paths and rejects unrelated directories or extensions") && ok;
 
 	const fs::path fileExistDirectory =
 		overlayRoot / "file-exist" / "real-directory";
@@ -1481,7 +1649,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 					readViaFile(
 						"asf/formal-current/caseonly.txt") ==
 						"formal-case-a" &&
-					readViaFile(
+					readAlias(
 						u8"asf/formal-current/tm910-丢失.asf") ==
 						"formal-alias-a" &&
 					std::find(
@@ -1553,7 +1721,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 						readViaFile(
 							"asf/formal-current/caseonly.txt") ==
 							"formal-case-b" &&
-						readViaFile(
+						readAlias(
 							u8"asf/formal-current/tm910-丢失.asf") ==
 							"formal-alias-b" &&
 						std::find(
@@ -1597,6 +1765,13 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			"formal final-file link fixture cleans up") &&
 			ok;
 	}
+
+	writeRawFile(activeRoot / "script/common/talkindex.txt", "[1,2]formal dialogue\n");
+	writeRawFile(overlayRoot / "script/common/talkindex.txt", u8"[1,3]编辑预览正文\n");
+	TalkTextList previewDialogue;
+	previewDialogue.load();
+	ok = check(previewDialogue.getText(1) == u8"编辑预览正文",
+		"default numbered dialogue reads the editor overlay before formal content") && ok;
 
 	const std::vector<std::string> formalBefore =
 		snapshotDirectoryTreeWithWriteTimes(formalRoot);
@@ -1840,8 +2015,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 					std::get<3>(fixture),
 					std::get<4>(fixture),
 					std::get<1>(fixture));
-			},
-			false);
+			});
 		if (fixtureOk)
 		{
 			announceRequiredSecurityFixture(
@@ -1890,40 +2064,16 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		[&]()
 		{
 			bool fixtureOk = true;
-			auto activeData = std::make_unique<char[]>(1);
-			int activeLength = 1;
-			auto commonData = std::make_unique<char[]>(1);
-			int commonLength = 1;
 			fixtureOk = check(
-				!File::activeResourceFileExist("config/active-first.txt") &&
-				!File::readActiveResourceFile(
-					"config/active-first.txt", activeData, activeLength) &&
-				activeData == nullptr && activeLength == 0 &&
-				!File::readCommonResourceFile(
-					"config/common-only.txt", commonData, commonLength) &&
-				commonData == nullptr && commonLength == 0,
-				"invalid installed layout blocks every explicit formal-resource read") &&
+				readViaActiveResourceFile("config/active-first.txt") == "active-first" &&
+				readViaCommonResourceFile("config/common-only.txt") == "common" &&
+				readViaFile("config/active-first.txt") == "active-first" &&
+				File::resolveFirstExistingResource({ "config/active-first.txt" }) ==
+					"config/active-first.txt" &&
+				readAlias("config/active-first.txt") == "active-first" &&
+				!File::listFiles("config").empty(),
+				"formal resource reads continue through their configured routes when the overlay is unavailable") &&
 				fixtureOk;
-			fixtureOk = check(readViaFile("config/active-first.txt").empty(),
-				"invalid overlay identity blocks reads instead of falling back to formal content") &&
-				fixtureOk;
-			fixtureOk = check(File::resolveFirstExistingResource({
-					"config/active-first.txt"
-				}).empty(),
-				"invalid overlay identity blocks candidate resolution") && fixtureOk;
-			bool visitorCalled = false;
-			fixtureOk = check(!File::visitReadableResources({
-					"config/active-first.txt"
-				},
-				[&visitorCalled](const std::string&,
-					std::unique_ptr<char[]>&, int)
-				{
-					visitorCalled = true;
-					return true;
-				}) && !visitorCalled,
-				"invalid overlay identity blocks readable-resource visitors") && fixtureOk;
-			fixtureOk = check(File::listFiles("config").empty(),
-				"invalid overlay identity blocks directory reads") && fixtureOk;
 			fixtureOk = check(!File::writeFileChecked(
 					"attack-checked.txt", tamperData, 6),
 				"invalid overlay identity blocks checked ordinary writes") && fixtureOk;
@@ -1938,10 +2088,10 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 					"attack-source/", "attack-destination/") &&
 				!File::recoverDirectoryCopy("attack-destination/"),
 				"invalid overlay identity blocks directory transactions") && fixtureOk;
-			fixtureOk = check(!File::writeSharedApplicationFile(
-					CONFIG_INI, tamperData, 6),
-				"one invalid installed output root blocks shared-state writes") && fixtureOk;
-			GameLog::write("invalid overlay identity must not use a legacy log");
+			fixtureOk = check(File::writeSharedApplicationFile(
+					"layout-route.txt", tamperData, 6) &&
+				readViaSharedApplicationFile("layout-route.txt") == "tamper",
+				"shared-state writes use their own configured directory") && fixtureOk;
 			fixtureOk = check(!fs::exists(legacyLogPath) &&
 				snapshotDirectoryTreeWithWriteTimes(formalRoot) == formalBefore,
 				"invalid overlay identity swallows void operations and leaves formal content unchanged") &&
@@ -2002,6 +2152,13 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 				"invalid application-state identity blocks shared state without touching formal content");
 		}) && ok;
 
+	// Earlier file-operation diagnostics may now open the independent log sink.
+	// Each failed output remains disabled until the next session.
+	File::resetEditorRunFileLayout();
+	fs::remove(logPath);
+	ok = check(File::installEditorRunFileLayoutForTests(layout),
+		"start an independent log parent failure session") && ok;
+
 	ok = runDirectoryReplacementFixture(
 		diagnosticsRoot,
 		formalDiagnosticsAttackRoot,
@@ -2017,6 +2174,9 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		}) && ok;
 
 	std::string linkError;
+	File::resetEditorRunFileLayout();
+	ok = check(File::installEditorRunFileLayoutForTests(layout),
+		"start an independent log symlink failure session") && ok;
 	const bool logSymlinkCreated = createSymbolicLinkFixture(
 		formalLogAttackTarget, logPath, false, linkError);
 	ok = check(logSymlinkCreated,
@@ -2026,9 +2186,11 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		std::cout << "FIXTURE: executed editor-run log leaf symlink" << std::endl;
 		std::string editorRunLogPath;
 		ok = check(File::getEditorRunLogPath(editorRunLogPath) ==
-				File::EditorRunFileLayoutState::Invalid &&
-			editorRunLogPath.empty(),
-			"an editor-run log leaf symlink invalidates the installed layout") && ok;
+				File::EditorRunFileLayoutState::Valid &&
+			!editorRunLogPath.empty() &&
+			readViaFile("config/order.txt") == "overlay" &&
+			readViaFile("save/game/session-only.ini") == "session-save",
+			"resource and save reads continue independently of the log leaf symlink") && ok;
 		GameLog::write("editor-run log symlink attack");
 		ok = check(readRawFile(formalLogAttackTarget) == "keep-log-target" &&
 			!fs::exists(legacyLogPath),
@@ -2042,9 +2204,12 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 	ok = check(File::getEditorRunLogPath(editorRunLogPath) ==
 			File::EditorRunFileLayoutState::Valid &&
 		!editorRunLogPath.empty(),
-		"removing the editor-run log symlink restores the installed layout identity") && ok;
+		"configured log path remains available after removing the symlink") && ok;
 
 	std::error_code hardLinkError;
+	File::resetEditorRunFileLayout();
+	ok = check(File::installEditorRunFileLayoutForTests(layout),
+		"start an independent log hard-link failure session") && ok;
 	fs::create_hard_link(formalLogAttackTarget, logPath, hardLinkError);
 	ok = check(!hardLinkError,
 		"editor-run log hard-link fixture must execute: " +
@@ -2054,9 +2219,11 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		std::cout << "FIXTURE: executed editor-run log leaf hard link" << std::endl;
 		editorRunLogPath.clear();
 		ok = check(File::getEditorRunLogPath(editorRunLogPath) ==
-				File::EditorRunFileLayoutState::Invalid &&
-			editorRunLogPath.empty(),
-			"an editor-run log leaf hard link invalidates the installed layout") && ok;
+				File::EditorRunFileLayoutState::Valid &&
+			!editorRunLogPath.empty() &&
+			readViaFile("config/order.txt") == "overlay" &&
+			readViaFile("save/game/session-only.ini") == "session-save",
+			"resource and save reads continue independently of the log leaf hard link") && ok;
 		GameLog::write("editor-run log hard-link attack");
 		ok = check(readRawFile(formalLogAttackTarget) == "keep-log-target" &&
 			!fs::exists(legacyLogPath),
@@ -2071,7 +2238,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			File::EditorRunFileLayoutState::Valid &&
 		!editorRunLogPath.empty() &&
 		snapshotDirectoryTreeWithWriteTimes(formalRoot) == formalBefore,
-		"restored directory and log leaves recover the valid layout without formal changes") && ok;
+		"configured output paths stay available and formal content is unchanged") && ok;
 
 	ok = check(readViaFile("config/order.txt") == "overlay" &&
 		readViaFile("config/dependency-only.txt") == "dependency" &&
@@ -2082,6 +2249,8 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			"ui-common" &&
 		File::getAssetsName("config/order.txt").empty(),
 		"editor-run ordinary reads use overlay then formal fallback order") && ok;
+	ok = check(readViaFile(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
+		"ordinary File reads resolve anchored aliases after unopened-log security checks") && ok;
 	ok = check(File::resolveFirstExistingResource({
 			"config/active-first.txt",
 			"config/overlay-second.txt"
@@ -2350,9 +2519,14 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		"directory copy staging and publication stay in isolated save") && ok;
 	fs::remove_all(saveRoot / "rpg2");
 	writeRawFile(saveRoot / ".jxqy-rpg2-backup" / "game.ini", "recovered");
-	ok = check(SaveFileManager::HasSaveFile(2) &&
+	ok = check(!SaveFileManager::HasSaveFile(2) &&
+		!fs::exists(saveRoot / "rpg2") &&
+		readRawFile(saveRoot / ".jxqy-rpg2-backup" / "game.ini") == "recovered",
+		"HasSaveFile queries the slot without performing legacy recovery") && ok;
+	ok = check(SaveFileManager::RecoverInterruptedSaveOperations() &&
+		SaveFileManager::HasSaveFile(2) &&
 		readRawFile(saveRoot / "rpg2" / "game.ini") == "recovered",
-		"HasSaveFile recovery mutates only isolated save") && ok;
+		"startup restores legacy transactions in the selected save namespace") && ok;
 	fs::remove_all(saveRoot / "rpg3");
 	writeRawFile(saveRoot / ".jxqy-rpg3-staging" / "game.ini", "partial");
 	ok = check(File::recoverDirectoryCopy("save/rpg3/") &&
@@ -3033,6 +3207,9 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		"transaction ready-file recovery preserves the old destination and formal target") &&
 		ok;
 
+	File::resetEditorRunFileLayout();
+	ok = check(File::installEditorRunFileLayoutForTests(layout),
+		"start a fresh session for held output lifecycle tests after failed output sessions") && ok;
 	std::string exactDiagnosticsPath;
 	uint64_t exactDiagnosticsGeneration = 0;
 	std::FILE* exactDiagnosticsFile = nullptr;
@@ -3162,7 +3339,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			std::string::npos &&
 		EditorRun::RuntimeTraceFileSink::open() ==
 			nullptr,
-		"runtime trace sink exclusively creates and durably batch-writes its independent exact leaf") &&
+		"runtime trace sink exclusively creates and batch-writes its independent exact leaf") &&
 		ok;
 
 	GameLog::write("editor-run exact log path");
@@ -3229,11 +3406,11 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			std::cout <<
 				"FIXTURE: executed held editor-run log hard-link replacement" <<
 				std::endl;
-			GameLog::write("held log hard-link replacement must be swallowed");
+			GameLog::write("held log writes through its original descriptor");
 			ok = check(
-				readRawFile(heldHardLinkOriginal) == heldContentBeforeHardLink &&
+				readRawFile(heldHardLinkOriginal).size() > heldContentBeforeHardLink.size() &&
 				readRawFile(formalLogAttackTarget) == "keep-log-target",
-				"held logger writes neither its displaced file nor the formal hard-link target") &&
+				"held logger writes its original descriptor without following the replacement link") &&
 				ok;
 			std::error_code removeError;
 			const bool removed = fs::remove(logPath, removeError);
@@ -3276,12 +3453,12 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 				GameLog::write(
 					"held logger must not follow a replaced diagnostics root");
 				return check(
-					readRawFile(heldOutsideDiagnosticsRoot) ==
-						logBeforeDiagnosticsReplacement &&
+					readRawFile(heldOutsideDiagnosticsRoot).size() >
+						logBeforeDiagnosticsReplacement.size() &&
 					!fs::exists(
 						formalDiagnosticsAttackRoot / logPath.filename()) &&
 					snapshotDirectoryTreeWithWriteTimes(formalRoot) == formalBefore,
-					"held logger remains silent while its diagnostics root identity is invalid");
+					"held logger keeps its opened file when the directory path is replaced");
 			}) && ok;
 		std::error_code heldOutsideRestoreError;
 		fs::rename(
@@ -3320,11 +3497,11 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 				File::EditorRunFileLayoutState::Valid,
 			"an unrelated regular replacement remains a valid path shape") && ok;
 		GameLog::write(
-			"ordinary replacement must fail closed instead of reusing old fd");
+			"ordinary replacement leaves the opened descriptor usable");
 		ok = check(
-			readRawFile(displacedHeldLog) == displacedContentBefore &&
+			readRawFile(displacedHeldLog).size() > displacedContentBefore.size() &&
 			readRawFile(logPath) == "ordinary-replacement",
-			"held logger compares OS file identity and writes neither mismatched leaf") && ok;
+			"held logger uses its opened descriptor and leaves the new path unchanged") && ok;
 
 		std::error_code removeError;
 		const bool removed = fs::remove(logPath, removeError);
@@ -3344,6 +3521,27 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			ok;
 	}
 #endif
+
+	writeRawFile(saveRoot / "direct-source" / "game.ini", "direct-current");
+	writeRawFile(saveRoot / "direct-source" / fs::u8path(u8"旧地图.npc"), "earlier-map");
+	writeRawFile(saveRoot / "direct-slot" / "stale.ini", "stale-slot");
+	ok = check(File::overwriteDirectoryFiles("save/direct-source", "save/direct-slot") &&
+		readRawFile(saveRoot / "direct-slot" / "game.ini") == "direct-current" &&
+		readRawFile(saveRoot / "direct-slot" / fs::u8path(u8"旧地图.npc")) == "earlier-map" &&
+		!fs::exists(saveRoot / "direct-slot" / "stale.ini"),
+		"direct save copies UTF-8 map state within the isolated save root and clears old files") && ok;
+	const fs::path directOutside = root / "direct-outside.txt";
+	const fs::path directLinkedSource = saveRoot / "direct-source" / "linked.txt";
+	writeRawFile(directOutside, "outside-state");
+	std::error_code directLinkError;
+	fs::create_hard_link(directOutside, directLinkedSource, directLinkError);
+	const bool copiedLinkedSource = File::overwriteDirectoryFiles("save/direct-source", "save/direct-slot");
+	ok = check(!directLinkError &&
+		!copiedLinkedSource &&
+		readRawFile(directOutside) == "outside-state" &&
+		!fs::exists(saveRoot / "direct-slot" / "linked.txt"),
+		"direct save reports an unreadable linked source without touching its outside target") && ok;
+	fs::remove(directLinkedSource);
 
 	const fs::path priorGenerationLog =
 		diagnosticsRoot / "prior-generation.log";
@@ -5816,8 +6014,447 @@ bool testStartupTolerance(const std::filesystem::path& root)
 }
 }
 
+#if defined(_WIN32)
+static thread_local unsigned long numericDefaultExceptionCount = 0;
+#endif
+
+bool testIniNumericDefaults()
+{
+	bool ok = true;
+	const auto originalInteger = [](const std::string& value)
+	{
+		try { return std::stol(value, nullptr, 0); }
+		catch (const std::exception&) { return 17L; }
+	};
+	const auto originalTime = [](const std::string& value)
+	{
+		try { return static_cast<UTime>(std::stoll(value, nullptr, 0)); }
+		catch (const std::exception&) { return UTime{19}; }
+	};
+	const auto originalReal = [](const std::string& value)
+	{
+		try { return static_cast<float>(std::stod(value)); }
+		catch (const std::exception&) { return 2.5f; }
+	};
+	for (auto sensitivity : { IniKeyCaseSensitivity::Insensitive, IniKeyCaseSensitivity::Sensitive })
+	{
+		INIReader ini(sensitivity);
+		for (const std::string value : { "", " ", "\t", "+", "-", "garbage", "12tail", "  -12 ",
+			"0", "0x2a", "077", "123.75", "1e3", "NaN", "inf", "-Infinity", "4294967296",
+			"999999999999999999999999999999999999999999" })
+		{
+			ini.Set("Section", "Value", value);
+			const float actual = ini.GetReal("SECTION", "Value", 2.5f);
+			const float expected = originalReal(value);
+			ok = check(ini.GetInteger("SECTION", "Value", 17) == originalInteger(value)
+				&& ini.GetTime("SECTION", "Value", 19) == originalTime(value)
+				&& (actual == expected || (std::isnan(actual) && std::isnan(expected))),
+				"numeric INI fields preserve the existing valid, partial, overflow and malformed conversion rules") && ok;
+		}
+		ini.Set("Section", "Value", "31");
+		ok = check(ini.GetInteger("Section", "value", 17) == (sensitivity == IniKeyCaseSensitivity::Sensitive ? 17 : 31),
+			"missing numeric defaults respect the configured key case policy") && ok;
+	}
+	INIReader ini;
+	ini.Set("Section", "Empty", "");
+	ok = check(ini.HasKey("Section", "Empty") && !ini.HasKey("Section", "Missing"),
+		"the default-value test includes both an explicit empty field and a missing field") && ok;
+	const auto measure = [&](bool original)
+	{
+		const auto started = std::chrono::steady_clock::now();
+		double total = 0;
+		for (int iteration = 0; iteration < 200; ++iteration)
+		{
+			for (const char* key : { "Empty", "Missing" })
+			{
+				total += original ? originalInteger(ini.Get("Section", key, "")) : ini.GetInteger("Section", key, 17);
+				total += original ? originalTime(ini.Get("Section", key, "")) : ini.GetTime("Section", key, 19);
+				total += original ? originalReal(ini.Get("Section", key, "")) : ini.GetReal("Section", key, 2.5f);
+			}
+		}
+		const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(
+			std::chrono::steady_clock::now() - started).count();
+		std::cout << "IniDefaultTiming\toriginal=" << original << "\tcalls=1200\tus=" << elapsed << "\ttotal=" << total << '\n';
+		return total == 15400.0;
+	};
+	ok = check(measure(true), "the previous conversion implementation returns the expected numeric defaults") && ok;
+#if defined(_WIN32)
+	numericDefaultExceptionCount = 0;
+	void* exceptionHandler = AddVectoredExceptionHandler(1, [](EXCEPTION_POINTERS* exception) -> LONG
+	{
+		if (exception->ExceptionRecord->ExceptionCode == 0xE06D7363) ++numericDefaultExceptionCount;
+		return EXCEPTION_CONTINUE_SEARCH;
+	});
+	if (!check(exceptionHandler != nullptr, "observe C++ exceptions only during numeric default reads")) return false;
+#endif
+	ok = check(measure(false), "current numeric default reads keep all default values") && ok;
+#if defined(_WIN32)
+	RemoveVectoredExceptionHandler(exceptionHandler);
+	std::cout << "IniDefaultExceptions\tcount=" << numericDefaultExceptionCount << '\n';
+	ok = check(numericDefaultExceptionCount == 0, "missing and empty numeric fields do not throw internal C++ exceptions") && ok;
+#endif
+	return ok;
+}
+
+// Opt-in diagnosis, not part of the normal file-test sweep. Stop at the first
+// failure and retain this process's isolated files for inspection.
+bool runSavePublicationReproduction()
+{
+	namespace fs = std::filesystem;
+	const fs::path root = makeUniqueTestDirectory("jxqy_save_publication_repro");
+	if (!check(fs::create_directory(root), "create a new private reproduction directory")) return false;
+	fs::create_directory(root / "assets");
+	File::setSharedApplicationRootForTests(root.u8string());
+	File::setPlatformStateParentForTests(root.u8string());
+	File::setAssetsCollectionRoot((root / "assets").u8string());
+	File::setActiveResourceRoot((root / "assets").u8string());
+	if (!check(File::configureUserDataRoot(root.u8string(), (root / "assets").u8string()),
+		"route all reproduction writes to its new private directory")) return false;
+	std::cout << "SavePublicationRepro root=" << root.u8string() << std::endl;
+	const auto started = std::chrono::steady_clock::now();
+	int completed = 0;
+	bool ok = true;
+	bool timedOut = false;
+	for (bool worker : { false, true })
+	{
+		for (int extraFiles : { 0, 20 })
+		{
+			if (!ok || timedOut) break;
+			const std::string saveNamespace = std::string(worker ? "worker-" : "main-") + std::to_string(extraFiles);
+			File::setActiveSaveNamespace(saveNamespace);
+			const fs::path saveRoot = root / "save" / saveNamespace;
+			const std::string gameIni = "[State]\nMap=reproduction.map\nNpc=\nObj=\n";
+			if (!check(File::writeFileChecked("save/rpg1/game.ini", gameIni.data(), static_cast<int>(gameIni.size())),
+				"seed the isolated slot through the production writer")) return false;
+			for (int file = 0; file < extraFiles; ++file)
+			{
+				const std::string name = "save/rpg1/entity-" + std::to_string(file) + ".ini";
+				const std::string bytes = "[Init]\nIndex=" + std::to_string(file) + "\nText=" + std::string(4096, 'x') + "\n";
+				if (!check(File::writeFileChecked(name, bytes.data(), static_cast<int>(bytes.size())),
+					"seed all closed input files")) return false;
+			}
+			int caseCompleted = 0;
+			const auto runCase = [&]()
+			{
+				for (int iteration = 0; iteration < 250; ++iteration)
+				{
+					if (std::chrono::steady_clock::now() - started >= std::chrono::seconds(120))
+					{
+						timedOut = true;
+						break;
+					}
+					const std::string variables = "[Init]\nEvent=" + std::to_string(iteration)
+						+ "\nevent=" + std::to_string(iteration + 1000) + "\n";
+					const auto fail = [&](const char* phase)
+					{
+						ok = false;
+						std::cerr << "SavePublicationRepro failure namespace=" << saveNamespace
+							<< " iteration=" << iteration << " phase=" << phase
+							<< " completed=" << completed << std::endl;
+					};
+					if (!File::writeFileChecked("save/rpg1/variable.ini", variables.data(), static_cast<int>(variables.size())))
+					{
+						fail("source-write");
+						break;
+					}
+					if (!SaveFileManager::CopySaveFileFrom(1))
+					{
+						fail("direct-load");
+						break;
+					}
+					if (readRawFile(saveRoot / "game" / "variable.ini") != variables
+						|| readRawFile(saveRoot / "game" / "game.ini") != gameIni
+						|| File::listFiles("save/game").size() != static_cast<std::size_t>(extraFiles + 2))
+					{
+						fail("published-readback");
+						break;
+					}
+					if (!SaveFileManager::CopySaveFileTo(1))
+					{
+						fail("slot-replacement");
+						break;
+					}
+					++caseCompleted;
+					++completed;
+				}
+			};
+			if (worker)
+			{
+				std::thread thread(runCase);
+				thread.join();
+			}
+			else
+			{
+				runCase();
+			}
+			std::cout << "SavePublicationRepro case=" << saveNamespace << " files=" << extraFiles + 2
+				<< " completed=" << caseCompleted << " failed=" << !ok << " time_limit=" << timedOut << std::endl;
+		}
+	}
+	const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count();
+	std::cout << "SavePublicationRepro total=" << completed << " milliseconds=" << elapsed
+		<< " failed=" << !ok << " time_limit=" << timedOut << " retained=" << root.u8string() << std::endl;
+	return ok && !timedOut;
+}
+
+bool testTransactionRenameRetryBoundaries()
+{
+#if defined(_WIN32) && defined(JXQY_ENABLE_TEST_HOOKS)
+	namespace fs = std::filesystem;
+	const fs::path root = makeUniqueTestDirectory("jxqy_rename_retry_boundaries");
+	if (!check(fs::create_directory(root), "create private rename-boundary root")) return false;
+	fs::create_directory(root / "assets");
+	File::setSharedApplicationRootForTests(root.u8string());
+	File::setPlatformStateParentForTests(root.u8string());
+	File::setAssetsCollectionRoot((root / "assets").u8string());
+	File::setActiveResourceRoot((root / "assets").u8string());
+	if (!check(File::configureUserDataRoot(root.u8string(), (root / "assets").u8string()),
+		"route rename-boundary writes below private root")) return false;
+	std::cout << "RenameRetryBoundaries root=" << root.u8string() << std::endl;
+	bool ok = true;
+	for (const std::string mode : { "publish-release", "delayed-release", "backup-release", "persistent",
+		"cancel", "source-changed", "destination-created", "parent-changed", "rollback-release",
+		"promote-release", "promote-cancel" })
+	{
+		File::setActiveSaveNamespace(mode);
+		const fs::path saveRoot = root / "save" / mode;
+		const fs::path staging = saveRoot / ".jxqy-rpg1-staging";
+		const fs::path backup = saveRoot / ".jxqy-rpg1-backup";
+		const fs::path displaced = saveRoot / "displaced-staging";
+		const fs::path displacedParent = root / "displaced-parent";
+		writeRawFile(saveRoot / "game" / "game.ini", "new-generation");
+		writeRawFile(saveRoot / "rpg1" / "game.ini", "old-generation");
+		HANDLE heldChild = INVALID_HANDLE_VALUE;
+		bool lockOpened = false;
+		bool cancelled = false;
+		bool fixtureChanged = false;
+		int failures = 0;
+		std::thread releaseWorker;
+		const auto closeChild = [&]()
+		{
+			if (heldChild != INVALID_HANDLE_VALUE)
+			{
+				ok = check(CloseHandle(heldChild) != 0, mode + ": close owned child handle") && ok;
+				heldChild = INVALID_HANDLE_VALUE;
+			}
+		};
+		const auto lockChild = [&](const fs::path& directory)
+		{
+			heldChild = CreateFileW((directory / "game.ini").c_str(), GENERIC_READ,
+				FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+			lockOpened = heldChild != INVALID_HANDLE_VALUE;
+			ok = check(lockOpened, mode + ": open real child denying delete sharing") && ok;
+		};
+		File::setEditorRunFileOperationTestHook([&](File::EditorRunFileOperationPhase phase)
+		{
+			if (phase != File::EditorRunFileOperationPhase::AfterTransactionRenameFailure) return;
+			++failures;
+			if (mode == "persistent" || failures != 1) return;
+			if (mode == "delayed-release")
+			{
+				const HANDLE delayedHandle = heldChild;
+				heldChild = INVALID_HANDLE_VALUE;
+				releaseWorker = std::thread([delayedHandle]()
+				{
+					std::this_thread::sleep_for(std::chrono::milliseconds(20));
+					CloseHandle(delayedHandle);
+				});
+				return;
+			}
+			closeChild();
+			cancelled = mode == "cancel" || mode == "promote-cancel";
+			if (mode == "source-changed")
+			{
+				std::error_code error;
+				fs::rename(staging, displaced, error);
+				fixtureChanged = !error;
+				ok = check(fixtureChanged, "move original staging aside after native refusal") && ok;
+				if (fixtureChanged) writeRawFile(staging / "game.ini", "foreign-staging");
+			}
+			if (mode == "destination-created")
+			{
+				fixtureChanged = !fs::exists(saveRoot / "rpg1");
+				if (fixtureChanged) writeRawFile(saveRoot / "rpg1" / "game.ini", "foreign-destination");
+			}
+			if (mode == "parent-changed")
+			{
+				std::error_code error;
+				fs::rename(saveRoot, displacedParent, error);
+				fixtureChanged = !error;
+				ok = check(fixtureChanged, "move original parent aside after native refusal") && ok;
+				if (fixtureChanged) writeRawFile(saveRoot / "rpg1" / "game.ini", "foreign-parent");
+			}
+		});
+		File::DirectoryCopyLimits limits;
+		limits.cancellationRequested = [&]() { return cancelled; };
+		const auto inject = [&](File::DirectoryCopyPhase phase)
+		{
+			if (mode == "backup-release" && phase == File::DirectoryCopyPhase::BeforeBackup)
+				lockChild(saveRoot / "rpg1");
+			if (phase == File::DirectoryCopyPhase::BeforePublish)
+			{
+				if (mode == "rollback-release")
+				{
+					lockChild(backup);
+					return true;
+				}
+				if (mode != "backup-release" && mode != "promote-release") lockChild(staging);
+			}
+			return false;
+		};
+		if (mode == "promote-release") lockChild(saveRoot / "game");
+		const auto started = std::chrono::steady_clock::now();
+		const bool promoted = mode == "promote-release" || mode == "promote-cancel";
+		const bool succeeded = promoted
+			? File::promotePreparedScratchDirectory("save/game/", "save/rpg1/", inject, limits)
+			: File::copyDirectoryFiles("save/game/", "save/rpg1/", {}, inject, limits);
+		const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - started).count();
+		File::setEditorRunFileOperationTestHook({});
+		if (releaseWorker.joinable()) releaseWorker.join();
+		closeChild();
+		const bool expectedSuccess = mode == "publish-release" || mode == "delayed-release" ||
+			mode == "backup-release" || mode == "promote-release";
+		ok = check(lockOpened && failures >= 1 && failures <= 5,
+			mode + ": observe real native failure with bounded attempts") && ok;
+		ok = check(succeeded == expectedSuccess, mode + ": transaction outcome") && ok;
+		if (mode == "persistent")
+			ok = check(failures == 5, "persistent refusal stops after exactly four retries") && ok;
+		if (mode == "cancel" || mode == "promote-cancel" || mode == "source-changed" ||
+			mode == "destination-created" || mode == "parent-changed")
+			ok = check(failures == 1, mode + ": no rename repeated after invalidation") && ok;
+		if (mode == "source-changed")
+		{
+			ok = check(fixtureChanged && readRawFile(staging / "game.ini") == "foreign-staging" &&
+				readRawFile(displaced / "game.ini") == "new-generation" &&
+				readRawFile(saveRoot / "rpg1" / "game.ini") == "old-generation",
+				"changed source is neither published nor deleted during rollback") && ok;
+		}
+		else if (mode == "destination-created")
+		{
+			ok = check(fixtureChanged && readRawFile(saveRoot / "rpg1" / "game.ini") == "foreign-destination" &&
+				readRawFile(backup / "game.ini") == "old-generation",
+				"new destination is not overwritten and original backup is retained") && ok;
+		}
+		else if (mode == "parent-changed")
+		{
+			ok = check(fixtureChanged && readRawFile(saveRoot / "rpg1" / "game.ini") == "foreign-parent" &&
+				readRawFile(displacedParent / ".jxqy-rpg1-staging" / "game.ini") == "new-generation" &&
+				readRawFile(displacedParent / ".jxqy-rpg1-backup" / "game.ini") == "old-generation",
+				"changed parent receives no writes; both original generations remain in displaced parent") && ok;
+		}
+		else
+		{
+			ok = check(readRawFile(saveRoot / "rpg1" / "game.ini") ==
+				(expectedSuccess ? "new-generation" : "old-generation"),
+				mode + ": selected slot contains the correct generation") && ok;
+		}
+		if (!(promoted && expectedSuccess) && mode != "parent-changed")
+			ok = check(readRawFile(saveRoot / "game" / "game.ini") == "new-generation",
+				mode + ": source generation retained or restored") && ok;
+		if (mode != "source-changed" && mode != "destination-created" && mode != "parent-changed")
+		{
+			ok = check(File::recoverDirectoryCopy("save/rpg1/") && !fs::exists(staging) && !fs::exists(backup),
+				mode + ": recovery after handles close clears only owned artifacts") && ok;
+		}
+		std::cout << "RenameBoundary mode=" << mode << " failures=" << failures << " succeeded=" << succeeded
+			<< " milliseconds=" << elapsed << std::endl;
+	}
+	File::setActiveSaveNamespace("");
+	File::setSharedApplicationRootForTests("");
+	File::setPlatformStateParentForTests("");
+	std::cout << "RenameRetryBoundaries passed=" << ok << " retained=" << root.u8string() << std::endl;
+	return ok;
+#else
+	std::cout << "SKIP Windows native rename retry boundaries\n";
+	return true;
+#endif
+}
+
+bool testCheckedWriteRecovery()
+{
+#if defined(_WIN32) && defined(JXQY_ENABLE_TEST_HOOKS)
+	namespace fs = std::filesystem;
+	const fs::path root = makeUniqueTestDirectory("jxqy_write_recovery");
+	fs::create_directories(root / "assets");
+	File::setSharedApplicationRootForTests(root.u8string());
+	File::setPlatformStateParentForTests(root.u8string());
+	File::setActiveResourceRoot((root / "assets").u8string());
+	if (!check(File::configureUserDataRoot(root.u8string(), (root / "assets").u8string()),
+		"route write recovery tests into a new private root")) return false;
+	bool ok = true;
+	for (const std::string mode : { "release", "persistent", "file-changed", "late-file-change", "parent-changed", "route-changed", "readonly" })
+	{
+		File::setActiveSaveNamespace(mode);
+		const fs::path parent = root / "save" / mode / "draft";
+		const fs::path path = parent / "variable.ini";
+		const std::string logicalPath = "save/draft/variable.ini";
+		if (!check(File::writeFileChecked(logicalPath, "old", 3), "seed the writer's prior file")) return false;
+		HANDLE reader = INVALID_HANDLE_VALUE;
+		if (mode == "readonly")
+		{
+			if (!check(SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_READONLY) != 0, "make a real read-only file")) return false;
+		}
+		else
+		{
+			reader = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+				nullptr, OPEN_EXISTING, 0, nullptr);
+			if (!check(reader != INVALID_HANDLE_VALUE, "hold a real reader incompatible with exclusive writing")) return false;
+		}
+		int failures = 0;
+		File::setEditorRunFileOperationTestHook([&](File::EditorRunFileOperationPhase phase)
+		{
+			if (mode == "late-file-change" && failures == 1 && phase == File::EditorRunFileOperationPhase::BeforeCheckedWriteOpen)
+			{
+				fs::rename(path, parent / "original.ini");
+				writeRawFile(path, "replacement");
+				return;
+			}
+			if (phase != File::EditorRunFileOperationPhase::AfterCheckedWriteOpenFailure) return;
+			++failures;
+			if (failures != 1 || mode == "persistent" || mode == "readonly") return;
+			CloseHandle(reader);
+			reader = INVALID_HANDLE_VALUE;
+			if (mode == "file-changed")
+			{
+				fs::rename(path, parent / "original.ini");
+				writeRawFile(path, "replacement");
+			}
+			if (mode == "parent-changed")
+			{
+				fs::rename(parent, parent.parent_path() / "original");
+				fs::create_directory(parent);
+				writeRawFile(path, "replacement");
+			}
+			if (mode == "route-changed") File::setActiveSaveNamespace("replacement-route");
+		});
+		const bool saved = File::writeFileChecked(logicalPath, "new-long-value", 14);
+		File::setEditorRunFileOperationTestHook({});
+		if (reader != INVALID_HANDLE_VALUE) CloseHandle(reader);
+		if (mode == "readonly") SetFileAttributesW(path.c_str(), FILE_ATTRIBUTE_NORMAL);
+		ok = check(saved == (mode == "release"), mode + ": only a released reader permits completion") && ok;
+		ok = check(failures == (mode == "persistent" ? 5 : 1), mode + ": retries are bounded and stop after changed paths or non-sharing errors") && ok;
+		const std::string expected = mode == "release" ? "new-long-value" :
+			(mode == "file-changed" || mode == "late-file-change" || mode == "parent-changed" ? "replacement" : "old");
+		ok = check(readRawFile(path) == expected, mode + ": changed files and rejected writes are not truncated") && ok;
+		std::cout << "WriteRecovery mode=" << mode << " failures=" << failures << " saved=" << saved << std::endl;
+	}
+	File::setActiveSaveNamespace("");
+	File::setSharedApplicationRootForTests("");
+	File::setPlatformStateParentForTests("");
+	std::cout << "WriteRecovery passed=" << ok << " retained=" << root.u8string() << std::endl;
+	return ok;
+#else
+	return true;
+#endif
+}
+
 int main(int argc, char* argv[])
 {
+	if (argc == 2 && std::string(argv[1]) == "--checked-write-recovery") return testCheckedWriteRecovery() ? 0 : 1;
+	if (argc == 2 && std::string(argv[1]) == "--ini-numeric-defaults") return testIniNumericDefaults() ? 0 : 1;
+	if (argc == 2 && std::string(argv[1]) == "--save-publication-repro") return runSavePublicationReproduction() ? 0 : 1;
+	if (argc == 2 && std::string(argv[1]) == "--transaction-retry-boundaries") return testTransactionRenameRetryBoundaries() ? 0 : 1;
 	namespace fs = std::filesystem;
 
 	bool ok = true;
@@ -5851,6 +6488,7 @@ int main(int argc, char* argv[])
 	}
 
 	ok = testSafeResourceTextFormatting(root) && ok;
+	ok = testTalkIndexResourcePriority(root) && ok;
 	ok = testResourceReadPrefixPolicy() && ok;
 	ok = testIMPFormatValidation() && ok;
 	ok = testResourceManagerDependencySelection(root) && ok;
@@ -6039,6 +6677,78 @@ int main(int argc, char* argv[])
 	ok = check(readViaFile("asf/goods/tm002-\xE7\xBC\xBA.asf").empty(),
 		"readFile refuses ambiguous image resource aliases") && ok;
 
+	const fs::path secondAlias = activeRoot / "asf" / "goods" / fs::u8path(u8"tm001-新增.asf");
+	writeRawFile(secondAlias, "second-alias");
+	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf").empty(),
+		"adding a second alias invalidates a formerly unique match on the next read") && ok;
+	fs::remove(secondAlias);
+	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "image-alias",
+		"removing the competing alias restores the unique match on the next read") && ok;
+	const fs::path exactAlias = activeRoot / "asf" / "goods" / fs::u8path(u8"tm001-丢失.asf");
+	writeRawFile(exactAlias, "new-exact-resource");
+	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "new-exact-resource",
+		"a newly created exact filename takes priority over the previous alias") && ok;
+	fs::remove(exactAlias);
+	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "image-alias",
+		"removing the exact filename re-enables the existing alias") && ok;
+	ok = check(readViaFile(u8"asf/goods/tm003-缺失.asf").empty(),
+		"the dynamic alias fixture begins with no matching resource") && ok;
+	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"tm003-新增.asf"), "new-alias");
+	ok = check(readViaFile(u8"asf/goods/tm003-缺失.asf") == "new-alias",
+		"a resource added after a missing read is visible without changing resource roots") && ok;
+
+	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"TM004-正确.ASF"), "uppercase-extension");
+	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"TM004-图标S.ASF"), "uppercase-icon");
+	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"tm004-说明.txt"), "different-extension");
+	fs::create_directory(activeRoot / "asf" / "goods" / fs::u8path(u8"tm004-目录.asf"));
+	ok = check(readViaFile(u8"asf/goods/tm004-丢失.asf") == "uppercase-extension" &&
+		readViaFile(u8"asf/goods/tm004-丢失s.asf") == "uppercase-icon",
+		"aliases preserve extension and icon-suffix case rules and ignore other extensions and directories") && ok;
+	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"tm005.part-正确.asf"), "dotted-stem");
+	ok = check(readViaFile(u8"asf/goods/tm005.other-丢失.asf") == "dotted-stem",
+		"a dot inside the stem still terminates the stable alias prefix") && ok;
+
+	{
+		File::ResourceLookupScope lookup;
+		const std::vector<std::pair<std::string, std::string>> cases = {
+			{u8"asf/goods/tm001-丢失.asf", "image-alias"},
+			{u8"asf/goods/tm001-丢失s.asf", "icon-alias"},
+			{u8"asf/goods/tm002-丢失.asf", ""},
+			{u8"asf/goods/tm004-丢失.asf", "uppercase-extension"},
+			{u8"asf/goods/tm004-丢失s.asf", "uppercase-icon"},
+			{u8"asf/goods/tm005.other-丢失.asf", "dotted-stem"}
+		};
+		for (int pass = 0; pass < 2; ++pass)
+		{
+			File::ResourceLookupScope nestedLookup;
+			for (const auto& entry : cases)
+			{
+				ok = check(readViaFile(entry.first) == entry.second,
+					"cached resource names retain aliases, ambiguity and icon suffixes") && ok;
+			}
+		}
+		ok = check(readViaFile(u8"asf/goods/tm900-缺失.asf").empty(),
+			"loading scope records an absent alias") && ok;
+		writeRawFile(activeRoot / "asf/goods" / fs::u8path(u8"tm900-新增.asf"), "next-load");
+		ok = check(readViaFile(u8"asf/goods/tm900-缺失.asf").empty(),
+			"nested loading scopes reuse the directory snapshot") && ok;
+		writeRawFile(exactAlias, "exact-during-load");
+		ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "exact-during-load",
+			"exact resource reads take precedence over cached aliases") && ok;
+		fs::remove(exactAlias);
+		File::setActiveResourceRoot(activeRoot.u8string());
+		ok = check(readViaFile(u8"asf/goods/tm900-缺失.asf") == "next-load",
+			"resource root changes refresh active directory snapshots") && ok;
+		ok = check(readViaFile(u8"asf/goods/tm901-缺失.asf").empty(),
+			"second absent alias is recorded") && ok;
+		writeRawFile(activeRoot / "asf/goods" / fs::u8path(u8"tm901-新增.asf"), "fresh-load");
+	}
+	{
+		File::ResourceLookupScope lookup;
+		ok = check(readViaFile(u8"asf/goods/tm901-缺失.asf") == "fresh-load",
+			"a new loading scope sees files added after the previous snapshot") && ok;
+	}
+
 	std::string resolvedDependencyFile = normalizePath(File::getAssetsName("config/base-only.txt"));
 	ok = check(resolvedDependencyFile.find("BasePack/config/base-only.txt") != std::string::npos,
 		"getAssetsName returns dependency path when active file is missing") && ok;
@@ -6137,6 +6847,80 @@ int main(int argc, char* argv[])
 		!fs::exists(userSaveRoot / ".jxqy-rpg1-backup"),
 		"handled transaction failures do not leave recovery artifacts") && ok;
 
+#if defined(_WIN32)
+	const fs::path renameFailureLog = root / "transaction-rename-failure.log";
+	writeRawFile(userSaveRoot / "rename-locked" / "game.ini", "old-locked-slot");
+	HANDLE stagingLock = INVALID_HANDLE_VALUE;
+	GameLog::setLogFilePath(renameFailureLog.u8string());
+	GameLog::use_log_file = true;
+	const bool lockedCopy = File::copyDirectoryFiles("save/game/", "save/rename-locked/", {},
+		[&](File::DirectoryCopyPhase phase)
+		{
+			if (phase == File::DirectoryCopyPhase::BeforePublish)
+			{
+				stagingLock = CreateFileW((userSaveRoot / ".jxqy-rename-locked-staging").c_str(),
+					FILE_LIST_DIRECTORY, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+					OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+			}
+			return false;
+		});
+	GameLog::use_log_file = false;
+	GameLog::setLogFilePath("");
+	ok = check(stagingLock != INVALID_HANDLE_VALUE && !lockedCopy &&
+		readViaFile("save/rename-locked/game.ini") == "old-locked-slot" &&
+		readViaFile("save/game/game.ini") == "new-before-publish",
+		"a real OS-denied staging rename reports failure and preserves source and selected slot") && ok;
+	if (stagingLock != INVALID_HANDLE_VALUE)
+	{
+		CloseHandle(stagingLock);
+	}
+	const std::string renameLog = readRawFile(renameFailureLog);
+	ok = check(renameLog.find("Can not rename transaction path") != std::string::npos &&
+		renameLog.find(" error=") != std::string::npos &&
+		renameLog.find(" category=system message=") != std::string::npos,
+		"transaction rename failures include the native error value and category") && ok;
+	ok = check(File::recoverDirectoryCopy("save/rename-locked/") &&
+		readViaFile("save/rename-locked/game.ini") == "old-locked-slot" &&
+		!fs::exists(userSaveRoot / ".jxqy-rename-locked-staging") &&
+		!fs::exists(userSaveRoot / ".jxqy-rename-locked-backup"),
+		"recovery after releasing the directory handle keeps the original slot") && ok;
+
+	writeRawFile(userSaveRoot / "child-locked" / "game.ini", "old-child-locked-slot");
+	HANDLE childLock = INVALID_HANDLE_VALUE;
+	const fs::path childFailureLog = root / "transaction-child-rename-failure.log";
+	GameLog::setLogFilePath(childFailureLog.u8string());
+	GameLog::use_log_file = true;
+	const bool childLockedCopy = File::copyDirectoryFiles("save/game/", "save/child-locked/", {},
+		[&](File::DirectoryCopyPhase phase)
+		{
+			if (phase == File::DirectoryCopyPhase::BeforePublish)
+			{
+				childLock = CreateFileW((userSaveRoot / ".jxqy-child-locked-staging" / "game.ini").c_str(),
+					GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, 0, nullptr);
+			}
+			return false;
+		});
+	GameLog::use_log_file = false;
+	GameLog::setLogFilePath("");
+	ok = check(childLock != INVALID_HANDLE_VALUE && !childLockedCopy &&
+		readViaFile("save/child-locked/game.ini") == "old-child-locked-slot" &&
+		readViaFile("save/game/game.ini") == "new-before-publish",
+		"a child file denying delete sharing prevents directory publication without replacing the old save") && ok;
+	if (childLock != INVALID_HANDLE_VALUE)
+	{
+		CloseHandle(childLock);
+	}
+	const std::string childLog = readRawFile(childFailureLog);
+	ok = check(childLog.find("error=5 category=system") != std::string::npos &&
+		childLog.find("source_error=0 destination_attributes=0xffffffff destination_error=2") != std::string::npos,
+		"Windows reports access denied for a directory rename with an unshared child and a missing destination") && ok;
+	ok = check(File::recoverDirectoryCopy("save/child-locked/") &&
+		readViaFile("save/child-locked/game.ini") == "old-child-locked-slot" &&
+		!fs::exists(userSaveRoot / ".jxqy-child-locked-staging") &&
+		!fs::exists(userSaveRoot / ".jxqy-child-locked-backup"),
+		"recovery after releasing the child file keeps the old slot and clears failed staging") && ok;
+#endif
+
 	fs::remove_all(userSaveRoot / "rpg2");
 	writeRawFile(userSaveRoot / ".jxqy-rpg2-backup" / "game.ini", "recovered-old");
 	writeRawFile(userSaveRoot / ".jxqy-rpg2-staging" / "game.ini", "unpublished-new");
@@ -6186,15 +6970,37 @@ int main(int argc, char* argv[])
 
 	writeRawFile(activeRoot / "ini" / "save" / "game.ini", "canonical-new-game");
 	writeRawFile(activeRoot / "ini" / "save" / "player.ini", "canonical-player");
+	writeRawFile(dependencyRoot / "ini" / "save" / "player.ini", "dependency-player");
+	writeRawFile(dependencyRoot / "ini" / "save" / "inherited.npc", "dependency-npc");
 	writeRawFile(userSaveRoot / "game" / "stale.ini", "stale");
 	ok = check(SaveFileManager::CopySaveFileFrom(0) &&
 		readViaFile("save/game/game.ini") == "canonical-new-game" &&
 		readViaFile("save/game/player.ini") == "canonical-player" &&
+		readViaFile("save/game/inherited.npc") == "dependency-npc" &&
+		readRawFile(activeRoot / "ini" / "save" / "player.ini") == "canonical-player" &&
+		readRawFile(dependencyRoot / "ini" / "save" / "player.ini") == "dependency-player" &&
 		!fs::exists(userSaveRoot / "game" / "stale.ini") &&
 		SaveFileManager::HasSaveFile(0) &&
 		!SaveFileManager::CopySaveFileTo(0) &&
 		!fs::exists(userSaveRoot / "rpg0"),
-		"new game loads directly from the canonical resource ini/save template") && ok;
+		"new game directly copies merged templates with MOD precedence and leaves both resource roots unchanged") && ok;
+
+#if defined(_WIN32)
+	writeRawFile(userSaveRoot / "game" / "player.ini", "previous-player");
+	HANDLE previousPlayerReader = CreateFileW((userSaveRoot / "game" / "player.ini").c_str(),
+		GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+		nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+	const bool copiedWithOpenReader = SaveFileManager::CopySaveFileFrom(0);
+	char previousPlayerBytes[32] = {};
+	DWORD previousPlayerLength = 0;
+	const bool previousPlayerReadable = previousPlayerReader != INVALID_HANDLE_VALUE &&
+		ReadFile(previousPlayerReader, previousPlayerBytes, sizeof(previousPlayerBytes), &previousPlayerLength, nullptr);
+	if (previousPlayerReader != INVALID_HANDLE_VALUE) CloseHandle(previousPlayerReader);
+	ok = check(copiedWithOpenReader && previousPlayerReadable &&
+		std::string(previousPlayerBytes, previousPlayerLength) == "previous-player" &&
+		readViaFile("save/game/player.ini") == "canonical-player",
+		"direct load replaces a file immediately while an existing shared-delete reader retains its old contents") && ok;
+#endif
 
 	writeRawFile(activeRoot / "save" / "rpg0" / "game.ini", "legacy-resource-template");
 	writeRawFile(userSaveRoot / "rpg0" / "game.ini", "legacy-user-template");
@@ -6247,6 +7053,7 @@ int main(int argc, char* argv[])
 		"[Game]\n"
 		"Id=MOD_A\n"
 		"Name=Mod A\n"
+		"InstallDirectory=mod_a\n"
 		"Author=Mod Author\n"
 		"Version=1.041\n"
 		"Type=99\n"
@@ -6265,6 +7072,7 @@ int main(int argc, char* argv[])
 		"\n"
 		"[Save]\n"
 		"Namespace=mod_a_save\n"
+		"MinimumCompatibleResourceVersion=1.03\n"
 		"\n"
 		"[Release]\n"
 		"Date=2026-07-25\n"
@@ -6308,10 +7116,16 @@ int main(int argc, char* argv[])
 	ok = check(manifest.isFeatureEnabled("UnknownFeature", true),
 		"manifest uses caller default for absent feature") && ok;
 	ok = check(manifest.saveNamespace == "mod_a_save", "manifest parses Save.Namespace") && ok;
+	ok = check(manifest.minimumCompatibleSaveResourceVersion == "1.03" &&
+		manifest.installDirectory == "mod_a",
+		"manifest parses independent save lower bound and install directory") && ok;
 	ok = check(manifest.teamInfoFile == "team.txt", "manifest parses Team.InfoFile") && ok;
 	ok = check(!manifest.isBaseGame(),
 		"manifest with content dependencies is not a base game") && ok;
 	ResourceManifest defaultManifest = ResourceManifest::createDefault("");
+	ok = check(defaultManifest.minimumCompatibleSaveResourceVersion == "1.0.0" &&
+		defaultManifest.installDirectory.empty(),
+		"save resource lower bound defaults to 1.0.0 and directory remains optional") && ok;
 	ok = check(
 		defaultManifest.teamInfoFile.empty() &&
 			defaultManifest.releaseMetadata.displayVersion.empty() &&

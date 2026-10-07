@@ -828,15 +828,17 @@ bool runOrdinaryModeBoundaryTest(
 				!gameManager.player->visible &&
 				!gameManager.player->needEvents &&
 				gameManager.varList.get(
-					"ordinarymixedcase") ==
+					"OrdinaryMixedCase") ==
 					ordinaryString &&
+				gameManager.varList.get(
+					"ordinarymixedcase").empty() &&
 				gameManager.varList.getInteger(
 					"OrdinaryInteger") == 17 &&
 				gameManager.varList.getReal(
 					"OrdinaryReal") == 1.25f &&
 				gameManager.varList.getBoolean(
 					"OrdinaryBoolean"),
-			"ordinary no-writer mode keeps its existing player and variable setter semantics") &&
+			"ordinary no-writer mode keeps its player and case-sensitive variable setter semantics") &&
 			ok;
 	}
 	ok = check(
@@ -1017,6 +1019,21 @@ bool runDeferredMissingOptionalResourcesTest(
 	ok = check(
 		fixture.prepareValidSceneFiles(),
 		"deferred missing-resource fixture is restored") && ok;
+	return ok;
+}
+
+bool runEmptyVariablePreviewTest(RuntimeFixture& fixture)
+{
+	auto target = fixture.target();
+	target.integerVariables.clear();
+	GameManager gameManager(target, fixture.prepared());
+	const auto result = EditorRunSceneRuntimeTestAccess::apply(gameManager);
+	bool ok = check(result.succeeded() && gameManager.varList.getInteger("EditorRunLuaApplied") == 77,
+		"preview with no supplied variables retains entry-script assignments");
+	gameManager.scriptAPI.assign("SelValue", 4);
+	gameManager.scriptAPI.assign("selvalue", 9);
+	ok = check(gameManager.scriptAPI.getVar("SelValue") == 4 && gameManager.scriptAPI.getVar("selvalue") == 9,
+		"preview choice outputs are writable and case-sensitive without a seeded variable") && ok;
 	return ok;
 }
 
@@ -1596,11 +1613,21 @@ bool runProductionRuntimeTraceTest(
 		gameManager.varList.setInteger(
 			"MiXeDInteger",
 			7);
+		gameManager.varList.setInteger(
+			"Result",
+			0);
+		gameManager.varList.setInteger(
+			"result",
+			1);
 		storedVariableSemanticsPreserved =
 			gameManager.varList.getInteger(
 				"MiXeDInteger") == 7 &&
 			gameManager.varList.getInteger(
-				"mixedinteger") == 7;
+				"mixedinteger") == 0 &&
+			gameManager.varList.getInteger(
+				"Result") == 0 &&
+			gameManager.varList.getInteger(
+				"result") == 1;
 		gameManager.varList.setReal(
 			"FineReal",
 			1.234567f);
@@ -1627,6 +1654,11 @@ bool runProductionRuntimeTraceTest(
 			true);
 		gameManager.varList.clearExcept(
 			{"MiXeDInteger"});
+		const bool caseSensitiveVariablesRoundTripped =
+			gameManager.varList.save() &&
+			gameManager.varList.load() &&
+			gameManager.varList.getInteger("MiXeDInteger") == 7 &&
+			gameManager.varList.getInteger("mixedinteger") == 0;
 
 		ok = check(
 			writeTextFile(
@@ -1634,11 +1666,24 @@ bool runProductionRuntimeTraceTest(
 					"game" / "variable.ini",
 				"[Variable]\n"
 				"LoadedEmpty=\n"
-				"LoadedMixed=9\n"),
+				"loadedmixed=9\n"
+				"Result=2\n"
+				"result=1\n"),
 			"runtime trace variable load fixture is written") &&
 			ok;
 		const bool validVariablesLoaded =
 			gameManager.varList.load();
+		const bool caseSensitiveVariablesRead =
+			validVariablesLoaded &&
+			gameManager.varList.getInteger("LoadedMixed") == 0 &&
+			gameManager.varList.getInteger("loadedmixed") == 9 &&
+			gameManager.varList.getInteger("Result") == 2 &&
+			gameManager.varList.getInteger("result") == 1;
+		const bool caseSensitiveVariablesReloaded =
+			gameManager.varList.save() &&
+			gameManager.varList.load() &&
+			gameManager.varList.getInteger("Result") == 2 &&
+			gameManager.varList.getInteger("result") == 1;
 		const bool emptyVariablesWritten =
 			writeTextFile(
 				fixture.isolatedSaveRoot /
@@ -1656,7 +1701,9 @@ bool runProductionRuntimeTraceTest(
 				"[Variable\nBroken=1\n");
 		std::string variableFailureReason;
 		variableLoadContractPreserved =
-			validVariablesLoaded &&
+			caseSensitiveVariablesRoundTripped &&
+			caseSensitiveVariablesRead &&
+			caseSensitiveVariablesReloaded &&
 			emptyVariablesLoaded &&
 			malformedVariablesWritten &&
 			!gameManager.varList.load(&variableFailureReason) &&
@@ -1674,7 +1721,7 @@ bool runProductionRuntimeTraceTest(
 		ok;
 	ok = check(
 		storedVariableSemanticsPreserved,
-		"trace observation preserves existing case-insensitive variable storage semantics") &&
+		"script variable storage preserves case-sensitive names") &&
 		ok;
 	ok = check(
 		variableLoadContractPreserved,
@@ -1733,34 +1780,34 @@ bool runProductionRuntimeTraceTest(
 		ok = check(
 			traceSubstringCount(
 				trace,
-				"\"variableName\":\"finereal\"") == 3 &&
+				"\"variableName\":\"FineReal\"") == 3 &&
 			trace.find(
-				"\"variableName\":\"largereal\"") !=
+				"\"variableName\":\"LargeReal\"") !=
 				std::string::npos &&
 			trace.find(
-				"\"variableName\":\"smallreal\"") !=
+				"\"variableName\":\"SmallReal\"") !=
 				std::string::npos &&
 			trace.find(
-				"\"variableName\":\"negativezero\"") !=
+				"\"variableName\":\"NegativeZero\"") !=
 				std::string::npos &&
 			trace.find("e+") == std::string::npos &&
 			trace.find("\"afterValue\":\"-0\"") ==
 				std::string::npos &&
 			!traceLineContains(
 				trace,
-				"\"variableName\":\"nonfinitereal\"",
+				"\"variableName\":\"NonFiniteReal\"",
 				"\"valueType\":\"real\""),
 			"real changes use persisted round-trip values with canonical exponent and zero spelling") &&
 			ok;
 		ok = check(
 			traceSubstringCount(
 				trace,
-				"\"variableName\":\"mixedcaseempty\","
+				"\"variableName\":\"MixedCaseEmpty\","
 				"\"valueType\":\"string\","
 				"\"beforeValue\":\"\","
 				"\"afterValue\":\"\"") == 2 &&
 			trace.find(
-				"\"variableName\":\"loadedempty\","
+				"\"variableName\":\"LoadedEmpty\","
 				"\"valueType\":\"string\","
 				"\"beforeValue\":\"\","
 				"\"afterValue\":\"\"") !=
@@ -2105,6 +2152,7 @@ bool runEditorRunSceneRuntimeTests()
 	bool ok = true;
 	ok = runOrdinaryModeBoundaryTest(fixture) && ok;
 	ok = runProductionSuccessTest(fixture) && ok;
+	ok = runEmptyVariablePreviewTest(fixture) && ok;
 	ok = runDeferredMissingOptionalResourcesTest(fixture) && ok;
 	ok = runDeferredCorruptResourcesTest(fixture) && ok;
 	ok = runDeferredMissingPlayerTest(fixture) && ok;
