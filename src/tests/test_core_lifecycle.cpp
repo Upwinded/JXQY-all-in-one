@@ -14733,6 +14733,26 @@ bool runCameraViewportResizeTests()
 		ok;
 
 	gameManager.camera->setPaused(false);
+	for (const Point viewport : { Point{ 1112, 500 }, Point{ 1111, 500 },
+		Point{ 1112, 501 }, Point{ 1111, 501 } })
+	{
+		CoreLifecycleTestAccess::setLogicalSize(viewport.x, viewport.y);
+		gameManager.player->setPosition({ 0, 0 });
+		gameManager.camera->snapToFollowTarget();
+		const Point screenCenter = { viewport.x / 2, viewport.y / 2 };
+		const Point firstTile = Map::getTilePosition(
+			{ 0, 1 }, gameManager.camera->position, screenCenter,
+			gameManager.camera->offset);
+		const Point nextColumnTile = Map::getTilePosition(
+			{ 1, 1 }, gameManager.camera->position, screenCenter,
+			gameManager.camera->offset);
+		const Point nextGroundRowTile = Map::getTilePosition(
+			{ 0, 11 }, gameManager.camera->position, screenCenter,
+			gameManager.camera->offset);
+		ok = check(nextColumnTile.x - firstTile.x == TILE_WIDTH &&
+			nextGroundRowTile.y - firstTile.y == 5 * TILE_HEIGHT,
+			"ground tiles retain their exact spacing across the screen origin in odd and even viewports") && ok;
+	}
 	CoreLifecycleTestAccess::setLogicalSize(
 		originalWidth,
 		originalHeight);

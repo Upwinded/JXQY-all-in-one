@@ -727,8 +727,9 @@ Point Map::getTilePosition(Point tile, Point cenTile, Point cenScreen, PointEx c
 {
 	PointEx pointEx = getTilePositionEx(tile, cenTile, cenScreen, cenTileOffset);
 	Point point;
-	point.x = static_cast<int>(std::clamp<double>(std::round(pointEx.x), INT_MIN, INT_MAX));
-	point.y = static_cast<int>(std::clamp<double>(std::round(pointEx.y), INT_MIN, INT_MAX));
+	// Round half pixels in one direction so tiles stay adjacent across zero.
+	point.x = static_cast<int>(std::clamp<double>(std::floor(static_cast<double>(pointEx.x) + 0.5), INT_MIN, INT_MAX));
+	point.y = static_cast<int>(std::clamp<double>(std::floor(static_cast<double>(pointEx.y) + 0.5), INT_MIN, INT_MAX));
 	return point;
 }
 
