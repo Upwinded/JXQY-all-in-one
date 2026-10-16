@@ -22,6 +22,9 @@ public:
     NPCActionBase(NPC* npc);
     virtual ~NPCActionBase() = default;
 
+    // Retained until this action finishes, even after its script returns.
+    bool scripted = false;
+
     // 进入该动作状态时调用
     virtual void enter() = 0;
     // 每帧更新动作状态

@@ -1,13 +1,14 @@
 #pragma once
 
+#include "SaveSlots.h"
 #include <filesystem>
 #include <string>
 #include <vector>
 
 namespace SavePackage
 {
-// 1..7 are manual slots; 8 names rpg_auto only inside the transfer interface.
-constexpr int AutomaticSlot = 8;
+// The UI, runtime and transfer interface share the same slot numbers.
+constexpr int AutomaticSlot = SaveSlots::Automatic;
 constexpr int AllSlots = 0;
 
 struct GameIdentity

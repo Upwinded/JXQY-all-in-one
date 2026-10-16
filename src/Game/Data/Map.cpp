@@ -1493,7 +1493,9 @@ Point Map::getJumpPath(Point from, Point to, int jumpRadius)
 	{
 		return from;
 	}
-	if (!isInMap(from) || !isInMap(to))
+	// A directional jump may aim outside the map. Let the tile checks below
+	// retain the last legal landing instead of discarding the whole jump.
+	if (!isInMap(from))
 	{
 		return from;
 	}
@@ -1517,9 +1519,13 @@ Point Map::getJumpPath(Point from, Point to, int jumpRadius)
 			}
 			previous = limited;
 			limited = next;
+			if (!isInMap(limited))
+			{
+				break;
+			}
 		}
 		to = limited;
-		if (from == to || !isInMap(to)) return from;
+		if (from == to) return from;
 	}
 	float angle;
 	if (from.x == to.x && std::llabs(static_cast<int64_t>(from.y) - to.y) % 2 == 0)
@@ -1547,7 +1553,7 @@ Point Map::getJumpPath(Point from, Point to, int jumpRadius)
 	else
 	{
 		Point pos = getTilePosition(to, from, { 0, 0 }, { 0, 0 });
-		angle = atan2((float)-pos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)pos.x);
+		angle = atan2(-static_cast<float>(pos.y) * ((float)TILE_WIDTH / TILE_HEIGHT), (float)pos.x);
 		if (angle < 0)
 		{
 			angle += 2 * M_PI;
@@ -3182,7 +3188,7 @@ std::vector<Point> Map::getLineSubStep(Point from, Point to, float angle)
 	else
 	{
 		Point newPos = getTilePosition(to, from, { 0, 0 }, { 0, 0 });
-		float newAngle = atan2((float)-newPos.y * ((float)TILE_WIDTH / TILE_HEIGHT), (float)newPos.x);
+		float newAngle = atan2(-static_cast<float>(newPos.y) * ((float)TILE_WIDTH / TILE_HEIGHT), (float)newPos.x);
 		if (newAngle < 0)
 		{
 			newAngle += 2 * M_PI;

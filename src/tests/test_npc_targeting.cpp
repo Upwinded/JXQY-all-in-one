@@ -28,7 +28,7 @@ bool runMediaRuntimeTests();
 bool runCoreLifecycleTests();
 bool runScriptMovementRuntimeTests();
 bool runCurrentModCompatibilityTests();
-bool runQingyuUiTests();
+bool runQingyuUiTests(bool interactionOnly = false);
 bool runSaveWriteSharingRuntimeTests();
 bool runSaveStabilityTests();
 bool runXiaoxiangMissingObjectRouteTests();
@@ -54,6 +54,7 @@ bool runCharacterCasterSaveRuntimeTests();
 bool runUIFocusTests();
 bool runMapThumbnailControllerTests();
 bool runPartnerEquipmentTransferTests();
+bool runPartnerMechanicsTests();
 bool runWorldInteractionRuntimeTests();
 bool runGamepadWorldRuntimeTests();
 bool runGamepadEssentialUITests();
@@ -241,6 +242,52 @@ bool runParasiticIntervalDefaultTest()
 	Magic zeroInterval;
 	zeroInterval.initFromIni("zero_parasitic_interval.ini", false);
 	ok = check(zeroInterval.parasiticInterval == 0, "explicit ParasiticInterval=0 remains explicit") && ok;
+	return ok;
+}
+
+bool runJumpBoundaryTest()
+{
+	GameManager game;
+	auto& map = *game.map;
+	map.data = std::make_shared<MapData>();
+	map.data->head.width = 9;
+	map.data->head.height = 17;
+	map.data->tile.assign(17, std::vector<MapTile>(9));
+	map.createDataMap();
+	const Point origin{ 4, 8 };
+	bool ok = true;
+	for (int direction = 0; direction < 8; ++direction)
+	{
+		Point target = origin;
+		for (int step = 0; step < 24; ++step)
+		{
+			target = Map::getSubPoint(target, direction);
+		}
+		for (int radius : { 0, 1, INT_MAX })
+		{
+			const Point landing = map.getJumpPath(origin, target, radius);
+			ok = check(landing != origin && map.canWalk(landing),
+				"out-of-map targets retain a legal jump in all eight directions and radius modes") && ok;
+		}
+	}
+	ok = check(map.getJumpPath(origin, { -20, 8 }) == Point{ 0, 8 }
+		&& map.getJumpPath(origin, { 4, -20 }) == Point{ 4, 0 }
+		&& map.getJumpPath(origin, { -20, 8 }, 1) == Point{ 2, 8 },
+		"boundary jumps stop at the edge or the actor's shorter radius") && ok;
+	map.data->tile[8][2].obstacle = toObstacle;
+	ok = check(map.getJumpPath(origin, { -20, 8 }) == Point{ 3, 8 },
+		"an out-of-map jump still stops before solid terrain") && ok;
+	map.data->tile[8][2].obstacle = 0;
+	game.mapFolderName = "boundary-jump-test";
+	game.traps.set(game.mapFolderName, 2, "jump-trap.txt");
+	map.data->tile[8][3].trap = 2;
+	ok = check(map.getJumpPath(origin, { -20, 8 }) == Point{ 3, 8 },
+		"an active adjacent trap becomes the boundary jump's landing") && ok;
+	game.traps.markTriggered(2);
+	ok = check(map.getJumpPath(origin, { -20, 8 }) == Point{ 0, 8 },
+		"a consumed trap does not shorten the boundary jump") && ok;
+	ok = check(map.getJumpPath({ -1, 8 }, origin) == Point{ -1, 8 },
+		"an invalid jump origin remains rejected") && ok;
 	return ok;
 }
 
@@ -798,7 +845,7 @@ bool runProjectileTilePathTest()
 		effect->level = 5;
 		effect->magic.level[5].moveKind = mmkSector;
 		effect->magic.attackAll = 1;
-		effect->evade = -1000;
+		effect->evade = 0;
 		effect->lifeTime = 10000;
 		effect->beginTime = 0;
 		effect->setTime(0);
@@ -825,6 +872,101 @@ bool runProjectileTilePathTest()
 	return ok;
 }
 
+bool runSharedMagicHitRateTest()
+{
+	GameManager gameManager;
+	auto player = gameManager.player;
+	auto enemy = std::make_shared<NPC>();
+	auto ally = std::make_shared<NPC>();
+	enemy->kind = ally->kind = nkBattle;
+	enemy->relation = nrHostile;
+	ally->relation = nrFriendly;
+	enemy->defend = ally->defend = player->info.defend = 50;
+	enemy->lifeMax = ally->lifeMax = player->info.lifeMax = 10000;
+	gameManager.npcManager->npcList = { enemy, ally };
+	bool ok = true;
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	for (const auto& pack : { "jxqy2", "yycs", "xjxqy", u8"潇湘行" })
+	{
+		std::ifstream input(assetsRoot / std::filesystem::u8path(pack) / "game_profile.ini", std::ios::binary);
+		const std::string bytes((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
+		ResourceManifest manifest;
+		if (!check(manifest.loadFromBuffer(bytes.data(), static_cast<int>(bytes.size())),
+			"load the actual trilogy and MOD combat profiles")) return false;
+		gameManager.global.applyResourceManifestFeatures(manifest);
+		const auto verify = [&](const std::shared_ptr<NPC>& caster,
+			const std::shared_ptr<NPC>& target, int attackerEvade, int targetEvade,
+			int expectedDamage, const char* route)
+		{
+			target->evade = targetEvade;
+			if (target == player) player->info.evade = targetEvade;
+			int hits = 0;
+			bool valid = true;
+			for (int attempt = 0; attempt < 256; ++attempt)
+			{
+				target->life = 10000;
+				target->nowAction = acStand;
+				auto effect = std::make_shared<Effect>();
+				effect->user = caster;
+				effect->launcherKind = lkFriend;
+				effect->doing = ekFlying;
+				effect->level = 1;
+				effect->damage = 200;
+				effect->evade = attackerEvade;
+				effect->position = target->getPosition();
+				effect->width = 0.5f;
+				valid = CollisionDetector::detectCollision(target, effect) && valid;
+				const int damage = 10000 - target->life;
+				valid = (damage == 0 || damage == expectedDamage) && valid;
+				hits += damage > 0;
+			}
+			std::cout << "Shared hit rate: pack=" << pack << " route=" << route
+				<< " hits=" << hits << "/256" << std::endl;
+			valid = check(valid && hits > 0 && hits < 256,
+				"real collisions retain hits and misses above 100 evade difference with unchanged damage");
+			target->evade = 100;
+			if (target == player) player->info.evade = 100;
+			int damageHits = 0, statusHits = 0;
+			for (int roll = 0; roll < 100; ++roll)
+			{
+				target->clearAbnormalState();
+				target->disableMoveMilliseconds = target->disableSkillMilliseconds = 0;
+				target->life = 10000;
+				target->nowAction = acStand;
+				auto effect = std::make_shared<Effect>();
+				effect->user = caster;
+				effect->launcherKind = lkFriend;
+				effect->level = 1;
+				effect->damage = 200;
+				effect->evade = 100;
+				effect->magic.level[1].specialKind = mskImmobilize;
+				effect->additionalEffect = maePoison;
+				effect->magic.disableMoveMilliseconds = 1000;
+				effect->magic.disableSkillMilliseconds = 1000;
+				target->hurt(effect, roll);
+				const bool statusHit = target->immobilized;
+				const int damage = 10000 - target->life;
+				damageHits += damage > 0;
+				statusHits += statusHit;
+				valid = check(damage == (roll < 60 ? expectedDamage : 0)
+					&& statusHit == (roll < 50) && target->poisoned == statusHit
+					&& (target->disableMoveMilliseconds > 0) == statusHit
+					&& (target->disableSkillMilliseconds > 0) == statusHit,
+					"damage, immobilization, equipment poison and action locks share one hit roll") && valid;
+			}
+			target->clearAbnormalState();
+			target->disableMoveMilliseconds = target->disableSkillMilliseconds = 0;
+			std::cout << "Shared status rate: pack=" << pack << " route=" << route
+				<< " damage=" << damageHits << "/100 status=" << statusHits << "/100" << std::endl;
+			return valid;
+		};
+		ok = verify(player, enemy, 83, 183, 150, "player-to-NPC") && ok;
+		ok = verify(enemy, player, 121, 225, 120, "NPC-to-player") && ok;
+		ok = verify(enemy, ally, 121, 225, 150, "NPC-to-NPC") && ok;
+	}
+	return ok;
+}
+
 bool runNeutralProjectileCollisionTest()
 {
 	GameManager gameManager;
@@ -836,6 +978,7 @@ bool runNeutralProjectileCollisionTest()
 	caster->kind = nkBattle;
 	caster->setPosition({ 2, 2 }, false);
 	auto target = std::make_shared<NPC>();
+	target->invincible = 1;
 	target->setPosition({ 5, 5 }, false);
 	gameManager.npcManager->npcList = { caster, target };
 	gameManager.map->createDataMap();
@@ -856,7 +999,7 @@ bool runNeutralProjectileCollisionTest()
 		effect->user = caster;
 		effect->launcherKind = lkEnemy;
 		effect->magic.attackAll = attackAll;
-		effect->evade = -1000; // Misses still distinguish collision from damage.
+		effect->evade = 0;
 		effect->width = 0.5f;
 		effect->lifeTime = 1;
 		gameManager.effectManager->effectList.push_back(effect);
@@ -872,7 +1015,7 @@ bool runNeutralProjectileCollisionTest()
 	ok = verifyCollision(nkBattle, nrNeutral, nrHostile, 0, 0, false,
 		"neutral fighter does not stop hostile projectile on clear tile") && ok;
 	ok = verifyCollision(nkBattle, nrNeutral, nrHostile, 1, 0, true,
-		"AttackAll projectile collides with neutral fighter before missed damage") && ok;
+		"AttackAll projectile collides with an invincible neutral fighter") && ok;
 	ok = verifyCollision(nkBattle, nrNeutral, nrNone, 0, 0, true,
 		"None-relation caster projectile collides with neutral fighter") && ok;
 	ok = verifyCollision(nkNormal, nrFriendly, nrHostile, 1, 0, false,
@@ -904,7 +1047,7 @@ bool runSweptProjectileCollisionTest()
 		auto effect = std::make_shared<Effect>();
 		effect->doing = ekFlying;
 		effect->magic.attackAll = 1;
-		effect->evade = -1000;
+		effect->evade = 0;
 		effect->width = 0.5f;
 		effect->lifeTime = 1;
 		return effect;
@@ -1273,6 +1416,7 @@ bool runGameplayAutomationRuntimeTests();
 
 int main(int argc, char** argv)
 {
+	if (argc > 1 && std::string(argv[1]) == "--partner-mechanics") return runPartnerMechanicsTests() ? 0 : 1;
 #if defined(__MOBILE__)
 	if (argc > 1)
 	{
@@ -1358,6 +1502,10 @@ int main(int argc, char** argv)
 	if (argc > 1 && std::string(argv[1]) == "--qingyu-ui")
 	{
 		return runQingyuUiTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--qingyu-ui-interaction")
+	{
+		return runQingyuUiTests(true) ? 0 : 1;
 	}
 	if (argc > 1 && std::string(argv[1]) == "--save-write-sharing")
 	{
@@ -1530,10 +1678,12 @@ int main(int argc, char** argv)
 
 	ok = runParasiticIntervalDefaultTest() && ok;
 	ok = runMapObstacleSemanticsTest() && ok;
+	ok = runJumpBoundaryTest() && ok;
 	ok = runNonCombatPartnerTargetingTest() && ok;
 	ok = runPartnerCombatOwnerLeashTest() && ok;
 	ok = runFollowerAttackAIGateTest() && ok;
 	ok = runProjectileTilePathTest() && ok;
+	ok = runSharedMagicHitRateTest() && ok;
 	ok = runNeutralProjectileCollisionTest() && ok;
 	ok = runSweptProjectileCollisionTest() && ok;
 	ok = runSweptProjectileInteractionTest() && ok;

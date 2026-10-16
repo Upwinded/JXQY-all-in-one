@@ -12,7 +12,7 @@ public:
     NPCActionManager(NPC* npc);
     ~NPCActionManager() = default;
 
-    void changeAction(NPCActionType type);
+    void changeAction(NPCActionType type, bool scripted = false);
     void forceChangeAction(NPCActionType type);
     // Reserved for explicit script/runtime state resets that must leave terminal actions.
     void resetActionIgnoringTransitions(NPCActionType type);
@@ -48,7 +48,7 @@ public:
 private:
     uint64_t _actionRevision = 0;
     void createAction(NPCActionType type);
-    void resetAction(NPCActionType type);
+    void resetAction(NPCActionType type, bool scripted = false);
 
     NPC* _npc = nullptr;
     std::shared_ptr<NPCActionBase> _currentAction;

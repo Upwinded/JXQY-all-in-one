@@ -1,4 +1,5 @@
 #include "ResourceManager.h"
+#include "../Game/GameManager/SaveSlots.h"
 
 #include "../File/INIReader.h"
 #include "../File/File.h"
@@ -296,7 +297,7 @@ std::filesystem::path configuredSaveRoot()
 int saveSlotCount(const std::filesystem::path& namespaceRoot)
 {
 	int count = 0;
-	for (int index = 1; index <= 7; index++)
+	for (int index = 1; index <= SaveSlots::ManualCount; index++)
 	{
 		std::error_code error;
 		if (std::filesystem::is_regular_file(
@@ -501,9 +502,22 @@ bool validateActivatedResourceGroup(
 	const OnlineUpdate::ResourceInstallTransactionResult& transaction,
 	const std::vector<ResourceManager::ResourcePack>& packs,
 	bool requirePlayableResourceGroup,
-	std::string& failedGameId)
+	std::string& failedGameId,
+	std::string* failureDetail = nullptr)
 {
 	failedGameId.clear();
+	if (failureDetail != nullptr)
+	{
+		failureDetail->clear();
+	}
+	const auto fail = [failureDetail](const std::string& reason)
+	{
+		if (failureDetail != nullptr)
+		{
+			*failureDetail = reason;
+		}
+		return false;
+	};
 	for (const OnlineUpdate::ResourceInstallTarget& target :
 		transaction.targets)
 	{
@@ -516,22 +530,22 @@ bool validateActivatedResourceGroup(
 				error);
 		if (error)
 		{
-			return false;
+			return fail(u8"无法访问安装目录：" + target.targetDirectoryName +
+				u8"（" + error.category().name() + ":" + std::to_string(error.value()) + u8"）");
 		}
 		if (toLowerAscii(target.gameId) == "common" &&
 			target.targetDirectoryName == "common")
 		{
 			if (!OnlineUpdate::isValidCommonResourceRoot(expectedPath))
 			{
-				return false;
+				return fail(u8"公共资源目录或 common/version.ini 无效");
 			}
 			continue;
 		}
-		const std::string expectedRoot =
-			normalizeRootPath(expectedPath.generic_u8string());
 		std::size_t identifierMatchCount = 0;
 		std::size_t exactTargetMatchCount = 0;
 		const ResourceManager::ResourcePack* exactPack = nullptr;
+		std::error_code pathComparisonError;
 		for (const ResourceManager::ResourcePack& pack : packs)
 		{
 			if (toLowerAscii(pack.manifest.id) !=
@@ -540,16 +554,40 @@ bool validateActivatedResourceGroup(
 				continue;
 			}
 			identifierMatchCount++;
-			if (pack.rootPath == expectedRoot)
+			std::error_code equivalentError;
+			if (std::filesystem::equivalent(
+					std::filesystem::u8path(pack.rootPath),
+					expectedPath,
+					equivalentError) && !equivalentError)
 			{
 				exactTargetMatchCount++;
 				exactPack = &pack;
+			}
+			else if (equivalentError)
+			{
+				pathComparisonError = equivalentError;
 			}
 		}
 		if (identifierMatchCount != 1 || exactTargetMatchCount != 1 ||
 			exactPack == nullptr)
 		{
-			return false;
+			if (identifierMatchCount == 0)
+			{
+				return fail(u8"安装后未扫描到该资源；请检查 " +
+					target.targetDirectoryName + "/game_profile.ini");
+			}
+			if (identifierMatchCount > 1)
+			{
+				return fail(u8"存在重复 Game.Id，共 " +
+					std::to_string(identifierMatchCount) + u8" 份资源");
+			}
+			if (pathComparisonError)
+			{
+				return fail(u8"无法核对安装目录（" +
+					std::string(pathComparisonError.category().name()) + ":" +
+					std::to_string(pathComparisonError.value()) + u8"）：" + target.targetDirectoryName);
+			}
+			return fail(u8"扫描到的资源目录与安装目标不符：" + target.targetDirectoryName);
 		}
 		if (!requirePlayableResourceGroup)
 		{
@@ -570,7 +608,8 @@ bool validateActivatedResourceGroup(
 			if (dependencyCount != 1)
 			{
 				failedGameId = dependencyId;
-				return false;
+				return fail(dependencyCount == 0 ? std::string(u8"安装后缺少依赖资源")
+					: u8"依赖 Game.Id 重复，共 " + std::to_string(dependencyCount) + u8" 份资源");
 			}
 		}
 	}
@@ -2736,12 +2775,18 @@ bool ResourceManager::activateStagedResourceInstall(
 
 	rescanResources();
 	std::string failedGameId;
+	std::string failureDetail;
 	const bool resourceGroupValid = validateActivatedResourceGroup(
 		writableResourceCollectionRoot,
 		activation,
 		discoveredPacks,
 		!allowUnplayableImportedResource,
-		failedGameId);
+		failedGameId, &failureDetail);
+	if (!resourceGroupValid)
+	{
+		GameLog::write("ResourceManager: installed resource validation failed id=%s reason=%s\n",
+			failedGameId.c_str(), failureDetail.c_str());
+	}
 	bool commitFailed = false;
 	const OnlineUpdate::ResourceInstallTransactionResult completion =
 		completeValidatedResourceInstall(
@@ -2767,6 +2812,7 @@ bool ResourceManager::activateStagedResourceInstall(
 			{
 				errorText += u8"：" + failedGameId;
 			}
+			errorText += "\n" + failureDetail;
 			if (!completion.rolledBack)
 			{
 				errorText += u8"；资源恢复未完成，请重启后重试";

@@ -47,6 +47,8 @@ int main()
 		"unconfigured resources retain their existing magic level rules") && ok;
 	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,
 		"unconfigured resources keep their existing NPC attack protocol") && ok;
+	ok = check(!global.feature.restorePartnerAttributes,
+		"unconfigured resources do not restore character attributes onto NPCs") && ok;
 
 	ResourceManifest yycsUi;
 	yycsUi.uiProfile = "YYCS";
@@ -72,6 +74,7 @@ int main()
 		"TopButtonsLayout=0\n"
 		"MagicTriggerAtAnimationEnd=1\n"
 		"NativeNpcAttackAtAnimationEnd=1\n"
+		"RestorePartnerAttributes=1\n"
 		"RageSystem=1\n"
 		"SeparateTalentSlots=1\n"
 		"MagicLevelLimitFromDefinition=1\n";
@@ -85,6 +88,8 @@ int main()
 		"explicit enabled feature overrides the universal default") && ok;
 	ok = check(global.feature.nativeNpcAttackAtAnimationEnd,
 		"the native NPC attack protocol is explicitly enabled through the generic feature parser") && ok;
+	ok = check(global.feature.restorePartnerAttributes,
+		"partner attribute restoration is enabled only by its explicit feature") && ok;
 	ok = check(global.feature.rageSystem,
 		"explicit manifest feature enables the MG-only rage system") && ok;
 	ok = check(global.feature.separateTalentSlots,
@@ -101,6 +106,8 @@ int main()
 	independentBehavior.features["magictriggeratanimationend"] = true;
 	independentBehavior.features["lumasbrightness"] = false;
 	global.applyResourceManifestFeatures(independentBehavior);
+	ok = check(!global.feature.restorePartnerAttributes,
+		"switching resources resets partner restoration independently of UI layout") && ok;
 	ok = check(!global.feature.separateTalentSlots,
 		"switching resources does not leak the talent capacity into another game") && ok;
 	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,

@@ -89,7 +89,8 @@ std::string validManifest()
 std::string downloadManifest(
 	const std::string& gameId,
 	const std::string& version,
-	const std::string& dependencyGameId)
+	const std::string& dependencyGameId,
+	const std::string& minimumEngineVersion = "2.0.0")
 {
 	return
 		"[Game]\n"
@@ -98,7 +99,7 @@ std::string downloadManifest(
 		"Version=" + version + "\n"
 		"\n"
 		"[Release]\n"
-		"MinimumEngineVersion=2.0.0\n"
+		"MinimumEngineVersion=" + minimumEngineVersion + "\n"
 		"\n"
 		"[Resource]\n"
 		"DependencyId=" + dependencyGameId + "\n";
@@ -418,7 +419,7 @@ OnlineUpdate::ResourcePackageArchiveResult prepare(
 	}
 	destination = nextPath(tree, "staging");
 	return OnlineUpdate::prepareResourcePackageArchive(
-		package, archive, destination, limits);
+		package, "2.0.0", archive, destination, limits);
 }
 
 void testValidPackage(const TemporaryTree& tree)
@@ -771,6 +772,16 @@ void testImportedCommonAndIncrementalPackage(const TemporaryTree& tree)
 		writeBytes(installedRoot / "script/keep.txt",
 			std::vector<std::uint8_t>{ 'k', 'e', 'e', 'p' }),
 		"open incremental installed base fixture is created");
+	std::vector<std::uint8_t> binaryContent(2 * 64 * 1024 + 17);
+	for (std::size_t index = 0; index < binaryContent.size(); index++)
+	{
+		binaryContent[index] = static_cast<std::uint8_t>(index % 251);
+	}
+	expect(writeBytes(installedRoot / ".gitattributes", { '*', ' ', '-', 't', 'e', 'x', 't', '\n' }) &&
+		writeBytes(installedRoot / "script/empty.txt", {}) &&
+		writeBytes(installedRoot / "script/binary.dat", binaryContent) &&
+		writeBytes(installedRoot / "script/truncate.txt", binaryContent),
+		"copy fixtures include a dotfile, an empty file and multiple binary blocks");
 
 	const std::filesystem::path incrementalArchive =
 		nextPath(tree, "imported-incremental", ".zip");
@@ -789,7 +800,8 @@ void testImportedCommonAndIncrementalPackage(const TemporaryTree& tree)
 		{
 			{ "game_profile.ini", overlayManifest },
 			{ "script/story.txt", "updated" },
-			{ "script/new.txt", "new" }
+			{ "script/new.txt", "new" },
+			{ "script/truncate.txt", "short" }
 		}), "open incremental ZIP is created");
 	const std::filesystem::path preparedOverlay =
 		nextPath(tree, "imported-incremental-overlay");
@@ -811,6 +823,11 @@ void testImportedCommonAndIncrementalPackage(const TemporaryTree& tree)
 		readText(materializedRoot / "script/story.txt") == "updated" &&
 		readText(materializedRoot / "script/new.txt") == "new" &&
 		readText(materializedRoot / "script/keep.txt") == "keep" &&
+		readText(materializedRoot / ".gitattributes") == "* -text\n" &&
+		std::filesystem::is_regular_file(materializedRoot / "script/empty.txt") &&
+		std::filesystem::file_size(materializedRoot / "script/empty.txt") == 0 &&
+		readBytes(materializedRoot / "script/binary.dat") == binaryContent &&
+		readText(materializedRoot / "script/truncate.txt") == "short" &&
 		readText(installedRoot / "script/story.txt") == "old" &&
 		materializedManifest.loadFromBuffer(
 			materializedManifestText.data(),
@@ -824,6 +841,41 @@ void testImportedCommonAndIncrementalPackage(const TemporaryTree& tree)
 			installedIncrementalChainCrc32s.empty(),
 		"open incremental import copies the base, overlays content, preserves the"
 		" full receipt and replaces unverifiable incremental receipts");
+
+	const auto conflictingOverlay = nextPath(tree, "overlay-directory-conflict");
+	std::filesystem::create_directories(conflictingOverlay / "script/story.txt");
+	expect(writeBytes(conflictingOverlay / "game_profile.ini",
+		readBytes(preparedOverlay / "game_profile.ini")), "conflicting overlay manifest is copied");
+	const auto conflictDestination = nextPath(tree, "overlay-conflict-staging");
+	const auto conflict = OnlineUpdate::materializeImportedIncrementalResourcePackage(
+		importedIncremental.package, installedRoot, conflictingOverlay, conflictDestination);
+	expect(conflict.status == OnlineUpdate::ResourcePackageArchiveStatus::ExtractionFailed &&
+		conflict.stage == OnlineUpdate::ResourcePackageArchiveStage::ApplyingOverlay &&
+		conflict.filesystemPath == conflictDestination / "script/story.txt" &&
+		!std::filesystem::exists(conflictDestination) &&
+		readText(installedRoot / "script/story.txt") == "old",
+		"overlay conflict identifies its stage and file and leaves the installed base intact");
+#if defined(_WIN32)
+	// Windows copies the read-only attribute with the base; overwriting that
+	// file then reports the actual filesystem error.
+	std::filesystem::permissions(installedRoot / "script/story.txt", std::filesystem::perms::owner_read);
+	const auto readOnlyDestination = nextPath(tree, "overlay-read-only-staging");
+	const auto denied = OnlineUpdate::materializeImportedIncrementalResourcePackage(
+		importedIncremental.package, installedRoot, preparedOverlay, readOnlyDestination);
+	expect(denied.status == OnlineUpdate::ResourcePackageArchiveStatus::ExtractionFailed &&
+		denied.stage == OnlineUpdate::ResourcePackageArchiveStage::ApplyingOverlay &&
+		denied.filesystemPath == readOnlyDestination / "script/story.txt" &&
+		denied.filesystemError == std::errc::permission_denied,
+		"a real write error retains its system code and original file: status=" +
+		std::to_string(static_cast<int>(denied.status)) + " stage=" + std::to_string(static_cast<int>(denied.stage)) +
+		" error=" + denied.filesystemError.category().name() + ":" + std::to_string(denied.filesystemError.value()) +
+		" cleanup=" + std::to_string(denied.cleanupFailed) + " path=" + denied.filesystemPath.generic_u8string());
+	std::filesystem::permissions(installedRoot / "script/story.txt", std::filesystem::perms::owner_all);
+	if (std::filesystem::exists(readOnlyDestination / "script/story.txt"))
+	{
+		std::filesystem::permissions(readOnlyDestination / "script/story.txt", std::filesystem::perms::owner_all);
+	}
+#endif
 }
 
 void testDesktopProgramPackage(const TemporaryTree& tree)
@@ -1042,7 +1094,7 @@ void testUnsafePathsAndConflicts(const TemporaryTree& tree)
 		nextPath(tree, "absolute-staging");
 	const auto absoluteResult =
 		OnlineUpdate::prepareResourcePackageArchive(
-			absolutePackage, absoluteArchive, absoluteDestination);
+			absolutePackage, "2.0.0", absoluteArchive, absoluteDestination);
 	expect(absoluteResult.status ==
 		ResourcePackageArchiveStatus::InvalidEntryPath,
 		"absolute ZIP path is rejected");
@@ -1085,7 +1137,7 @@ void testSpecialEntry(const TemporaryTree& tree)
 	const std::filesystem::path destination = nextPath(tree, "symlink-staging");
 	const OnlineUpdate::ResourcePackageArchiveResult result =
 		OnlineUpdate::prepareResourcePackageArchive(
-			package, archive, destination);
+			package, "2.0.0", archive, destination);
 	expect(result.status ==
 		OnlineUpdate::ResourcePackageArchiveStatus::UnsupportedEntry,
 		"Unix symlink entry is rejected");
@@ -1137,6 +1189,7 @@ void testLimitsAndManifest(const TemporaryTree& tree)
 		limits);
 	expect(result.status ==
 		ResourcePackageArchiveStatus::InsufficientDiskSpace &&
+		result.availableDiskBytes.has_value() &&
 		!std::filesystem::exists(destination),
 		"target filesystem free space is checked before extraction");
 
@@ -1194,7 +1247,7 @@ void testCatalogIdentity(const TemporaryTree& tree)
 		const std::filesystem::path destination =
 			nextPath(tree, "identity-staging");
 		const auto result = OnlineUpdate::prepareResourcePackageArchive(
-			package, archive, destination);
+			package, "2.0.0", archive, destination);
 		expect(result.status == status, message);
 		expect(!std::filesystem::exists(destination),
 			message + " removes staging");
@@ -1206,14 +1259,33 @@ void testCatalogIdentity(const TemporaryTree& tree)
 		"catalog Game.Id must match the manifest");
 	package = valid;
 	package.versionText = "2.0";
-	checkMismatch(package,
-		ResourcePackageArchiveStatus::DisplayVersionMismatch,
-		"catalog display version must match the manifest");
+	checkMismatch(package, ResourcePackageArchiveStatus::DisplayVersionMismatch,
+		"a full package without increments must supply the catalog version");
+	package.incrementalPackage = OnlineUpdate::IncrementalResourcePackage{
+		"resources/tail.zip", 1, "12345678" };
+	const auto olderVersionDestination = nextPath(tree, "identity-older-version");
+	const auto olderVersion = OnlineUpdate::prepareResourcePackageArchive(
+		package, "2.0.0", archive, olderVersionDestination);
+	ResourceManifest olderManifest;
+	const auto olderManifestText = readText(olderVersionDestination / "game_profile.ini");
+	expect(olderVersion.succeeded() && olderManifest.loadFromBuffer(
+		olderManifestText.data(), static_cast<int>(olderManifestText.size())) &&
+		olderManifest.releaseMetadata.displayVersion == "1.0",
+		"full package preserves its own version independently of the latest catalog version");
+	package.incrementalPackage = OnlineUpdate::IncrementalResourcePackage{
+		package.artifactPath, package.artifactSize, package.crc32Hex };
+	const auto mismatchedIncrementalDestination = nextPath(tree, "identity-incremental-version");
+	const auto mismatchedIncremental = OnlineUpdate::prepareIncrementalResourcePackageArchive(
+		package, "2.0.0", archive, mismatchedIncrementalDestination);
+	expect(mismatchedIncremental.status == ResourcePackageArchiveStatus::DisplayVersionMismatch &&
+		!std::filesystem::exists(mismatchedIncrementalDestination),
+		"final incremental package supplies the version declared by the catalog");
 	package = valid;
 	package.minimumEngineVersionText = "2.1.0";
-	checkMismatch(package,
-		ResourcePackageArchiveStatus::MinimumEngineVersionMismatch,
-		"catalog minimum engine version must match the manifest");
+	const auto compatible = OnlineUpdate::prepareResourcePackageArchive(
+		package, "2.1.0", archive, nextPath(tree, "identity-compatible-engine"));
+	expect(compatible.succeeded(),
+		"package minimum engine version may differ from the catalog when supported");
 	package = valid;
 	package.dependencyGameIds = { "XJXQY" };
 	checkMismatch(package, ResourcePackageArchiveStatus::DependencyMismatch,
@@ -1246,7 +1318,7 @@ void testExistingDestinationAndFailureCleanup(const TemporaryTree& tree)
 	}
 	const auto existingResult =
 		OnlineUpdate::prepareResourcePackageArchive(
-			package, archive, destination);
+			package, "2.0.0", archive, destination);
 	expect(existingResult.status == OnlineUpdate::
 		ResourcePackageArchiveStatus::DestinationAlreadyExists &&
 		std::filesystem::is_regular_file(sentinel),
@@ -1269,10 +1341,17 @@ void testExistingDestinationAndFailureCleanup(const TemporaryTree& tree)
 		nextPath(tree, "corrupt-staging");
 	const auto corruptResult =
 		OnlineUpdate::prepareResourcePackageArchive(
-			corruptPackage, corruptArchive, corruptDestination);
+			corruptPackage, "2.0.0", corruptArchive, corruptDestination);
 	expect(corruptResult.status ==
-		OnlineUpdate::ResourcePackageArchiveStatus::ExtractionFailed,
-		"CRC failure aborts extraction");
+		OnlineUpdate::ResourcePackageArchiveStatus::ExtractionFailed &&
+		corruptResult.stage == OnlineUpdate::ResourcePackageArchiveStage::Extraction &&
+		corruptResult.archiveEntryPath == "data.bin" &&
+		(corruptResult.archiveError == MZ_ZIP_CRC_CHECK_FAILED ||
+			corruptResult.archiveError == MZ_ZIP_DECOMPRESSION_FAILED) &&
+		!corruptResult.filesystemError,
+		"CRC failure retains the ZIP error and entry without claiming a filesystem error: zip=" +
+		std::to_string(corruptResult.archiveError) + " error=" + std::to_string(corruptResult.filesystemError.value()) +
+		" entry=" + corruptResult.archiveEntryPath);
 	expect(!std::filesystem::exists(corruptDestination),
 		"CRC failure removes the staging directory created by the call");
 }
@@ -1554,6 +1633,7 @@ void testDownloadPreparation(const TemporaryTree& tree)
 	const OnlineUpdate::ResourcePackageArchiveResult fullWithIncremental =
 		OnlineUpdate::prepareResourcePackageArchive(
 			incrementalTargetPackage,
+			"2.0.0",
 			targetArchive,
 			fullWithIncrementalDestination);
 	ResourceManifest fullWithIncrementalManifest;
@@ -1933,6 +2013,199 @@ void testDownloadPreparation(const TemporaryTree& tree)
 		commonReceipt.installedArtifactCrc32 ==
 			catalog.commonPackage->crc32Hex,
 		"common download preparation records the validated archive receipt");
+
+	// Exercise prepared packages through the same grouped install used by the UI.
+	chainCatalog.commonPackage = catalog.commonPackage;
+	for (int installCase = 0; installCase < 7; installCase++)
+	{
+		const auto collection = nextPath(tree, "chain-common-install");
+		const auto transactionWorkspace = OnlineUpdate::resourceUpdateWorkspacePath(collection);
+		std::filesystem::create_directories(transactionWorkspace.parent_path());
+		const auto installed = collection / "moon";
+		const bool fresh = installCase == 0;
+		const bool current = installCase == 4;
+		const bool replaceFull = installCase == 5;
+		const bool rollback = installCase == 6;
+		auto receipts = chainReceipts;
+		OnlineUpdate::InstalledResourceRootMap roots;
+		const auto writeText = [](const std::filesystem::path& path, const std::string& text)
+		{
+			std::filesystem::create_directories(path.parent_path());
+			return writeBytes(path, std::vector<std::uint8_t>(text.begin(), text.end()));
+		};
+		const std::string oldStory = installCase >= 2 ? "chain-one" : "old";
+		if (!fresh)
+		{
+			std::filesystem::copy(installedTarget, installed, std::filesystem::copy_options::recursive);
+			std::string manifestText = readText(installed / "game_profile.ini");
+			std::string receiptLines;
+			receipts["YYCS"] = { replaceFull ? "00000000" : targetPackage.crc32Hex, {}, true };
+			if (installCase >= 2)
+			{
+				receipts["YYCS"].incrementalArtifactCrc32 = current ? chainTwo.crc32Hex : chainOne.crc32Hex;
+				receiptLines = "InstalledIncrementalArtifactCrc32=" + receipts["YYCS"].incrementalArtifactCrc32 + "\n";
+				expect(writeText(installed / "script/one.txt", "one"), "old first increment is present");
+			}
+			if (installCase >= 3)
+			{
+				receipts["YYCS"].incrementalChainCrc32s = { chainOne.crc32Hex };
+				std::string chainReceipt = chainOne.crc32Hex;
+				if (current)
+				{
+					receipts["YYCS"].incrementalChainCrc32s.push_back(chainTwo.crc32Hex);
+					chainReceipt += "," + chainTwo.crc32Hex;
+					expect(writeText(installed / "script/two.txt", "two"), "old tail is present");
+				}
+				receiptLines += "InstalledIncrementalChainCrc32s=" + chainReceipt + "\n";
+			}
+			manifestText.insert(manifestText.find(minimumEngineLine) + minimumEngineLine.size(), receiptLines);
+			expect(writeText(installed / "game_profile.ini", manifestText) &&
+				writeText(installed / "script/story.txt", current ? "chain-two" : oldStory) &&
+				writeText(collection / "common/version.ini", "[Common]\nVersion=0.9\n") &&
+				writeText(collection / "common/obsolete.txt", "old-common"), "old install and common are present");
+			roots["YYCS"] = installed;
+		}
+		expect(writeText(collection / "player-data/save.txt", "saved-game"), "unrelated save sentinel is present");
+		chainUrls.clear();
+		const auto prepared = OnlineUpdate::prepareResourceDownload(
+			chainCatalog, "YYCS", "2.0.0", {{"https://updates.example/catalog.ini"}, {}},
+			transactionWorkspace, receipts, roots, OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, {}, chainDownloader);
+		const std::size_t expectedDownloads[] = { 3, 2, 2, 1, 0, 3, 1 };
+		const auto label = "chain/common install case " + std::to_string(installCase);
+		expect(prepared.succeeded() && chainUrls.size() == expectedDownloads[installCase], label + " downloads only required artifacts");
+		if (!prepared.succeeded())
+		{
+			continue;
+		}
+		const auto preparedCommon = OnlineUpdate::prepareCommonDownload(
+			chainCatalog, {{"https://updates.example/catalog.ini"}, {}}, transactionWorkspace / "common-download", {}, commonDownloader);
+		expect(preparedCommon.succeeded(), label + " prepares common");
+		if (!preparedCommon.succeeded())
+		{
+			continue;
+		}
+		std::vector<OnlineUpdate::ResourceInstallTarget> targets;
+		if (!current)
+		{
+			targets.push_back({"YYCS", "moon"});
+		}
+		std::filesystem::rename(preparedCommon.preparedCommonPath,
+			transactionWorkspace / "prepared" / ("package-" + std::to_string(targets.size())));
+		targets.push_back({"common", "common"});
+		expect(fresh ? !std::filesystem::exists(installed)
+			: readText(installed / "script/story.txt") == (current ? "chain-two" : oldStory),
+			label + " preserves live resources before activation");
+		const auto staged = OnlineUpdate::stageResourceInstallTransaction(collection, "YYCS", targets);
+		const auto switched = OnlineUpdate::beginResourceInstallTransaction(collection);
+		expect(staged.succeeded() && switched.needsValidation &&
+			readText(installed / "script/story.txt") == "chain-two" &&
+			readText(installed / "script/one.txt") == "one" &&
+			readText(installed / "script/two.txt") == "two", label + " activates the complete chain");
+		const auto committed = OnlineUpdate::completeResourceInstallTransaction(collection, !rollback);
+		OnlineUpdate::CommonPackageInstallation finalCommon;
+		expect(committed.succeeded() &&
+			readText(collection / "player-data/save.txt") == "saved-game" &&
+			!std::filesystem::exists(transactionWorkspace), label + " completes without touching saved data");
+		if (rollback)
+		{
+			expect(committed.rolledBack && readText(installed / "script/story.txt") == oldStory &&
+				readText(collection / "common/obsolete.txt") == "old-common", label + " restores resource and common together");
+		}
+		else
+		{
+			expect(OnlineUpdate::parseCommonPackageInstallation(readText(collection / "common/version.ini"), finalCommon) &&
+				finalCommon.installedArtifactCrc32 == chainCatalog.commonPackage->crc32Hex &&
+				!std::filesystem::exists(collection / "common/obsolete.txt"), label + " replaces common and records its CRC");
+		}
+	}
+}
+
+void testPackageEngineRequirements(const TemporaryTree& tree)
+{
+	const auto fullArchive = nextPath(tree, "engine-full", ".zip");
+	const auto historicalArchive = nextPath(tree, "engine-historical", ".zip");
+	const auto tailArchive = nextPath(tree, "engine-tail", ".zip");
+	for (const bool useChain : { false, true })
+	{
+		for (const int requirementCase : { -1, 0, 1, 2, 3, 4, 5 })
+		{
+			if (!useChain && requirementCase == 1)
+			{
+				continue;
+			}
+			const std::string fullMinimum = requirementCase == 0 ? "1.1.5" : "1.1.0";
+			const std::string historicalMinimum = requirementCase == 1 ? "1.1.5" : "1.1.1";
+			const std::string tailMinimum = requirementCase == 2 ? "1.1.5"
+				: requirementCase == 3 ? "invalid"
+				: requirementCase == 4 ? ""
+				: requirementCase == 5 ? "1.1.4" : "1.1.2";
+			expect(writeZip(fullArchive,
+				{ { "game_profile.ini", downloadManifest("XJXQY", "1.0", "", fullMinimum) } }) &&
+				writeZip(historicalArchive,
+				{ { "game_profile.ini", downloadManifest("XJXQY", "1.1", "", historicalMinimum) } }) &&
+				writeZip(tailArchive,
+				{ { "game_profile.ini", downloadManifest("XJXQY", "1.2", "", tailMinimum) } }),
+				"per-package engine requirement ZIPs are created");
+			auto package = downloadPackage(fullArchive, "XJXQY", "1.2", "full.zip", {});
+			package.minimumEngineVersionText = "1.1.3";
+			package.minimumEngineVersion =
+				ModRelease::parseSemanticVersion("1.1.3").version;
+			const auto tail = downloadPackage(tailArchive, "XJXQY", "1.2", "tail.zip", {});
+			package.incrementalPackage = OnlineUpdate::IncrementalResourcePackage{
+				tail.artifactPath, tail.artifactSize, tail.crc32Hex };
+			if (useChain)
+			{
+				const auto historical = downloadPackage(
+					historicalArchive, "XJXQY", "1.1", "historical.zip", {});
+				package.incrementalChain = {
+					{ historical.artifactPath, historical.artifactSize, historical.crc32Hex },
+					*package.incrementalPackage };
+			}
+			OnlineUpdate::Catalog catalog;
+			catalog.resourcePackages.emplace(OnlineUpdate::foldGameId(package.gameId), package);
+			const auto downloader = [&](const std::string& url,
+				const std::filesystem::path& destination, std::uint64_t,
+				std::uint64_t expectedBytes, const OnlineUpdate::HttpsDownloadProgress&)
+			{
+				const auto& source = url.find("full.zip") != std::string::npos ? fullArchive
+					: url.find("historical.zip") != std::string::npos ? historicalArchive : tailArchive;
+				std::error_code error;
+				std::filesystem::copy_file(source, destination, error);
+				OnlineUpdate::HttpsDownloadResult result;
+				result.status = error ? OnlineUpdate::HttpsDownloadStatus::WriteFailed
+					: OnlineUpdate::HttpsDownloadStatus::Success;
+				result.transferredBytes = error ? 0 : expectedBytes;
+				return result;
+			};
+			const auto workspace = nextPath(tree, "engine-requirements");
+			const auto result = OnlineUpdate::prepareResourceDownload(
+				catalog, "XJXQY", "1.1.4",
+				{ { "https://updates.example/catalog.ini" }, {} }, workspace, {}, {},
+				requirementCase == 5 ? OnlineUpdate::RequestedResourceDownloadMode::ForceFullPackage
+					: OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, {}, downloader);
+			const std::string caseName = (useChain ? "chain" : "single") +
+				std::string(" engine requirement case ") + std::to_string(requirementCase);
+			if (requirementCase == -1 || requirementCase == 5)
+			{
+				ResourceManifest manifest;
+				const auto manifestText = readText(workspace / "prepared/package-0/game_profile.ini");
+				expect(result.succeeded() && manifest.loadFromBuffer(
+					manifestText.data(), static_cast<int>(manifestText.size())) &&
+					manifest.releaseMetadata.displayVersion == package.versionText &&
+					manifest.releaseMetadata.minimumEngineVersion == tailMinimum &&
+					manifest.releaseMetadata.installedArtifactCrc32 == package.crc32Hex &&
+					manifest.releaseMetadata.installedIncrementalArtifactCrc32 == tail.crc32Hex,
+					caseName + " applies resource versions in order and preserves each package's engine requirement");
+			}
+			else
+			{
+				expect(result.status == OnlineUpdate::ResourceDownloadPreparationStatus::PackageValidationFailed &&
+					result.packageResult.status == OnlineUpdate::ResourcePackageArchiveStatus::MinimumEngineVersionMismatch &&
+					!std::filesystem::exists(workspace),
+					caseName + " rejects an unsupported or invalid requirement and cleans staging");
+			}
+		}
+	}
 }
 
 void testProgramDownloadPreparation(const TemporaryTree& tree)
@@ -2491,6 +2764,185 @@ void testOptionalLiveResourceUpdate(const TemporaryTree& tree)
 }
 }
 
+// The worker workspace can be discarded while the matching ZIP prefix survives.
+void testResumableResourcePreparation()
+{
+	TemporaryTree tree;
+	const auto archive = tree.root / "source.zip";
+	expect(writeZip(archive, { { "game_profile.ini", downloadManifest("YYCS", "1.0", "") },
+		{ "script/story.txt", "resumed content" } }), "resume fixture ZIP is created");
+	const auto package = downloadPackage(archive, "YYCS", "1.0", "yycs.zip", {});
+	OnlineUpdate::Catalog catalog;
+	catalog.resourcePackages.emplace(OnlineUpdate::foldGameId(package.gameId), package);
+	const auto cache = tree.root / "downloads";
+	const auto workspace = tree.root / "current";
+	const std::string bytes = readText(archive);
+	const auto prefixSize = bytes.size() / 2;
+	std::filesystem::path partial;
+	std::size_t resumedFrom = 0;
+	bool interrupt = true;
+	const auto downloader = [&](const std::string&, const std::filesystem::path& path,
+		std::uint64_t, std::uint64_t expected, const OnlineUpdate::HttpsDownloadProgress& progress)
+	{
+		partial = path;
+		const auto prefix = std::filesystem::exists(path) ? readText(path) : std::string();
+		resumedFrom = prefix.size();
+		expect(prefix == bytes.substr(0, prefix.size()), "retry receives exactly the existing ZIP prefix");
+		const auto length = interrupt ? prefixSize : bytes.size();
+		std::ofstream output(path, std::ios::binary | std::ios::app);
+		output.write(bytes.data() + prefix.size(), length - prefix.size());
+		output.close();
+		OnlineUpdate::HttpsDownloadResult result;
+		result.transferredBytes = length;
+		result.status = interrupt ? OnlineUpdate::HttpsDownloadStatus::NetworkError : OnlineUpdate::HttpsDownloadStatus::Success;
+		if (progress && !progress(length, expected))
+		{
+			result.status = OnlineUpdate::HttpsDownloadStatus::Cancelled;
+		}
+		return result;
+	};
+	const auto prepare = [&](const OnlineUpdate::ResourceDownloadPreparationProgressCallback& progress = {})
+	{
+		return OnlineUpdate::prepareResourceDownload(catalog, "YYCS", "2.0.0",
+			{ { "https://example.test/catalog.ini" }, {} }, workspace, {}, {},
+			OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, progress, downloader, {}, cache);
+	};
+	const auto failed = prepare();
+	expect(failed.status == OnlineUpdate::ResourceDownloadPreparationStatus::DownloadFailed &&
+		!std::filesystem::exists(workspace) && readText(partial) == bytes.substr(0, prefixSize),
+		"connection failure removes staging but retains the exact partial ZIP");
+	const auto plan = OnlineUpdate::planResourceDownload(catalog, "YYCS", "2.0.0");
+	const auto partialFiles = OnlineUpdate::resourceDownloadPartialFiles(plan, nullptr, cache);
+	expect(partialFiles.size() == 1 && partialFiles.begin()->first == partial &&
+		partialFiles.begin()->second == bytes.size(), "cancellation tracks the same catalog-scoped partial path as the downloader");
+	expect(OnlineUpdate::remainingResourceDownloadBytes(plan, nullptr, cache) == bytes.size() - prefixSize,
+		"space preflight counts remaining bytes rather than downloading the prefix again");
+	interrupt = false;
+	const auto resumed = prepare();
+	expect(resumed.succeeded() && resumedFrom == prefixSize && !std::filesystem::exists(partial) &&
+		readText(workspace / "prepared/package-0/script/story.txt") == "resumed content",
+		"new worker resumes, verifies CRC, extracts, and consumes its partial file");
+	std::error_code error;
+	std::filesystem::remove_all(workspace, error);
+	interrupt = true;
+	const auto cancelled = prepare([](const auto& progress) { return progress.completedBytes == 0; });
+	expect(cancelled.status == OnlineUpdate::ResourceDownloadPreparationStatus::Cancelled &&
+		readText(partial) == bytes.substr(0, prefixSize), "explicit cancellation also preserves the valid prefix");
+	std::filesystem::remove(partial, error);
+	int mirrorAttempts = 0;
+	const auto mirrored = OnlineUpdate::prepareResourceDownload(catalog, "YYCS", "2.0.0",
+		{ { "https://first.test/catalog.ini", "https://second.test/catalog.ini" }, { 'o', 'k' } },
+		workspace, {}, {}, OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, {},
+		[&](const std::string& url, const std::filesystem::path& path, std::uint64_t maximum,
+			std::uint64_t expected, const OnlineUpdate::HttpsDownloadProgress& progress)
+		{
+			interrupt = ++mirrorAttempts == 1;
+			expect(interrupt || url.find("second.test") != std::string::npos,
+				"fallback uses the next matching catalog mirror");
+			return downloader(url, path, maximum, expected, progress);
+		}, [](const std::string&, std::size_t, const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			OnlineUpdate::HttpsBufferDownloadResult result;
+			result.status = OnlineUpdate::HttpsDownloadStatus::Success;
+			result.bytes = { 'o', 'k' };
+			return result;
+		}, cache);
+	expect(mirrored.succeeded() && mirrorAttempts == 2 && resumedFrom == prefixSize,
+		"switching mirrors preserves the partial file and completes CRC validation");
+	std::filesystem::remove_all(workspace, error);
+	for (int successfulMirror : { 1, 2, 3 })
+	{
+		std::filesystem::create_directory(cache, error);
+		{
+			std::ofstream output(partial, std::ios::binary);
+			output.write(bytes.data(), prefixSize);
+		}
+		int attempts = 0;
+		const auto fallback = OnlineUpdate::prepareResourceDownload(catalog, "YYCS", "2.0.0",
+			{ { "https://gitee.test/catalog.ini", "https://cnb.test/catalog.ini", "https://github.test/catalog.ini" }, { 'o', 'k' } },
+			workspace, {}, {}, OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, {},
+			[&](const std::string& url, const std::filesystem::path& path, std::uint64_t maximum,
+				std::uint64_t expected, const OnlineUpdate::HttpsDownloadProgress& progress)
+			{
+				const int index = attempts++;
+				if (index == successfulMirror)
+				{
+					interrupt = false;
+					return downloader(url, path, maximum, expected, progress);
+				}
+				OnlineUpdate::HttpsDownloadResult result;
+				result.status = index == 0 ? OnlineUpdate::HttpsDownloadStatus::HttpError
+					: OnlineUpdate::HttpsDownloadStatus::NetworkError;
+				result.httpStatus = index == 0 ? 404 : 0;
+				return result;
+			}, [](const std::string&, std::size_t, const OnlineUpdate::HttpsDownloadProgress&)
+			{
+				OnlineUpdate::HttpsBufferDownloadResult result;
+				result.status = OnlineUpdate::HttpsDownloadStatus::Success;
+				result.bytes = { 'o', 'k' };
+				return result;
+			}, cache);
+		expect(attempts == std::min(3, successfulMirror + 1) && fallback.succeeded() == (successfulMirror < 3),
+			"Gitee 404 silently falls through CNB and GitHub; failure is returned only after all mirrors fail");
+		expect(successfulMirror < 3 ? resumedFrom == prefixSize : readText(partial) == bytes.substr(0, prefixSize),
+			"both successful fallback and exhausted mirrors retain the saved prefix");
+		std::filesystem::remove_all(workspace, error);
+	}
+	for (const bool secondMirrorAvailable : { true, false })
+	{
+		std::filesystem::create_directory(cache, error);
+		{
+			std::ofstream output(partial, std::ios::binary);
+			output.write(bytes.data(), prefixSize);
+		}
+		OnlineUpdate::CatalogMirrorSources sources;
+		sources.catalogUrls = { "https://first.test/catalog.ini" };
+		if (secondMirrorAvailable) sources.catalogUrls.push_back("https://second.test/catalog.ini");
+		sources.catalogBytes = { 'o', 'k' };
+		int attempts = 0;
+		const auto ignoredRange = OnlineUpdate::prepareResourceDownload(catalog, "YYCS", "2.0.0",
+			sources, workspace, {}, {}, OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, {},
+			[&](const std::string& url, const std::filesystem::path& path, std::uint64_t maximum,
+				std::uint64_t expected, const OnlineUpdate::HttpsDownloadProgress& progress)
+			{
+				++attempts;
+				if (url.find("first.test") != std::string::npos && std::filesystem::exists(path) &&
+					std::filesystem::file_size(path) > 0)
+				{
+					OnlineUpdate::HttpsDownloadResult result;
+					result.status = OnlineUpdate::HttpsDownloadStatus::HttpError;
+					result.httpStatus = 200;
+					return result;
+				}
+				interrupt = false;
+				return downloader(url, path, maximum, expected, progress);
+			}, [](const std::string&, std::size_t, const OnlineUpdate::HttpsDownloadProgress&)
+			{
+				OnlineUpdate::HttpsBufferDownloadResult result;
+				result.status = OnlineUpdate::HttpsDownloadStatus::Success;
+				result.bytes = { 'o', 'k' };
+				return result;
+			}, cache);
+		expect(ignoredRange.succeeded() && attempts == 2 && resumedFrom == (secondMirrorAvailable ? prefixSize : 0),
+			"ignored Range tries another mirror with the prefix before falling back to a full download");
+		std::filesystem::remove_all(workspace, error);
+	}
+	const auto corrupted = OnlineUpdate::prepareResourceDownload(catalog, "YYCS", "2.0.0",
+		{ { "https://example.test/catalog.ini" }, {} }, workspace, {}, {},
+		OnlineUpdate::RequestedResourceDownloadMode::IfNeeded, {},
+		[&](const std::string&, const std::filesystem::path& path, std::uint64_t,
+			std::uint64_t, const OnlineUpdate::HttpsDownloadProgress&)
+		{
+			std::ofstream output(path, std::ios::binary);
+			output << std::string(bytes.size(), 'x');
+			OnlineUpdate::HttpsDownloadResult result;
+			result.status = OnlineUpdate::HttpsDownloadStatus::Success;
+			return result;
+		}, {}, cache);
+	expect(corrupted.status == OnlineUpdate::ResourceDownloadPreparationStatus::ArtifactValidationFailed &&
+		!std::filesystem::exists(partial), "a corrupted complete partial file is discarded and never installed");
+}
+
 int main()
 {
 	TemporaryTree tree;
@@ -2511,6 +2963,8 @@ int main()
 	testCatalogIdentity(tree);
 	testExistingDestinationAndFailureCleanup(tree);
 	testDownloadPreparation(tree);
+	testResumableResourcePreparation();
+	testPackageEngineRequirements(tree);
 	testProgramDownloadPreparation(tree);
 	testOptionalLiveResourceUpdate(tree);
 

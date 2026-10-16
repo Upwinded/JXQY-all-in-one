@@ -16,6 +16,8 @@
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
+#include <chrono>
+#include <thread>
 
 #if defined(_WIN32)
 #ifndef NOMINMAX
@@ -675,7 +677,7 @@ public:
 	AndroidHttpsStream(const AndroidHttpsStream&) = delete;
 	AndroidHttpsStream& operator=(const AndroidHttpsStream&) = delete;
 
-	bool open(const std::string& url)
+	bool open(const std::string& url, std::uint64_t offset, std::uint64_t expectedBytes)
 	{
 		environment = static_cast<JNIEnv*>(SDL_GetAndroidJNIEnv());
 		if (environment == nullptr || url.empty() ||
@@ -700,7 +702,7 @@ public:
 		const jmethodID openMethod = environment->GetStaticMethodID(
 			activityClass,
 			"openHttpsDownload",
-			"([B)Ljava/lang/Object;");
+			"([BJJ)Ljava/lang/Object;");
 		const bool openMethodException = clearAndroidException(environment);
 		if (openMethod == nullptr || openMethodException)
 		{
@@ -728,7 +730,8 @@ public:
 			return false;
 		}
 		object = environment->CallStaticObjectMethod(
-			activityClass, openMethod, urlBytes);
+			activityClass, openMethod, urlBytes,
+			static_cast<jlong>(offset), static_cast<jlong>(expectedBytes));
 		environment->DeleteLocalRef(urlBytes);
 		environment->DeleteLocalRef(activityClass);
 		const bool openException = clearAndroidException(environment);
@@ -762,10 +765,11 @@ public:
 		closeMethod = getMethod("close", "()V");
 		httpStatusMethod = getMethod("getHttpStatus", "()I");
 		contentLengthMethod = getMethod("getContentLength", "()J");
+		responseOffsetMethod = getMethod("getResponseOffset", "()J");
 		readMethod = getMethod("read", "([B)I");
 		environment->DeleteLocalRef(streamClass);
 		if (httpStatusMethod == nullptr || contentLengthMethod == nullptr ||
-			readMethod == nullptr || closeMethod == nullptr)
+			responseOffsetMethod == nullptr || readMethod == nullptr || closeMethod == nullptr)
 		{
 			close();
 			return false;
@@ -778,7 +782,7 @@ public:
 		return environment;
 	}
 
-	bool getResponseMetadata(jint& httpStatus, jlong& contentLength)
+	bool getResponseMetadata(jint& httpStatus, jlong& contentLength, jlong& responseOffset)
 	{
 		if (environment == nullptr || object == nullptr ||
 			httpStatusMethod == nullptr || contentLengthMethod == nullptr)
@@ -793,6 +797,11 @@ public:
 		}
 		contentLength = environment->CallLongMethod(
 			object, contentLengthMethod);
+		if (clearAndroidException(environment))
+		{
+			return false;
+		}
+		responseOffset = environment->CallLongMethod(object, responseOffsetMethod);
 		return !clearAndroidException(environment);
 	}
 
@@ -829,6 +838,7 @@ private:
 	jobject object = nullptr;
 	jmethodID httpStatusMethod = nullptr;
 	jmethodID contentLengthMethod = nullptr;
+	jmethodID responseOffsetMethod = nullptr;
 	jmethodID readMethod = nullptr;
 	jmethodID closeMethod = nullptr;
 };
@@ -838,7 +848,8 @@ OnlineUpdate::HttpsDownloadResult performAndroidDownload(
 	std::uint64_t maximumBytes,
 	std::uint64_t expectedBytes,
 	const OnlineUpdate::HttpsDownloadProgress& progress,
-	const PlatformWriteChunk& writeChunk)
+	const PlatformWriteChunk& writeChunk,
+	std::uint64_t offset = 0)
 {
 	OnlineUpdate::HttpsDownloadResult result;
 	if (maximumBytes == 0 || !isPlainHttpsUrl(url))
@@ -856,27 +867,35 @@ OnlineUpdate::HttpsDownloadResult performAndroidDownload(
 	}
 
 	AndroidHttpsStream stream;
-	if (!stream.open(url))
+	result.transferredBytes = offset;
+	if (progress && !progress(offset, expectedBytes))
+	{
+		result.status = OnlineUpdate::HttpsDownloadStatus::Cancelled;
+		return result;
+	}
+	if (!stream.open(url, offset, expectedBytes))
 	{
 		result.status = OnlineUpdate::HttpsDownloadStatus::NetworkError;
 		return result;
 	}
 	jint httpStatus = 0;
 	jlong contentLength = -1;
-	if (!stream.getResponseMetadata(httpStatus, contentLength) ||
+	jlong responseOffset = -1;
+	if (!stream.getResponseMetadata(httpStatus, contentLength, responseOffset) ||
 		httpStatus <= 0)
 	{
 		result.status = OnlineUpdate::HttpsDownloadStatus::NetworkError;
 		return result;
 	}
 	result.httpStatus = static_cast<std::uint32_t>(httpStatus);
-	if (httpStatus != 200)
+	if (httpStatus != (offset == 0 ? 200 : 206) ||
+		responseOffset < 0 || static_cast<std::uint64_t>(responseOffset) != offset)
 	{
 		result.status = OnlineUpdate::HttpsDownloadStatus::HttpError;
 		return result;
 	}
 	if (contentLength >= 0 &&
-		static_cast<std::uint64_t>(contentLength) > maximumBytes)
+		static_cast<std::uint64_t>(contentLength) > maximumBytes - offset)
 	{
 		result.status =
 			OnlineUpdate::HttpsDownloadStatus::SizeLimitExceeded;
@@ -1203,6 +1222,129 @@ HttpsBufferDownloadResult downloadHttpsToMemory(
 	return result;
 }
 
+HttpsDownloadResult downloadHttpsToResumableFile(
+	const std::string& url,
+	const std::filesystem::path& destinationPath,
+	std::uint64_t maximumBytes,
+	std::uint64_t expectedBytes,
+	const HttpsDownloadProgress& progress)
+{
+	HttpsDownloadResult result;
+#if defined(__ANDROID__)
+	if (!isPlainHttpsUrl(url))
+	{
+		result.status = HttpsDownloadStatus::InvalidUrl;
+		return result;
+	}
+	if (destinationPath.empty() || expectedBytes == 0 || expectedBytes > maximumBytes ||
+		expectedBytes > static_cast<std::uint64_t>((std::numeric_limits<jlong>::max)()))
+	{
+		return result;
+	}
+	if (!isSafePosixDirectory(destinationPath.parent_path()))
+	{
+		result.status = HttpsDownloadStatus::DestinationUnavailable;
+		return result;
+	}
+	const int descriptor = ::open(destinationPath.c_str(),
+		O_WRONLY | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK, S_IRUSR | S_IWUSR);
+	if (descriptor < 0)
+	{
+		result.nativeErrorCode = errno;
+		result.status = errno == ENOSPC || errno == EDQUOT
+			? HttpsDownloadStatus::InsufficientDiskSpace : HttpsDownloadStatus::DestinationUnavailable;
+		return result;
+	}
+	struct CloseFile
+	{
+		int descriptor;
+		~CloseFile() { ::close(descriptor); }
+	} file{ descriptor };
+	struct stat information{};
+	if (::fstat(descriptor, &information) != 0 || !S_ISREG(information.st_mode) ||
+		information.st_nlink != 1 || information.st_size < 0)
+	{
+		result.status = HttpsDownloadStatus::DestinationUnavailable;
+		return result;
+	}
+	if (static_cast<std::uint64_t>(information.st_size) > expectedBytes &&
+		::ftruncate(descriptor, 0) != 0)
+	{
+		result.status = HttpsDownloadStatus::WriteFailed;
+		return result;
+	}
+	for (int attempt = 0; attempt < 3; ++attempt)
+	{
+		const off_t position = ::lseek(descriptor, 0, SEEK_END);
+		if (position < 0)
+		{
+			result.status = HttpsDownloadStatus::WriteFailed;
+			return result;
+		}
+		const std::uint64_t offset = static_cast<std::uint64_t>(position);
+		result.transferredBytes = offset;
+		if (offset == expectedBytes)
+		{
+			result.status = !progress || progress(offset, expectedBytes)
+				? HttpsDownloadStatus::Success : HttpsDownloadStatus::Cancelled;
+			return result; // Caller still checks the complete file CRC32.
+		}
+		int writeError = 0;
+		result = performAndroidDownload(url, maximumBytes, expectedBytes, progress,
+			[descriptor, &writeError](const char* bytes, std::size_t size)
+			{
+				if (!writeAllToFileDescriptor(descriptor, bytes, size))
+				{
+					writeError = errno;
+					return false;
+				}
+				return true;
+			}, offset);
+		if (result.succeeded() && ::fsync(descriptor) != 0)
+		{
+			writeError = errno;
+			result.status = HttpsDownloadStatus::WriteFailed;
+		}
+		if (writeError != 0)
+		{
+			result.nativeErrorCode = writeError;
+			if (writeError == ENOSPC || writeError == EDQUOT)
+			{
+				result.status = HttpsDownloadStatus::InsufficientDiskSpace;
+			}
+			return result;
+		}
+		// Keep a rejected range for the next mirror; the preparation layer decides
+		// whether a full restart is needed after all mirrors have been tried.
+		if (result.status != HttpsDownloadStatus::NetworkError &&
+			result.status != HttpsDownloadStatus::SizeMismatch)
+		{
+			return result;
+		}
+		if (attempt < 2)
+		{
+			for (int tick = 0; tick < 10; ++tick)
+			{
+				if (progress && !progress(result.transferredBytes, expectedBytes))
+				{
+					result.status = HttpsDownloadStatus::Cancelled;
+					return result;
+				}
+				std::this_thread::sleep_for(std::chrono::milliseconds(100));
+			}
+		}
+	}
+#else
+	(void)url;
+	(void)destinationPath;
+	(void)maximumBytes;
+	(void)expectedBytes;
+	(void)progress;
+	result.status = HttpsDownloadStatus::UnsupportedPlatform;
+#endif
+	return result;
+}
+
 HttpsDownloadResult downloadHttpsToNewFile(
 	const std::string& url,
 	const std::filesystem::path& destinationPath,
@@ -1248,6 +1390,10 @@ HttpsDownloadResult downloadHttpsToNewFile(
 			result.nativeErrorCode == ERROR_ALREADY_EXISTS
 			? HttpsDownloadStatus::DestinationAlreadyExists
 			: HttpsDownloadStatus::DestinationUnavailable;
+		if (result.nativeErrorCode == ERROR_DISK_FULL || result.nativeErrorCode == ERROR_HANDLE_DISK_FULL)
+		{
+			result.status = HttpsDownloadStatus::InsufficientDiskSpace;
+		}
 		return result;
 	}
 	DWORD writeError = ERROR_SUCCESS;
@@ -1292,6 +1438,11 @@ HttpsDownloadResult downloadHttpsToNewFile(
 	{
 		result.nativeErrorCode = writeError;
 	}
+	if (result.status == HttpsDownloadStatus::WriteFailed &&
+		(result.nativeErrorCode == ERROR_DISK_FULL || result.nativeErrorCode == ERROR_HANDLE_DISK_FULL))
+	{
+		result.status = HttpsDownloadStatus::InsufficientDiskSpace;
+	}
 	if (!result.succeeded())
 	{
 		// Close the file before deleting the partial download.
@@ -1323,6 +1474,10 @@ HttpsDownloadResult downloadHttpsToNewFile(
 		result.status = errno == EEXIST
 			? HttpsDownloadStatus::DestinationAlreadyExists
 			: HttpsDownloadStatus::DestinationUnavailable;
+		if (errno == ENOSPC || errno == EDQUOT)
+		{
+			result.status = HttpsDownloadStatus::InsufficientDiskSpace;
+		}
 		return result;
 	}
 	int writeError = 0;
@@ -1360,6 +1515,11 @@ HttpsDownloadResult downloadHttpsToNewFile(
 	{
 		result.status = HttpsDownloadStatus::WriteFailed;
 		result.nativeErrorCode = static_cast<std::uint32_t>(errno);
+	}
+	if (result.status == HttpsDownloadStatus::WriteFailed &&
+		(result.nativeErrorCode == ENOSPC || result.nativeErrorCode == EDQUOT))
+	{
+		result.status = HttpsDownloadStatus::InsufficientDiskSpace;
 	}
 	if (!result.succeeded() && ::unlink(destinationPath.c_str()) != 0 &&
 		errno != ENOENT)

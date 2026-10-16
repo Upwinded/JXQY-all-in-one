@@ -34,6 +34,7 @@ public:
 	std::shared_ptr<FlatTextButton> touchControlsButton = nullptr;
 	std::shared_ptr<FlatTextButton> cheatSettingsButton = nullptr;
 	std::shared_ptr<FlatTextButton> themeButton = nullptr;
+	std::shared_ptr<FlatTextButton> automaticSaveButton = nullptr;
 
 private:
 	struct ElementPresentationState
@@ -64,6 +65,7 @@ private:
 	void createFooterOptions();
 	void layoutFooterOptions();
 	void toggleThemeOption();
+	void toggleAutomaticSaveOption();
 	void syncTouchControlsOption();
 	void toggleTouchControlsOption();
 	void createCheatPanel();

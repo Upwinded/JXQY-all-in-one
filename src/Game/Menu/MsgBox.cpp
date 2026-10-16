@@ -1,4 +1,5 @@
 #include "MsgBox.h"
+#include "../GameManager/GameManager.h"
 
 
 MsgBox::MsgBox()
@@ -38,10 +39,28 @@ void MsgBox::showMessage(const std::string & str, UTime duration)
 	beginTime = getTime();
 	showed = true;
 	visible = true;
+	onUpdate();
 }
 
 void MsgBox::onUpdate()
 {
+	if (gm != nullptr && gm->global.feature.qingyuUi && gm->menu != nullptr)
+	{
+		const int previousTop = rect.y;
+		setAlign();
+		const auto& timer = gm->menu->timerMenu;
+		const auto& bottom = gm->menu->bottomMenu;
+		if (gm->timerStarted && !gm->timerHidden && timer != nullptr && bottom != nullptr
+			&& rect.x < timer->rect.x + timer->rect.w && timer->rect.x < rect.x + rect.w
+			&& rect.y < timer->rect.y + timer->rect.h && timer->rect.y < rect.y + rect.h)
+		{
+			rect.y = bottom->rect.y - rect.h - 12;
+		}
+		if (label != nullptr && rect.y != previousTop)
+		{
+			label->rect.y += rect.y - previousTop;
+		}
+	}
 	const UTime currentTime = getTime();
 	if (showed && currentTime < beginTime)
 	{

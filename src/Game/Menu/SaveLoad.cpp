@@ -4,6 +4,7 @@
 #include "../../Engine/SaveShotSafety.h"
 #include "../GameManager/SaveFileManager.h"
 #include "../GameManager/GameManager.h"
+#include "../Config/Config.h"
 
 #include <vector>
 
@@ -25,13 +26,39 @@ void SaveLoad::init()
 {
 	const std::string preferredFocusId = focusManager.getFocusedNodeId();
 	freeResource();
-	loadMenuDefinition("ini\\ui\\saveload\\saveload.menu.ini");
+	std::string menuDefinition = "ini\\ui\\saveload\\saveload.menu.ini";
+	// Title opens this menu before a GameManager exists. In-game menus keep
+	// using the current world's skin until the player re-enters the game.
+	const std::string qingyuDefinition = "ini\\ui\\qingyu\\saveload\\saveload.menu.ini";
+	if (gm == nullptr && Config::useQingyuUi && File::fileExist(qingyuDefinition))
+	{
+		menuDefinition = qingyuDefinition;
+	}
+	loadMenuDefinition(menuDefinition);
 
 	saveBtn = getComponentByName<Button>("saveBtn");
 	loadBtn = getComponentByName<Button>("loadBtn");
 	exitBtn = getComponentByName<Button>("exitBtn");
 	snap = getComponentByName<ImageContainer>("snap");
 	listBox = getComponentByName<ListBox>("listBox");
+
+	// Older resource lists may still expose a tenth row without automatic-save support.
+	if (listBox)
+	{
+		for (const auto& definition : getComponentDefinitions())
+		{
+			if (definition.name != "listBox") continue;
+			INIReader ini(definition.file);
+			const int maximumSlots = ini.GetBoolean("Init", "AutomaticSave", false)
+				? SaveSlots::Automatic : SaveSlots::ManualCount;
+			if (listBox->itemCount > maximumSlots)
+			{
+				ini.SetInteger("Init", "ItemCount", maximumSlots);
+				listBox->initFromIni(ini);
+			}
+			break;
+		}
+	}
 
 	if (snap)
 	{
@@ -176,6 +203,12 @@ bool SaveLoad::selectSlot(int selectedIndex)
 
 void SaveLoad::refreshSelectedSlotPreview()
 {
+	if (saveBtn)
+	{
+		saveBtn->activated = save && index + 1 != SaveSlots::Automatic;
+		saveBtn->visible = saveBtn->activated;
+		configureFocus(focusManager.getFocusedNodeId());
+	}
 	if (snap != nullptr)
 	{
 		snap->impImage = nullptr;
@@ -185,8 +218,8 @@ void SaveLoad::refreshSelectedSlotPreview()
 		return;
 	}
 
-	std::string imageName = SHOT_FOLDER + convert::formatString(SHOT_PNG, index + 1);
-	std::string legacyImageName = SHOT_FOLDER + convert::formatString(LEGACY_SHOT_BMP, index + 1);
+	std::string imageName = "save/" + SaveSlots::screenshot(index + 1);
+	std::string legacyImageName = "save/" + SaveSlots::screenshot(index + 1, ".bmp");
 
 	_shared_image img = nullptr;
 	File::visitReadableResources({ imageName, legacyImageName },
@@ -213,7 +246,7 @@ void SaveLoad::refreshSelectedSlotPreview()
 
 void SaveLoad::requestSave()
 {
-	if (!save)
+	if (!save || !SaveSlots::isManual(index + 1))
 	{
 		return;
 	}

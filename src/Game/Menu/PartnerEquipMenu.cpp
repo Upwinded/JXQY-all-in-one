@@ -114,7 +114,7 @@ void PartnerEquipMenu::setPartner(std::shared_ptr<NPC> value)
 		cancelControllerInteraction();
 	}
 	partner = value;
-	visible = (partner != nullptr && partner->canEquip > 0);
+	visible = (partner != nullptr && partner->canChangePartnerEquipment());
 	updateGoods();
 	if (visible)
 	{
@@ -282,7 +282,7 @@ void PartnerEquipMenu::configureControllerFocus()
 		playerBagSlotController,
 		[this]()
 		{
-			return visible && partner != nullptr && partner->canEquip > 0
+			return visible && partner != nullptr && partner->canChangePartnerEquipment()
 				&& gm != nullptr && gm->menu != nullptr
 				&& gm->menu->goodsMenu != nullptr
 				&& gm->menu->goodsMenu->scrollbar != nullptr
@@ -302,7 +302,7 @@ void PartnerEquipMenu::configureControllerFocus()
 		partnerEquipmentSlotController,
 		[this]()
 		{
-			return visible && partner != nullptr && partner->canEquip > 0;
+			return visible && partner != nullptr && partner->canChangePartnerEquipment();
 		},
 		[this]()
 		{

@@ -179,7 +179,7 @@ QVector<ApiInfo> buildScriptApiList()
 
     addApi("ClearAllSave()",
         QCoreApplication::translate("ScriptApiList", "清除用户存档槽"),
-        QCoreApplication::translate("ScriptApiList", "ClearAllSave()\n清除当前资源包下的 rpg1-rpg7 用户存档和对应截图，不清除当前运行存档或初始模板\n参数: 无\n示例: ClearAllSave()"));
+        QCoreApplication::translate("ScriptApiList", "ClearAllSave()\n清除当前资源包下的 rpg1-rpg9 用户存档和对应截图，不清除自动存档、当前运行存档或初始模板\n参数: 无\n示例: ClearAllSave()"));
 
     addApi("EnableSave()",
         QCoreApplication::translate("ScriptApiList", "允许手动存档"),

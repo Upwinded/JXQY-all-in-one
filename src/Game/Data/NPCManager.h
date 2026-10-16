@@ -28,6 +28,7 @@ public:
 		std::shared_ptr<INIReader> parsedIni;
 		std::size_t preparedNpcCount = 0;
 		bool normalizationRequired = false;
+		bool joinsFromResource = false;
 		std::string resolvedSourcePath;
 	};
 

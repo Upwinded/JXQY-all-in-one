@@ -188,6 +188,10 @@ public:
 	void showMessage(const std::string & str);
 	void processGlobalInputFrame(bool toggleTouchControls = false);
 	void requestTouchControlsToggle();
+	void setAutomaticSaveEnabled(bool enabled);
+	void requestAutomaticSaveAfterMapLoad();
+	void resetAutomaticSave();
+	void saveSlotScreenshot(int slot);
 
 	Point getMousePoint();
 	Point getMousePoint(int x, int y);
@@ -290,6 +294,12 @@ private:
 	EditorRun::RuntimeTraceWriter* runtimeTraceWriter = nullptr;
 	EditorRun::SceneApplicationResult editorRunSceneApplicationResult;
 	bool gameplayPaused = false;
+	UTime automaticSaveElapsed = 0;
+	UTime automaticSaveLastTick = 0;
+	UTime automaticSaveQuietElapsed = 0;
+	bool automaticSavePending = false;
+	bool canAutomaticallySave();
+	void updateAutomaticSave(UTime elapsed, UTime safeFrameElapsed);
 	bool controllerPausedBeforeGameplayPause = false;
 	bool menuPausedBeforeGameplayPause = false;
 	bool weatherPausedBeforeGameplayPause = false;

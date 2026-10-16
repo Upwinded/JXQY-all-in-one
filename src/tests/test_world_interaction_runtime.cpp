@@ -83,13 +83,13 @@ public:
 		recordedDestination = destination;
 	}
 
-	void beginRun(Point destination) override
+	void beginRun(Point destination, bool = false) override
 	{
 		recordedAction = RecordedControlledAction::Run;
 		recordedDestination = destination;
 	}
 
-	void beginJump(Point destination) override
+	void beginJump(Point destination, bool = false) override
 	{
 		recordedAction = RecordedControlledAction::Jump;
 		recordedDestination = destination;
@@ -97,7 +97,7 @@ public:
 
 	void beginAttack(
 		Point destination,
-		std::shared_ptr<GameElement> target) override
+		std::shared_ptr<GameElement> target, bool = false) override
 	{
 		recordedAction = RecordedControlledAction::Attack;
 		recordedDestination = destination;
@@ -106,7 +106,7 @@ public:
 
 	void beginMagic(
 		Point destination,
-		std::shared_ptr<GameElement> target) override
+		std::shared_ptr<GameElement> target, bool = false) override
 	{
 		recordedAction = RecordedControlledAction::Magic;
 		recordedDestination = destination;

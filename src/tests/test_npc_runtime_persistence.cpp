@@ -2469,7 +2469,7 @@ bool runCounterImpactContracts(GameManager& gameManager, const std::filesystem::
 				actor->relation = nrHostile;
 				actor->lifeMax = 1000;
 				actor->life = impact.lethal ? 1 : 1000;
-				actor->evade = 0;
+				actor->evade = impact.miss ? 1000 : 0;
 				actor->defend = 0;
 				actor->attackLevel = 2;
 				actor->invincible = impact.invincible ? 1 : 0;
@@ -2513,15 +2513,16 @@ bool runCounterImpactContracts(GameManager& gameManager, const std::filesystem::
 				incoming->lifeTime = 1000;
 				incoming->magic.attackAll = 1;
 				incoming->damage = 200;
-				incoming->evade = impact.miss ? -1000 : 100000;
+				incoming->evade = impact.miss ? 0 : 100000;
 				incoming->launcherKind = playerTarget ? lkEnemy : lkFriend;
 				incoming->position = actor->getPosition();
 				incoming->flyingDirection = { 0, 1 };
 				ok = check(CollisionDetector::detectCollision(actor, incoming),
 					"a real colliding projectile reaches the ordinary NPC/Player hurt path") && ok;
-				// Player's legacy random range includes zero: observe a real hit, never assume one.
-				exercised = impact.miss || impact.blockMagic || impact.invincible ||
-					actor->life != (impact.lethal ? 1 : 1000) || actor->shieldLife != impact.shield;
+				// Observe the requested hit or miss through the real random engine.
+				exercised = impact.miss ? actor->life == 1000
+					: impact.blockMagic || impact.invincible ||
+						actor->life != (impact.lethal ? 1 : 1000) || actor->shieldLife != impact.shield;
 				if (!exercised)
 				{
 					continue;
@@ -2680,19 +2681,25 @@ bool runCounterImpactContracts(GameManager& gameManager, const std::filesystem::
 			gameManager.npcManager->addNPC(actor);
 		}
 		const int lifeBefore = actor->life;
-		auto incoming = std::make_shared<Effect>();
-		incoming->user = gameManager.player;
-		incoming->level = 1;
-		incoming->damage = 100;
-		incoming->evade = -1000;
-		incoming->launcherKind = lkSelf;
-		incoming->doing = ekFlying;
-		incoming->lifeTime = 1000;
-		incoming->position = actor->getPosition();
-		gameManager.effectManager->effectList.clear();
-		const bool collided = CollisionDetector::detectCollision(actor, incoming);
-		ok = check(collided && actor->life == lifeBefore &&
-			!gameManager.effectManager->effectList.empty(),
+		bool observedMiss = false;
+		for (int attempt = 0; attempt < 64 && !observedMiss; ++attempt)
+		{
+			actor->life = lifeBefore;
+			actor->nowAction = acStand;
+			auto incoming = std::make_shared<Effect>();
+			incoming->user = gameManager.player;
+			incoming->level = 1;
+			incoming->damage = 100;
+			incoming->evade = 0;
+			incoming->launcherKind = lkSelf;
+			incoming->doing = ekFlying;
+			incoming->lifeTime = 1000;
+			incoming->position = actor->getPosition();
+			gameManager.effectManager->effectList.clear();
+			const bool collided = CollisionDetector::detectCollision(actor, incoming);
+			observedMiss = collided && actor->life == lifeBefore;
+		}
+		ok = check(observedMiss && !gameManager.effectManager->effectList.empty(),
 			"actual Xiaoxiang NPC counters an evaded projectile before and after file reload") && ok;
 		for (const auto& effect : gameManager.effectManager->effectList)
 		{
@@ -3509,6 +3516,135 @@ bool runSpecialDeathBodySuppressionRoundTrip(GameManager& gameManager)
 	return ok;
 }
 
+bool runPartnerAttributeRestoration(GameManager& gameManager,
+	const std::filesystem::path& root)
+{
+	resetRuntime(gameManager);
+	gameManager.global.data.characterIndex = 0;
+	const std::string templateAttributes =
+		"[Init]\nName=RestoredPartner\nLevel=12\nLife=535\nLifeMax=535\n"
+		"Attack=533\nDefend=423\nEvade=54\nThew=460\nThewMax=460\n"
+		"Mana=152\nManaMax=152\nExp=2266\nLevelUpExp=2665\nLevelIni=partner-level.ini\n";
+	const std::string npcText =
+		"[Init]\nName=RestoredPartner\nKind=3\nRelation=0\nLevel=0\n"
+		"Life=1000\nLifeMax=1000\nAttack=100\nDefend=10\nEvade=10\n"
+		"MapX=6\nMapY=7\nScriptFile=dialogue.lua\nDeathScript=death.lua\n";
+	const auto playerPath = saveGameFixturePath(root, "player1.ini");
+	bool ok = check(writeTextFile(root / "partneridx.ini", "[Init]\n1=RestoredPartner\n") &&
+		writeTextFile(root / "ini" / "save" / "player1.ini", templateAttributes) &&
+		writeTextFile(root / "ini" / "level" / "partner-level.ini",
+			"[Head]\nLevels=1\n[Level1]\nLifeMax=50\nAttack=1\nDefend=1\n"),
+		"write partner attribute sources");
+	std::error_code errorCode;
+	std::filesystem::remove(playerPath, errorCode);
+	INIReader npcIni;
+	// Parse the same legacy NPC input used by map and partner loaders.
+	const auto npcPath = root / "ini" / "save" / "restore-npc.ini";
+	ok = check(writeTextFile(npcPath, npcText), "write low-attribute partner") && ok;
+	npcIni = INIReader("ini\\save\\restore-npc.ini");
+	auto npc = std::make_shared<NPC>();
+	gameManager.global.feature.restorePartnerAttributes = false;
+	npc->initFromIni(&npcIni, "Init");
+	ok = check(npc->level == 0 && npc->defend == 10,
+		"disabled restoration keeps legacy attributes") && ok;
+	gameManager.global.feature.restorePartnerAttributes = true;
+	npc->initFromIni(&npcIni, "Init");
+	ok = check(npc->level == 12 && npc->attack == 533 && npc->defend == 423 &&
+		npc->evade == 54 && npc->lifeMax == 1000 && npc->life == 1000 &&
+		npc->mana == 152 && npc->thew == 460 && npc->exp == 2266 &&
+		npc->levelUpExp == 2665 && npc->npcLevelIni == "partner-level.ini" &&
+		npc->npcLevelList.size() == 1 && npc->getPosition() == Point{6, 7} &&
+		npc->kind == nkPartner && npc->scriptFile == "dialogue.lua" && npc->deathScript == "death.lua",
+		"legacy load restores template attributes while retaining larger life and map identity") && ok;
+	npc->life = 100;
+	npc->defend = 500;
+	npc->restorePartnerAttributes();
+	ok = check(npc->life == 100 && npc->defend == 500,
+		"equal-level records do not heal or overwrite a trained partner") && ok;
+	const std::string savedAttributes =
+		"[Init]\nName=RestoredPartner\nLevel=20\nLife=4392\nLifeMax=1020\n"
+		"Attack=805\nDefend=629\nEvade=87\nAttack2=20\nAttack3=30\n"
+		"Defend2=40\nDefend3=50\nMana=200\nManaMax=250\nThew=300\nThewMax=400\n";
+	ok = check(writeTextFile(playerPath, savedAttributes), "write trained player snapshot") && ok;
+	npc->equipmentAttributes.defend = 25;
+	npc->restorePartnerAttributes();
+	ok = check(npc->level == 20 && npc->attack == 805 && npc->getDefend() == 654 &&
+		npc->life == 1020 && npc->lifeMax == 1020 && npc->attack2 == 20 && npc->attack3 == 30 &&
+		npc->defend2 == 40 && npc->defend3 == 50 && npc->mana == 250 && npc->thew == 400,
+		"current save precedes the template, clamps saved life and retains equipment bonuses") && ok;
+	npc->level = 0;
+	npc->relation = nrNeutral;
+	npc->kind = nkBattle;
+	gameManager.npcManager->addNPC(npc);
+	gameManager.scriptAPI.setNPCRelation("RestoredPartner", nrFriendly);
+	ok = check(npc->level == 20 && npc->kind == nkBattle,
+		"a named friendly battle role also restores attributes when its relation changes") && ok;
+	npc->level = 0;
+	npc->kind = nkNormal;
+	gameManager.scriptNPC = npc;
+	gameManager.scriptAPI.setNPCKind("", nkPartner);
+	ok = check(npc->level == 20, "empty-name join restores the current script owner") && ok;
+	gameManager.scriptNPC = nullptr;
+	npc->level = 0;
+	npc->life = 0;
+	npc->restorePartnerAttributes();
+	ok = check(npc->level == 0 && npc->life == 0, "restoration does not revive dead roles") && ok;
+	npc->life = 10;
+	ok = check(writeTextFile(playerPath, "[Init]\nName=DifferentRole\nLevel=99\nLifeMax=2000\n"),
+		"write mismatched snapshot") && ok;
+	npc->restorePartnerAttributes();
+	ok = check(npc->level == 0, "mismatched snapshot does not restore another character") && ok;
+	ok = check(writeTextFile(playerPath, "invalid INI"), "write malformed snapshot") && ok;
+	npc->restorePartnerAttributes();
+	ok = check(npc->level == 0, "malformed existing snapshot does not fall back to a new-game template") && ok;
+	ok = check(writeTextFile(playerPath, savedAttributes) &&
+		writeTextFile(saveGameFixturePath(root, "partner0.ini"),
+			"[Head]\nCount=1\n[Partner000]\nName=RestoredPartner\nKind=3\nRelation=0\n"
+			"Level=0\nLife=1000\nLifeMax=1000\nAttack=100\nDefend=10\nEvade=10\n"),
+		"write old partner save") && ok;
+	ok = check(gameManager.partnerManager.load(0), "load old low-attribute partner save") && ok;
+	const auto partners = gameManager.partnerManager.findPartnersFromNPCManager();
+	ok = check(partners.size() == 1 && partners.front()->level == 20 && partners.front()->defend == 629,
+		"old partner saves receive the same attribute restoration") && ok;
+	resetRuntime(gameManager);
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	std::filesystem::copy_file(assetsRoot / "xjxqy" / "partneridx.ini", root / "partneridx.ini",
+		std::filesystem::copy_options::overwrite_existing);
+	std::filesystem::copy_file(assetsRoot / "xjxqy" / "game_profile.ini", root / "game_profile.ini",
+		std::filesystem::copy_options::overwrite_existing);
+	std::filesystem::copy_file(assetsRoot / "xjxqy" / "ini" / "level" / "level-hard.ini",
+		root / "ini" / "level" / "level-hard.ini", std::filesystem::copy_options::overwrite_existing);
+	ResourceManifest actualManifest;
+	ok = check(actualManifest.loadFromFile("game_profile.ini"), "parse actual New Sword manifest") && ok;
+	gameManager.global.applyResourceManifestFeatures(actualManifest);
+	for (int index : {1, 2, 3})
+	{
+		const std::string fileName = "player" + std::to_string(index) + ".ini";
+		std::filesystem::remove(saveGameFixturePath(root, fileName), errorCode);
+		std::filesystem::copy_file(assetsRoot / "xjxqy" / "ini" / "save" / fileName,
+			root / "ini" / "save" / fileName, std::filesystem::copy_options::overwrite_existing);
+		INIReader source("ini\\save\\" + fileName);
+		npcIni.Set("Init", "Name", source.Get("Init", "Name", ""));
+		npc->initFromIni(&npcIni, "Init");
+		ok = check(gameManager.global.feature.restorePartnerAttributes &&
+			npc->level == source.GetInteger("Init", "Level", -1) &&
+			npc->attack == source.GetInteger("Init", "Attack", -1) &&
+			npc->defend == source.GetInteger("Init", "Defend", -1) &&
+			npc->evade == source.GetInteger("Init", "Evade", -1) && !npc->npcLevelList.empty(),
+			"actual New Sword role index restores its matching published template attributes") && ok;
+	}
+	std::filesystem::copy_file(assetsRoot / "yycs" / "game_profile.ini", root / "game_profile.ini",
+		std::filesystem::copy_options::overwrite_existing);
+	ok = check(actualManifest.loadFromFile("game_profile.ini"), "parse actual Moon Shadow manifest") && ok;
+	gameManager.global.applyResourceManifestFeatures(actualManifest);
+	npc->initFromIni(&npcIni, "Init");
+	ok = check(!gameManager.global.feature.restorePartnerAttributes && npc->level == 0 && npc->defend == 10,
+		"actual Moon Shadow configuration does not enable partner restoration") && ok;
+	gameManager.global.feature.restorePartnerAttributes = false;
+	resetRuntime(gameManager);
+	return ok;
+}
+
 bool runPendingDeathScriptRoundTrip(GameManager& gameManager)
 {
 	resetRuntime(gameManager);
@@ -3622,6 +3758,7 @@ bool runNpcRuntimePersistenceTests()
 		gameManager,
 		root) && ok;
 	ok = runExperienceAndLowLifePersistence(gameManager, root) && ok;
+	ok = runPartnerAttributeRestoration(gameManager, root) && ok;
 	resetRuntime(gameManager);
 	File::setActiveSaveNamespace("");
 	File::setPlatformStateParentForTests("");

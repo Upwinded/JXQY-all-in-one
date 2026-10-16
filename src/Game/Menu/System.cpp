@@ -222,27 +222,5 @@ void System::onRun()
 
 void System::saveScreen()
 {
-	const auto started = std::chrono::steady_clock::now();
-	std::string imageName = SHOT_FOLDER + convert::formatString(SHOT_PNG, index + 1);
-	int w = 260;
-	int h = 200;
-	if (!engine->beginSaveScreen())
-	{
-		return;
-	}
-	gm->map->drawMap();
-	gm->weather->draw();
-	auto snap = engine->endSaveScreen();
-	if (snap == nullptr)
-	{
-		return;
-	}
-	std::unique_ptr<char[]> data;
-	int len = engine->saveImageToPngMemory(snap, w, h, data);
-	if (len > 0 && data.get() != nullptr)
-	{
-		File::writeFile(imageName, data, len);
-	}
-	GameLog::write("Save timing: slot=%d phase=thumbnail elapsed_ms=%lld", index + 1,
-		static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count()));
+	gm->saveSlotScreenshot(index + 1);
 }

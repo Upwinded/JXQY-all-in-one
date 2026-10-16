@@ -46,6 +46,7 @@ private:
 	bool showingDetails = false;
 	bool detailFocused = false;
 	std::string detailedMagicFile;
+	int detailedSlotIndex = -1;
 	int detailPage = 0;
 	std::string detailContent;
 	int detailWidth = 0;

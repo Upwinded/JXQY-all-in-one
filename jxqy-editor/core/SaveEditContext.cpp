@@ -1,6 +1,7 @@
 #include "SaveEditContext.h"
 
 #include "EditorSettings.h"
+#include "../../src/Game/GameManager/SaveSlots.h"
 
 #include <QDir>
 #include <QCoreApplication>
@@ -21,7 +22,7 @@ SaveEditContext& SaveEditContext::instance()
 SaveEditContext::SaveEditContext()
 {
     availableTargets.append({"new_game", QString(), "ini/save", false});
-    for (int slot = 1; slot <= 7; slot++)
+    for (int slot = 1; slot <= SaveSlots::ManualCount; slot++)
     {
         availableTargets.append({
             QString("slot_%1").arg(slot),
@@ -30,6 +31,7 @@ SaveEditContext::SaveEditContext()
             false
         });
     }
+    availableTargets.append({ "automatic", QString(), "save/rpg_auto", false });
     availableTargets.append({
         "temporary",
         QString(),
@@ -134,16 +136,18 @@ int SaveEditContext::findTargetIndex(const QString& id) const
 
 void SaveEditContext::refreshDisplayNames() const
 {
-    if (availableTargets.size() != 9)
+    if (availableTargets.size() != SaveSlots::Automatic + 2)
         return;
 
     availableTargets[0].displayName = QCoreApplication::translate(
         "SaveEditContext", "新游戏模板（ini/save）");
-    for (int slot = 1; slot <= 7; slot++)
+    for (int slot = 1; slot <= SaveSlots::ManualCount; slot++)
     {
         availableTargets[slot].displayName = QCoreApplication::translate(
             "SaveEditContext", "存档槽 %1（save/rpg%1）").arg(slot);
     }
-    availableTargets[8].displayName = QCoreApplication::translate(
+    availableTargets[SaveSlots::Automatic].displayName = QCoreApplication::translate(
+        "SaveEditContext", "自动存档（save/rpg_auto）");
+    availableTargets[SaveSlots::Automatic + 1].displayName = QCoreApplication::translate(
         "SaveEditContext", "临时运行存档（save/game，高风险）");
 }

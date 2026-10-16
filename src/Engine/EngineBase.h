@@ -210,6 +210,7 @@ struct VideoImage
 {
 	_shared_image image = nullptr;
 	float t = 0.0;
+	std::uint64_t textureBytes = 0;
 };
 
 struct MediaContent
@@ -251,6 +252,8 @@ struct VideoStruct
 	static constexpr int MaxAudioSampleRate = 384000;
 	static constexpr int MaxAudioFrameSamples = MaxAudioSampleRate * 4;
 	static constexpr std::uint64_t MaxDecodedVideoPixels = 64ULL * 1024ULL * 1024ULL;
+	static constexpr std::size_t MaxVideoTextureCount = 16;
+	static constexpr std::uint64_t MaxVideoTextureBytes = 64ULL * 1024ULL * 1024ULL;
 
 	std::string fileName;
 
@@ -271,6 +274,9 @@ struct VideoStruct
 	
 	int pixelFormat = 0;
 	std::deque<VideoImage> videoImage;
+	bool videoFramePending = false;
+	bool videoDecoderFlushed = false;
+	bool videoOutputFailed = false;
 	AVFrame * sFrame = nullptr;
 	SwsContext * swsContext = nullptr;
 
@@ -747,7 +753,8 @@ private:
 	float setVideoTime(_video video, float time);
 	float getVideoSoundRate(_video video);
 	void enqueueDecodedAudioFrame(_video video);
-	void enqueueDecodedVideoFrame(_video video);
+	// False keeps the decoded frame pending until texture queue space is available.
+	bool enqueueDecodedVideoFrame(_video video);
 	void decodeNextAudio(_video video);
 	void decodeNextVideo(_video video);
 	void checkVideoDecodeEnd(_video video);

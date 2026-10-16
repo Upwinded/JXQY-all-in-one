@@ -154,6 +154,7 @@ void MenuController::configureControllerMenuDescriptors()
 	{
 		return gm != nullptr
 			&& gm->global.feature.hideRightMenusWithIntegratedEquip
+			&& !(equipMenu && equipMenu->getSelectedPartner())
 			? ControllerMenuGroup::Right
 			: ControllerMenuGroup::None;
 	};
@@ -265,6 +266,7 @@ void MenuController::configureControllerMenuDescriptors()
 	{
 		return gm != nullptr
 			&& gm->global.feature.hideRightMenusWithIntegratedEquip
+			&& !(equipMenu && equipMenu->getSelectedPartner())
 			? ControllerMenuGroup::Left
 			: ControllerMenuGroup::None;
 	};
@@ -1070,69 +1072,13 @@ bool MenuController::openPartnerEquipment(
 	const std::shared_ptr<NPC>& partner,
 	bool returnToPartnerList)
 {
-	if (partner == nullptr || partner->canEquip <= 0
-		|| partnerEquipMenu == nullptr || goodsMenu == nullptr)
-	{
-		return false;
-	}
-
-	cancelControllerInteraction();
-	if (!partnerEquipmentReturnPending)
-	{
-		stateVisibleBeforePartnerEquipment =
-			stateMenu != nullptr && stateMenu->visible;
-		equipVisibleBeforePartnerEquipment =
-			equipMenu != nullptr && equipMenu->visible;
-		practiceVisibleBeforePartnerEquipment =
-			practiceMenu != nullptr && practiceMenu->visible;
-		goodsVisibleBeforePartnerEquipment = goodsMenu->visible;
-		magicVisibleBeforePartnerEquipment =
-			magicMenu != nullptr && magicMenu->visible;
-		memoVisibleBeforePartnerEquipment =
-			memoMenu != nullptr && memoMenu->visible;
-		if (returnToPartnerList)
-		{
-			controllerMenuBeforePartnerEquipment = partnerHeadMenu;
-			controllerRoleBeforePartnerEquipment =
-				ControllerMenuRole::PartnerList;
-		}
-		else
-		{
-			auto previousMenu = controllerFocusedMenu.lock();
-			if (previousMenu != partnerEquipMenu)
-			{
-				controllerMenuBeforePartnerEquipment = previousMenu;
-				controllerRoleBeforePartnerEquipment =
-					controllerFocusedRole;
-			}
-		}
-		partnerEquipmentReturnPending = true;
-	}
-
-	if (stateMenu != nullptr) stateMenu->visible = false;
-	if (equipMenu != nullptr) equipMenu->visible = false;
-	if (practiceMenu != nullptr) practiceMenu->visible = false;
-	if (magicMenu != nullptr) magicMenu->visible = false;
-	if (memoMenu != nullptr) memoMenu->visible = false;
-	goodsMenu->visible = true;
-	goodsMenu->updateGoods();
-	goodsMenu->updateMoney();
-	setPartnerEquipmentPointerScope(true);
-	partnerEquipMenu->setPartner(partner);
-	if (!partnerEquipMenu->visible)
-	{
-		closePartnerEquipment(true);
-		return false;
-	}
-	if (!partnerEquipMenu->focusControllerDefault())
-	{
-		closePartnerEquipment(true);
-		return false;
-	}
-	setControllerFocusedMenu(
-		partnerEquipMenu, ControllerMenuRole::PartnerEquipment);
-	updateLeftButtonChecks(false, false, false);
-	updateRightButtonChecks(true, false, false);
+	(void)returnToPartnerList;
+	if (!partner || !partner->isLivingPartner() || !equipMenu || !goodsMenu
+		|| !equipMenu->selectPartner(partner)) return false;
+	if (!equipMenu->visible) toggleEquipView();
+	if (!goodsMenu->visible) toggleGoodsView();
+	if (!equipMenu->focusControllerEquipment()) return false;
+	setControllerFocusedMenu(equipMenu, ControllerMenuRole::Equip);
 	cancelWorldInteractionForMenuOpen();
 	return true;
 }
@@ -3330,10 +3276,6 @@ bool MenuController::showGoodsToolTip(
 	}
 	toolTip->setGoods(goods, shop != nullptr && shop->visible && anchor->dragType == dtGoods);
 	toolTip->placeNearElement(anchor);
-#ifdef __MOBILE__
-	// A touch hint is a deliberate long press; give it a readable, paged surface.
-	details = true;
-#endif
 	if (details && gm != nullptr && gm->global.feature.qingyuUi)
 	{
 		toolTip->runDetails();

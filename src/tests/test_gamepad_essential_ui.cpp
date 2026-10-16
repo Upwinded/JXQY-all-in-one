@@ -1,4 +1,5 @@
 #include "../Component/Button.h"
+#include "../Component/TextLayout.h"
 #include "../Engine/Engine.h"
 #include "../JxqyEngineVersion.h"
 #include "../File/File.h"
@@ -34,6 +35,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <functional>
@@ -48,6 +50,26 @@
 class GamepadEssentialUITestAccess
 {
 public:
+	static bool clickControl(Element& owner, const PElement& control, bool touch)
+	{
+		Engine* engine = Engine::getInstance();
+		if (!control || !control->visible || !control->activated) return false;
+		owner.visible = true;
+		owner.setRunning(true);
+		const int x = control->rect.x + control->rect.w / 2;
+		const int y = control->rect.y + control->rect.h / 2;
+		engine->pushEvent(AEvent(touch ? ET_FINGERDOWN : ET_MOUSEDOWN,
+			touch ? 86 : MBC_MOUSE_LEFT, x, y, false));
+		owner.allHandleEvents();
+		owner.onEvent();
+		engine->pushEvent(AEvent(touch ? ET_FINGERUP : ET_MOUSEUP,
+			touch ? 86 : MBC_MOUSE_LEFT, x, y, false));
+		owner.allHandleEvents();
+		owner.onEvent();
+		return engine->getEventCount() == 0;
+	}
+	static void selectSaveSlot(SaveLoad& menu, int index) { menu.selectSlot(index); }
+
 	class CapturedResourceScene : public ResourceSelectScene
 	{
 	public:
@@ -71,6 +93,53 @@ public:
 	{
 		Engine::getInstance()->EngineBase::width = width;
 		Engine::getInstance()->EngineBase::height = height;
+	}
+
+	static bool dispatchOptionReturnClick(Option& option, bool useTouch)
+	{
+		Engine* engine = Engine::getInstance();
+		const auto& control = option.rtnBtn;
+		if (engine == nullptr || engine->getEventCount() != 0
+			|| control == nullptr || !control->visible || !control->activated
+			|| control->rect.w <= 0 || control->rect.h <= 0)
+		{
+			return false;
+		}
+		option.setRunning(true);
+		option.result = erNone;
+		const int pointerX = control->rect.x + control->rect.w / 2;
+		const int pointerY = control->rect.y + control->rect.h / 2;
+		const EventTouchID pointerId = useTouch ? 83 : TOUCH_MOUSEID;
+		if (!useTouch)
+		{
+			engine->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID, pointerX, pointerY, false));
+		}
+		engine->pushEvent(AEvent(useTouch ? ET_FINGERDOWN : ET_MOUSEDOWN,
+			useTouch ? pointerId : MBC_MOUSE_LEFT, pointerX, pointerY, false));
+		option.allHandleEvents();
+		const bool pressed = engine->getEventCount() == 0
+			&& control->touchingDownID == pointerId && option.logicRunning
+			&& option.result == erNone;
+		engine->pushEvent(AEvent(useTouch ? ET_FINGERUP : ET_MOUSEUP,
+			useTouch ? pointerId : MBC_MOUSE_LEFT, pointerX, pointerY, false));
+		option.allHandleEvents();
+		return pressed && engine->getEventCount() == 0
+			&& !option.logicRunning && option.result == erOK;
+	}
+
+	static bool dispatchOptionEscape(Option& option)
+	{
+		Engine* engine = Engine::getInstance();
+		if (engine == nullptr || engine->getEventCount() != 0)
+		{
+			return false;
+		}
+		option.setRunning(true);
+		option.result = erNone;
+		engine->pushEvent(AEvent(ET_KEYDOWN, KEY_ESCAPE, 0, 0, false));
+		option.allHandleEvents();
+		return engine->getEventCount() == 0
+			&& !option.logicRunning && option.result == erOK;
 	}
 
 	static void drawResourceSelection(ResourceSelectScene& scene)
@@ -283,15 +352,175 @@ public:
 			"last display setting leaves space for status and apply buttons");
 		scene.onHandleUIAction(UIAction::Cancel);
 #endif
+		for (int failure = 0; failure < 8; ++failure)
+		{
+			scene.resourceInstallOperation = ResourceSelectScene::ResourceInstallOperation::OnlineDownload;
+			scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Downloading;
+			scene.resourceInstallWorkerResult = std::make_shared<ResourceSelectScene::ResourceInstallWorkerResult>();
+			auto& preparation = scene.resourceInstallWorkerResult->preparation;
+			preparation.failedGameId = "JIAN_ER_GAI_CHENGHE_1_041";
+			preparation.status = OnlineUpdate::ResourceDownloadPreparationStatus::DownloadFailed;
+			preparation.downloadResult.status = failure == 0 ? OnlineUpdate::HttpsDownloadStatus::NetworkError
+				: failure == 1 ? OnlineUpdate::HttpsDownloadStatus::HttpError
+				: failure == 2 ? OnlineUpdate::HttpsDownloadStatus::InsufficientDiskSpace
+				: OnlineUpdate::HttpsDownloadStatus::WriteFailed;
+			preparation.downloadResult.httpStatus = 404;
+			if (failure == 4)
+			{
+				preparation.status = OnlineUpdate::ResourceDownloadPreparationStatus::PackageValidationFailed;
+				preparation.packageResult.status = OnlineUpdate::ResourcePackageArchiveStatus::InsufficientDiskSpace;
+				preparation.packageResult.uncompressedBytes = 3ULL * 1024 * 1024 * 1024;
+				preparation.packageResult.availableDiskBytes = 1024ULL * 1024 * 1024;
+			}
+			if (failure >= 5)
+			{
+				preparation.status = OnlineUpdate::ResourceDownloadPreparationStatus::PackageValidationFailed;
+				preparation.packageResult.status = OnlineUpdate::ResourcePackageArchiveStatus::ExtractionFailed;
+				preparation.packageResult.stage = OnlineUpdate::ResourcePackageArchiveStage::ApplyingOverlay;
+				preparation.workspacePath = std::filesystem::u8path("test-workspace");
+				preparation.packageResult.filesystemPath = preparation.workspacePath / "prepared/package-0/game_profile.ini";
+				preparation.packageResult.filesystemError = std::make_error_code(std::errc::permission_denied);
+				if (failure == 6)
+				{
+					preparation.packageResult.stage = OnlineUpdate::ResourcePackageArchiveStage::ManifestValidation;
+					preparation.packageResult.status = OnlineUpdate::ResourcePackageArchiveStatus::MinimumEngineVersionMismatch;
+					preparation.packageResult.filesystemError.clear();
+				}
+				if (failure == 7)
+				{
+					preparation.status = OnlineUpdate::ResourceDownloadPreparationStatus::CleanupFailed;
+					preparation.packageResult.cleanupFailed = true;
+				}
+			}
+			GameLoading::ExclusiveLoadingCompletion completion;
+			completion.taskResult = GameLoading::LoadingTaskResult::success();
+			scene.setMainControlsAvailable(false);
+			scene.finishResourceInstall(completion);
+			const auto& message = scene.resourceInstallDialogMessage;
+			const std::array<const char*, 8> reasons = { u8"网络", "404", u8"空间不足", u8"无法写入", u8"无法解压",
+				u8"拒绝访问", u8"最低引擎版本", u8"暂存清理未完成" };
+			verify(message.find(reasons[failure]) != std::string::npos && message.find(preparation.failedGameId) != std::string::npos,
+				"download failure identifies its cause and resource");
+			if (failure >= 5)
+			{
+				verify(message.find("game_profile.ini") != std::string::npos && message.find(u8"阶段：") != std::string::npos,
+					"package failure identifies the stage and file");
+				verify(failure == 6 || message.find("generic:") != std::string::npos,
+					"write errors expose their system error category and value");
+			}
+			const Rect dialog = scene.getResourceInstallDialogRect();
+			const auto lines = TextLayout::wrapUtf8Text(message,
+				TextLayout::charactersPerLineForWidth(dialog.w - 64, 17));
+			verify(static_cast<int>(lines.size()) * 19 <= scene.getResourceInstallPrimaryButtonRect().y - dialog.y - 104,
+				"download failure and recovery steps fit without truncation: " + std::to_string(failure));
+			capture("download-failure-" + std::to_string(failure), { scene.resourceInstallPrimaryButton->rect });
+			scene.dismissResourceInstallDialog();
+		}
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+		const auto cancellationRoot = makeUniqueTestDirectory("jxqy-download-retention");
+		const auto partialDirectory = cancellationRoot / ".jxqy-update/downloads";
+		std::filesystem::create_directories(partialDirectory);
+		const auto partial = partialDirectory / "4096-11111111.part";
+		const auto commonPartial = partialDirectory / "8192-22222222.part";
+		const auto unrelated = partialDirectory / "4096-33333333.part";
+		const auto installed = cancellationRoot / "installed-resource";
+		const auto save = cancellationRoot / "player-save";
+		for (const auto& path : { partial, unrelated, installed, save })
+		{
+			std::ofstream output(path, std::ios::binary);
+			output << std::string(1024, 'p');
+		}
+		{
+			std::ofstream output(commonPartial, std::ios::binary);
+			output << std::string(2048, 'c');
+		}
+		const std::map<std::filesystem::path, std::uint64_t> partialFiles = { { partial, 4096 }, { commonPartial, 8192 } };
+		const auto touchDownloadControl = [&](const std::shared_ptr<FlatTextButton>& control)
+		{
+			// This audit also draws controller prompts. Settle the touch layout
+			// before choosing coordinates for a synthetic touch gesture.
+			scene.hideSemanticFocus();
+			scene.updateLayout(scene.rect.w, scene.rect.h);
+			return dispatchResourceControlClickAcrossLayout(scene, control, true);
+		};
+		scene.pendingResourceInstall.partialDownloadFiles = partialFiles;
 		scene.resourceInstallOperation = ResourceSelectScene::ResourceInstallOperation::OnlineDownload;
-		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Failed;
-		scene.resourceInstallDialogMessage = u8"网络连接失败，请检查网络后重试。";
+		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Downloading;
+		scene.resourceInstallWorkerResult = std::make_shared<ResourceSelectScene::ResourceInstallWorkerResult>();
+		std::atomic<bool> releaseWorker{ false };
+		scene.resourceInstallRunner = std::make_unique<GameLoading::ExclusiveLoadingRunner>(
+			[&releaseWorker, partial](const GameLoading::LoadingCancellationToken& token)
+			{
+				const auto deadline = SDL_GetTicks() + 5000;
+				while ((!token.isCancellationRequested() || !releaseWorker.load()) && SDL_GetTicks() < deadline) SDL_Delay(1);
+				std::ofstream output(partial, std::ios::binary | std::ios::app);
+				output << std::string(512, 't');
+				return GameLoading::LoadingTaskResult::cancellation();
+			});
 		scene.setMainControlsAvailable(false);
 		scene.refreshResourceInstallDialogControls();
-		scene.semanticFocusVisible = scene.focusManager.focusNode("install-primary");
-		capture("failure", { scene.resourceInstallPrimaryButton->rect });
-		scene.dismissResourceInstallDialog();
-#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+		verify(touchDownloadControl(scene.resourceInstallSecondaryButton),
+			"touch requests download cancellation");
+		verify(scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::Cancelling &&
+			scene.resourceInstallRunner->isCancellationRequested(), "wait for the worker before offering cleanup");
+		scene.finishDownloadCancellation(true);
+		verify(std::filesystem::exists(partial), "cleanup cannot delete an active download");
+		releaseWorker.store(true);
+		const auto cancellationDeadline = SDL_GetTicks() + 6000;
+		while (scene.resourceInstallRunner && SDL_GetTicks() < cancellationDeadline)
+		{
+			scene.pollResourceInstall();
+			SDL_Delay(1);
+		}
+		verify(!scene.resourceInstallRunner && scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::ChoosingDownloadRetention &&
+			scene.resourceInstallDialogMessage.find("3.5 KiB") != std::string::npos,
+			"manual cancellation reports final resource and common prefix sizes after the worker stops");
+		scene.drawSelf();
+		const Rect retentionDialog = scene.getResourceInstallDialogRect();
+		verify(static_cast<int>(TextLayout::wrapUtf8Text(scene.resourceInstallDialogMessage,
+			TextLayout::charactersPerLineForWidth(retentionDialog.w - 64, 17)).size()) * 19 <=
+			scene.getResourceInstallPrimaryButtonRect().y - retentionDialog.y - 104, "retention explanation fits without truncation");
+		capture("download-retention", { scene.resourceInstallPrimaryButton->rect, scene.resourceInstallSecondaryButton->rect });
+		verify(touchDownloadControl(scene.resourceInstallPrimaryButton) &&
+			scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			std::filesystem::file_size(partial) == 1536, "keep progress preserves the exact download prefix");
+		scene.pendingResourceInstall.partialDownloadFiles = partialFiles;
+		scene.setMainControlsAvailable(false);
+		scene.showDownloadRetentionChoice();
+		scene.onHandleUIAction(UIAction::Cancel);
+		verify(scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			std::filesystem::exists(partial), "back defaults to keeping progress");
+		scene.pendingResourceInstall.partialDownloadFiles = partialFiles;
+		scene.resourceInstallDialogState = ResourceSelectScene::ResourceInstallDialogState::Downloading;
+		scene.resourceInstallWorkerResult = std::make_shared<ResourceSelectScene::ResourceInstallWorkerResult>();
+		GameLoading::ExclusiveLoadingCompletion interrupted;
+		interrupted.taskResult = GameLoading::LoadingTaskResult::cancellation();
+		scene.finishResourceInstall(interrupted);
+		verify(scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			std::filesystem::file_size(partial) == 1536 && std::filesystem::file_size(commonPartial) == 2048,
+			"automatic interruption keeps all progress without a cleanup prompt");
+		scene.pendingResourceInstall.partialDownloadFiles = partialFiles;
+		scene.setMainControlsAvailable(false);
+		scene.showDownloadRetentionChoice();
+		verify(touchDownloadControl(scene.resourceInstallSecondaryButton) &&
+			scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::Hidden &&
+			!std::filesystem::exists(partial) && !std::filesystem::exists(commonPartial) &&
+			scene.catalogStatusText.find("3.5 KiB") != std::string::npos,
+			"clear removes only this download's resource/common prefixes and reports reclaimed space");
+		verify(std::filesystem::file_size(unrelated) == 1024 && std::filesystem::file_size(installed) == 1024 &&
+			std::filesystem::file_size(save) == 1024, "cleanup preserves other downloads, installed resources and saves");
+		std::error_code fixtureError;
+		std::filesystem::create_directory(partial, fixtureError);
+		verify(!fixtureError, "create the unexpected-entry fixture after cleanup");
+		scene.pendingResourceInstall.partialDownloadFiles = partialFiles;
+		scene.setMainControlsAvailable(false);
+		scene.showDownloadRetentionChoice();
+		scene.activateResourceDialogSecondary();
+		verify(scene.resourceInstallDialogState == ResourceSelectScene::ResourceInstallDialogState::ChoosingDownloadRetention &&
+			std::filesystem::is_directory(partial) && scene.resourceInstallDialogMessage.find(u8"未能清理") != std::string::npos,
+			"unexpected entries are left alone and a cleanup failure is actionable");
+		scene.onHandleUIAction(UIAction::Cancel);
+		std::filesystem::remove_all(cancellationRoot);
 		scene.showExternalResourceDialog(true);
 		scene.drawSelf();
 		capture("external", { scene.externalResourceConfirmButton->rect, scene.externalResourceCancelButton->rect });
@@ -1372,6 +1601,13 @@ public:
 		return scene.onlineActionButton != nullptr &&
 			scene.onlineActionButton->visible &&
 			 scene.onlineActionButton->activated;
+	}
+
+	static bool selectedResourceRunStatusContains(
+		const ResourceSelectScene& scene,
+		const std::string& text)
+	{
+		return scene.selectedDetails.runStatus.find(text) != std::string::npos;
 	}
 
 	static bool selectedResourceNeedsContinueUpdate(
@@ -3139,7 +3375,7 @@ struct ResourcePackExpectation
 const ResourcePackExpectation ResourcePacks[] =
 {
 	{ "JXQY2", GAME_JXQY2, 7, 180, 100, 3, { 284, 227, 274, 36 } },
-	{ "XJXQY", GAME_XJXQY, 10, 125, 2, 3, { 204, 164, 199, 51 } },
+	{ "XJXQY", GAME_XJXQY, 9, 125, 2, 3, { 204, 164, 199, 51 } },
 	{ "YYCS", GAME_YYCS, 7, 194, 2, 3, { 327, 112, 81, 66 } }
 };
 
@@ -3157,6 +3393,9 @@ bool checkPack(
 	const ResourcePackExpectation& resourcePack,
 	const std::string& expectation)
 {
+	std::cout << "ESSENTIAL_PATH pack=" << resourcePack.id
+		<< " theme=" << (Config::useQingyuUi ? "qingyu" : "original")
+		<< " result=" << (condition ? "pass" : "fail") << " path=" << expectation << '\n';
 	return check(condition, std::string(resourcePack.id) + " " + expectation);
 }
 
@@ -4365,6 +4604,88 @@ bool testResourceSelectionController(
 		installedIncrementalArtifactCrc32 = previousIncrementalReceipt;
 	mutablePacks[sameVersionLocalPackIndex].manifest.releaseMetadata.
 		installedIncrementalChainCrc32s = previousIncrementalChainReceipt;
+	OnlineUpdate::ResourcePackage incompatibleOnlinePackage = sameVersionPackage;
+	incompatibleOnlinePackage.minimumEngineVersionText = "999.0.0";
+	incompatibleOnlinePackage.minimumEngineVersion =
+		ModRelease::parseSemanticVersion("999.0.0").version;
+	OnlineUpdate::Catalog incompatibleOnlineCatalog;
+	incompatibleOnlineCatalog.resourcePackages.emplace(
+		OnlineUpdate::foldGameId(incompatibleOnlinePackage.gameId),
+		incompatibleOnlinePackage);
+	ResourceSelectScene compatibleLocalScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		compatibleLocalScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::applyOnlineCatalog(
+			compatibleLocalScene, incompatibleOnlineCatalog) &&
+		GamepadEssentialUITestAccess::selectResourceEntry(
+			compatibleLocalScene,
+			GamepadEssentialUITestAccess::resourceEntryIndexByGameId(
+				compatibleLocalScene, incompatibleOnlinePackage.gameId)) &&
+		!GamepadEssentialUITestAccess::resourceOnlineActionIsAvailable(
+			compatibleLocalScene) &&
+		GamepadEssentialUITestAccess::selectedResourceRunStatusContains(
+			compatibleLocalScene, u8"更新资源需先更新主程序"),
+		"an incompatible online update is unavailable and labelled as an update"
+		" requirement rather than a local launch requirement") && ok;
+	compatibleLocalScene.setRunning(true);
+	GamepadEssentialUITestAccess::confirmSelectedResource(compatibleLocalScene);
+	ok = check(
+		!GamepadEssentialUITestAccess::resourceSceneRunning(compatibleLocalScene) &&
+		!GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			compatibleLocalScene),
+		"checking an incompatible online update still enters the compatible"
+		" installed resource without an update prompt") && ok;
+	incompatibleOnlinePackage.gameId = "ONLINE_REQUIRES_NEWER_ENGINE";
+	incompatibleOnlineCatalog.resourcePackages.emplace(
+		OnlineUpdate::foldGameId(incompatibleOnlinePackage.gameId),
+		incompatibleOnlinePackage);
+	ResourceSelectScene incompatibleOnlineOnlyScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		incompatibleOnlineOnlyScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::applyOnlineCatalog(
+			incompatibleOnlineOnlyScene, incompatibleOnlineCatalog) &&
+		GamepadEssentialUITestAccess::selectResourceEntry(
+			incompatibleOnlineOnlyScene,
+			GamepadEssentialUITestAccess::resourceEntryIndexByGameId(
+				incompatibleOnlineOnlyScene, incompatibleOnlinePackage.gameId)) &&
+		!GamepadEssentialUITestAccess::resourceOnlineActionIsAvailable(
+			incompatibleOnlineOnlyScene),
+		"an online-only resource requiring a newer engine cannot be downloaded") && ok;
+	incompatibleOnlineOnlyScene.setRunning(true);
+	GamepadEssentialUITestAccess::confirmSelectedResource(incompatibleOnlineOnlyScene);
+	ok = check(
+		GamepadEssentialUITestAccess::resourceSceneRunning(incompatibleOnlineOnlyScene) &&
+		!GamepadEssentialUITestAccess::localEntryUpdatePromptIsVisible(
+			incompatibleOnlineOnlyScene) &&
+		GamepadEssentialUITestAccess::resourceCatalogStatusContains(
+			incompatibleOnlineOnlyScene, u8"当前引擎版本过低"),
+		"an incompatible online-only resource still blocks entry") && ok;
+	const auto previousCompatibility =
+		mutablePacks[sameVersionLocalPackIndex].compatibility;
+	mutablePacks[sameVersionLocalPackIndex].compatibility.status =
+		ModRelease::CompatibilityStatus::RequiresNewerEngine;
+	ResourceSelectScene incompatibleLocalScene;
+	GamepadEssentialUITestAccess::prepareResourceSelection(
+		incompatibleLocalScene, 800, 480);
+	ok = check(
+		GamepadEssentialUITestAccess::applyOnlineCatalog(
+			incompatibleLocalScene, sameVersionCatalog) &&
+		GamepadEssentialUITestAccess::selectResourceEntry(
+			incompatibleLocalScene,
+			GamepadEssentialUITestAccess::resourceEntryIndexByGameId(
+				incompatibleLocalScene, sameVersionPackage.gameId)),
+		"an incompatible installed resource stays visible") && ok;
+	incompatibleLocalScene.setRunning(true);
+	GamepadEssentialUITestAccess::confirmSelectedResource(incompatibleLocalScene);
+	ok = check(
+		GamepadEssentialUITestAccess::resourceSceneRunning(incompatibleLocalScene) &&
+		GamepadEssentialUITestAccess::resourceCatalogStatusContains(
+			incompatibleLocalScene, u8"当前引擎版本过低"),
+		"a compatible online version does not bypass installed resource"
+		" incompatibility") && ok;
+	mutablePacks[sameVersionLocalPackIndex].compatibility = previousCompatibility;
 	OnlineUpdate::Catalog testCatalog;
 	ok = check(GamepadEssentialUITestAccess::importedPackageUsesStableDirectory(onlineCatalogScene),
 		"local full import uses its declared directory and rejects traversal") && ok;
@@ -5042,7 +5363,7 @@ bool testTitleController(const ResourcePackExpectation& resourcePack)
 	ok = checkPack(
 		systemNotice->visible &&
 			systemNotice->currentMessage ==
-				u8"系统：读档失败（存档槽 3）：玩家存档 player3.ini 缺少 Init 段。请保留日志以便进一步排查。",
+				u8"系统：读档失败（存档槽 3）：玩家存档 player3.ini 缺少 Init 段。",
 		resourcePack,
 		"title reports the selected save slot and concrete load failure") && ok;
 	systemNotice->dismiss();
@@ -5055,7 +5376,7 @@ bool testTitleController(const ResourcePackExpectation& resourcePack)
 	ok = checkPack(
 		systemNotice->visible &&
 			systemNotice->currentMessage ==
-				u8"系统：游戏运行失败：地图切换提交失败。请保留日志以便进一步排查。",
+				u8"系统：游戏运行失败：地图切换提交失败。",
 		resourcePack,
 		"title does not mislabel a later runtime failure as a save-slot load failure") && ok;
 	systemNotice->dismiss();
@@ -5400,7 +5721,7 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	{
 		return false;
 	}
-	if (resourcePack.gameType == GAME_JXQY2)
+	if (!Config::useQingyuUi && std::string(resourcePack.id) == "JXQY2")
 	{
 		auto lifeLabel = menu.stateMenu->getComponentByName<Label>("labLife");
 		auto thewLabel = menu.stateMenu->getComponentByName<Label>("labThew");
@@ -5491,13 +5812,15 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 		const Rect& panelRect = menu.messageBox->rect;
 		const std::shared_ptr<Label>& messageLabel = menu.messageBox->label;
 		ok = checkPack(
-			panelRect.x == 272 && panelRect.y == 435
+			(Config::useQingyuUi ? (messageLabel && messageLabel->fontSize > 0
+				&& panelRect.y + panelRect.h <= menu.bottomMenu->rect.y)
+				: (panelRect.x == 272 && panelRect.y == 435
 				&& panelRect.w == 236 && panelRect.h == 94
 				&& messageLabel != nullptr
 				&& messageLabel->rect.x == 318 && messageLabel->rect.y == 467
 				&& messageLabel->rect.w == 148 && messageLabel->rect.h == 50
 				&& messageLabel->fontSize == 20
-				&& messageLabel->color == 0xCC9B2216,
+				&& messageLabel->color == 0xCC9B2216)),
 			resourcePack,
 			"money notification stays above the bottom menu and preserves its text style")
 			&& ok;
@@ -5509,8 +5832,16 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 		gameManager.scriptAPI.runScript(u8"1级钱.txt");
 		const int moneyGained =
 			gameManager.player->money - moneyBeforePickup;
+		std::unique_ptr<char[]> scriptContent;
+		int scriptSize = 0;
+		int minimumMoney = 0, maximumMoney = 0;
+		const bool scriptRead = File::readFile(u8"script/common/1级钱.txt", scriptContent, scriptSize);
+		const std::string moneyScript = scriptRead ? std::string(scriptContent.get(), scriptSize) : "";
+		const auto randomMoney = moneyScript.find("addrandmoney(");
+		const bool rangeRead = randomMoney != std::string::npos
+			&& std::sscanf(moneyScript.c_str() + randomMoney, "addrandmoney(%d,%d)", &minimumMoney, &maximumMoney) == 2;
 		ok = checkPack(
-			moneyGained >= 10 && moneyGained <= 40
+			rangeRead && moneyGained >= minimumMoney && moneyGained <= maximumMoney
 				&& menu.messageBox->currentMessage ==
 					u8"获得" + std::to_string(moneyGained) +
 					u8"两银子！"
@@ -5525,13 +5856,14 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	menu.messageBox->showed = false;
 	menu.messageBox->visible = false;
 	menu.stateMenu->visible = true;
-	ok = checkPack(!menu.stateMenu->needEvents
+	menu.stateMenu->updateLabel();
+	ok = checkPack(menu.stateMenu->needEvents
 			&& menu.blocksWorldInput()
 			&& !menu.blocksWorldPointerInput()
-			&& !isUIFocusElementAvailable(menu.stateMenu),
+			&& menu.stateMenu->controllerFocusCandidates().empty(),
 		resourcePack,
-		"display-only state surface blocks world semantics without pointer"
-		" capture or an empty focus target") && ok;
+		"state surface without companions blocks world semantics without pointer"
+		" capture or a character focus target") && ok;
 	menu.stateMenu->visible = false;
 
 	menu.messageBox->showMessage("controller passive overlay", 1000);
@@ -5539,12 +5871,11 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	menu.timerMenu->startTimer(61);
 	menu.toolTip->visible = true;
 	menu.npcInfoPanel->visible = true;
-	const std::array<PElement, 5> passiveOverlays =
+	const std::array<PElement, 4> passiveOverlays =
 	{
 		menu.messageBox,
 		menu.systemNotice,
 		menu.timerMenu,
-		menu.toolTip,
 		menu.npcInfoPanel
 	};
 	ok = checkPack(std::all_of(
@@ -5558,8 +5889,26 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 					&& !isUIFocusElementAvailable(surface);
 			}),
 		resourcePack,
-		"message, timer, tooltip, and NPC info stay visible while remaining"
+		"message, timer, and NPC info stay visible while remaining"
 		" outside pointer and focus dispatch") && ok;
+	if (Config::useQingyuUi)
+	{
+		auto description = std::make_shared<Goods>();
+		description->intro = std::string(1600, 'A');
+		menu.toolTip->setGoods(description);
+		menu.toolTip->visible = true;
+		auto pageLabel = menu.toolTip->getComponentByName<Label>("page");
+		const auto firstPage = pageLabel ? pageLabel->getStr() : "";
+		ok = checkPack(menu.toolTip->needEvents && pageLabel
+			&& menu.toolTip->turnPage(UIAction::PageNext) && pageLabel->getStr() != firstPage
+			&& menu.toolTip->turnPage(UIAction::PagePrevious) && pageLabel->getStr() == firstPage,
+			resourcePack, "Qingyu tooltip retains its configured forward and backward pagination") && ok;
+	}
+	else
+	{
+		ok = checkPack(!menu.toolTip->needEvents && !isUIFocusElementAvailable(menu.toolTip),
+			resourcePack, "original tooltip stays outside pointer and focus dispatch") && ok;
+	}
 
 	if (gameManager.global.feature.topButtonsLayout)
 	{
@@ -5722,12 +6071,18 @@ bool testOptionController(
 		&& option.speed != nullptr && option.speed->slideBtn != nullptr
 		&& option.musicCB != nullptr && option.soundCB != nullptr
 		&& option.speedCB != nullptr && option.playerAlpha != nullptr
-		&& option.dyLoad != nullptr && option.shadow != nullptr;
+		&& option.dyLoad != nullptr && (Config::useQingyuUi || option.shadow != nullptr);
 	if (!checkPack(complete, resourcePack,
 		"option menu loads its production controls"))
 	{
 		return false;
 	}
+	ok = checkPack(GamepadEssentialUITestAccess::dispatchOptionReturnClick(option, false),
+		resourcePack, "option mouse return closes the production menu on release") && ok;
+	ok = checkPack(GamepadEssentialUITestAccess::dispatchOptionReturnClick(option, true),
+		resourcePack, "option touch return closes the production menu on release") && ok;
+	ok = checkPack(GamepadEssentialUITestAccess::dispatchOptionEscape(option),
+		resourcePack, "option Escape returns to the system menu") && ok;
 
 	const bool slidersUsable = option.music->max > option.music->min
 		&& option.sound->max > option.sound->min
@@ -5743,14 +6098,20 @@ bool testOptionController(
 	{
 		return false;
 	}
-	ok = checkPack(option.music->rect.w == resourcePack.optionMusicWidth
+	int expectedMusicWidth = resourcePack.optionMusicWidth;
+	if (Config::useQingyuUi)
+	{
+		INIReader windowDefinition("ini\\ui\\qingyu\\option\\window.ini");
+		expectedMusicWidth = static_cast<int>(std::lround(static_cast<double>(expectedMusicWidth)
+			* option.rect.w / windowDefinition.GetInteger("Init", "Width", 500)));
+	}
+	ok = checkPack(option.music->rect.w == expectedMusicWidth
 		&& option.speed->max == resourcePack.optionSpeedMaximum,
 		resourcePack,
 		"option menu exposes resource-specific production geometry and range") && ok;
 
 	std::vector<std::string> focusOrder = { "music", "sound", "speed" };
-	const bool exposesExtendedCheckBoxes =
-		std::string(resourcePack.id) == "JXQY2";
+	const bool exposesExtendedCheckBoxes = option.playerAlpha->activated && option.dyLoad->activated;
 	if (exposesExtendedCheckBoxes)
 	{
 		focusOrder.push_back("player-alpha");
@@ -5781,6 +6142,7 @@ bool testOptionController(
 		focusOrder.push_back("ui-theme");
 	}
 
+	if (option.automaticSaveButton) focusOrder.push_back("automatic-save");
 	ok = checkPack(option.focusManager.getFocusedNodeId() == "music",
 		resourcePack,
 		"option defaults to the first usable production slider") && ok;
@@ -5816,6 +6178,23 @@ bool testOptionController(
 			"option skips checkbox settings without a drawable control or label") && ok;
 	}
 	option.focusManager.focusDefault();
+
+	if (gameManager.global.feature.automaticSave)
+	{
+		const bool previousAutomaticSave = Config::automaticSaveEnabled;
+		ok = checkPack(option.automaticSaveButton && option.focusManager.focusNode("automatic-save")
+			&& option.handleUIAction(UIAction::Confirm) && Config::automaticSaveEnabled != previousAutomaticSave,
+			resourcePack, "Qingyu exposes its independent automatic save option") && ok;
+		Config::load();
+		ok = checkPack(Config::automaticSaveEnabled != previousAutomaticSave,
+			resourcePack, "automatic save switch persists in shared application settings") && ok;
+		option.handleUIAction(UIAction::Confirm);
+		option.focusManager.focusDefault();
+	}
+	else
+	{
+		ok = checkPack(!option.automaticSaveButton, resourcePack, "original options retain their existing controls") && ok;
+	}
 
 	const bool touchControlsVisibleBefore =
 		gameManager.controller->areTouchControlsVisible();
@@ -6086,7 +6465,8 @@ bool testSaveLoadController(
 	File::setResourceFallbackRoots({});
 	File::setUiResourceFallbackRoots({});
 	File::setActiveSaveNamespace(
-		std::string("gamepad-save-load-") + resourcePack.id);
+		temporaryRoot.filename().string() + "-" + resourcePack.id
+			+ (Config::useQingyuUi ? "-qingyu" : "-original"));
 
 	if (GamepadEssentialUITestAccess::focusedSaveLoadControl(combined)
 		!= combined.loadBtn)
@@ -6151,6 +6531,31 @@ bool testSaveLoadController(
 		resourcePack,
 		"save-only mode returns a save request without writing the save") && ok;
 
+	for (int slot : { 8, 9 })
+	{
+		if (slot > resourcePack.saveSlotCount) continue;
+		saveOnly.result = erNone;
+		saveOnly.index = slot - 2;
+		saveOnly.listBox->setSelectedIndex(slot - 2);
+		ok = checkPack(saveOnly.handleUIAction(UIAction::NavigateDown)
+			&& saveOnly.index == slot - 1 && saveOnly.handleUIAction(UIAction::Confirm)
+			&& saveOnly.result == erSave, resourcePack, "manual eight and nine are selectable save actions") && ok;
+	}
+	if (resourcePack.saveSlotCount == SaveSlots::Automatic)
+	{
+		saveOnly.result = erNone;
+		saveOnly.handleUIAction(UIAction::NavigateDown);
+		ok = checkPack(saveOnly.index == 9 && !saveOnly.saveBtn->activated,
+			resourcePack, "automatic slot disables manual saving and leaves return available") && ok;
+		loadOnly.result = erNone;
+		loadOnly.index = 8;
+		loadOnly.listBox->setSelectedIndex(8);
+		File::writeFile("save/rpg_auto/game.ini", "[State]\nMap=auto.map\n", 21);
+		ok = checkPack(loadOnly.handleUIAction(UIAction::NavigateDown) && loadOnly.index == 9
+			&& loadOnly.handleUIAction(UIAction::Confirm) && loadOnly.result == erLoad,
+			resourcePack, "title-style load-only UI can read the existing automatic directory") && ok;
+	}
+
 	if (GamepadEssentialUITestAccess::focusedSaveLoadControl(combined)
 		!= combined.exitBtn)
 	{
@@ -6179,16 +6584,112 @@ bool testSaveLoadController(
 	return ok;
 }
 
+bool testSaveOptionsRendering(const ResourcePackExpectation& pack, const std::filesystem::path& assetsRoot)
+{
+	Engine* engine = Engine::getInstance();
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (!check(SDL_Init(0) && (!initializeTtf || TTF_Init()), "initialize save menu renderer")) return false;
+	int oldWidth = 0, oldHeight = 0;
+	engine->getWindowSize(oldWidth, oldHeight);
+	engine->setFontName((assetsRoot / "engine/font/font.ttf").string());
+	bool ok = true;
+	for (const Point size : { Point{640, 480}, Point{800, 600}, Point{960, 540} })
+	{
+		BaseComponent resourceCache;
+		resourceCache.tryCleanRes();
+		auto surface = make_shared_surface(SDL_CreateSurface(size.x, size.y, SDL_PIXELFORMAT_ARGB8888));
+		auto* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+		if (!check(renderer != nullptr, "create save menu software renderer")) return false;
+		auto* previousRenderer = GamepadEssentialUITestAccess::exchangeRenderer(renderer);
+		GamepadEssentialUITestAccess::setLogicalSize(size.x, size.y);
+		{
+			const auto capture = [&](const std::shared_ptr<Element>& menu, const std::string& label)
+			{
+				HeadlessPhysicalInputTest::ScopedRunningOwner owner(menu);
+				menu->visible = true;
+				engine->renderClear(24, 32, 38, 255);
+				menu->drawAll();
+				if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+				{
+					std::filesystem::create_directories(std::filesystem::u8path(directory));
+					const auto path = std::filesystem::u8path(directory) / (std::string(pack.id) +
+						(Config::useQingyuUi ? "-qingyu-" : "-original-") + label + "-" +
+						std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+					auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+					ok = check(pixels && IMG_SavePNG(pixels.get(), path.string().c_str()), "capture save/options layout") && ok;
+				}
+			};
+			auto option = std::make_shared<Option>();
+			std::vector<PElement> controls = { option->touchControlsButton, option->cheatSettingsButton,
+				option->themeButton, option->automaticSaveButton, option->rtnBtn };
+			if (Config::useQingyuUi)
+			{
+				controls.insert(controls.end(), { option->music, option->sound, option->speed,
+					option->musicCB, option->soundCB, option->speedCB, option->playerAlpha, option->dyLoad });
+				ok = checkPack(option->themeButton->rect.y + option->themeButton->rect.h < option->rtnBtn->rect.y,
+					pack, "Qingyu return button follows all option rows") && ok;
+			}
+			for (std::size_t i = 0; i < controls.size(); ++i)
+			{
+				if (!controls[i]) continue;
+				const auto a = controls[i]->rect;
+				ok = checkPack(a.x >= 0 && a.y >= 0 && a.x + a.w <= size.x && a.y + a.h <= size.y,
+					pack, "save option controls remain within the viewport") && ok;
+				if (option->automaticSaveButton)
+				{
+					const auto panel = option->rect;
+					ok = checkPack(a.x >= panel.x && a.y >= panel.y
+						&& a.x + a.w <= panel.x + panel.w && a.y + a.h <= panel.y + panel.h,
+						pack, "automatic-save footer controls remain inside the panel") && ok;
+				}
+				for (std::size_t j = i + 1; j < controls.size(); ++j)
+				{
+					if (!controls[j]) continue;
+					const auto b = controls[j]->rect;
+					ok = checkPack(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y,
+						pack, "save option controls do not cover each other") && ok;
+				}
+			}
+			capture(option, "options");
+			auto saves = std::make_shared<SaveLoad>(true, true);
+			GamepadEssentialUITestAccess::selectSaveSlot(*saves, 0);
+			capture(saves, "save-first");
+			for (bool touch : {false, true})
+			{
+				const int manualIndex = std::min(pack.saveSlotCount, SaveSlots::ManualCount) - 1;
+				ok = checkPack(GamepadEssentialUITestAccess::clickControl(*saves, saves->listBox->itemButton[manualIndex], touch)
+					&& saves->index == manualIndex && saves->saveBtn->activated,
+					pack, "mouse and touch can save the final manual slot") && ok;
+				if (pack.saveSlotCount == SaveSlots::Automatic)
+				{
+					ok = checkPack(GamepadEssentialUITestAccess::clickControl(*saves, saves->listBox->itemButton[9], touch)
+						&& saves->index == 9 && !saves->saveBtn->activated && !saves->saveBtn->visible,
+						pack, "mouse and touch select automatic without a manual-save action") && ok;
+				}
+			}
+			capture(saves, pack.saveSlotCount == SaveSlots::Automatic ? "save-auto" : "save-last");
+		}
+		resourceCache.tryCleanRes();
+		GamepadEssentialUITestAccess::exchangeRenderer(previousRenderer);
+		SDL_DestroyRenderer(renderer);
+	}
+	GamepadEssentialUITestAccess::setLogicalSize(oldWidth, oldHeight);
+	engine->setFontName("");
+	if (initializeTtf) TTF_Quit();
+	return ok;
+}
+
 bool testYesNoAndDialogController(const ResourcePackExpectation& resourcePack)
 {
 	bool ok = true;
-	INIReader dialogLabelDefinition("ini\\ui\\dialog\\label.ini");
+	const bool qingyu = Config::useQingyuUi;
+	INIReader dialogLabelDefinition(qingyu ? "ini\\ui\\qingyu\\dialog\\label.ini" : "ini\\ui\\dialog\\label.ini");
 	ok = checkPack(dialogLabelDefinition.ParseError() == 0
-		&& dialogLabelDefinition.GetInteger("Init", "LineCount", 0)
-			== resourcePack.dialogLineCount,
+		&& (qingyu || dialogLabelDefinition.GetInteger("Init", "LineCount", 0)
+			== resourcePack.dialogLineCount),
 		resourcePack,
 		"dialog production resource declares its explicit row count") && ok;
-	if (std::string(resourcePack.id) == "YYCS")
+	if (!qingyu && std::string(resourcePack.id) == "YYCS")
 	{
 		ok = checkPack(
 			dialogLabelDefinition.GetInteger("Init", "Font", 0) == 18 &&
@@ -6248,12 +6749,13 @@ bool testYesNoAndDialogController(const ResourcePackExpectation& resourcePack)
 	{
 		return false;
 	}
-	const int dialogCharactersPerLine = std::max(
-		1, dialogLabel->rect.w / dialogLabel->fontSize);
+	const int dialogCharactersPerLine = dialogLabelDefinition.GetInteger("Init", "CharactersPerLine",
+		std::max(1, dialogLabel->rect.w / dialogLabel->fontSize));
+	const int lineCount = qingyu ? std::max(1, dialogLabel->rect.h / dialogLabel->fontSize) : resourcePack.dialogLineCount;
 	const int expectedDialogPageCharacters =
-		dialogCharactersPerLine * resourcePack.dialogLineCount;
+		dialogCharactersPerLine * lineCount;
 	const int productionDialogHeight = dialogLabel->rect.h;
-	dialogLabel->rect.h = dialogLabel->fontSize;
+	if (!qingyu) dialogLabel->rect.h = dialogLabel->fontSize;
 	const std::vector<TalkString> productionDialogPages =
 		dialogLabel->splitTalkString(std::string(
 			static_cast<std::size_t>(expectedDialogPageCharacters + 1), 'D'));
@@ -6270,7 +6772,7 @@ bool testYesNoAndDialogController(const ResourcePackExpectation& resourcePack)
 				? 0 : productionDialogPages.front().talkChar.size())
 			+ ", pages " + std::to_string(productionDialogPages.size()) + ")") && ok;
 
-	if (std::string(resourcePack.id) == "YYCS")
+	if (!qingyu && std::string(resourcePack.id) == "YYCS")
 	{
 		const std::vector<TalkString> exactPage =
 			dialogLabel->splitTalkString(std::string(51, 'D'));
@@ -6326,19 +6828,23 @@ bool testYesNoAndDialogController(const ResourcePackExpectation& resourcePack)
 	{
 		const auto markedPages = dialogLabel->splitTalkString(
 			u8"甲<Enter><color=Red>乙<enter>丙\n丁\r\n戊\r己");
-		ok = checkPack(markedPages.size() == 4
-			&& markedPages[0].talkChar.size() == 1
-			&& markedPages[1].talkChar.size() == 1
-			&& markedPages[2].talkChar.size() == 3
-			&& markedPages[3].talkChar.size() == 1
-			&& markedPages[1].talkChar[0].row == 0
-			&& markedPages[1].talkChar[0].column == 0
-			&& markedPages[1].talkChar[0].color == 0xFFFF0000
-			&& markedPages[2].talkChar[0].row == 0
-			&& markedPages[2].talkChar[1].row == 1
-			&& markedPages[2].talkChar[2].row == 2
-			&& markedPages[3].talkChar[0].row == 0
-			&& markedPages[3].talkChar[0].color == 0xFFFF0000,
+		// Qingyu's fitted panel can hold fewer rows in a small window.
+		const std::array<const char*, 6> expectedCharacters = { u8"甲", u8"乙", u8"丙", u8"丁", u8"戊", u8"己" };
+		bool markedPagesMatch = markedPages.size() == static_cast<std::size_t>(2 + (4 + lineCount - 1) / lineCount);
+		std::size_t characterIndex = 0;
+		for (std::size_t page = 0; page < markedPages.size(); ++page)
+		{
+			const int expectedCount = page < 2 ? 1 : std::min(lineCount, 4 - static_cast<int>(page - 2) * lineCount);
+			markedPagesMatch = markedPagesMatch && static_cast<int>(markedPages[page].talkChar.size()) == expectedCount;
+			for (std::size_t row = 0; row < markedPages[page].talkChar.size(); ++row, ++characterIndex)
+			{
+				const auto& character = markedPages[page].talkChar[row];
+				markedPagesMatch = markedPagesMatch && characterIndex < expectedCharacters.size() &&
+					character.s == expectedCharacters[characterIndex] && character.row == static_cast<int>(row) &&
+					character.column == 0 && character.color == (page == 0 ? dialogLabel->color : 0xFFFF0000);
+			}
+		}
+		ok = checkPack(markedPagesMatch && characterIndex == expectedCharacters.size(),
 			resourcePack,
 			"dialog Enter markers force pages while LF, CRLF, and CR retain line breaks and color") && ok;
 		const std::string fullPage(expectedDialogPageCharacters, 'D');
@@ -6721,8 +7227,34 @@ bool runGamepadEssentialUITests()
 	ok = testTitlePhysicalExitLink() && ok;
 	ok = testActionOnlyModalSurfaces() && ok;
 
-	for (const ResourcePackExpectation& resourcePack : ResourcePacks)
+	const bool previousTheme = Config::useQingyuUi;
+	for (bool qingyu : { false, true })
 	{
+	Config::useQingyuUi = qingyu;
+	for (const auto& discoveredPack : resourceManager.getDiscoveredPacks())
+	{
+		if (!discoveredPack.isLaunchable()) continue;
+		const auto& discoveredManifest = discoveredPack.manifest;
+		const auto expectedBase = std::find_if(std::begin(ResourcePacks), std::end(ResourcePacks),
+			[&](const auto& candidate)
+			{
+				return discoveredManifest.uiProfile.empty() ? candidate.gameType == discoveredManifest.type
+					: discoveredManifest.uiProfile == candidate.id;
+			});
+		if (!check(expectedBase != std::end(ResourcePacks), "essential UI profile has a known layout family"))
+		{
+			ok = false;
+			continue;
+		}
+		ResourcePackExpectation resourcePack = *expectedBase;
+		resourcePack.id = discoveredManifest.id.c_str();
+		resourcePack.gameType = discoveredManifest.type;
+		if (qingyu)
+		{
+			resourcePack.optionMusicWidth = 236;
+			resourcePack.optionSpeedMaximum = 100;
+			resourcePack.saveSlotCount = 10;
+		}
 		if (!checkPack(resourceManager.setActiveResourcePackById(resourcePack.id),
 			resourcePack,
 			"resource pack can be selected for essential UI tests"))
@@ -6731,6 +7263,16 @@ bool runGamepadEssentialUITests()
 			continue;
 		}
 		const ResourceManifest& manifest = resourceManager.getActiveManifest();
+		INIReader titleMenu(manifest.titleMenu.empty() ? "ini\\ui\\title\\title.menu.ini" : manifest.titleMenu);
+		for (const auto& section : titleMenu.GetSectionNames())
+		{
+			if (titleMenu.Get(section, "Name", "") != "initBtn") continue;
+			INIReader source(titleMenu.Get(section, "File", ""));
+			resourcePack.titleNewGameRect = { static_cast<int>(source.GetInteger("Init", "Left", 0)),
+				static_cast<int>(source.GetInteger("Init", "Top", 0)),
+				static_cast<int>(source.GetInteger("Init", "Width", 0)),
+				static_cast<int>(source.GetInteger("Init", "Height", 0)) };
+		}
 		ok = checkPack(manifest.type == resourcePack.gameType,
 			resourcePack,
 			"resource pack exposes the expected game type") && ok;
@@ -6748,6 +7290,8 @@ bool runGamepadEssentialUITests()
 
 		GameManager gameManager;
 		configureGameManager(gameManager, manifest);
+		ok = checkPack(gameManager.global.feature.automaticSave == qingyu,
+			resourcePack, "only Qingyu resources declare automatic-save support") && ok;
 		ok = testTitleController(resourcePack) && ok;
 		ok = testRunningModalSubtreeSurvivesConfigDrivenResize(resourcePack)
 			&& ok;
@@ -6756,11 +7300,17 @@ bool runGamepadEssentialUITests()
 			resourcePack, gameManager) && ok;
 		ok = testSaveLoadController(
 			resourcePack, resourceManager, gameManager) && ok;
+        if (std::string(resourcePack.id) == "JXQY2" || std::string(resourcePack.id) == "XJXQY" || std::string(resourcePack.id) == "YYCS")
+		{
+			ok = testSaveOptionsRendering(resourcePack, assetsRoot) && ok;
+		}
 		ok = testYesNoAndDialogController(resourcePack) && ok;
 		ok = testChooseController(resourcePack) && ok;
 		ok = testDisplayOnlyAndPassiveSurfaceContracts(
 			resourcePack, gameManager) && ok;
 	}
+	}
+	Config::useQingyuUi = previousTheme;
 
 	ok = check(resourceManager.setActiveResourcePackById("JXQY2"),
 		"gamepad essential UI tests restore the default resource pack") && ok;

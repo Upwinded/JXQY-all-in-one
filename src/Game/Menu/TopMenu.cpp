@@ -34,6 +34,10 @@ void TopMenu::init()
 	optionBtn = getComponentByName<CheckBox>("optionBtn");
 	stateBtn = getComponentByName<CheckBox>("stateBtn");
 	xiulianBtn = getComponentByName<CheckBox>("xiulianBtn");
+	if (xiulianBtn && gm->global.feature.practiceMenuDisabled)
+	{
+		xiulianBtn->visible = xiulianBtn->activated = false;
+	}
 
 	setChildRectReferToParent();
 	configureControllerFocus();

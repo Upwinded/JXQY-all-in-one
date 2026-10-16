@@ -84,7 +84,7 @@ bool ImageContainer::drawImagetoRect(
 		return false;
 	}
 
-	if (!drawStretch)
+	if (!drawStretch && !cropContent)
 	{
 		engine->drawImage(image, destinationRect.x, destinationRect.y);
 		return true;
@@ -99,7 +99,7 @@ bool ImageContainer::drawImagetoRect(
 	}
 
 	Rect sourceRect = { 0, 0, sourceWidth, sourceHeight };
-	if (nineSlice > 0 && destinationRect.w > 0 && destinationRect.h > 0)
+	if (drawStretch && nineSlice > 0 && destinationRect.w > 0 && destinationRect.h > 0)
 	{
 		const int sourceBorder = std::min({ nineSlice, sourceWidth / 2, sourceHeight / 2 });
 		const int border = std::min({ nineSliceWidth, destinationRect.w / 2, destinationRect.h / 2 });
@@ -136,7 +136,13 @@ bool ImageContainer::drawImagetoRect(
 		}
 	}
 
-	if (keepAspect)
+	if (!drawStretch)
+	{
+		destinationRect.w = sourceRect.w;
+		destinationRect.h = sourceRect.h;
+		engine->drawImage(image, &sourceRect, &destinationRect);
+	}
+	else if (keepAspect)
 	{
 		engine->drawAspectFitImage(
 			image,

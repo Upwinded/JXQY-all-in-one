@@ -66,6 +66,7 @@ private:
 		OnlineUpdate::InstalledResourceRootMap installedResourceRoots;
 		std::vector<OnlineUpdate::ResourceInstallTarget> targets;
 		std::vector<ResourceInstallConfirmationItem> items;
+		std::map<std::filesystem::path, std::uint64_t> partialDownloadFiles;
 	};
 
 	enum class ResourceInstallOperation
@@ -135,6 +136,7 @@ private:
 		TransferringSaves,
 		Downloading,
 		Cancelling,
+		ChoosingDownloadRetention,
 		ReadyToRestart,
 		Completed,
 		Failed
@@ -205,6 +207,8 @@ private:
 	void finishResourceInstall(
 		const GameLoading::ExclusiveLoadingCompletion& completion);
 	void cancelResourceInstall();
+	void showDownloadRetentionChoice();
+	void finishDownloadCancellation(bool clearFiles);
 	void dismissResourceInstallDialog();
 	void refreshResourceInstallDialogControls();
 	void moveResourceInstallConfirmationPage(int offset);
@@ -321,7 +325,7 @@ private:
 		bool onlineVersionMatches = false;
 		bool localVersionNewerThanOnline = false;
 		bool hasPendingOnlineArtifacts = false;
-		bool requiresNewerEngine = false;
+		bool onlineRequiresNewerEngine = false;
 		bool wasRecentlySelected = false;
 		bool descriptionLoadedFromPack = false;
 		bool coverLoadedFromPack = false;
@@ -341,6 +345,7 @@ private:
 		bool localVersionNewerThanOnline = false;
 		bool hasPendingOnlineArtifacts = false;
 		bool requiresNewerEngine = false;
+		bool onlineRequiresNewerEngine = false;
 		bool wasRecentlySelected = false;
 		bool configurationError = false;
 
@@ -471,6 +476,7 @@ private:
 	int resourceInstallConfirmationPage = 0;
 	bool pendingDownloadUsesMeteredNetwork = false;
 	bool pendingMeteredDownloadConfirmed = false;
+	bool manualResourceDownloadCancellation = false;
 	bool resourceUpdatePromptedByEntry = false;
 	bool resourcePackageImportSelectionPending = false;
 	ResourcePackageImportKind resourcePackageImportKind =

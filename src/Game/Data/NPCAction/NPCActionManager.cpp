@@ -20,7 +20,7 @@ NPCActionManager::NPCActionManager(NPC* npc)
     createAction(NPCActionType::acStand);
 }
 
-void NPCActionManager::changeAction(NPCActionType type)
+void NPCActionManager::changeAction(NPCActionType type, bool scripted)
 {
     if (isInAction(type))
     {
@@ -31,7 +31,7 @@ void NPCActionManager::changeAction(NPCActionType type)
         return;
     }
 
-    resetAction(type);
+    resetAction(type, scripted);
 }
 
 void NPCActionManager::forceChangeAction(NPCActionType type)
@@ -64,9 +64,12 @@ void NPCActionManager::restartActionIgnoringTransitions(NPCActionType type)
     resetAction(type);
 }
 
-void NPCActionManager::resetAction(NPCActionType type)
+void NPCActionManager::resetAction(NPCActionType type, bool scripted)
 {
     auto oldAction = _currentAction;
+    // Being hurt pauses a move; resuming it keeps the original cost policy.
+    const bool resumingScriptedMove = _npc->resumingMove && oldAction && oldAction->scripted
+        && (type == NPCActionType::acHurt || type == _npc->previousMoveAction);
     if (oldAction)
     {
         oldAction->exit();
@@ -78,6 +81,7 @@ void NPCActionManager::resetAction(NPCActionType type)
 
     if (_currentAction)
     {
+        _currentAction->scripted = scripted || resumingScriptedMove;
         _currentAction->enter();
     }
 }

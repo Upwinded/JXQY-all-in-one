@@ -175,6 +175,10 @@ void BottomMenu::init()
 	optionBtn = getComponentByName<CheckBox>("optionBtn");
 	stateBtn = getComponentByName<CheckBox>("stateBtn");
 	xiulianBtn = getComponentByName<CheckBox>("xiulianBtn");
+	if (xiulianBtn && gm->global.feature.practiceMenuDisabled)
+	{
+		xiulianBtn->visible = xiulianBtn->activated = false;
+	}
 
 	for (size_t i = 0; i < GOODS_TOOLBAR_COUNT; i++)
 	{
@@ -284,20 +288,32 @@ void BottomMenu::onEvent()
 		{
 			gm->menu->toolTip->visible = false;
 			goodsItem[i]->resetHint();
-			
+			if (goodsItem[i]->dropType == dtPartnerEquipment)
+			{
+				const auto& equip = gm->menu->equipMenu;
+				if (equip && equip->visible && equip->getSelectedPartner())
+				{
+					std::string message;
+					gm->partnerManager.exchangePlayerBagWithPartnerEquipment(
+						equip->getSelectedPartner(), listIndex, goodsItem[i]->dropIndex, false, &message);
+					if (!message.empty()) gm->showMessage(message);
+					gm->goodsManager.updateMenu();
+				}
+				continue;
+			}
 			if (goodsItem[i]->dropType == dtGoods)
 			{
 				if (gm->goodsManager.goodsListExists(goodsItem[i]->dropIndex))
 				{	
 					if (gm->goodsManager.isStoreIndex(goodsItem[i]->dropIndex))
 					{						
-						gm->goodsManager.exchange(listIndex, goodsItem[i]->dropIndex);
+						gm->goodsManager.exchange(goodsItem[i]->dropIndex, listIndex);
 						gm->menu->goodsMenu->updateGoods();
 						updateGoodsItem(i);
 					}
 					else if (gm->goodsManager.isBottomIndex(goodsItem[i]->dropIndex))
 					{
-						gm->goodsManager.exchange(listIndex, goodsItem[i]->dropIndex);
+						gm->goodsManager.exchange(goodsItem[i]->dropIndex, listIndex);
 						updateGoodsItem();			
 					}
 					else if (gm->goodsManager.isEquipIndex(goodsItem[i]->dropIndex))
@@ -314,7 +330,7 @@ void BottomMenu::onEvent()
 						}
 						if (canExchange)
 						{
-							gm->goodsManager.exchange(listIndex, goodsItem[i]->dropIndex);
+							gm->goodsManager.exchange(goodsItem[i]->dropIndex, listIndex);
 							gm->menu->equipMenu->updateGoods(gm->goodsManager.equipSlot(goodsItem[i]->dropIndex));
 							updateGoodsItem(i);
 						}
@@ -335,6 +351,12 @@ void BottomMenu::onEvent()
 		}
 		int ret = magicItem[i]->getResult();
 		int listIndex = gm->magicManager.bottomIndex(i);
+		if ((ret & erClick) && gm->global.feature.qingyuUi
+			&& gm->menu->magicMenu->showDetails(listIndex))
+		{
+			magicItem[i]->resetHint();
+			continue;
+		}
 		if (ret & erShowHint)
 		{
 			if (gm->magicManager.magicListExists(listIndex))
@@ -519,6 +541,13 @@ void BottomMenu::configureControllerFocus(
 	{
 		return getControllerMagicIndex(visibleIndex);
 	};
+	if (gm->global.feature.qingyuUi)
+	{
+		magicBinding.grid.primary = [this](int logicalIndex, int)
+		{
+			gm->menu->magicMenu->showDetails(logicalIndex);
+		};
+	}
 	magicBinding.grid.details = [this](int logicalIndex, int visibleIndex)
 	{
 		showControllerMagicDetails(logicalIndex, visibleIndex);

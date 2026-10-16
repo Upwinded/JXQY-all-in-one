@@ -158,9 +158,9 @@ int main()
 	ok = check(shouldUseRunForPlayerMoveIntent(true, 0, true, true),
 		"an explicit run intent remains running when available") && ok;
 	ok = check(!shouldUseRunForPlayerMoveIntent(false, 1, false, true),
-		"DisableRun keeps WalkIsRun movement as a walk intent") && ok;
+		"CanRun=0 keeps WalkIsRun movement as a walk intent") && ok;
 	ok = check(!shouldUseRunForPlayerMoveIntent(true, 1, false, true),
-		"DisableRun downgrades an explicit run intent to walking") && ok;
+		"CanRun=0 downgrades an explicit run intent to walking") && ok;
 	ok = check(!shouldUseRunForPlayerMoveIntent(false, 1, true, false),
 		"insufficient thew keeps WalkIsRun movement as walking") && ok;
 	ok = check(!shouldUseRunForPlayerMoveIntent(true, 0, true, false),

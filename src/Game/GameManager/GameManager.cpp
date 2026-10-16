@@ -172,6 +172,7 @@ GameManager::GameManager(
 	setPriority(epMap);
 	result = erNone;
 	init();
+	resetAutomaticSave();
 	
 }
 
@@ -1082,7 +1083,7 @@ void GameManager::handleSystemResult(unsigned int systemResult, int selectedSave
 							(lastLoadFailureMessage.empty()
 								? std::string(u8"未提供详细原因")
 								: lastLoadFailureMessage) +
-							u8"。请保留日志以便进一步排查。",
+							u8"。",
 						15000);
 				}
 				clearLastLoadFailureMessage();
@@ -1218,6 +1219,8 @@ bool GameManager::writeCurrentSave(
 		SaveFileManager::CurrentPathScope currentPath(SAVE_CURRENT_FOLDER);
 		if (!currentPath.valid()) return false;
 
+		// Persist migrated companion equipment before advancing the save's engine version.
+		if (!partnerManager.save(global.data.characterIndex)) return false;
 		saved = true;
 		saved = savedGlobal.save() && saved;
 		saved = varList.save() && saved;
@@ -1230,8 +1233,6 @@ bool GameManager::writeCurrentSave(
 		}
 
 		saved = player->save(
-			global.data.characterIndex) && saved;
-		saved = partnerManager.save(
 			global.data.characterIndex) && saved;
 		if (!ownerCheckpointCanContinue(
 				ownerCheckpoint))
@@ -1267,7 +1268,7 @@ bool GameManager::writeCurrentSave(
 
 bool GameManager::saveGame(int index, const std::function<bool()>& ownerCheckpoint)
 {
-	if (index > 7) return false;
+	if (index > SaveSlots::ManualCount) return false;
 	if (engine == nullptr || !engine->isMainThread())
 	{
 		GameLog::write(
@@ -1309,6 +1310,122 @@ bool GameManager::saveGame(int index, const std::function<bool()>& ownerCheckpoi
 		if (!saved) return false;
 	}
 	return true;
+}
+
+void GameManager::resetAutomaticSave()
+{
+	automaticSaveElapsed = 0;
+	automaticSaveLastTick = SDL_GetTicks();
+	automaticSaveQuietElapsed = 0;
+	automaticSavePending = false;
+}
+
+void GameManager::setAutomaticSaveEnabled(bool enabled)
+{
+	Config::automaticSaveEnabled = enabled;
+	resetAutomaticSave();
+	Config::save();
+}
+
+void GameManager::requestAutomaticSaveAfterMapLoad()
+{
+	// Full save loads also use the scene loaders. Only script-driven scene
+	// changes request a new automatic save, after the outer script completes.
+	if (Config::automaticSaveEnabled && global.feature.automaticSave && script.running && !editorRunMode)
+	{
+		automaticSavePending = true;
+		automaticSaveQuietElapsed = 0;
+	}
+}
+
+bool GameManager::canAutomaticallySave()
+{
+	// MainScene owns the run loop; this manager normally updates as its child.
+	const Element* scene = this;
+	while (scene->parent != nullptr)
+	{
+		scene = scene->parent;
+	}
+	if (editorRunMode || inEvent || script.running || inThread || gameplayPaused
+		|| !global.data.canInput || global.data.saveDisabled || !eventList.empty()
+		|| engine == nullptr || !engine->isApplicationActive()
+		|| engine->isApplicationQuitRequested() || !Element::isCurrentRunOwner(scene)
+		|| !scene->isRunLoopActive() || (result & (erExit | erOK | erReturnToTitle)) != 0
+		|| player == nullptr || map == nullptr || map->data == nullptr
+		|| player->life <= 0 || player->isDying() || player->isHiding()
+		|| player->isJumping() || player->fightState.get() || menuDisplayed())
+	{
+		return false;
+	}
+	{
+		std::lock_guard<std::mutex> lock(scriptTaskMutex);
+		for (const auto& task : scriptTaskList)
+		{
+			if (task.remainingMilliseconds == 0) return false;
+		}
+	}
+	for (const auto& npc : npcManager->npcList)
+	{
+		if (npc == nullptr || npc->life <= 0 || npc->isDying()
+			|| npc->isHiding() || !npc->isVisibleForRuntime()) continue;
+		if (partnerManager.isActivePartner(npc) && npc->fightState.get()) return false;
+		const auto target = std::dynamic_pointer_cast<NPC>(npc->currentCombatTarget.lock());
+		if (npc->isEnemy() && target != nullptr && npc->fightState.get()
+			&& npc->isCombatTargetValid(target)
+			&& (target == player || partnerManager.isActivePartner(target))) return false;
+	}
+	return true;
+}
+
+void GameManager::updateAutomaticSave(UTime elapsed, UTime safeFrameElapsed)
+{
+	if (!Config::automaticSaveEnabled || !global.feature.automaticSave)
+	{
+		resetAutomaticSave();
+		return;
+	}
+	constexpr UTime Interval = 5 * 60 * 1000;
+	automaticSaveElapsed = std::min(Interval, automaticSaveElapsed + elapsed);
+	if (automaticSaveElapsed >= Interval) automaticSavePending = true;
+	if (!automaticSavePending) return;
+	if (!canAutomaticallySave())
+	{
+		automaticSaveQuietElapsed = 0;
+		return;
+	}
+	// Let newly loaded NPCs acquire their targets before declaring the scene safe.
+	automaticSaveQuietElapsed += safeFrameElapsed;
+	if (automaticSaveQuietElapsed < 1000) return;
+
+	// Consume before entering the loading event pump. A failed write waits for
+	// the next trigger instead of retrying on every frame.
+	resetAutomaticSave();
+	if (scriptAPI.saveGameWithFeedback(-1))
+	{
+		saveSlotScreenshot(SaveSlots::Automatic);
+		showMessage(u8"自动存档完成");
+	}
+	else if (!engine->isApplicationQuitRequested())
+	{
+		showMessage(u8"自动存档失败，请检查可用空间并手动存档");
+	}
+}
+
+void GameManager::saveSlotScreenshot(int slot)
+{
+	const auto started = std::chrono::steady_clock::now();
+	const auto imageName = "save/" + SaveSlots::screenshot(slot);
+	if (!engine->beginSaveScreen()) return;
+	map->drawMap();
+	weather->draw();
+	const auto snapshot = engine->endSaveScreen();
+	if (snapshot == nullptr) return;
+	std::unique_ptr<char[]> data;
+	const int length = engine->saveImageToPngMemory(snapshot, 260, 200, data);
+	if (length > 0 && data != nullptr) File::writeFile(imageName, data, length);
+	GameLog::write("Save timing: slot=%d phase=thumbnail elapsed_ms=%lld", slot,
+		static_cast<long long>(std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - started).count()));
 }
 
 bool GameManager::saveScriptRuntimeState()
@@ -2358,6 +2475,10 @@ void GameManager::onUpdate()
 			timeScriptFileName = "";
 		}
 	}
+	const UTime now = SDL_GetTicks();
+	const UTime elapsed = now - automaticSaveLastTick;
+	automaticSaveLastTick = now;
+	updateAutomaticSave(elapsed, getFrameTime());
 }
 
 bool GameManager::runPendingPlayerDeathScript()
@@ -2742,14 +2863,33 @@ GameManager::CheatOperationResult GameManager::performCheatAction(
 			player->clearAbnormalState();
 			player->disableMoveMilliseconds = 0;
 			player->disableSkillMilliseconds = 0;
+			if (npcManager != nullptr)
+			{
+				for (const auto& partner : partnerManager.findPartnersFromNPCManager())
+				{
+					partner->clearAbnormalState();
+					partner->disableMoveMilliseconds = 0;
+					partner->disableSkillMilliseconds = 0;
+				}
+			}
 		}
 		return completeCheatOperation(true,
-			cheatInvincibilityEnabled ? "已开启无敌：免伤、免异常状态，内力、体力不消耗" : "无敌模式已关闭");
+			cheatInvincibilityEnabled ? "已开启无敌：主角与伙伴免伤、免异常状态，主角内力、体力不消耗" : "无敌模式已关闭");
 	case CheatAction::RestorePlayerResources:
 		player->fullMana();
 		player->fullLife();
 		player->fullThew();
-		return completeCheatOperation(true, "生命、内力和体力已补满");
+		if (npcManager != nullptr)
+		{
+			for (const auto& partner : partnerManager.findPartnersFromNPCManager())
+			{
+				if (partner->life > 0 && !partner->isDying() && !partner->isHiding())
+				{
+					partner->addLife(partner->getLifeMax());
+				}
+			}
+		}
+		return completeCheatOperation(true, "主角生命、内力和体力及伙伴生命已补满");
 	case CheatAction::IncreasePracticeMagicLevel:
 	{
 		const int practiceIndex = magicManager.practiceIndex();

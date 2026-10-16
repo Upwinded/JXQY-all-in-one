@@ -6,6 +6,7 @@
 #include "../Game/Data/MobileTouchInteraction.h"
 #include "../Game/Data/NPC.h"
 #include "../Game/Data/Object.h"
+#include "../Game/Config/Config.h"
 #include "../Game/GameManager/GameManager.h"
 #include "../Game/GameManager/SaveFileManager.h"
 #include "../Game/Menu/BottomMenu.h"
@@ -43,6 +44,11 @@
 class GamepadRPGMenuActionsTestAccess
 {
 public:
+	static void resize(Element& element, int width, int height)
+	{
+		element.onWindowResize(width, height);
+	}
+
 	static std::vector<PElement> collectVisibleControllerFocusCandidates(
 		const MenuController& menuController)
 	{
@@ -189,13 +195,6 @@ std::string describeStringSet(const std::set<std::string>& values)
 	return description;
 }
 
-const ResourcePackExpectation BaseResourcePacks[] =
-{
-	{ "JXQY2", GAME_JXQY2, "" },
-	{ "XJXQY", GAME_XJXQY, "独孤剑" },
-	{ "YYCS", GAME_YYCS, "杨影枫" }
-};
-
 constexpr const char* ShopGoodsFile =
 	"controller_rpg_menu_shop.ini";
 constexpr const char* DrugGoodsFile =
@@ -227,7 +226,10 @@ bool checkPack(
 	const ResourcePackExpectation& resourcePack,
 	const std::string& expectation)
 {
-	return check(condition, resourcePack.id + " " + expectation);
+	const std::string theme = Config::useQingyuUi ? "qingyu" : "original";
+	std::cout << "RPG_PATH pack=" << resourcePack.id << " theme=" << theme
+		<< " result=" << (condition ? "pass" : "fail") << " path=" << expectation << '\n';
+	return check(condition, resourcePack.id + " " + theme + " " + expectation);
 }
 
 bool videoSubsystemIsStopped(const std::string& checkpoint)
@@ -683,7 +685,7 @@ bool writeRPGMenuFixtures(const std::filesystem::path& root)
 		return false;
 	}
 
-	return writeGoodsFixture(
+	bool ok = writeGoodsFixture(
 		goodsDirectory,
 		ShopGoodsFile,
 		"Controller RPG Menu Shop Item",
@@ -714,6 +716,16 @@ bool writeRPGMenuFixtures(const std::filesystem::path& root)
 			"Controller RPG Menu Partner Head B",
 			gkEquipment,
 			"Part=head\n");
+	for (const std::string part : { "head", "neck", "body", "back", "hand", "wrist", "foot" })
+	{
+		for (const std::string variant : { "a", "b" })
+		{
+			ok = writeGoodsFixture(goodsDirectory, "partner-" + part + "-" + variant + ".ini",
+				"Partner " + part + " " + variant, gkEquipment,
+				"Part=" + part + "\nAttack=" + (variant == "a" ? "7" : "12") + "\n") && ok;
+		}
+	}
+	return ok;
 }
 
 bool loadGoodsInfo(
@@ -926,36 +938,17 @@ bool testGoodsUseAndArrange(
 }
 
 std::vector<MagicInfo> loadProductionMagicInfos(
-	const std::filesystem::path& resourceRoot,
 	int requestedCount)
 {
-	std::vector<std::filesystem::path> magicFiles;
-	std::error_code errorCode;
-	const std::filesystem::path magicDirectory =
-		resourceRoot / "ini" / "magic";
-	for (std::filesystem::directory_iterator iterator(
-		magicDirectory, errorCode), end;
-		!errorCode && iterator != end;
-		iterator.increment(errorCode))
-	{
-		if (iterator->is_regular_file(errorCode)
-			&& iterator->path().extension() == ".ini")
-		{
-			magicFiles.push_back(iterator->path());
-		}
-	}
-	std::sort(magicFiles.begin(), magicFiles.end(),
-		[](const std::filesystem::path& left,
-			const std::filesystem::path& right)
-		{
-			return left.generic_u8string() < right.generic_u8string();
-		});
+	auto magicFiles = File::listFiles("ini/magic/");
+	std::sort(magicFiles.begin(), magicFiles.end());
 
 	std::vector<MagicInfo> result;
-	for (const std::filesystem::path& magicFile : magicFiles)
+	for (const auto& magicFile : magicFiles)
 	{
+		if (std::filesystem::u8path(magicFile).extension() != ".ini") continue;
 		MagicInfo magicInfo;
-		magicInfo.iniFile = magicFile.filename().u8string();
+		magicInfo.iniFile = std::filesystem::u8path(magicFile).filename().u8string();
 		magicInfo.magic = std::make_shared<Magic>();
 		magicInfo.magic->initFromIni(magicInfo.iniFile, false);
 		if (!magicInfo.magic->loadSucceeded)
@@ -982,6 +975,10 @@ void clearMagicList(GameManager& gameManager)
 
 bool openProductionMagicMenu(GameManager& gameManager)
 {
+	if (gameManager.menu->magicMenu->isShowingDetails())
+	{
+		gameManager.menu->magicMenu->closeDetails();
+	}
 	gameManager.menu->clearMenu();
 	gameManager.menu->toggleMagicView();
 	if (gameManager.global.feature.magicButtonOpensIntegratedEquip)
@@ -1006,9 +1003,17 @@ bool testMagicActions(
 	const int bottomCount = gameManager.magicManager.bottomCount();
 	const int requestedMagicCount = std::max(2, bottomCount + 1);
 	const std::vector<MagicInfo> productionMagics =
-		loadProductionMagicInfos(
-			resourceManager.getActiveResourceRoot(),
-			requestedMagicCount);
+		loadProductionMagicInfos(requestedMagicCount);
+	const auto confirmMagicAssignment = [&](bool practice)
+	{
+		if (!menuController.handleUIAction(UIAction::Confirm)) return false;
+		if (!gameManager.global.feature.qingyuUi) return true;
+		const auto magicMenu = menuController.magicMenu;
+		return magicMenu->isShowingDetails()
+			&& magicMenu->focusControllerElement(magicMenu->getComponentByName(
+				practice ? "detailPractice" : "detailQuick"))
+			&& menuController.handleUIAction(UIAction::Confirm);
+	};
 	if (!checkPack(
 		gameManager.magicManager.isStoreIndex(storeIndex)
 			&& gameManager.magicManager.isStoreIndex(secondStoreIndex)
@@ -1033,7 +1038,7 @@ bool testMagicActions(
 	const std::shared_ptr<Magic> quickMagicIdentity =
 		gameManager.magicManager.magicList[storeIndex].magic;
 	ok = checkPack(
-		menuController.handleUIAction(UIAction::Confirm)
+		confirmMagicAssignment(false)
 			&& !gameManager.magicManager.magicListExists(storeIndex)
 			&& gameManager.magicManager.magicList[
 				gameManager.magicManager.bottomBegin()].magic
@@ -1053,7 +1058,7 @@ bool testMagicActions(
 			gameManager.magicManager.magicList[storeIndex].magic;
 		ok = checkPack(
 			menuController.practiceMenu->visible
-				&& menuController.handleUIAction(UIAction::Confirm)
+				&& confirmMagicAssignment(true)
 				&& !gameManager.magicManager.magicListExists(storeIndex)
 				&& gameManager.magicManager.magicList[
 					gameManager.magicManager.practiceIndex()].magic
@@ -1092,7 +1097,7 @@ bool testMagicActions(
 		gameManager.magicManager.magicList[storeIndex].magic;
 	bool quickSlotsUnchanged = true;
 	const bool fullActionHandled =
-		menuController.handleUIAction(UIAction::Confirm);
+		confirmMagicAssignment(false);
 	for (int slot = 0; slot < bottomCount; slot++)
 	{
 		quickSlotsUnchanged = quickSlotsUnchanged
@@ -1153,178 +1158,454 @@ bool testPartnerActions(
 {
 	bool ok = true;
 	MenuController& menuController = *gameManager.menu;
-	if (!gameManager.global.feature.partnerHeadMenu)
+	if (gameManager.global.feature.equipPlayerNameImages)
 	{
-		return checkPack(
-			resourcePack.partnerName.empty()
-				&& !menuController.partnerHeadMenu->hasControllerPartners(),
-			resourcePack,
-			"keeps the unsupported PartnerHead controller page unavailable");
-	}
-	if (!checkPack(
-		!resourcePack.partnerName.empty(),
-		resourcePack,
-		"provides a production partner-head resource expectation"))
-	{
-		return false;
-	}
+		const int previousIndex = gameManager.global.data.characterIndex;
+		gameManager.global.data.characterIndex = 0;
+		INIReader registry("partneridx.ini");
+		auto registered = std::make_shared<NPC>();
+		registered->npcName = registry.Get("Init", "1", "");
+		registered->kind = nkPartner;
+		registered->life = registered->lifeMax = 100;
+		registered->canEquip = 0;
+		gameManager.npcManager->addNPC(registered);
+		menuController.clearMenu();
+		menuController.toggleEquipView();
+		auto& equip = *menuController.equipMenu;
+		equip.updateGoods();
+		if (checkPack(equip.playerNameButtons.size() > 1 && equip.playerNameButtons[1]
+			&& equip.playerNameButtons[1]->activated, resourcePack, "registered name exposes an equipment selector"))
+		{
+			auto button = equip.playerNameButtons[1];
+			ok = checkPack(equip.focusControllerElement(button)
+				&& equip.handleUIAction(UIAction::Confirm)
+				&& equip.getSelectedPartner() == registered
+				&& equip.visible && !menuController.partnerEquipMenu->visible, resourcePack,
+				"registered name selects companion in the existing equipment panel") && ok;
+			ok = checkPack(equip.openPartnerByCharacterIndex(0) && !equip.getSelectedPartner(),
+				resourcePack, "name switches back to the hero without changing the world actor") && ok;
+			dispatchPointerTapThroughElementTree(gameManager,
+				button->rect.x + button->rect.w / 2, button->rect.y + button->rect.h / 2);
+			ok = checkPack(equip.visible && !menuController.partnerEquipMenu->visible
+				&& equip.getSelectedPartner() == registered && gameManager.global.data.characterIndex == 0,
+				resourcePack, "name pointer tap keeps the original panel and world actor") && ok;
+			const auto productionRoot = resourceManager.getActiveResourceRoot();
+			File::setActiveResourceRoot(fixtureRoot.generic_string());
+			File::setResourceFallbackRoots({ productionRoot });
+			const int bagIndex = gameManager.goodsManager.storeBegin();
+			const int headIndex = gameManager.goodsManager.equipIndex(0);
+			const auto heroHead = gameManager.goodsManager.goodsList[headIndex].iniFile;
+			if (!gameManager.global.feature.restorePartnerAttributes)
+			{
+				loadGoodsInfo(gameManager.goodsManager.goodsList[bagIndex], PartnerHeadGoodsAFile);
+				ok = checkPack(!equip.equipOnSelectedPartner(bagIndex, 0)
+					&& registered->headEquip.empty() && registered->getPartnerCharacterIndex() < 0,
+					resourcePack, "name selection without restoration preserves explicit equipment permission") && ok;
+				registered->canEquip = 1;
+			}
+			ok = checkPack(loadGoodsInfo(gameManager.goodsManager.goodsList[bagIndex], PartnerHeadGoodsAFile)
+				&& equip.equipOnSelectedPartner(bagIndex, 0)
+				&& registered->headEquip == PartnerHeadGoodsAFile
+				&& gameManager.goodsManager.goodsList[headIndex].iniFile == heroHead,
+				resourcePack, "shared panel equips the selected companion without changing hero equipment") && ok;
+			ok = checkPack(equip.focusControllerElement(equip.item[0])
+				&& equip.handleUIAction(UIAction::Confirm)
+				&& registered->headEquip.empty()
+				&& gameManager.goodsManager.goodsListExists(bagIndex)
+				&& gameManager.goodsManager.goodsList[bagIndex].iniFile == PartnerHeadGoodsAFile,
+				resourcePack, "shared panel controller unequips exactly one companion item to the bag") && ok;
+			ok = checkPack(menuController.openPartnerEquipment(registered, true)
+				&& equip.visible && equip.getSelectedPartner() == registered
+				&& !menuController.partnerEquipMenu->visible,
+				resourcePack, "companion portrait entry uses the same shared panel") && ok;
+			if (!menuController.goodsMenu->visible) menuController.toggleGoodsView();
+			menuController.goodsMenu->scrollbar->position = 0;
+			menuController.goodsMenu->updateGoods();
+			menuController.adoptControllerPointerFocus(menuController.goodsMenu->item.front());
+			const bool bagConfirmed = menuController.handleUIAction(UIAction::Confirm);
+			if (registered->headEquip != PartnerHeadGoodsAFile)
+			{
+				std::cerr << "shared equipment bag confirm: goodsVisible=" << menuController.goodsMenu->visible
+					<< " equipVisible=" << equip.visible << " selected=" << bool(equip.getSelectedPartner())
+					<< " head=" << registered->headEquip << " bag=" << gameManager.goodsManager.goodsList[bagIndex].iniFile
+					<< " handled=" << bagConfirmed << '\n';
+			}
+			ok = checkPack(bagConfirmed
+				&& registered->headEquip == PartnerHeadGoodsAFile
+				&& !gameManager.goodsManager.goodsListExists(bagIndex)
+				&& gameManager.goodsManager.goodsList[headIndex].iniFile == heroHead,
+				resourcePack, "bag confirm equips the displayed companion and preserves hero equipment") && ok;
+			ok = checkPack(loadGoodsInfo(gameManager.goodsManager.goodsList[bagIndex], PartnerHeadGoodsBFile),
+				resourcePack, "loads a replacement for the shared panel transfer") && ok;
+			gameManager.goodsManager.updateMenu();
+			menuController.adoptControllerPointerFocus(menuController.goodsMenu->item.front());
+			ok = checkPack(menuController.handleUIAction(UIAction::Secondary)
+				&& menuController.controllerTransfers().hasSource()
+				&& menuController.handleUIAction(UIAction::PanelPrevious)
+				&& equip.visible && equip.getSelectedPartner() == registered
+				&& menuController.handleUIAction(UIAction::Secondary)
+				&& registered->headEquip == PartnerHeadGoodsBFile
+				&& gameManager.goodsManager.goodsList[bagIndex].iniFile == PartnerHeadGoodsAFile
+				&& gameManager.goodsManager.goodsList[headIndex].iniFile == heroHead,
+				resourcePack, "cross-panel controller exchange keeps the selected companion and both items") && ok;
+			const int quickIndex = gameManager.goodsManager.bottomIndex(0);
+			auto& quickGoods = gameManager.goodsManager.goodsList[quickIndex];
+			menuController.cancelControllerInteraction();
+			quickGoods.clear();
+			gameManager.goodsManager.updateMenu();
+			menuController.adoptControllerPointerFocus(menuController.bottomMenu->goodsItem[0]);
+			ok = checkPack(menuController.adoptControllerPointerFocus(equip.item[0])
+				&& menuController.handleUIAction(UIAction::Secondary)
+				&& menuController.controllerTransfers().hasSource()
+				&& menuController.handleUIAction(UIAction::PanelPrevious)
+				&& menuController.controllerTransfers().activeDomain() == ControllerSlotDomain::GoodsQuick
+				&& menuController.handleUIAction(UIAction::Confirm)
+				&& registered->headEquip.empty()
+				&& quickGoods.iniFile == PartnerHeadGoodsBFile && quickGoods.number == 1,
+				resourcePack, "companion equipment transfers to an empty quick slot through controller panel navigation") && ok;
 
-	const std::string productionRoot =
-		resourceManager.getActiveResourceRoot();
-	auto partner = std::make_shared<NPC>();
-	partner->kind = nkPartner;
-	partner->npcName = resourcePack.partnerName;
-	partner->canEquip = 1;
-	partner->level = 10;
-	gameManager.npcManager->addNPC(partner);
-	menuController.partnerHeadMenu->visible = true;
-	menuController.partnerHeadMenu->activated = true;
-	menuController.goodsMenu->updateGoods();
-	menuController.clearMenu();
-	menuController.toggleEquipView();
-	for (int switchCount = 0;
-		switchCount < 4
-			&& !menuController.partnerHeadMenu->isControllerFocusActive();
-		switchCount++)
-	{
-		menuController.handleUIAction(UIAction::PanelNext);
-	}
-	ok = checkPack(
-		menuController.partnerHeadMenu->hasControllerPartners()
-			&& menuController.partnerHeadMenu->isControllerFocusActive()
-			&& menuController.handleUIAction(UIAction::Confirm)
-			&& menuController.partnerEquipMenu->visible
-			&& menuController.partnerEquipMenu->getPartner() == partner,
-		resourcePack,
-		"cycles into PartnerHead and routes Confirm through MenuController")
-		&& ok;
+			menuController.cancelControllerInteraction();
+			registered->setEquipmentFileByPartIndex(0, "");
+			loadGoodsInfo(quickGoods, PartnerHeadGoodsAFile);
+			quickGoods.number = 3;
+			gameManager.goodsManager.updateMenu();
+			ok = checkPack(menuController.adoptControllerPointerFocus(menuController.bottomMenu->goodsItem[0])
+				&& menuController.handleUIAction(UIAction::Secondary)
+				&& menuController.controllerTransfers().hasSource()
+				&& menuController.handleUIAction(UIAction::PanelNext)
+				&& menuController.controllerTransfers().activeDomain() == ControllerSlotDomain::PlayerEquipment
+				&& menuController.handleUIAction(UIAction::Confirm)
+				&& registered->headEquip == PartnerHeadGoodsAFile && quickGoods.number == 2
+				&& gameManager.goodsManager.goodsList[headIndex].iniFile == heroHead,
+				resourcePack, "quick slot transfers one item to the displayed companion without changing hero equipment") && ok;
 
+			menuController.cancelControllerInteraction();
+			ok = checkPack(menuController.adoptControllerPointerFocus(equip.item[0])
+				&& menuController.handleUIAction(UIAction::Secondary)
+				&& menuController.handleUIAction(UIAction::PanelPrevious)
+				&& menuController.handleUIAction(UIAction::Confirm)
+				&& quickGoods.iniFile == PartnerHeadGoodsAFile
+				&& (gameManager.global.goodsLayout.listType == 1
+					? (registered->headEquip == PartnerHeadGoodsAFile && quickGoods.number == 2)
+					: (registered->headEquip.empty() && quickGoods.number == 3)),
+				resourcePack, "controller return follows the resource quick-slot stacking policy") && ok;
+			if (gameManager.global.goodsLayout.listType == 1)
+			{
+				menuController.cancelControllerInteraction();
+				gameManager.goodsManager.goodsList[gameManager.goodsManager.bottomIndex(1)].clear();
+				gameManager.goodsManager.updateMenu();
+				const bool moved = menuController.adoptControllerPointerFocus(equip.item[0])
+					&& menuController.handleUIAction(UIAction::Secondary)
+					&& menuController.handleUIAction(UIAction::PanelPrevious)
+					&& menuController.handleUIAction(UIAction::NavigateRight)
+					&& menuController.handleUIAction(UIAction::Confirm);
+				if (!moved || !registered->headEquip.empty())
+				{
+					std::cerr << "empty quick transfer: moved=" << moved << " head=" << registered->headEquip
+						<< " quick0=" << quickGoods.number << " quick1="
+						<< gameManager.goodsManager.goodsList[gameManager.goodsManager.bottomIndex(1)].iniFile << '\n';
+				}
+				ok = checkPack(moved && registered->headEquip.empty()
+					&& gameManager.goodsManager.goodsList[gameManager.goodsManager.bottomIndex(1)].number == 1,
+					resourcePack, "item-per-slot controller return places one item in a separate empty quick slot") && ok;
+				gameManager.goodsManager.goodsList[gameManager.goodsManager.bottomIndex(1)].clear();
+				quickGoods.number = 3;
+				gameManager.goodsManager.updateMenu();
+			}
+			menuController.cancelControllerInteraction();
+			registered->setEquipmentFileByPartIndex(0, "");
+			loadGoodsInfo(quickGoods, PartnerHeadGoodsAFile, 3);
+			gameManager.goodsManager.updateMenu();
+			auto dragEquipment = [&](const PElement& source, const PElement& target)
+			{
+				const int x = target->rect.x + target->rect.w / 2;
+				const int y = target->rect.y + target->rect.h / 2;
+				Engine::getInstance()->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID,
+					source->rect.x + source->rect.w / 2, source->rect.y + source->rect.h / 2, false));
+				GamepadRPGMenuActionsTestAccess::dispatchElementEvents(gameManager);
+				dispatchPointerDownThroughElementTree(gameManager,
+					source->rect.x + source->rect.w / 2, source->rect.y + source->rect.h / 2);
+				Engine::getInstance()->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID, x, y, false));
+				GamepadRPGMenuActionsTestAccess::dispatchElementEvents(gameManager);
+				Engine::getInstance()->pushEvent(AEvent(ET_MOUSEUP, MBC_MOUSE_LEFT, x, y, false));
+				GamepadRPGMenuActionsTestAccess::dispatchElementEvents(gameManager);
+			};
+			dragEquipment(menuController.bottomMenu->goodsItem[0], equip.item[0]);
+			ok = checkPack(registered->headEquip == PartnerHeadGoodsAFile && quickGoods.number == 2,
+				resourcePack, "pointer drag equips one companion item from the quick stack") && ok;
+			dragEquipment(equip.item[0], menuController.bottomMenu->goodsItem[0]);
+			ok = checkPack(gameManager.global.goodsLayout.listType == 1
+				? (registered->headEquip == PartnerHeadGoodsAFile && quickGoods.number == 2)
+				: (registered->headEquip.empty() && quickGoods.number == 3),
+				resourcePack, "pointer return follows the resource quick-slot stacking policy") && ok;
+			if (gameManager.global.goodsLayout.listType == 1)
+			{
+				dragEquipment(equip.item[0], menuController.bottomMenu->goodsItem[1]);
+				ok = checkPack(registered->headEquip.empty()
+					&& gameManager.goodsManager.goodsList[gameManager.goodsManager.bottomIndex(1)].number == 1,
+					resourcePack, "item-per-slot pointer return uses a separate empty quick slot") && ok;
+				gameManager.goodsManager.goodsList[gameManager.goodsManager.bottomIndex(1)].clear();
+			}
+			quickGoods.clear();
+			ok = checkPack(equip.openPartnerByCharacterIndex(0)
+				&& !menuController.controllerTransfers().active() && !equip.getSelectedPartner(),
+				resourcePack, "switching character cancels the pending equipment interaction") && ok;
+			gameManager.goodsManager.goodsList[bagIndex].clear();
+			resourceManager.setActiveResourcePackById(resourcePack.id);
+			menuController.clearMenu();
+		}
+		else ok = false;
+		gameManager.npcManager->removeNPCOnlyFromList(registered);
+		gameManager.global.data.characterIndex = 1;
+		INIReader names("ini\\playername.ini");
+		auto formerHero = std::make_shared<NPC>();
+		formerHero->npcName = names.Get("Name", "Name1", "");
+		formerHero->kind = nkPartner;
+		formerHero->life = formerHero->lifeMax = 100;
+		gameManager.npcManager->addNPC(formerHero);
+		menuController.toggleEquipView();
+		equip.updateGoods();
+		const bool formerAvailable = equip.playerNameButtons[0] && equip.playerNameButtons[0]->activated;
+		const bool formerSelected = equip.openPartnerByCharacterIndex(0) && equip.getSelectedPartner() == formerHero;
+		const bool actorPreserved = gameManager.global.data.characterIndex == 1;
+		const bool returned = equip.openPartnerByCharacterIndex(1) && !equip.getSelectedPartner();
+		if (!formerAvailable || !formerSelected || !actorPreserved || !returned)
+		{
+			std::cerr << "former hero selection: available=" << formerAvailable << " selected=" << formerSelected
+				<< " actor=" << actorPreserved << " returned=" << returned << " living=" << formerHero->isLivingPartner()
+				<< " name=" << formerHero->npcName << '\n';
+		}
+		ok = checkPack(formerAvailable && formerSelected && actorPreserved && returned,
+			resourcePack, "character-zero former hero remains selectable when another character is the world actor") && ok;
+		gameManager.npcManager->removeNPCOnlyFromList(formerHero);
+		gameManager.global.data.characterIndex = previousIndex;
+		equip.updateGoods();
+	}
+	const auto productionRoot = resourceManager.getActiveResourceRoot();
 	File::setActiveResourceRoot(fixtureRoot.generic_string());
 	File::setResourceFallbackRoots({ productionRoot });
-	gameManager.goodsManager.clearItem();
-	const int storeIndex = gameManager.goodsManager.storeBegin();
-	ok = checkPack(
-		loadGoodsInfo(
-			gameManager.goodsManager.goodsList[storeIndex],
-			PartnerHeadGoodsAFile),
-		resourcePack,
-		"loads the player equipment used by PartnerEquip A") && ok;
-	menuController.goodsMenu->updateGoods();
-
-	if (!checkPack(
-		!menuController.goodsMenu->item.empty()
-			&& menuController.goodsMenu->item.front() != nullptr,
-		resourcePack,
-		"exposes the underlying Goods item for modal pointer isolation"))
+	auto partner = std::make_shared<NPC>();
+	partner->kind = nkPartner;
+	partner->npcName = resourcePack.partnerName.empty() ? "Test Partner" : resourcePack.partnerName;
+	partner->life = partner->lifeMax = 100;
+	partner->attack = 73;
+	partner->canEquip = 0;
+	gameManager.npcManager->addNPC(partner);
+	menuController.clearMenu();
+	auto& equip = *menuController.equipMenu;
+	auto checkSelectorLayout = [&](ConfigDrivenPanel& panel, const std::shared_ptr<TextButton>& selector)
 	{
-		menuController.closePartnerEquipment(false);
-		gameManager.npcManager->removeNPCOnlyFromList(partner);
-		gameManager.goodsManager.clearItem();
-		resourceManager.setActiveResourcePackById(resourcePack.id);
-		return false;
+		bool valid = selector && selector->visible && selector->flat
+			&& selector->rect.x >= panel.rect.x && selector->rect.y >= panel.rect.y
+			&& selector->rect.x + selector->rect.w <= panel.rect.x + panel.rect.w
+			&& selector->rect.y + selector->rect.h <= panel.rect.y + panel.rect.h;
+		const auto title = panel.getComponentByName<ImageContainer>("title");
+		valid = valid && title && title->visible
+			&& selector->rect.y >= title->rect.y + title->rect.h;
+		for (int i = 1; i <= GOODS_BODY_COUNT; ++i)
+		{
+			const auto slot = panel.getComponentByName<Item>("item" + std::to_string(i));
+			if (slot) valid = valid && selector->rect.y >= slot->rect.y + slot->rect.h;
+		}
+		for (const char* name : { "labLevel", "labExp", "labExpUp", "labAttack", "labDefend",
+			"labEvade", "labLife", "labThew", "labMana" })
+		{
+			const auto label = panel.getComponentByName<Label>(name);
+			if (label) valid = valid && selector->rect.y >= label->rect.y + label->rect.h;
+		}
+		return checkPack(valid, resourcePack,
+			"character selector preserves the title and occupies its own row below panel contents");
+	};
+	if (!menuController.isStateEquipIntegrated())
+	{
+		menuController.toggleStateView();
+		auto& state = *menuController.stateMenu;
+		state.updateLabel();
+		const auto selector = state.characterSelector;
+		ok = checkPack(selector && selector->visible && state.focusControllerElement(selector)
+			&& state.handleUIAction(UIAction::Confirm) && equip.getSelectedPartner() == partner
+			&& state.getComponentByName<Label>("labAttack")->getStr() == "73",
+			resourcePack, "state panel selects and displays a partner even when equipment is disabled") && ok;
+		ok = checkSelectorLayout(state, selector) && ok;
+		menuController.toggleEquipView();
+		ok = checkPack(equip.getSelectedPartner() == partner && equip.characterSelector
+			&& equip.characterSelector->visible && !menuController.partnerEquipMenu->visible,
+			resourcePack, "equipment panel retains the character selected in the original state panel") && ok;
+		ok = checkSelectorLayout(equip, equip.characterSelector) && ok;
+		ok = checkPack(equip.focusControllerElement(equip.item[GOODS_BODY_COUNT - 1])
+			&& equip.handleUIAction(UIAction::NavigateDown)
+			&& equip.controllerFocusedElement() == equip.characterSelector
+			&& equip.handleUIAction(UIAction::NavigateUp)
+			&& equip.controllerFocusedElement() == equip.item[GOODS_BODY_COUNT - 1], resourcePack,
+			"controller navigation follows the selector's position below the equipment slots") && ok;
+		const auto button = equip.characterSelector;
+		dispatchPointerTapThroughElementTree(gameManager,
+			button->rect.x + button->rect.w / 2, button->rect.y + button->rect.h / 2);
+		ok = checkPack(!equip.getSelectedPartner(), resourcePack,
+			"equipment name pointer click cycles back to the hero") && ok;
+		ok = checkPack(equip.focusControllerElement(button) && equip.handleUIAction(UIAction::Confirm)
+			&& equip.getSelectedPartner() == partner, resourcePack,
+			"equipment name controller confirmation selects a normal unregistered partner") && ok;
 	}
-	const PElement underlyingGoodsItem =
-		menuController.goodsMenu->item.front();
-	const Rect underlyingGoodsRect = underlyingGoodsItem->rect;
-	underlyingGoodsItem->rect = { 8, 8, 36, 36 };
-	underlyingGoodsItem->cancelPointerInteraction();
-	const int modalOutsideX =
-		underlyingGoodsItem->rect.x + underlyingGoodsItem->rect.w / 2;
-	const int modalOutsideY =
-		underlyingGoodsItem->rect.y + underlyingGoodsItem->rect.h / 2;
-	const std::shared_ptr<Goods> modalGoodsIdentity =
-		gameManager.goodsManager.goodsList[storeIndex].goods;
-	const int modalGoodsCount =
-		gameManager.goodsManager.goodsList[storeIndex].number;
-	ok = checkPack(
-		!menuController.partnerEquipMenu->rect.PointInRect(
-			modalOutsideX, modalOutsideY),
-		resourcePack,
-		"places the pointer outside the PartnerEquip panel but inside Goods")
-		&& ok;
-	dispatchPointerDownThroughElementTree(
-		gameManager, modalOutsideX, modalOutsideY);
-	ok = checkPack(
-		menuController.partnerEquipMenu->visible
-			&& menuController.partnerEquipMenu->isControllerFocusActive()
-			&& !menuController.goodsMenu->isControllerFocusActive()
-			&& underlyingGoodsItem->touchingID == TOUCH_MOUSEID
-			&& underlyingGoodsItem->touchingDownID == TOUCH_MOUSEID
-			&& menuController.partnerEquipMenu->controllerFocusedElement()
-				== underlyingGoodsItem
-			&& !menuController.controllerTransfers().active()
-			&& gameManager.goodsManager.goodsListExists(storeIndex)
-			&& gameManager.goodsManager.goodsList[storeIndex].goods
-				== modalGoodsIdentity
-			&& gameManager.goodsManager.goodsList[storeIndex].number
-				== modalGoodsCount
-			&& partner->getEquipmentFileByPartIndex(0).empty(),
-		resourcePack,
-		"keeps the borrowed Goods bag interactive inside the PartnerEquip"
-		" modal scope without activating its standalone owner") && ok;
-	underlyingGoodsItem->cancelPointerInteraction();
-	menuController.partnerEquipMenu->focusControllerEquipment();
-	underlyingGoodsItem->rect = underlyingGoodsRect;
-
-	ok = checkPack(
-		menuController.handleUIAction(UIAction::PanelNext)
-			&& menuController.partnerEquipMenu->isControllerFocusActive()
-			&& menuController.handleUIAction(UIAction::Confirm)
-			&& partner->getEquipmentFileByPartIndex(0)
-				== PartnerHeadGoodsAFile
-			&& !gameManager.goodsManager.goodsListExists(storeIndex),
-		resourcePack,
-		"switches to the player bag and equips the focused item with PartnerEquip A")
-		&& ok;
-	ok = checkPack(
-		menuController.handleUIAction(UIAction::PanelNext)
-			&& menuController.handleUIAction(UIAction::Confirm)
-			&& partner->getEquipmentFileByPartIndex(0).empty()
-			&& gameManager.goodsManager.goodsListExists(storeIndex)
-			&& gameManager.goodsManager.goodsList[storeIndex].iniFile
-				== PartnerHeadGoodsAFile,
-		resourcePack,
-		"returns to partner equipment and unequips the focused slot with A")
-		&& ok;
-
+	else if (gameManager.global.feature.qingyuUi)
+	{
+		menuController.toggleEquipView();
+		equip.updateGoods();
+		const auto selector = equip.characterSelector;
+		ok = checkPack(selector && selector->visible && selector->activated
+			&& equip.focusControllerElement(selector) && equip.handleUIAction(UIAction::Confirm)
+			&& equip.getSelectedPartner() == partner, resourcePack,
+			"Qingyu resource name button selects a partner without requiring an avatar") && ok;
+		auto secondPartner = std::make_shared<NPC>();
+		secondPartner->kind = nkPartner;
+		secondPartner->npcName = "Second Test Partner";
+		secondPartner->life = secondPartner->lifeMax = 100;
+		secondPartner->attack = 91;
+		gameManager.npcManager->addNPC(secondPartner);
+		if (selector)
+		{
+			dispatchPointerTapThroughElementTree(gameManager,
+				selector->rect.x + selector->rect.w / 2, selector->rect.y + selector->rect.h / 2);
+			ok = checkPack(equip.getSelectedPartner() == secondPartner, resourcePack,
+				"Qingyu pointer name click cycles to the second active partner") && ok;
+			equip.showAttributes(true);
+			ok = checkPack(equip.getSelectedPartner() == secondPartner
+				&& equip.getComponentByName<Label>("detail0")->getStr() == u8"攻击  91",
+				resourcePack, "Qingyu attributes show the selected partner effective attack") && ok;
+			ok = checkPack(equip.focusControllerElement(selector) && equip.handleUIAction(UIAction::Confirm)
+				&& !equip.getSelectedPartner(), resourcePack,
+				"Qingyu attributes name confirmation returns to the hero") && ok;
+			equip.showAttributes(false);
+		}
+		gameManager.npcManager->removeNPCOnlyFromList(secondPartner);
+	}
+	ok = checkPack(menuController.openPartnerEquipment(partner, false)
+		&& equip.visible && equip.getSelectedPartner() == partner
+		&& menuController.goodsMenu->visible && !menuController.partnerEquipMenu->visible,
+		resourcePack, "partner entry uses the original equipment panel and shared hero bag") && ok;
+	resourceManager.setActiveResourcePackById(resourcePack.id);
+	GamepadRPGMenuActionsTestAccess::resize(equip, 1024, 768);
+	ok = checkPack(equip.getSelectedPartner() == partner && equip.item[0] && equip.item[0]->dragType == dtPartnerEquipment,
+		resourcePack, "resizing the resource-defined menu preserves the selected companion") && ok;
+	File::setActiveResourceRoot(fixtureRoot.generic_string());
+	File::setResourceFallbackRoots({ productionRoot });
+	const int storeIndex = gameManager.goodsManager.storeBegin();
 	gameManager.goodsManager.clearItem();
-	ok = checkPack(
-		loadGoodsInfo(
-			gameManager.goodsManager.goodsList[storeIndex],
-			PartnerHeadGoodsBFile)
-			&& partner->setEquipmentFileByPartIndex(
-				0, PartnerHeadGoodsAFile),
-		resourcePack,
-		"prepares two loaded singleton head items for precise PartnerEquip X")
-		&& ok;
-	menuController.goodsMenu->updateGoods();
-	menuController.partnerEquipMenu->updateGoods();
-	ok = checkPack(
-		menuController.partnerEquipMenu->focusControllerPlayerBag()
-			&& menuController.handleUIAction(UIAction::Secondary)
-			&& menuController.controllerTransfers().active(
-				ControllerSlotKind::PartnerGoods)
-			&& menuController.controllerTransfers().hasSource(),
-		resourcePack,
-		"starts PartnerGoods X from the real borrowed player-bag pane") && ok;
-	ok = checkPack(
-		menuController.handleUIAction(UIAction::PanelNext)
-			&& menuController.handleUIAction(UIAction::Secondary)
-			&& menuController.controllerTransfers().active(
-				ControllerSlotKind::PartnerGoods)
-			&& !menuController.controllerTransfers().hasSource()
-			&& partner->getEquipmentFileByPartIndex(0)
-				== PartnerHeadGoodsBFile
-			&& gameManager.goodsManager.goodsList[storeIndex].iniFile
-				== PartnerHeadGoodsAFile,
-		resourcePack,
-		"cycles to partner equipment and submits the contextual X exchange")
-		&& ok;
-
-	menuController.cancelControllerInteraction();
-	menuController.closePartnerEquipment(false);
+	loadGoodsInfo(gameManager.goodsManager.goodsList[storeIndex], PartnerHeadGoodsAFile);
+	gameManager.goodsManager.goodsList[storeIndex].number = 3;
+	ok = checkPack(!equip.equipOnSelectedPartner(storeIndex, 0) && partner->headEquip.empty()
+		&& gameManager.goodsManager.goodsList[storeIndex].number == 3, resourcePack,
+		"CanEquip zero permits viewing but rejects equipment changes without consuming goods") && ok;
+	partner->canEquip = 1;
+	const char* parts[] = { "head", "neck", "body", "back", "hand", "wrist", "foot" };
+	for (int partIndex = 0; partIndex < GOODS_BODY_COUNT; ++partIndex)
+	{
+		gameManager.goodsManager.clearItem();
+		const std::string first = std::string("partner-") + parts[partIndex] + "-a.ini";
+		const std::string replacement = std::string("partner-") + parts[partIndex] + "-b.ini";
+		loadGoodsInfo(gameManager.goodsManager.goodsList[storeIndex], first, 3);
+		gameManager.goodsManager.updateMenu();
+		menuController.adoptControllerPointerFocus(menuController.goodsMenu->item.front());
+		ok = checkPack(menuController.handleUIAction(UIAction::Confirm)
+			&& partner->getEquipmentFileByPartIndex(partIndex) == first
+			&& gameManager.goodsManager.getItemNum(first) == 2 && partner->getAttack() == 80,
+			resourcePack, std::string("seven-slot wear takes one and applies one bonus: ") + parts[partIndex]) && ok;
+		loadGoodsInfo(gameManager.goodsManager.goodsList[storeIndex + 3], replacement, 1);
+		ok = checkPack(equip.equipOnSelectedPartner(storeIndex + 3, partIndex)
+			&& partner->getEquipmentFileByPartIndex(partIndex) == replacement
+			&& gameManager.goodsManager.getItemNum(first) == 3 && partner->getAttack() == 85,
+			resourcePack, std::string("seven-slot replacement returns the old item once: ") + parts[partIndex]) && ok;
+		ok = checkPack(equip.focusControllerElement(equip.item[partIndex]) && equip.handleUIAction(UIAction::Confirm)
+			&& partner->getEquipmentFileByPartIndex(partIndex).empty()
+			&& gameManager.goodsManager.getItemNum(first) == 3
+			&& gameManager.goodsManager.getItemNum(replacement) == 1 && partner->getAttack() == 73,
+			resourcePack, std::string("seven-slot unequip preserves both files and removes one bonus: ") + parts[partIndex]) && ok;
+	}
+	gameManager.goodsManager.clearItem();
+	loadGoodsInfo(gameManager.goodsManager.goodsList[storeIndex], PartnerHeadGoodsAFile, 3);
+	gameManager.goodsManager.updateMenu();
+	menuController.adoptControllerPointerFocus(menuController.goodsMenu->item.front());
+	ok = checkPack(menuController.goodsMenu->handleUIAction(UIAction::Confirm)
+		&& partner->headEquip == PartnerHeadGoodsAFile
+		&& gameManager.goodsManager.goodsList[storeIndex].number == 2,
+		resourcePack, "shared bag confirmation equips one item on an enabled ordinary partner") && ok;
+	ok = checkPack(equip.focusControllerElement(equip.item[0]) && equip.handleUIAction(UIAction::Confirm)
+		&& partner->headEquip.empty()
+		&& gameManager.goodsManager.goodsList[storeIndex].number
+			== (gameManager.global.goodsLayout.listType == 1 ? 2 : 3)
+		&& (gameManager.global.goodsLayout.listType != 1
+			|| gameManager.goodsManager.goodsList[storeIndex + 1].number == 1),
+		resourcePack, "original equipment panel unequips using the shared bag stacking policy") && ok;
+	ok = checkPack(equip.equipOnSelectedPartner(storeIndex, 0), resourcePack,
+		"equips a partner item for an empty-bag pointer drop") && ok;
+	gameManager.goodsManager.updateMenu();
+	const int emptySlot = gameManager.global.goodsLayout.listType == 1 ? 2 : 1;
+	const auto emptyBagSlot = menuController.goodsMenu->item[emptySlot];
+	const int dropX = emptyBagSlot->rect.x + emptyBagSlot->rect.w / 2;
+	const int dropY = emptyBagSlot->rect.y + emptyBagSlot->rect.h / 2;
+	dispatchPointerDownThroughElementTree(gameManager,
+		equip.item[0]->rect.x + equip.item[0]->rect.w / 2,
+		equip.item[0]->rect.y + equip.item[0]->rect.h / 2);
+	Engine::getInstance()->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID, dropX, dropY, false));
+	GamepadRPGMenuActionsTestAccess::dispatchElementEvents(gameManager);
+	Engine::getInstance()->pushEvent(AEvent(ET_MOUSEUP, MBC_MOUSE_LEFT, dropX, dropY, false));
+	GamepadRPGMenuActionsTestAccess::dispatchElementEvents(gameManager);
+	ok = checkPack(partner->headEquip.empty()
+		&& (gameManager.global.goodsLayout.listType == 1
+			? (gameManager.goodsManager.goodsList[storeIndex].number == 1
+				&& gameManager.goodsManager.goodsList[storeIndex + 1].number == 1
+				&& gameManager.goodsManager.goodsList[storeIndex + emptySlot].number == 1)
+			: (gameManager.goodsManager.goodsList[storeIndex].number == 3
+				&& !gameManager.goodsManager.goodsListExists(storeIndex + emptySlot))), resourcePack,
+		"pointer drop to an empty bag slot respects each resource pack's stacking policy") && ok;
+	resourceManager.setActiveResourcePackById(resourcePack.id);
+	for (const Point size : { Point{800, 480}, Point{1280, 720}, Point{1280, 960}, Point{1920, 1080} })
+	{
+		dispatchWindowResizeThroughElementTree(gameManager, size.x, size.y);
+		equip.updateGoods();
+		bool valid = equip.getSelectedPartner() == partner && equip.visible
+			&& equip.rect.x >= 0 && equip.rect.y >= 0
+			&& equip.rect.x + equip.rect.w <= size.x && equip.rect.y + equip.rect.h <= size.y;
+		for (const auto& slot : equip.item)
+		{
+			valid = valid && slot && slot->rect.w > 0 && slot->rect.h > 0
+				&& slot->rect.x >= equip.rect.x && slot->rect.y >= equip.rect.y
+				&& slot->rect.x + slot->rect.w <= equip.rect.x + equip.rect.w
+				&& slot->rect.y + slot->rect.h <= equip.rect.y + equip.rect.h;
+		}
+		if (equip.characterSelector)
+		{
+			const auto selector = equip.characterSelector;
+			valid = valid && selector->visible && selector->activated
+				&& equip.focusControllerElement(selector);
+		}
+		ok = checkPack(valid, resourcePack, "open equipment resize preserves character, slots and selector at "
+			+ std::to_string(size.x) + "x" + std::to_string(size.y)) && ok;
+		if (!menuController.isStateEquipIntegrated())
+		{
+			menuController.toggleStateView();
+			menuController.stateMenu->updateLabel();
+			const auto attackLabel = menuController.stateMenu->getComponentByName<Label>("labAttack");
+			ok = checkPack(equip.getSelectedPartner() == partner
+				&& attackLabel && attackLabel->getStr() == "73"
+				&& checkSelectorLayout(*menuController.stateMenu, menuController.stateMenu->characterSelector),
+				resourcePack, "resized state page retains companion attributes and name selection") && ok;
+			menuController.toggleEquipView();
+		}
+	}
+	dispatchWindowResizeThroughElementTree(gameManager, 1024, 768);
+	equip.updateGoods();
+	partner->canEquip = 0;
+	equip.updateGoods();
+	ok = checkPack(equip.getSelectedPartner() == partner && !equip.item[0]->canDrag && !equip.item[0]->canDrop,
+		resourcePack, "revoking equipment permission keeps partner selection and disables transfers") && ok;
+	partner->kind = nkNormal;
+	equip.updateGoods();
+	ok = checkPack(!equip.getSelectedPartner() && equip.item[0]->dragType == dtGoods,
+		resourcePack, "departed companion returns the original panel to the hero") && ok;
 	gameManager.npcManager->removeNPCOnlyFromList(partner);
 	gameManager.goodsManager.clearItem();
+	menuController.clearMenu();
 	resourceManager.setActiveResourcePackById(resourcePack.id);
 	return ok;
 }
@@ -1447,7 +1728,8 @@ bool testScriptShopTransactions(
 	const auto previousShop = gameManager.menu->buySellMenu;
 	auto shop = std::make_shared<ScriptTransactionShop>();
 	gameManager.menu->buySellMenu = shop;
-	SaveFileManager::CurrentPathScope currentPath("save/shop_contracts_" + resourcePack.id);
+	SaveFileManager::CurrentPathScope currentPath("save/shop_contracts_" + resourcePack.id
+		+ (Config::useQingyuUi ? "_qingyu" : "_original"));
 	gameManager.varList.ensureInitialized();
 	const auto verify = [&](bool condition, const std::string& message)
 	{
@@ -1911,7 +2193,7 @@ bool testYycsBottomColumnSeam(
 	const ResourcePackExpectation& resourcePack,
 	GameManager& gameManager)
 {
-	if (resourcePack.gameType != GAME_YYCS)
+	if (resourcePack.gameType != GAME_YYCS || gameManager.global.feature.qingyuUi)
 	{
 		return true;
 	}
@@ -1996,6 +2278,10 @@ bool hasFullyCoveredCandidate(const std::vector<PElement>& candidates)
 				&& covering->rect.y + covering->rect.h
 					>= candidate->rect.y + candidate->rect.h)
 			{
+				std::cerr << "COVERED candidate=" << candidate->name << " rect=" << candidate->rect.x
+					<< ',' << candidate->rect.y << ',' << candidate->rect.w << ',' << candidate->rect.h
+					<< " covering=" << covering->name << " rect=" << covering->rect.x
+					<< ',' << covering->rect.y << ',' << covering->rect.w << ',' << covering->rect.h << '\n';
 				return true;
 			}
 		}
@@ -2066,6 +2352,10 @@ std::vector<PhysicalNavigationOwner> collectPhysicalNavigationOwners(
 		}
 	};
 
+	addOwner(
+		"State",
+		menuController.stateMenu,
+		menuController.stateMenu.get());
 	addOwner(
 		"Equip",
 		menuController.equipMenu,
@@ -2320,9 +2610,10 @@ bool verifyPhysicalVisibleMenuNavigationGraph(
 						direction))
 				{
 					graphValid = false;
-					graphFailure =
-						"physical focus movement contradicts the displayed"
-						" direction";
+					graphFailure = "physical focus movement contradicts the displayed direction; source="
+						+ candidates[static_cast<std::size_t>(previousCandidateIndex)].element->name
+						+ "; target=" + candidates[static_cast<std::size_t>(currentCandidateIndex)].element->name
+						+ "; direction=" + std::to_string(static_cast<int>(direction));
 					break;
 				}
 				const bool crossedOwner =
@@ -3338,7 +3629,7 @@ bool testPhysicalBuySellModalCandidateNavigation(
 		gameManager,
 		menuController.buySellMenu,
 		groups,
-		18,
+		static_cast<int>(buySellMenu.item.size() + menuController.goodsMenu->item.size()),
 		0,
 		focusedElement,
 		ownerInvariant) && ok;
@@ -3357,163 +3648,6 @@ bool testPhysicalBuySellModalCandidateNavigation(
 		resourcePack,
 		"restores the production resource root after physical buy-sell"
 		" modal navigation") && ok;
-	return ok;
-}
-
-bool testPhysicalPartnerEquipmentModalCandidateNavigation(
-	const ResourcePackExpectation& resourcePack,
-	ResourceManager& resourceManager,
-	GameManager& gameManager,
-	const std::filesystem::path& fixtureRoot)
-{
-	bool ok = true;
-	MenuController& menuController = *gameManager.menu;
-	const std::string productionRoot =
-		resourceManager.getActiveResourceRoot();
-	const int storeIndex = gameManager.goodsManager.storeBegin();
-
-	menuController.clearMenu();
-	gameManager.goodsManager.clearItem();
-	File::setActiveResourceRoot(fixtureRoot.generic_string());
-	File::setResourceFallbackRoots({ productionRoot });
-	if (!checkPack(
-		loadGoodsInfo(
-			gameManager.goodsManager.goodsList[storeIndex],
-			PartnerHeadGoodsAFile),
-		resourcePack,
-		"loads the physical partner-equipment borrowed-bag fixture"))
-	{
-		gameManager.goodsManager.clearItem();
-		resourceManager.setActiveResourcePackById(resourcePack.id);
-		return false;
-	}
-	menuController.goodsMenu->updateGoods();
-
-	auto partner = std::make_shared<NPC>();
-	partner->kind = nkPartner;
-	partner->npcName = resourcePack.partnerName.empty()
-		? "Controller Partner"
-		: resourcePack.partnerName;
-	partner->canEquip = 1;
-	partner->level = 10;
-	gameManager.npcManager->addNPC(partner);
-	if (!checkPack(
-		menuController.openPartnerEquipment(partner, false),
-		resourcePack,
-		"opens the production partner-equipment modal at its real default"))
-	{
-		gameManager.npcManager->removeNPCOnlyFromList(partner);
-		gameManager.goodsManager.clearItem();
-		resourceManager.setActiveResourcePackById(resourcePack.id);
-		return false;
-	}
-
-	PartnerEquipMenu& partnerEquipMenu =
-		*menuController.partnerEquipMenu;
-	const std::vector<PElement> ownerCandidates =
-		partnerEquipMenu.controllerFocusCandidates();
-	const std::vector<PElement> bagCandidates =
-		makePhysicalModalCandidates(menuController.goodsMenu->item);
-	std::set<const Element*> bagCandidateSet;
-	for (const PElement& candidate : bagCandidates)
-	{
-		if (candidate != nullptr)
-		{
-			bagCandidateSet.insert(candidate.get());
-		}
-	}
-	std::vector<PElement> equipmentCandidates;
-	std::set<const Element*> ownerCandidateSet;
-	for (const PElement& candidate : ownerCandidates)
-	{
-		if (candidate != nullptr)
-		{
-			ownerCandidateSet.insert(candidate.get());
-			if (bagCandidateSet.find(candidate.get())
-				== bagCandidateSet.end())
-			{
-				equipmentCandidates.push_back(candidate);
-			}
-		}
-	}
-	bool ownerCandidateSetMatches =
-		ownerCandidateSet.size() == ownerCandidates.size()
-		&& ownerCandidates.size() == 16
-		&& bagCandidates.size() == 9
-		&& equipmentCandidates.size() == 7;
-	for (const PElement& candidate : bagCandidates)
-	{
-		ownerCandidateSetMatches = ownerCandidateSetMatches
-			&& candidate != nullptr
-			&& ownerCandidateSet.find(candidate.get())
-				!= ownerCandidateSet.end();
-	}
-	if (!checkPack(
-		ownerCandidateSetMatches,
-		resourcePack,
-		"partner-equipment modal exclusively owns its 9 borrowed bag"
-		" candidates and 7 equipment candidates"))
-	{
-		menuController.closePartnerEquipment(false);
-		gameManager.npcManager->removeNPCOnlyFromList(partner);
-		gameManager.goodsManager.clearItem();
-		resourceManager.setActiveResourcePackById(resourcePack.id);
-		return false;
-	}
-
-	// Put the production default pane first so the graph walk begins at the
-	// equipment slot selected by openPartnerEquipment(), not at a test-seeded
-	// borrowed Goods focus.
-	const std::vector<PhysicalModalNavigationGroup> groups =
-	{
-		{ "partner-equipment", equipmentCandidates },
-		{ "borrowed-player-bag", bagCandidates },
-	};
-	const PElement realDefaultFocus =
-		partnerEquipMenu.controllerFocusedElement();
-	ok = checkPack(
-		realDefaultFocus == equipmentCandidates.front()
-			&& partnerEquipMenu.isControllerFocusActive()
-			&& !menuController.goodsMenu->isControllerFocusActive(),
-		resourcePack,
-		"opens partner-equipment with one modal owner on its first"
-		" equipment candidate") && ok;
-
-	auto runningRoot =
-		std::make_shared<HeadlessRPGMenuUIRoot>(gameManager);
-	auto focusedElement = [&partnerEquipMenu]()
-	{
-		return partnerEquipMenu.controllerFocusedElement();
-	};
-	auto ownerInvariant =
-		[&partnerEquipMenu, &menuController, &partner]()
-	{
-		return partnerEquipMenu.visible && partnerEquipMenu.activated
-			&& partnerEquipMenu.getPartner() == partner
-			&& partnerEquipMenu.isControllerFocusActive()
-			&& menuController.goodsMenu != nullptr
-			&& menuController.goodsMenu->visible
-			&& !menuController.goodsMenu->isControllerFocusActive();
-	};
-	ok = verifyPhysicalModalCandidateNavigation(
-		resourcePack,
-		"partner-equipment-bag-equipment",
-		gameManager,
-		runningRoot,
-		groups,
-		16,
-		0,
-		focusedElement,
-		ownerInvariant) && ok;
-
-	menuController.closePartnerEquipment(false);
-	gameManager.npcManager->removeNPCOnlyFromList(partner);
-	gameManager.goodsManager.clearItem();
-	ok = checkPack(
-		resourceManager.setActiveResourcePackById(resourcePack.id),
-		resourcePack,
-		"restores the production resource root after physical"
-		" partner-equipment modal navigation") && ok;
 	return ok;
 }
 
@@ -3698,6 +3832,23 @@ bool testPhysicalAllVisibleMenuSpatialNavigation(
 		&& ok;
 	verifyScenario("memo-map-hud");
 	gameManager.memo.memo.clear();
+
+	prepareBase();
+	auto equipmentPartner = std::make_shared<NPC>();
+	equipmentPartner->kind = nkPartner;
+	equipmentPartner->npcName = "Equipment Partner";
+	equipmentPartner->canEquip = 1;
+	gameManager.npcManager->addNPC(equipmentPartner);
+	ok = menuController.openPartnerEquipment(equipmentPartner, false) && ok;
+	verifyScenario("shared-partner-equipment-bag-hud");
+	if (!menuController.isStateEquipIntegrated())
+	{
+		menuController.toggleStateView();
+		verifyScenario("shared-partner-state-bag-hud");
+	}
+	gameManager.npcManager->removeNPCOnlyFromList(equipmentPartner);
+	menuController.equipMenu->updateGoods();
+	prepareBase();
 
 	std::string partnerHeadFixtureName;
 	if (gameManager.global.feature.menuResourceProfile == mrpXjxqy)
@@ -4073,15 +4224,17 @@ bool testTopHUDFocusLifecycle(
 	const std::vector<PElement> configuredControlsBeforeResize =
 		configuredTopControls();
 	bool ok = true;
-	if (resourcePack.id == "YYCS")
+	if (resourcePack.id == "YYCS" && !gameManager.global.feature.qingyuUi)
 	{
 		ok = checkPack(
-			menuController.topMenu->stateBtn != nullptr
+			menuController.topMenu->rect.w == 428
+				&& menuController.topMenu->rect.h == 41
+				&& menuController.topMenu->stateBtn != nullptr
 				&& menuController.topMenu->stateBtn->stretch
-				&& menuController.topMenu->stateBtn->rect.w == 38
-				&& menuController.topMenu->stateBtn->rect.h == 38,
+				&& menuController.topMenu->stateBtn->rect.w == 28
+				&& menuController.topMenu->stateBtn->rect.h == 28,
 			resourcePack,
-			"applies the configured two-times scale to the Top CheckBox icon")
+			"applies the configured 1.5-times scale to the Top panel and CheckBox icon")
 			&& ok;
 	}
 	TopControlMember stableFocusMember = nullptr;
@@ -4414,6 +4567,16 @@ bool testVisibleMenuCrossNavigation(
 		allVisibleCandidates.end(),
 		mapCandidates.begin(),
 		mapCandidates.end());
+	const auto exposedCandidates = GamepadRPGMenuActionsTestAccess::collectVisibleControllerFocusCandidates(menuController);
+	for (const auto& candidate : allVisibleCandidates)
+	{
+		if (std::find(exposedCandidates.begin(), exposedCandidates.end(), candidate) == exposedCandidates.end())
+		{
+			ok = checkPack(!menuController.adoptControllerPointerFocus(candidate), resourcePack,
+				"map-covered controls are excluded from focus and cannot adopt pointer focus") && ok;
+		}
+	}
+	allVisibleCandidates = exposedCandidates;
 	ok = checkPack(
 		!hasFullyCoveredCandidate(
 			menuController.goodsMenu->controllerFocusCandidates())
@@ -4434,7 +4597,7 @@ bool testVisibleMenuCrossNavigation(
 	};
 	std::vector<NavigationOwner> navigationOwners;
 	auto addNavigationOwner =
-		[&navigationOwners](
+		[&navigationOwners, &exposedCandidates](
 			const std::string& name,
 			const PElement& element,
 			ControllerFocusParticipant* participant)
@@ -4442,9 +4605,12 @@ bool testVisibleMenuCrossNavigation(
 		if (element != nullptr && participant != nullptr
 			&& element->visible && element->activated)
 		{
-			navigationOwners.push_back(
-				{ name, element, participant,
-					participant->controllerFocusCandidates() });
+			auto candidates = participant->controllerFocusCandidates();
+			candidates.erase(std::remove_if(candidates.begin(), candidates.end(), [&](const PElement& candidate)
+			{
+				return std::find(exposedCandidates.begin(), exposedCandidates.end(), candidate) == exposedCandidates.end();
+			}), candidates.end());
+			if (!candidates.empty()) navigationOwners.push_back({ name, element, participant, std::move(candidates) });
 		}
 	};
 	addNavigationOwner(
@@ -4618,44 +4784,54 @@ bool testVisibleMenuCrossNavigation(
 		graphDispatchValid && missingPaths.empty(),
 		resourcePack,
 		graphExpectation) && ok;
+	std::vector<PElement> uncoveredGoods;
+	for (const auto& item : menuController.goodsMenu->item)
+	{
+		if (std::find(exposedCandidates.begin(), exposedCandidates.end(), item) != exposedCandidates.end())
+			uncoveredGoods.push_back(item);
+	}
+	if (!checkPack(uncoveredGoods.size() >= 2, resourcePack,
+		"map overlay leaves two real bag targets for pointer and controller navigation")) return false;
+	const UIAction pointerDirection = uncoveredGoods[1]->rect.y == uncoveredGoods[0]->rect.y
+		? UIAction::NavigateRight : UIAction::NavigateDown;
 
 	dispatchPointerTapThroughElementTree(
 		gameManager,
-		menuController.goodsMenu->item[0]->rect.x
-			+ menuController.goodsMenu->item[0]->rect.w / 2,
-		menuController.goodsMenu->item[0]->rect.y
-			+ menuController.goodsMenu->item[0]->rect.h / 2);
+		uncoveredGoods[0]->rect.x
+			+ uncoveredGoods[0]->rect.w / 2,
+		uncoveredGoods[0]->rect.y
+			+ uncoveredGoods[0]->rect.h / 2);
 	ok = checkPack(
 		menuController.goodsMenu->isControllerFocusActive()
 			&& menuController.goodsMenu->controllerFocusedElement()
-				== menuController.goodsMenu->item[0]
+				== uncoveredGoods[0]
 			&& !menuController.mapThumbnailMenu->isControllerFocusActive(),
 		resourcePack,
 		"adopts the exact Goods control selected by a real Element-tree"
 		" mouse down/up transaction") && ok;
 	ok = checkPack(
-		menuController.handleUIAction(UIAction::NavigateRight)
+		menuController.handleUIAction(pointerDirection)
 			&& menuController.goodsMenu->controllerFocusedElement()
-				== menuController.goodsMenu->item[1],
+				== uncoveredGoods[1],
 		resourcePack,
 		"continues gamepad navigation from the pointer-selected control") && ok;
 	dispatchPointerRightDownThroughElementTree(
 		gameManager,
-		menuController.goodsMenu->item[0]->rect.x
-			+ menuController.goodsMenu->item[0]->rect.w / 2,
-		menuController.goodsMenu->item[0]->rect.y
-			+ menuController.goodsMenu->item[0]->rect.h / 2);
+		uncoveredGoods[0]->rect.x
+			+ uncoveredGoods[0]->rect.w / 2,
+		uncoveredGoods[0]->rect.y
+			+ uncoveredGoods[0]->rect.h / 2);
 	ok = checkPack(
 		menuController.goodsMenu->isControllerFocusActive()
 			&& menuController.goodsMenu->controllerFocusedElement()
-				== menuController.goodsMenu->item[0],
+				== uncoveredGoods[0],
 		resourcePack,
 		"right-click adopts the exact hovered Item before its business action")
 		&& ok;
 	ok = checkPack(
-		menuController.handleUIAction(UIAction::NavigateRight)
+		menuController.handleUIAction(pointerDirection)
 			&& menuController.goodsMenu->controllerFocusedElement()
-				== menuController.goodsMenu->item[1],
+				== uncoveredGoods[1],
 		resourcePack,
 		"gamepad navigation continues from the right-click-selected Item")
 		&& ok;
@@ -4664,7 +4840,7 @@ bool testVisibleMenuCrossNavigation(
 	ok = checkPack(
 		menuController.goodsMenu->isControllerFocusActive()
 			&& menuController.goodsMenu->controllerFocusedElement()
-				== menuController.goodsMenu->item[1],
+				== uncoveredGoods[1],
 		resourcePack,
 		"closing an unfocused map preserves the current valid focus") && ok;
 	ok = checkPack(
@@ -4710,7 +4886,7 @@ bool testPhysicalBottomMenuInputComposition(
 		resourceManager.getActiveResourceRoot();
 	const int magicStoreIndex = gameManager.magicManager.storeBegin();
 	const std::vector<MagicInfo> productionMagics =
-		loadProductionMagicInfos(productionRoot, 1);
+		loadProductionMagicInfos(1);
 	if (!checkPack(
 		gameManager.magicManager.isStoreIndex(magicStoreIndex)
 			&& gameManager.magicManager.bottomCount() >= 2
@@ -5434,6 +5610,10 @@ bool runGamepadRPGMenuActionTests()
 			discoveredIds.size() == resourcePacks.size(),
 		resourceSetExpectation) && ok;
 
+	const bool previousTheme = Config::useQingyuUi;
+	for (const bool qingyuTheme : { false, true })
+	{
+	Config::useQingyuUi = qingyuTheme;
 	for (const ResourcePackExpectation& resourcePack : resourcePacks)
 	{
 		if (!checkPack(
@@ -5462,6 +5642,8 @@ bool runGamepadRPGMenuActionTests()
 				resourcePack, gameManager) && ok;
 			ok = testTopHUDFocusLifecycle(
 				resourcePack, gameManager) && ok;
+			ok = testPartnerActions(
+				resourcePack, resourceManager, gameManager, fixtureRoot) && ok;
 #ifdef __MOBILE__
 			ok = testDeferredWorldTouchDoesNotCrossMenuOpen(
 				resourcePack, gameManager) && ok;
@@ -5476,7 +5658,7 @@ bool runGamepadRPGMenuActionTests()
 				+ " dynamic production menu-input boundaries complete") && ok;
 	}
 
-	for (const ResourcePackExpectation& resourcePack : BaseResourcePacks)
+	for (const ResourcePackExpectation& resourcePack : resourcePacks)
 	{
 		if (!checkPack(
 			resourceManager.setActiveResourcePackById(resourcePack.id),
@@ -5510,11 +5692,6 @@ bool runGamepadRPGMenuActionTests()
 				resourcePack,
 				resourceManager,
 				gameManager) && ok;
-			ok = testPartnerActions(
-				resourcePack,
-				resourceManager,
-				gameManager,
-				fixtureRoot) && ok;
 			ok = testBuySellTransactions(
 				resourcePack,
 				resourceManager,
@@ -5527,7 +5704,7 @@ bool runGamepadRPGMenuActionTests()
 	}
 
 	for (const ResourcePackExpectation& physicalResourcePack :
-		BaseResourcePacks)
+		resourcePacks)
 	{
 		if (checkPack(
 			resourceManager.setActiveResourcePackById(physicalResourcePack.id),
@@ -5573,7 +5750,7 @@ bool runGamepadRPGMenuActionTests()
 	}
 
 	for (const ResourcePackExpectation& physicalResourcePack :
-		BaseResourcePacks)
+		resourcePacks)
 	{
 		if (checkPack(
 			resourceManager.setActiveResourcePackById(physicalResourcePack.id),
@@ -5590,11 +5767,7 @@ bool runGamepadRPGMenuActionTests()
 				resourceManager,
 				gameManager,
 				fixtureRoot) && ok;
-			ok = testPhysicalPartnerEquipmentModalCandidateNavigation(
-				physicalResourcePack,
-				resourceManager,
-				gameManager,
-				fixtureRoot) && ok;
+
 		}
 		else
 		{
@@ -5602,6 +5775,8 @@ bool runGamepadRPGMenuActionTests()
 		}
 	}
 
+	}
+	Config::useQingyuUi = previousTheme;
 	File::setAssetsCollectionRoot(assetsRoot.generic_string());
 	ok = check(resourceManager.setActiveResourcePackById("JXQY2"),
 		"gamepad RPG menu action tests restore the default resource pack") && ok;

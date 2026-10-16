@@ -61,7 +61,8 @@ void EquipMenu::showAttributes(bool value)
 void EquipMenu::updateAttributes()
 {
 	if (!showingAttributes || !gm || !gm->player) return;
-	const auto& player = gm->player;
+	const auto partner = getSelectedPartner();
+	const auto player = partner ? partner : std::static_pointer_cast<NPC>(gm->player);
 	std::vector<std::string> values = {
 		convert::formatString(u8"攻击  %d", player->getAttack()),
 		convert::formatString(u8"防御  %d", player->getDefend()),
@@ -73,12 +74,12 @@ void EquipMenu::updateAttributes()
 		convert::formatString(u8"医术  %d", player->leechcraft),
 		convert::formatString(u8"跳跃距离  %d", player->jumpRadius),
 		convert::formatString(u8"移速倍率  %.2f", player->getMoveSpeedFold()),
-		convert::formatString(u8"银两  %d", player->money) };
-	if (gm->global.feature.rageSystem)
+		convert::formatString(u8"银两  %d", gm->player->money) };
+	if (gm->global.feature.rageSystem && !partner)
 	{
-		values.push_back(convert::formatString(u8"怒气  %d / %d", player->rage, player->rageMax));
-		values.push_back(convert::formatString(u8"暴击概率  %.1f%%", player->getCriticalChancePercent()));
-		values.push_back(convert::formatString(u8"暴击增伤  %d%%", player->getCriticalDamagePercent()));
+		values.push_back(convert::formatString(u8"怒气  %d / %d", gm->player->rage, gm->player->rageMax));
+		values.push_back(convert::formatString(u8"暴击概率  %.1f%%", gm->player->getCriticalChancePercent()));
+		values.push_back(convert::formatString(u8"暴击增伤  %d%%", gm->player->getCriticalDamagePercent()));
 	}
 	for (int index = 0; index < 14; ++index)
 	{
@@ -89,8 +90,46 @@ void EquipMenu::updateAttributes()
 	}
 }
 
+void EquipMenu::updateCharacterBindings()
+{
+	const auto partner = getSelectedPartner();
+	if (!partner)
+	{
+		updateDataBindings();
+		return;
+	}
+	const std::map<std::string, int> values = {
+		{ "player.level", partner->level }, { "player.exp", partner->exp },
+		{ "player.levelUpExp", partner->levelUpExp },
+		{ "player.info.attack", partner->getAttack() }, { "player.effectiveAttack", partner->getAttack() },
+		{ "player.info.defend", partner->getDefend() }, { "player.effectiveDefend", partner->getDefend() },
+		{ "player.info.evade", partner->getEvade() }, { "player.effectiveEvade", partner->getEvade() },
+		{ "player.life", partner->life }, { "player.info.lifeMax", partner->getLifeMax() },
+		{ "player.thew", partner->thew }, { "player.info.thewMax", partner->getThewMax() },
+		{ "player.mana", partner->mana }, { "player.info.manaMax", partner->getManaMax() }
+	};
+	for (const auto& binding : dataBindings)
+	{
+		auto label = getComponentByName<Label>(binding.componentName);
+		if (!label) continue;
+		std::vector<int> numbers;
+		for (const auto& path : binding.bindPaths)
+		{
+			const auto found = values.find(path);
+			numbers.push_back(found != values.end() ? found->second : gm->getBindValue(path));
+		}
+		std::string text;
+		if (convert::formatIntegerValues(binding.formatStr, numbers, text)) label->setStr(text);
+	}
+}
+
 void EquipMenu::updateGoods()
 {
+	if (showingPartner && !getSelectedPartner())
+	{
+		selectPartner(nullptr);
+		return;
+	}
 	updatePanelImage();
 	updatePlayerNameDisplay();
 
@@ -111,6 +150,27 @@ void EquipMenu::updateGoods(int index)
 	{
 		return;
 	}
+	const auto partner = getSelectedPartner();
+	item[index]->canDrag = item[index]->canDrop = !partner || partner->canChangePartnerEquipment();
+	item[index]->dragType = partner ? dtPartnerEquipment : dtGoods;
+	item[index]->dragIndex = partner ? index : gm->goodsManager.equipIndex(index);
+	if (partner)
+	{
+		const auto file = partner->getEquipmentFileByPartIndex(index);
+		partnerGoods[index].reset();
+		item[index]->impImage = nullptr;
+		item[index]->setStr("");
+		if (!file.empty())
+		{
+			partnerGoods[index] = std::make_shared<Goods>();
+			partnerGoods[index]->initFromIni(file);
+			item[index]->impImage = MenuResource::createGoodsMenuImage(partnerGoods[index]);
+			item[index]->setStr("1");
+		}
+		updateCharacterBindings();
+		return;
+	}
+	partnerGoods[index].reset();
 	int listIndex = gm->goodsManager.equipIndex(index);
 	if (listIndex < 0 || listIndex >= gm->goodsManager.listLength())
 	{
@@ -129,7 +189,7 @@ void EquipMenu::updateGoods(int index)
 	}
 	gm->player->calInfo();
 	gm->menu->stateMenu->updateLabel();
-	updateDataBindings();
+	updateCharacterBindings();
 }
 
 void EquipMenu::updateMagicDisplay()
@@ -155,6 +215,14 @@ void EquipMenu::updateMagicDisplay(int index)
 		return;
 	}
 
+	if (getSelectedPartner())
+	{
+		magicDisplayItem[index]->canDrag = magicDisplayItem[index]->canDrop = false;
+		magicDisplayIniFile[index].clear();
+		magicDisplayItem[index]->impImage = nullptr;
+		return;
+	}
+	magicDisplayItem[index]->canDrop = true;
 	std::string iniFile;
 	int listIndex = getMagicDisplayStartIndex() + index;
 	if (gm->magicManager.magicListExists(listIndex))
@@ -195,6 +263,7 @@ int EquipMenu::getMagicDisplayStartIndex() const
 
 void EquipMenu::quickEquipMagic(int sourceIndex)
 {
+	if (getSelectedPartner()) return;
 	if (!gm->magicManager.magicListExists(sourceIndex))
 	{
 		return;
@@ -250,13 +319,13 @@ void EquipMenu::loadNewSwordPartnerNames()
 	newSwordPartnerNames.resize(4);
 
 	INIReader partnerIni("partneridx.ini");
-	for (int index = 1; index <= 3; index++)
+	for (int index = 0; index <= 3; index++)
 	{
 		newSwordPartnerNames[index] = partnerIni.Get("Init", convert::formatString("%d", index), "");
 	}
 
 	INIReader playerNameIni("ini\\playername.ini");
-	for (int index = 1; index <= 3; index++)
+	for (int index = 0; index <= 3; index++)
 	{
 		if (newSwordPartnerNames[index].empty())
 		{
@@ -272,7 +341,7 @@ int EquipMenu::getNewSwordPartnerIndex(const std::string& partnerName) const
 		return -1;
 	}
 
-	for (int index = 1; index < static_cast<int>(newSwordPartnerNames.size()) && index < 4; index++)
+	for (int index = 0; index < static_cast<int>(newSwordPartnerNames.size()) && index < 4; index++)
 	{
 		if (newSwordPartnerNames[index] == partnerName)
 		{
@@ -284,9 +353,15 @@ int EquipMenu::getNewSwordPartnerIndex(const std::string& partnerName) const
 
 void EquipMenu::updatePlayerNameDisplay()
 {
+	if (!gm || !gm->player) return;
+	if (characterSelector)
+	{
+		updateCharacterSelector(*characterSelector);
+	}
 	if (auto playerName = getComponentByName<Label>("playerName"))
 	{
-		playerName->setStr(gm->player->npcName);
+		const auto partner = getSelectedPartner();
+		playerName->setStr(partner ? partner->npcName : gm->player->npcName);
 	}
 	if (gm == nullptr || !gm->global.feature.equipPlayerNameImages || playerNameImages.empty())
 	{
@@ -295,6 +370,7 @@ void EquipMenu::updatePlayerNameDisplay()
 
 	bool available[4] = { false, false, false, false };
 	int currentIndex = gm->global.data.characterIndex;
+	const int displayedIndex = getSelectedPartner() ? getNewSwordPartnerIndex(getSelectedPartner()->npcName) : currentIndex;
 	if (currentIndex < 0)
 	{
 		currentIndex = 0;
@@ -307,7 +383,7 @@ void EquipMenu::updatePlayerNameDisplay()
 	auto partners = gm->partnerManager.findPartnersFromNPCManager();
 	for (auto& partner : partners)
 	{
-		if (partner == nullptr)
+		if (partner == nullptr || !partner->isLivingPartner())
 		{
 			continue;
 		}
@@ -324,7 +400,7 @@ void EquipMenu::updatePlayerNameDisplay()
 		{
 			continue;
 		}
-		if (index == currentIndex)
+		if (index == displayedIndex)
 		{
 			playerNameImages[index]->frameIndex = 2;
 		}
@@ -332,7 +408,105 @@ void EquipMenu::updatePlayerNameDisplay()
 		{
 			playerNameImages[index]->frameIndex = available[index] ? 1 : 0;
 		}
+		if (index < static_cast<int>(playerNameButtons.size()) && playerNameButtons[index])
+		{
+			playerNameButtons[index]->activated = available[index];
+		}
 	}
+	if (focusedPlayerName >= 0 && !playerNameButtons[focusedPlayerName]->activated)
+	{
+		focusControllerEquipment();
+	}
+}
+
+std::shared_ptr<NPC> EquipMenu::getSelectedPartner() const
+{
+	const auto partner = selectedPartner.lock();
+	return gm && partner && gm->partnerManager.isActivePartner(partner)
+		&& partner->isLivingPartner() ? partner : nullptr;
+}
+
+void EquipMenu::updateCharacterSelector(TextButton& button) const
+{
+	if (!gm || !gm->player) return;
+	const auto partners = gm->partnerManager.findPartnersFromNPCManager();
+	button.activated = std::any_of(partners.begin(), partners.end(),
+		[](const auto& partner) { return partner && partner->isLivingPartner(); });
+	button.visible = button.activated || gm->global.feature.qingyuUi;
+	const auto partner = getSelectedPartner();
+	button.setStr((partner ? partner->npcName : gm->player->npcName) + (button.activated ? "  >" : ""));
+}
+
+bool EquipMenu::cycleCharacter()
+{
+	if (!gm) return false;
+	const auto current = getSelectedPartner();
+	bool found = !current;
+	for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
+	{
+		if (!partner || !partner->isLivingPartner()) continue;
+		if (found) return selectPartner(partner);
+		if (partner == current) found = true;
+	}
+	return selectPartner(nullptr);
+}
+
+bool EquipMenu::openPartnerByCharacterIndex(int index)
+{
+	if (!gm || !gm->menu) return false;
+	std::shared_ptr<NPC> partner;
+	if (index != gm->global.data.characterIndex)
+	{
+		for (const auto& candidate : gm->partnerManager.findPartnersFromNPCManager())
+		{
+			if (candidate && candidate->isLivingPartner() && getNewSwordPartnerIndex(candidate->npcName) == index)
+			{
+				partner = candidate;
+				break;
+			}
+		}
+		if (!partner) return false;
+	}
+	if (!selectPartner(partner)) return false;
+	return focusControllerEquipment();
+}
+
+bool EquipMenu::selectPartner(const std::shared_ptr<NPC>& partner)
+{
+	if (!gm || !gm->menu || (partner && (!gm->partnerManager.isActivePartner(partner)
+		|| !partner->isLivingPartner()))) return false;
+	gm->menu->cancelControllerInteraction();
+	cancelPointerInteraction();
+	if (gm->menu->goodsMenu) gm->menu->goodsMenu->cancelPointerInteraction();
+	deactivateControllerFocus();
+	selectedPartner = partner;
+	showingPartner = partner != nullptr;
+	if (magicScrollbar) magicScrollbar->position = 0;
+	for (auto& file : magicDisplayIniFile) file.clear();
+	for (auto& item : magicDisplayItem) if (item) item->impImage = nullptr;
+	updateGoods();
+	updateMagicDisplay();
+	updateAttributes();
+	if (gm->menu->stateMenu) gm->menu->stateMenu->updateLabel();
+	return true;
+}
+
+bool EquipMenu::equipOnSelectedPartner(int goodsIndex, int partIndex)
+{
+	std::string message;
+	const bool result = gm->partnerManager.equipOnePlayerGoodsOnPartner(getSelectedPartner(), goodsIndex, partIndex, &message);
+	if (!result && !message.empty()) gm->showMessage(message);
+	gm->goodsManager.updateMenu();
+	return result;
+}
+
+bool EquipMenu::unequipSelectedPartner(int partIndex)
+{
+	std::string message;
+	const bool result = gm->partnerManager.unequipPartnerGoodsToPlayerBag(getSelectedPartner(), partIndex, &message);
+	if (!result && !message.empty()) gm->showMessage(message);
+	gm->goodsManager.updateMenu();
+	return result;
 }
 
 int EquipMenu::getPartIndex(const std::string & part)
@@ -376,7 +550,7 @@ void EquipMenu::updatePanelImage()
 		return;
 	}
 
-	int panelIndex = gm->global.data.characterIndex;
+	int panelIndex = getSelectedPartner() ? getNewSwordPartnerIndex(getSelectedPartner()->npcName) : gm->global.data.characterIndex;
 	if (panelIndex < 0)
 	{
 		panelIndex = 0;
@@ -395,6 +569,15 @@ void EquipMenu::updatePanelImage()
 	loadedPanelIndex = panelIndex;
 }
 
+void EquipMenu::onUpdate()
+{
+	if (!visible) return;
+	if (showingPartner && !getSelectedPartner()) selectPartner(nullptr);
+	updateCharacterBindings();
+	updatePlayerNameDisplay();
+	updateAttributes();
+}
+
 void EquipMenu::onEvent()
 {
 	if (!visible)
@@ -402,8 +585,22 @@ void EquipMenu::onEvent()
 		return;
 	}
 
-	updateDataBindings();
+	if (showingPartner && !getSelectedPartner()) selectPartner(nullptr);
+	updateCharacterBindings();
 	updatePlayerNameDisplay();
+	if (characterSelector && characterSelector->getResult(erClick))
+	{
+		cycleCharacter();
+		return;
+	}
+	for (int index = 0; index < static_cast<int>(playerNameButtons.size()); ++index)
+	{
+		if (playerNameButtons[index] && playerNameButtons[index]->getResult(erClick))
+		{
+			openPartnerByCharacterIndex(index);
+			return;
+		}
+	}
 	if (equipmentTab && equipmentTab->getResult(erClick)) showAttributes(false);
 	if (attributesTab && attributesTab->getResult(erClick)) showAttributes(true);
 	updateAttributes();
@@ -422,6 +619,29 @@ void EquipMenu::onEvent()
 
 		unsigned int ret = item[i]->getResult();
 		int listIndex = gm->goodsManager.equipIndex(static_cast<int>(i));
+		if (const auto partner = getSelectedPartner())
+		{
+			if ((ret & erShowHint) && partnerGoods[i]) gm->menu->showGoodsToolTip(getMySharedPtr(), partnerGoods[i], item[i]);
+			if (ret & erHideHint) gm->menu->toolTip->visible = false;
+#ifdef __MOBILE__
+			if (ret & (erClick | erMouseRDown)) unequipSelectedPartner(static_cast<int>(i));
+#else
+			if (ret & erMouseRDown) unequipSelectedPartner(static_cast<int>(i));
+#endif
+			if (ret & erDropped)
+			{
+				gm->menu->cancelControllerInteraction();
+				if (item[i]->dropType == dtGoods) equipOnSelectedPartner(item[i]->dropIndex, static_cast<int>(i));
+				else if (item[i]->dropType == dtPartnerEquipment)
+				{
+					std::string message;
+					gm->partnerManager.exchangePartnerEquipmentSlots(partner, item[i]->dropIndex, static_cast<int>(i), &message);
+					if (!message.empty()) gm->showMessage(message);
+					updateGoods();
+				}
+			}
+			continue;
+		}
 #ifndef __MOBILE__
 		if (gm->global.feature.qingyuUi && (ret & erClick)
 			&& gm->goodsManager.goodsListExists(listIndex))
@@ -451,29 +671,19 @@ void EquipMenu::onEvent()
 			gm->menu->toolTip->visible = false;
 		}
 #ifdef __MOBILE__
-		if ((ret & erClick) && (ret & erMouseRDown) && false)
-		{
-			for (int j = gm->goodsManager.storeBegin(); j <= gm->goodsManager.storeEnd(); ++j)
-			{
-				if (gm->goodsManager.goodsList[j].iniFile.empty())
-				{
-					gm->goodsManager.exchange(j, item[i]->dragIndex);
-					updateGoods(i);
-					gm->menu->goodsMenu->updateGoods();
-					break;
-				}
-			}
-			gm->menu->toolTip->visible = false;
-			item[i]->resetHint();
-		}
+		if (gm->global.feature.qingyuUi && (ret & (erClick | erMouseRDown)))
 #else
 		if (ret & erMouseRDown)
+#endif
 		{
 			gm->menu->cancelControllerInteraction();
 			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
+			if (gm->global.feature.qingyuUi)
+			{
+				activateControllerEquipment(listIndex, static_cast<int>(i));
+			}
 		}
-#endif
 
 		if (ret & erDropped)
 		{
@@ -521,6 +731,7 @@ void EquipMenu::onEvent()
 		}
 
 		unsigned int ret = magicDisplayItem[i]->getResult();
+		if (getSelectedPartner()) continue;
 		if (ret & erShowHint)
 		{
 			int listIndex = magicDisplayItem[i]->dragIndex;
@@ -590,6 +801,20 @@ void EquipMenu::init()
 		playerNameImages.push_back(getComponentByName<ImageContainer>(convert::formatString("showname%02d", i)));
 	}
 	loadNewSwordPartnerNames();
+	characterSelector = getComponentByName<TextButton>("characterSelector");
+	playerNameButtons.resize(playerNameImages.size());
+	if (gm->global.feature.equipPlayerNameImages)
+	{
+		for (size_t index = 0; index < playerNameImages.size(); ++index)
+		{
+			if (!playerNameImages[index]) continue;
+			auto button = std::make_shared<Button>();
+			button->name = "partnerName" + std::to_string(index);
+			button->rect = playerNameImages[index]->rect;
+			addChild(button);
+			playerNameButtons[index] = button;
+		}
+	}
 
 	for (size_t i = 0; i < GOODS_BODY_COUNT; i++)
 	{
@@ -639,8 +864,26 @@ void EquipMenu::init()
 	showAttributes(showingAttributes);
 }
 
+void EquipMenu::onWindowResize(int width, int height)
+{
+	const auto partner = getSelectedPartner();
+	ConfigDrivenPanel::onWindowResize(width, height);
+	selectedPartner = partner;
+	showingPartner = partner != nullptr;
+	updateGoods();
+	updateMagicDisplay();
+	updateAttributes();
+	if (gm && gm->menu && gm->menu->stateMenu) gm->menu->stateMenu->updateLabel();
+}
+
 void EquipMenu::freeResource()
 {
+	selectedPartner.reset();
+	showingPartner = false;
+	characterSelectorFocused = false;
+	characterSelector.reset();
+	focusedPlayerName = -1;
+	playerNameButtons.clear();
 	tabFocused = false;
 	equipmentTab = nullptr;
 	attributesTab = nullptr;
@@ -703,6 +946,7 @@ void EquipMenu::configureControllerFocus()
 		showControllerEquipmentDetails(logicalIndex, visibleIndex);
 	};
 	equipmentBinding.grid.hideDetails = [this]() { hideControllerDetails(); };
+	equipmentBinding.resolveContext = [this]() -> std::shared_ptr<const void> { return getSelectedPartner(); };
 	equipmentSlotController.bind(std::move(equipmentBinding));
 	configureEquipmentControllerNeighbours();
 
@@ -807,6 +1051,7 @@ bool EquipMenu::activateControllerFocus(ControllerFocusTarget target)
 
 bool EquipMenu::focusControllerEquipment()
 {
+	if (characterSelectorFocused || focusedPlayerName >= 0) deactivateControllerFocus();
 	if (showingAttributes) return focusControllerElement(attributesTab);
 	tabFocused = false;
 	return controllerPaneRouter.activatePane(EquipmentControllerPaneId);
@@ -819,11 +1064,15 @@ bool EquipMenu::focusControllerMagicList()
 
 bool EquipMenu::isControllerFocusActive() const
 {
-	return tabFocused || controllerPaneRouter.isActive();
+	return characterSelectorFocused || focusedPlayerName >= 0 || tabFocused || controllerPaneRouter.isActive();
 }
 
 void EquipMenu::deactivateControllerFocus()
 {
+	characterSelectorFocused = false;
+	if (characterSelector) characterSelector->setFocused(false);
+	focusedPlayerName = -1;
+	for (const auto& button : playerNameButtons) if (button) button->setFocused(false);
 	tabFocused = false;
 	if (equipmentTab) equipmentTab->setFocused(false);
 	if (attributesTab) attributesTab->setFocused(false);
@@ -833,6 +1082,8 @@ void EquipMenu::deactivateControllerFocus()
 
 PElement EquipMenu::controllerFocusedElement() const
 {
+	if (characterSelectorFocused) return characterSelector;
+	if (focusedPlayerName >= 0) return playerNameButtons[focusedPlayerName];
 	if (tabFocused) return showingAttributes ? attributesTab : equipmentTab;
 	return controllerPaneRouter.controllerFocusedElement();
 }
@@ -840,6 +1091,11 @@ PElement EquipMenu::controllerFocusedElement() const
 std::vector<PElement> EquipMenu::controllerFocusCandidates() const
 {
 	auto candidates = showingAttributes ? std::vector<PElement>{} : controllerPaneRouter.controllerFocusCandidates();
+	if (characterSelector && characterSelector->visible && characterSelector->activated) candidates.push_back(characterSelector);
+	for (const auto& button : playerNameButtons)
+	{
+		if (button && button->visible && button->activated) candidates.push_back(button);
+	}
 	if (equipmentTab && attributesTab)
 	{
 		candidates.push_back(equipmentTab);
@@ -850,6 +1106,23 @@ std::vector<PElement> EquipMenu::controllerFocusCandidates() const
 
 bool EquipMenu::focusControllerElement(const PElement& element)
 {
+	if (element && element == characterSelector && element->visible && element->activated)
+	{
+		deactivateControllerFocus();
+		characterSelectorFocused = true;
+		element->setFocused(true);
+		return true;
+	}
+	for (int index = 0; index < static_cast<int>(playerNameButtons.size()); ++index)
+	{
+		if (element && element == playerNameButtons[index] && element->visible && element->activated)
+		{
+			deactivateControllerFocus();
+			focusedPlayerName = index;
+			element->setFocused(true);
+			return true;
+		}
+	}
 	if (element && element->visible && element->activated && (element == equipmentTab || element == attributesTab))
 	{
 		showAttributes(element == attributesTab);
@@ -875,6 +1148,8 @@ bool EquipMenu::controllerFocusElementMatchesTarget(
 	if (target == ControllerFocusTarget::Default
 		|| target == ControllerFocusTarget::PlayerEquipment)
 	{
+		if (element && element == characterSelector) return true;
+		for (const auto& button : playerNameButtons) if (element && element == button) return true;
 		if (element && (element == equipmentTab || element == attributesTab)) return true;
 		return contains(equipmentSlotController.controllerFocusCandidates());
 	}
@@ -885,8 +1160,13 @@ bool EquipMenu::controllerFocusElementMatchesTarget(
 	return false;
 }
 
-void EquipMenu::activateControllerEquipment(int logicalIndex, int)
+void EquipMenu::activateControllerEquipment(int logicalIndex, int visibleIndex)
 {
+	if (getSelectedPartner())
+	{
+		unequipSelectedPartner(visibleIndex);
+		return;
+	}
 	if (gm == nullptr || gm->menu == nullptr
 		|| !gm->goodsManager.isEquipIndex(logicalIndex))
 	{
@@ -906,6 +1186,13 @@ void EquipMenu::activateControllerEquipment(int logicalIndex, int)
 void EquipMenu::showControllerEquipmentDetails(
 	int logicalIndex, int visibleIndex)
 {
+	if (getSelectedPartner())
+	{
+		if (visibleIndex >= 0 && visibleIndex < GOODS_BODY_COUNT && partnerGoods[visibleIndex])
+			gm->menu->showGoodsToolTip(getMySharedPtr(), partnerGoods[visibleIndex], item[visibleIndex]);
+		else hideControllerDetails();
+		return;
+	}
 	if (gm == nullptr || gm->menu == nullptr || gm->menu->toolTip == nullptr
 		|| gm->menu->upMenu == nullptr || visibleIndex < 0
 		|| visibleIndex >= GOODS_BODY_COUNT || item[visibleIndex] == nullptr
@@ -929,7 +1216,7 @@ int EquipMenu::getControllerMagicIndex(int visibleIndex) const
 		return -1;
 	}
 	const int logicalIndex = getMagicDisplayStartIndex() + visibleIndex;
-	return gm->magicManager.isStoreIndex(logicalIndex)
+	return !getSelectedPartner() && gm->magicManager.isStoreIndex(logicalIndex)
 		&& logicalIndex < gm->magicManager.listLength()
 		? logicalIndex : -1;
 }
@@ -946,7 +1233,7 @@ void EquipMenu::activateControllerMagic(int logicalIndex, int)
 }
 void EquipMenu::showControllerMagicDetails(int logicalIndex, int visibleIndex)
 {
-	if (gm == nullptr || gm->menu == nullptr || gm->menu->toolTip == nullptr
+	if (getSelectedPartner() || gm == nullptr || gm->menu == nullptr || gm->menu->toolTip == nullptr
 		|| gm->menu->upMenu == nullptr || visibleIndex < 0
 		|| visibleIndex >= static_cast<int>(magicDisplayItem.size())
 		|| magicDisplayItem[visibleIndex] == nullptr
@@ -978,6 +1265,64 @@ void EquipMenu::refreshControllerTransferHighlight()
 
 bool EquipMenu::onHandleUIAction(UIAction action)
 {
+	if (characterSelectorFocused)
+	{
+		if (action == UIAction::Confirm)
+		{
+			cycleCharacter();
+			return focusControllerElement(characterSelector);
+		}
+		const bool selectorAboveEquipment = characterSelector && item[0]
+			&& characterSelector->rect.y < item[0]->rect.y;
+		if (selectorAboveEquipment && action == UIAction::NavigateRight && equipmentTab)
+		{
+			return focusControllerElement(showingAttributes ? attributesTab : equipmentTab);
+		}
+		if (action == UIAction::Cancel
+			|| action == (selectorAboveEquipment ? UIAction::NavigateDown : UIAction::NavigateUp))
+		{
+			deactivateControllerFocus();
+			return selectorAboveEquipment ? focusControllerEquipment()
+				: focusControllerElement(item[GOODS_BODY_COUNT - 1]);
+		}
+		return false;
+	}
+	if (focusedPlayerName >= 0)
+	{
+		if (action == UIAction::Confirm) return openPartnerByCharacterIndex(focusedPlayerName);
+		if (action == UIAction::NavigateDown || action == UIAction::Cancel) return focusControllerEquipment();
+		if (action == UIAction::NavigateLeft || action == UIAction::NavigateRight)
+		{
+			const int count = static_cast<int>(playerNameButtons.size());
+			const int delta = action == UIAction::NavigateLeft ? -1 : 1;
+			for (int offset = 1; offset <= count; ++offset)
+			{
+				const int index = (focusedPlayerName + delta * offset + count) % count;
+				if (playerNameButtons[index] && playerNameButtons[index]->activated)
+					return focusControllerElement(playerNameButtons[index]);
+			}
+		}
+		return true;
+	}
+	if ((action == UIAction::NavigateDown || action == UIAction::NavigateUp) && equipmentSlotController.isActive()
+		&& characterSelector && characterSelector->visible && characterSelector->activated)
+	{
+		const auto focused = equipmentSlotController.controllerFocusedElement();
+		const bool down = action == UIAction::NavigateDown;
+		const bool selectorInDirection = focused && (down
+			? characterSelector->rect.y > focused->rect.y : characterSelector->rect.y < focused->rect.y);
+		const bool hasNextSlot = focused && std::any_of(std::begin(item), std::end(item), [&](const auto& slot)
+		{
+			return slot && (down ? slot->rect.y > focused->rect.y : slot->rect.y < focused->rect.y);
+		});
+		if (selectorInDirection && !hasNextSlot) return focusControllerElement(characterSelector);
+	}
+	if (action == UIAction::NavigateUp && equipmentSlotController.isActive()
+		&& equipmentSlotController.focusedVisibleIndex() < 4)
+	{
+		for (const auto& button : playerNameButtons)
+			if (button && button->activated) return focusControllerElement(button);
+	}
 	if (equipmentTab && attributesTab)
 	{
 		if (action == UIAction::Cancel && showingAttributes)
@@ -987,7 +1332,24 @@ bool EquipMenu::onHandleUIAction(UIAction action)
 		if (tabFocused)
 		{
 			if (action == UIAction::NavigateLeft || action == UIAction::NavigateRight)
-				return focusControllerElement(showingAttributes ? equipmentTab : attributesTab);
+			{
+				const auto source = showingAttributes ? attributesTab : equipmentTab;
+				const int sourceX = source->rect.x + source->rect.w / 2;
+				const bool right = action == UIAction::NavigateRight;
+				PElement target;
+				int nearestDistance = 0;
+				for (const PElement& candidate : { PElement(characterSelector), PElement(equipmentTab), PElement(attributesTab) })
+				{
+					if (!candidate || candidate == source || !candidate->visible || !candidate->activated) continue;
+					const int distance = (candidate->rect.x + candidate->rect.w / 2 - sourceX) * (right ? 1 : -1);
+					if (distance > 0 && (!target || distance < nearestDistance))
+					{
+						target = candidate;
+						nearestDistance = distance;
+					}
+				}
+				return target && focusControllerElement(target);
+			}
 			if (action == UIAction::Confirm || action == UIAction::NavigateDown)
 			{
 				if (showingAttributes) return true;

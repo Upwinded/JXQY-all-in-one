@@ -506,7 +506,9 @@ const char* catalogDownloadFailureText(
 	case OnlineUpdate::HttpsDownloadStatus::Cancelled:
 		return u8"检查已取消";
 	case OnlineUpdate::HttpsDownloadStatus::NetworkError:
-		return u8"无法连接更新服务器";
+		return u8"网络连接中断或超时。请确认 Wi-Fi 或移动网络可上网，再重试。";
+	case OnlineUpdate::HttpsDownloadStatus::InsufficientDiskSpace:
+		return u8"设备存储空间不足。请到系统设置清理空间，再返回游戏重试。";
 	case OnlineUpdate::HttpsDownloadStatus::DestinationAlreadyExists:
 	case OnlineUpdate::HttpsDownloadStatus::DestinationUnavailable:
 	case OnlineUpdate::HttpsDownloadStatus::SizeMismatch:
@@ -633,6 +635,25 @@ bool removePlainOwnedDirectoryIfPresent(
 	}
 	const bool remains = std::filesystem::exists(path, error);
 	return !error && !remains;
+}
+
+bool readDownloadPartialSize(const std::filesystem::path& path, std::uint64_t& bytes)
+{
+	bytes = 0;
+	std::error_code error;
+	const auto status = std::filesystem::symlink_status(path, error);
+	if (error == std::errc::no_such_file_or_directory || (!error && !std::filesystem::exists(status)))
+	{
+		return true;
+	}
+	if (error || !std::filesystem::is_regular_file(status) ||
+		!isPlainDirectory(path.parent_path()) || !isPlainDirectory(path.parent_path().parent_path()) ||
+		std::filesystem::hard_link_count(path, error) != 1 || error)
+	{
+		return false;
+	}
+	bytes = std::filesystem::file_size(path, error);
+	return !error;
 }
 
 bool isPlainRegularFile(const std::filesystem::path& path)
@@ -1154,7 +1175,46 @@ std::string resourcePlanFailureText(
 	return text;
 }
 
-std::string resourcePreparationFailureText(
+const char* resourceArchiveFailureText(OnlineUpdate::ResourcePackageArchiveStatus status)
+{
+	using Status = OnlineUpdate::ResourcePackageArchiveStatus;
+	switch (status)
+	{
+	case Status::InvalidInput: return u8"资源包校验参数无效";
+	case Status::ArchiveUnavailable: return u8"下载的 ZIP 文件不存在或不可读取";
+	case Status::ArtifactMismatch: return u8"资源包大小、CRC32 或基础资源校验记录不符";
+	case Status::DestinationAlreadyExists: return u8"解压目标目录已存在";
+	case Status::UnsafeDestination: return u8"目标目录不可访问或包含不支持的链接";
+	case Status::ArchiveOpenFailed: return u8"无法打开 ZIP 资源包";
+	case Status::TooManyEntries: return u8"ZIP 文件数量超过限制";
+	case Status::UncompressedSizeLimitExceeded: return u8"解压大小超过限制";
+	case Status::InsufficientDiskSpace: return u8"存储空间不足";
+	case Status::InvalidEntryPath: return u8"ZIP 内文件路径无效";
+	case Status::DuplicateEntryPath: return u8"ZIP 内存在重复或冲突的文件路径";
+	case Status::UnsupportedEntry: return u8"ZIP 内包含不支持的文件类型";
+	case Status::MissingManifest: return u8"缺少 game_profile.ini";
+	case Status::UnexpectedManifest: return u8"资源包包含不应出现的 game_profile.ini";
+	case Status::MissingCommonBootstrap: return u8"公共资源缺少 version.ini";
+	case Status::MissingEngineBootstrap: return u8"缺少引擎启动资源";
+	case Status::CommonVersionMismatch: return u8"common/version.ini 无效或版本不符";
+	case Status::MissingProgramExecutable: return u8"程序包缺少主程序";
+	case Status::MissingProgramUpdater: return u8"程序包缺少更新器";
+	case Status::DestinationCreateFailed: return u8"无法创建或检查解压目录";
+	case Status::ExtractionFailed: return u8"文件解压、复制或写入失败";
+	case Status::ManifestReadFailed: return u8"game_profile.ini 无法读取或超过大小限制";
+	case Status::InvalidManifest: return u8"game_profile.ini 内容或增量校验记录无效";
+	case Status::GameIdMismatch: return u8"资源包 Game.Id 与下载目录不一致";
+	case Status::DisplayVersionMismatch: return u8"资源包 Game.Version 与下载目录不一致";
+	case Status::MinimumEngineVersionMismatch: return u8"最低引擎版本声明无效或高于当前程序";
+	case Status::DependencyMismatch: return u8"资源包依赖与下载目录不一致";
+	case Status::ResourceOnlyMismatch: return u8"资源包类型与下载目录不一致";
+	case Status::CleanupFailed: return u8"失败后的暂存目录清理未完成";
+	case Status::Success: return u8"资源包处理完成";
+	}
+	return u8"未知资源包错误";
+}
+
+std::string resourcePreparationFailureSummary(
 	const OnlineUpdate::ResourceDownloadPreparationResult& result)
 {
 	using Status = OnlineUpdate::ResourceDownloadPreparationStatus;
@@ -1167,18 +1227,50 @@ std::string resourcePreparationFailureText(
 	case Status::WorkspaceAlreadyExists:
 		return u8"已有待处理资源更新，请先重启游戏";
 	case Status::WorkspaceUnavailable:
-		return u8"无法创建资源更新暂存目录";
+		return u8"无法创建下载目录。请检查设备存储空间，重启游戏后重试。";
 	case Status::Cancelled:
 		return u8"资源下载已取消";
 	case Status::DownloadFailed:
-		return catalogDownloadFailureText(result.downloadResult.status);
+		switch (result.downloadResult.status)
+		{
+		case OnlineUpdate::HttpsDownloadStatus::HttpError:
+			return result.downloadResult.httpStatus == 404
+				? std::string(u8"下载源找不到资源包（404）。请关闭提示，点“检查更新”后重试；仍失败请反馈游戏名称。")
+				: u8"下载源暂时无法提供文件（HTTP " + std::to_string(result.downloadResult.httpStatus) +
+					u8"）。请稍后重试，或切换 Wi-Fi / 移动网络。";
+		case OnlineUpdate::HttpsDownloadStatus::WriteFailed:
+		case OnlineUpdate::HttpsDownloadStatus::DestinationUnavailable:
+			return u8"资源文件无法写入设备。请检查存储空间和存储卡是否可用，关闭提示后重新下载。";
+		case OnlineUpdate::HttpsDownloadStatus::DestinationAlreadyExists:
+		case OnlineUpdate::HttpsDownloadStatus::CleanupFailed:
+			return u8"下载暂存文件无法处理。请重启游戏后再次下载；仍失败请反馈此提示。";
+		case OnlineUpdate::HttpsDownloadStatus::UnexpectedError:
+			return u8"下载意外中止。请重启游戏后再次下载；仍失败请反馈游戏名称和此提示。";
+		case OnlineUpdate::HttpsDownloadStatus::SizeMismatch:
+		case OnlineUpdate::HttpsDownloadStatus::SizeLimitExceeded:
+			return u8"资源包下载不完整，或文件大小与下载目录不一致。请点“检查更新”后重新下载。";
+		default:
+			return catalogDownloadFailureText(result.downloadResult.status);
+		}
 	case Status::ProgramNotAvailable:
 		return u8"当前平台没有可用的新程序版本";
 	case Status::ArtifactValidationFailed:
-		return u8"下载文件的大小或 CRC32 校验失败";
+		return u8"下载文件损坏或与线上版本不一致，未安装。请点“检查更新”后重新下载；仍失败请反馈游戏名称。";
 	case Status::PackageValidationFailed:
-		return u8"下载的资源包校验或解压失败";
+		if (result.packageResult.status == OnlineUpdate::ResourcePackageArchiveStatus::InsufficientDiskSpace)
+		{
+			return u8"空间不足，无法解压。解压文件需要 " + formatByteCount(result.packageResult.uncompressedBytes) +
+				(result.packageResult.availableDiskBytes.has_value()
+					? u8"，检查时可用 " + formatByteCount(*result.packageResult.availableDiskBytes) : std::string()) +
+				u8"，另需保留 64 MiB。请清理后重试。";
+		}
+		return resourceArchiveFailureText(result.packageResult.status);
 	case Status::CleanupFailed:
+		if (result.packageResult.status != OnlineUpdate::ResourcePackageArchiveStatus::InvalidInput &&
+			result.packageResult.status != OnlineUpdate::ResourcePackageArchiveStatus::Success)
+		{
+			return resourceArchiveFailureText(result.packageResult.status);
+		}
 		return u8"下载失败且暂存目录清理未完成，请重启后重试";
 	case Status::InvalidInput:
 		return u8"资源下载参数无效";
@@ -1186,6 +1278,65 @@ std::string resourcePreparationFailureText(
 	default:
 		return u8"资源下载失败";
 	}
+}
+
+std::string resourcePreparationFailureText(
+	const OnlineUpdate::ResourceDownloadPreparationResult& result)
+{
+	std::string text = resourcePreparationFailureSummary(result);
+	if (!result.failedGameId.empty())
+	{
+		text += u8"\n资源：" + result.failedGameId;
+	}
+	if (result.status == OnlineUpdate::ResourceDownloadPreparationStatus::PackageValidationFailed ||
+		(result.status == OnlineUpdate::ResourceDownloadPreparationStatus::CleanupFailed &&
+			result.packageResult.status != OnlineUpdate::ResourcePackageArchiveStatus::InvalidInput &&
+			result.packageResult.status != OnlineUpdate::ResourcePackageArchiveStatus::Success))
+	{
+		const auto& package = result.packageResult;
+		using Stage = OnlineUpdate::ResourcePackageArchiveStage;
+		const char* stage = u8"校验资源包";
+		switch (package.stage)
+		{
+		case Stage::Extraction: stage = u8"解压文件"; break;
+		case Stage::CopyingBase: stage = u8"复制基础资源"; break;
+		case Stage::ApplyingOverlay: stage = u8"覆盖增量文件"; break;
+		case Stage::ManifestValidation: stage = u8"校验资源清单"; break;
+		case Stage::Validation: break;
+		}
+		text += u8"\n阶段：" + std::string(stage) + " [" +
+			std::to_string(static_cast<int>(package.status)) + "]";
+		std::string path = package.archiveEntryPath;
+		if (path.empty() && !package.filesystemPath.empty())
+		{
+			const auto relative = package.filesystemPath.lexically_relative(result.workspacePath);
+			path = !result.workspacePath.empty() && !relative.empty() && *relative.begin() != ".."
+				? relative.generic_u8string() : package.filesystemPath.filename().generic_u8string();
+		}
+		if (!path.empty()) text += u8"\n文件：" + path;
+		if (package.filesystemError)
+		{
+			const auto& error = package.filesystemError;
+			const char* reason = error == std::errc::permission_denied ? u8"拒绝访问"
+				: error == std::errc::no_space_on_device ? u8"空间不足"
+				: error == std::errc::read_only_file_system ? u8"只读存储"
+				: error == std::errc::no_such_file_or_directory ? u8"文件或目录不存在"
+				: error == std::errc::io_error ? u8"读写错误" : u8"系统错误";
+			text += "\n" + std::string(reason) + " (" + error.category().name() + ":" +
+				std::to_string(error.value()) + ")";
+		}
+		if (package.archiveError != 0) text += u8"\nZIP 错误：" + std::to_string(package.archiveError);
+		if (package.cleanupFailed || result.status == OnlineUpdate::ResourceDownloadPreparationStatus::CleanupFailed)
+		{
+			text += u8"\n暂存清理未完成，请重启后重试";
+		}
+	}
+	else if (result.status == OnlineUpdate::ResourceDownloadPreparationStatus::DownloadFailed &&
+		result.downloadResult.nativeErrorCode != 0)
+	{
+		text += u8"\n下载错误：" + std::to_string(result.downloadResult.nativeErrorCode);
+	}
+	return text;
 }
 
 std::string programPackageFailureText(
@@ -1271,6 +1422,8 @@ std::string commonPreparationFailureText(
 	shared.status = result.status;
 	shared.downloadResult = result.downloadResult;
 	shared.packageResult = result.packageResult;
+	shared.workspacePath = result.workspacePath;
+	shared.failedGameId = "common";
 	return resourcePreparationFailureText(shared);
 }
 
@@ -1848,9 +2001,8 @@ void ResourceSelectScene::rebuildResourceEntries()
 						OnlineUpdate::RequestedResourceDownloadMode::IfNeeded);
 				entry.hasPendingOnlineArtifacts = plan.succeeded() &&
 					!plan.downloadOrder.empty();
-				entry.requiresNewerEngine = entry.requiresNewerEngine ||
-					plan.status ==
-						OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
+				entry.onlineRequiresNewerEngine = plan.status ==
+					OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
 			}
 		}
 		resourceEntries.push_back(std::move(entry));
@@ -1931,7 +2083,7 @@ void ResourceSelectScene::rebuildResourceEntries()
 				OnlineUpdate::RequestedResourceDownloadMode::IfNeeded);
 		entry.hasPendingOnlineArtifacts = plan.succeeded() &&
 			!plan.downloadOrder.empty();
-		entry.requiresNewerEngine = plan.status ==
+		entry.onlineRequiresNewerEngine = plan.status ==
 			OnlineUpdate::ResourcePlanStatus::RequiresNewerEngine;
 		resourceEntries.push_back(std::move(entry));
 	}
@@ -2010,7 +2162,7 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 		entry.localVersionNewerThanOnline;
 	selectedDetails.hasPendingOnlineArtifacts =
 		entry.hasPendingOnlineArtifacts;
-	selectedDetails.requiresNewerEngine = entry.requiresNewerEngine;
+	selectedDetails.onlineRequiresNewerEngine = entry.onlineRequiresNewerEngine;
 	selectedDetails.wasRecentlySelected = entry.wasRecentlySelected;
 	if (entry.configurationError)
 	{
@@ -2030,7 +2182,7 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 	{
 		selectedDetails.version = u8"未安装";
 		selectedDetails.releaseDate = u8"未声明";
-		selectedDetails.runStatus = entry.requiresNewerEngine
+		selectedDetails.runStatus = entry.onlineRequiresNewerEngine
 			? std::string(u8"尚未安装；需要先更新主程序")
 			: u8"尚未安装；可获取线上版本 " +
 				valueOrUndeclared(entry.onlineVersion);
@@ -2058,9 +2210,9 @@ void ResourceSelectScene::updateSelectedResourceDetails(int selectedIndex)
 	selectedDetails.runStatus = describePackRunStatus(pack.compatibility);
 	if (entry.onlineAvailable)
 	{
-		if (entry.requiresNewerEngine)
+		if (entry.onlineRequiresNewerEngine)
 		{
-			selectedDetails.runStatus += u8"；需要先更新主程序";
+			selectedDetails.runStatus += u8"；更新资源需先更新主程序";
 		}
 		else if (entry.localVersionNewerThanOnline)
 		{
@@ -2675,7 +2827,7 @@ void ResourceSelectScene::refreshOnlineActionButton()
 		!externalResourceDialogVisible &&
 		resourceInstallDialogState == ResourceInstallDialogState::Hidden &&
 		selectedDetails.packIndex >= 0 && selectedDetails.onlineAvailable &&
-		!selectedDetails.requiresNewerEngine &&
+		!selectedDetails.onlineRequiresNewerEngine &&
 		catalogCheckState == CatalogCheckState::Ready;
 	onlineActionButton->visible = available;
 	onlineActionButton->activated = available;
@@ -3566,13 +3718,26 @@ bool ResourceSelectScene::buildResourceInstallConfirmation(
 		errorText = u8"无法检查资源目录磁盘空间";
 		return false;
 	}
-	if (totalDownloadBytes >
+	std::uint64_t remainingDownloadBytes = totalDownloadBytes;
+#if defined(__ANDROID__)
+	remainingDownloadBytes = OnlineUpdate::remainingResourceDownloadBytes(
+		plan, includeCommon ? &*onlineCatalog.commonPackage : nullptr,
+		OnlineUpdate::resourceUpdateDirectoryPath(collectionRoot) / "downloads");
+#endif
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+	confirmation.partialDownloadFiles = OnlineUpdate::resourceDownloadPartialFiles(
+		plan, includeCommon ? &*onlineCatalog.commonPackage : nullptr,
+		OnlineUpdate::resourceUpdateDirectoryPath(collectionRoot) / "downloads");
+#endif
+	if (remainingDownloadBytes >
 		std::numeric_limits<std::uint64_t>::max() -
 			ResourceDownloadDiskHeadroom ||
-		space.available < totalDownloadBytes +
+		space.available < remainingDownloadBytes +
 			ResourceDownloadDiskHeadroom)
 	{
-		errorText = u8"磁盘空间不足：至少需要下载大小加 64 MiB 临时空间";
+		errorText = u8"设备空间不足。剩余下载 " + formatByteCount(remainingDownloadBytes) +
+			u8"，当前可用 " + formatByteCount(space.available) +
+			u8"，还需保留 64 MiB，下载后解压也要占空间。请到系统设置清理空间，再返回游戏下载。";
 		return false;
 	}
 
@@ -3978,6 +4143,11 @@ void ResourceSelectScene::executeSaveRemoval()
 
 void ResourceSelectScene::activateResourceDialogPrimary()
 {
+	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingDownloadRetention)
+	{
+		finishDownloadCancellation(false);
+		return;
+	}
 	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingSaveExport)
 	{
 		selectSaveFile(true);
@@ -4067,6 +4237,11 @@ void ResourceSelectScene::activateResourceDialogPrimary()
 
 void ResourceSelectScene::activateResourceDialogSecondary()
 {
+	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingDownloadRetention)
+	{
+		finishDownloadCancellation(true);
+		return;
+	}
 	if (resourceInstallDialogState == ResourceInstallDialogState::SelectingSaveFile ||
 		resourceInstallDialogState == ResourceInstallDialogState::TransferringSaves) return;
 	if (resourceInstallOperation == ResourceInstallOperation::SaveTransfer)
@@ -4801,6 +4976,12 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 		return;
 	}
 
+	std::filesystem::path partialDownloadDirectory;
+	manualResourceDownloadCancellation = false;
+#if defined(__ANDROID__)
+	partialDownloadDirectory = updateDirectory / "downloads";
+#endif
+
 	resourceInstallWorkerResult =
 		std::make_shared<ResourceInstallWorkerResult>();
 	resourceInstallWorkerResult->operation = resourceInstallOperation;
@@ -4836,6 +5017,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 			catalogSources,
 			collectionRoot,
 			workspacePath,
+			partialDownloadDirectory,
 			targets,
 			installedArtifacts,
 			installedResourceRoots,
@@ -4873,7 +5055,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 								: ResourceInstallProgressStage::Downloading,
 							std::memory_order_release);
 						return !cancellationToken.isCancellationRequested();
-					});
+					}, {}, {}, partialDownloadDirectory);
 			if (workerResult->preparation.status ==
 					OnlineUpdate::ResourceDownloadPreparationStatus::Cancelled ||
 				cancellationToken.isCancellationRequested())
@@ -4942,7 +5124,7 @@ void ResourceSelectScene::startConfirmedResourceDownload()
 								std::memory_order_release);
 							return !cancellationToken.
 								isCancellationRequested();
-						});
+						}, {}, {}, partialDownloadDirectory);
 				if (workerResult->commonPreparation.status ==
 						OnlineUpdate::ResourceDownloadPreparationStatus::
 							Cancelled ||
@@ -5248,7 +5430,16 @@ void ResourceSelectScene::finishResourceInstall(
 			resourceInstallWorkerResult->commonPreparation.status ==
 				OnlineUpdate::ResourceDownloadPreparationStatus::Cancelled))
 	{
+		if (manualResourceDownloadCancellation)
+		{
+			manualResourceDownloadCancellation = false;
+			showDownloadRetentionChoice();
+			return;
+		}
 		catalogStatusText = u8"资源下载已取消，现有资源未改变";
+#if defined(__ANDROID__)
+		catalogStatusText = u8"下载已取消，已下载部分保留；再次下载同一游戏可尝试继续";
+#endif
 		resourceInstallDialogState = ResourceInstallDialogState::Hidden;
 		pendingResourceInstall = {};
 		resourceInstallDialogMessage.clear();
@@ -5308,6 +5499,16 @@ void ResourceSelectScene::finishResourceInstall(
 				resourceInstallWorkerResult->transaction.status);
 		}
 	}
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+	if (resourceInstallDialogState == ResourceInstallDialogState::Failed &&
+		resourceInstallOperation == ResourceInstallOperation::OnlineDownload &&
+		(resourceInstallWorkerResult->preparation.status == OnlineUpdate::ResourceDownloadPreparationStatus::DownloadFailed ||
+		 resourceInstallWorkerResult->commonPreparation.status == OnlineUpdate::ResourceDownloadPreparationStatus::DownloadFailed))
+	{
+		resourceInstallDialogMessage += u8"\n已下载部分保留。关闭提示，再次下载同一游戏可尝试继续。";
+	}
+#endif
+
 	refreshResourceInstallDialogControls();
 	semanticFocusVisible = focusManager.focusNode(
 		resourceInstallDialogState == ResourceInstallDialogState::ReadyToRestart ||
@@ -5479,6 +5680,11 @@ void ResourceSelectScene::startPreparedProgramUpdate()
 
 void ResourceSelectScene::cancelResourceInstall()
 {
+	if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingDownloadRetention)
+	{
+		finishDownloadCancellation(false);
+		return;
+	}
 	if (resourceInstallDialogState == ResourceInstallDialogState::Confirming &&
 		pendingDownloadUsesMeteredNetwork && pendingMeteredDownloadConfirmed)
 	{
@@ -5491,6 +5697,9 @@ void ResourceSelectScene::cancelResourceInstall()
 	{
 		if (resourceInstallRunner != nullptr)
 		{
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+			manualResourceDownloadCancellation = resourceInstallOperation == ResourceInstallOperation::OnlineDownload;
+#endif
 			resourceInstallRunner->requestCancellation();
 			resourceInstallDialogState =
 				ResourceInstallDialogState::Cancelling;
@@ -5506,6 +5715,67 @@ void ResourceSelectScene::cancelResourceInstall()
 	if (resourceInstallDialogState == ResourceInstallDialogState::Cancelling)
 	{
 		return;
+	}
+	dismissResourceInstallDialog();
+}
+
+void ResourceSelectScene::showDownloadRetentionChoice()
+{
+	std::uint64_t bytes = 0;
+	bool spaceKnown = true;
+	for (const auto& file : pendingResourceInstall.partialDownloadFiles)
+	{
+		std::uint64_t size = 0;
+		if (!readDownloadPartialSize(file.first, size) || size > std::numeric_limits<std::uint64_t>::max() - bytes)
+		{
+			spaceKnown = false;
+			continue;
+		}
+		bytes += size;
+	}
+	resourceInstallDialogState = ResourceInstallDialogState::ChoosingDownloadRetention;
+	resourceInstallDialogMessage = spaceKnown
+		? u8"已下载文件占用 " + formatByteCount(bytes) + u8"。"
+		: std::string(u8"暂时无法统计已下载文件占用空间。");
+	resourceInstallDialogMessage += u8"\n保留进度：下次下载同一游戏可继续。\n取消并清理：删除这些文件，下次重新下载。";
+	refreshResourceInstallDialogControls();
+	semanticFocusVisible = focusManager.focusNode("install-primary");
+	updateFocusPresentation();
+}
+
+void ResourceSelectScene::finishDownloadCancellation(bool clearFiles)
+{
+	if (resourceInstallRunner != nullptr || resourceInstallDialogState != ResourceInstallDialogState::ChoosingDownloadRetention)
+	{
+		return;
+	}
+	if (clearFiles)
+	{
+		std::uint64_t removedBytes = 0;
+		bool cleaned = true;
+		for (const auto& file : pendingResourceInstall.partialDownloadFiles)
+		{
+			std::uint64_t size = 0;
+			if (!readDownloadPartialSize(file.first, size))
+			{
+				cleaned = false;
+				continue;
+			}
+			std::error_code error;
+			if (std::filesystem::remove(file.first, error)) removedBytes += size;
+			cleaned = !error && cleaned;
+		}
+		if (!cleaned)
+		{
+			showDownloadRetentionChoice();
+			resourceInstallDialogMessage = u8"部分临时文件未能清理。请检查存储空间或存储卡后再点“取消并清理”，也可选择“保留进度”稍后处理。";
+			return;
+		}
+		catalogStatusText = u8"下载已取消，已清理 " + formatByteCount(removedBytes) + u8"；下次重新下载";
+	}
+	else
+	{
+		catalogStatusText = u8"下载已暂停，断点文件已保留；再次下载同一游戏可继续";
 	}
 	dismissResourceInstallDialog();
 }
@@ -5533,6 +5803,7 @@ void ResourceSelectScene::dismissResourceInstallDialog()
 	resourceInstallOperation = ResourceInstallOperation::OnlineDownload;
 	pendingResourceInstall = {};
 	resourcePackageImportKind = ResourcePackageImportKind::Full;
+	manualResourceDownloadCancellation = false;
 	pendingImportedPackage = {};
 	pendingProgramPackagePath.clear();
 	pendingSavePackage.reset();
@@ -5775,6 +6046,12 @@ void ResourceSelectScene::refreshResourceInstallDialogControls()
 	{
 		resourceInstallSecondaryButton->setUTF8Str(u8"正在取消…");
 		secondaryVisible = true;
+	}
+	else if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingDownloadRetention)
+	{
+		resourceInstallPrimaryButton->setUTF8Str(u8"保留进度");
+		resourceInstallSecondaryButton->setUTF8Str(u8"取消并清理");
+		primaryVisible = primaryActivated = secondaryVisible = secondaryActivated = true;
 	}
 	else if (resourceInstallDialogState ==
 		ResourceInstallDialogState::ReadyToRestart)
@@ -6669,7 +6946,8 @@ void ResourceSelectScene::confirmSelection()
 		catalogStatusText = u8"资源配置错误，不能进入：" + entry.title;
 		return;
 	}
-	if (entry.requiresNewerEngine)
+	if (entry.requiresNewerEngine ||
+		(entry.isOnlineOnly() && entry.onlineRequiresNewerEngine))
 	{
 		catalogStatusText = u8"当前引擎版本过低，不能进入：" + entry.title;
 		return;
@@ -6679,7 +6957,8 @@ void ResourceSelectScene::confirmSelection()
 		beginResourceDownloadConfirmation();
 		return;
 	}
-	if (entry.onlineAvailable && !entry.localVersionNewerThanOnline &&
+	if (entry.onlineAvailable && !entry.onlineRequiresNewerEngine &&
+		!entry.localVersionNewerThanOnline &&
 		beginResourceDownloadConfirmation(true))
 	{
 		return;
@@ -8715,6 +8994,9 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				ResourceInstallOperation::ResourceImport
 			? u8"正在取消导入" : u8"正在取消下载";
 		break;
+	case ResourceInstallDialogState::ChoosingDownloadRetention:
+		title = u8"下载已停止";
+		break;
 	case ResourceInstallDialogState::ReadyToRestart:
 		title = resourceInstallOperation ==
 				ResourceInstallOperation::ProgramDownload
@@ -9914,6 +10196,11 @@ bool ResourceSelectScene::onHandleUIAction(UIAction action)
 		}
 		if (action == UIAction::Cancel)
 		{
+			if (resourceInstallDialogState == ResourceInstallDialogState::ChoosingDownloadRetention)
+			{
+				finishDownloadCancellation(false);
+				return true;
+			}
 			if (resourceInstallDialogState ==
 				ResourceInstallDialogState::ChoosingImportType)
 			{

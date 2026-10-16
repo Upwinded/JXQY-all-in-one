@@ -278,25 +278,25 @@ public:
 		recordedDestination = destination;
 	}
 
-	void beginRun(Point destination) override
+	void beginRun(Point destination, bool = false) override
 	{
 		recordedAction = RecordedNpcAction::Run;
 		recordedDestination = destination;
 	}
 
-	void beginJump(Point destination) override
+	void beginJump(Point destination, bool = false) override
 	{
 		recordedAction = RecordedNpcAction::Jump;
 		recordedDestination = destination;
 	}
 
-	void beginAttack(Point destination, std::shared_ptr<GameElement>) override
+	void beginAttack(Point destination, std::shared_ptr<GameElement>, bool = false) override
 	{
 		recordedAction = RecordedNpcAction::Attack;
 		recordedDestination = destination;
 	}
 
-	void beginMagic(Point destination, std::shared_ptr<GameElement>) override
+	void beginMagic(Point destination, std::shared_ptr<GameElement>, bool = false) override
 	{
 		recordedAction = RecordedNpcAction::Magic;
 		recordedDestination = destination;
@@ -1254,6 +1254,175 @@ bool runPlayerForcedMovementUpdateTests()
 	return ok;
 }
 
+bool runScriptActionResourceCostTests()
+{
+	class ScriptCostPlayer final : public Player
+	{
+	public:
+		void advance()
+		{
+			setTime(getTime() + 16);
+			actionManager->update(16);
+		}
+		unsigned int eventRun() override
+		{
+			for (int frame = 0; frame < 600 && !isStanding(); ++frame)
+			{
+				advance();
+			}
+			return isStanding() ? erNone : erInitError;
+		}
+	};
+	bool ok = true;
+	for (int originalType : { GAME_JXQY2, GAME_YYCS, GAME_XJXQY })
+	{
+		GameManager gameManager;
+		applyOriginalBehavior(gameManager.global, originalType);
+		gameManager.global.data.NPCAI = false;
+		gameManager.map->data = std::make_shared<MapData>();
+		gameManager.map->data->head.width = gameManager.map->data->head.height = 16;
+		gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
+		auto player = std::make_shared<ScriptCostPlayer>();
+		gameManager.player = player;
+		player->npcName = "StoryPlayer";
+		player->lifeMax = player->info.lifeMax = player->life = 1000;
+		player->manaMax = player->info.manaMax = player->thewMax = player->info.thewMax = 100;
+		NPCActionRes animation;
+		animation.imagePackage = std::make_shared<IMPImage>();
+		animation.imagePackage->directions = 8;
+		animation.imagePackage->interval = 100;
+		animation.imagePackage->frame.resize(24);
+		player->res.stand = player->res.walk = player->res.run = player->res.jump =
+			player->res.attack = player->res.magic = player->res.hurt = animation;
+		auto magic = std::make_shared<Magic>();
+		magic->loadSucceeded = true;
+		magic->level[1].moveKind = mmkPoint;
+		magic->level[1].lifeFrame = 10;
+		magic->level[1].manaCost = 30;
+		magic->level[1].thewCost = 20;
+		magic->coldMilliSeconds = 1000;
+		auto& magicInfo = gameManager.magicManager.magicList[gameManager.magicManager.bottomBegin()];
+		magicInfo.magic = magic;
+		magicInfo.iniFile = "story_cost.ini";
+		magicInfo.level = 1;
+		player->npcMagic = magic;
+		player->magicIndex = 0;
+		gameManager.map->createDataMap();
+		auto reset = [&](int resources)
+		{
+			player->forceBeginStand();
+			player->setPosition({ 4, 4 }, false);
+			player->setOffset({ 0, 0 });
+			player->mana = player->thew = resources;
+			magicInfo.remainColdMilliseconds = 0;
+			gameManager.effectManager->freeResource();
+			gameManager.map->createDataMap();
+		};
+		for (int resources : { 0, 100 })
+		{
+			for (const char* command : {
+				"npcattack('StoryPlayer',6,6);", "setnpcaction('StoryPlayer',5,6,6);",
+				"playerrunto(8,8);", "playerruntoex(8,8);", "playerjumpto(8,8);",
+				"setnpcaction('StoryPlayer',3,8,8);", "setnpcaction('StoryPlayer',4,8,8);",
+				"usemagic('story_cost.ini',6,6);", "setnpcaction('StoryPlayer',8,6,6);" })
+			{
+				reset(resources);
+				gameManager.inEvent = true;
+				ok = check(ScriptEngineRuntimeTestAccess::execute(gameManager.script, command) == LUA_OK,
+					"scripted resource-cost fixture executes through Lua") && ok;
+				const std::string source = command;
+				if (source != "playerrunto(8,8);" && source != "playerjumpto(8,8);")
+				{
+					ok = check(!player->isStanding() && player->actionManager->getCurrentAction()->scripted,
+						(std::string("scripted action actually starts, even with zero resources: ") + command).c_str()) && ok;
+				}
+				gameManager.inEvent = false;
+				for (int frame = 0; frame < 600 && !player->isStanding(); ++frame)
+				{
+					player->advance();
+				}
+				const bool movement = std::string(command).find("8,8") != std::string::npos;
+				const bool casting = std::string(command).find("magic") != std::string::npos
+					|| std::string(command).find(",8,6,6") != std::string::npos;
+				ok = check(player->isStanding() && !player->actionManager->getCurrentAction()->scripted
+					&& player->mana == resources && player->thew == resources
+					&& (!movement || player->getPosition() == Point{ 8, 8 })
+					&& (!casting || !gameManager.effectManager->effectList.empty()),
+					(std::string("scripted actions complete without resource costs, including after return: ")
+						+ std::to_string(originalType) + " " + command).c_str()) && ok;
+			}
+		}
+		reset(100);
+		player->beginAttack({ 6, 6 });
+		ok = check(player->thew == 100 - ATTACK_THEW_COST,
+			"ordinary attacks still pay stamina after scripted actions") && ok;
+		reset(100);
+		player->beginJump({ 8, 8 });
+		ok = check(player->thew == 100 - JUMP_THEW_COST,
+			"ordinary jumps still pay stamina after scripted actions") && ok;
+		reset(100);
+		player->beginRun({ 8, 8 });
+		ok = check(player->thew == 100 - RUN_THEW_COST,
+			"ordinary running still pays its initial stamina cost") && ok;
+		player->eventRun();
+		ok = check(player->isStanding() && player->thew < 100 - RUN_THEW_COST,
+			"ordinary running continues to pay stamina per step") && ok;
+		reset(100);
+		player->beginMagic(magicInfo, { 6, 6 });
+		player->eventRun();
+		ok = check(player->mana == 70 && player->thew == 80,
+			"ordinary delayed casting still pays both resource costs") && ok;
+		reset(100);
+		gameManager.scriptAPI.playerRunToEx(8, 8);
+		player->advance();
+		player->beginRun({ 8, 10 });
+		ok = check(!player->actionManager->getCurrentAction()->scripted,
+			"player retargeting replaces the scripted running cost policy") && ok;
+		player->eventRun();
+		ok = check(player->isStanding() && player->thew < 100,
+			"player running after taking over a scripted path consumes stamina") && ok;
+		reset(100);
+		gameManager.scriptAPI.playerRunToEx(8, 8);
+		player->advance();
+		player->beginHurt({ 6, 6 });
+		ok = check(player->isHurting(), "scripted running can be interrupted by a normal hurt action") && ok;
+		player->eventRun();
+		ok = check(player->isStanding() && player->getPosition() == Point{ 8, 8 } && player->thew == 100,
+			"resuming scripted running after being hurt retains its cost policy") && ok;
+		reset(100);
+		gameManager.inEvent = true;
+		player->beginAttack({ 6, 6 });
+		ok = check(player->thew == 100 - ATTACK_THEW_COST,
+			"an unrelated running script does not exempt an ordinary attack") && ok;
+		gameManager.inEvent = false;
+		reset(0);
+		player->beginAttack({ 6, 6 });
+		player->beginJump({ 8, 8 });
+		player->beginRun({ 8, 8 });
+		ok = check(player->isStanding() && !player->canPayRunThewCost()
+			&& !player->tryConsumeMagicCost(magic, 1, false),
+			"ordinary actions still reject insufficient resources") && ok;
+		magic->goodsName = "missing-story-cost-item";
+		ok = check(!player->tryConsumeMagicCost(magic, 1, false, true),
+			"scripted casts retain required-item checks") && ok;
+		magic->goodsName.clear();
+		player->canUseMana = false;
+		ok = check(!player->tryConsumeMagicCost(magic, 1, false, true),
+			"scripted casts retain explicit skill-use restrictions") && ok;
+		player->canUseMana = true;
+		magicInfo.remainColdMilliseconds = 1000;
+		player->beginMagic(magicInfo, { 6, 6 }, nullptr, -1, true);
+		ok = check(player->isStanding(), "scripted casting retains cooldown restrictions") && ok;
+		reset(0);
+		magic->level[1].moveKind = mmkSelf;
+		magic->level[1].specialKind = mskClearAbnormalState;
+		gameManager.scriptAPI.useMagic("story_cost.ini", 4, 4, true);
+		ok = check(!gameManager.effectManager->effectList.empty() && player->mana == 0 && player->thew == 0,
+			"immediate self-cure script casts also ignore mana and stamina costs") && ok;
+	}
+	return ok;
+}
+
 bool runScriptEngineRuntimeTests()
 {
 	bool ok = true;
@@ -1272,6 +1441,7 @@ bool runScriptEngineRuntimeTests()
 	ok = runRuntimeTraceInstrumentationTests() && ok;
 	ok = runGoodsUseWithoutMenusTests() && ok;
 	ok = runPlayerForcedMovementUpdateTests() && ok;
+	ok = runScriptActionResourceCostTests() && ok;
 	Script script;
 
 	for (int index = 0; index < 4096; index++)
@@ -1779,14 +1949,15 @@ bool runScriptEngineRuntimeTests()
 	const bool savedActionCanInput = gameManager.global.data.canInput;
 	const bool savedActionFightState = gameManager.player->fightState.get();
 	gameManager.player->fightState.set(true);
+	gameManager.player->canRun = true;
 	const int disableActionsResult = ScriptEngineRuntimeTestAccess::execute(script,
 		"disablerun(); disablejump(); disablefight(); disableinput(); disablenpcai()");
 	ok = check(disableActionsResult == LUA_OK
-		&& !gameManager.player->canRun && !gameManager.player->canJump
+		&& gameManager.player->canRun && !gameManager.player->canJump
 		&& !gameManager.player->canFight && !gameManager.global.data.canInput
 		&& !gameManager.global.data.NPCAI && !recordingNPC->isAIEnabled()
 		&& !recordingNPC->isAIDisabled && gameManager.player->fightState.get(),
-		"global Lua action restrictions do not overwrite the local NPC flag or current fight stance") && ok;
+		"DisableRun is ignored while other Lua restrictions retain their independent behavior") && ok;
 	ScriptEngineRuntimeTestAccess::execute(script, "disablenpcai(''); enablenpcai()");
 	ok = check(gameManager.global.data.NPCAI && recordingNPC->isAIDisabled
 		&& !recordingNPC->isAIEnabled() && !gameManager.player->canFight
@@ -1799,6 +1970,10 @@ bool runScriptEngineRuntimeTests()
 		&& gameManager.player->canFight && gameManager.global.data.canInput
 		&& recordingNPC->isAIEnabled() && !recordingNPC->isAIDisabled,
 		"Lua Enable commands restore their independent action permissions") && ok;
+	gameManager.player->canRun = false;
+	ScriptEngineRuntimeTestAccess::execute(script, "disablerun()");
+	ok = check(!gameManager.player->canRun,
+		"ignored DisableRun does not rewrite a separately loaded CanRun permission") && ok;
 	gameManager.player->canRun = savedCanRun;
 	gameManager.player->canJump = savedCanJump;
 	gameManager.player->canFight = savedCanFight;

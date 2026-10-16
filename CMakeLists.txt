@@ -218,10 +218,10 @@ elseif(UNIX AND NOT APPLE)
         include/libswscale/swscale.h
         lib/libSDL3.so
         lib/libSDL3.so.0
-        lib/libSDL3.so.0.4.10
+        lib/libSDL3.so.0.4.18
         lib/libSDL3_image.so
         lib/libSDL3_image.so.0
-        lib/libSDL3_image.so.0.2.4
+        lib/libSDL3_image.so.0.4.8
         lib/libSDL3_ttf.so
         lib/libSDL3_ttf.so.0
         lib/libSDL3_ttf.so.0.2.2
@@ -470,10 +470,12 @@ if(WIN32)
         "${_SDL3_BIN_DIR}/optional/libogg-0.dll"
         "${_SDL3_BIN_DIR}/optional/libopus-0.dll"
         "${_SDL3_BIN_DIR}/optional/libopusfile-0.dll"
+        "${_SDL3_BIN_DIR}/optional/libpng16-16.dll"
         "${_SDL3_BIN_DIR}/optional/libtiff-6.dll"
         "${_SDL3_BIN_DIR}/optional/libwavpack-1.dll"
         "${_SDL3_BIN_DIR}/optional/libwebp-7.dll"
         "${_SDL3_BIN_DIR}/optional/libwebpdemux-2.dll"
+        "${_SDL3_BIN_DIR}/optional/libwebpmux-3.dll"
         "${_SDL3_BIN_DIR}/optional/libxmp.dll")
     set(_FFMPEG_RUNTIME_SEARCH_DIRS
         "${FFMPEG_ROOT}/lib/${LIB_ARCH_DIR}/bin"
@@ -1131,6 +1133,7 @@ add_executable(jxqy-npc-targeting-tests
 	${SRC_DIR}/tests/test_ui_focus.cpp
 	${SRC_DIR}/tests/test_map_thumbnail_controller.cpp
 	${SRC_DIR}/tests/test_partner_equipment_transfer.cpp
+	${SRC_DIR}/tests/test_partner_mechanics.cpp
 	${SRC_DIR}/tests/test_world_interaction_runtime.cpp
 	${SRC_DIR}/tests/test_gamepad_world_runtime.cpp
 	${SRC_DIR}/tests/test_gamepad_essential_ui.cpp
@@ -1189,6 +1192,8 @@ add_test(NAME jxqy-script-movement-tests COMMAND jxqy-npc-targeting-tests --scri
 set_tests_properties(jxqy-core-lifecycle-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-current-mod-compatibility-tests COMMAND jxqy-npc-targeting-tests --current-mod-compatibility)
 add_test(NAME jxqy-qingyu-ui-tests COMMAND jxqy-npc-targeting-tests --qingyu-ui)
+add_test(NAME jxqy-qingyu-ui-interaction-tests COMMAND jxqy-npc-targeting-tests --qingyu-ui-interaction)
+set_tests_properties(jxqy-qingyu-ui-interaction-tests PROPERTIES TIMEOUT 180)
 set_tests_properties(jxqy-qingyu-ui-tests PROPERTIES TIMEOUT 180)
 set_tests_properties(jxqy-current-mod-compatibility-tests PROPERTIES TIMEOUT 180)
 if(WIN32 AND BUILD_TESTING)
@@ -1243,6 +1248,7 @@ add_test(NAME jxqy-map-thumbnail-controller-tests
 	COMMAND jxqy-npc-targeting-tests --map-thumbnail-controller)
 add_test(NAME jxqy-partner-equipment-transfer-tests
 	COMMAND jxqy-npc-targeting-tests --partner-equipment-transfer)
+add_test(NAME jxqy-partner-mechanics-tests COMMAND jxqy-npc-targeting-tests --partner-mechanics)
 add_test(NAME jxqy-world-interaction-tests
 	COMMAND jxqy-npc-targeting-tests --world-interaction-runtime)
 add_test(NAME jxqy-gamepad-world-runtime-tests

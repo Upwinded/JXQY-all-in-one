@@ -288,8 +288,21 @@ bool runDirectSaveTests(SaveGenerationFixture& fixture)
 	ok = check(SaveFileManager::CopySaveFileToAuto() &&
 		fixture.snapshot("save/rpg_auto") == fixture.snapshot("save/rpg1"),
 		"automatic save uses the same direct copy") && ok;
+	for (int slot : { 8, 9 })
+	{
+		ok = check(SaveFileManager::CopySaveFileTo(slot) && SaveFileManager::HasSaveFile(slot)
+			&& SaveFileManager::CopySaveFileFrom(slot)
+			&& fixture.read("save/game/game.ini") == "new-current",
+			"manual slots eight and nine save and load through the real file routing") && ok;
+	}
+	ok = check(SaveFileManager::HasSaveFile(SaveSlots::Automatic)
+		&& SaveFileManager::CopySaveFileFrom(SaveSlots::Automatic)
+		&& !SaveFileManager::CopySaveFileTo(SaveSlots::Automatic)
+		&& !File::fileExist("save/rpg10/game.ini"),
+		"automatic UI slot reads rpg_auto and rejects manual writes") && ok;
+	fixture.write("save/game/list.ini", "legacy-list");
 	const auto slotBefore = fixture.snapshot("save/rpg1");
-	ok = check(!SaveFileManager::CopySaveFileTo(0) && !SaveFileManager::CopySaveFileTo(8) &&
+	ok = check(!SaveFileManager::CopySaveFileTo(0) && !SaveFileManager::CopySaveFileTo(SaveSlots::Automatic) &&
 		!File::overwriteDirectoryFiles("save/game", "save/game") &&
 		!SaveFileManager::CopySaveFileTo(1, []() { return true; }) &&
 		fixture.snapshot("save/rpg1") == slotBefore && fixture.snapshot("save/game") == currentBefore,
@@ -332,7 +345,7 @@ bool runDirectLoadTests(SaveGenerationFixture& fixture)
 		!std::filesystem::exists(fixture.physicalPath("save/.jxqy-game-staging-ready")),
 		"loading creates no candidate directory or publication transaction") && ok;
 	const auto runtimeBefore = fixture.snapshot("save/game");
-	ok = check(!SaveFileManager::CopySaveFileFrom(8) && !SaveFileManager::CopySaveFileFrom(7) &&
+	ok = check(!SaveFileManager::CopySaveFileFrom(SaveSlots::Automatic + 1) && !SaveFileManager::CopySaveFileFrom(7) &&
 		fixture.snapshot("save/game") == runtimeBefore,
 		"invalid and missing slots are rejected before clearing runtime files") && ok;
 	ok = check(fixture.write("save/rpg_auto/game.ini", "automatic-save") &&

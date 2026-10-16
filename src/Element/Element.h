@@ -177,6 +177,7 @@ public:
 	// select at these event coordinates without changing hover/down state.
 	Element* findPointerHitTargetInTree(int x, int y);
 	void setRunning(bool sRunning) { logicRunning = sRunning; }
+	bool isRunLoopActive() const { return logicRunning; }
 
 protected:
 

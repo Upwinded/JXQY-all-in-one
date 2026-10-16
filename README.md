@@ -70,7 +70,7 @@ Debug 构建可使用完整本地资源集合。Android、macOS 和 iOS 的 Rele
 
 ### Windows
 
-要求 Visual Studio 2022，并准备 `ThirdParty/devel/win/`。
+准备 `ThirdParty/devel/win/`。建议使用 Visual Studio 2026 的 MSVC 14.51 或更新工具集，避开 MSVC 14.50 在部分磁盘上的 [filesystem 目录识别问题](https://github.com/microsoft/STL/issues/6180)。
 
 打开：
 

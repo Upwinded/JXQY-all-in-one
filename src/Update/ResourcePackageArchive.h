@@ -5,7 +5,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace OnlineUpdate
@@ -54,6 +56,15 @@ enum class ResourcePackageArchiveStatus
 	CleanupFailed
 };
 
+enum class ResourcePackageArchiveStage
+{
+	Validation,
+	Extraction,
+	CopyingBase,
+	ApplyingOverlay,
+	ManifestValidation
+};
+
 struct ResourcePackageArchiveResult
 {
 	ResourcePackageArchiveStatus status =
@@ -62,7 +73,11 @@ struct ResourcePackageArchiveResult
 	std::filesystem::path filesystemPath;
 	std::size_t fileCount = 0;
 	std::uint64_t uncompressedBytes = 0;
+	std::optional<std::uint64_t> availableDiskBytes;
 	int archiveError = 0;
+	ResourcePackageArchiveStage stage = ResourcePackageArchiveStage::Validation;
+	std::error_code filesystemError;
+	bool cleanupFailed = false;
 
 	bool succeeded() const noexcept
 	{
@@ -97,11 +112,16 @@ struct ImportedResourcePackageArchiveResult
 };
 
 // Verifies the downloaded artifact, extracts it into a new staging directory,
-// and checks that its root manifest matches the online catalog entry. The
-// destination must not exist. Any failure removes only the destination created
-// by this call; current installed resources are never modified here.
+// and checks its root identity, dependencies and resource type against the
+// online catalog entry. Its own resource version is preserved; increments may
+// supply a newer version. Without increments, the version must match the catalog.
+// Its minimum engine version is checked against the
+// running engine independently of the catalog's minimum version. The destination
+// must not exist. Any failure removes only the destination created by this call;
+// current installed resources are never modified here.
 ResourcePackageArchiveResult prepareResourcePackageArchive(
 	const ResourcePackage& expectedPackage,
+	const std::string& currentEngineVersion,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits = {});
@@ -136,15 +156,18 @@ ImportedResourcePackageArchiveResult
 // add or replace files. Removing files requires publishing a new full package.
 ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
 	const ResourcePackage& expectedPackage,
+	const std::string& currentEngineVersion,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits = {});
 
 // Validates and extracts one ordered chain overlay. Historical entries only
-// need a valid manifest with the expected Game.Id; the last entry must match
-// the current catalog metadata and receives the complete chain receipt.
+// need a valid manifest with the expected Game.Id; every entry must support
+// the running engine. The last entry matches the current catalog metadata
+// apart from its independently checked minimum engine version.
 ResourcePackageArchiveResult prepareIncrementalChainPackageArchive(
 	const ResourcePackage& expectedPackage,
+	const std::string& currentEngineVersion,
 	std::size_t chainIndex,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,

@@ -145,7 +145,19 @@ bool expect(bool condition, const char* description)
 	return condition;
 }
 
-bool testValidGroupCommitsAfterRuntimeScan()
+std::filesystem::path alternateCollectionRoot(
+	const std::filesystem::path& assets)
+{
+#if defined(_WIN32)
+	return assets.parent_path() / "ASSETS";
+#else
+	const std::filesystem::path alias = assets.parent_path() / "assets-alias";
+	std::filesystem::create_directory_symlink(assets, alias);
+	return alias;
+#endif
+}
+
+bool testValidGroupCommitsAfterRuntimeScan(bool useAlternateRoot = false)
 {
 	TemporaryTree tree("jxqy-resource-manager-install-success");
 	const std::filesystem::path assets = tree.root / "assets";
@@ -159,7 +171,9 @@ bool testValidGroupCommitsAfterRuntimeScan()
 	}
 	ResourceManager& manager = ResourceManager::instance();
 	ResourceManagerPolicyTestAccess::reset(manager);
-	ok = expect(manager.initialize(assets.generic_u8string()),
+	const std::filesystem::path scanRoot = useAlternateRoot
+		? alternateCollectionRoot(assets) : assets;
+	ok = expect(manager.initialize(scanRoot.generic_u8string()),
 		"runtime install: manager initializes") && ok;
 #if !defined(__ANDROID__) && !defined(__APPLE__)
 	ok = expect(
@@ -180,7 +194,8 @@ bool testValidGroupCommitsAfterRuntimeScan()
 	return ok;
 }
 
-bool testSelectionSceneActivatesAndRescansWithoutRestart()
+bool testSelectionSceneActivatesAndRescansWithoutRestart(
+	bool useAlternateRoot = false)
 {
 	TemporaryTree tree("jxqy-resource-manager-live-install");
 	const std::filesystem::path assets = tree.root / "assets";
@@ -193,7 +208,9 @@ bool testSelectionSceneActivatesAndRescansWithoutRestart()
 	}
 	ResourceManager& manager = ResourceManager::instance();
 	ResourceManagerPolicyTestAccess::reset(manager);
-	ok = expect(manager.initialize(assets.generic_u8string()) &&
+	const std::filesystem::path scanRoot = useAlternateRoot
+		? alternateCollectionRoot(assets) : assets;
+	ok = expect(manager.initialize(scanRoot.generic_u8string()) &&
 			manager.needsSelection() && !manager.hasActiveResourceRoot(),
 		"live install: ordinary startup remains on explicit resource selection")
 		&& ok;
@@ -246,6 +263,15 @@ bool testInvalidActivatedGroupRollsBackAndRescans()
 	ok = expect(manager.getDiscoveredPacks().size() == 1 &&
 			manager.getDiscoveredPacks().front().manifest.id == "YYCS",
 			"runtime rollback: old resource group is rescanned") && ok;
+	ok = expect(prepareSingleUpdate(assets, validManifest("YYCS")) &&
+		writeText(preparedRoot(assets, 0) / "game_profile.ini", "[Game]\nId=YYCS\ninvalid line\n"),
+		"live invalid manifest is staged") && ok;
+	std::string errorText;
+	ok = expect(!manager.activateStagedResourceInstall(errorText) &&
+		errorText.find(u8"安装后未扫描到该资源") != std::string::npos &&
+		errorText.find("moon/game_profile.ini") != std::string::npos &&
+		readText(assets / "moon/payload.txt") == "old",
+		"live validation names the rejected manifest before restoring the old resources") && ok;
 	ResourceManagerPolicyTestAccess::reset(manager);
 	return ok;
 }
@@ -272,6 +298,12 @@ bool testOpenImportCanCommitAnUnplayableResource()
 	ok = expect(prepareSingleUpdate(assets, unplayableManifest),
 		"open import: semantically unplayable resource is staged") && ok;
 	std::string errorText;
+	ok = expect(!manager.activateStagedResourceInstall(errorText) &&
+		errorText.find("MISSING_DEPENDENCY") != std::string::npos &&
+		errorText.find(u8"缺少依赖资源") != std::string::npos,
+		"strict activation distinguishes a missing dependency from a missing target") && ok;
+	ok = expect(prepareSingleUpdate(assets, unplayableManifest),
+		"open import: resource is staged again after strict rollback") && ok;
 	ok = expect(manager.activateStagedResourceInstall(errorText, true) &&
 			errorText.empty(),
 		"open import: explicit permissive activation commits structural package")
@@ -355,6 +387,19 @@ bool testResourceConfigurationErrorsRemainVisible()
 		hasCode("resource.catalog.discovered_manifest_invalid") &&
 			hasCode("resource.catalog.duplicate_game_id"),
 		"resource diagnostics: invalid manifests and duplicate IDs remain available to the selection UI") && ok;
+	ok = expect(writeResource(
+		preparedRoot(assets, 0), validManifest("DUPLICATE"), "new") &&
+		OnlineUpdate::stageResourceInstallTransaction(
+			assets, "DUPLICATE", {{"DUPLICATE", "first"}}).succeeded(),
+		"resource diagnostics: duplicate-ID update is staged") && ok;
+	std::string errorText;
+	ok = expect(!manager.activateStagedResourceInstall(errorText) &&
+			errorText == u8"已下载资源验证失败：DUPLICATE\n存在重复 Game.Id，共 2 份资源" &&
+			readText(assets / "first" / "payload.txt") == "one" &&
+			readText(assets / "second" / "payload.txt") == "two" &&
+			!std::filesystem::exists(
+				OnlineUpdate::resourceUpdateWorkspacePath(assets)),
+		"resource diagnostics: duplicate identities still reject activation and restore old resources") && ok;
 	ResourceManagerPolicyTestAccess::reset(manager);
 	return ok;
 }
@@ -365,6 +410,8 @@ int main()
 	bool ok = true;
 	ok = testValidGroupCommitsAfterRuntimeScan() && ok;
 	ok = testSelectionSceneActivatesAndRescansWithoutRestart() && ok;
+	ok = testValidGroupCommitsAfterRuntimeScan(true) && ok;
+	ok = testSelectionSceneActivatesAndRescansWithoutRestart(true) && ok;
 	ok = testInvalidActivatedGroupRollsBackAndRescans() && ok;
 	ok = testOpenImportCanCommitAnUnplayableResource() && ok;
 	ok = testCommonCommitsAfterRuntimeValidation() && ok;

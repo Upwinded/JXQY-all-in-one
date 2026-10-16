@@ -876,48 +876,25 @@ bool testKeyboardEventRoutingPrecedence()
 		&& !gameManager.menu->partnerEquipMenu->visible,
 		"PartnerEquip did not keep its dedicated Escape close path ahead of mapping") && ok;
 
-	auto modalPartner = std::make_shared<NPC>();
-	modalPartner->kind = nkPartner;
-	modalPartner->canEquip = 1;
-	ok = check(gameManager.menu->openPartnerEquipment(
-			modalPartner, false),
-		"keyboard routing test could not open the PartnerEquip modal") && ok;
-	const bool stateVisible = gameManager.menu->stateMenu->visible;
-	const bool equipVisible = gameManager.menu->equipMenu->visible;
-	const bool practiceVisible = gameManager.menu->practiceMenu->visible;
-	const bool goodsVisible = gameManager.menu->goodsMenu->visible;
-	const bool magicVisible = gameManager.menu->magicMenu->visible;
-	const bool memoVisible = gameManager.menu->memoMenu->visible;
-	const KeyCode lowerMenuShortcuts[] =
-	{
-		KEY_F1, KEY_F2, KEY_F3, KEY_F4,
-		KEY_F5, KEY_F6, KEY_F7, KEY_F8,
-		KEY_M, KEY_TAB
-	};
+	auto partner = std::make_shared<NPC>();
+	partner->kind = nkPartner;
+	partner->canEquip = 1;
+	gameManager.npcManager->addNPC(partner);
+	ok = check(gameManager.menu->openPartnerEquipment(partner, false)
+		&& gameManager.menu->equipMenu->getSelectedPartner() == partner
+		&& !gameManager.menu->partnerEquipMenu->visible,
+		"keyboard routing opens the companion in the original equipment panel") && ok;
 	AEvent queuedEvent;
-	while (Engine::getInstance()->getEvent(queuedEvent) > 0)
-	{
-	}
-	for (KeyCode shortcut : lowerMenuShortcuts)
-	{
-		Engine::getInstance()->pushEvent(
-			AEvent(ET_KEYDOWN, shortcut, 0, 0, false));
-		UIFocusTestAccess::dispatchElementEvents(gameManager);
-	}
-	ok = check(gameManager.menu->partnerEquipMenu->visible
-			&& gameManager.menu->stateMenu->visible == stateVisible
-			&& gameManager.menu->equipMenu->visible == equipVisible
-			&& gameManager.menu->practiceMenu->visible == practiceVisible
-			&& gameManager.menu->goodsMenu->visible == goodsVisible
-			&& gameManager.menu->magicMenu->visible == magicVisible
-			&& gameManager.menu->memoMenu->visible == memoVisible,
-		"unhandled lower-menu shortcuts changed surfaces behind PartnerEquip")
-		&& ok;
-	Engine::getInstance()->pushEvent(
-		AEvent(ET_KEYDOWN, KEY_ESCAPE, 0, 0, false));
+	while (Engine::getInstance()->getEvent(queuedEvent) > 0) {}
+	Engine::getInstance()->pushEvent(AEvent(ET_KEYDOWN, KEY_F1, 0, 0, false));
 	UIFocusTestAccess::dispatchElementEvents(gameManager);
-	ok = check(!gameManager.menu->partnerEquipMenu->visible,
-		"Escape did not close only the active PartnerEquip modal") && ok;
+	ok = check(gameManager.menu->stateMenu->visible && !gameManager.menu->equipMenu->visible
+		&& gameManager.menu->equipMenu->getSelectedPartner() == partner,
+		"state shortcut switches the original panel without losing the companion") && ok;
+	Engine::getInstance()->pushEvent(AEvent(ET_KEYDOWN, KEY_ESCAPE, 0, 0, false));
+	UIFocusTestAccess::dispatchElementEvents(gameManager);
+	ok = check(!gameManager.menu->stateMenu->visible && !gameManager.menu->partnerEquipMenu->visible,
+		"Escape closes the active original panel") && ok;
 
 	System systemMenu;
 	systemMenu.setRunning(true);
@@ -2855,7 +2832,7 @@ bool testRuntimeSlotMenuResizeRecovery()
 		&& gameManager.goodsManager.isStoreIndex(partnerBagLogicalIndex)
 		&& partnerBagLogicalIndex < gameManager.goodsManager.listLength();
 	ok = check(partnerBagPageAvailable,
-		"runtime player bag exposes a second logical page for borrowed views") && ok;
+		"runtime player bag exposes a second logical page for shared bags") && ok;
 	if (partnerBagPageAvailable)
 	{
 		setControllerTestGoods(
@@ -2869,13 +2846,13 @@ bool testRuntimeSlotMenuResizeRecovery()
 		&& ok;
 	ok = check(gameManager.menu->openPartnerEquipment(partner, false),
 		"integrated magic owner opens partner equipment with return context") && ok;
-	ok = check(gameManager.menu->partnerEquipMenu->focusControllerPlayerBag()
+	ok = check(gameManager.menu->adoptControllerPointerFocus(gameManager.menu->goodsMenu->item[0])
 		&& !gameManager.menu->goodsMenu->item.empty()
-		&& gameManager.menu->partnerEquipMenu->controllerFocusedElement()
+		&& gameManager.menu->goodsMenu->controllerFocusedElement()
 			== gameManager.menu->goodsMenu->item[0],
 		"partner equipment focuses the shared player bag") && ok;
 	ok = check(partnerBagPageAvailable
-		&& gameManager.menu->partnerEquipMenu->handleUIAction(
+		&& gameManager.menu->goodsMenu->handleUIAction(
 			UIAction::PageNext)
 		&& gameManager.menu->goodsMenu->scrollbar != nullptr
 		&& !gameManager.menu->goodsMenu->item.empty()
@@ -2883,11 +2860,13 @@ bool testRuntimeSlotMenuResizeRecovery()
 			== partnerBagTargetPosition
 		&& gameManager.menu->goodsMenu->item[0]->dragIndex
 			== partnerBagLogicalIndex,
-		"partner borrowed view pages through the producer's logical mapping") && ok;
+		"partner shared bag pages through the producer's logical mapping") && ok;
 	const auto previousPlayerBagItem = gameManager.menu->goodsMenu->item[0];
 	const auto previousPlayerBagScrollbar =
 		gameManager.menu->goodsMenu->scrollbar;
 	UIFocusTestAccess::resize(*gameManager.menu, 1024, 768);
+	ok = check(UIFocusTestAccess::recoverFocusedOwner(*gameManager.menu) == gameManager.menu->goodsMenu,
+		"shared bag recovers its original focus owner after resize") && ok;
 	ok = check(!gameManager.menu->goodsMenu->item.empty()
 		&& gameManager.menu->goodsMenu->item[0] != previousPlayerBagItem
 		&& gameManager.menu->goodsMenu->scrollbar != nullptr
@@ -2897,30 +2876,29 @@ bool testRuntimeSlotMenuResizeRecovery()
 			== partnerBagTargetPosition
 		&& gameManager.menu->goodsMenu->item[0]->dragIndex
 			== partnerBagLogicalIndex
-		&& gameManager.menu->partnerEquipMenu->isControllerFocusActive()
-		&& gameManager.menu->partnerEquipMenu->controllerFocusedElement()
+		&& gameManager.menu->goodsMenu->isControllerFocusActive()
+		&& gameManager.menu->goodsMenu->controllerFocusedElement()
 			== gameManager.menu->goodsMenu->item[0],
 		"partner equipment rebinds the recreated player bag after resize") && ok;
-	ok = check(gameManager.menu->partnerEquipMenu->handleUIAction(
+	ok = check(gameManager.menu->goodsMenu->handleUIAction(
 		UIAction::Secondary),
-		"partner borrowed view starts transfer through its production action") && ok;
+		"partner shared bag starts transfer through its production action") && ok;
 	const std::optional<ControllerSlotAddress> borrowedPartnerSource =
 		gameManager.menu->controllerTransfers().source();
 	ok = check(borrowedPartnerSource.has_value()
-		&& borrowedPartnerSource->kind == ControllerSlotKind::PartnerGoods
-		&& borrowedPartnerSource->domain == ControllerSlotDomain::PartnerBag
+		&& borrowedPartnerSource->kind == ControllerSlotKind::Goods
+		&& borrowedPartnerSource->domain == ControllerSlotDomain::GoodsBag
 		&& borrowedPartnerSource->logicalIndex == partnerBagLogicalIndex
-		&& borrowedPartnerSource->context
-			== std::static_pointer_cast<const void>(partner),
-		"partner borrowed view preserves transfer domain, index, and context") && ok;
+		&& !borrowedPartnerSource->context,
+		"partner shared bag preserves transfer domain, index, and context") && ok;
 	gameManager.menu->controllerTransfers().cancel();
 	gameManager.menu->hideBottomWnd();
 	gameManager.menu->showBottomWnd();
 	ok = check(gameManager.menu->equipMenu->visible
 		&& UIFocusTestAccess::focusedOwner(*gameManager.menu)
-			== gameManager.menu->equipMenu
-		&& UIFocusTestAccess::focusedRoleIsMagic(*gameManager.menu),
-		"non-restoring partner close preserves the shared owner's magic role") && ok;
+			== gameManager.menu->goodsMenu
+		&& gameManager.menu->equipMenu->getSelectedPartner() == partner,
+		"hide and show preserve the shared bag focus and companion selection") && ok;
 	gameManager.menu->equipMenu->visible = false;
 	gameManager.menu->equipMenu->deactivateControllerFocus();
 	File::setActiveResourceRoot(activeRoot.generic_string());
@@ -3039,13 +3017,14 @@ bool testControllerToolTipRouting()
 	auto partner = std::make_shared<NPC>();
 	partner->kind = nkPartner;
 	partner->canEquip = 1;
+	gameManager.npcManager->addNPC(partner);
 	ok = check(
 		gameManager.menu->openPartnerEquipment(partner, false)
-		&& gameManager.menu->partnerEquipMenu->focusControllerPlayerBag(),
+		&& gameManager.menu->adoptControllerPointerFocus(gameManager.menu->goodsMenu->item[0]),
 		"partner equipment exposes the shared player-bag focus target") && ok;
 
 	std::shared_ptr<Item> controllerAnchor = findFocusedItem(
-		*gameManager.menu->partnerEquipMenu);
+		*gameManager.menu->goodsMenu);
 	ok = check(controllerAnchor != nullptr,
 		"partner equipment selects a concrete player-bag tooltip anchor") && ok;
 	if (controllerAnchor != nullptr)
@@ -3053,12 +3032,12 @@ bool testControllerToolTipRouting()
 		controllerAnchor->rect = { 360, 180, 32, 32 };
 		auto previousParent = std::make_shared<Panel>();
 		previousParent->addChild(gameManager.menu->toolTip);
-		ok = check(gameManager.menu->partnerEquipMenu->handleUIAction(
+		ok = check(gameManager.menu->goodsMenu->handleUIAction(
 			UIAction::Details),
 			"partner equipment routes Details through its production pane") && ok;
 
 		ok = check(controllerToolTipMatches(
-			"controller tooltip goods", controllerAnchor, gameManager.menu->partnerEquipMenu.get())
+			"controller tooltip goods", controllerAnchor)
 			&& gameManager.menu->toolTip->intro2 != nullptr
 			&& gameManager.menu->toolTip->intro2->colorTagsEnabled()
 			&& gameManager.menu->toolTip->intro2->getStr()
@@ -3067,11 +3046,11 @@ bool testControllerToolTipRouting()
 			&& ok;
 		gameManager.menu->goodsMenu->visible = false;
 		UIFocusTestAccess::update(*gameManager.menu->toolTip);
-		ok = check(gameManager.menu->toolTip->visible,
-			"tooltip ownership follows the partner menu rather than its shared bag anchor")
+		ok = check(!gameManager.menu->toolTip->visible,
+			"hiding the shared bag clears its companion-view tooltip")
 			&& ok;
 		gameManager.menu->goodsMenu->visible = true;
-		gameManager.menu->partnerEquipMenu->visible = false;
+		gameManager.menu->goodsMenu->visible = false;
 		UIFocusTestAccess::update(*gameManager.menu->toolTip);
 		ok = check(!gameManager.menu->toolTip->visible,
 			"hiding the controller tooltip owner clears its details") && ok;
@@ -3147,6 +3126,7 @@ bool testControllerToolTipRouting()
 		setControllerTestGoods(
 			equipmentInfo, "controller_tooltip_equipment.ini");
 		equipmentInfo.goods->name = "controller tooltip equipment";
+		gameManager.menu->equipMenu->selectPartner(nullptr);
 		gameManager.menu->equipMenu->visible = true;
 		gameManager.menu->equipMenu->updateGoods();
 		ok = check(gameManager.menu->equipMenu->focusControllerEquipment(),
@@ -3501,89 +3481,26 @@ bool testControllerMenuTransitions()
 	auto partner = std::make_shared<NPC>();
 	partner->kind = nkPartner;
 	partner->canEquip = 1;
+	gameManager.npcManager->addNPC(partner);
 	ok = check(gameManager.menu->openPartnerEquipment(partner, false)
 		&& gameManager.menu->goodsMenu->visible
-		&& UIFocusTestAccess::focusedOwner(*gameManager.menu)
-			== gameManager.menu->partnerEquipMenu
-		&& UIFocusTestAccess::focusedRoleIs(
-			*gameManager.menu, MenuRole::PartnerEquipment),
-		"partner equipment opens as the exclusive controller owner") && ok;
-	const std::vector<PElement> partnerCandidates =
-		gameManager.menu->partnerEquipMenu->controllerFocusCandidates();
-	std::vector<bool> partnerCandidateVisibility;
-	partnerCandidateVisibility.reserve(partnerCandidates.size());
-	for (const PElement& candidate : partnerCandidates)
-	{
-		partnerCandidateVisibility.push_back(
-			candidate != nullptr && candidate->visible);
-		if (candidate != nullptr)
-		{
-			candidate->visible = false;
-		}
-	}
-	ok = check(!partnerCandidates.empty()
-		&& UIFocusTestAccess::recoverFocusedOwner(*gameManager.menu) == nullptr
-		&& !gameManager.menu->goodsMenu->isControllerFocusActive()
-		&& UIFocusTestAccess::focusedOwner(*gameManager.menu) == nullptr,
-		"invalid modal candidates do not restore focus to the visible lower bag")
-		&& ok;
-	ok = check(gameManager.menu->handleUIAction(UIAction::Cancel)
-			&& !gameManager.menu->partnerEquipMenu->visible,
-		"a PartnerEquip modal with no focus candidate could not close on Cancel")
-		&& ok;
-	for (std::size_t index = 0; index < partnerCandidates.size(); index++)
-	{
-		if (partnerCandidates[index] != nullptr)
-		{
-			partnerCandidates[index]->visible =
-				partnerCandidateVisibility[index];
-		}
-	}
-	ok = check(gameManager.menu->openPartnerEquipment(partner, false)
-			&& UIFocusTestAccess::recoverFocusedOwner(*gameManager.menu)
-			== gameManager.menu->partnerEquipMenu
-		&& UIFocusTestAccess::toggleMenu(
-			*gameManager.menu, MenuRole::Goods)
 		&& !gameManager.menu->partnerEquipMenu->visible
+		&& UIFocusTestAccess::focusedOwner(*gameManager.menu) == gameManager.menu->equipMenu
+		&& UIFocusTestAccess::focusedRoleIs(*gameManager.menu, MenuRole::Equip),
+		"companion uses the original equipment focus owner") && ok;
+	ok = check(UIFocusTestAccess::toggleMenu(*gameManager.menu, MenuRole::Goods)
+		&& !gameManager.menu->goodsMenu->visible && gameManager.menu->equipMenu->visible
+		&& UIFocusTestAccess::toggleMenu(*gameManager.menu, MenuRole::Goods)
 		&& gameManager.menu->goodsMenu->visible
-		&& gameManager.menu->goodsMenu->isControllerFocusActive()
-		&& UIFocusTestAccess::focusedOwner(*gameManager.menu)
-			== gameManager.menu->goodsMenu
-		&& UIFocusTestAccess::focusedRoleIs(
-			*gameManager.menu, MenuRole::Goods),
-		"goods toggle closes partner equipment before reading shared bag visibility")
-		&& ok;
-	ok = check(UIFocusTestAccess::toggleMenu(
-		*gameManager.menu, MenuRole::Goods)
-		&& !gameManager.menu->goodsMenu->visible
-		&& UIFocusTestAccess::ensureMenuOpen(
-			*gameManager.menu, MenuRole::Goods)
-		&& gameManager.menu->openPartnerEquipment(partner, false)
-		&& UIFocusTestAccess::toggleMenu(
-			*gameManager.menu, MenuRole::Goods)
-		&& !gameManager.menu->partnerEquipMenu->visible
-		&& !gameManager.menu->goodsMenu->visible,
-		"goods toggle uses the restored pre-modal state when it was already open")
-		&& ok;
-
-	ok = check(gameManager.menu->openPartnerEquipment(partner, false)
-		&& UIFocusTestAccess::toggleMenu(
-			*gameManager.menu, MenuRole::Magic)
-		&& !gameManager.menu->partnerEquipMenu->visible
-		&& gameManager.menu->magicMenu->visible
-		&& UIFocusTestAccess::toggleMenu(
-			*gameManager.menu, MenuRole::Magic)
-		&& !gameManager.menu->magicMenu->visible,
-		"standalone magic toggle resolves visibility after closing partner equipment")
-		&& ok;
-	ok = check(UIFocusTestAccess::ensureMenuOpen(
-		*gameManager.menu, MenuRole::Memo)
-		&& gameManager.menu->openPartnerEquipment(partner, false)
-		&& UIFocusTestAccess::toggleMenu(
-			*gameManager.menu, MenuRole::Memo)
-		&& !gameManager.menu->partnerEquipMenu->visible
-		&& !gameManager.menu->memoMenu->visible,
-		"memo toggle preserves toggle-off semantics across the partner modal") && ok;
+		&& gameManager.menu->equipMenu->getSelectedPartner() == partner,
+		"shared bag toggles independently while retaining companion equipment selection") && ok;
+	ok = check(UIFocusTestAccess::toggleMenu(*gameManager.menu, MenuRole::Magic)
+		&& gameManager.menu->magicMenu->visible && !gameManager.menu->goodsMenu->visible
+		&& gameManager.menu->equipMenu->getSelectedPartner() == partner
+		&& UIFocusTestAccess::toggleMenu(*gameManager.menu, MenuRole::Memo)
+		&& gameManager.menu->memoMenu->visible && !gameManager.menu->magicMenu->visible,
+		"ordinary right-side menu switching remains available beside companion equipment") && ok;
+	gameManager.menu->clearMenu();
 
 	gameManager.global.feature.magicButtonOpensIntegratedEquip = true;
 	gameManager.global.feature.stateEquipIntegratedLayout = true;
@@ -3907,18 +3824,7 @@ bool testControllerTransferDomainDescriptors()
 	partner->canEquip = 1;
 	gameManager.npcManager->addNPC(partner);
 	ok = check(gameManager.menu->openPartnerEquipment(partner, false),
-		"partner modal opens for transfer-domain checks") && ok;
-	ok = check(!transfers.start(
-		ControllerSlotKind::Goods, ControllerSlotDomain::GoodsBag)
-		&& !transfers.start(
-			ControllerSlotKind::Goods, ControllerSlotDomain::GoodsQuick)
-		&& !transfers.start(
-			ControllerSlotKind::Magic, ControllerSlotDomain::MagicList)
-		&& !transfers.start(
-			ControllerSlotKind::Magic, ControllerSlotDomain::MagicQuick)
-		&& !transfers.active(),
-		"partner modal rejects ordinary transfer domains without partial state")
-		&& ok;
+		"companion equipment opens for shared transfer-domain checks") && ok;
 	const int partnerBagIndex = gameManager.goodsManager.storeBegin();
 	setControllerTestGoods(
 		gameManager.goodsManager.goodsList[partnerBagIndex],
@@ -3927,36 +3833,35 @@ bool testControllerTransferDomainDescriptors()
 		gameManager.goodsManager.goodsList[partnerBagIndex].goods;
 	const ControllerSlotAddress partnerSource =
 	{
-		ControllerSlotKind::PartnerGoods,
-		ControllerSlotDomain::PartnerBag,
-		partnerBagIndex,
-		std::static_pointer_cast<const void>(partner)
+		ControllerSlotKind::Goods,
+		ControllerSlotDomain::GoodsBag,
+		partnerBagIndex
 	};
 	ok = check(transfers.start(
-		ControllerSlotKind::PartnerGoods,
-		ControllerSlotDomain::PartnerBag)
+		ControllerSlotKind::Goods,
+		ControllerSlotDomain::GoodsBag)
 		&& transfers.begin(partnerSource)
-		&& transfers.cycleDomain(1)
+		&& transfers.cycleDomain(-1)
 		&& transfers.activeDomain()
-			== ControllerSlotDomain::PartnerEquipment
+			== ControllerSlotDomain::PlayerEquipment
 		&& transfers.source().has_value()
 		&& transfers.source().value() == partnerSource
-		&& transfers.activeOwner() == gameManager.menu->partnerEquipMenu
-		&& gameManager.menu->partnerEquipMenu->isControllerFocusActive()
+		&& transfers.activeOwner() == gameManager.menu->equipMenu
+		&& gameManager.menu->equipMenu->isControllerFocusActive()
 		&& UIFocusTestAccess::focusedRoleIs(
 			*gameManager.menu,
-			UIFocusTestAccess::MenuRole::PartnerEquipment),
-		"partner domains preserve the contextual source on one modal owner") && ok;
+			UIFocusTestAccess::MenuRole::Equip),
+		"shared bag source crosses to the original equipment owner") && ok;
 	auto replacementPartner = std::make_shared<NPC>();
 	replacementPartner->kind = nkPartner;
 	replacementPartner->canEquip = 1;
 	gameManager.npcManager->addNPC(replacementPartner);
-	gameManager.menu->partnerEquipMenu->setPartner(replacementPartner);
+	gameManager.menu->equipMenu->selectPartner(replacementPartner);
 	transferMessage.clear();
 	const ControllerTransferSubmitResult invalidContextSubmit = transfers.submit(
 		{
-			ControllerSlotKind::PartnerGoods,
-			ControllerSlotDomain::PartnerEquipment,
+			ControllerSlotKind::Goods,
+			ControllerSlotDomain::PlayerEquipment,
 			0,
 			std::static_pointer_cast<const void>(replacementPartner)
 		},

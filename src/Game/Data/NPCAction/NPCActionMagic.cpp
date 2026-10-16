@@ -75,7 +75,7 @@ void NPCActionMagic::update(UTime frameTime)
 
             if (canUse && player != nullptr)
             {
-                canUse = player->tryConsumeMagicCost(_magicToUse, level, true);
+                canUse = player->tryConsumeMagicCost(_magicToUse, level, true, scripted);
             }
 
             if (canUse)

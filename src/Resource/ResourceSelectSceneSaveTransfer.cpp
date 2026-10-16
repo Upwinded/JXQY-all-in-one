@@ -201,7 +201,7 @@ void ResourceSelectScene::finishSaveTransfer(const GameLoading::ExclusiveLoading
 			{
 				selectedTransferSlot = pendingSavePackage->slots().front().index;
 				const auto occupied = SavePackage::listSlots(saveTransferRoot());
-				for (int slot = 1; slot <= 7; ++slot)
+				for (int slot = 1; slot <= SaveSlots::ManualCount; ++slot)
 				{
 					if (std::find(occupied.begin(), occupied.end(), slot) == occupied.end())
 					{

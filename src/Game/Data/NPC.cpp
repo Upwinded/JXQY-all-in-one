@@ -12,6 +12,7 @@
 #include <unordered_set>
 #include "NPC.h"
 #include "NPCPersistence.h"
+#include "SaveIniPersistence.h"
 #include "BuySellInventory.h"
 #include "ColorStyle.h"
 #include "DefeatedNpcExperience.h"
@@ -23,6 +24,7 @@
 #include "NPCAction/NPCBounceMotion.h"
 #include "Player.h"
 #include "../GameManager/GameManager.h"
+#include "../GameManager/SaveFileManager.h"
 #include "../Config/Config.h"
 #include "../../Image/IMP.h"
 #include "../../File/INIReader.h"
@@ -919,7 +921,7 @@ void NPC::jumpTo(Point dest)
 {
 	destGE.reset();
 	haveAsyncDest = false;
-	beginJump(dest);
+	beginJump(dest, true);
 	eventRun();
 }
 
@@ -969,7 +971,7 @@ void NPC::moveToForScript(Point dest, bool isRun)
 		}
 		if (isRun)
 		{
-			beginRun(dest);
+			beginRun(dest, true);
 		}
 		else
 		{
@@ -1427,7 +1429,7 @@ bool NPC::tryMoveToDestinationMapPosition()
 
 void NPC::attackTo(Point dest, std::shared_ptr<GameElement> target)
 {
-	beginAttack(dest, target);
+	beginAttack(dest, target, true);
 	eventRun();
 }
 
@@ -1673,6 +1675,243 @@ void NPC::setPropToLevel(int lvl)
 	if (displayLifePercent < 0.0f) displayLifePercent = 0.0f;
 }
 
+int NPC::getPartnerCharacterIndex()
+{
+	if (gm == nullptr || !gm->global.feature.restorePartnerAttributes || npcName.empty()
+		|| name == "player" || kind == nkPlayer)
+	{
+		return -1;
+	}
+	if (registeredPartnerName != npcName)
+	{
+		registeredPartnerName = npcName;
+		registeredPartnerIndex = -1;
+		std::shared_ptr<INIReader> indices;
+		if (SaveIniPersistence::read(PARTNER_IDX_INI, indices) == SaveIniPersistence::ReadStatus::Loaded)
+		{
+			for (const auto& key : indices->GetSectionKeys("Init"))
+			{
+				int index = -1;
+				const auto parsed = std::from_chars(key.data(), key.data() + key.size(), index);
+				if (parsed.ec == std::errc() && parsed.ptr == key.data() + key.size()
+					&& index >= 0 && indices->Get("Init", key, "") == npcName)
+				{
+					registeredPartnerIndex = index;
+					break;
+				}
+			}
+		}
+	}
+	return registeredPartnerIndex == gm->global.data.characterIndex ? -1 : registeredPartnerIndex;
+}
+
+bool NPC::isLivingPartner()
+{
+	return kind == nkPartner && relation == nrFriendly && life > 0
+		&& !isDying() && !isHiding() && isVisibleForRuntime();
+}
+
+bool NPC::canChangePartnerEquipment()
+{
+	return isLivingPartner() && characterEquipmentSynchronized && (canEquip > 0 || getPartnerCharacterIndex() >= 0);
+}
+
+void NPC::resetPartnerRecovery()
+{
+	partnerRecoveryQuietTime = 0;
+	for (double& fraction : partnerRecoveryFractions) fraction = 0.0;
+}
+
+void NPC::refillPartnerResources()
+{
+	if (relation != nrFriendly || life <= 0 || isDying() || isHiding() || !isVisibleForRuntime()) return;
+	life = std::max(0, getLifeMax());
+	thew = std::max(0, getThewMax());
+	mana = std::max(0, getManaMax());
+	resetPartnerRecovery();
+}
+
+void NPC::finishPartnerJoin()
+{
+	if (!isLivingPartner()) return;
+	restorePartnerAttributes(true);
+	updateEquipmentAttributes(false);
+	refillPartnerResources();
+}
+
+bool NPC::setKindAndRelation(int newKind, int newRelation)
+{
+	const bool wasPartner = kind == nkPartner && relation == nrFriendly;
+	const bool becomesPartner = newKind == nkPartner && newRelation == nrFriendly;
+	if (wasPartner && !becomesPartner && gm != nullptr
+		&& !gm->partnerManager.saveCharacterSnapshot(std::dynamic_pointer_cast<NPC>(getMySharedPtr())))
+	{
+		GameLog::write("NPC: cannot save departing partner %s\n", npcName.c_str());
+		return false;
+	}
+	kind = newKind;
+	relation = newRelation;
+	if (!wasPartner && becomesPartner) finishPartnerJoin();
+	else restorePartnerAttributes();
+	if (!becomesPartner) resetPartnerRecovery();
+	return true;
+}
+
+bool NPC::restorePartnerAttributes(bool joining)
+{
+	if (gm == nullptr || !gm->global.feature.restorePartnerAttributes ||
+		relation != nrFriendly || npcName.empty() ||
+		name == "player" || life <= 0 || isDying() || isHiding())
+	{
+		return false;
+	}
+	File::ResourceLookupScope resourceLookup;
+	const int index = getPartnerCharacterIndex();
+	if (index >= 0)
+	{
+		const std::string fileName = std::string(PLAYER_INI_NAME) +
+			std::to_string(index) + PLAYER_INI_EXT;
+		std::shared_ptr<INIReader> attributes;
+		auto status = SaveIniPersistence::read(
+			SaveFileManager::CurrentPath() + fileName, attributes);
+		if (status == SaveIniPersistence::ReadStatus::Missing)
+		{
+			status = SaveIniPersistence::read(
+				std::string(INI_SAVE_FOLDER) + fileName, attributes);
+		}
+		int savedLevel = 0;
+		int savedLifeMax = 0;
+		if (status != SaveIniPersistence::ReadStatus::Loaded ||
+			attributes->Get("Init", "Name", "") != npcName ||
+			!NPCPersistence::readBoundedInteger(*attributes, "Init", "Level",
+				1, NPCPersistence::MaximumLevelCount, savedLevel) ||
+			!NPCPersistence::readBoundedInteger(*attributes, "Init", "LifeMax",
+				1, INT_MAX, savedLifeMax))
+		{
+			GameLog::write("NPC: invalid partner character record %s\n", fileName.c_str());
+			return false;
+		}
+		if (savedLevel < level || (savedLevel == level && !joining)) return false;
+		if (joining && !gm->partnerManager.restoreCharacterEquipment(*this, index)) return false;
+		// Restore only character attributes; the map owns scripts, appearance and position.
+		attack = attributes->GetInteger("Init", "Attack", attack);
+		attack2 = attributes->GetInteger("Init", "Attack2", attack2);
+		attack3 = attributes->GetInteger("Init", "Attack3", attack3);
+		defend = attributes->GetInteger("Init", "Defend",
+			attributes->GetInteger("Init", "Defence", defend));
+		defend2 = attributes->GetInteger("Init", "Defend2", defend2);
+		defend3 = attributes->GetInteger("Init", "Defend3", defend3);
+		evade = attributes->GetInteger("Init", "Evade", evade);
+		lifeMax = std::max(lifeMax, savedLifeMax);
+		thewMax = std::max(0L, attributes->GetInteger("Init", "ThewMax", thewMax));
+		manaMax = std::max(0L, attributes->GetInteger("Init", "ManaMax", manaMax));
+		exp = attributes->GetInteger("Init", "Exp", exp);
+		levelUpExp = attributes->GetInteger("Init", "LevelUpExp", levelUpExp);
+		level = savedLevel;
+		npcLevelIni = attributes->Get("Init", "LevelIni", npcLevelIni);
+		loadLevel(npcLevelIni.empty() ? "level-npc.ini" : npcLevelIni);
+		refillPartnerResources();
+		return true;
+	}
+	return false;
+}
+
+void NPC::updatePartnerRecovery(UTime frameTime)
+{
+	if (!isLivingPartner() || gm == nullptr || gm->inEvent || !isAIEnabled()
+		|| scriptMoveDestination || scriptSpecialActionOverlayActive || haveAsyncDest
+		|| hasDestinationMapPosition() || frozen || poisoned || petrified
+		|| isAttacking() || isMagicing() || isHurting() || isDoingSpecialAction()
+		|| isCombatTargetValid(currentCombatTarget.lock()) || isCombatTargetValid(lastCombatTarget.lock()))
+	{
+		resetPartnerRecovery();
+		return;
+	}
+	constexpr UTime QuietMilliseconds = 5000;
+	const UTime waiting = std::min(frameTime, QuietMilliseconds - partnerRecoveryQuietTime);
+	partnerRecoveryQuietTime += waiting;
+	const UTime recovering = frameTime - waiting;
+	if (recovering == 0) return;
+	int* values[] = { &life, &thew, &mana };
+	const int maxima[] = { getLifeMax(), getThewMax(), getManaMax() };
+	const double rates[] = { 0.02, 0.04, 0.03 };
+	for (int i = 0; i < 3; ++i)
+	{
+		const int maximum = std::max(0, maxima[i]);
+		if (*values[i] >= maximum)
+		{
+			partnerRecoveryFractions[i] = 0.0;
+			continue;
+		}
+		const double amount = partnerRecoveryFractions[i] + maximum * rates[i] * (recovering / 1000.0);
+		const int added = static_cast<int>(std::min<double>(amount, static_cast<int64_t>(maximum) - *values[i]));
+		*values[i] += added;
+		partnerRecoveryFractions[i] = *values[i] == maximum ? 0.0 : amount - added;
+	}
+}
+
+void NPC::addPartnerExperience(int amount)
+{
+	if (!isLivingPartner() || amount <= 0 || level < 1 || level >= static_cast<int>(npcLevelList.size())
+		|| levelUpExp <= 0) return;
+	exp = addRepeatedSaturated(exp, amount, 1);
+	const bool strict = ResourceManager::instance().getActiveManifest().resolvedLevelUpThresholdMode()
+		== LevelUpThresholdMode::GreaterThan;
+	while (levelUpExp > 0 && level < static_cast<int>(npcLevelList.size())
+		&& (strict ? exp > levelUpExp : exp >= levelUpExp))
+	{
+		const auto& previous = npcLevelList[level - 1];
+		const auto& next = npcLevelList[level];
+		if ((previous.lifeMax <= 0 && previous.life <= 0)
+			|| (next.lifeMax <= 0 && next.life <= 0)) break;
+		auto increase = [](int& value, int previousValue, int nextValue)
+		{
+			const int64_t delta = std::max<int64_t>(0, static_cast<int64_t>(nextValue) - previousValue);
+			value = static_cast<int>(std::min<int64_t>(INT_MAX, static_cast<int64_t>(value) + delta));
+		};
+		increase(attack, previous.attack, next.attack);
+		increase(attack2, previous.attack2, next.attack2);
+		increase(attack3, previous.attack3, next.attack3);
+		increase(defend, previous.defend, next.defend);
+		increase(defend2, previous.defend2, next.defend2);
+		increase(defend3, previous.defend3, next.defend3);
+		increase(evade, previous.evade, next.evade);
+		increase(lifeMax, previous.lifeMax > 0 ? previous.lifeMax : previous.life, next.lifeMax > 0 ? next.lifeMax : next.life);
+		increase(thewMax, previous.thewMax, next.thewMax);
+		increase(manaMax, previous.manaMax, next.manaMax);
+		levelUpExp = next.levelUpExp;
+		++level;
+		refillPartnerResources();
+	}
+}
+
+bool NPC::tryRegroupWithPlayer()
+{
+	if (!isLivingPartner() || !isAIEnabled() || gm->inEvent || gm->player == nullptr
+		|| gm->map == nullptr || gm->map->data == nullptr || isPartnerBlockingPlayer
+		|| !followNPC.empty() || scriptMoveDestination || scriptSpecialActionOverlayActive
+		|| haveAsyncDest || hasDestinationMapPosition() || hasFixedPath() || immobilized || petrified || frozen
+		|| disableMoveMilliseconds > 0 || isBouncing() || isMagicForcedMoving()
+		|| !(isStanding() || isWalking() || isRunning())
+		|| gm->map->calDistance(position, gm->player->position) <= 20) return false;
+	for (int radius = 1; radius <= 3; ++radius)
+	{
+		for (int directionIndex = 0; directionIndex < 8; ++directionIndex)
+		{
+			Point candidate = gm->player->position;
+			for (int step = 0; step < radius; ++step) candidate = Map::getSubPoint(candidate, directionIndex);
+			if (!gm->map->canWalk(candidate)) continue;
+			const auto& tile = gm->map->dataMap.tile[candidate.y][candidate.x];
+			if (!tile.npcList.empty() || !tile.stepNPCList.empty()) continue;
+			clearCombatTargetMemory();
+			beginStand();
+			setPosition(candidate);
+			return true;
+		}
+	}
+	return false;
+}
+
 void NPC::loadLevel(const std::string& fileName)
 {
 	npcLevelList.clear();
@@ -1705,6 +1944,11 @@ void NPC::loadLevel(const std::string& fileName)
 	for (size_t i = 0; i < npcLevelList.size(); ++i)
 	{
 		std::string section = convert::formatString("Level%d", (int)i + 1);
+		if (!ini.HasSection(section))
+		{
+			npcLevelList.resize(i);
+			break;
+		}
 		NPCLevelInfo& levelInfo = npcLevelList[i];
 		levelInfo.exp = ini.GetInteger(section, "Exp", 0);
 		levelInfo.levelUpExp = ini.GetInteger(section, "LevelUpExp", 0);
@@ -2129,7 +2373,7 @@ void NPC::updateEquipmentAttributes(bool adjustCurrentValues)
 	equipmentAttributes.reset();
 	resetEquipmentMagicEffectBonuses();
 	attackAdditionalEffect = maeNone;
-	if (canEquip <= 0)
+	if (canEquip <= 0 && getPartnerCharacterIndex() < 0)
 	{
 		return;
 	}
@@ -2791,7 +3035,8 @@ void NPC::loadActionFile(const std::string & fileName, int act)
 
 void NPC::addLife(int value)
 {
-	if (value < 0 && invincible > 0)
+	if (value < 0) resetPartnerRecovery();
+	if (value < 0 && (invincible > 0 || isProtectedByCheatInvincibility()))
 	{
 		return;
 	}
@@ -2805,6 +3050,7 @@ void NPC::addLife(int value)
 
 void NPC::addLifeWithoutDeath(int value)
 {
+	if (value < 0) resetPartnerRecovery();
 	life = std::max(0, life + value);
 }
 
@@ -2820,7 +3066,7 @@ void NPC::addMana(int value)
 
 void NPC::hurtLife(int damage, bool ignoreDefense)
 {
-	if (hasActiveSelfMagic(mskBlockDamage) || invincible > 0)
+	if (hasActiveSelfMagic(mskBlockDamage) || invincible > 0 || isProtectedByCheatInvincibility())
 	{
 		return;
 	}
@@ -4880,7 +5126,7 @@ bool NPC::mouseInRect(int x, int y)
 	}
 }
 
-void NPC::hurt(std::shared_ptr<Effect> e)
+void NPC::hurt(std::shared_ptr<Effect> e, int hitRoll)
 {
 	if (isDying() || isHiding() || e == nullptr)
 	{
@@ -4901,13 +5147,20 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 		return;
 	}
 	int damage = calculateEffectDamage(e);
-	applyEffectRuntimeStates(*e);
 	int effectLevel = clampMagicLevelForNpc(e->level);
-	bool handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
 	const int targetEvade = getEvade();
+#ifdef JXQY_ENABLE_TEST_HOOKS
+	if (testMagicHitRoll >= 0) hitRoll = testMagicHitRoll;
+#endif
+	if (hitRoll < 0) hitRoll = engine->getRand(99);
+	bool handledSpecialEffect = false;
+	if (isMagicAbnormalStateHit(e->evade, targetEvade, hitRoll))
+	{
+		applyEffectRuntimeStates(*e);
+		handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
+	}
 
-	if (isMagicDamageHitAgainstNPC(
-		e->evade, targetEvade, engine->getRand(100)))
+	if (isMagicDamageHit(e->evade, targetEvade, hitRoll))
 	{
 		if (addexp)
 		{
@@ -4916,7 +5169,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 		bool wasCritical = false;
 		damage = applyCriticalDamageFromEffect(e, damage, &wasCritical);
 		applyEffectManaDamage(e);
-		if (invincible > 0)
+		if (invincible > 0 || isProtectedByCheatInvincibility())
 		{
 			damage = 0;
 		}
@@ -4952,10 +5205,7 @@ void NPC::hurt(std::shared_ptr<Effect> e)
 		{
 			life = 0;
 			rememberDamageSource(e);
-			if (addexp)
-			{
-				awardDefeatedNpcExperience(e);
-			}
+			awardDefeatedNpcExperience(e);
 			handleDeath();
 			triggerMagicWhenBeAttacked(*e);
 			triggerMagicWhenKillEnemy(*e);
@@ -5011,6 +5261,11 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 	{
 		return;
 	}
+	if (hasActiveSelfMagic(mskBlockDamage))
+	{
+		triggerMagicWhenBeAttacked(*e);
+		return;
+	}
 	bool addexp = false;
 	if (e->launcherKind == lkSelf)
 	{
@@ -5020,14 +5275,18 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 	bool wasCritical = false;
 	damage = applyCriticalDamageFromEffect(e, damage, &wasCritical);
 	int effectLevel = clampMagicLevelForNpc(e->level);
-	applyEffectRuntimeStates(*e);
-	bool handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
+	bool handledSpecialEffect = false;
+	if (isMagicAbnormalStateHit(e->evade, getEvade(), engine->getRand(99)))
+	{
+		applyEffectRuntimeStates(*e);
+		handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
+	}
 	if (addexp)
 	{
 		gm->magicManager.addHitExp(e, level);
 	}
 	applyEffectManaDamage(e);
-	if (invincible > 0)
+	if (invincible > 0 || isProtectedByCheatInvincibility())
 	{
 		damage = 0;
 	}
@@ -5041,10 +5300,7 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 	{
 		life = 0;
 		rememberDamageSource(e);
-		if (addexp)
-		{
-			awardDefeatedNpcExperience(e);
-		}
+		awardDefeatedNpcExperience(e);
 		handleDeath();
 		triggerMagicWhenBeAttacked(*e);
 		triggerMagicWhenKillEnemy(*e);
@@ -5066,7 +5322,7 @@ void NPC::directHurt(std::shared_ptr<Effect> e)
 	}	
 }
 
-void NPC::beginJump(Point dest)
+void NPC::beginJump(Point dest, bool scripted)
 {
 	const auto* currentAction = actionManager->getCurrentAction();
 	if (currentAction != nullptr && !currentAction->canTransitionTo(acJump))
@@ -5087,7 +5343,7 @@ void NPC::beginJump(Point dest)
 	stepList[0] = step;
 	direction = getDirection(stepList[0]);
 	
-	actionManager->changeAction(acJump);
+	actionManager->changeAction(acJump, scripted);
 }
 
 void NPC::playSound(NPCActionType act)
@@ -5558,6 +5814,7 @@ std::shared_ptr<Magic> NPC::resolveMagicReplacement(std::shared_ptr<Magic> magic
 
 void NPC::useMagic(std::shared_ptr<Magic> m, Point dest, int level, std::shared_ptr<GameElement> target)
 {
+	resetPartnerRecovery();
 	if (m == nullptr)
 	{
 		return;
@@ -6172,24 +6429,57 @@ void NPC::clearAbnormalState()
 	clearImmobilizedState();
 }
 
+bool NPC::isProtectedByCheatInvincibility() const
+{
+	return gm != nullptr && (gm->player.get() == this || kind == nkPartner)
+		&& gm->shouldProtectPlayerFromCheatDamage();
+}
+
 bool NPC::isImmuneToAbnormalState() const
 {
-	return gm != nullptr && gm->player.get() == this
-		&& gm->shouldProtectPlayerFromCheatDamage();
+	return isProtectedByCheatInvincibility();
 }
 
 void NPC::rememberPoisonSource(std::shared_ptr<GameElement> source)
 {
+	if (auto caster = std::dynamic_pointer_cast<NPC>(source)) source = caster->getExperienceOwner();
 	poisonedBy = source;
 	poisonedByCharacterName = getCharacterNameForStateSource(source);
 }
 
-void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect)
+std::shared_ptr<NPC> NPC::getExperienceOwner()
 {
-	if (gm == nullptr || gm->player == nullptr)
+	auto owner = std::dynamic_pointer_cast<NPC>(getMySharedPtr());
+	std::unordered_set<const NPC*> visited;
+	while (owner != nullptr && visited.insert(owner.get()).second)
+	{
+		if (owner->summonExperienceOwner != nullptr)
+		{
+			owner = owner->summonExperienceOwner;
+			continue;
+		}
+		auto summon = owner->summonedByMagicEffect.lock();
+		if (summon == nullptr) return owner;
+		owner = std::dynamic_pointer_cast<NPC>(summon->user.lock());
+	}
+	return nullptr;
+}
+
+void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect, std::shared_ptr<NPC> killer)
+{
+	if (gm == nullptr || gm->player == nullptr || defeatedExperienceAwarded)
 	{
 		return;
 	}
+	if (killer == nullptr && effect != nullptr) killer = std::dynamic_pointer_cast<NPC>(effect->user.lock());
+	if (killer != nullptr) killer = killer->getExperienceOwner();
+	const bool playerKill = killer != nullptr ? (killer == gm->player || killer->kind == nkPlayer)
+		: (effect != nullptr && effect->launcherKind == lkSelf);
+	const bool partnerKill = killer != nullptr && killer->relation == nrFriendly
+		&& killer->kind == nkPartner;
+	if (!playerKill && !partnerKill) return;
+	if (partnerKill && relation != nrHostile) return;
+	defeatedExperienceAwarded = true;
 
 	const ResourceManifest& manifest =
 		ResourceManager::instance().getActiveManifest();
@@ -6202,11 +6492,29 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect)
 		expBonus,
 		kind == nkBattle && relation == nrHostile,
 		&usedLevelProductFallback);
-	if (usedLevelProductFallback)
+	const double scaledExperience = usedLevelProductFallback ? static_cast<double>(baseExperience)
+		: scaleAutomaticExperience(baseExperience, manifest.resolvedExperienceMultiplier());
+	const int playerExperience = roundAutomaticExperience(scaledExperience);
+	gm->player->addExp(playerExperience);
+	for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
 	{
-		// 等级乘积兜底整套借用月影规则：人物拿乘积原值，不乘包倍率。
-		gm->player->addExp(baseExperience);
-		if (effect != nullptr)
+		if (partner == nullptr || !partner->isLivingPartner()) continue;
+		if (partner->getPartnerCharacterIndex() >= 0)
+		{
+			partner->addPartnerExperience(playerExperience);
+		}
+		else if (partner == killer && partner->canLevelUp > 0)
+		{
+			bool fallback = false;
+			const int ownBase = calculateDefeatedNpcBaseExperience(manifest, partner->level,
+				level, exp, expBonus, kind == nkBattle && relation == nrHostile, &fallback);
+			partner->addPartnerExperience(fallback ? ownBase
+				: roundAutomaticExperience(scaleAutomaticExperience(ownBase, manifest.resolvedExperienceMultiplier())));
+		}
+	}
+	if (effect != nullptr && playerKill)
+	{
+		if (usedLevelProductFallback)
 		{
 			gm->magicManager.addKillExp(
 				effect,
@@ -6214,15 +6522,7 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect)
 				FallbackPracticeKillFraction,
 				FallbackUseKillFraction);
 		}
-		return;
-	}
-	const double scaledExperience = scaleAutomaticExperience(
-		baseExperience,
-		manifest.resolvedExperienceMultiplier());
-	gm->player->addExp(roundAutomaticExperience(scaledExperience));
-	if (effect != nullptr)
-	{
-		gm->magicManager.addKillExp(effect, scaledExperience);
+		else gm->magicManager.addKillExp(effect, scaledExperience);
 	}
 }
 
@@ -6235,10 +6535,7 @@ void NPC::rewardPoisonKillExperience()
 
 	if (auto poisoner = poisonedBy.lock())
 	{
-		if (std::dynamic_pointer_cast<Player>(poisoner) != nullptr)
-		{
-			awardDefeatedNpcExperience(nullptr);
-		}
+		awardDefeatedNpcExperience(nullptr, std::dynamic_pointer_cast<NPC>(poisoner));
 		return;
 	}
 
@@ -6250,7 +6547,17 @@ void NPC::rewardPoisonKillExperience()
 		|| sameCharacterName(poisonedByCharacterName, gm->player->name)
 		|| sameCharacterName(poisonedByCharacterName, "player"))
 	{
-		awardDefeatedNpcExperience(nullptr);
+		awardDefeatedNpcExperience(nullptr, gm->player);
+		return;
+	}
+	for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
+	{
+		if (partner != nullptr && (sameCharacterName(poisonedByCharacterName, partner->npcName)
+			|| sameCharacterName(poisonedByCharacterName, partner->name)))
+		{
+			awardDefeatedNpcExperience(nullptr, partner);
+			return;
+		}
 	}
 }
 
@@ -6367,7 +6674,7 @@ void NPC::applyAdditionalAttackEffect(const Effect& effect, int effectLevel)
 	}
 }
 
-void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
+void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target, bool scripted)
 {
 	const auto* currentAction = actionManager->getCurrentAction();
 	if (currentAction != nullptr && !currentAction->canTransitionTo(acAttack))
@@ -6393,8 +6700,9 @@ void NPC::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	attackDest = dest;
 	attackReleaseMode = releaseMode;
 	direction = getDirection(dest);
+	resetPartnerRecovery();
 	
-	actionManager->changeAction(acAttack);
+	actionManager->changeAction(acAttack, scripted);
 }
 
 void NPC::beginSpecial()
@@ -6417,7 +6725,7 @@ void NPC::beginSit()
 	actionManager->changeAction(acSit);
 }
 
-void NPC::beginMagic(Point dest, std::shared_ptr<GameElement> target)
+void NPC::beginMagic(Point dest, std::shared_ptr<GameElement> target, bool scripted)
 {
 	if (!canDoAction(acMagic) || immobilized || petrified)
 	{
@@ -6432,14 +6740,14 @@ void NPC::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 	direction = getDirection(dest);
 	
 	auto previousAction = actionManager->getCurrentAction();
-	actionManager->changeAction(acMagic);
+	actionManager->changeAction(acMagic, scripted);
 	if (actionManager->getCurrentAction() == previousAction)
 	{
 		clearPreparedMagicAction();
 	}
 }
 
-void NPC::beginRun(Point dest)
+void NPC::beginRun(Point dest, bool scripted)
 {
 	if ((!canDoAction(acRun) && !canDoAction(acARun)) || immobilized || petrified)
 	{
@@ -6477,7 +6785,7 @@ void NPC::beginRun(Point dest)
 		}
 		stepList = tempList;
 		direction = getDirection(stepList[0]);
-		actionManager->changeAction(acRun);
+		actionManager->changeAction(acRun, scripted);
 	}
 	else
 	{
@@ -7410,8 +7718,14 @@ void NPC::limitDir()
 
 void NPC::initFromIni(INIReader * ini, const std::string & section)
 {
+	registeredPartnerName.clear();
+	registeredPartnerIndex = -1;
+	characterEquipmentSynchronized = true;
+	defeatedExperienceAwarded = false;
+	resetPartnerRecovery();
 	freeResource();
 	transientSummonedNPC = false;
+	summonExperienceOwner.reset();
 	
 	if (ini == nullptr)
 	{
@@ -7701,6 +8015,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 	{
 		name = "npc-" + npcName;
 	}
+	restorePartnerAttributes();
 }
 
 void NPC::freeResource()
@@ -7815,8 +8130,16 @@ void NPC::freeActionImage(NPCActionRes * act)
 
 void NPC::onUpdate()
 {
+	if (isImmuneToAbnormalState())
+	{
+		clearAbnormalState();
+		disableMoveMilliseconds = 0;
+		disableSkillMilliseconds = 0;
+	}
 	updateVisibleByVariable();
 	auto ft = getFrameTime();
+	if (life > 0 && !isDying()) defeatedExperienceAwarded = false;
+	updatePartnerRecovery(ft);
 	if (!isVisibleByVariable)
 	{
 		if (scriptMoveDestination)
@@ -8009,6 +8332,7 @@ void NPC::onUpdate()
 		updateMagicForcedMovement(ft);
 	}
 	updateEquipmentLifeRestore(ft);
+	tryRegroupWithPlayer();
 
 	if (hurtPlayerInterval > 0 && hurtPlayerLife != 0 && nowAction != acDeath && nowAction != acHide && gm != nullptr && gm->map != nullptr && gm->player != nullptr)
 	{

@@ -524,7 +524,7 @@ void NPCActionRun::commitNextStep(Player* player, bool canWalkNextStep)
     if (_npc->stepList.size() > 0 && _npc->canEnterMoveStep(_npc->stepList[0]))
     {
         // 玩家体力不足时无法跑步
-        if (player && !player->ignoresRunThewCost() && player->thew < RUN_THEW_COST && !gm->inEvent)
+        if (player && !player->ignoresRunThewCost() && player->thew < RUN_THEW_COST && !scripted)
         {
             player->resetRecoveryTime(_npc->getTime());
             _npc->stepList.resize(0);
@@ -550,7 +550,7 @@ void NPCActionRun::commitNextStep(Player* player, bool canWalkNextStep)
             {
                 _npc->stepState = ssOut;
                 // 扣除玩家体力
-                if (player && !gm->inEvent && !player->ignoresRunThewCost())
+                if (player && !scripted && !player->ignoresRunThewCost())
                 {
                     player->thew -= RUN_THEW_COST;
                 }
@@ -569,7 +569,7 @@ void NPCActionRun::commitNextStep(Player* player, bool canWalkNextStep)
         {
             // 奇数方向（斜向），直接提交步进
             _npc->stepState = ssOut;
-            if (player && !gm->inEvent && !player->ignoresRunThewCost())
+            if (player && !scripted && !player->ignoresRunThewCost())
             {
                 player->thew -= RUN_THEW_COST;
             }

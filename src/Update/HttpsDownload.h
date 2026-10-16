@@ -22,6 +22,7 @@ enum class HttpsDownloadStatus
 	SizeLimitExceeded,
 	SizeMismatch,
 	WriteFailed,
+	InsufficientDiskSpace,
 	UnexpectedError,
 	Cancelled,
 	CleanupFailed
@@ -73,5 +74,15 @@ HttpsDownloadResult downloadHttpsToNewFile(
 	const std::filesystem::path& destinationPath,
 	std::uint64_t maximumBytes,
 	std::uint64_t expectedBytes = 0,
+	const HttpsDownloadProgress& progress = {});
+
+// Android resource downloads only. The caller owns a private partial file
+// identified by the catalog size/CRC32 and must verify the complete artifact.
+// Network failure/cancellation keeps the prefix for a later explicit retry.
+HttpsDownloadResult downloadHttpsToResumableFile(
+	const std::string& url,
+	const std::filesystem::path& destinationPath,
+	std::uint64_t maximumBytes,
+	std::uint64_t expectedBytes,
 	const HttpsDownloadProgress& progress = {});
 }

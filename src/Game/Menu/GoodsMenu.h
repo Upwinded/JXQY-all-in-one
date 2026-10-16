@@ -42,6 +42,7 @@ private:
 
 	void configureControllerFocus();
 	void activateControllerItem(int visibleIndex);
+	void useDisplayedItem(int listIndex);
 	void showControllerItemDetails(int visibleIndex);
 	void hideControllerItemDetails();
 	int getControllerItemIndex(int visibleIndex) const;

@@ -24,10 +24,10 @@ required_files=(
     include/libswscale/swscale.h
     lib/libSDL3.so
     lib/libSDL3.so.0
-    lib/libSDL3.so.0.4.10
+    lib/libSDL3.so.0.4.18
     lib/libSDL3_image.so
     lib/libSDL3_image.so.0
-    lib/libSDL3_image.so.0.2.4
+    lib/libSDL3_image.so.0.4.8
     lib/libSDL3_ttf.so
     lib/libSDL3_ttf.so.0
     lib/libSDL3_ttf.so.0.2.2
@@ -62,7 +62,9 @@ required_files=(
 dependencies_are_ready()
 {
     [[ -f "${dependency_root}/.dependency-set" ]] || return 1
-    [[ "$(<"${dependency_root}/.dependency-set")" == "${dependency_set_id}" ]] || return 1
+    local installed_dependency_set
+    installed_dependency_set="$(<"${dependency_root}/.dependency-set")"
+    [[ "${installed_dependency_set%$'\r'}" == "${dependency_set_id}" ]] || return 1
 
     local required_file
     for required_file in "${required_files[@]}"; do
@@ -242,6 +244,7 @@ cmake -S "${image_source}" -B "${build_root}/SDL3_image" \
     -DBUILD_SHARED_LIBS=ON -DSDLIMAGE_INSTALL=ON \
     -DSDLIMAGE_SAMPLES=OFF -DSDLIMAGE_TESTS=OFF \
     -DSDLIMAGE_BACKEND_STB=ON -DSDLIMAGE_AVIF=OFF \
+    -DSDLIMAGE_PNG_LIBPNG=OFF \
     -DSDLIMAGE_JXL=OFF -DSDLIMAGE_TIF=OFF -DSDLIMAGE_WEBP=OFF \
     -DSDLIMAGE_DEPS_SHARED=OFF -DSDLIMAGE_STRICT=ON
 cmake --build "${build_root}/SDL3_image" --parallel "${parallel_jobs}"

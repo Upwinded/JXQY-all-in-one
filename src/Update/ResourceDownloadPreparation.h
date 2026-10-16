@@ -172,7 +172,8 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 	RequestedResourceDownloadMode requestedMode,
 	const ResourceDownloadPreparationProgressCallback& progress = {},
 	const ResourceArtifactDownloadFunction& artifactDownloader = {},
-	const CatalogDownloadFunction& catalogDownloader = {});
+	const CatalogDownloadFunction& catalogDownloader = {},
+	const std::filesystem::path& partialDownloadDirectory = {});
 
 // Downloads and validates the optional catalog [Common] package into a new
 // private workspace. It never replaces the installed assets/common directory.
@@ -182,7 +183,22 @@ CommonDownloadPreparationResult prepareCommonDownload(
 	const std::filesystem::path& workspacePath,
 	const ResourceDownloadPreparationProgressCallback& progress = {},
 	const ResourceArtifactDownloadFunction& artifactDownloader = {},
-	const CatalogDownloadFunction& catalogDownloader = {});
+	const CatalogDownloadFunction& catalogDownloader = {},
+	const std::filesystem::path& partialDownloadDirectory = {});
+
+// Catalog-scoped partial paths and complete artifact sizes for this plan.
+// Includes requested resources, dependencies, selected increments and common.
+std::map<std::filesystem::path, std::uint64_t> resourceDownloadPartialFiles(
+	const ResourceDownloadPlan& plan,
+	const CommonPackage* common,
+	const std::filesystem::path& partialDownloadDirectory);
+
+// Remaining ZIP bytes for the existing disk-space preflight. Only matching
+// catalog artifacts in the private partial directory count as downloaded.
+std::uint64_t remainingResourceDownloadBytes(
+	const ResourceDownloadPlan& plan,
+	const CommonPackage* common,
+	const std::filesystem::path& partialDownloadDirectory);
 
 // Downloads the selected platform's sole online program artifact into a new
 // private workspace. The public semantic Version is comparison information

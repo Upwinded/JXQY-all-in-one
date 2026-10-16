@@ -24714,8 +24714,8 @@ bool testSaveEditContextPathsAndPersistence()
 
     SaveEditContext& context = SaveEditContext::instance();
     const QList<SaveEditTarget>& targets = context.targets();
-    bool ok = check(targets.size() == 9,
-                    "save edit context exposes new game, seven slots and temporary save");
+    bool ok = check(targets.size() == 12,
+                    "save edit context exposes new game, nine manual slots, automatic and temporary save");
     ok = check(targets.first().id == "new_game" &&
                targets.first().relativeDirectory == "ini/save" &&
                targets.last().id == "temporary" && targets.last().highRisk,
@@ -24734,6 +24734,16 @@ bool testSaveEditContextPathsAndPersistence()
     ok = check(QDir::cleanPath(slotPath) ==
                    QDir::cleanPath(assetsDirectory.filePath("save/rpg7/npc.ini")),
                "save edit context resolves slot seven") && ok;
+
+    for (int slot : { 8, 9 })
+    {
+        ok = check(context.setCurrentId(QString("slot_%1").arg(slot)) &&
+                   context.currentTarget().relativeDirectory == QString("save/rpg%1").arg(slot),
+                   "editor manual slots eight and nine stay distinct") && ok;
+    }
+    ok = check(context.setCurrentId("automatic") &&
+               context.currentTarget().relativeDirectory == "save/rpg_auto",
+               "editor automatic target uses the runtime automatic directory") && ok;
 
     context.setCurrentId("temporary");
     QString temporaryPath = context.resolveFilePath(assetsDirectory.path(), "traps.ini", &error);
@@ -24822,7 +24832,7 @@ bool testTrapScriptEditorSaveContextSwitchAndTransactionalCreation()
         return false;
     }
 
-    bool ok = check(combo->count() == 9 && combo->currentData().toString() == "new_game",
+    bool ok = check(combo->count() == 12 && combo->currentData().toString() == "new_game",
                     "trap context dialog defaults to new game") &&
               check(QDir::cleanPath(pathLabel->text()).contains(
                         QDir::cleanPath(root.filePath("ini/save/traps.ini"))),
@@ -24876,7 +24886,7 @@ bool testTrapScriptEditorSaveContextSwitchAndTransactionalCreation()
             messageBox->button(QMessageBox::Ok)->click();
         }
     });
-    combo->setCurrentIndex(8);
+    combo->setCurrentIndex(combo->findData("temporary"));
     ok = check(highRiskWarningSeen && combo->currentData().toString() == "temporary",
                "selecting temporary save displays a high-risk warning") && ok;
     ok = check(pathLabel->text().contains(QDir::toNativeSeparators("save/game/traps.ini")) ||
@@ -32238,6 +32248,11 @@ int main(int argc, char* argv[])
     {
         return testProjectAssetMigrationPolicySchemaAndRecovery() &&
             testProjectAwareAssetMigrationWorkflow() ? 0 : 1;
+    }
+    if (qEnvironmentVariableIsSet("JXQY_SAVE_CONTEXT_TEST_ONLY"))
+    {
+        return testSaveEditContextPathsAndPersistence() &&
+            testTrapScriptEditorSaveContextSwitchAndTransactionalCreation() ? 0 : 1;
     }
     bool ok = true;
     ok = testEditorEntityImageCandidates() && ok;

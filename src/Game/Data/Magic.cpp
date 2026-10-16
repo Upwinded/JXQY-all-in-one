@@ -3249,7 +3249,13 @@ std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<
 		{
 			return;
 		}
-		if (gm->map->calDistance(npc->getPosition(), effectPosition) <= MAGIC_MAX_CAST_DISTANCE)
+		// A fixed 2x 640x480 area in world projection, centered on the caster.
+		constexpr int fullScreenWidth = 1280;
+		constexpr int fullScreenHeight = 960;
+		PointEx relativePosition = Map::getTilePositionEx(npc->getPosition(), effectPosition,
+			{ 0, 0 }, effectOffset - npc->getOffset());
+		if (std::abs(relativePosition.x) <= fullScreenWidth / 2
+			&& std::abs(relativePosition.y) <= fullScreenHeight / 2)
 		{
 			damageList.push_back(npc);
 		}

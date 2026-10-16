@@ -68,11 +68,13 @@ enum MapThumbnailLayoutProfile
 struct GameFeatureFlags
 {
 	bool qingyuUi = false;
+	bool automaticSave = false;
 	bool freezeVisualEffect = true;
 	bool poisonVisualEffect = true;
 	bool petrifyVisualEffect = true;
 	bool magicTriggerAtAnimationEnd = false;
 	bool nativeNpcAttackAtAnimationEnd = false;
+	bool restorePartnerAttributes = false;
 	bool lumAsBrightness = true;
 	bool ambientLumOverlay = true;
 	bool topButtonsLayout = false;

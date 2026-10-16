@@ -17,6 +17,9 @@ public:
 
 	std::vector<std::shared_ptr<NPC>> findPartnersFromNPCManager();
 	bool isActivePartner(const std::shared_ptr<NPC>& partner) const;
+	bool saveCharacterSnapshot(const std::shared_ptr<NPC>& partner);
+	bool saveCharacterSnapshots();
+	bool restoreCharacterEquipment(NPC& partner, int characterIndex);
 	void setPartnersIsBlockingPlayer(bool value);
 	bool equipOnePlayerGoodsOnPartner(
 		const std::shared_ptr<NPC>& partner,

@@ -364,7 +364,7 @@ SaveGenerationResult prepareLoadGeneration(
 {
 	std::string sourceDirectory = index == 0
 		? std::string(INI_SAVE_FOLDER)
-		: (index < 0
+		: (index < 0 || index == SaveSlots::Automatic
 			? std::string(SAVE_AUTO_FOLDER)
 			: convert::formatString(SAVE_FOLDER, index));
 
@@ -1934,7 +1934,7 @@ bool setNpcRuntimeAttribute(GameManager* gameManager, const std::shared_ptr<NPC>
 	}
 	if (lowerKey == "kind" && readInteger())
 	{
-		npc->kind = integerValue;
+		if (!npc->setKindAndRelation(integerValue, npc->relation)) return false;
 		npc->beginStand();
 		return true;
 	}
@@ -2172,7 +2172,7 @@ bool setNpcRuntimeAttribute(GameManager* gameManager, const std::shared_ptr<NPC>
 	}
 	if (lowerKey == "relation" && readInteger())
 	{
-		npc->relation = integerValue;
+		if (!npc->setKindAndRelation(npc->kind, integerValue)) return false;
 		npc->beginStand();
 		return true;
 	}
@@ -8409,7 +8409,7 @@ void ScriptAPI::attackTo(const std::string& name, int x, int y)
 		std::shared_ptr<NPC> npc = gameManager->scriptNPC;
 		if (npc != nullptr)
 		{
-			npc->beginAttack({ x, y }, nullptr);
+			npc->beginAttack({ x, y }, nullptr, true);
 		}
 	}
 	else
@@ -8419,7 +8419,7 @@ void ScriptAPI::attackTo(const std::string& name, int x, int y)
 		for (size_t i = 0; i < targetCount; i++)
 		{
 			if (npc[i] == nullptr) continue;
-			npc[i]->beginAttack({ x, y }, nullptr);
+			npc[i]->beginAttack({ x, y }, nullptr, true);
 		}
 	}
 }
@@ -8527,7 +8527,7 @@ void ScriptAPI::setNPCKind(const std::string& name, int kind)
 		std::shared_ptr<NPC> npc = gameManager->scriptNPC;
 		if (npc != nullptr)
 		{
-			npc->kind = kind;
+			npc->setKindAndRelation(kind, npc->relation);
 		}
 	}
 	else
@@ -8536,7 +8536,7 @@ void ScriptAPI::setNPCKind(const std::string& name, int kind)
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			if (npc[i] == nullptr) continue;
-			npc[i]->kind = kind;
+			npc[i]->setKindAndRelation(kind, npc[i]->relation);
 		}
 	}
 }
@@ -8605,21 +8605,21 @@ void ScriptAPI::setNPCAction(const std::string& name, int action, int x, int y)
 		case ScriptNpcActionKind::Run:
 		case ScriptNpcActionKind::FightRun:
 			npc->haveAsyncDest = false;
-			npc->beginRun(destination);
+			npc->beginRun(destination, true);
 			break;
 		case ScriptNpcActionKind::Jump:
 		case ScriptNpcActionKind::FightJump:
 			npc->haveAsyncDest = false;
-			npc->beginJump(destination);
+			npc->beginJump(destination, true);
 			break;
 		case ScriptNpcActionKind::Attack:
-			npc->beginAttack(destination, nullptr);
+			npc->beginAttack(destination, nullptr, true);
 			break;
 		case ScriptNpcActionKind::Magic:
 			if (npc->npcMagic != nullptr)
 			{
 				npc->setPreparedMagicAction(npc->npcMagic, destination, 1, nullptr);
-				npc->beginMagic(destination, nullptr);
+				npc->beginMagic(destination, nullptr, true);
 			}
 			break;
 		case ScriptNpcActionKind::Sit:
@@ -8664,7 +8664,7 @@ void ScriptAPI::setNPCRelation(const std::string& name, int relation)
 			return;
 		}
 		const int previousRelation = npc->relation;
-		npc->relation = relation;
+		if (!npc->setKindAndRelation(npc->kind, relation)) return;
 		if (updatesAllMatchingNpcRelations)
 		{
 			if ((previousRelation == nrFriendly && relation == nrHostile) ||
@@ -9407,7 +9407,7 @@ void ScriptAPI::enableRun()
 
 void ScriptAPI::disableRun()
 {
-	gameManager->player->setRunDisabled(true);
+	// 保留旧脚本入口；所有游戏的 DisableRun 均不再改变跑步权限。
 }
 
 void ScriptAPI::enableJump()
@@ -9477,7 +9477,7 @@ void ScriptAPI::playerRunToEx(int x, int y)
 	target->haveAsyncDest = false;
 	if (target->getPosition() != position)
 	{
-		target->beginRun(position);
+		target->beginRun(position, true);
 	}
 }
 
@@ -9537,7 +9537,7 @@ void ScriptAPI::useMagic(const std::string& magicName, int x, int y, bool hasDes
 	std::shared_ptr<GameElement> target = hasDestination && shouldResolveScriptMagicTarget(magic, magicInfo->level)
 		? std::dynamic_pointer_cast<GameElement>(findScriptMagicTarget(destination))
 		: nullptr;
-	gameManager->player->beginMagic(*magicInfo, destination, target);
+	gameManager->player->beginMagic(*magicInfo, destination, target, -1, true);
 }
 
 void ScriptAPI::petrifyMillisecond(int milliseconds)
@@ -10864,8 +10864,7 @@ void ScriptAPI::setNpcPartner(const std::string& name)
 		{
 			return;
 		}
-		npc->kind = nkPartner;
-		npc->relation = nrFriendly;
+		if (!npc->setKindAndRelation(nkPartner, nrFriendly)) return;
 		npc->followNPC = "";
 		npc->isPartnerBlockingPlayer = false;
 		npc->nextFollowCheckTime = 0;
@@ -11107,6 +11106,11 @@ void ScriptAPI::select(int messageIdx, int optionAIdx, int optionBIdx, const std
 
 void ScriptAPI::playerChange(int index)
 {
+	if (!gameManager->partnerManager.saveCharacterSnapshots())
+	{
+		gameManager->showMessage("伙伴资料保存失败，无法切换角色");
+		return;
+	}
 	const int previousIndex =
 		gameManager->global.data.characterIndex;
 	bool previousStateSaved =
@@ -11174,7 +11178,7 @@ void ScriptAPI::playerChange(int index)
 		{
 			gameManager->menu->showSystemNotice(
 				!rollbackSucceeded
-					? std::string(u8"切换角色失败，且恢复原角色数据失败；请保留日志")
+					? std::string(u8"切换角色失败，且恢复原角色数据失败")
 					: failureReason.empty()
 					? std::string(u8"切换角色失败：玩家数据无法读取")
 					: std::string(u8"切换角色失败：") +
@@ -11359,6 +11363,10 @@ bool ScriptAPI::loadMapWithFailurePolicy(
 				gameManager->camera->followNPC.reset();
 			}
 			commitCompleted();
+			if (actorResetMode != MapActorResetMode::ReplaceAllForSaveLoad)
+			{
+				gameManager->requestAutomaticSaveAfterMapLoad();
+			}
 			enqueueMapChange(
 				gameManager->runtimeTraceWriter,
 				fileName,
@@ -12066,6 +12074,7 @@ ScriptAPI::finishGameLoad(
 				failureMessage);
 		}
 
+		gameManager->resetAutomaticSave();
 		return GameLoading::LoadingTaskResult::success();
 	}
 	catch (...)

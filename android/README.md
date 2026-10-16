@@ -34,7 +34,7 @@ miniz 读取 ZIP 中央目录，从文件名的 `assets/` 前缀后提取第一�
 再通过共享 `ResourceCatalog` 读取各目录的 `game_profile.ini`。
 中央目录读入内存后，名称遍历不读取资源内容或各文件的本地头；枚举完成即释放
 ZIP 元数据。下载/导入资源继续使用应用专属目录，同 `Game.Id` 的可写资源保持
-原有覆盖优先级。Android 依赖使用 `ThirdParty/devel` 中的官方 SDL 3.4.10 AAR。
+原有覆盖优先级。Android 依赖使用 `ThirdParty/devel` 中的官方 SDL 3.4.18 和 SDL_image 3.4.8 AAR。
 
 启动时先准备内置引擎字体并呈现“正在加载资源…”等待页，再扫描本地资源。
 扫描结束后显示资源选择页，并丢弃等待期间积压的鼠标和触摸事件。
@@ -48,3 +48,22 @@ python scripts/check_android_bundled_resources.py --serial emulator-5580 --apk <
 ```
 
 检查普通 `release` 的零内置游戏场景时加 `--allow-empty`；默认仍要求 APK 含游戏资源。
+
+## 资源下载续传验证
+
+Android 资源包及公共包保留未完成的下载，网络短暂中断后自动重连；失败或选择保留进度后，
+再次下载同一版本也会尝试续传。手动取消后显示占用空间，可选“保留进度”或“取消并清理”；
+返回键保留进度，清理只涉及本次下载的断点文件。服务器不支持 Range 时安全重下，完成后统一校验大小和 CRC32。
+这不保证系统限制后台网络或终止进程时持续下载，回到游戏可重新发起下载。
+
+在仓库根目录用 JDK 运行实际 Java 传输类的协议回归，无需安装额外测试框架：
+
+```powershell
+$taskJava = 'C:\Program Files\Android\Android Studio\jbr\bin'
+& "$taskJava\javac.exe" -encoding UTF-8 -d tmp/download-java-tests android/app/src/main/java/com/upwinded/jxqy/HttpsDownloadStream.java android/tests/HttpsDownloadStreamTest.java
+& "$taskJava\java.exe" -cp tmp/download-java-tests com.upwinded.jxqy.HttpsDownloadStreamTest
+```
+
+原生准备、校验及解压回归位于 `jxqy-resource-package-archive-tests`；包含断网、取消、
+再次下载、镜像切换和损坏文件清除。手机验收还应覆盖下载中切后台、Wi-Fi 与移动网络互切、
+强制结束后重开，以及空间不足时的提示。

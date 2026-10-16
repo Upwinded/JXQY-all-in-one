@@ -1,5 +1,6 @@
 #include "../File/File.h"
 #include "../File/INIReader.h"
+#include "../Engine/Engine.h"
 #include "../Game/Data/Effect.h"
 #include "../Game/Data/EffectManager.h"
 #include "../Game/Data/Magic.h"
@@ -52,6 +53,11 @@ public:
 	static void updateFlyMagic(Effect& effect, UTime frameTime)
 	{
 		effect.updateFlyMagic(frameTime);
+	}
+
+	static void updateParasiticEffect(Effect& effect, UTime frameTime)
+	{
+		effect.updateParasiticEffect(frameTime);
 	}
 
 	static void updateMagicWhenNewPosition(Effect& effect)
@@ -109,6 +115,88 @@ bool runEffectProjectedDirectionTest()
 	effect.magic.flyImage->directions = 32;
 	ok = check(effect.getDirection({ 1000, 2000 }) == 28,
 		"pre-compensated target direction keeps its screen-space angle") && ok;
+	return ok;
+}
+
+bool runDirectDamageShieldTest(GameManager& gameManager)
+{
+	gameManager.global.feature.rageSystem = false;
+	gameManager.setCheatModeEnabled(false);
+	auto caster = std::make_shared<NPC>();
+	caster->kind = nkBattle;
+	caster->relation = nrHostile;
+	caster->lifeMax = 1000;
+	caster->attack = 100;
+	gameManager.npcManager->npcList = { caster };
+	bool ok = true;
+	for (int kind : { nkPlayer, nkBattle, nkPartner })
+	{
+		std::shared_ptr<NPC> target = kind == nkPlayer ? gameManager.player : std::make_shared<NPC>();
+		target->kind = kind;
+		target->relation = nrFriendly;
+		target->lifeMax = target->life = 1000;
+		target->manaMax = target->mana = 100;
+		target->defend = target->defend2 = target->defend3 = 0;
+		target->evade = 100000;
+		target->invincible = 0;
+		target->disableMoveMilliseconds = 0;
+		if (kind == nkPlayer) gameManager.player->calInfo();
+		gameManager.npcManager->npcList = { caster };
+		if (kind != nkPlayer) gameManager.npcManager->npcList.push_back(target);
+		auto block = std::make_shared<Effect>();
+		block->level = 1;
+		block->doing = ekFlying;
+		block->magic.level[1].moveKind = mmkSelf;
+		block->magic.level[1].specialKind = mskBlockDamage;
+		target->shieldEffects = { block };
+		target->shieldLife = 300;
+		auto incoming = std::make_shared<Effect>();
+		incoming->user = caster;
+		incoming->level = 1;
+		incoming->launcherKind = lkEnemy;
+		incoming->damage = incoming->magic.level[1].effect = 100;
+		incoming->damageMana = incoming->magic.level[1].effectMana = 10;
+		incoming->magic.level[1].moveKind = mmkFly;
+		incoming->magic.disableMoveMilliseconds = 1000;
+		incoming->magic.restoreProbability = 100;
+		incoming->magic.restorePercent = 50;
+		incoming->magic.restoreType = 0;
+		incoming->magic.linkedLevel[1].parasitic = 1;
+		incoming->magic.linkedLevel[1].parasiticInterval = 100;
+		auto counter = std::make_shared<Magic>();
+		counter->loadSucceeded = true;
+		for (auto& level : counter->level) level.moveKind = mmkFly;
+		target->magicToUseWhenBeAttacked = counter;
+		target->equipmentMagicToUseWhenAttacked.clear();
+		gameManager.effectManager->clearEffect();
+		const size_t effectCount = gameManager.effectManager->effectList.size();
+		caster->life = 500;
+		target->hurt(incoming, 0);
+		target->directHurt(incoming);
+		ok = check(incoming->beginParasitic(target, target->getPosition()), "attach a real parasitic effect") && ok;
+		RageSystemTestAccess::updateParasiticEffect(*incoming, 100);
+		ok = check(target->life == 1000 && target->mana == 100 && target->shieldLife == 300
+			&& target->disableMoveMilliseconds == 0 && caster->life == 500,
+			"immunity blocks ordinary/direct/initial-parasitic/tick health, mana, states and leech for player, NPC and partner") && ok;
+		ok = check(gameManager.effectManager->effectList.size() == effectCount + 4,
+			"blocked hits still trigger one counterattack each") && ok;
+		block->vanishing = true;
+		const int loss = kind == nkPlayer ? static_cast<int>(std::round(100 * DAMAGE_RATE)) : 100;
+		RageSystemTestAccess::updateParasiticEffect(*incoming, 100);
+		ok = check(target->life == 1000 - loss && target->mana == 90 && caster->life == 550
+			&& target->shieldLife == 300,
+			"parasitic damage resumes after immunity expires, bypasses hit rolls and retains capacity-shield behavior") && ok;
+		block->vanishing = false;
+		block->magic.level[1].specialKind = mskAddDamageReduceShield;
+		block->magic.level[1].effect = 20;
+		target->shieldEffects = { block };
+		target->directHurt(incoming);
+		const int reducedLoss = kind == nkPlayer ? static_cast<int>(std::round(80 * DAMAGE_RATE)) : 80;
+		ok = check(target->life == 1000 - loss - reducedLoss && target->shieldLife == 300,
+			"direct damage retains numeric reduction without consuming capacity shields") && ok;
+		target->magicToUseWhenBeAttacked.reset();
+		target->shieldEffects.clear();
+	}
 	return ok;
 }
 
@@ -512,6 +600,15 @@ bool runAutomaticSelfMagicAdmissionContract(GameManager& gameManager)
 
 bool runCarryWallCollisionContract(GameManager& gameManager)
 {
+	class CollisionTargetNPC : public NPC
+	{
+	public:
+		void hurt(std::shared_ptr<Effect> effect, int = -1) override
+		{
+			// This contract checks collision reach; damage hit rates are tested separately.
+			NPC::hurt(effect, 0);
+		}
+	};
 	enum class Scenario { OpenFloor, SolidWall, PassThroughWall, SpawnInsideWall, HiddenAtWall, Throw, Attached, AttachedOpen,
 		TransparentWall, JumpTransparentWall, SpawnInsideTransparentWall, BoxWall };
 	const auto originalMap = gameManager.map->data;
@@ -546,7 +643,7 @@ bool runCarryWallCollisionContract(GameManager& gameManager)
 				caster->life = caster->lifeMax = 100;
 				caster->setPosition({ scenario == Scenario::SpawnInsideWall || scenario == Scenario::SpawnInsideTransparentWall ? 9 : 8, 10 }, false);
 				gameManager.npcManager->addNPC(caster);
-				auto target = std::make_shared<NPC>();
+				auto target = std::make_shared<CollisionTargetNPC>();
 				target->npcName = "CARRY_WALL_TARGET";
 				target->kind = nkBattle;
 				target->relation = nrHostile;
@@ -2269,6 +2366,120 @@ bool runSelfLifeExchangeTest(GameManager& gameManager)
 	gameManager.menu->stateMenu = originalStateMenu;
 	return ok;
 }
+
+bool runPartnerCheatProtectionTest(GameManager& gameManager)
+{
+	const auto originalNpcs = gameManager.npcManager->npcList;
+	auto partner = std::make_shared<NPC>();
+	partner->kind = nkPartner;
+	partner->life = 100;
+	partner->res.hurt.imagePackage = std::make_shared<IMPImage>();
+	partner->res.hurt.imagePackage->directions = 1;
+	partner->res.hurt.imagePackage->frame.resize(1);
+	partner->poisoned = partner->frozen = partner->petrified = partner->immobilized = true;
+	partner->poisonedLastTime = partner->frozenLastTime = 10000;
+	partner->petrifiedLastTime = partner->immobilizedLastTime = 10000;
+	partner->disableMoveMilliseconds = partner->disableSkillMilliseconds = 10000;
+	auto enemy = std::make_shared<NPC>();
+	enemy->kind = nkBattle;
+	enemy->relation = nrHostile;
+	gameManager.npcManager->npcList = { partner, enemy };
+	gameManager.performCheatAction(GameManager::CheatAction::ToggleInvincibility);
+	auto hasNoAbnormalState = [](const NPC& npc)
+	{
+		return !npc.frozen && !npc.poisoned && !npc.petrified && !npc.immobilized
+			&& npc.frozenLastTime == 0 && npc.poisonedLastTime == 0
+			&& npc.petrifiedLastTime == 0 && npc.immobilizedLastTime == 0
+			&& npc.disableMoveMilliseconds == 0 && npc.disableSkillMilliseconds == 0;
+	};
+	bool ok = check(gameManager.isCheatInvincibilityEnabled() && hasNoAbnormalState(*partner),
+		"enabling cheat invincibility immediately cures partner statuses and action locks");
+	auto effect = std::make_shared<Effect>();
+	effect->level = 1;
+	effect->damage = 10000;
+	effect->magic.disableMoveMilliseconds = effect->magic.disableSkillMilliseconds = 10000;
+	partner->addLife(-10000);
+	partner->hurtLife(10000, true);
+	partner->hurt(effect, 0);
+	partner->directHurt(effect);
+	partner->applySideEffectDamage(0, 10000);
+	partner->beginHurt();
+	partner->beginHurt({1, 1});
+	for (int status : {mskFreeze, mskPoison, mskPetrify, mskImmobilize})
+	{
+		effect->magic.level[1].specialKind = status;
+		partner->applyPreDamageMagicStatus(*effect, 1);
+		partner->applyEffectRuntimeStates(*effect);
+	}
+	ok = check(partner->life == 100 && !partner->isDying() && !partner->isHurting()
+		&& partner->invincible == 0 && hasNoAbnormalState(*partner),
+		"partner cheat protection covers lethal hits, direct damage, side effects, hurt actions and statuses without changing Invincible") && ok;
+
+	class PartnerTestNPC : public NPC
+	{
+	public:
+		using NPC::onUpdate;
+	};
+	auto latePartner = std::make_shared<PartnerTestNPC>();
+	latePartner->kind = nkPartner;
+	latePartner->life = 80;
+	gameManager.npcManager->npcList.push_back(latePartner);
+	latePartner->addLife(-10000);
+	latePartner->poisoned = latePartner->immobilized = true;
+	latePartner->poisonedLastTime = latePartner->immobilizedLastTime = 10000;
+	latePartner->disableMoveMilliseconds = latePartner->disableSkillMilliseconds = 10000;
+	latePartner->onUpdate();
+	ok = check(latePartner->life == 80 && hasNoAbnormalState(*latePartner),
+		"new partners gain protection immediately and their next update clears restored statuses") && ok;
+	enemy->addLife(-10);
+	enemy->applyPreDamageMagicStatus(*effect, 1);
+	latePartner->kind = nkNormal;
+	latePartner->addLife(-10);
+	ok = check(enemy->life == 990 && enemy->immobilized && latePartner->life == 70,
+		"enemies and companions that leave the party remain vulnerable") && ok;
+	latePartner->kind = nkPartner;
+	gameManager.performCheatAction(GameManager::CheatAction::ToggleInvincibility);
+	partner->addLife(-10);
+	partner->applyPreDamageMagicStatus(*effect, 1);
+	ok = check(partner->life == 90 && partner->immobilized,
+		"turning invincibility off restores partner damage and statuses immediately") && ok;
+	gameManager.performCheatAction(GameManager::CheatAction::ToggleInvincibility);
+	gameManager.setCheatModeEnabled(false);
+	partner->addLife(-10);
+	ok = check(partner->life == 80 && !partner->isProtectedByCheatInvincibility(),
+		"turning cheat mode off also removes partner protection") && ok;
+	gameManager.setCheatModeEnabled(true);
+	gameManager.performCheatAction(GameManager::CheatAction::ToggleInvincibility);
+	latePartner->res.death.imagePackage = std::make_shared<IMPImage>();
+	latePartner->res.death.imagePackage->directions = 1;
+	latePartner->res.death.imagePackage->frame.resize(1);
+	latePartner->deathScript = "plot-death.txt";
+	latePartner->life = 0;
+	latePartner->handleDeath();
+	ok = check(latePartner->isDying() && (latePartner->getResult() & erRunDeathScript),
+		"explicit plot death still runs for a protected partner") && ok;
+	gameManager.performCheatAction(GameManager::CheatAction::ToggleInvincibility);
+
+	auto secondPartner = std::make_shared<NPC>();
+	secondPartner->kind = nkPartner;
+	secondPartner->life = 25;
+	secondPartner->lifeMax = 200;
+	secondPartner->mana = secondPartner->thew = 7;
+	partner->equipmentAttributes.lifeMax = 50;
+	auto hiddenPartner = std::make_shared<NPC>();
+	hiddenPartner->kind = nkPartner;
+	hiddenPartner->life = 30;
+	hiddenPartner->nowAction = acHide;
+	gameManager.npcManager->npcList.push_back(secondPartner);
+	gameManager.npcManager->npcList.push_back(hiddenPartner);
+	gameManager.performCheatAction(GameManager::CheatAction::RestorePlayerResources);
+	ok = check(partner->life == 1050 && secondPartner->life == 200
+		&& secondPartner->mana == 7 && secondPartner->thew == 7
+		&& latePartner->life == 0 && hiddenPartner->life == 30 && enemy->life == 990,
+		"resource restoration heals all living partners to their equipped maximum without reviving dead or hidden actors or healing enemies") && ok;
+	gameManager.npcManager->npcList = originalNpcs;
+	return ok;
+}
 }
 
 bool runMagicDerivedRuntimeTests()
@@ -2309,6 +2520,7 @@ bool runMagicDerivedRuntimeTests()
 	ok = runDerivedExperienceTest(gameManager, copiedParent) && ok;
 	ok = runPublishedIniCommentContract(root) && ok;
 	ok = runWarningRegionContract(gameManager, root) && ok;
+	ok = runDirectDamageShieldTest(gameManager) && ok;
 
 	File::setPlatformStateParentForTests("");
 	std::filesystem::remove_all(root, errorCode);
@@ -2696,6 +2908,75 @@ bool runReplacementExperienceOwnershipTests()
 				"full-screen child credits the original entry during its internal damage phase") && ok;
 			std::cout << "Full-screen experience ownership:\tdamage=" << 1000 - target->life
 				<< "\texp=" << manager.findMagic("cache-source.ini")->exp << std::endl;
+			auto block = std::make_shared<Effect>();
+			block->level = 1;
+			block->doing = ekFlying;
+			block->magic.level[1].moveKind = mmkSelf;
+			block->magic.level[1].specialKind = mskBlockDamage;
+			target->shieldEffects = { block };
+			Magic::addEffect(fullScreen, gameManager.player, { 4, 5 }, { 5, 5 }, 1, 20, 0, lkSelf, target, fullScreenContext);
+			ok = check(target->life == 980 && manager.findMagic("cache-source.ini")->exp == 36,
+				"full-screen immunity prevents damage and magic hit experience") && ok;
+			block->vanishing = true;
+			Magic::addEffect(fullScreen, gameManager.player, { 4, 5 }, { 5, 5 }, 1, 20, 0, lkSelf, target, fullScreenContext);
+			ok = check(target->life == 960 && manager.findMagic("cache-source.ini")->exp == 45,
+				"full-screen damage and hit experience resume after immunity expires") && ok;
+			target->shieldEffects.clear();
+			const auto casterOffset = PointEx{ 5.5f, -7.5f };
+			auto hits = [&](Point tileDelta, PointEx extraOffset)
+			{
+				target->setPosition(gameManager.player->getPosition() + tileDelta, false);
+				target->setOffset(casterOffset + extraOffset);
+				target->life = 1000;
+				Magic::addEffect(fullScreen, gameManager.player, gameManager.player->getPosition(),
+					target->getPosition(), 1, 20, 0, lkSelf, target);
+				return target->life == 980;
+			};
+			// No window or video initialization: only change the logical size used by the engine.
+			for (Point size : { Point{ 640, 480 }, Point{ 1280, 720 }, Point{ 2560, 1440 } })
+			{
+				Engine::getInstance()->setWindowSize(size.x, size.y);
+				gameManager.camera->position = { size.x, size.y };
+				gameManager.camera->offset = { 120.5f, -42.5f };
+				for (Point center : { Point{ 32, 32 }, Point{ 32, 33 } })
+				{
+					gameManager.player->setPosition(center, false);
+					gameManager.player->setOffset(casterOffset);
+					ok = check(hits({ 10, 0 }, { 0, 0 }) && !hits({ 10, 0 }, { 0.5f, 0 })
+						&& hits({ -10, 0 }, { 0, 0 }) && !hits({ -10, 0 }, { -0.5f, 0 }),
+						"fixed full-screen horizontal bounds are exactly plus/minus 640 including fractional movement") && ok;
+					ok = check(hits({ 0, 30 }, { 0, 0 }) && !hits({ 0, 30 }, { 0, 0.5f })
+						&& hits({ 0, -30 }, { 0, 0 }) && !hits({ 0, -30 }, { 0, -0.5f }),
+						"fixed full-screen vertical bounds are exactly plus/minus 480") && ok;
+					ok = check(hits({ 10, 30 }, { 0, 0 }) && hits({ -10, -30 }, { 0, 0 })
+						&& hits({ -10, 30 }, { 0, 0 }) && hits({ 10, -30 }, { 0, 0 }),
+						"all four corners are hit beyond the former twenty-tile radius at every resolution and row parity") && ok;
+					ok = check(!hits({ 11, 0 }, { 0, 0 }) && !hits({ 0, 32 }, { 0, 0 }),
+						"NPCs outside the rectangle are excluded even when within twenty tiles") && ok;
+				}
+			}
+			target->relation = nrFriendly;
+			ok = check(!hits({ 0, 0 }, { 0, 0 }), "fixed-area casts retain faction filtering") && ok;
+			target->relation = nrHostile;
+			target->scriptHidden = true;
+			ok = check(!hits({ 0, 0 }, { 0, 0 }), "fixed-area casts exclude hidden NPCs") && ok;
+			target->scriptHidden = false;
+			target->actionManager->restartActionIgnoringTransitions(acDeath);
+			ok = check(!hits({ 0, 0 }, { 0, 0 }), "fixed-area casts exclude dead NPCs") && ok;
+			target->actionManager->restartActionIgnoringTransitions(acStand);
+			target->setPosition({ 32, 32 }, false);
+			target->setOffset(casterOffset);
+			for (int horizontalTiles : { 10, 11 })
+			{
+				gameManager.player->setPosition({ 32 + horizontalTiles, 62 }, false);
+				gameManager.player->life = 1000;
+				Magic::addEffect(fullScreen, target, target->getPosition(), gameManager.player->getPosition(),
+					1, 20, 0, lkEnemy, gameManager.player);
+				ok = check((gameManager.player->life < 1000) == (horizontalTiles == 10),
+					"enemy full-screen damage applies the same fixed rectangle to the player") && ok;
+			}
+			ok = check((SDL_WasInit(SDL_INIT_VIDEO) & SDL_INIT_VIDEO) == 0,
+				"fixed-area tests never initialize the video subsystem") && ok;
 		}
 	}
 	{
@@ -2841,7 +3122,7 @@ bool runMagicExperienceTests()
 	ok = check(playerHasNoAbnormalState(), "invincibility rejects hit, equipment, script and action-lock statuses") && ok;
 	auto statusTarget = std::make_shared<NPC>();
 	statusTarget->applyPreDamageMagicStatus(*statusEffect, 1);
-	ok = check(statusTarget->petrified, "player cheat immunity does not protect enemies or partners") && ok;
+	ok = check(statusTarget->petrified, "cheat immunity does not protect ordinary NPCs") && ok;
 	const auto originalStatusMap = gameManager.map->data;
 	const Point originalStatusPosition = gameManager.player->getPosition();
 	gameManager.map->data = std::make_shared<MapData>();
@@ -2901,10 +3182,25 @@ bool runMagicExperienceTests()
 	gameManager.player->applyPreDamageMagicStatus(*statusEffect, 1);
 	ok = check(gameManager.player->immobilized, "disabling invincibility restores normal negative statuses") && ok;
 	gameManager.player->clearAbnormalState();
-	RageSystemTestAccess::updateRangeEffect(*statusEffect, 1);
-	ok = check(gameManager.player->petrified && gameManager.player->poisoned,
-		"the same range effect applies negative statuses when invincibility is disabled") && ok;
+	int rangeStatusHits = 0;
+	statusEffect->magic.level[1].rangeDamage = 10;
+	for (int attempt = 0; attempt < 256; ++attempt)
+	{
+		gameManager.player->clearAbnormalState();
+		gameManager.player->disableMoveMilliseconds = gameManager.player->disableSkillMilliseconds = 0;
+		gameManager.player->life = 100;
+		gameManager.player->nowAction = acStand;
+		RageSystemTestAccess::updateRangeEffect(*statusEffect, 1);
+		const bool statusHit = gameManager.player->petrified && gameManager.player->poisoned;
+		rangeStatusHits += statusHit;
+		ok = check(!statusHit || gameManager.player->life < 100,
+			"a missed range damage roll cannot apply range negative states") && ok;
+	}
+	ok = check(rangeStatusHits > 0 && rangeStatusHits < 256,
+		"range negative states can hit and be evaded when invincibility is disabled") && ok;
 	gameManager.player->clearAbnormalState();
+	gameManager.player->disableMoveMilliseconds = gameManager.player->disableSkillMilliseconds = 0;
+	gameManager.player->life = 100;
 	gameManager.player->setPosition(originalStatusPosition, false);
 	gameManager.map->data = originalStatusMap;
 	gameManager.map->createDataMap();
@@ -3028,8 +3324,9 @@ bool runMagicExperienceTests()
 			&& gameManager.player->mana == 222
 			&& gameManager.player->thew == 123
 			&& gameManager.menu->systemNotice->currentMessage
-				== u8"系统：生命、内力和体力已补满",
+				== u8"系统：主角生命、内力和体力及伙伴生命已补满",
 		"cheat resource restoration reports the completed operation") && ok;
+	ok = runPartnerCheatProtectionTest(gameManager) && ok;
 	gameManager.menu->goodsMenu = std::make_shared<GoodsMenu>();
 	gameManager.player->money = 456;
 	ok = check(

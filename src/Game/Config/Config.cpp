@@ -14,6 +14,7 @@ bool Config::loadAsync = true;
 #endif
 bool Config::externalResourcesEnabled = false;
 bool Config::useQingyuUi = false;
+bool Config::automaticSaveEnabled = false;
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
 float Config::gameSpeed = SPEED_TIME_DEFAULT;
@@ -62,6 +63,7 @@ void Config::load()
 	loadAsync = ini.GetBoolean("game", "loadAsync", loadAsync);
 	externalResourcesEnabled = ini.GetBoolean("game", "externalresources", externalResourcesEnabled);
 	useQingyuUi = ini.GetBoolean("game", "qingyuui", false);
+	automaticSaveEnabled = ini.GetBoolean("game", "automaticsave", false);
 
 	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
 	gameSpeed = convSpeedTofloat(speed);
@@ -101,6 +103,7 @@ void Config::save()
 	ini.SetBoolean("game", "playeralpha", playerAlpha);
 	ini.SetBoolean("game", "externalresources", externalResourcesEnabled);
 	ini.SetBoolean("game", "qingyuui", useQingyuUi);
+	ini.SetBoolean("game", "automaticsave", automaticSaveEnabled);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();
 	//ini.SetReal("game", "speed", gameSpeed);

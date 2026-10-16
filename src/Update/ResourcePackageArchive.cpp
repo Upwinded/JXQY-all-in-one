@@ -19,6 +19,7 @@ extern "C"
 }
 
 #include <algorithm>
+#include <cerrno>
 #include <cstring>
 #include <fstream>
 #include <limits>
@@ -72,7 +73,17 @@ struct FileOutput
 	std::uint64_t expectedSize = 0;
 	std::uint64_t writtenBytes = 0;
 	bool failed = false;
+	int writeError = 0;
 };
+
+bool isDiskSpaceError(int error)
+{
+	return error == ENOSPC
+#if defined(EDQUOT)
+		|| error == EDQUOT
+#endif
+		;
+}
 
 std::string trimAscii(std::string value)
 {
@@ -162,11 +173,13 @@ size_t writeExtractedFile(
 		}
 		return 0;
 	}
+	errno = 0;
 	output->stream.write(
 		static_cast<const char*>(buffer),
 		static_cast<std::streamsize>(bytes));
 	if (!output->stream)
 	{
+		output->writeError = errno;
 		output->failed = true;
 		return 0;
 	}
@@ -229,8 +242,10 @@ bool isUnixSpecialEntry(const mz_zip_archive_file_stat& stat)
 
 bool ensureDirectoryTree(
 	const std::filesystem::path& root,
-	const std::filesystem::path& relativeDirectory)
+	const std::filesystem::path& relativeDirectory,
+	std::error_code& failure)
 {
+	failure.clear();
 	std::filesystem::path current = root;
 	for (const std::filesystem::path& component : relativeDirectory)
 	{
@@ -251,12 +266,14 @@ bool ensureDirectoryTree(
 		if (statusError &&
 			statusError != std::errc::no_such_file_or_directory)
 		{
+			failure = statusError;
 			return false;
 		}
 		std::error_code createError;
 		if (!std::filesystem::create_directory(current, createError) ||
 			createError || !isSafeExistingDirectory(current))
 		{
+			failure = createError;
 			return false;
 		}
 	}
@@ -615,13 +632,69 @@ bool removeIniValue(
 		path, eraseIniKey(original, section, key), maximumBytes);
 }
 
+bool copyFileContents(
+	const std::filesystem::path& sourcePath,
+	const std::filesystem::path& destinationPath,
+	std::error_code& failure)
+{
+	const auto fail = [&failure]()
+	{
+		failure = errno != 0
+			? std::error_code(errno, std::generic_category())
+			: std::make_error_code(std::errc::io_error);
+		return false;
+	};
+	errno = 0;
+	std::ifstream input(sourcePath, std::ios::binary);
+	if (!input)
+	{
+		return fail();
+	}
+	errno = 0;
+	std::ofstream output(destinationPath, std::ios::binary | std::ios::trunc);
+	if (!output)
+	{
+		return fail();
+	}
+	char buffer[64 * 1024];
+	for (;;)
+	{
+		errno = 0;
+		input.read(buffer, sizeof(buffer));
+		if (input.bad() || (input.fail() && !input.eof()))
+		{
+			return fail();
+		}
+		errno = 0;
+		output.write(buffer, input.gcount());
+		if (!output)
+		{
+			return fail();
+		}
+		if (input.eof())
+		{
+			break;
+		}
+	}
+	errno = 0;
+	output.close();
+	if (!output)
+	{
+		return fail();
+	}
+	failure.clear();
+	return true;
+}
+
 bool copyPlainTree(
 	const std::filesystem::path& sourceRoot,
 	const std::filesystem::path& destinationRoot,
 	bool overwriteFiles,
-	std::filesystem::path& failedPath)
+	std::filesystem::path& failedPath,
+	std::error_code& failure)
 {
 	failedPath.clear();
+	failure.clear();
 	if (!isSafeExistingDirectory(sourceRoot) ||
 		!isSafeExistingDirectory(destinationRoot))
 	{
@@ -653,13 +726,14 @@ bool copyPlainTree(
 			isReparsePoint(sourcePath))
 		{
 			failedPath = sourcePath;
+			failure = statusError;
 			return false;
 		}
 		const std::filesystem::path destinationPath =
 			destinationRoot / relativePath;
 		if (std::filesystem::is_directory(sourceStatus))
 		{
-			if (!ensureDirectoryTree(destinationRoot, relativePath))
+			if (!ensureDirectoryTree(destinationRoot, relativePath, failure))
 			{
 				failedPath = destinationPath;
 				return false;
@@ -667,7 +741,7 @@ bool copyPlainTree(
 			continue;
 		}
 		if (!std::filesystem::is_regular_file(sourceStatus) ||
-			!ensureDirectoryTree(destinationRoot, relativePath.parent_path()))
+			!ensureDirectoryTree(destinationRoot, relativePath.parent_path(), failure))
 		{
 			failedPath = sourcePath;
 			return false;
@@ -685,6 +759,7 @@ bool copyPlainTree(
 					isReparsePoint(destinationPath))))
 		{
 			failedPath = destinationPath;
+			failure = statusError;
 			return false;
 		}
 		statusError.clear();
@@ -695,15 +770,23 @@ bool copyPlainTree(
 				? std::filesystem::copy_options::overwrite_existing
 				: std::filesystem::copy_options::none,
 			statusError);
-		if (statusError)
+		// Some Android storage drivers reject libc++'s sendfile-based copy.
+		// Restart the checked file with ordinary I/O, including a partial copy.
+		const bool unsupportedCopy = statusError == std::errc::invalid_argument ||
+			statusError == std::errc::function_not_supported ||
+			statusError == std::errc::operation_not_supported;
+		if (statusError && !(unsupportedCopy &&
+			copyFileContents(sourcePath, destinationPath, statusError)))
 		{
 			failedPath = destinationPath;
+			failure = statusError;
 			return false;
 		}
 	}
 	if (iteratorError)
 	{
 		failedPath = sourceRoot;
+		failure = iteratorError;
 		return false;
 	}
 	return true;
@@ -724,9 +807,8 @@ OnlineUpdate::ResourcePackageArchiveResult cleanupFailure(
 	const bool remains = std::filesystem::exists(destinationPath, statusError);
 	if (cleanupError || statusError || remains)
 	{
-		result.status =
-			OnlineUpdate::ResourcePackageArchiveStatus::CleanupFailed;
-		result.filesystemPath = destinationPath;
+		// Keep the original failure so a cleanup error cannot hide its cause.
+		result.cleanupFailed = true;
 	}
 	return result;
 }
@@ -758,7 +840,8 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	bool importingIncrementalResource,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
-	const ResourcePackageArchiveLimits& limits)
+	const ResourcePackageArchiveLimits& limits,
+	const std::string& currentEngineVersion = {})
 {
 	ResourcePackageArchiveResult result;
 	if (importedResourcePackage != nullptr)
@@ -774,6 +857,8 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		expectedCommonPackage == nullptr &&
 		importedResourcePackage != nullptr;
 	const bool importingPackage = importingResource || importingCommon;
+	const auto engineVersion =
+		ModRelease::parseSemanticVersion(currentEngineVersion);
 	std::vector<std::string> parsedChainReceipts;
 	const bool invalidInstalledReceipts = expectedResourcePackage != nullptr &&
 		(!isValidCrc32Hex(installedFullArtifactCrc32) ||
@@ -789,7 +874,8 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		(!importingPackage &&
 			(expectedArtifactSize == 0 ||
 				!isValidCrc32Hex(expectedCrc32Hex))) ||
-		invalidInstalledReceipts)
+		invalidInstalledReceipts ||
+		(expectedResourcePackage != nullptr && !engineVersion.succeeded()))
 	{
 		result.status = ResourcePackageArchiveStatus::InvalidInput;
 		return result;
@@ -817,6 +903,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	{
 		result.status = ResourcePackageArchiveStatus::UnsafeDestination;
 		result.filesystemPath = destinationPath;
+		result.filesystemError = destinationStatusError;
 		return result;
 	}
 	const std::filesystem::path destinationParent =
@@ -831,10 +918,15 @@ static ResourcePackageArchiveResult preparePackageArchive(
 
 	std::uint32_t checksum = 0;
 	std::uint64_t artifactSize = 0;
-	if (!calculateFileCrc32(archivePath, checksum, artifactSize) ||
-		(!importingPackage &&
-			(artifactSize != expectedArtifactSize ||
-				crc32ToLowerHex(checksum) != expectedCrc32Hex)))
+	if (!calculateFileCrc32(archivePath, checksum, artifactSize))
+	{
+		result.status = ResourcePackageArchiveStatus::ArchiveUnavailable;
+		result.filesystemPath = archivePath;
+		return result;
+	}
+	if (!importingPackage &&
+		(artifactSize != expectedArtifactSize ||
+			crc32ToLowerHex(checksum) != expectedCrc32Hex))
 	{
 		result.status = ResourcePackageArchiveStatus::ArtifactMismatch;
 		result.filesystemPath = archivePath;
@@ -842,9 +934,11 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	}
 
 	ArchiveInput archiveInput;
+	errno = 0;
 	archiveInput.stream.open(archivePath, std::ios::binary);
 	if (!archiveInput.stream)
 	{
+		result.filesystemError = std::error_code(errno, std::generic_category());
 		result.status = ResourcePackageArchiveStatus::ArchiveOpenFailed;
 		result.filesystemPath = archivePath;
 		return result;
@@ -1118,16 +1212,25 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	std::error_code spaceError;
 	const std::filesystem::space_info space =
 		std::filesystem::space(destinationParent, spaceError);
-	if (spaceError || result.uncompressedBytes > space.available ||
+	if (spaceError)
+	{
+		result.status = ResourcePackageArchiveStatus::DestinationCreateFailed;
+		result.filesystemPath = destinationParent;
+		result.filesystemError = spaceError;
+		return result;
+	}
+	if (result.uncompressedBytes > space.available ||
 		limits.minimumFreeSpaceAfterExtractionBytes >
 			space.available - result.uncompressedBytes)
 	{
 		result.status = ResourcePackageArchiveStatus::InsufficientDiskSpace;
+		result.availableDiskBytes = space.available;
 		result.filesystemPath = destinationParent;
 		return result;
 	}
 
 	std::error_code createRootError;
+	result.stage = ResourcePackageArchiveStage::Extraction;
 	const bool rootCreated = std::filesystem::create_directory(
 		destinationPath, createRootError);
 	if (!rootCreated || createRootError ||
@@ -1135,6 +1238,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 	{
 		result.status = ResourcePackageArchiveStatus::DestinationCreateFailed;
 		result.filesystemPath = destinationPath;
+		result.filesystemError = createRootError;
 		return cleanupFailure(result, destinationPath, rootCreated);
 	}
 	const bool destinationCreated = true;
@@ -1151,7 +1255,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			destinationPath / relativePath;
 		const std::filesystem::path relativeParent =
 			entry.directory ? relativePath : relativePath.parent_path();
-		if (!ensureDirectoryTree(destinationPath, relativeParent))
+		if (!ensureDirectoryTree(destinationPath, relativeParent, result.filesystemError))
 		{
 			result.status = ResourcePackageArchiveStatus::DestinationCreateFailed;
 			result.archiveEntryPath = entry.path;
@@ -1170,6 +1274,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			(outputStatusError &&
 				outputStatusError != std::errc::no_such_file_or_directory))
 		{
+			result.filesystemError = outputStatusError;
 			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
 			result.archiveEntryPath = entry.path;
 			result.filesystemPath = outputPath;
@@ -1178,6 +1283,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		}
 		FileOutput output;
 		output.expectedSize = entry.uncompressedSize;
+		errno = 0;
 		output.stream.open(
 			outputPath, std::ios::binary | std::ios::out | std::ios::trunc);
 		if (!output.stream || !mz_zip_reader_extract_to_callback(
@@ -1187,8 +1293,12 @@ static ResourcePackageArchiveResult preparePackageArchive(
 				&output,
 				0))
 		{
+			result.filesystemError = std::error_code(
+				output.writeError != 0 ? output.writeError : (!output.stream ? errno : 0), std::generic_category());
+			const bool diskFull = isDiskSpaceError(result.filesystemError.value());
 			output.stream.close();
-			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+			result.status = diskFull ? ResourcePackageArchiveStatus::InsufficientDiskSpace
+				: ResourcePackageArchiveStatus::ExtractionFailed;
 			result.archiveEntryPath = entry.path;
 			result.filesystemPath = outputPath;
 			result.archiveError = static_cast<int>(
@@ -1196,12 +1306,17 @@ static ResourcePackageArchiveResult preparePackageArchive(
 			return cleanupFailure(
 				result, destinationPath, destinationCreated);
 		}
+		errno = 0;
 		output.stream.flush();
 		if (output.failed || !output.stream ||
 			output.writtenBytes != output.expectedSize)
 		{
+			result.filesystemError = std::error_code(
+				output.writeError != 0 ? output.writeError : errno, std::generic_category());
+			const bool diskFull = isDiskSpaceError(output.writeError) || isDiskSpaceError(errno);
 			output.stream.close();
-			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
+			result.status = diskFull ? ResourcePackageArchiveStatus::InsufficientDiskSpace
+				: ResourcePackageArchiveStatus::ExtractionFailed;
 			result.archiveEntryPath = entry.path;
 			result.filesystemPath = outputPath;
 			return cleanupFailure(
@@ -1209,6 +1324,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		}
 	}
 
+	result.stage = ResourcePackageArchiveStage::ManifestValidation;
 	if (archiveKind == PackageArchiveKind::Common)
 	{
 		const std::filesystem::path versionPath =
@@ -1532,17 +1648,23 @@ static ResourcePackageArchiveResult preparePackageArchive(
 		result.filesystemPath = manifestPath;
 		return cleanupFailure(result, destinationPath, destinationCreated);
 	}
+	// The full archive can predate the current version supplied by increments.
 	if (requireCurrentResourceManifest &&
-		manifest.releaseMetadata.displayVersion != expectedPackage.versionText)
+		(manifest.releaseMetadata.displayVersion.empty() ||
+			((!installedIncrementalArtifactCrc32.empty() ||
+				!expectedPackage.incrementalPackage.has_value()) &&
+				manifest.releaseMetadata.displayVersion != expectedPackage.versionText)))
 	{
 		result.status =
 			ResourcePackageArchiveStatus::DisplayVersionMismatch;
 		result.filesystemPath = manifestPath;
 		return cleanupFailure(result, destinationPath, destinationCreated);
 	}
-	if (requireCurrentResourceManifest &&
-		manifest.releaseMetadata.minimumEngineVersion !=
-		expectedPackage.minimumEngineVersionText)
+	const auto minimumEngineVersion = ModRelease::parseSemanticVersion(
+		manifest.releaseMetadata.minimumEngineVersion);
+	if (!minimumEngineVersion.succeeded() ||
+		ModRelease::compareSemanticVersionPrecedence(
+			engineVersion.version, minimumEngineVersion.version) < 0)
 	{
 		result.status =
 			ResourcePackageArchiveStatus::MinimumEngineVersionMismatch;
@@ -1631,6 +1753,7 @@ static ResourcePackageArchiveResult preparePackageArchive(
 
 ResourcePackageArchiveResult prepareResourcePackageArchive(
 	const ResourcePackage& expectedPackage,
+	const std::string& currentEngineVersion,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits)
@@ -1661,7 +1784,8 @@ ResourcePackageArchiveResult prepareResourcePackageArchive(
 		false,
 		archivePath,
 		destinationPath,
-		limits);
+		limits,
+		currentEngineVersion);
 }
 
 ImportedResourcePackageArchiveResult prepareImportedResourcePackageArchive(
@@ -1754,6 +1878,7 @@ ImportedResourcePackageArchiveResult
 
 ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
 	const ResourcePackage& expectedPackage,
+	const std::string& currentEngineVersion,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
 	const ResourcePackageArchiveLimits& limits)
@@ -1786,7 +1911,8 @@ ResourcePackageArchiveResult prepareIncrementalResourcePackageArchive(
 		false,
 		archivePath,
 		destinationPath,
-		limits);
+		limits,
+		currentEngineVersion);
 }
 
 static std::string incrementalChainReceipt(
@@ -1807,6 +1933,7 @@ static std::string incrementalChainReceipt(
 
 ResourcePackageArchiveResult prepareIncrementalChainPackageArchive(
 	const ResourcePackage& expectedPackage,
+	const std::string& currentEngineVersion,
 	std::size_t chainIndex,
 	const std::filesystem::path& archivePath,
 	const std::filesystem::path& destinationPath,
@@ -1853,7 +1980,8 @@ ResourcePackageArchiveResult prepareIncrementalChainPackageArchive(
 		false,
 		archivePath,
 		destinationPath,
-		limits);
+		limits,
+		currentEngineVersion);
 }
 
 static ResourcePackageArchiveResult materializeIncrementalOverlays(
@@ -1949,6 +2077,7 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 	{
 		result.status = ResourcePackageArchiveStatus::DestinationAlreadyExists;
 		result.filesystemPath = destinationPath;
+		result.filesystemError = statusError;
 		return result;
 	}
 	if (destinationPath.parent_path().empty() ||
@@ -1964,11 +2093,13 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 	{
 		result.status = ResourcePackageArchiveStatus::DestinationCreateFailed;
 		result.filesystemPath = destinationPath;
+		result.filesystemError = statusError;
 		return cleanupFailure(result, destinationPath, true);
 	}
 	std::filesystem::path failedPath;
+	result.stage = ResourcePackageArchiveStage::CopyingBase;
 	if (!copyPlainTree(
-			installedResourcePath, destinationPath, false, failedPath))
+			installedResourcePath, destinationPath, false, failedPath, result.filesystemError))
 	{
 		result.status = ResourcePackageArchiveStatus::ExtractionFailed;
 		result.filesystemPath = failedPath;
@@ -1976,13 +2107,15 @@ static ResourcePackageArchiveResult materializeIncrementalOverlays(
 	}
 	for (const std::filesystem::path& overlayPath : preparedOverlayPaths)
 	{
-		if (!copyPlainTree(overlayPath, destinationPath, true, failedPath))
+		result.stage = ResourcePackageArchiveStage::ApplyingOverlay;
+		if (!copyPlainTree(overlayPath, destinationPath, true, failedPath, result.filesystemError))
 		{
 			result.status = ResourcePackageArchiveStatus::ExtractionFailed;
 			result.filesystemPath = failedPath;
 			return cleanupFailure(result, destinationPath, true);
 		}
 	}
+	result.stage = ResourcePackageArchiveStage::ManifestValidation;
 	const std::string installedFullReceipt = requirePreparedReceipts
 		? expectedFullReceipt
 		: installedManifest.releaseMetadata.installedArtifactCrc32;

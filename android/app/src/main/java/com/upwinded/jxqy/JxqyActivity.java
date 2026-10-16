@@ -22,12 +22,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
 
-import javax.net.ssl.HttpsURLConnection;
 
 import org.libsdl.app.SDLActivity;
 
@@ -45,7 +41,6 @@ public class JxqyActivity extends SDLActivity
 {
 	private static final int ExternalStoragePermissionRequestCode = 4301;
 	private static final int ResourcePackageImportRequestCode = 4302;
-	private static final int MaximumHttpsRedirects = 5;
 	private static final long MaximumImportedResourcePackageBytes =
 		256L * 1024L * 1024L * 1024L;
 	private static final long ResourcePackageImportDiskHeadroomBytes =
@@ -812,118 +807,10 @@ public class JxqyActivity extends SDLActivity
 		});
 	}
 
-	/**
-	 * 供 native 工作线程逐块读取一个 HTTPS 响应。重定向由这里显式处理，
-	 * 只允许继续跳转到 HTTPS；证书和主机名继续使用系统默认校验。
-	 */
-	public static Object openHttpsDownload(byte[] urlUtf8)
+	public static Object openHttpsDownload(byte[] urlUtf8, long offset, long expectedBytes)
 		throws IOException
 	{
-		if (urlUtf8 == null || urlUtf8.length == 0)
-		{
-			throw new IOException("Empty HTTPS URL");
-		}
-		URL currentUrl = new URL(
-			new String(urlUtf8, StandardCharsets.UTF_8));
-		for (int redirectCount = 0;
-			redirectCount <= MaximumHttpsRedirects;
-			redirectCount++)
-		{
-			if (!"https".equalsIgnoreCase(currentUrl.getProtocol()))
-			{
-				throw new IOException("Non-HTTPS URL rejected");
-			}
-			URLConnection rawConnection = currentUrl.openConnection();
-			if (!(rawConnection instanceof HttpsURLConnection))
-			{
-				throw new IOException("HTTPS connection unavailable");
-			}
-			HttpsURLConnection connection =
-				(HttpsURLConnection) rawConnection;
-			connection.setInstanceFollowRedirects(false);
-			connection.setRequestMethod("GET");
-			connection.setRequestProperty(
-				"User-Agent", "jxqy-all-in-one/1.0");
-			connection.setConnectTimeout(10000);
-			connection.setReadTimeout(30000);
-			int responseCode = connection.getResponseCode();
-			if (responseCode == HttpURLConnection.HTTP_MOVED_PERM ||
-				responseCode == HttpURLConnection.HTTP_MOVED_TEMP ||
-				responseCode == HttpURLConnection.HTTP_SEE_OTHER ||
-				responseCode == 307 || responseCode == 308)
-			{
-				String location = connection.getHeaderField("Location");
-				connection.disconnect();
-				if (location == null || location.isEmpty() ||
-					redirectCount == MaximumHttpsRedirects)
-				{
-					throw new IOException("HTTPS redirect rejected");
-				}
-				currentUrl = new URL(currentUrl, location);
-				continue;
-			}
-			InputStream input = responseCode == HttpURLConnection.HTTP_OK
-				? connection.getInputStream() : null;
-			return new HttpsDownloadStream(
-				connection, input, responseCode,
-				connection.getContentLengthLong());
-		}
-		throw new IOException("Too many HTTPS redirects");
-	}
-
-	/** Native 侧持有并在同一工作线程中读取的短生命周期响应对象。 */
-	public static final class HttpsDownloadStream
-	{
-		private final HttpsURLConnection connection;
-		private final InputStream input;
-		private final int httpStatus;
-		private final long contentLength;
-
-		private HttpsDownloadStream(
-			HttpsURLConnection connection,
-			InputStream input,
-			int httpStatus,
-			long contentLength)
-		{
-			this.connection = connection;
-			this.input = input;
-			this.httpStatus = httpStatus;
-			this.contentLength = contentLength;
-		}
-
-		public int getHttpStatus()
-		{
-			return httpStatus;
-		}
-
-		public long getContentLength()
-		{
-			return contentLength;
-		}
-
-		public int read(byte[] buffer) throws IOException
-		{
-			if (input == null || buffer == null || buffer.length == 0)
-			{
-				return -1;
-			}
-			return input.read(buffer);
-		}
-
-		public void close()
-		{
-			if (input != null)
-			{
-				try
-				{
-					input.close();
-				}
-				catch (IOException ignored)
-				{
-				}
-			}
-			connection.disconnect();
-		}
+		return HttpsDownloadStream.open(urlUtf8, offset, expectedBytes);
 	}
 
 	/**

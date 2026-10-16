@@ -4,6 +4,7 @@
 #include "../GameTypes.h"
 #include "../../libconvert/libconvert.h"
 #include "SaveGeneration.h"
+#include "SaveSlots.h"
 #include <functional>
 #include <memory>
 #include <climits>
@@ -66,8 +67,8 @@ private:
 	inline static std::string _currentPath = SAVE_CURRENT_FOLDER;
 	inline static std::recursive_mutex _currentPathMutex;
 public:
-	// CopySaveFileTo仅接受1至7，对应手动存档槽。
-	// CopySaveFileFrom接受0至7；0读取资源包的ini/save模板，1至7读取手动槽。
+	// CopySaveFileTo仅接受1至9，对应手动存档槽。
+	// CopySaveFileFrom接受0至10；0读取资源包的ini/save模板，1至9读取手动槽，10读取自动槽。
 	static bool CopySaveFileTo(int index, const std::function<bool()>& cancellationRequested = {});
 	static bool CopySaveFileFrom(int index);
 	static bool CopySaveFileToAuto(const std::function<bool()>& cancellationRequested = {});

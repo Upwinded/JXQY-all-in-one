@@ -1314,7 +1314,7 @@ bool NPCManager::scheduleBattleAction(std::shared_ptr<NPC> npc)
 		if (!npc->canDoAction(acAttack) || !hasAttackMagic)
 		{
 			npc->clearCombatTargetMemory();
-			return false;
+			return npc->tryUseMagicWhenLifeLow();
 		}
 	}
 	// Owner following outranks target acquisition once a partner falls too far
@@ -1781,6 +1781,7 @@ void NPCManager::addNPC(std::string iniName, int x, int y, int dir)
 	npc->setPosition({ x, y });
 	npc->direction = dir;
 	addNPC(npc);
+	if (findNPC(npc)) npc->finishPartnerJoin();
 }
 
 void NPCManager::addNPC(std::shared_ptr<NPC> npc)
@@ -2031,6 +2032,7 @@ bool NPCManager::prepareParsedLoad(
 	candidate.preparedNpcCount = static_cast<size_t>(count);
 	candidate.normalizationRequired = !declaredCountIsValid || count != declaredCount;
 	candidate.resolvedSourcePath = sourcePath;
+	candidate.joinsFromResource = exactResource || sourcePath.rfind(INI_SAVE_FOLDER, 0) == 0;
 	preparedLoad = std::move(candidate);
 	return true;
 }
@@ -2160,6 +2162,7 @@ bool NPCManager::commitPreparedLoad(
 		npc->initFromIni(
 			preparedLoad.parsedIni.get(),
 			section);
+		if (preparedLoad.joinsFromResource) npc->finishPartnerJoin();
 		loadedNpcList.push_back(std::move(npc));
 	}
 	if (preparationCheckpoint &&

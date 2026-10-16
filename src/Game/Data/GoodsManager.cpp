@@ -11,6 +11,7 @@
 #include <climits>
 #include <cstdint>
 #include <utility>
+#include <unordered_set>
 
 namespace
 {
@@ -63,15 +64,18 @@ void limitNpcDrugAttributes(std::shared_ptr<NPC> npc)
 	}
 }
 
-void applyDrugEffect(std::shared_ptr<NPC> npc, std::shared_ptr<Goods> goods)
+void applyDrugEffect(std::shared_ptr<NPC> npc, std::shared_ptr<Goods> goods, bool includePermanentAttributes = true)
 {
 	if (npc == nullptr || goods == nullptr)
 	{
 		return;
 	}
-	npc->lifeMax += goods->lifeMax;
-	npc->thewMax += goods->thewMax;
-	npc->manaMax += goods->manaMax;
+	if (includePermanentAttributes)
+	{
+		npc->lifeMax += goods->lifeMax;
+		npc->thewMax += goods->thewMax;
+		npc->manaMax += goods->manaMax;
+	}
 	auto player = std::dynamic_pointer_cast<Player>(npc);
 	if (player != nullptr)
 	{
@@ -329,7 +333,13 @@ bool GoodsManager::load(int index, std::string* failureReason)
 		}
 	}
 
+	const bool equipmentNormalized = loadedManager.normalizeEquipmentStacks();
+	if (!equipmentNormalized)
+	{
+		GameLog::write("GoodsManager: equipment overflow retained until bag space is available\n");
+	}
 	goodsList = std::move(loadedManager.goodsList);
+	if (!equipmentNormalized && gm) gm->showMessage(u8"背包已满，多余装备将在腾出空间后自动归包");
 	if (gm != nullptr && gm->player != nullptr)
 	{
 		gm->player->resetEquipmentGrantedMagicSync();
@@ -428,62 +438,154 @@ int GoodsManager::getItemNumByDisplayName(const std::string& name)
 	return static_cast<int>(count);
 }
 
-void GoodsManager::setItemNum(const std::string & itemName, int num)
+void GoodsManager::setItemNum(const std::string& itemName, int num)
 {
-	if (num <= 0)
-	{
-		for (size_t i = 0; i < goodsList.size(); i++)
-		{
-			if (equalsGoodsFileName(goodsList[i].iniFile, itemName))
-			{
-				goodsList[i].clear();
-				updateMenu(static_cast<int>(i));
-			}
-		}
-		refreshEquipmentEffects();
-	}
-	else
-	{
-		if (isItemPerSlotListType())
-		{
-			int currentCount = getItemNum(itemName);
-			if (currentCount > num)
-			{
-				int deleteCount = currentCount - num;
-				for (int i = 0; i < deleteCount; i++)
-				{
-					deleteItem(itemName);
-				}
-			}
-			else if (currentCount < num)
-			{
-				addItem(itemName, num - currentCount);
-			}
-			return;
-		}
-		GoodsInfo * g = findGoods(itemName);
-		if (g != nullptr)
-		{
-			g->number = num;
-			refreshEquipmentEffects();
-		}
-		else
-		{
-			addItem(itemName, num);
-		}
-		updateMenu();
-	}
+    int64_t current = 0;
+    for (const auto& item : goodsList)
+        if (equalsGoodsFileName(item.iniFile, itemName)) current += std::max(0, item.number);
+    const int desired = std::max(0, num);
+    if (current < desired)
+    {
+        addItem(itemName, static_cast<int>(desired - current));
+        return;
+    }
+    int64_t remaining = current - desired;
+    // Remove carried copies first, retaining the worn item whenever possible.
+    for (int equippedPass = 0; equippedPass < 2; ++equippedPass)
+    {
+        for (int i = 0; i < listLength() && remaining > 0; ++i)
+        {
+            auto& item = goodsList[i];
+            if (isEquipIndex(i) != (equippedPass != 0) || !equalsGoodsFileName(item.iniFile, itemName)) continue;
+            const int removed = static_cast<int>(std::min<int64_t>(remaining, std::max(0, item.number)));
+            item.number -= removed;
+            remaining -= removed;
+            if (item.number <= 0) item.clear();
+        }
+    }
+    refreshEquipmentEffects();
+    updateMenu();
 }
 
-void GoodsManager::exchange(int index1, int index2)
+int GoodsManager::returnToBag(const GoodsInfo& item, int count, int preferredIndex)
 {
-	if (index1 >= 0 && index1 < listLength() && index2 >= 0 && index2 < listLength())
-	{
-		GoodsInfo tempInfo = goodsList[index1];
-		goodsList[index1] = goodsList[index2];
-		goodsList[index2] = tempInfo;
-		refreshEquipmentEffects();
-	}
+    const int requested = count;
+    if (!isItemPerSlotListType())
+    {
+        for (int i = storeBegin(); i <= storeEnd() && count > 0; ++i)
+        {
+            if (!equalsGoodsFileName(goodsList[i].iniFile, item.iniFile)) continue;
+            const int moved = std::min(count, INT_MAX - std::max(0, goodsList[i].number));
+            goodsList[i].number += moved;
+            count -= moved;
+        }
+    }
+    auto fill = [&](int index)
+    {
+        if ((!isStoreIndex(index) && !(index == preferredIndex && isBottomIndex(index)))
+            || index < 0 || index >= listLength() || count <= 0
+            || !goodsList[index].iniFile.empty()) return;
+        goodsList[index] = item;
+        goodsList[index].number = isItemPerSlotListType() ? 1 : count;
+        count -= goodsList[index].number;
+    };
+    fill(preferredIndex);
+    for (int i = storeBegin(); i <= storeEnd() && count > 0; ++i) fill(i);
+    return requested - count;
+}
+
+bool GoodsManager::normalizeEquipmentStacks(bool* changed)
+{
+    if (changed) *changed = false;
+    bool complete = true;
+    for (int i = equipBegin(); i <= equipEnd() && i < listLength(); ++i)
+    {
+        auto& equipped = goodsList[i];
+        if (equipped.iniFile.empty() || equipped.number <= 1) continue;
+        const int moved = returnToBag(equipped, equipped.number - 1);
+        equipped.number -= moved;
+        if (changed && moved > 0) *changed = true;
+        complete = complete && equipped.number == 1;
+    }
+    return complete;
+}
+
+bool GoodsManager::normalizeEquipmentRecord(INIReader& ini)
+{
+    GoodsManager record;
+    for (int i = 0; i < record.listLength(); ++i)
+    {
+        const std::string section = std::to_string(i + 1);
+        record.goodsList[i].iniFile = ini.Get(section, "IniFile", "");
+        record.goodsList[i].number = static_cast<int>(ini.GetInteger(section, "Number", 0));
+        if (record.goodsList[i].number <= 0) record.goodsList[i].clear();
+    }
+    const bool complete = record.normalizeEquipmentStacks();
+    for (int i = 0; i < record.listLength(); ++i)
+    {
+        const auto& item = record.goodsList[i];
+        if (item.iniFile.empty()) continue;
+        const std::string section = std::to_string(i + 1);
+        ini.Set(section, "IniFile", item.iniFile);
+        ini.SetInteger(section, "Number", item.number);
+    }
+    return complete;
+}
+
+bool GoodsManager::exchange(int index1, int index2, std::string* message)
+{
+    auto reject = [&](const std::string& reason)
+    {
+        if (message) *message = reason;
+        else if (gm) gm->showMessage(reason);
+        return false;
+    };
+    if (message) message->clear();
+    if (index1 < 0 || index1 >= listLength() || index2 < 0 || index2 >= listLength())
+        return reject(u8"物品位置无效");
+    if (index1 == index2) return true;
+    if (isEquipIndex(index1) != isEquipIndex(index2))
+    {
+        const int equipmentIndex = isEquipIndex(index1) ? index1 : index2;
+        const int bagIndex = isEquipIndex(index1) ? index2 : index1;
+        if (!isStoreIndex(bagIndex) && !isBottomIndex(bagIndex)) return reject(u8"包裹位置无效");
+        if (goodsListExists(bagIndex))
+        {
+            if (equalsGoodsFileName(goodsList[bagIndex].iniFile, goodsList[equipmentIndex].iniFile))
+            {
+                if (index1 != equipmentIndex || isItemPerSlotListType()) return true;
+                if (goodsList[equipmentIndex].number > INT_MAX - goodsList[bagIndex].number)
+                    return reject(u8"该物品数量已达到上限");
+                goodsList[bagIndex].number += goodsList[equipmentIndex].number;
+                goodsList[equipmentIndex].clear();
+                refreshEquipmentEffects();
+                updateMenu();
+                return true;
+            }
+            std::string reason;
+            if (!canEquipGoodsAt(bagIndex, equipSlot(equipmentIndex), gm->player, &reason)) return reject(reason);
+        }
+        GoodsManager changed;
+        changed.goodsList = goodsList;
+        const GoodsInfo previous = changed.goodsList[equipmentIndex];
+        changed.goodsList[equipmentIndex] = changed.goodsList[bagIndex];
+        if (changed.goodsListExists(bagIndex))
+        {
+            changed.goodsList[equipmentIndex].number = 1;
+            if (--changed.goodsList[bagIndex].number == 0) changed.goodsList[bagIndex].clear();
+        }
+        if (!previous.iniFile.empty() && previous.number > 0
+            && changed.returnToBag(previous, previous.number, bagIndex) != previous.number)
+            return reject(u8"包裹没有足够空间放回原装备");
+        std::move(changed.goodsList.begin(), changed.goodsList.end(), goodsList.begin());
+    }
+    else
+    {
+        std::swap(goodsList[index1], goodsList[index2]);
+    }
+    refreshEquipmentEffects();
+    updateMenu();
+    return true;
 }
 
 void GoodsManager::sellItem(const std::string & itemName)
@@ -574,7 +676,7 @@ bool GoodsManager::addItem(const std::string & itemName, int num)
 	{
 		for (size_t i = 0; i < goodsList.size(); i++)
 		{
-			if (equalsGoodsFileName(goodsList[i].iniFile, itemName))
+			if (!isEquipIndex(static_cast<int>(i)) && equalsGoodsFileName(goodsList[i].iniFile, itemName))
 			{
 				goodsList[i].number = saturatingGoodsCountAdd(goodsList[i].number, num);
 				refreshEquipmentEffects();
@@ -642,16 +744,12 @@ void GoodsManager::clearItemByFileName(const std::string& itemName)
 		{
 			goodsList[i].clear();
 			cleared = true;
-			updateMenu(static_cast<int>(i));
-			if (!isItemPerSlotListType())
-			{
-				break;
-			}
 		}
 	}
 	if (cleared)
 	{
 		refreshEquipmentEffects();
+		updateMenu();
 	}
 }
 
@@ -701,13 +799,13 @@ void GoodsManager::deleteItemByDisplayName(const std::string& name, int count)
 			goodsList[i].number -= static_cast<int>(static_cast<int64_t>(count) - deletedCount);
 			deletedCount = count;
 		}
-		refreshEquipmentEffects();
-		updateMenu((int)i);
 		if (count > 0 && deletedCount >= count)
 		{
-			return;
+			break;
 		}
 	}
+	refreshEquipmentEffects();
+	updateMenu();
 }
 
 bool GoodsManager::buyItem(const std::string & itemName, int num)
@@ -780,12 +878,19 @@ bool GoodsManager::useItem(int itemIndex)
 		}
 		applyDrugEffect(gm->player, goods);
 		gm->player->limitAttribute();
+		std::unordered_set<const NPC*> treated{ gm->player.get() };
+		auto shareDrug = [&](const std::shared_ptr<NPC>& recipient, bool includePermanentAttributes)
+		{
+			if (recipient == nullptr || recipient->life <= 0 || recipient->isDying() || recipient->isHiding()
+				|| !recipient->isVisibleForRuntime() || !treated.insert(recipient.get()).second) return;
+			applyDrugEffect(recipient, goods, includePermanentAttributes);
+		};
 		if (goods->fighterFriendHasDrugEffect > 0)
 		{
 			auto friendFighters = gm->npcManager->findFriendFighters();
 			for (auto& friendFighter : friendFighters)
 			{
-				applyDrugEffect(friendFighter, goods);
+				shareDrug(friendFighter, true);
 			}
 		}
 		else if (goods->followPartnerHasDrugEffect > 0)
@@ -793,7 +898,14 @@ bool GoodsManager::useItem(int itemIndex)
 			auto partners = gm->partnerManager.findPartnersFromNPCManager();
 			for (auto& partner : partners)
 			{
-				applyDrugEffect(partner, goods);
+				shareDrug(partner, true);
+			}
+		}
+		if (gm->global.feature.restorePartnerAttributes)
+		{
+			for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
+			{
+				if (partner != nullptr && partner->isLivingPartner()) shareDrug(partner, false);
 			}
 		}
 		playDrugUseSound();
@@ -802,7 +914,8 @@ bool GoodsManager::useItem(int itemIndex)
 		{
 			goodsList[itemIndex].clear();
 		}
-		updateMenu(itemIndex);
+		normalizeEquipmentStacks();
+		updateMenu();
 		return true;
 	}
 	else if (goodsList[itemIndex].goods->kind == gkEquipment)
@@ -816,7 +929,7 @@ bool GoodsManager::useItem(int itemIndex)
 		if (partIndex >= 0)
 		{
 			const int equipmentIndex = equipIndex(partIndex);
-			exchange(itemIndex, equipmentIndex);
+			if (!exchange(itemIndex, equipmentIndex)) return false;
 			updateMenu(equipmentIndex);
 			gm->player->limitAttribute();
 			updateMenu(itemIndex);
@@ -828,6 +941,8 @@ bool GoodsManager::useItem(int itemIndex)
 
 void GoodsManager::refreshEquipmentEffects(bool adjustCurrentValues)
 {
+	bool equipmentMoved = false;
+	normalizeEquipmentStacks(&equipmentMoved);
 	if (gm == nullptr || gm->player == nullptr)
 	{
 		return;
@@ -847,6 +962,7 @@ void GoodsManager::refreshEquipmentEffects(bool adjustCurrentValues)
 	{
 		gm->player->limitAttribute();
 	}
+	if (equipmentMoved) updateMenu();
 }
 
 bool GoodsManager::canUseGoods(int itemIndex, std::shared_ptr<NPC> user, std::string* message) const
@@ -942,25 +1058,20 @@ bool GoodsManager::unequipToFirstStoreSlot(
 		}
 		return false;
 	}
-	for (int index = storeBegin();
-		index <= storeEnd() && index < listLength(); index++)
-	{
-		if (isStoreIndex(index) && !goodsListExists(index))
-		{
-			exchange(equipmentIndex, index);
-			updateMenu();
-			if (message != nullptr)
-			{
-				message->clear();
-			}
-			return true;
-		}
-	}
-	if (message != nullptr)
-	{
-		*message = "包裹没有空位";
-	}
-	return false;
+    GoodsManager changed;
+    changed.goodsList = goodsList;
+    const GoodsInfo item = goodsList[equipmentIndex];
+    if (changed.returnToBag(item, item.number) != item.number)
+    {
+        if (message) *message = u8"包裹没有足够空间";
+        return false;
+    }
+    changed.goodsList[equipmentIndex].clear();
+    std::move(changed.goodsList.begin(), changed.goodsList.end(), goodsList.begin());
+    refreshEquipmentEffects();
+    updateMenu();
+    if (message) message->clear();
+    return true;
 }
 
 void GoodsManager::updateMenu(int idx)
@@ -1016,7 +1127,7 @@ bool GoodsManager::goodsListExists(int index)
 {
 	if (index >= 0 && index < listLength())
 	{
-		return !gm->goodsManager.goodsList[index].iniFile.empty() && gm->goodsManager.goodsList[index].goods != nullptr && gm->goodsManager.goodsList[index].number > 0;
+		return !goodsList[index].iniFile.empty() && goodsList[index].goods != nullptr && goodsList[index].number > 0;
 	}
 	return false;
 }

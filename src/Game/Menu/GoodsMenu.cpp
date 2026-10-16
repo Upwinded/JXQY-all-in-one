@@ -185,7 +185,7 @@ void GoodsMenu::onEvent()
 					else
 					{
 #endif
-						gm->goodsManager.useItem(item[i]->dragIndex);
+						useDisplayedItem(item[i]->dragIndex);
 #ifdef __MOBILE__
 					}
 				}
@@ -197,6 +197,19 @@ void GoodsMenu::onEvent()
 			cancelControllerInteraction();
 			gm->menu->toolTip->visible = false;
 			item[i]->resetHint();
+			if (item[i]->dropType == dtPartnerEquipment)
+			{
+				const auto& equip = gm->menu->equipMenu;
+				if (equip && equip->visible && equip->getSelectedPartner())
+				{
+					std::string message;
+					gm->partnerManager.exchangePlayerBagWithPartnerEquipment(equip->getSelectedPartner(),
+						item[i]->dragIndex, item[i]->dropIndex, false, &message);
+					if (!message.empty()) gm->showMessage(message);
+					gm->goodsManager.updateMenu();
+				}
+				continue;
+			}
 			if (item[i]->dropType == dtGoods)
 			{
 				if (gm->goodsManager.goodsListExists(item[i]->dropIndex))
@@ -540,8 +553,22 @@ void GoodsMenu::activateControllerItem(int visibleIndex)
 		return;
 	}
 	hideControllerItemDetails();
-	gm->goodsManager.useItem(listIndex);
+	useDisplayedItem(listIndex);
 	updateGoods();
+}
+
+void GoodsMenu::useDisplayedItem(int listIndex)
+{
+	const auto& equip = gm->menu->equipMenu;
+	if (equip && equip->visible && equip->getSelectedPartner()
+		&& gm->goodsManager.goodsListExists(listIndex)
+		&& gm->goodsManager.goodsList[listIndex].goods->kind == gkEquipment)
+	{
+		equip->equipOnSelectedPartner(listIndex,
+			NPC::getEquipmentPartIndex(gm->goodsManager.goodsList[listIndex].goods->part));
+		return;
+	}
+	gm->goodsManager.useItem(listIndex);
 }
 void GoodsMenu::showControllerItemDetails(int visibleIndex)
 {

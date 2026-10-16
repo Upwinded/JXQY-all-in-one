@@ -4,6 +4,7 @@
 #include <vector>
 
 class NPC;
+class INIReader;
 
 struct GoodsInfo
 {
@@ -52,7 +53,9 @@ public:
 	int getItemNum(const std::string & itemName);
 	int getItemNumByDisplayName(const std::string& name);
 	void setItemNum(const std::string & itemName, int num);
-	void exchange(int index1, int index2);
+	bool exchange(int index1, int index2, std::string* message = nullptr);
+	bool normalizeEquipmentStacks(bool* changed = nullptr);
+	static bool normalizeEquipmentRecord(INIReader& ini);
 	void sellItem(const std::string & itemName);
 	bool addItem(const std::string & itemName, int num);
 	void clearItemByFileName(const std::string& itemName);
@@ -91,4 +94,6 @@ public:
 	bool isEquipIndex(int index) const;
 	std::vector<GoodsInfo> goodsList;
 	bool goodsListExists(int index);
+private:
+	int returnToBag(const GoodsInfo& item, int count, int preferredIndex = -1);
 };

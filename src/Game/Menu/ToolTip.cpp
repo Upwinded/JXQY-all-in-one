@@ -456,14 +456,24 @@ void ToolTip::updatePage()
 		body->mstr[row]->setStr(index < static_cast<int>(lines.size()) ? lines[index] : "");
 	}
 	if (auto label = getComponentByName<Label>("page"))
+	{
 		label->setStr(convert::formatString("%d / %d", page + 1, pages));
+		label->visible = pages > 1;
+#ifdef __MOBILE__
+		label->visible = label->visible && expanded;
+#endif
+	}
 	if (auto button = getComponentByName("previous")) button->visible = button->activated = expanded && page > 0;
 	if (auto button = getComponentByName("next")) button->visible = button->activated = expanded && page + 1 < pages;
 	if (auto button = getComponentByName("back")) button->visible = button->activated = expanded;
 	if (auto hint = getComponentByName<Label>("hint"))
 	{
 		hint->visible = !expanded;
+#ifdef __MOBILE__
+		hint->setStr(u8"松手关闭提示");
+#else
 		hint->setStr(pages > 1 ? "滚轮 / 翻页键：翻阅说明" : "点击物品查看完整说明");
+#endif
 	}
 }
 

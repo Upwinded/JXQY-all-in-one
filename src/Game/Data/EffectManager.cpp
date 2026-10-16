@@ -94,7 +94,8 @@ void loadMagicEffectBonusMap(
 	}
 }
 
-void saveDetachedEffectCaster(INIReader& ini, const std::string& section, const std::shared_ptr<NPC>& caster)
+void saveDetachedEffectCaster(INIReader& ini, const std::string& section, const std::shared_ptr<NPC>& caster,
+	EffectReferenceSaveContext* referenceContext = nullptr)
 {
 	if (caster == nullptr)
 	{
@@ -106,6 +107,12 @@ void saveDetachedEffectCaster(INIReader& ini, const std::string& section, const 
 	ini.SetInteger(section, "RuntimeRelation", caster->relation);
 	ini.SetInteger(section, "RuntimeGroup", caster->group);
 	ini.SetInteger(section, "RuntimeLevel", caster->level);
+	const auto experienceOwner = caster->getExperienceOwner();
+	if (referenceContext != nullptr && experienceOwner != nullptr && experienceOwner != caster)
+	{
+		Effect::saveElementReference(ini, section, "SummonExperienceOwner", experienceOwner,
+			EffectElementReferenceRole::Caster, referenceContext);
+	}
 	Point casterPosition = caster->getPosition();
 	PointEx casterOffset = caster->getOffset();
 	ini.SetInteger(section, "RuntimeMapX", casterPosition.x);
@@ -593,6 +600,23 @@ void EffectManager::loadFromIni(INIReader& ini)
 			static_cast<size_t>(i),
 			loadDetachedEffectCaster(ini, getDetachedCasterSection(i)));
 	}
+	// Owners may themselves be detached casters, so resolve after every snapshot exists.
+	for (int i = 0; i < detachedCasterCount; i++)
+	{
+		const auto caster = referenceContext.getDetachedCaster(i);
+		if (caster == nullptr) continue;
+		const auto owner = std::dynamic_pointer_cast<NPC>(Effect::loadElementReference(
+			ini, getDetachedCasterSection(i), "SummonExperienceOwner",
+			EffectElementReferenceRole::Caster, &referenceContext));
+		if (owner == nullptr) continue;
+		const auto resolvedOwner = owner->getExperienceOwner();
+		if (resolvedOwner == nullptr || resolvedOwner == caster)
+		{
+			GameLog::write("EffectManager: ignored cyclic summon experience owner for caster %d\n", i);
+			continue;
+		}
+		caster->summonExperienceOwner = owner;
+	}
 
 	std::string section = "Head";
 	int count = std::clamp(
@@ -813,14 +837,17 @@ void EffectManager::saveToIni(INIReader& ini)
 	ini.SetInteger("Head", "DelayedCount", delayedIndex);
 	ini.SetInteger("Head", "EffectPersistenceVersion", 2);
 	const auto& detachedCasters = referenceContext.getDetachedCasters();
-	ini.SetInteger("Head", "DetachedCasterCount", static_cast<long>(detachedCasters.size()));
 	for (size_t i = 0; i < detachedCasters.size(); i++)
 	{
+		// Saving an owner may grow the vector; do not retain a reference to its element.
+		const auto caster = detachedCasters[i];
 		saveDetachedEffectCaster(
 			ini,
 			getDetachedCasterSection(static_cast<int>(i)),
-			detachedCasters[i]);
+			caster,
+			&referenceContext);
 	}
+	ini.SetInteger("Head", "DetachedCasterCount", static_cast<long>(detachedCasters.size()));
 }
 
 std::shared_ptr<GameElement> EffectManager::getPendingTrailMagicUser(size_t index) const
@@ -932,19 +959,27 @@ std::shared_ptr<NPC> EffectManager::captureCasterSnapshot(const std::shared_ptr<
 	{
 		return nullptr;
 	}
+	const auto referencesCaster = [&](const EffectCasterReference& reference)
+	{
+		const auto user = std::dynamic_pointer_cast<NPC>(reference.lock());
+		return user != nullptr && (user == caster || user->getExperienceOwner() == caster);
+	};
 	const bool referenced = std::any_of(effectList.begin(), effectList.end(),
-		[&](const auto& effect) { return effect != nullptr && effect->user.lock() == caster; })
+		[&](const auto& effect) { return effect != nullptr && referencesCaster(effect->user); })
 		|| std::any_of(delayedMagicList.begin(), delayedMagicList.end(),
-			[&](const auto& info) { return info.user.lock() == caster; })
+			[&](const auto& info) { return referencesCaster(info.user); })
 		|| std::any_of(trailMagicList.begin(), trailMagicList.end(),
-			[&](const auto& info) { return info.user.lock() == caster; });
+			[&](const auto& info) { return referencesCaster(info.user); });
 	if (!referenced)
 	{
 		return nullptr;
 	}
 	INIReader snapshot;
 	saveDetachedEffectCaster(snapshot, "Caster", caster);
-	return loadDetachedEffectCaster(snapshot, "Caster");
+	auto result = loadDetachedEffectCaster(snapshot, "Caster");
+	const auto owner = caster->getExperienceOwner();
+	if (result != nullptr && owner != caster) result->summonExperienceOwner = owner;
+	return result;
 }
 
 void EffectManager::replaceCasterReferences(const std::shared_ptr<GameElement>& caster,
@@ -954,17 +989,26 @@ void EffectManager::replaceCasterReferences(const std::shared_ptr<GameElement>& 
 	{
 		return;
 	}
+	const auto replaceReference = [&](EffectCasterReference& reference)
+	{
+		auto user = std::dynamic_pointer_cast<NPC>(reference.lock());
+		if (reference.lock() == caster) reference = replacement;
+		else if (user != nullptr && user->getExperienceOwner() == caster)
+		{
+			user->summonExperienceOwner = std::dynamic_pointer_cast<NPC>(replacement);
+		}
+	};
 	for (const auto& effect : effectList)
 	{
-		if (effect != nullptr && effect->user.lock() == caster) effect->user = replacement;
+		if (effect != nullptr) replaceReference(effect->user);
 	}
 	for (auto& info : delayedMagicList)
 	{
-		if (info.user.lock() == caster) info.user = replacement;
+		replaceReference(info.user);
 	}
 	for (auto& info : trailMagicList)
 	{
-		if (info.user.lock() == caster) info.user = replacement;
+		replaceReference(info.user);
 	}
 }
 

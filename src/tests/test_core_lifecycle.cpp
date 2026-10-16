@@ -53,6 +53,12 @@
 class CoreLifecycleTestAccess
 {
 public:
+	static void automaticSaveStep(GameManager& game, UTime elapsed) { game.updateAutomaticSave(elapsed, elapsed); }
+	static bool automaticSavePending(const GameManager& game) { return game.automaticSavePending; }
+	static bool canAutomaticallySave(GameManager& game) { return game.canAutomaticallySave(); }
+	static bool selectSaveSlot(SaveLoad& menu, int index) { return menu.selectSlot(index); }
+	static void requestLoad(SaveLoad& menu) { menu.requestLoad(); }
+
 	static std::size_t scriptMessageCount(const SystemNotice& notice)
 	{
 		return notice.messages.size();
@@ -386,6 +392,18 @@ public:
 		Element& element, EventTouchID pointerID, int x, int y)
 	{
 		return element.checkAllTouchDown(pointerID, x, y);
+	}
+	static void movePointerInteraction(Element& element, EventTouchID pointerID, int x, int y)
+	{
+		element.checkAllTouchMotion(pointerID, x, y, false);
+	}
+	static void endPointerInteraction(Element& element, EventTouchID pointerID, int x, int y)
+	{
+		element.checkAllTouchUp(pointerID, x, y);
+	}
+	static PElement draggedElement()
+	{
+		return Element::currentDragItem;
 	}
 
 	static GameLoading::LoadingTaskResult runExclusiveLoadingTask(
@@ -767,15 +785,15 @@ public:
 		requestedDestination = destination;
 		NPC::beginWalk(destination);
 	}
-	void beginRun(Point destination) override
+	void beginRun(Point destination, bool scripted = false) override
 	{
 		requestedDestination = destination;
-		NPC::beginRun(destination);
+		NPC::beginRun(destination, scripted);
 	}
-	void beginJump(Point destination) override
+	void beginJump(Point destination, bool scripted = false) override
 	{
 		requestedDestination = destination;
-		NPC::beginJump(destination);
+		NPC::beginJump(destination, scripted);
 	}
 	unsigned int eventRun() override
 	{
@@ -3149,11 +3167,11 @@ bool runProductionXiaoxiangCompanionHistoryTests(int requestedLoadMode)
 	{
 	public:
 		int guardCollisions = 0;
-		void hurt(std::shared_ptr<Effect> effect) override
+		void hurt(std::shared_ptr<Effect> effect, int hitRoll = -1) override
 		{
 			const auto caster = effect ? std::dynamic_pointer_cast<NPC>(effect->user.lock()) : nullptr;
 			if (caster && caster->npcName == u8"家丁") ++guardCollisions;
-			Player::hurt(effect);
+			Player::hurt(effect, hitRoll);
 		}
 	};
 	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
@@ -3257,7 +3275,8 @@ bool runProductionXiaoxiangCompanionHistoryTests(int requestedLoadMode)
 					if (!actor) continue;
 					actor->updateVisibleByVariable();
 					if (!actor->isVisibleByVariable || actor->relation != nrHostile || actor->life <= 0
-						|| (!navigateCombatMaze && actor->deathScript != deathScript)) continue;
+						|| (!navigateCombatMaze && actor->deathScript != deathScript
+							&& Map::calDistance(game.player->getPosition(), actor->getPosition()) > combatRadius)) continue;
 					candidates.push_back(actor);
 				}
 				const auto previousTarget = pursuedTarget.lock();
@@ -5399,23 +5418,29 @@ bool runMissedAttackMotionContracts()
 	{
 		for (int motion : { 0, 1, 2 })
 		{
-			gameManager.npcManager->clearNPC(true);
-			gameManager.player = std::make_shared<Player>();
-			std::shared_ptr<NPC> target = playerTarget ? gameManager.player : std::make_shared<NPC>();
-			if (!playerTarget) gameManager.npcManager->addNPC(target);
-			target->lifeMax = target->life = 1000;
-			target->evade = gameManager.player->info.evade = 1000;
-			target->setPosition({ 10, 10 }, false);
-			gameManager.map->createDataMap();
-			auto effect = std::make_shared<Effect>();
-			effect->level = 1;
-			effect->evade = 0;
-			effect->damage = 10;
-			effect->flyingDirection = { 0, 1000 };
-			effect->magic.bounce = motion == 1 ? 500 : 0;
-			effect->magic.bounceFly = effect->magic.linkedLevel[1].bounceFly = motion == 2 ? 3 : 0;
-			target->hurt(effect);
-			ok = check(target->life == 1000, "evade difference above 100 guarantees no damage without replacing the random engine") && ok;
+			std::shared_ptr<NPC> target;
+			bool observedMiss = false;
+			for (int attempt = 0; attempt < 64 && !observedMiss; ++attempt)
+			{
+				gameManager.npcManager->clearNPC(true);
+				gameManager.player = std::make_shared<Player>();
+				target = playerTarget ? gameManager.player : std::make_shared<NPC>();
+				if (!playerTarget) gameManager.npcManager->addNPC(target);
+				target->lifeMax = target->life = 1000;
+				target->evade = gameManager.player->info.evade = 1000;
+				target->setPosition({ 10, 10 }, false);
+				gameManager.map->createDataMap();
+				auto effect = std::make_shared<Effect>();
+				effect->level = 1;
+				effect->evade = 0;
+				effect->damage = 10;
+				effect->flyingDirection = { 0, 1000 };
+				effect->magic.bounce = motion == 1 ? 500 : 0;
+				effect->magic.bounceFly = effect->magic.linkedLevel[1].bounceFly = motion == 2 ? 3 : 0;
+				target->hurt(effect);
+				observedMiss = target->life == 1000;
+			}
+			ok = check(observedMiss, "observe an actual miss with the shared ratio formula") && ok;
 			ok = check(target->isBouncing() == (motion == 1) && target->isMagicForcedMoving() == (motion == 2),
 				"a missed NPC/Player attack retains configured Bounce/BounceFly while an untagged attack adds no movement") && ok;
 			std::cout << "Miss motion:\tplayer=" << playerTarget << "\tmotion=" << motion
@@ -5431,11 +5456,12 @@ bool runProductionExplicitAttackCombat()
 	{
 	public:
 		int collisions = 0;
+		bool forceMiss = false;
 		std::string firstCollisionMagic;
-		void hurt(std::shared_ptr<Effect> effect) override
+		void hurt(std::shared_ptr<Effect> effect, int hitRoll = -1) override
 		{
 			if (effect && collisions++ == 0) firstCollisionMagic = effect->magic.iniName;
-			Player::hurt(effect);
+			Player::hurt(effect, forceMiss ? 99 : hitRoll);
 		}
 	};
 	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
@@ -5526,6 +5552,7 @@ bool runProductionExplicitAttackCombat()
 			for (int slot = -1; slot < fixture.options + (hasCharge ? 1 : 0); ++slot)
 			{
 				const bool forcedMiss = slot == fixture.options;
+				target->forceMiss = forcedMiss;
 				const int selected = forcedMiss ? fixture.options - 1 : slot;
 				gameManager.effectManager->freeResource();
 				gameManager.global.data.NPCAI = selected < 0;
@@ -5627,11 +5654,10 @@ bool runProductionExplicitAttackCombat()
 					<< "\tfirstMagic=" << firstMagic << "\tdamage=" << damage << "\tactorMoves=" << actorMoves
 					<< "\tplayerMoves=" << playerMoves << "\tcarried=" << carried << "\tbounced=" << bounced
 					<< "\tcollisions=" << target->collisions << "\tfirstCollisionMagic=" << target->firstCollisionMagic << std::endl;
-				// Player hit rolls include zero even at zero evade. Observe actual
-				// collision without replacing that legitimate random damage branch.
+				// Collision coverage remains independent of random damage hits.
 				ok = check(firstRelease > 0 && target->collisions > 0,
 					"the full production NPC really releases and collides with a player before and after file readback") && ok;
-				if (forcedMiss) ok = check(damage == 0, "the real charge collides but guaranteed evasion keeps player life unchanged") && ok;
+				if (forcedMiss) ok = check(damage == 0, "the real charge collides but a fixed miss roll keeps player life unchanged") && ok;
 				if (selected >= 0)
 				{
 					ok = check(firstMagic == actor->attackOptions[selected].magic->iniName && releases == 1
@@ -8413,8 +8439,8 @@ bool runProductionMoonlightRescueReturnTests()
 		game.varList.setInteger("Map022Enemy", 2);
 		game.varList.setInteger("Result", legacyResult);
 		game.runScript(u8"清平乡无赖死亡脚本.txt");
-		ok = check(game.varList.getInteger("Event") == 170 && !game.player->canRun && !game.player->canJump,
-			"defeating the last thug starts the walking escort home") && ok;
+		ok = check(game.varList.getInteger("Event") == 170 && game.player->canRun && !game.player->canJump,
+			"defeating the last thug starts the escort with the current unrestricted-run rule") && ok;
 		ok = check(game.scriptAPI.loadMap(u8"map_018_连接地图.map", false) && game.scriptAPI.loadNPC("map018.npc"), "reach Hanbo entrance checkpoint") && ok;
 		game.runTrapScript(2);
 		ok = check(game.mapFolderName == u8"map_019_寒波谷", "Event170 escort can enter Hanbo despite a stale legacy Result") && ok;
@@ -8518,7 +8544,7 @@ bool runProductionNewSwordFeedbackTests()
 				const auto heroine = game.npcManager->findNPC(u8"张琳心");
 				const auto enemy = game.npcManager->findNPC(u8"南宫灭");
 				if (!check(heroine.size() == 1 && enemy.size() == 1, "duel keeps one heroine and one opponent")) { ok = false; continue; }
-				ok = check(!game.global.data.PartnerCombat, "scene does not enable combat for every partner") && ok;
+				ok = check(game.global.data.PartnerCombat, "scene retains the enabled-by-default partner combat rule") && ok;
 				heroine.front()->beginStand();
 				CoreLifecycleTestAccess::advanceActorFrame(*heroine.front(), 1000);
 				ok = check(heroine.front()->currentCombatTarget.lock() == enemy.front(), "heroine actively targets Nangong Mie") && ok;
@@ -11832,11 +11858,11 @@ bool runScriptSpeedAndStatusTests()
 	player->lifeMax = player->life = 1000;
 	player->calInfo();
 	player->setPosition({ 4, 4 }, false);
-	player->directHurt(immobilizeEffect);
+	player->hurt(immobilizeEffect, 0);
 	ok = check(player->immobilized && player->immobilizedLastTime == 2000,
 		"actual magic damage applies immobilize") && ok;
 	CoreLifecycleTestAccess::advanceActorFrame(*player, 750);
-	player->directHurt(immobilizeEffect);
+	player->hurt(immobilizeEffect, 0);
 	ok = check(player->immobilizedLastTime == 1250,
 		"another hit does not refresh a still-active immobilize") && ok;
 	ok = check(execute("addnpcproperty('ImmobilizeTarget','ImmobilizedMilliseconds',250); "
@@ -11880,7 +11906,7 @@ bool runScriptSpeedAndStatusTests()
 		const std::string label = restoreAsPlayer ? "Player" : "NPC";
 		ok = check(!restored->immobilized && restored->immobilizedLastTime == 0 && restored->immobilizedVisualEffect,
 			(label + " clears immobilize and resets visuals at exact expiry").c_str()) && ok;
-		restored->directHurt(immobilizeEffect);
+		restored->hurt(immobilizeEffect, 0);
 		ok = check(restored->immobilized && restored->immobilizedLastTime == 2000,
 			(label + " accepts another actual immobilize hit immediately after exact expiry").c_str()) && ok;
 		CoreLifecycleTestAccess::advanceActorFrame(*restored, 2050);
@@ -11889,6 +11915,304 @@ bool runScriptSpeedAndStatusTests()
 		restored->beginWalk({ 6, 4 });
 		ok = check(restored->isWalking(), "the same NPC/Player can begin walking once immobilize expires") && ok;
 	}
+	return ok;
+}
+
+bool runQingyuMessagePlacementTests()
+{
+	ScopedActiveResourceRoot resourceRoot;
+	if (!check(resourceRoot.valid(), "message placement isolates player files")) return false;
+	const auto assets = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	File::setResourceFallbackRoots({ (assets / "yycs").u8string() });
+	File::setUiResourceFallbackRoots({ (assets / "yycs").u8string() }, true, (assets / "common").u8string());
+	File::setCommonResourceRoot((assets / "common").u8string());
+	const bool previousTheme = Config::useQingyuUi;
+	Config::useQingyuUi = true;
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (!SDL_Init(0) || (initializeTtf && !TTF_Init())) return false;
+	Engine* engine = Engine::getInstance();
+	int previousWidth = 0, previousHeight = 0;
+	CoreLifecycleTestAccess::getLogicalSize(previousWidth, previousHeight);
+	bool ok = true;
+	for (const Point size : { Point{640, 480}, Point{800, 480}, Point{1280, 720} })
+	{
+		auto surface = make_shared_surface(SDL_CreateSurface(size.x, size.y, SDL_PIXELFORMAT_ARGB8888));
+		auto* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+		if (!check(renderer != nullptr, "create message scene renderer")) return false;
+		auto* previousRenderer = CoreLifecycleTestAccess::exchangeRenderer(renderer);
+		CoreLifecycleTestAccess::setLogicalSize(size.x, size.y);
+		engine->setFontName((assets / "engine/font/font.ttf").string());
+		{
+			auto game = std::make_shared<GameManager>();
+			HeadlessPhysicalInputTest::ScopedRunningOwner owner(game);
+			ResourceManifest manifest;
+			ok = check(manifest.loadFromFile("game_profile.ini"), "read actual scene profile") && ok;
+			game->global.applyResourceManifestFeatures(manifest);
+			game->global.loadUiSettings();
+			game->goodsManager.configureLayout();
+			game->magicManager.configureLayout();
+			game->menu->init();
+			ok = check(game->loadGame(0), "load original opening map and character for message preview") && ok;
+			game->camera->snapToFollowTarget();
+			game->menu->clearMenu();
+			CoreLifecycleTestAccess::advanceActorFrame(*game->menu->columnMenu, 0);
+			game->timerStarted = false;
+			game->menu->showMessage(u8"获得物品，已放入包裹。", 30000);
+			const auto message = game->menu->messageBox;
+			const auto capture = [&](const std::string& label)
+			{
+				CoreLifecycleTestAccess::advanceActorFrame(*message, 0);
+				engine->renderClear(24, 32, 38, 255);
+				game->drawAll();
+				if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+				{
+					std::filesystem::create_directories(std::filesystem::u8path(directory));
+					const auto path = std::filesystem::u8path(directory) / (label + "-" +
+						std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+					auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+					ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()), "capture complete scene and message") && ok;
+				}
+			};
+			capture("message-top");
+			ok = check(message->rect.y == 80 && message->label->rect.y == 92
+				&& message->rect.y + message->rect.h < size.y / 2 - 60,
+				"ordinary message and label stay above the central character") && ok;
+			game->timerStarted = true;
+			game->timerHidden = false;
+			game->menu->timerMenu->startTimer(120);
+			game->menu->showMessage(u8"获得物品，已放入包裹。", 30000);
+			ok = check(message->rect.y + message->rect.h + 12 == game->menu->bottomMenu->rect.y,
+				"a message appearing during a timer avoids overlap from its first frame") && ok;
+			capture("message-with-timer");
+			CoreLifecycleTestAccess::advanceActorFrame(*message, 0);
+			ok = check(message->rect.y + message->rect.h + 12 == game->menu->bottomMenu->rect.y
+				&& message->label->rect.y == message->rect.y + 12,
+				"visible timer moves the complete message just above the quickbar") && ok;
+			game->timerStarted = false;
+			game->menu->timerMenu->stopTimer();
+			capture("message-timer-ended");
+			ok = check(message->rect.y == 80 && message->label->rect.y == 92,
+				"ending the timer restores the resource-defined message position") && ok;
+		}
+		BaseComponent resourceCache;
+		resourceCache.tryCleanRes();
+		CoreLifecycleTestAccess::exchangeRenderer(previousRenderer);
+		SDL_DestroyRenderer(renderer);
+	}
+	CoreLifecycleTestAccess::setLogicalSize(previousWidth, previousHeight);
+	engine->setFontName("");
+	Config::useQingyuUi = previousTheme;
+	if (initializeTtf) TTF_Quit();
+	return ok;
+}
+
+bool runTitleSaveLoadThemeTests()
+{
+	const auto assets = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	ScopedActiveResourceRoot resourceRoot;
+	if (!check(resourceRoot.valid() && GameManager::getInstance() == nullptr,
+		"title save-load regression runs without a GameManager")) return false;
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (!SDL_Init(0) || (initializeTtf && !TTF_Init())) return false;
+	const bool previousTheme = Config::useQingyuUi;
+	const bool previousAutomaticSave = Config::automaticSaveEnabled;
+	Config::automaticSaveEnabled = false;
+	int previousWidth = 0, previousHeight = 0;
+	CoreLifecycleTestAccess::getLogicalSize(previousWidth, previousHeight);
+	auto* engine = Engine::getInstance();
+	bool ok = writeVirtualFile(SAVE_AUTO_FOLDER + std::string("game.ini"), "[Game]\nMap=automatic.map\n");
+	for (const std::string profile : { "jxqy2", "yycs", "xjxqy" })
+	{
+		File::setResourceFallbackRoots({ (assets / profile).u8string() });
+		File::setUiResourceFallbackRoots({ (assets / profile).u8string() }, true, (assets / "common").u8string());
+		for (const Point viewport : { Point{ 640, 480 }, Point{ 960, 540 } })
+		{
+			auto surface = make_shared_surface(SDL_CreateSurface(viewport.x, viewport.y, SDL_PIXELFORMAT_ARGB8888));
+			auto* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+			if (!check(renderer != nullptr, "create title save-load software renderer")) return false;
+			auto* previousRenderer = CoreLifecycleTestAccess::exchangeRenderer(renderer);
+			CoreLifecycleTestAccess::setLogicalSize(viewport.x, viewport.y);
+			engine->setFontName((assets / "engine/font/font.ttf").u8string());
+			for (bool qingyu : { false, true })
+			{
+				Config::useQingyuUi = qingyu;
+				SaveLoad menu(false, true);
+				const int expectedSlots = qingyu ? 10 : (profile == "xjxqy" ? 9 : 7);
+				ok = check(menu.listBox && menu.listBox->itemCount == expectedSlots
+					&& menu.listBox->itemButton.size() == static_cast<std::size_t>(expectedSlots),
+					("title uses the configured skin and slot count without a GameManager: " + profile).c_str()) && ok;
+				if (qingyu && menu.listBox && menu.listBox->itemCount == 10)
+				{
+					ok = check(menu.listBox->itemName.back() == u8"自动存档"
+						&& CoreLifecycleTestAccess::selectSaveSlot(menu, 9)
+						&& menu.saveBtn && !menu.saveBtn->visible,
+						"title exposes the automatic slot while the automatic-save switch is off, without a save action") && ok;
+					CoreLifecycleTestAccess::requestLoad(menu);
+					ok = check(menu.index == 9 && menu.result == erLoad,
+						"title automatic-slot selection requests loading slot ten") && ok;
+				}
+				SDL_SetRenderDrawColor(renderer, 45, 61, 54, 255);
+				SDL_RenderClear(renderer);
+				CoreLifecycleTestAccess::drawSubtree(menu);
+				if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+				{
+					std::filesystem::create_directories(std::filesystem::u8path(directory));
+					auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+					const auto path = std::filesystem::u8path(directory) / (profile + "-title-load-"
+						+ (qingyu ? "qingyu-" : "original-") + std::to_string(viewport.x) + "x" + std::to_string(viewport.y) + ".png");
+					ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()),
+						"write title save-load rendered screenshot") && ok;
+				}
+			}
+			BaseComponent resourceCache;
+			resourceCache.tryCleanRes();
+			CoreLifecycleTestAccess::exchangeRenderer(previousRenderer);
+			SDL_DestroyRenderer(renderer);
+		}
+	}
+	CoreLifecycleTestAccess::setLogicalSize(previousWidth, previousHeight);
+	engine->setFontName("");
+	Config::useQingyuUi = previousTheme;
+	Config::automaticSaveEnabled = previousAutomaticSave;
+	if (initializeTtf) TTF_Quit();
+	return ok;
+}
+
+bool runAutomaticSaveTests()
+{
+	ScopedActiveResourceRoot resourceRoot;
+	if (!check(resourceRoot.valid(), "automatic save uses an isolated resource root")) return false;
+	auto bytes = MapV3ContractFixture::build();
+	std::fill(bytes.begin() + MapV3ContractFixture::BaseHeaderLength,
+		bytes.begin() + MapV3ContractFixture::HeaderLength + MapV3ContractFixture::NameLength, std::uint8_t{0});
+	if (!check(writeVirtualFile("map/automatic.map", std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size())),
+		"automatic save map fixture is ready")) return false;
+	auto scene = std::make_shared<MainScene>(0);
+	auto game = scene->game;
+	scene->setRunning(true);
+	HeadlessPhysicalInputTest::ScopedRunningOwner owner(scene);
+	Engine::getInstance()->resetApplicationQuitRequest();
+	const bool previousEnabled = Config::automaticSaveEnabled;
+	Config::automaticSaveEnabled = false;
+	game->global.feature.automaticSave = true;
+	game->varList.ensureInitialized();
+	game->traps.beginMapVisit();
+	game->player->life = game->player->lifeMax = 100;
+	game->player->thewMax = game->player->manaMax = 100;
+	game->player->setPosition({1, 1});
+	bool ok = check(game->scriptAPI.loadMap("automatic.map"), "load an actual map before auto saving");
+	game->menu->clearMenu();
+	ok = check(!CoreLifecycleTestAccess::logicRunning(*game)
+		&& CoreLifecycleTestAccess::canAutomaticallySave(*game),
+		"automatic saving uses the active MainScene rather than requiring its GameManager child to run") && ok;
+	{
+		auto modal = std::make_shared<Element>();
+		game->addChild(modal);
+		HeadlessPhysicalInputTest::ScopedRunningOwner modalOwner(modal);
+		ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game),
+			"a nested modal blocks automatic saving even while MainScene remains running") && ok;
+		game->removeChild(modal);
+	}
+	scene->setRunning(false);
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game),
+		"a stopped scene cannot automatically save") && ok;
+	scene->setRunning(true);
+	game->result = erReturnToTitle;
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game)
+		&& game->result == erReturnToTitle,
+		"return-to-title prevents automatic saving without consuming the scene completion result") && ok;
+	game->result = erNone;
+	File::clearDirectoryFiles(SAVE_AUTO_FOLDER);
+	game->script.running = true;
+	game->requestAutomaticSaveAfterMapLoad();
+	game->script.running = false;
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 300000);
+	ok = check(!CoreLifecycleTestAccess::automaticSavePending(*game) && !SaveFileManager::HasSaveFile(10),
+		"default-off rejects both timer and scene triggers") && ok;
+	for (int slot : {8, 9})
+	{
+		game->varList.setInteger("AutomaticSaveProbe", slot);
+		ok = check(game->saveGame(slot) && SaveFileManager::HasSaveFile(slot), "full engine saves manual eight and nine") && ok;
+	}
+	ok = check(!game->saveGame(10) && !SaveFileManager::HasSaveFile(10), "backend rejects manual writes to automatic") && ok;
+	Config::automaticSaveEnabled = true;
+	game->resetAutomaticSave();
+	game->global.feature.automaticSave = false;
+	game->script.running = true;
+	game->requestAutomaticSaveAfterMapLoad();
+	game->script.running = false;
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 300000);
+	ok = check(!CoreLifecycleTestAccess::automaticSavePending(*game) && !SaveFileManager::HasSaveFile(10),
+		"original UI does not trigger timer or map automatic saving") && ok;
+	game->global.feature.automaticSave = true;
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 299999);
+	ok = check(!CoreLifecycleTestAccess::automaticSavePending(*game) && !SaveFileManager::HasSaveFile(10),
+		"timer does not save before five minutes") && ok;
+	game->inEvent = true;
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 1);
+	ok = check(CoreLifecycleTestAccess::automaticSavePending(*game) && !SaveFileManager::HasSaveFile(10),
+		"five-minute request waits through an event") && ok;
+	game->inEvent = false;
+	game->player->fightState.set(true);
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 1000);
+	ok = check(!SaveFileManager::HasSaveFile(10), "combat defers a pending save") && ok;
+	game->player->fightState.update(9999);
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game), "combat still blocks before its timeout") && ok;
+	game->player->fightState.update(1);
+	game->global.data.saveDisabled = true;
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game), "script save prohibition also blocks automatic saves") && ok;
+	game->global.data.saveDisabled = false;
+	game->script.running = true;
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game), "outer script continues to block after individual commands finish") && ok;
+	game->script.running = false;
+	auto partner = std::make_shared<NPC>();
+	partner->kind = nkPartner; partner->life = 100; partner->fightState.set(true);
+	game->npcManager->npcList.push_back(partner);
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game), "partner combat blocks even when player has stopped attacking") && ok;
+	partner->fightState.set(false);
+	auto enemy = std::make_shared<NPC>();
+	enemy->kind = nkBattle; enemy->relation = nrHostile; enemy->life = 100;
+	enemy->fightState.set(true); enemy->currentCombatTarget = game->player;
+	game->npcManager->npcList.push_back(enemy);
+	ok = check(!CoreLifecycleTestAccess::canAutomaticallySave(*game), "enemy pursuit blocks an otherwise idle player") && ok;
+	game->npcManager->npcList.clear();
+	game->varList.setInteger("AutomaticSaveProbe", 10);
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 999);
+	ok = check(!SaveFileManager::HasSaveFile(10), "safe scene must remain stable for a full second") && ok;
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 1);
+	ok = check(SaveFileManager::HasSaveFile(10) && !CoreLifecycleTestAccess::automaticSavePending(*game),
+		"pending request writes automatic slot once after leaving combat") && ok;
+	game->varList.setInteger("AutomaticSaveProbe", 11);
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 1000);
+	ok = check(game->loadGame(10) && game->varList.getInteger("AutomaticSaveProbe") == 10,
+		"slot ten loads actual automatic world without a save on each frame") && ok;
+	ok = check(!CoreLifecycleTestAccess::automaticSavePending(*game), "loading clears old scene requests") && ok;
+	game->global.feature.automaticSave = true;
+	game->player->fightState.set(false);
+	game->global.data.canInput = true;
+	game->global.data.saveDisabled = false;
+	game->inEvent = true;
+	game->script.running = true;
+	ok = check(game->scriptAPI.loadNPC("") && !CoreLifecycleTestAccess::automaticSavePending(*game),
+		"LoadNPC alone does not request automatic saving") && ok;
+	game->script.running = false;
+	const std::string sceneScript = "loadmap(\"automatic.map\"); loadnpc(\"\");";
+	auto scriptBytes = std::make_unique<char[]>(sceneScript.size());
+	std::copy(sceneScript.begin(), sceneScript.end(), scriptBytes.get());
+	ok = check(game->script.runScript(scriptBytes, static_cast<int>(sceneScript.size())) == LUA_OK
+		&& CoreLifecycleTestAccess::automaticSavePending(*game), "actual LoadMap plus LoadNpc script queues a single save") && ok;
+	game->inEvent = false;
+	game->varList.setInteger("AutomaticSaveProbe", 20);
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 1000);
+	ok = check(!CoreLifecycleTestAccess::automaticSavePending(*game) && game->loadGame(10)
+		&& game->varList.getInteger("AutomaticSaveProbe") == 20, "scene save contains the completed script state") && ok;
+	ok = check(game->loadGame(8) && game->varList.getInteger("AutomaticSaveProbe") == 8
+		&& game->scriptAPI.loadGameAsync(9) && game->varList.getInteger("AutomaticSaveProbe") == 9,
+		"synchronous and asynchronous manual loads retain distinct eight and nine") && ok;
+	Config::automaticSaveEnabled = false;
+	CoreLifecycleTestAccess::automaticSaveStep(*game, 300000);
+	ok = check(!CoreLifecycleTestAccess::automaticSavePending(*game), "turning automatic saves off cancels a waiting request") && ok;
+	Config::automaticSaveEnabled = previousEnabled;
 	return ok;
 }
 
@@ -15034,10 +15358,10 @@ bool runFullAttackSaveRuntimeTests()
 	{
 	public:
 		int collisions = 0;
-		void hurt(std::shared_ptr<Effect> effect) override
+		void hurt(std::shared_ptr<Effect> effect, int hitRoll = -1) override
 		{
 			if (effect != nullptr) ++collisions;
-			Player::hurt(effect);
+			Player::hurt(effect, 0);
 		}
 	};
 	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
@@ -15104,6 +15428,8 @@ bool runFullAttackSaveRuntimeTests()
 			std::shared_ptr<NPC> actor = playerAttack ? std::static_pointer_cast<NPC>(player) : npc;
 			std::shared_ptr<NPC> target = playerAttack ? npc : std::static_pointer_cast<NPC>(player);
 			// Keep the production attacks, but make a durable stationary target.
+			// Compare save/load behavior with the same hit roll on both executions.
+			target->testMagicHitRoll = 0;
 			target->lifeMax = target->life = 1000000;
 			target->defend = target->defend2 = target->defend3 = target->evade = 0;
 			player->calInfo();
@@ -15150,6 +15476,8 @@ bool runFullAttackSaveRuntimeTests()
 			// guarantee that a native Moonlight projectile physically reaches it.
 			player->collisions = 0;
 			const int savedLife = target->life;
+			const int savedTargetEvade = target->getEvade();
+			const int savedAttackerEvade = actor->getEvade();
 			if (!afterRelease) CoreLifecycleTestAccess::advanceActorFrame(*actor, duration + 1);
 			advanceEffects();
 			const int liveCollisions = player->collisions;
@@ -15163,10 +15491,13 @@ bool runFullAttackSaveRuntimeTests()
 			npc = gameManager.npcManager->npcList.front();
 			actor = playerAttack ? std::static_pointer_cast<NPC>(player) : npc;
 			target = playerAttack ? npc : std::static_pointer_cast<NPC>(player);
+			target->testMagicHitRoll = 0;
 			ok = check(npc != originalNpc && actor->isStanding() && !actor->hasPreparedAttackMagic
 				&& actor->usesNativeAttackProtocol() == native && gameManager.varList.getInteger("AttackSave") == 73
 				&& gameManager.varList.getInteger("attacksave") == 29 && target->life == savedLife,
 				"full reload clears stale attacks and restores profile, target life and case-sensitive state") && ok;
+			ok = check(target->getEvade() == savedTargetEvade && actor->getEvade() == savedAttackerEvade,
+				"fixed collision rolls do not mask changed hit-rate inputs after loading") && ok;
 			const auto restoredEffects = gameManager.effectManager->effectList;
 			ok = check(restoredEffects.size() == originalEffects.size(), "full reload restores the saved effect count without extra releases") && ok;
 			for (size_t index = 0; index < std::min(originalEffects.size(), restoredEffects.size()); ++index)
@@ -15182,6 +15513,7 @@ bool runFullAttackSaveRuntimeTests()
 					&& std::abs(effect->offset.x - savedEffects.GetReal(section, "OffsetX", 0)) < 0.01f
 					&& std::abs(effect->offset.y - savedEffects.GetReal(section, "OffsetY", 0)) < 0.01f
 					&& effect->damage == savedEffects.GetInteger(section, "Damage", -1)
+					&& effect->evade == savedEffects.GetInteger(section, "Evade", -1)
 					&& effect->lifeTime == savedEffects.GetTime(section, "LifeTime", 0)
 					&& effect->doing == savedEffects.GetInteger(section, "Doing", -1)
 					&& effect->dest.x == savedEffects.GetInteger(section, "DestX", -1)
@@ -15200,7 +15532,7 @@ bool runFullAttackSaveRuntimeTests()
 			player->collisions = 0;
 			advanceEffects();
 			const bool reachable = !native || distance < actor->attackRadius;
-			ok = check(playerAttack ? liveDamage > 0 && target->life < initialLife
+			ok = check(playerAttack ? liveDamage > 0 && initialLife - target->life == liveDamage
 				: (liveCollisions > 0) == (player->collisions > 0) && (!reachable || player->collisions > 0),
 				"post-load collision agrees with the live control, including reachable native and explicit attacks") && ok;
 			std::cout << "Full attack save:\tpack=" << fixture.id << "\tplayer=" << playerAttack << "\tafterRelease=" << afterRelease
@@ -15293,6 +15625,7 @@ bool runEquipmentReplacementSaveRuntimeTests()
 			gameManager.map->createDataMap();
 			const auto cast = [&](const std::string& expectedFile, bool release)
 			{
+				target->testMagicHitRoll = 0;
 				gameManager.effectManager->freeResource();
 				player->actionManager->restartActionIgnoringTransitions(acStand);
 				gameManager.scriptAPI.useMagic(sourceMagic, target->getPosition().x, target->getPosition().y, true);
@@ -16654,6 +16987,7 @@ bool runFullExperienceSaveRuntimeTests()
 			};
 			const auto collideAndCheck = [&](const char* phase)
 			{
+				npc->testMagicHitRoll = 0;
 				const int initialLife = npc->life;
 				advanceEffects(2000);
 				const int projectileDamage = initialLife - npc->life;
@@ -16731,6 +17065,7 @@ bool runFullExperienceSaveRuntimeTests()
 					gameManager.npcManager->clearNPC();
 					npc = std::make_shared<NPC>();
 					npc->initFromIni(&definition, fixture.section);
+					npc->testMagicHitRoll = 0;
 					npc->npcName = "ActualKillTarget";
 					npc->relation = nrHostile;
 					npc->isAIDisabled = true;
@@ -16987,6 +17322,7 @@ bool runCharacterCasterSaveRuntimeTests()
 				"failed switches keep the live caster while successful switches persist one shared detached caster") && ok;
 			const auto collide = [&](const char* phase)
 			{
+				npc->testMagicHitRoll = 0;
 				const int initialLife = npc->life;
 				for (int elapsed = 0; elapsed < 2000; elapsed += 20)
 				{
@@ -17062,7 +17398,7 @@ bool runMergedEntitySaveTests()
 	return runMergedEntityListSaveLoadRoundTripTests();
 }
 
-bool runQingyuUiTests()
+bool runQingyuUiTests(bool interactionOnly)
 {
 	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
 	ScopedActiveResourceRoot resourceRoot;
@@ -17080,15 +17416,17 @@ bool runQingyuUiTests()
 		{ "jxqy2", "jxqy2" }, { "yycs", "yycs" }, { "xjxqy", "xjxqy" },
 		{ u8"江湖余尘", "yycs" }, { u8"潇湘行", "yycs" },
 		{ u8"江湖余尘二", "yycs" }, { u8"月眉儿外传", "yycs" },
-		{ u8"剑二改承合版", "jxqy2" }, { u8"新月无痕", "jxqy2" } })
+		{ u8"剑二改承合版", "jxqy2" }, { u8"新月无痕", "jxqy2" },
+		{ "xjxqy_test_mod", "xjxqy" }, { "xjxqy_test_fallback", "yycs" } })
 	{
 		const auto& profile = selection.first;
 		File::setResourceFallbackRoots({ (assetsRoot / std::filesystem::u8path(profile)).u8string(),
-			(assetsRoot / "jxqy2").u8string(), (assetsRoot / "yycs").u8string() });
+			(assetsRoot / selection.second).u8string(),
+			(assetsRoot / "jxqy2").u8string(), (assetsRoot / "yycs").u8string(), (assetsRoot / "xjxqy").u8string() });
 		const auto& uiProfile = selection.second;
 		File::setUiResourceFallbackRoots({ (assetsRoot / std::filesystem::u8path(profile)).u8string(),
 			(assetsRoot / uiProfile).u8string() }, true, (assetsRoot / "common").u8string());
-		for (const auto viewport : { Point{ 1280, 720 }, Point{ 800, 480 }, Point{ 640, 480 } })
+		for (const auto viewport : { Point{ 1280, 720 }, Point{ 800, 480 }, Point{ 1280, 960 }, Point{ 1920, 1080 } })
 		{
 			auto surface = make_shared_surface(SDL_CreateSurface(viewport.x, viewport.y, SDL_PIXELFORMAT_ARGB8888));
 			SDL_Renderer* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
@@ -17105,9 +17443,12 @@ bool runQingyuUiTests()
 				game.global.loadUiSettings();
 				const auto goods = game.global.goodsLayout;
 				const auto magic = game.global.magicLayout;
+				const bool practiceDisabled = game.global.feature.practiceMenuDisabled;
 				Config::useQingyuUi = true;
 				game.global.applyResourceManifestFeatures(manifest);
 				game.global.loadUiSettings();
+				ok = check(game.global.feature.practiceMenuDisabled == practiceDisabled,
+					"Qingyu preserves the selected game's practice permission") && ok;
 				const auto& themedGoods = game.global.goodsLayout;
 				const auto& themedMagic = game.global.magicLayout;
 				ok = check(game.global.feature.qingyuUi
@@ -17121,6 +17462,16 @@ bool runQingyuUiTests()
 				game.goodsManager.configureLayout();
 				game.magicManager.configureLayout();
 				game.menu->init();
+				if (practiceDisabled)
+				{
+					const auto practiceButton = game.menu->topMenu->xiulianBtn;
+					ok = check(practiceButton && !practiceButton->visible && !practiceButton->activated
+						&& !game.menu->topMenu->focusControllerElement(practiceButton),
+						"disabled practice is absent from the top menu and controller focus") && ok;
+					game.menu->togglePracticeView();
+					ok = check(!game.menu->practiceMenu->visible,
+						"practice shortcuts cannot open a disabled practice panel") && ok;
+				}
 				game.menu->toggleStateView();
 				ok = check(game.menu->equipMenu->visible && game.menu->topMenu->equipBtn
 					&& game.menu->topMenu->equipBtn->checked,
@@ -17220,7 +17571,7 @@ bool runQingyuUiTests()
 						std::filesystem::create_directories(std::filesystem::u8path(directory));
 						auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
 						const auto path = std::filesystem::u8path(directory) / std::filesystem::u8path(
-							profile + "-" + std::to_string(viewport.x) + "-" + name + ".png");
+							profile + "-" + std::to_string(viewport.x) + "x" + std::to_string(viewport.y) + "-" + name + ".png");
 						ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()), "write runtime UI screenshot") && ok;
 					}
 				};
@@ -17276,6 +17627,21 @@ bool runQingyuUiTests()
 						ok = check(textVisible, "composed quick-slot key letters remain visible above their badges") && ok;
 					}
 				};
+				const auto checkDraggedSlot = [&](const std::shared_ptr<Item>& source)
+				{
+					SDL_SetRenderDrawColor(renderer, 45, 61, 54, 255);
+					SDL_RenderClear(renderer);
+					source->onDraw();
+					SDL_Rect slotRect{ source->rect.x, source->rect.y, source->rect.w, source->rect.h };
+					auto draggedSlot = make_shared_surface(SDL_RenderReadPixels(renderer, &slotRect));
+					SDL_RenderClear(renderer);
+					const auto background = source->backImage[source->touchingID != TOUCH_UNTOUCHEDID ? 1 : 0];
+					engine->drawImage(IMP::loadImageForTime(background, 0), nullptr, &source->rect);
+					auto emptySlot = make_shared_surface(SDL_RenderReadPixels(renderer, &slotRect));
+					ok = check(draggedSlot && emptySlot && draggedSlot->pitch == emptySlot->pitch
+						&& std::memcmp(draggedSlot->pixels, emptySlot->pixels, emptySlot->pitch * emptySlot->h) == 0,
+						"dragging renders the source slot background without the item icon") && ok;
+				};
 				for (const int life : { 0, game.player->info.lifeMax })
 				{
 					game.player->life = life;
@@ -17287,6 +17653,246 @@ bool runQingyuUiTests()
 				game.player->mana = game.player->info.manaMax / 2;
 				CoreLifecycleTestAccess::advanceActorFrame(*game.menu->columnMenu, 0);
 				equipment->updateGoods();
+				captureGameplay("equipment", { equipment, bag });
+				{
+					const auto inventory = game.goodsManager.goodsList;
+					const auto source = equipment->item[4];
+					const auto target = bag->item.back();
+					const int equipmentIndex = source->dragIndex;
+					const Point press{ source->rect.x + source->rect.w / 2, source->rect.y + source->rect.h / 2 };
+					const Point release{ target->rect.x + target->rect.w / 2, target->rect.y + target->rect.h / 2 };
+					constexpr EventTouchID finger = 731;
+					game.menu->cancelPointerInteraction();
+					ok = check(!game.goodsManager.goodsListExists(target->dragIndex)
+						&& CoreLifecycleTestAccess::beginPointerInteraction(*game.menu, finger, press.x, press.y)
+						&& source->touchingDownID == finger,
+						"Qingyu equipment receives a real finger press through the menu tree") && ok;
+					CoreLifecycleTestAccess::movePointerInteraction(*game.menu, finger, press.x + 16, press.y);
+					ok = check(CoreLifecycleTestAccess::draggedElement() == source,
+						"Qingyu equipped goods start a finger drag") && ok;
+					checkDraggedSlot(source);
+					captureGameplay("equipment-drag", { equipment, bag });
+					CoreLifecycleTestAccess::advanceActorFrame(*source, source->beginShowHintTime + 1);
+					CoreLifecycleTestAccess::handleMenuEvent(*source);
+					ok = check(!source->getResult(erShowHint),
+						"a slow equipment drag does not open a modal long-press hint") && ok;
+					CoreLifecycleTestAccess::movePointerInteraction(*game.menu, finger, release.x, release.y);
+					CoreLifecycleTestAccess::endPointerInteraction(*game.menu, finger, release.x, release.y);
+					CoreLifecycleTestAccess::handleMenuEvent(*bag);
+					ok = check(!game.goodsManager.goodsListExists(equipmentIndex)
+						&& game.goodsManager.goodsList[target->dragIndex].goods == inventory[equipmentIndex].goods,
+						"Qingyu finger drag returns the equipped item to the chosen bag slot") && ok;
+					game.menu->cancelPointerInteraction();
+					game.goodsManager.goodsList = inventory;
+					game.goodsManager.updateMenu();
+#ifdef __MOBILE__
+					CoreLifecycleTestAccess::beginPointerInteraction(*game.menu, finger, press.x, press.y);
+					CoreLifecycleTestAccess::endPointerInteraction(*game.menu, finger, press.x, press.y);
+#else
+					source->result = erMouseRDown;
+#endif
+					CoreLifecycleTestAccess::handleMenuEvent(*equipment);
+					ok = check(!game.goodsManager.goodsListExists(equipmentIndex),
+						"Qingyu tap or desktop right-click unequips the selected item") && ok;
+					game.menu->cancelPointerInteraction();
+					game.goodsManager.goodsList = inventory;
+					game.goodsManager.updateMenu();
+					CoreLifecycleTestAccess::beginPointerInteraction(*game.menu, finger, press.x, press.y);
+					CoreLifecycleTestAccess::advanceActorFrame(*source, source->beginShowHintTime + 1);
+					CoreLifecycleTestAccess::handleMenuEvent(*source);
+					ok = check(source->showHint,
+						"a stationary long press still offers equipment details") && ok;
+					CoreLifecycleTestAccess::handleMenuEvent(*equipment);
+					ok = check(game.menu->toolTip->visible && !game.menu->toolTip->getComponentByName("back")->visible,
+						"holding equipment shows a transient hint without a back button") && ok;
+#ifdef __MOBILE__
+					ok = check(!game.menu->toolTip->getComponentByName("page")->visible,
+						"mobile hold hints hide pagination that cannot be operated") && ok;
+#endif
+					CoreLifecycleTestAccess::endPointerInteraction(*game.menu, finger, press.x, press.y);
+					CoreLifecycleTestAccess::handleMenuEvent(*source);
+					CoreLifecycleTestAccess::handleMenuEvent(*equipment);
+					ok = check(!game.menu->toolTip->visible && game.goodsManager.goodsListExists(equipmentIndex),
+						"releasing a long press closes the hint without unequipping the item") && ok;
+					game.menu->cancelPointerInteraction();
+				}
+				{
+					const auto originalMagicSlots = game.magicManager.magicList;
+					auto bottom = game.menu->bottomMenu;
+					const int quickIndex = game.magicManager.bottomIndex(0);
+					game.magicManager.exchange(game.magicManager.storeBegin(), quickIndex);
+					game.magicManager.magicList[quickIndex].level = 2;
+					game.magicManager.magicList[quickIndex].exp = 125;
+					game.magicManager.magicList[quickIndex].remainColdMilliseconds = 1234;
+					game.magicManager.updateMenu();
+					const auto snapshot = game.magicManager.magicList;
+					const auto selected = snapshot[quickIndex];
+					ok = check(game.magicManager.magicListExists(quickIndex),
+						"the quickbar interaction fixture contains a real spell") && ok;
+					const auto tap = [&](const PElement& control, const PElement& owner)
+					{
+#ifdef __MOBILE__
+						constexpr EventTouchID pointer = 732;
+#else
+						constexpr EventTouchID pointer = TOUCH_MOUSEID;
+#endif
+						game.menu->cancelPointerInteraction();
+						const Point point{ control->rect.x + control->rect.w / 2, control->rect.y + control->rect.h / 2 };
+						ok = check(CoreLifecycleTestAccess::beginPointerInteraction(*game.menu, pointer, point.x, point.y)
+							&& control->touchingDownID == pointer, "magic action receives the pointer press") && ok;
+						CoreLifecycleTestAccess::endPointerInteraction(*game.menu, pointer, point.x, point.y);
+						CoreLifecycleTestAccess::handleMenuEvent(*owner);
+					};
+					spells->visible = false;
+					spells->showTalents(true);
+					tap(bottom->magicItem[0], bottom);
+					ok = check(spells->visible && spells->isShowingDetails() && !spells->isShowingTalents()
+						&& spells->getComponentByName("detailQuick")->visible,
+						"tapping a quickbar spell opens the same actionable magic details") && ok;
+					captureGameplay("quick-magic-details", { spells });
+					int freeSlot = game.magicManager.storeBegin();
+					while (game.magicManager.magicListExists(freeSlot) && freeSlot <= game.magicManager.storeEnd()) ++freeSlot;
+					tap(spells->getComponentByName("detailQuick"), spells);
+					ok = check(!spells->isShowingDetails() && !game.magicManager.magicListExists(quickIndex)
+						&& game.magicManager.magicList[freeSlot].magic == selected.magic
+						&& game.magicManager.magicList[freeSlot].level == selected.level
+						&& game.magicManager.magicList[freeSlot].exp == selected.exp
+						&& game.magicManager.magicList[freeSlot].remainColdMilliseconds == selected.remainColdMilliseconds,
+						"quickbar return preserves the spell and its progression in the first free list slot") && ok;
+					spells->showDetails(freeSlot);
+					tap(spells->getComponentByName("detailQuick"), spells);
+					ok = check(game.magicManager.magicList[quickIndex].magic == selected.magic,
+						"the same detail action assigns a stored spell back to the quickbar") && ok;
+					spells->showDetails(quickIndex);
+					for (int index = game.magicManager.storeBegin(); index <= game.magicManager.storeEnd(); ++index)
+						game.magicManager.magicList[index] = selected;
+					ok = check(!spells->assignDetailedMagic(false) && spells->isShowingDetails()
+						&& game.magicManager.magicList[quickIndex].magic == selected.magic,
+						"a full spell list leaves the quickbar spell intact") && ok;
+					game.magicManager.magicList = snapshot;
+					spells->closeDetails();
+					if (!practiceDisabled)
+					{
+						spells->showDetails(quickIndex);
+						tap(spells->getComponentByName("detailPractice"), spells);
+						const int practiceIndex = game.magicManager.practiceIndex();
+						ok = check(game.magicManager.magicList[practiceIndex].magic == selected.magic,
+							"quickbar details can assign the selected spell to practice") && ok;
+						captureGameplay("practice-tap", { game.menu->practiceMenu, spells });
+						tap(game.menu->practiceMenu->magic, game.menu->practiceMenu);
+						ok = check(spells->isShowingDetails()
+							&& spells->getComponentByName("detailPractice")->visible,
+							"practice slots expose the same details with a return action") && ok;
+						tap(spells->getComponentByName("detailPractice"), spells);
+						ok = check(!game.magicManager.magicListExists(practiceIndex),
+							"practice can be cleared by touch without dragging") && ok;
+					}
+					game.magicManager.magicList = snapshot;
+					game.magicManager.updateMenu();
+					spells->closeDetails();
+					spells->visible = false;
+					const auto slot = bottom->magicItem[0];
+					const Point point{ slot->rect.x + slot->rect.w / 2, slot->rect.y + slot->rect.h / 2 };
+					CoreLifecycleTestAccess::beginPointerInteraction(*game.menu, 733, point.x, point.y);
+					CoreLifecycleTestAccess::advanceActorFrame(*slot, slot->beginShowHintTime + 1);
+					CoreLifecycleTestAccess::handleMenuEvent(*slot);
+					CoreLifecycleTestAccess::handleMenuEvent(*bottom);
+					ok = check(game.menu->toolTip->visible && !spells->visible
+						&& !game.menu->toolTip->getComponentByName("back")->visible,
+						"holding a quickbar spell shows only a transient hint") && ok;
+					CoreLifecycleTestAccess::endPointerInteraction(*game.menu, 733, point.x, point.y);
+					CoreLifecycleTestAccess::handleMenuEvent(*slot);
+					CoreLifecycleTestAccess::handleMenuEvent(*bottom);
+					ok = check(!game.menu->toolTip->visible && !spells->visible,
+						"releasing the spell hint does not open click details") && ok;
+					game.menu->cancelPointerInteraction();
+					captureGameplay("magic-drag", { spells });
+					const auto target = spells->item[freeSlot - game.magicManager.storeBegin()];
+					const Point release{ target->rect.x + target->rect.w / 2, target->rect.y + target->rect.h / 2 };
+#ifdef __MOBILE__
+					constexpr EventTouchID dragPointer = 734;
+#else
+					constexpr EventTouchID dragPointer = TOUCH_MOUSEID;
+#endif
+					CoreLifecycleTestAccess::beginPointerInteraction(*game.menu, dragPointer, point.x, point.y);
+					CoreLifecycleTestAccess::movePointerInteraction(*game.menu, dragPointer, point.x + 16, point.y);
+					CoreLifecycleTestAccess::advanceActorFrame(*slot, slot->beginShowHintTime + 1);
+					CoreLifecycleTestAccess::handleMenuEvent(*slot);
+					CoreLifecycleTestAccess::handleMenuEvent(*bottom);
+					ok = check(!game.menu->toolTip->visible && !spells->isShowingDetails(),
+						"slow quickbar dragging does not open a hint or click details") && ok;
+					checkDraggedSlot(slot);
+					captureGameplay("magic-drag", { spells });
+					CoreLifecycleTestAccess::movePointerInteraction(*game.menu, dragPointer, release.x, release.y);
+					CoreLifecycleTestAccess::endPointerInteraction(*game.menu, dragPointer, release.x, release.y);
+					CoreLifecycleTestAccess::handleMenuEvent(*spells);
+					ok = check(!game.magicManager.magicListExists(quickIndex)
+						&& game.magicManager.magicList[freeSlot].magic == selected.magic,
+						"quickbar spells still drag into the selected list slot") && ok;
+					game.magicManager.magicList = snapshot;
+					game.magicManager.updateMenu();
+					game.menu->cancelPointerInteraction();
+					game.menu->adoptControllerPointerFocus(bottom, slot);
+					game.menu->handleUIAction(UIAction::Confirm);
+					ok = check(spells->isShowingDetails(), "quickbar confirmation opens spell details") && ok;
+					game.menu->handleUIAction(UIAction::Cancel);
+					ok = check(!spells->isShowingDetails() && spells->visible,
+						"detail opening transfers navigation so cancel returns to the spell list") && ok;
+					game.magicManager.magicList = originalMagicSlots;
+					game.magicManager.updateMenu();
+					spells->visible = false;
+				}
+				game.menu->showMessage(u8"获得物品，已放入包裹。");
+				captureGameplay("message", { game.menu->messageBox });
+				game.menu->messageBox->visible = false;
+				// JXQY2 scripts use portrait filenames directly instead of headfile.ini indices.
+				const std::string firstPortrait = uiProfile == "jxqy2"
+					? u8"南宫飞云.mpc" : game.menu->dialog->getHeadName(1);
+				const std::string secondPortrait = uiProfile == "jxqy2"
+					? u8"燕若雪.mpc" : game.menu->dialog->getHeadName(uiProfile == "yycs" ? 16 : 21);
+				const Rect dialogueFrame = game.menu->dialog->rect;
+				const auto captureDialogue = [&](const std::string& name, const std::string& portrait, bool right)
+				{
+					auto dialog = game.menu->dialog;
+					if (right) dialog->setHead2(portrait);
+					else dialog->setHead1(portrait);
+					dialog->setTalkStr(u8"前路虽远，且行且看。待我收拾行囊，便与你一同下山。");
+					const auto label = dialog->getComponentByName<TalkLabel>("label");
+					label->showAllImmediately();
+					const auto head = dialog->getComponentByName<ImageContainer>(right ? "head2" : "head1");
+					const auto image = IMP::loadImageForTime(head->impImage, 0);
+					Rect content{};
+					const int padding = label->rect.y - dialog->rect.y;
+					ok = check(game.menu->bottomMenu->visible
+						&& dialog->rect.x == dialogueFrame.x && dialog->rect.y == dialogueFrame.y
+						&& dialog->rect.w == dialogueFrame.w && dialog->rect.h == dialogueFrame.h
+						&& dialog->rect.y + dialog->rect.h + 10 == game.menu->bottomMenu->rect.y,
+						"switching portraits preserves the fixed dialogue frame and ten-pixel quickbar gap") && ok;
+					ok = check(image && engine->getImageContentBounds(image, content, true)
+						&& !head->stretch && head->rect.w == content.w && head->rect.h == content.h
+						&& head->rect.y + head->rect.h == dialog->rect.y + dialog->rect.h - padding
+						&& head->rect.x == (right ? dialog->rect.x + dialog->rect.w - padding - content.w : dialog->rect.x + padding)
+						&& label->rect.w > 0 && (right ? label->rect.x + label->rect.w + padding == head->rect.x
+							: head->rect.x + head->rect.w + padding == label->rect.x),
+						"native portraits keep their pixel size and bottom-corner anchor beside the text") && ok;
+					SDL_SetRenderDrawColor(renderer, 45, 61, 54, 255);
+					SDL_RenderClear(renderer);
+					head->onDraw();
+					auto actual = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+					SDL_RenderClear(renderer);
+					engine->drawImage(image, &content, &head->rect);
+					auto expected = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+					ok = check(actual && expected && actual->pitch == expected->pitch
+						&& std::memcmp(actual->pixels, expected->pixels, actual->pitch * actual->h) == 0,
+						"portrait rendering matches the original pixels with only surrounding padding cropped") && ok;
+					capture(name, { game.menu, dialog });
+				};
+				captureDialogue("dialog", firstPortrait, false);
+				captureDialogue("dialog-second-speaker", secondPortrait, true);
+				if (profile == "xjxqy") captureDialogue("dialog-wide", game.menu->dialog->getHeadName(20), true);
+				game.menu->dialog->setHead1(firstPortrait);
+				if (!interactionOnly)
+				{
 				captureGameplay("equipment", { equipment, bag });
 				equipment->focusControllerEquipment();
 				equipment->handleUIAction(UIAction::NavigateUp);
@@ -17403,8 +18009,32 @@ bool runQingyuUiTests()
 					partner->canEquip = 1;
 					partner->level = 99;
 					game.npcManager->addNPC(partner);
+					game.menu->equipMenu->visible = true;
+					CoreLifecycleTestAccess::advanceActorFrame(*game.menu->equipMenu, 0);
+					ok = check(game.menu->equipMenu->characterSelector
+						&& game.menu->equipMenu->characterSelector->activated
+						&& std::dynamic_pointer_cast<FlatTextButton>(game.menu->equipMenu->characterSelector),
+						"Qingyu first visible update refreshes the name after loading the hero and partner") && ok;
 					ok = check(game.menu->openPartnerEquipment(partner, false), "Qingyu opens active partner equipment") && ok;
-					auto panel = game.menu->partnerEquipMenu;
+					auto panel = game.menu->equipMenu;
+					ok = check(panel->visible && !game.menu->partnerEquipMenu->visible
+						&& panel->getSelectedPartner() == partner,
+						"Qingyu companion entry reuses the original equipment panel") && ok;
+					const auto selector = panel->characterSelector;
+					ok = check(selector && selector->visible && selector->activated,
+						"Qingyu menu resource provides an active character selector") && ok;
+					if (selector)
+					{
+						ok = check(panel->focusControllerElement(selector)
+							&& panel->handleUIAction(UIAction::Confirm) && !panel->getSelectedPartner()
+							&& panel->handleUIAction(UIAction::Confirm) && panel->getSelectedPartner() == partner,
+							"Qingyu name cycles between hero and partner using the shared controller path") && ok;
+						panel->showAttributes(true);
+						ok = check(panel->getSelectedPartner() == partner
+							&& panel->getComponentByName<Label>("labLevel")->getStr() == u8"等级  99",
+							"Qingyu attributes retain the selected companion") && ok;
+						panel->showAttributes(false);
+					}
 					auto weapon = game.goodsManager.findGoods(u8"goods-jian-1-桃木剑.ini");
 					if (weapon)
 					{
@@ -17416,7 +18046,7 @@ bool runQingyuUiTests()
 						ok = check(partner->getEquipmentFileByPartIndex(4) == u8"goods-jian-1-桃木剑.ini",
 							"dropping a real bag weapon equips the intended partner body slot") && ok;
 						CoreLifecycleTestAccess::resize(*panel, viewport.x, viewport.y);
-						ok = check(panel->getPartner() == partner && panel->rect.x >= 0
+						ok = check(panel->getSelectedPartner() == partner && panel->rect.x >= 0
 							&& panel->rect.x + panel->rect.w <= bag->rect.x
 							&& panel->rect.y + panel->rect.h <= viewport.y - 108,
 							"partner resize retains selection and leaves bag and HUD regions accessible") && ok;
@@ -17525,7 +18155,7 @@ bool runQingyuUiTests()
 					spells->item[visibleIndex]->result = erClick;
 					CoreLifecycleTestAccess::handleMenuEvent(*spells);
 					ok = check(spells->isShowingDetails() && !spells->item[0]->visible
-						&& spells->getComponentByName<FlatTextButton>("detailPractice")->visible,
+						&& spells->getComponentByName<FlatTextButton>("detailPractice")->visible == !practiceDisabled,
 						"clicking a real spell opens actionable details") && ok;
 					captureGameplay("magic-details", { equipment, spells });
 					const auto originalIntro = selectedMagic->intro;
@@ -17541,12 +18171,24 @@ bool runQingyuUiTests()
 					selectedMagic->intro = originalIntro;
 					spells->closeDetails();
 					spells->showDetails(source);
-					spells->focusControllerElement(spells->getComponentByName("detailPractice"));
-					spells->handleUIAction(UIAction::Confirm);
-					const auto& practiced = game.magicManager.magicList[game.magicManager.practiceIndex()];
-					ok = check(!spells->isShowingDetails() && practiced.magic == selectedMagic
-						&& practiced.exp == 125 && practiced.remainColdMilliseconds == 1234,
-						"practice action preserves the actual spell, experience and cooldown") && ok;
+					if (practiceDisabled)
+					{
+						ok = check(!spells->focusControllerElement(spells->getComponentByName("detailPractice"))
+							&& !spells->assignDetailedMagic(true) && spells->isShowingDetails()
+							&& game.magicManager.magicList[source].magic == selectedMagic
+							&& game.magicManager.magicList[source].exp == 125
+							&& game.magicManager.magicList[source].remainColdMilliseconds == 1234,
+							"disabled practice has no focusable action and preserves the selected spell") && ok;
+					}
+					else
+					{
+						spells->focusControllerElement(spells->getComponentByName("detailPractice"));
+						spells->handleUIAction(UIAction::Confirm);
+						const auto& practiced = game.magicManager.magicList[game.magicManager.practiceIndex()];
+						ok = check(!spells->isShowingDetails() && practiced.magic == selectedMagic
+							&& practiced.exp == 125 && practiced.remainColdMilliseconds == 1234,
+							"practice action preserves the actual spell, experience and cooldown") && ok;
+					}
 					game.magicManager.magicList = snapshot;
 					for (int index = game.magicManager.bottomBegin(); index <= game.magicManager.bottomEnd(); ++index)
 						game.magicManager.magicList[index] = snapshot[source];
@@ -17668,6 +18310,47 @@ bool runQingyuUiTests()
 					}
 				}
 				capture("original-option", { originalOptions });
+				game.global.loadUiSettings();
+				game.menu->init();
+				equipment = game.menu->equipMenu;
+				bag = game.menu->goodsMenu;
+				spells = game.menu->magicMenu;
+				const auto captureOriginalGameplay = [&](const std::string& name, const std::vector<PElement>& panels)
+				{
+					for (const auto& child : game.menu->upMenu->children)
+					{
+						child->visible = std::find(panels.begin(), panels.end(), child) != panels.end();
+					}
+					equipment->updateGoods();
+					game.menu->stateMenu->updateLabel();
+					capture("original-" + name, { game.menu });
+				};
+				captureOriginalGameplay("equipment", { equipment, bag });
+				auto originalPartner = std::make_shared<NPC>();
+				INIReader registry("partneridx.ini");
+				originalPartner->npcName = registry.Get("Init", "1", u8"同行伙伴");
+				originalPartner->kind = nkPartner;
+				originalPartner->canEquip = 1;
+				originalPartner->life = originalPartner->lifeMax = 100;
+				originalPartner->attack = 73;
+				game.npcManager->addNPC(originalPartner);
+				ok = check(equipment->selectPartner(originalPartner), "original UI selects the rendered companion") && ok;
+				captureOriginalGameplay("partner-equipment", { equipment, bag });
+				if (game.menu->isStateEquipIntegrated())
+				{
+					equipment->showAttributes(true);
+					captureOriginalGameplay("partner-attributes", { equipment, bag });
+					equipment->showAttributes(false);
+				}
+				else captureOriginalGameplay("partner-attributes", { game.menu->stateMenu, bag });
+				ok = check(equipment->getSelectedPartner() == originalPartner,
+					"original composed pages preserve their selected companion") && ok;
+				equipment->selectPartner(nullptr);
+				game.npcManager->removeNPCOnlyFromList(originalPartner);
+				captureOriginalGameplay("magic", { spells, bag });
+				captureOriginalGameplay("memo", { game.menu->memoMenu });
+				captureOriginalGameplay("map", { game.menu->mapThumbnailMenu });
+				}
 			}
 			BaseComponent().tryCleanRes();
 			CoreLifecycleTestAccess::exchangeRenderer(previousRenderer);
@@ -17809,6 +18492,9 @@ bool runCoreLifecycleTests()
 	ok = timed("runEditorRunWindowClosePolicyTests", runEditorRunWindowClosePolicyTests) && ok;
 	ok = timed("runLoadingInputNeutralityTests", runLoadingInputNeutralityTests) && ok;
 	ok = timed("runSaveFeedbackRenderingTests", runSaveFeedbackRenderingTests) && ok;
+	ok = timed("runAutomaticSaveTests", runAutomaticSaveTests) && ok;
+	ok = timed("runTitleSaveLoadThemeTests", runTitleSaveLoadThemeTests) && ok;
+	ok = timed("runQingyuMessagePlacementTests", runQingyuMessagePlacementTests) && ok;
 	ok = timed("runQuitLatchTests", runQuitLatchTests) && ok;
 	ok = timed("runElementRunExceptionCleanupTests", runElementRunExceptionCleanupTests) && ok;
 	ok = timed("runScriptSleepLifecycleTests", runScriptSleepLifecycleTests) && ok;

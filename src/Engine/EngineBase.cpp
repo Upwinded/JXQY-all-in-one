@@ -6302,21 +6302,34 @@ void EngineBase::decodeNextAudio(_video video)
 #endif
 }
 
-void EngineBase::enqueueDecodedVideoFrame(_video video)
+bool EngineBase::enqueueDecodedVideoFrame(_video video)
 {
 	if (video == nullptr || video->videoStream.frame == nullptr)
 	{
-		return;
+		return true;
 	}
+	auto failOutput = [this, video](const char* reason)
+	{
+		GameLog::write("video output failed: %s\n", reason);
+		video->videoOutputFailed = true;
+		stopVideo(video);
+		return true;
+	};
 	AVFrame* frame = video->videoStream.frame;
 	if (frame->width <= 0 || frame->height <= 0 ||
 		static_cast<std::uint64_t>(frame->width) >
 			VideoStruct::MaxDecodedVideoPixels /
 			static_cast<std::uint64_t>(frame->height))
 	{
-		GameLog::write("video frame dimensions exceed the decoded pixel budget\n");
-		video->videoStream.decodeEnd = true;
-		return;
+		return failOutput("frame dimensions exceed the decoded pixel budget");
+	}
+	// Budget four bytes per pixel even for compact YUV textures. Driver-side
+	// allocation and decoder buffers are separate from this texture queue.
+	const std::uint64_t textureBytes =
+		static_cast<std::uint64_t>(frame->width) * frame->height * 4;
+	if (textureBytes > VideoStruct::MaxVideoTextureBytes)
+	{
+		return failOutput("frame exceeds the video texture byte budget");
 	}
 	float frameDuration = video->videoStream.timePerFrame;
 	if (frame->pkt_duration > 0 && video->videoStream.timeBasePacket > 0.0f)
@@ -6337,39 +6350,50 @@ void EngineBase::enqueueDecodedVideoFrame(_video video)
 	float frameTime = video->lastDecodedVideoTime >= 0.0f
 		? video->lastDecodedVideoTime + frameDuration
 		: 0.0f;
+	int64_t timelineStartTimestamp = video->videoStream.timelineStartTimestamp;
 	if (timestamp != AV_NOPTS_VALUE)
 	{
-		if (video->videoStream.timelineStartTimestamp == AV_NOPTS_VALUE)
+		if (timelineStartTimestamp == AV_NOPTS_VALUE)
 		{
-			video->videoStream.timelineStartTimestamp = timestamp;
+			timelineStartTimestamp = timestamp;
 		}
 		double relativeTimestamp = static_cast<double>(timestamp) -
-			static_cast<double>(video->videoStream.timelineStartTimestamp);
+			static_cast<double>(timelineStartTimestamp);
 		double candidateTime = relativeTimestamp *
 			static_cast<double>(video->videoStream.timeBasePacket);
 		if (std::isfinite(candidateTime) && candidateTime >= 0.0 &&
 			candidateTime <= static_cast<double>((std::numeric_limits<float>::max)()))
 		{
-			frameTime = static_cast<float>(candidateTime);
-			if (video->lastDecodedVideoTime >= 0.0f &&
-				frameTime < video->lastDecodedVideoTime)
+			const float timestampTime = static_cast<float>(candidateTime);
+			if (timestampTime > video->lastDecodedVideoTime)
 			{
-				frameTime = video->lastDecodedVideoTime;
+				frameTime = timestampTime;
 			}
+			// Repeated or backward timestamps keep the frame-duration fallback
+			// so predecoding can reach its look-ahead time and stop buffering.
 		}
 	}
-	video->decodedVideoFrameCount++;
-	if (video->firstDecodedVideoTime < 0.0f)
+	std::uint64_t queuedBytes = 0;
+	for (const auto& queuedFrame : video->videoImage)
 	{
-		video->firstDecodedVideoTime = frameTime;
+		queuedBytes += queuedFrame.textureBytes;
 	}
-	video->lastDecodedVideoTime = frameTime;
-	float frameEndTime = frameTime + frameDuration;
-	video->totalTime = (std::max)(video->totalTime, frameEndTime);
+	while (video->videoImage.size() >= VideoStruct::MaxVideoTextureCount ||
+		queuedBytes > VideoStruct::MaxVideoTextureBytes - textureBytes)
+	{
+		// Keep future frames intact. When the pending frame is due, older
+		// textures can be retired even if a large frame fills the byte budget.
+		if (frameTime > getVideoTime(video))
+		{
+			return false;
+		}
+		queuedBytes -= video->videoImage.front().textureBytes;
+		video->videoImage.pop_front();
+	}
 	SDL_Renderer* currentRenderer = renderer.load();
 	if (currentRenderer == nullptr)
 	{
-		return;
+		return failOutput("renderer is unavailable");
 	}
 	SDL_PixelFormat sdlPixelFormat = getVideoPixelFormat(frame->format);
 	SDL_PixelFormat texturePixelFormat = sdlPixelFormat == SDL_PIXELFORMAT_UNKNOWN
@@ -6379,10 +6403,10 @@ void EngineBase::enqueueDecodedVideoFrame(_video video)
 		SDL_TEXTUREACCESS_STREAMING, frame->width, frame->height));
 	if (texture == nullptr)
 	{
-		GameLog::write("SDL_CreateTexture Error(video): %s", SDL_GetError());
-		return;
+		return failOutput(SDL_GetError());
 	}
 
+	bool uploaded = false;
 	switch (sdlPixelFormat)
 	{
 	case SDL_PIXELFORMAT_UNKNOWN:
@@ -6397,9 +6421,9 @@ void EngineBase::enqueueDecodedVideoFrame(_video video)
 			if (SDL_LockTexture(texture.get(), nullptr,
 				reinterpret_cast<void**>(pixels), pitches))
 			{
-				sws_scale(video->swsContext,
+				uploaded = sws_scale(video->swsContext,
 					const_cast<const uint8_t* const*>(frame->data), frame->linesize,
-					0, frame->height, pixels, pitches);
+					0, frame->height, pixels, pitches) == frame->height;
 				SDL_UnlockTexture(texture.get());
 			}
 		}
@@ -6408,29 +6432,23 @@ void EngineBase::enqueueDecodedVideoFrame(_video video)
 		if (frame->linesize[0] > 0 && frame->linesize[1] > 0 && frame->linesize[2] > 0)
 		{
 #ifdef __ANDROID__
-			SDL_UpdateYUVTexture(texture.get(), nullptr,
+			uploaded = SDL_UpdateYUVTexture(texture.get(), nullptr,
 				frame->data[0], frame->linesize[0],
 				frame->data[2], frame->linesize[2],
 				frame->data[1], frame->linesize[1]);
 #else
-			if (!SDL_UpdateYUVTexture(texture.get(), nullptr,
+			uploaded = SDL_UpdateYUVTexture(texture.get(), nullptr,
 				frame->data[0], frame->linesize[0],
 				frame->data[1], frame->linesize[1],
-				frame->data[2], frame->linesize[2]))
-			{
-				GameLog::write("SDL_UpdateYUVTexture Error(1): %s", SDL_GetError());
-			}
+				frame->data[2], frame->linesize[2]);
 #endif
 		}
 		else if (frame->linesize[0] < 0 && frame->linesize[1] < 0 && frame->linesize[2] < 0)
 		{
-			if (!SDL_UpdateYUVTexture(texture.get(), nullptr,
+			uploaded = SDL_UpdateYUVTexture(texture.get(), nullptr,
 				frame->data[0] + frame->linesize[0] * (frame->height - 1), -frame->linesize[0],
 				frame->data[1] + frame->linesize[1] * (AV_CEIL_RSHIFT(frame->height, 1) - 1), -frame->linesize[1],
-				frame->data[2] + frame->linesize[2] * (AV_CEIL_RSHIFT(frame->height, 1) - 1), -frame->linesize[2]))
-			{
-				GameLog::write("SDL_UpdateYUVTexture Error(2): %s", SDL_GetError());
-			}
+				frame->data[2] + frame->linesize[2] * (AV_CEIL_RSHIFT(frame->height, 1) - 1), -frame->linesize[2]);
 		}
 		else
 		{
@@ -6440,32 +6458,69 @@ void EngineBase::enqueueDecodedVideoFrame(_video video)
 	default:
 		if (frame->linesize[0] < 0)
 		{
-			SDL_UpdateTexture(texture.get(), nullptr,
+			uploaded = SDL_UpdateTexture(texture.get(), nullptr,
 				frame->data[0] + frame->linesize[0] * (frame->height - 1),
 				-frame->linesize[0]);
 		}
 		else
 		{
-			SDL_UpdateTexture(texture.get(), nullptr, frame->data[0], frame->linesize[0]);
+			uploaded = SDL_UpdateTexture(texture.get(), nullptr, frame->data[0], frame->linesize[0]);
 		}
 		break;
+	}
+	if (!uploaded)
+	{
+		return failOutput("could not convert or upload the decoded video frame");
 	}
 
 	VideoImage videoImage;
 	videoImage.t = frameTime;
 	videoImage.image = texture;
+	videoImage.textureBytes = textureBytes;
 	video->videoImage.push_back(videoImage);
+	video->videoStream.timelineStartTimestamp = timelineStartTimestamp;
+	video->decodedVideoFrameCount++;
+	if (video->firstDecodedVideoTime < 0.0f)
+	{
+		video->firstDecodedVideoTime = frameTime;
+	}
+	video->lastDecodedVideoTime = frameTime;
+	video->totalTime = (std::max)(video->totalTime, frameTime + frameDuration);
+	return true;
 }
 
 void EngineBase::decodeNextVideo(_video video)
 {
-	if (video == nullptr || !video->videoStream.exists)
+	if (video == nullptr || !video->videoStream.exists ||
+		video->videoStream.decodeEnd || video->videoOutputFailed)
 	{
 		return;
 	}
-	bool decodedFrame = false;
-	while (!decodedFrame)
+	if (video->videoFramePending)
 	{
+		video->videoFramePending = !enqueueDecodedVideoFrame(video);
+		return;
+	}
+	while (!video->videoStream.decodeEnd)
+	{
+		// Receive one frame at a time before sending more packets, including
+		// delayed tail frames. A full texture queue must not discard decoder output.
+		const int receiveResult = avcodec_receive_frame(video->videoStream.codecCtx,
+			video->videoStream.frame);
+		if (receiveResult == 0)
+		{
+			if (video->videoDecoderFlushed)
+			{
+				video->drainedVideoFrameCount++;
+			}
+			video->videoFramePending = !enqueueDecodedVideoFrame(video);
+			return;
+		}
+		if (receiveResult != AVERROR(EAGAIN) || video->videoDecoderFlushed)
+		{
+			video->videoStream.decodeEnd = true;
+			return;
+		}
 		video->videoStream.packet = av_packet_alloc();
 		if (video->videoStream.packet == nullptr)
 		{
@@ -6476,27 +6531,17 @@ void EngineBase::decodeNextVideo(_video video)
 		if (readResult < 0)
 		{
 			av_packet_free(&video->videoStream.packet);
-			avcodec_send_packet(video->videoStream.codecCtx, nullptr);
-			while (avcodec_receive_frame(video->videoStream.codecCtx,
-				video->videoStream.frame) == 0)
+			video->videoDecoderFlushed = true;
+			if (avcodec_send_packet(video->videoStream.codecCtx, nullptr) < 0)
 			{
-				decodedFrame = true;
-				video->drainedVideoFrameCount++;
-				enqueueDecodedVideoFrame(video);
+				video->videoStream.decodeEnd = true;
 			}
-			video->videoStream.decodeEnd = true;
-			break;
+			continue;
 		}
 
-		if (video->videoStream.packet->stream_index == video->videoStream.index &&
-			avcodec_send_packet(video->videoStream.codecCtx, video->videoStream.packet) == 0)
+		if (video->videoStream.packet->stream_index == video->videoStream.index)
 		{
-			while (avcodec_receive_frame(video->videoStream.codecCtx,
-				video->videoStream.frame) == 0)
-			{
-				decodedFrame = true;
-				enqueueDecodedVideoFrame(video);
-			}
+			avcodec_send_packet(video->videoStream.codecCtx, video->videoStream.packet);
 		}
 		av_packet_free(&video->videoStream.packet);
 	}
@@ -6586,6 +6631,11 @@ void EngineBase::clearVideo(_video video)
 	//	freeImage(video->videoImage[i]);
 	//}
 	video->videoImage.clear();
+	video->videoFramePending = false;
+	if (video->videoStream.frame != nullptr)
+	{
+		av_frame_unref(video->videoStream.frame);
+	}
 }
 
 void EngineBase::rearrangeVideoFrame(_video video)
@@ -6676,6 +6726,8 @@ void EngineBase::resetVideo(_video video)
 	video->drainedVideoFrameCount = 0;
 	video->firstDecodedVideoTime = -1.0f;
 	video->lastDecodedVideoTime = -1.0f;
+	video->videoDecoderFlushed = false;
+	video->videoOutputFailed = false;
 	video->audioOutputFlushed = false;
 	video->pausedBeforePause = false;
 	video->decodeEnd = false;
@@ -6758,14 +6810,14 @@ int EngineBase::convert(AVCodecContext * codecCtx, AVFrame * frame, int out_samp
 #if (defined USE_FFMPEG4)
 	av_opt_set_int(swr_ctx, "in_channel_layout", src_ch_layout, 0);
 #else
-	av_opt_set_chlayout(swr_ctx, "in_channel_layout", &src_ch_layout, 0);
+	av_opt_set_chlayout(swr_ctx, "in_chlayout", &src_ch_layout, 0);
 #endif
 	av_opt_set_int(swr_ctx, "in_sample_rate", inputSampleRate, 0);
 	av_opt_set_sample_fmt(swr_ctx, "in_sample_fmt", codecCtx->sample_fmt, 0);
 #if (defined USE_FFMPEG4)
 	av_opt_set_int(swr_ctx, "out_channel_layout", dst_ch_layout, 0);
 #else
-	av_opt_set_chlayout(swr_ctx, "out_channel_layout", &dst_ch_layout, 0);
+	av_opt_set_chlayout(swr_ctx, "out_chlayout", &dst_ch_layout, 0);
 #endif
 	av_opt_set_int(swr_ctx, "out_sample_rate", out_sample_rate, 0);
 	av_opt_set_sample_fmt(swr_ctx, "out_sample_fmt", (AVSampleFormat)out_sample_format, 0);
@@ -7064,7 +7116,7 @@ void EngineBase::freeVideo(Video_t* video)
 void EngineBase::runVideo(_video video)
 {
 #ifdef SHF_USE_VIDEO
-	if (video == nullptr || video->running)
+	if (video == nullptr || video->running || video->videoOutputFailed)
 	{
 		return;
 	}
@@ -7072,6 +7124,10 @@ void EngineBase::runVideo(_video video)
 	initVideoTime(video);
 	setVideoTimePaused(video, true);
 	tryDecodeVideo(video);
+	if (video->stopped)
+	{
+		return;
+	}
 	video->running = true;
 
 	initVideoTime(video);
@@ -7090,7 +7146,7 @@ bool EngineBase::updateVideo(_video video)
 		return false;
 	}
 	tryDecodeVideo(video);
-	if (video->stopped)
+	if (video->stopped && !video->videoOutputFailed)
 	{
 		if (video->loop > 0)
 		{
@@ -7129,35 +7185,26 @@ void EngineBase::tryDecodeVideo(_video video)
 	}
 	video->lastTime = video_time;
 	if (video->audioStream.exists)
-	{		
-		if (video->videoStream.exists)
-		{			
-			while ((!video->audioStream.decodeEnd) && (video->soundDelay < video_time + 500))
-			{
-				decodeNextAudio(video);
-				checkVideoDecodeEnd(video);
-			}
-			while ((!video->videoStream.decodeEnd) && ((video->videoImage.size() < (unsigned int)2) || (video->videoImage.size() > 0 && (video->videoImage[video->videoImage.size() - 1].t < video_time + 100))))
-			{
-				decodeNextVideo(video);
-				checkVideoDecodeEnd(video);
-			}
-		}
-		else
+	{
+		while (!video->audioStream.decodeEnd && video->soundDelay < video_time + 500)
 		{
-			while ((!video->audioStream.decodeEnd) && (video->soundDelay < video_time + 500))
-			{
-				decodeNextAudio(video);
-				checkVideoDecodeEnd(video);
-			}
+			decodeNextAudio(video);
+			checkVideoDecodeEnd(video);
 		}
 	}
-	else if (video->videoStream.exists)
+	if (video->videoStream.exists)
 	{
-		while ((!video->videoStream.decodeEnd) && ((video->videoImage.size() < (unsigned int)2) || (video->videoImage.size() > 0 && (video->videoImage[video->videoImage.size() - 1].t < video_time + 100))))
+		std::size_t decodedFrames = 0;
+		while (!video->videoStream.decodeEnd &&
+			decodedFrames++ < VideoStruct::MaxVideoTextureCount &&
+			(video->videoImage.size() < 2 || video->videoImage.back().t < video_time + 100))
 		{
 			decodeNextVideo(video);
 			checkVideoDecodeEnd(video);
+			if (video->videoFramePending || video->videoOutputFailed)
+			{
+				break;
+			}
 		}
 	}
 	if (video->decodeEnd &&
@@ -7323,10 +7370,9 @@ void EngineBase::drawVideoFrame(_video video)
 
 		drawFrame(video->videoImage[index].image);
 
-		// TODO: 优化代码
 		if (index > 0)
 		{
-			video->videoImage.erase(video->videoImage.begin(), video->videoImage.begin() + index - 1);
+			video->videoImage.erase(video->videoImage.begin(), video->videoImage.begin() + index);
 		}	
 	}
 #endif
@@ -7409,6 +7455,19 @@ void EngineBase::frameBegin()
 	if (!canPrepareRenderFrame())
 	{
 		return;
+	}
+	// Reclaim expired sources once per drawable frame, including after a
+	// scene returns to color and stops requesting grayscale images.
+	for (auto iter = grayscaleImageCache.begin(); iter != grayscaleImageCache.end();)
+	{
+		if (iter->second.source.expired())
+		{
+			iter = grayscaleImageCache.erase(iter);
+		}
+		else
+		{
+			++iter;
+		}
 	}
 	if (pendingWindowResize && window != nullptr)
 	{

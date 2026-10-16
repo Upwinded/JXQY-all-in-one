@@ -89,7 +89,13 @@ int main(int argc, char** argv)
 		put(desktop / "rpg1/list.ini", "obsolete");
 		put(desktop / "rpg3/game.ini", state());
 		put(desktop / "rpg3/items.dat", binary);
+		put(desktop / "rpg8/game.ini", state());
+		put(desktop / "rpg8/marker", "manual-eight");
+		put(desktop / "rpg9/game.ini", state());
+		put(desktop / "rpg9/marker", "manual-nine");
 		put(desktop / "rpg_auto/game.ini", state());
+		put(desktop / "rpg_auto/marker", "automatic");
+		put(desktop / "shot/rpg_auto.png", binary);
 		put(desktop / "shot/rpg1.png", binary);
 		put(desktop / "shot/rpg3.bmp", binary);
 		put(desktop / "game/live.ini", "live");
@@ -120,9 +126,13 @@ int main(int argc, char** argv)
 		require(get(desktop / "rpg4/player0.ini") == get(mobile / "rpg2/player0.ini"), "reverse transfer");
 		require(SavePackage::write(desktop, game, SavePackage::AllSlots, archive.u8string(), error), error);
 		require(SavePackage::read(archive.u8string(), package, error), error);
-		require(package.slots().size() == 4, "all slots includes automatic");
+		require(package.slots().size() == 6, "all slots includes automatic");
 		require(SavePackage::importTo(package, game, mobile, SavePackage::AllSlots, error), error);
 		require(get(mobile / "rpg3/items.dat") == binary && get(mobile / "rpg_auto/game.ini") == state(), "all payloads");
+		require(SavePackage::AutomaticSlot == 10 && SavePackage::slotDirectory(8) == "rpg8" &&
+			get(mobile / "rpg8/marker") == "manual-eight" && get(mobile / "rpg9/marker") == "manual-nine" &&
+			get(mobile / "rpg_auto/marker") == "automatic" && get(mobile / "shot/rpg_auto.png") == binary &&
+			!fs::exists(mobile / "rpg10"), "eight, nine and automatic remain distinct across transfers");
 		require(!fs::exists(mobile / "rpg0") && get(mobile / "rpg7/game.ini") == "keep-other-slot", "only packaged slots imported");
 		require(!SavePackage::importTo(package, game, mobile, 5, error), "multiple slots cannot remap to one");
 		auto wrongGame = game;
@@ -139,6 +149,11 @@ int main(int argc, char** argv)
 
 		const std::string manifest = "[Package]\nFormat=JXQY-SAVE\nVersion=1\nGameId=TEST_MOD\nGameName=" +
 			std::string(u8"测试模组") + "\nSaveNamespace=test_mod\n";
+		makeArchive(archive, { {"save_package.ini", manifest}, {"rpg_auto/game.ini", state()} });
+		require(SavePackage::read(archive.u8string(), package, error) && package.slots().size() == 1 &&
+			package.slots().front().index == 10, "old automatic archives map to automatic slot ten");
+		require(SavePackage::importTo(package, game, mobile, 8, error) &&
+			get(mobile / "rpg_auto/marker") == "automatic", "explicit import into manual eight preserves automatic");
 		const auto limits = createRuntimeSaveGenerationPolicy().limits;
 		const auto checkImportBoundary = [&](const std::vector<std::pair<std::string, std::string>>& files,
 			bool readable, const std::string& expectedError)

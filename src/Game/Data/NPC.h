@@ -813,6 +813,9 @@ public:
 	std::weak_ptr<Effect> hiddenByCarryEffect;
 	std::weak_ptr<Effect> transportEffect;
 	std::weak_ptr<Effect> summonedByMagicEffect;
+	// Outstanding attacks retain this owner after the summon effect is removed.
+	std::shared_ptr<NPC> summonExperienceOwner;
+	std::shared_ptr<NPC> getExperienceOwner();
 	// Runtime provenance remains true after the owning Effect detaches on death.
 	// Summoned NPCs are transient and must never become save candidates merely
 	// because their weak owner reference expired.
@@ -1002,9 +1005,11 @@ public:
 	void clearPoisonedState();
 	void clearPetrifiedState();
 	void clearAbnormalState();
+	bool isProtectedByCheatInvincibility() const;
 	bool isImmuneToAbnormalState() const;
 	void rememberPoisonSource(std::shared_ptr<GameElement> source);
-	void awardDefeatedNpcExperience(std::shared_ptr<Effect> effect);
+	void awardDefeatedNpcExperience(std::shared_ptr<Effect> effect, std::shared_ptr<NPC> killer = nullptr);
+	bool defeatedExperienceAwarded = false;
 	void rewardPoisonKillExperience();
 	bool applyPreDamageMagicStatus(const Effect& effect, int effectLevel);
 	void applyAdditionalAttackEffect(const Effect& effect, int effectLevel);
@@ -1286,6 +1291,18 @@ public:
 	virtual bool startScriptSpecialAction(const std::string& fileName);
 	virtual void doSpecialAction(const std::string & fileName);
 	virtual void setLevel(int lvl);
+	bool restorePartnerAttributes(bool joining = false);
+	bool characterEquipmentSynchronized = true;
+	int getPartnerCharacterIndex();
+	bool isLivingPartner();
+	bool canChangePartnerEquipment();
+	bool setKindAndRelation(int newKind, int newRelation);
+	void finishPartnerJoin();
+	void refillPartnerResources();
+	void resetPartnerRecovery();
+	void updatePartnerRecovery(UTime frameTime);
+	void addPartnerExperience(int amount);
+	bool tryRegroupWithPlayer();
 	void setFixedPos(const std::string& value);
 	bool hasFixedPath() const;
 	bool beginFixedPathWalk();
@@ -1305,10 +1322,10 @@ public:
 	void cancelMoveResumeState();
 	virtual void beginStand();
 	virtual void beginWalk(Point dest);
-	virtual void beginRun(Point dest);
-	virtual void beginJump(Point dest);
-	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
-	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr);
+	virtual void beginRun(Point dest, bool scripted = false);
+	virtual void beginJump(Point dest, bool scripted = false);
+	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr, bool scripted = false);
+	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr, bool scripted = false);
 	virtual void beginSit();
 	virtual void beginHurt(Point dest);
 	virtual void beginHurt();
@@ -1349,7 +1366,11 @@ private:
 public:
 
 	// ---- 战斗 ----
-	virtual void hurt(std::shared_ptr<Effect> e);
+	virtual void hurt(std::shared_ptr<Effect> e, int hitRoll = -1);
+#ifdef JXQY_ENABLE_TEST_HOOKS
+	// Collision/save tests isolate hit rewards from the separately tested dodge RNG.
+	int testMagicHitRoll = -1;
+#endif
 	virtual void directHurt(std::shared_ptr<Effect> e);
 	void addBody(UTime millisecondsToRemove = 0);
 	virtual bool doAttack(Point dest, std::shared_ptr<GameElement> target, AttackReleaseMode releaseMode = armCombatTarget);
@@ -1400,6 +1421,10 @@ public:
 	void freeResource();
 
 protected:
+	std::string registeredPartnerName;
+	int registeredPartnerIndex = -1;
+	UTime partnerRecoveryQuietTime = 0;
+	double partnerRecoveryFractions[3] = { 0.0, 0.0, 0.0 };
 	bool deathTransitionInProgress = false;
 	unsigned int jumpState = 0;
 	unsigned int stepState = 0;

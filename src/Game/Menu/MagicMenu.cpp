@@ -22,26 +22,29 @@ MagicMenu::~MagicMenu()
 
 int MagicMenu::detailedMagicIndex() const
 {
-	if (detailedMagicFile.empty()) return -1;
-	for (int index = displayBegin(); index < displayBegin() + displayCount(); ++index)
-	{
-		if (gm->magicManager.magicListExists(index)
-			&& gm->magicManager.magicList[index].iniFile == detailedMagicFile) return index;
-	}
-	return -1;
+	return !detailedMagicFile.empty() && gm->magicManager.magicListExists(detailedSlotIndex)
+		&& gm->magicManager.magicList[detailedSlotIndex].iniFile == detailedMagicFile
+		? detailedSlotIndex : -1;
 }
 
 bool MagicMenu::showDetails(int listIndex)
 {
-	if (!detailText || !isDisplayIndex(listIndex) || !gm->magicManager.magicListExists(listIndex)) return false;
-	cancelControllerInteraction();
+	if (!detailText || !gm->magicManager.magicListExists(listIndex)
+		|| !(isDisplayIndex(listIndex) || gm->magicManager.isStoreIndex(listIndex)
+			|| gm->magicManager.isBottomIndex(listIndex) || gm->magicManager.isPracticeIndex(listIndex))) return false;
+	if (showingTalents && !isDisplayIndex(listIndex)) showTalents(false);
+	if (!visible) gm->menu->toggleMagicView();
+	gm->menu->cancelControllerInteraction();
+	deactivateControllerFocus();
 	detailedMagicFile = gm->magicManager.magicList[listIndex].iniFile;
+	detailedSlotIndex = listIndex;
 	detailContent.clear();
 	showingDetails = true;
 	detailPage = 0;
 	setDetailVisibility();
 	updateDetails();
 	detailFocused = detailFocus.focusDefault();
+	gm->menu->adoptControllerPointerFocus(getMySharedPtr(), detailFocus.getFocusedElement());
 	return true;
 }
 
@@ -64,7 +67,8 @@ void MagicMenu::setDetailVisibility()
 	for (const char* name : { "detailPractice", "detailQuick" })
 	{
 		if (auto button = getComponentByName<FlatTextButton>(name))
-			button->visible = button->activated = showingDetails && !showingTalents;
+			button->visible = button->activated = showingDetails && !showingTalents
+				&& (std::string(name) != "detailPractice" || !gm->global.feature.practiceMenuDisabled);
 	}
 }
 
@@ -77,16 +81,29 @@ void MagicMenu::closeDetails()
 	detailFocus.suspendFocus();
 	setDetailVisibility();
 	slotController.activate();
-	if (index >= 0) slotController.focusLogicalIndex(index);
+	if (isDisplayIndex(index)) slotController.focusLogicalIndex(index);
 }
 
 bool MagicMenu::assignDetailedMagic(bool practice)
 {
 	const int source = detailedMagicIndex();
-	if (!showingDetails || showingTalents || source < 0 || !gm->magicManager.isStoreIndex(source)) return false;
+	if (!showingDetails || showingTalents || source < 0) return false;
 	int target = practice ? gm->magicManager.practiceIndex() : -1;
 	if (practice && gm->global.feature.practiceMenuDisabled) return false;
-	if (!practice)
+	const bool returnToList = practice ? gm->magicManager.isPracticeIndex(source) : gm->magicManager.isBottomIndex(source);
+	if (returnToList)
+	{
+		target = -1;
+		for (int index = gm->magicManager.storeBegin(); index <= gm->magicManager.storeEnd(); ++index)
+		{
+			if (!gm->magicManager.magicListExists(index))
+			{
+				target = index;
+				break;
+			}
+		}
+	}
+	else if (!practice)
 	{
 		for (int index = gm->magicManager.bottomBegin(); index <= gm->magicManager.bottomEnd(); ++index)
 		{
@@ -99,13 +116,13 @@ bool MagicMenu::assignDetailedMagic(bool practice)
 	}
 	if (target < 0)
 	{
-		gm->showMessage(u8"快捷武功栏已满");
+		gm->showMessage(returnToList ? u8"武功栏已满" : u8"快捷武功栏已满");
 		return false;
 	}
 	gm->magicManager.exchange(source, target);
 	closeDetails();
 	gm->magicManager.updateMenu();
-	gm->showMessage(practice ? u8"已设为修炼武功" : u8"已放入快捷武功栏");
+	gm->showMessage(returnToList ? u8"已收回武功栏" : (practice ? u8"已设为修炼武功" : u8"已放入快捷武功栏"));
 	return true;
 }
 
@@ -127,6 +144,10 @@ void MagicMenu::updateDetails()
 	}
 	const auto& info = gm->magicManager.magicList[index];
 	const auto& magic = info.magic;
+	if (auto button = getComponentByName<FlatTextButton>("detailPractice"))
+		button->setStr(gm->magicManager.isPracticeIndex(index) ? u8"取消修炼" : u8"设为修炼");
+	if (auto button = getComponentByName<FlatTextButton>("detailQuick"))
+		button->setStr(gm->magicManager.isBottomIndex(index) ? u8"收回武功栏" : u8"放入快捷栏");
 	const int level = std::clamp(info.level, 1, MAGIC_MAX_LEVEL);
 	const auto& attributes = magic->level[level];
 	if (auto label = getComponentByName<Label>("detailName")) label->setStr(magic->name);

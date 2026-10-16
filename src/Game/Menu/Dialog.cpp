@@ -1,5 +1,6 @@
 #include "Dialog.h"
 #include "UIFocusManager.h"
+#include "../../Engine/Engine.h"
 #include "../../File/log.h"
 #include "../../libconvert/libconvert.h"
 #include "../GameTypes.h"
@@ -56,6 +57,31 @@ std::string Dialog::getHeadName(int index)
 
 void Dialog::setTalkStr(const std::string & str)
 {
+	if (label && head1 && head2 && head1->cropContent && !head1->stretch)
+	{
+		const int padding = std::max(1, label->rect.y - rect.y);
+		const bool right = head2->impImage != nullptr;
+		const auto head = right ? head2 : head1;
+		Rect content{};
+		const auto image = IMP::loadImageForTime(head->impImage, 0);
+		const bool hasPortrait = image && engine->getImageContentBounds(image, content, head->cropBlack);
+		// Anchor visible portrait pixels at the panel's inner bottom corners.
+		label->rect.x = rect.x + padding;
+		label->rect.w = rect.w - padding * 2;
+		if (hasPortrait)
+		{
+			head->rect = { right ? rect.x + rect.w - padding - content.w : rect.x + padding,
+				rect.y + rect.h - padding - content.h, content.w, content.h };
+			if (!right) label->rect.x += content.w + padding;
+			label->rect.w -= content.w + padding;
+		}
+		if (auto hint = getComponentByName<Label>("hint"))
+		{
+			hint->rect.x = label->rect.x + (label->rect.w - hint->rect.w) / 2;
+			hint->rect.y = rect.y + rect.h - padding - hint->rect.h;
+			label->rect.h = std::max(label->fontSize, hint->rect.y - padding - label->rect.y);
+		}
+	}
 	currentTalkText = str;
 	index = 0;
 	if (label)

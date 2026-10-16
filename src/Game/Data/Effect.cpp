@@ -6,6 +6,7 @@
 #include "Player.h"
 #include "ProjectedMovement.h"
 #include "MagicDamageChannels.h"
+#include "MagicHitRate.h"
 #include "MagicTransport.h"
 #include "../GameManager/GameManager.h"
 #include "../../File/File.h"
@@ -784,6 +785,7 @@ bool Effect::beginSummon(Point summonPosition)
 	npc->setPosition(summonTile, false);
 	npc->transientSummonedNPC = true;
 	npc->summonedByMagicEffect = std::dynamic_pointer_cast<Effect>(getMySharedPtr());
+	npc->summonExperienceOwner = caster->getExperienceOwner();
 	caster->addSummonedNpc(magic, npc);
 	summonedNPC = npc;
 	position = summonTile;
@@ -2272,13 +2274,15 @@ void Effect::updateRangeEffect(UTime frameTime)
 			return;
 		}
 		bool showSpecialKindVisualEffect = magic.noSpecialKindEffect <= 0;
-		if (levelInfo.rangeFreezeMilliseconds > 0 && !target->petrified && !target->frozen)
+		const int hitRoll = engine->getRand(99);
+		const bool abnormalStateHit = isMagicAbnormalStateHit(evade, target->getEvade(), hitRoll);
+		if (abnormalStateHit && levelInfo.rangeFreezeMilliseconds > 0 && !target->petrified && !target->frozen)
 		{
 			target->frozen = true;
 			target->frozenLastTime = levelInfo.rangeFreezeMilliseconds;
 			target->frozenVisualEffect = showSpecialKindVisualEffect;
 		}
-		if (levelInfo.rangePoisonMilliseconds > 0 && !target->petrified && !target->poisoned)
+		if (abnormalStateHit && levelInfo.rangePoisonMilliseconds > 0 && !target->petrified && !target->poisoned)
 		{
 			target->poisoned = true;
 			target->poisonedLastTime = levelInfo.rangePoisonMilliseconds;
@@ -2289,7 +2293,7 @@ void Effect::updateRangeEffect(UTime frameTime)
 				target->rememberPoisonSource(caster);
 			}
 		}
-		if (levelInfo.rangePetrifyMilliseconds > 0 && !target->petrified)
+		if (abnormalStateHit && levelInfo.rangePetrifyMilliseconds > 0 && !target->petrified)
 		{
 			target->petrified = true;
 			target->petrifiedLastTime = levelInfo.rangePetrifyMilliseconds;
@@ -2319,7 +2323,7 @@ void Effect::updateRangeEffect(UTime frameTime)
 			rangeDamageEffect->evade = evade;
 			rangeDamageEffect->flyingDirection = Map::getTilePosition(target->getPosition(), position);
 			rangeDamageEffect->direction = rangeDamageEffect->getDirection();
-			target->hurt(rangeDamageEffect);
+			target->hurt(rangeDamageEffect, hitRoll);
 		}
 	};
 

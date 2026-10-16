@@ -283,6 +283,7 @@ enum DragType
 	dtMagic = 2, //拖拽魔法
 	dtSell = 3,  //拖拽出售
 	dtBuy = 4,   //拖拽购买
+	dtPartnerEquipment = 5, // 同伴装备，不属于主角物品列表
 };
 
 //特效格子数据

@@ -102,6 +102,10 @@ void Option::init()
 	playerBg = getComponentByName<ImageContainer>("playerBg");
 	shadowBg = getComponentByName<ImageContainer>("shadowBg");
 	dyLoadBg = getComponentByName<ImageContainer>("dyLoadBg");
+	touchControlsButton = getComponentByName<FlatTextButton>("touchControlsButton");
+	cheatSettingsButton = getComponentByName<FlatTextButton>("cheatSettingsButton");
+	themeButton = getComponentByName<FlatTextButton>("themeButton");
+	automaticSaveButton = getComponentByName<FlatTextButton>("automaticSaveButton");
 
 	setChildRectReferToParent();
 
@@ -218,6 +222,7 @@ void Option::freeResource()
 	touchControlsButton = nullptr;
 	cheatSettingsButton = nullptr;
 	themeButton = nullptr;
+	automaticSaveButton = nullptr;
 	cheatPanelTitle = nullptr;
 	cheatResultLabel = nullptr;
 	cheatModeButton = nullptr;
@@ -336,6 +341,8 @@ void Option::configureFocus(const std::string& preferredFocusId)
 
 	addRow("ui-theme", themeButton,
 		[this]() { toggleThemeOption(); }, consumeHorizontalNavigation);
+	addRow("automatic-save", automaticSaveButton,
+		[this]() { toggleAutomaticSaveOption(); }, consumeHorizontalNavigation);
 	const std::vector<std::string> focusOrder = focusManager.addLinearGroup(
 		"option-rows",
 		UIFocusLinearAxis::Vertical,
@@ -809,6 +816,16 @@ void Option::onRun()
 
 void Option::onChildCallBack(PElement child)
 {
+	if (child == rtnBtn && child->getResult(erClick))
+	{
+		closeMenu();
+		return;
+	}
+	if (child == automaticSaveButton && child->getResult(erClick))
+	{
+		toggleAutomaticSaveOption();
+		return;
+	}
 	if (child == themeButton && child->getResult(erClick))
 	{
 		toggleThemeOption();
@@ -899,7 +916,6 @@ void Option::createFooterOptions()
 		cheatSettingsButton->setUTF8Str("作弊设置");
 		addChild(cheatSettingsButton);
 	}
-	layoutFooterOptions();
 	syncTouchControlsOption();
 	if (themeButton == nullptr
 		&& File::fileExist("ini\\ui\\qingyu\\theme.ini")
@@ -908,24 +924,27 @@ void Option::createFooterOptions()
 		themeButton = std::make_shared<FlatTextButton>();
 		themeButton->name = "themeButton";
 		themeButton->setFontSize(16);
-		themeButton->setUTF8Str(Config::useQingyuUi ? u8"界面：青玉 · 重进游戏生效" : u8"界面：原版 · 重进游戏生效");
-		int footerBottom = rect.y;
-		for (const auto& button : { touchControlsButton, cheatSettingsButton })
-		{
-			if (button) footerBottom = std::max(footerBottom, button->rect.y + button->rect.h);
-		}
-		themeButton->rect = { rect.x + (rect.w - 280) / 2, footerBottom + 8, 280, 30 };
-		int windowWidth = 0, windowHeight = 0;
-		engine->getWindowSize(windowWidth, windowHeight);
-		// Full-height YYCS options have room beside the tall return button.
-		if (themeButton->rect.y + themeButton->rect.h > windowHeight - 8 && rtnBtn
-			&& rtnBtn->rect.x - rect.x >= themeButton->rect.w + 16)
-		{
-			themeButton->rect.x = rtnBtn->rect.x - themeButton->rect.w - 16;
-			themeButton->rect.y = rtnBtn->rect.y + (rtnBtn->rect.h - themeButton->rect.h) / 2;
-		}
 		addChild(themeButton);
 	}
+	if (themeButton)
+	{
+		themeButton->setUTF8Str(gameManager->global.feature.automaticSave
+			? (Config::useQingyuUi ? u8"界面：青玉·重进生效" : u8"界面：原版·重进生效")
+			: (Config::useQingyuUi ? u8"界面：青玉 · 重进游戏生效" : u8"界面：原版 · 重进游戏生效"));
+	}
+	if (gameManager->global.feature.automaticSave && automaticSaveButton == nullptr)
+	{
+		automaticSaveButton = std::make_shared<FlatTextButton>();
+		automaticSaveButton->name = "automaticSaveButton";
+		addChild(automaticSaveButton);
+	}
+	if (automaticSaveButton)
+	{
+		automaticSaveButton->visible = automaticSaveButton->activated = gameManager->global.feature.automaticSave;
+		automaticSaveButton->setUTF8Str(Config::automaticSaveEnabled ? u8"自动存档：开" : u8"自动存档：关");
+		if (!gameManager->global.feature.automaticSave) automaticSaveButton.reset();
+	}
+	layoutFooterOptions();
 }
 
 void Option::toggleThemeOption()
@@ -934,12 +953,16 @@ void Option::toggleThemeOption()
 	Config::save();
 	if (themeButton != nullptr)
 	{
-		themeButton->setUTF8Str(Config::useQingyuUi ? u8"界面：青玉 · 重进游戏生效" : u8"界面：原版 · 重进游戏生效");
+		themeButton->setUTF8Str(automaticSaveButton
+			? (Config::useQingyuUi ? u8"界面：青玉·重进生效" : u8"界面：原版·重进生效")
+			: (Config::useQingyuUi ? u8"界面：青玉 · 重进游戏生效" : u8"界面：原版 · 重进游戏生效"));
 	}
 }
 
 void Option::layoutFooterOptions()
 {
+	// Skins with their own footer controls already position and style them in the menu resources.
+	if (getComponentByName("cheatSettingsButton") != nullptr) return;
 	std::vector<std::shared_ptr<FlatTextButton>> buttons;
 	if (touchControlsButton != nullptr)
 	{
@@ -978,6 +1001,56 @@ void Option::layoutFooterOptions()
 			: buttonWidth;
 		buttons[index]->rect = { buttonX, buttonY, width, ButtonHeight };
 		buttonX += width + ButtonGap;
+	}
+	if (!automaticSaveButton)
+	{
+		if (themeButton)
+		{
+			themeButton->rect = { rect.x + (rect.w - 280) / 2, buttonY + ButtonHeight + 8, 280, 30 };
+			int windowWidth = 0, windowHeight = 0;
+			engine->getWindowSize(windowWidth, windowHeight);
+			if (themeButton->rect.y + themeButton->rect.h > windowHeight - 8 && rtnBtn
+				&& rtnBtn->rect.x - rect.x >= themeButton->rect.w + 16)
+			{
+				themeButton->rect.x = rtnBtn->rect.x - themeButton->rect.w - 16;
+				themeButton->rect.y = rtnBtn->rect.y + (rtnBtn->rect.h - themeButton->rect.h) / 2;
+			}
+		}
+		return;
+	}
+	int secondRowWidth = totalWidth;
+	int secondRowX = rect.x + (rect.w - secondRowWidth) / 2;
+	int secondRowY = buttonY + ButtonHeight + ButtonGap;
+	int windowWidth = 0, windowHeight = 0;
+	engine->getWindowSize(windowWidth, windowHeight);
+	if (secondRowY + ButtonHeight > windowHeight - PanelMargin && rtnBtn)
+	{
+		secondRowWidth = std::min(secondRowWidth, rtnBtn->rect.x - rect.x - PanelMargin * 3);
+		secondRowX = rtnBtn->rect.x - secondRowWidth - PanelMargin * 2;
+		secondRowY = rtnBtn->rect.y + (rtnBtn->rect.h - ButtonHeight) / 2;
+	}
+	const int secondButtonWidth = themeButton ? (secondRowWidth - ButtonGap) / 2 : secondRowWidth;
+	if (themeButton)
+	{
+		themeButton->rect = { secondRowX, secondRowY, secondButtonWidth, ButtonHeight };
+		themeButton->setFontSize(secondButtonWidth < 180 ? 14 : 16);
+	}
+	if (automaticSaveButton)
+	{
+		automaticSaveButton->rect = { secondRowX + (themeButton ? secondButtonWidth + ButtonGap : 0),
+			secondRowY, secondButtonWidth, ButtonHeight };
+		automaticSaveButton->setFontSize(secondButtonWidth < 180 ? 14 : 16);
+	}
+	// Include the footer rows in the panel without rescaling the existing controls.
+	rect.h = std::max(rect.h, secondRowY + ButtonHeight + PanelMargin - rect.y);
+}
+
+void Option::toggleAutomaticSaveOption()
+{
+	if (auto* gameManager = GameManager::getInstance())
+	{
+		gameManager->setAutomaticSaveEnabled(!Config::automaticSaveEnabled);
+		automaticSaveButton->setUTF8Str(Config::automaticSaveEnabled ? u8"自动存档：开" : u8"自动存档：关");
 	}
 }
 

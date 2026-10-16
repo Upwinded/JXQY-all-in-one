@@ -351,6 +351,7 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	applyBooleanFeatureOverride(manifest, "PetrifyVisualEffect", feature.petrifyVisualEffect);
 	applyBooleanFeatureOverride(manifest, "MagicTriggerAtAnimationEnd", feature.magicTriggerAtAnimationEnd);
 	applyBooleanFeatureOverride(manifest, "NativeNpcAttackAtAnimationEnd", feature.nativeNpcAttackAtAnimationEnd);
+	applyBooleanFeatureOverride(manifest, "RestorePartnerAttributes", feature.restorePartnerAttributes);
 	applyBooleanFeatureOverride(manifest, "LumAsBrightness", feature.lumAsBrightness);
 	applyBooleanFeatureOverride(manifest, "AmbientLumOverlay", feature.ambientLumOverlay);
 	applyBooleanFeatureOverride(manifest, "TopButtonsLayout", feature.topButtonsLayout);
@@ -384,6 +385,7 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 		"petrifyvisualeffect",
 		"magictriggeratanimationend",
 		"nativenpcattackatanimationend",
+		"restorepartnerattributes",
 		"lumasbrightness",
 		"ambientlumoverlay",
 		"topbuttonslayout",
@@ -412,12 +414,15 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	feature.qingyuUi = Config::useQingyuUi
 		&& File::fileExist("ini\\ui\\qingyu\\theme.ini")
 		&& File::fileExist("asf\\ui\\qingyu\\panel.png");
+	INIReader saveList(feature.qingyuUi
+		? "ini\\ui\\qingyu\\saveload\\listBox.ini"
+		: "ini\\ui\\saveload\\listbox.ini");
+	feature.automaticSave = saveList.GetBoolean("Init", "AutomaticSave", false);
 	if (feature.qingyuUi)
 	{
 		feature.topButtonsLayout = true;
 		feature.stateEquipIntegratedLayout = true;
 		feature.hideRightMenusWithIntegratedEquip = false;
-		feature.practiceMenuDisabled = false;
 		feature.magicButtonOpensIntegratedEquip = false;
 		feature.equipPlayerNameImages = false;
 		feature.characterPanelImages = false;

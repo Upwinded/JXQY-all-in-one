@@ -151,28 +151,28 @@ public:
 	virtual void beginStand();
 	void forceBeginStand();
 	virtual void beginWalk(Point dest);
-	virtual void beginRun(Point dest);
-	virtual void beginJump(Point dest);
+	virtual void beginRun(Point dest, bool scripted = false);
+	virtual void beginJump(Point dest, bool scripted = false);
 	// change 系列：移动中切换目标（保持动作时间，通过 action retarget）
 	virtual bool changeWalk(Point dest);
 	virtual bool changeRun(Point dest);
 
 	// ---- 战斗 ----
-	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
-	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr);
-	void beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<GameElement> target = nullptr, int listIndex = -1);
+	virtual void beginAttack(Point dest, std::shared_ptr<GameElement> target = nullptr, bool scripted = false);
+	virtual void beginMagic(Point dest, std::shared_ptr<GameElement> target = nullptr, bool scripted = false);
+	void beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<GameElement> target = nullptr, int listIndex = -1, bool scripted = false);
 	virtual bool doSpecialAttack(Point dest, std::shared_ptr<GameElement> target = nullptr);
 	std::shared_ptr<Magic> prepareSpecialAttackMagicForAction(Point dest, std::shared_ptr<GameElement> target);
 	bool releasePreparedSpecialAttackMagic(Point dest, std::shared_ptr<GameElement> target);
 	virtual std::shared_ptr<Magic> resolveMagicReplacement(std::shared_ptr<Magic> magic);
-	bool tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool showMessage);
+	bool tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool showMessage, bool scripted = false);
 	void setRage(int value);
 	void addRage(int value);
 	float getCriticalChancePercent() const;
 	int getCriticalDamagePercent() const;
 	int applyCriticalDamage(int damage, int roll, bool* wasCritical = nullptr) const;
 	virtual void beginHurt(Point dest);
-	virtual void hurt(std::shared_ptr<Effect> e);
+	void hurt(std::shared_ptr<Effect> e, int hitRoll = -1) override;
 	virtual void hurtLife(int damage, bool ignoreDefense = false);
 	bool canHurt();
 	void suppressTrapAtScriptPosition();
@@ -258,7 +258,7 @@ private:
 	void controlActorTriggerObject(std::shared_ptr<NPC> actor, std::shared_ptr<Object> obj, bool useRightScript);
 	void triggerTouchObjects();
 	// 移动的统一内部实现，begin 和 change 系列最终都走这里
-	bool startMoveInternal(Point dest, bool running, bool isRetarget);
+	bool startMoveInternal(Point dest, bool running, bool isRetarget, bool scripted = false);
 	bool equipmentIgnoresRunThewCost = false;
 	bool runThewLowMessageShown = false;
 	UTime lastRunThewLowMessageTime = 0;

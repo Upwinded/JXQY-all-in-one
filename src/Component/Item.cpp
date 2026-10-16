@@ -132,7 +132,8 @@ void Item::onUpdate()
 
 void Item::onEvent()
 {
-	if (canShowHint && touchingID != TOUCH_UNTOUCHEDID && getTime() - moveInTime > beginShowHintTime)
+	if (canShowHint && currentDragItem == nullptr && touchingID != TOUCH_UNTOUCHEDID
+		&& getTime() - moveInTime > beginShowHintTime)
 	{
 		if (!showHint)
 		{
@@ -193,11 +194,6 @@ bool Item::shouldKeepTouchWhenPointerLeaves(int x, int y)
 
 void Item::onDraw()
 {
-	if (dragging > TOUCH_UNTOUCHEDID && currentDragItem.get() == this)
-	{
-		return;
-	}
-
 	_shared_imp currentBackImage = nullptr;
 	if (drawSlot)
 	{
@@ -217,6 +213,11 @@ void Item::onDraw()
 	{
 		auto backgroundImage = IMP::loadImageForTime(currentBackImage, getTime());
 		engine->drawImage(backgroundImage, nullptr, &rect);
+	}
+
+	if (dragging > TOUCH_UNTOUCHEDID && currentDragItem.get() == this)
+	{
+		return;
 	}
 
 	_shared_image img = frameIndex >= 0
@@ -367,5 +368,9 @@ bool Item::onHandleEvent(AEvent & e)
 
 void Item::onClick()
 {
+	if (showHint && touchingDownID != TOUCH_MOUSEID)
+	{
+		return;
+	}
 	result |= erClick;
 }

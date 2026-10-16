@@ -503,11 +503,12 @@ bool runLazyRawImageTest()
 	const uint8_t snapshotPixels[] =
 	{
 		0x00, 0x00, 0xFF, 0xFF,
-		0x00, 0xFF, 0x00, 0xFF,
+		0x00, 0xFF, 0x00, 0x80,
+		0xFF, 0x00, 0x00, 0x00,
 	};
 	std::unique_ptr<char[]> encodedSnapshot;
 	int encodedSnapshotSize = PngImageEncoder::encodeBgra8888(snapshotPixels,
-		2, 1, static_cast<int>(sizeof(snapshotPixels)), encodedSnapshot);
+		3, 1, static_cast<int>(sizeof(snapshotPixels)), encodedSnapshot);
 	const uint8_t pngSignature[] = { 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A };
 	ok = check(encodedSnapshotSize > static_cast<int>(sizeof(pngSignature)) &&
 		encodedSnapshot != nullptr &&
@@ -516,7 +517,7 @@ bool runLazyRawImageTest()
 	SDL_Surface* decodedSnapshot = SafeImageDecoder::loadSurface(
 		encodedSnapshot.get(), encodedSnapshotSize);
 	ok = check(decodedSnapshot != nullptr &&
-		decodedSnapshot->w == 2 && decodedSnapshot->h == 1,
+		decodedSnapshot->w == 3 && decodedSnapshot->h == 1,
 		"standard PNG save snapshot round-trips through the bounded runtime decoder") && ok;
 	Uint8 red0 = 0;
 	Uint8 green0 = 0;
@@ -532,12 +533,41 @@ bool runLazyRawImageTest()
 		SDL_ReadSurfacePixel(decodedSnapshot, 1, 0,
 			&red1, &green1, &blue1, &alpha1) &&
 		red0 == 0xFF && green0 == 0 && blue0 == 0 && alpha0 == 0xFF &&
-		red1 == 0 && green1 == 0xFF && blue1 == 0 && alpha1 == 0xFF,
-		"standard PNG save snapshot preserves BGRA color channels") && ok;
+		red1 == 0 && green1 == 0xFF && blue1 == 0 && alpha1 == 0x80,
+		"standard PNG save snapshot preserves BGRA colors and partial transparency") && ok;
+	ok = check(decodedSnapshot != nullptr &&
+		SDL_ReadSurfacePixel(decodedSnapshot, 2, 0,
+			&red1, &green1, &blue1, &alpha1) && alpha1 == 0,
+		"standard PNG save snapshot preserves fully transparent pixels") && ok;
 	if (decodedSnapshot != nullptr)
 	{
 		SDL_DestroySurface(decodedSnapshot);
 	}
+	const uint8_t transparentGif[] =
+	{
+		0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x03, 0x00, 0x01, 0x00,
+		0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0x00, 0x00, 0x00,
+		0xFF, 0x00, 0x00, 0x00, 0x00, 0x21, 0xF9, 0x04, 0x01, 0x00,
+		0x00, 0x00, 0x00, 0x2C, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00,
+		0x01, 0x00, 0x00, 0x08, 0x06, 0x00, 0x01, 0x04, 0x10, 0x10,
+		0x10, 0x00, 0x3B,
+	};
+	SDL_Surface* decodedGif = SafeImageDecoder::loadSurface(
+		transparentGif, static_cast<int>(sizeof(transparentGif)));
+	SDL_Surface* rgbaGif = decodedGif != nullptr
+		? SDL_ConvertSurface(decodedGif, SDL_PIXELFORMAT_RGBA32) : nullptr;
+	ok = check(rgbaGif != nullptr && rgbaGif->w == 3 && rgbaGif->h == 1 &&
+		SDL_ReadSurfacePixel(rgbaGif, 0, 0,
+			&red0, &green0, &blue0, &alpha0) && alpha0 == 0 &&
+		SDL_ReadSurfacePixel(rgbaGif, 1, 0,
+			&red1, &green1, &blue1, &alpha1) &&
+		red1 == 0xFF && green1 == 0 && blue1 == 0 && alpha1 == 0xFF &&
+		SDL_ReadSurfacePixel(rgbaGif, 2, 0,
+			&red1, &green1, &blue1, &alpha1) &&
+		red1 == 0 && green1 == 0xFF && blue1 == 0 && alpha1 == 0xFF,
+		"indexed GIF preserves its transparent color key and palette through RGBA conversion") && ok;
+	SDL_DestroySurface(rgbaGif);
+	SDL_DestroySurface(decodedGif);
 
 	namespace fs = std::filesystem;
 	fs::path root = makeUniqueTestDirectory("jxqy-image-candidate-runtime-tests");
@@ -1390,6 +1420,137 @@ bool runMediaRuntimeTests()
 	if (talkRenderer != nullptr)
 	{
 		SDL_Renderer* previousRenderer = EngineBase::renderer.exchange(talkRenderer);
+		AVFrame* videoFrame = av_frame_alloc();
+		ok = check(videoFrame != nullptr,
+			"video timeline fixture allocates a decoded frame") && ok;
+		if (videoFrame != nullptr)
+		{
+			videoFrame->format = AV_PIX_FMT_BGRA;
+			videoFrame->width = 16;
+			videoFrame->height = 16;
+			const int frameBufferResult = av_frame_get_buffer(videoFrame, 0);
+			ok = check(frameBufferResult >= 0,
+				"video timeline fixture has pixel storage") && ok;
+			if (frameBufferResult >= 0)
+			{
+				std::memset(videoFrame->data[0], 0,
+					videoFrame->linesize[0] * videoFrame->height);
+				VideoStruct timelineVideo;
+				timelineVideo.videoStream.frame = videoFrame;
+				timelineVideo.videoStream.timeBasePacket = 1.0f;
+				timelineVideo.videoStream.timePerFrame = 40.0f;
+				const int64_t timestamps[] =
+					{ 1000, 1040, 1040, 1020, AV_NOPTS_VALUE, 1200 };
+				for (std::size_t index = 0; index < std::size(timestamps); ++index)
+				{
+					videoFrame->best_effort_timestamp = timestamps[index];
+					videoFrame->pts = timestamps[index];
+					engine->enqueueDecodedVideoFrame(&timelineVideo);
+					ok = check(timelineVideo.lastDecodedVideoTime == index * 40.0f &&
+						timelineVideo.videoImage.size() == index + 1 &&
+						timelineVideo.videoImage.back().t == index * 40.0f,
+						"video timestamps advance across repeated, backward and missing values") && ok;
+				}
+				ok = check(timelineVideo.decodedVideoFrameCount == std::size(timestamps) &&
+					timelineVideo.totalTime == 240.0f,
+					"timestamp recovery retains every frame and its playback duration") && ok;
+
+				VideoStruct boundedVideo;
+				boundedVideo.videoStream.frame = videoFrame;
+				boundedVideo.videoStream.timePerFrame = 40.0f;
+				engine->initVideoTime(&boundedVideo);
+				engine->setVideoTimePaused(&boundedVideo, true);
+				videoFrame->best_effort_timestamp = AV_NOPTS_VALUE;
+				videoFrame->pts = AV_NOPTS_VALUE;
+				for (std::size_t index = 0; index < VideoStruct::MaxVideoTextureCount; ++index)
+				{
+					ok = check(engine->enqueueDecodedVideoFrame(&boundedVideo),
+						"video queue admits frames up to its count limit") && ok;
+				}
+				ok = check(!engine->enqueueDecodedVideoFrame(&boundedVideo) &&
+					boundedVideo.videoImage.size() == VideoStruct::MaxVideoTextureCount &&
+					boundedVideo.decodedVideoFrameCount == VideoStruct::MaxVideoTextureCount &&
+					boundedVideo.lastDecodedVideoTime == 600.0f,
+					"full video queue preserves future frames and does not advance timestamps") && ok;
+				engine->setVideoTime(&boundedVideo, 640.0f);
+				ok = check(engine->enqueueDecodedVideoFrame(&boundedVideo) &&
+					boundedVideo.videoImage.size() == VideoStruct::MaxVideoTextureCount &&
+					boundedVideo.videoImage.back().t == 640.0f,
+					"a due pending frame replaces an obsolete texture without shifting its timestamp") && ok;
+				engine->drawVideoFrame(&boundedVideo);
+				ok = check(boundedVideo.videoImage.size() == 1 &&
+					boundedVideo.videoImage.front().t == 640.0f,
+					"drawing releases all textures older than the displayed frame") && ok;
+
+				// Restrict this isolated software renderer to force the actual SDL
+				// creation error without exhausting the machine's memory.
+				const SDL_PropertiesID rendererProperties = SDL_GetRendererProperties(talkRenderer);
+				const Sint64 maximumTextureSize = SDL_GetNumberProperty(rendererProperties,
+					SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 0);
+				SDL_SetNumberProperty(rendererProperties, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER, 8);
+				SDL_AudioSpec videoAudioSpec = { SDL_AUDIO_F32, 2, 48000 };
+				boundedVideo.audioOutputStream = SDL_CreateAudioStream(&videoAudioSpec, &videoAudioSpec);
+				const float audioSamples[128] = {};
+				ok = check(boundedVideo.audioOutputStream &&
+					SDL_PutAudioStreamData(boundedVideo.audioOutputStream, audioSamples, sizeof(audioSamples)),
+					"video output failure fixture has queued audio") && ok;
+				boundedVideo.loop = -1;
+				engine->enqueueDecodedVideoFrame(&boundedVideo);
+				engine->updateVideo(&boundedVideo);
+				engine->runVideo(&boundedVideo);
+				ok = check(boundedVideo.videoOutputFailed && boundedVideo.stopped &&
+					!boundedVideo.running && boundedVideo.videoImage.empty() &&
+					SDL_GetAudioStreamQueued(boundedVideo.audioOutputStream) == 0,
+					"SDL texture creation failure stops playback, clears textures and cannot loop") && ok;
+				SDL_DestroyAudioStream(boundedVideo.audioOutputStream);
+				boundedVideo.audioOutputStream = nullptr;
+				SDL_SetNumberProperty(rendererProperties, SDL_PROP_RENDERER_MAX_TEXTURE_SIZE_NUMBER,
+					maximumTextureSize);
+			}
+		}
+		av_frame_free(&videoFrame);
+		AVFrame* budgetFrame = av_frame_alloc();
+		if (budgetFrame != nullptr)
+		{
+			budgetFrame->format = AV_PIX_FMT_BGRA;
+			budgetFrame->width = 2048;
+			budgetFrame->height = 2048;
+			const int allocated = av_frame_get_buffer(budgetFrame, 0);
+			ok = check(allocated >= 0, "video byte budget fixture allocates") && ok;
+			if (allocated >= 0)
+			{
+				std::memset(budgetFrame->data[0], 0, budgetFrame->linesize[0] * budgetFrame->height);
+				VideoStruct budgetVideo;
+				budgetVideo.videoStream.frame = budgetFrame;
+				budgetVideo.videoStream.timePerFrame = 40.0f;
+				engine->initVideoTime(&budgetVideo);
+				engine->setVideoTimePaused(&budgetVideo, true);
+				for (int index = 0; index < 4; ++index)
+				{
+					ok = check(engine->enqueueDecodedVideoFrame(&budgetVideo),
+						"video textures fill the byte budget") && ok;
+				}
+				ok = check(budgetVideo.videoImage.size() == 4 &&
+					budgetVideo.videoImage.front().textureBytes == 16ULL * 1024ULL * 1024ULL &&
+					!engine->enqueueDecodedVideoFrame(&budgetVideo),
+					"byte budget blocks allocation before the frame count limit is reached") && ok;
+				engine->setVideoTime(&budgetVideo, 160.0f);
+				ok = check(engine->enqueueDecodedVideoFrame(&budgetVideo) &&
+					budgetVideo.videoImage.size() == 4 && budgetVideo.lastDecodedVideoTime == 160.0f,
+					"byte budget resumes without discarding the pending frame") && ok;
+				EngineBase::renderer.store(nullptr);
+				engine->setVideoTime(&budgetVideo, 200.0f);
+				engine->enqueueDecodedVideoFrame(&budgetVideo);
+				ok = check(budgetVideo.videoOutputFailed && budgetVideo.stopped &&
+					budgetVideo.videoImage.empty(), "missing renderer stops video output") && ok;
+				EngineBase::renderer.store(talkRenderer);
+			}
+		}
+		else
+		{
+			ok = check(false, "video byte budget fixture allocates a frame") && ok;
+		}
+		av_frame_free(&budgetFrame);
 		auto originalRenderTarget = make_shared_image(
 			SDL_CreateTexture(
 				talkRenderer,
@@ -1485,6 +1646,40 @@ bool runMediaRuntimeTests()
 				cachedBlue == 255,
 			"grayscale rendering restores cached texture modulation after the translucent overlay") &&
 			ok;
+		std::vector<_shared_image> temporaryGrayscaleSources;
+		std::vector<std::weak_ptr<Image_t>> temporaryGrayscaleImages;
+		bool grayscaleLifetimeFixtureReady = true;
+		for (int index = 0; index < 64; ++index)
+		{
+			auto source = grayscaleEngineBase->createImageFromPixelData(
+				reinterpret_cast<const std::uint8_t*>(&redPixel), 1, 1);
+			auto grayscale = engine->getGrayscaleImage(source);
+			grayscaleLifetimeFixtureReady =
+				grayscaleLifetimeFixtureReady && source != nullptr && grayscale != nullptr;
+			temporaryGrayscaleSources.push_back(source);
+			temporaryGrayscaleImages.push_back(grayscale);
+		}
+		ok = check(grayscaleLifetimeFixtureReady,
+			"grayscale lifetime fixture creates every source and cached texture") && ok;
+		temporaryGrayscaleSources.clear();
+		// No grayscale lookup is needed for a normal frame to reclaim the
+		// textures left behind when a scene releases its source images.
+		engine->frameBegin();
+		ok = check(std::all_of(
+			temporaryGrayscaleImages.begin(), temporaryGrayscaleImages.end(),
+			[](const std::weak_ptr<Image_t>& image) { return image.expired(); }) &&
+			grayscaleEngineBase->grayscaleImageCache.size() == 1,
+			"a normal frame releases all grayscale textures whose sources were freed") && ok;
+		ok = check(cachedGrayscaleImage != nullptr &&
+			engine->getGrayscaleImage(redImage) == cachedGrayscaleImage,
+			"grayscale collection preserves the cached texture of a live source") && ok;
+		std::weak_ptr<Image_t> releasedGrayscaleImage = cachedGrayscaleImage;
+		cachedGrayscaleImage.reset();
+		redImage.reset();
+		engine->frameBegin();
+		ok = check(releasedGrayscaleImage.expired() &&
+			grayscaleEngineBase->grayscaleImageCache.empty(),
+			"a later frame also releases the last grayscale texture without another grayscale draw") && ok;
 		ok = check(
 			SDL_SetRenderTarget(
 				talkRenderer,
@@ -2046,6 +2241,37 @@ bool runMediaRuntimeTests()
 				AV_SAMPLE_FMT_S16, 44100, 2, convertedAudio);
 			ok = check(convertedLength < 0 && convertedAudio.empty(),
 				"oversized decoded audio frame is rejected before allocation or copy") && ok;
+			av_frame_unref(audioFrame);
+			audioFrame->format = AV_SAMPLE_FMT_S16;
+			audioFrame->sample_rate = 44100;
+			audioFrame->nb_samples = 128;
+#if defined(USE_FFMPEG4)
+			codecContext->channels = 1;
+			codecContext->channel_layout = AV_CH_LAYOUT_MONO;
+			audioFrame->channels = 1;
+			audioFrame->channel_layout = AV_CH_LAYOUT_MONO;
+#else
+			av_channel_layout_uninit(&codecContext->ch_layout);
+			av_channel_layout_default(&codecContext->ch_layout, 1);
+			av_channel_layout_default(&audioFrame->ch_layout, 1);
+#endif
+			const int monoAllocated = av_frame_get_buffer(audioFrame, 0);
+			ok = check(monoAllocated >= 0, "mono video audio fixture allocates") && ok;
+			if (monoAllocated >= 0)
+			{
+				std::fill_n(reinterpret_cast<int16_t*>(audioFrame->data[0]), 128, 1000);
+				convertedLength = engine->convert(codecContext, audioFrame,
+					AV_SAMPLE_FMT_S16, 44100, 2, convertedAudio);
+				ok = check(convertedLength == 128 * 2 * sizeof(int16_t),
+					"mono video audio converts to stereo without losing its duration") && ok;
+				if (convertedLength == 128 * 2 * sizeof(int16_t))
+				{
+					int16_t channels[2] = {};
+					std::memcpy(channels, convertedAudio.data(), sizeof(channels));
+					ok = check(channels[0] > 0 && channels[0] == channels[1],
+						"mono video audio reaches both output channels") && ok;
+				}
+			}
 		}
 	}
 	av_frame_free(&audioFrame);
@@ -2057,6 +2283,10 @@ bool runMediaRuntimeTests()
 	fs::path delayedVideoPath = realPackRoot / "video" / "begin.avi";
 	if (fs::exists(delayedVideoPath))
 	{
+		SDL_Surface* videoSurface = SDL_CreateSurface(16, 16, SDL_PIXELFORMAT_ARGB8888);
+		SDL_Renderer* videoRenderer = videoSurface ? SDL_CreateSoftwareRenderer(videoSurface) : nullptr;
+		ok = check(videoRenderer != nullptr, "real video fixture creates a renderer") && ok;
+		SDL_Renderer* previousRenderer = EngineBase::renderer.exchange(videoRenderer);
 		File::setActiveResourceRoot(realPackRoot.string());
 		File::setResourceFallbackRoots({});
 		_video delayedVideo = Engine::getInstance()->loadVideo("video/begin.avi");
@@ -2064,12 +2294,23 @@ bool runMediaRuntimeTests()
 		if (delayedVideo != nullptr)
 		{
 			int decodeCalls = 0;
+			bool resumedPendingFrame = false;
 			while (!delayedVideo->videoStream.decodeEnd && decodeCalls < 2000)
 			{
+				if (delayedVideo->videoFramePending)
+				{
+					const auto decodedCount = delayedVideo->decodedVideoFrameCount;
+					engine->decodeNextVideo(delayedVideo);
+					ok = check(delayedVideo->videoFramePending &&
+						delayedVideo->decodedVideoFrameCount == decodedCount,
+						"full real-video queue retries the same frame without decoding ahead") && ok;
+					delayedVideo->videoImage.clear();
+					resumedPendingFrame = true;
+				}
 				Engine::getInstance()->decodeNextVideo(delayedVideo);
 				decodeCalls++;
 			}
-			ok = check(delayedVideo->videoStream.decodeEnd && decodeCalls < 2000,
+			ok = check(delayedVideo->videoStream.decodeEnd && decodeCalls < 2000 && resumedPendingFrame,
 				"real H.264 video reaches decoder EOF") && ok;
 			ok = check(delayedVideo->decodedVideoFrameCount > 0 &&
 				delayedVideo->drainedVideoFrameCount > 0,
@@ -2077,8 +2318,30 @@ bool runMediaRuntimeTests()
 			ok = check(delayedVideo->firstDecodedVideoTime >= 0.0f &&
 				delayedVideo->lastDecodedVideoTime >= delayedVideo->firstDecodedVideoTime,
 				"runtime normalizes best-effort frame timestamps to a monotonic media timeline") && ok;
+			engine->resetVideo(delayedVideo);
+			ok = check(!delayedVideo->videoFramePending && !delayedVideo->videoDecoderFlushed &&
+				!delayedVideo->videoOutputFailed && delayedVideo->videoImage.empty(),
+				"reset clears pending video and decoder drain state for replay") && ok;
+			engine->runVideo(delayedVideo);
+			ok = check(delayedVideo->running && !delayedVideo->stopped &&
+				!delayedVideo->videoImage.empty(), "video restarts after decoder EOF") && ok;
+			engine->pauseVideo(delayedVideo);
+			const auto pausedDecodedCount = delayedVideo->decodedVideoFrameCount;
+			const float pausedTime = engine->getVideoTime(delayedVideo);
+			SDL_Delay(20);
+			engine->updateVideo(delayedVideo);
+			ok = check(delayedVideo->decodedVideoFrameCount == pausedDecodedCount &&
+				engine->getVideoTime(delayedVideo) == pausedTime,
+				"pausing real playback freezes the clock and video decoding") && ok;
+			engine->resumeVideo(delayedVideo);
+			SDL_Delay(20);
+			ok = check(engine->getVideoTime(delayedVideo) > pausedTime,
+				"resuming real playback advances the same media clock") && ok;
 			Engine::getInstance()->freeVideo(delayedVideo);
 		}
+		EngineBase::renderer.store(previousRenderer);
+		SDL_DestroyRenderer(videoRenderer);
+		SDL_DestroySurface(videoSurface);
 	}
 	return ok;
 }

@@ -5,6 +5,9 @@
 #include "SlotGridController.h"
 #include <vector>
 
+class NPC;
+class Goods;
+
 class EquipMenu :
 	public ConfigDrivenPanel,
 	public ControllerTransferParticipant
@@ -21,6 +24,15 @@ public:
 	std::vector<std::shared_ptr<Item>> magicDisplayItem;
 	std::shared_ptr<Scrollbar> magicScrollbar = nullptr;
 	std::vector<std::shared_ptr<ImageContainer>> playerNameImages;
+	std::vector<std::shared_ptr<Button>> playerNameButtons;
+	bool openPartnerByCharacterIndex(int index);
+	bool selectPartner(const std::shared_ptr<NPC>& partner);
+	bool cycleCharacter();
+	void updateCharacterSelector(TextButton& button) const;
+	std::shared_ptr<TextButton> characterSelector;
+	std::shared_ptr<NPC> getSelectedPartner() const;
+	bool equipOnSelectedPartner(int goodsIndex, int partIndex);
+	bool unequipSelectedPartner(int partIndex);
 
 	void updateGoods();
 	void updateGoods(int index);
@@ -47,8 +59,14 @@ public:
 	int getPartIndex(const std::string & part);
 
 private:
+	std::weak_ptr<NPC> selectedPartner;
+	bool showingPartner = false;
+	bool characterSelectorFocused = false;
+	std::shared_ptr<Goods> partnerGoods[GOODS_BODY_COUNT];
+	void updateCharacterBindings();
 	bool showingAttributes = false;
 	bool tabFocused = false;
+	int focusedPlayerName = -1;
 	std::shared_ptr<CheckBox> equipmentTab;
 	std::shared_ptr<CheckBox> attributesTab;
 	void updateAttributes();
@@ -63,7 +81,9 @@ private:
 	static constexpr int EquipmentControllerPaneId = 0;
 	static constexpr int MagicControllerPaneId = 1;
 
+	virtual void onUpdate() override;
 	virtual void onEvent() override;
+	virtual void onWindowResize(int width, int height) override;
 	virtual bool onHandleUIAction(UIAction action) override;
 	void freeResource();
 	void configureControllerFocus();

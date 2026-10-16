@@ -386,8 +386,7 @@ bool Player::hasUnlimitedCheatResources() const
 
 bool Player::canPayRunThewCost() const
 {
-	return (gm != nullptr && gm->inEvent)
-		|| ignoresRunThewCost()
+	return ignoresRunThewCost()
 		|| thew >= RUN_THEW_COST;
 }
 
@@ -660,7 +659,7 @@ std::shared_ptr<Magic> Player::resolveMagicReplacement(std::shared_ptr<Magic> ma
 	return prepared;
 }
 
-bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool showMessage)
+bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool showMessage, bool scripted)
 {
 	if (magic == nullptr || level < 1 || level > MAGIC_MAX_LEVEL)
 	{
@@ -676,7 +675,7 @@ bool Player::tryConsumeMagicCost(std::shared_ptr<Magic> magic, int level, bool s
 	}
 
 	auto& levelInfo = magic->level[level];
-	const bool unlimitedResources = hasUnlimitedCheatResources();
+	const bool unlimitedResources = scripted || hasUnlimitedCheatResources();
 	if (!unlimitedResources && mana < levelInfo.manaCost)
 	{
 		if (showMessage)
@@ -1313,7 +1312,7 @@ void Player::freeResource()
 	recoveryAccumulator = 0.0f;
 }
 
-void Player::hurt(std::shared_ptr<Effect> e)
+void Player::hurt(std::shared_ptr<Effect> e, int hitRoll)
 {
 	if (nowAction == acDeath || isHiding() || e == nullptr)
 	{
@@ -1337,14 +1336,16 @@ void Player::hurt(std::shared_ptr<Effect> e)
 	int effectLevel = e->level;
 	if (effectLevel < 1) effectLevel = 1;
 	if (effectLevel > MAGIC_MAX_LEVEL) effectLevel = MAGIC_MAX_LEVEL;
-	applyEffectRuntimeStates(*e);
-	bool handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
 	const int targetEvade = getEvade();
+	if (hitRoll < 0) hitRoll = engine->getRand(99);
+	bool handledSpecialEffect = false;
+	if (isMagicAbnormalStateHit(e->evade, targetEvade, hitRoll))
+	{
+		applyEffectRuntimeStates(*e);
+		handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
+	}
 
-	const int hitRollMaximum = calculatePlayerMagicDamageHitRollMaximum(
-		e->evade, targetEvade);
-	if (isMagicDamageHitAgainstPlayer(
-		e->evade, targetEvade, engine->getRand(hitRollMaximum)))
+	if (isMagicDamageHit(e->evade, targetEvade, hitRoll))
 	{
 		if (addexp)
 		{
@@ -2231,7 +2232,7 @@ bool Player::resumeStrictQueuedInteraction()
 	return true;
 }
 
-bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
+bool Player::startMoveInternal(Point dest, bool running, bool isRetarget, bool scripted)
 {
 	const NPCActionType moveAction = running ? acRun : acWalk;
 	const bool isSameMoveAction = actionManager->isInAction(moveAction);
@@ -2314,6 +2315,7 @@ bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 		}
 		gm->partnerManager.setPartnersIsBlockingPlayer(false);
 		stepList = preservedStepList;
+		actionManager->getCurrentAction()->scripted = scripted;
 		return true;
 	}
 
@@ -2338,7 +2340,7 @@ bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 		return false;
 	}
 
-	if (running && !gm->inEvent)
+	if (running && !scripted)
 	{
 		if (!ignoresRunThewCost() && thew < RUN_THEW_COST)
 		{
@@ -2361,6 +2363,10 @@ bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 	stepList = tempList;
 	direction = getDirection(stepList[0]);
 
+	if (isSameMoveAction)
+	{
+		actionManager->getCurrentAction()->scripted = scripted;
+	}
 	if (isSameMoveAction && isRetarget)
 	{
 		actionManager->getCurrentAction()->retarget();
@@ -2374,7 +2380,7 @@ bool Player::startMoveInternal(Point dest, bool running, bool isRetarget)
 		}
 	}
 
-	actionManager->changeAction(running ? acRun : acWalk);
+	actionManager->changeAction(running ? acRun : acWalk, scripted);
 	return true;
 }
 
@@ -2512,7 +2518,7 @@ void Player::beginWalk(Point dest)
 	
 }
 
-void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
+void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target, bool scripted)
 {
 	if (!canFight || magicIndex < 0 || magicIndex >= gm->magicManager.bottomCount())
 	{
@@ -2533,10 +2539,10 @@ void Player::beginMagic(Point dest, std::shared_ptr<GameElement> target)
 		gm->showMessage("该武功不能使用");
 		return;
 	}
-	beginMagic(magicInfo, dest, target, listIndex);
+	beginMagic(magicInfo, dest, target, listIndex, scripted);
 }
 
-void Player::beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<GameElement> target, int listIndex)
+void Player::beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<GameElement> target, int listIndex, bool scripted)
 {
 	if (magicInfo.remainColdMilliseconds > 0)
 	{
@@ -2562,7 +2568,7 @@ void Player::beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<
 	if (preparedMagic->level[level].moveKind == mmkSelf
 		&& preparedMagic->level[level].specialKind == mskClearAbnormalState)
 	{
-		if (tryConsumeMagicCost(preparedMagic, level, true))
+		if (tryConsumeMagicCost(preparedMagic, level, true, scripted))
 		{
 			playSound(acMagic);
 			revealMagicInvisibilityOnAction();
@@ -2597,14 +2603,14 @@ void Player::beginMagic(const MagicInfo& magicInfo, Point dest, std::shared_ptr<
 	direction = getDirection(dest);
 	
 	auto previousAction = actionManager->getCurrentAction();
-	actionManager->changeAction(acMagic);
+	actionManager->changeAction(acMagic, scripted);
 	if (actionManager->getCurrentAction() == previousAction)
 	{
 		clearPreparedMagicAction();
 	}
 }
 
-void Player::beginJump(Point dest)
+void Player::beginJump(Point dest, bool scripted)
 {
 	const auto* currentAction = actionManager->getCurrentAction();
 	if (currentAction != nullptr && !currentAction->canTransitionTo(acJump))
@@ -2615,7 +2621,7 @@ void Player::beginJump(Point dest)
 	{
 		return;
 	}
-	if (!gm->inEvent)
+	if (!scripted)
 	{
 		if (!hasUnlimitedCheatResources() && thew < JUMP_THEW_COST)
 		{
@@ -2627,7 +2633,7 @@ void Player::beginJump(Point dest)
 	{
 		return;
 	}
-	if (!gm->inEvent && !hasUnlimitedCheatResources())
+	if (!scripted && !hasUnlimitedCheatResources())
 	{
 		thew -= JUMP_THEW_COST;
 	}
@@ -2637,10 +2643,10 @@ void Player::beginJump(Point dest)
 	stepList[0] = step;
 	direction = getDirection(stepList[0]);
 	
-	actionManager->changeAction(acJump);
+	actionManager->changeAction(acJump, scripted);
 }
 
-void Player::beginRun(Point dest)
+void Player::beginRun(Point dest, bool scripted)
 {
 	if (!canRun || !canDoAction(acRun) || immobilized || petrified)
 	{
@@ -2650,10 +2656,10 @@ void Player::beginRun(Point dest)
 	{
 		return;
 	}
-	startMoveInternal(dest, true, false);
+	startMoveInternal(dest, true, false, scripted);
 }
 
-void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
+void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target, bool scripted)
 {
 	const auto* currentAction = actionManager->getCurrentAction();
 	if (currentAction != nullptr && !currentAction->canTransitionTo(acAttack))
@@ -2664,7 +2670,7 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	{
 		return;
 	}
-	if (!hasUnlimitedCheatResources() && thew < ATTACK_THEW_COST)
+	if (!scripted && !hasUnlimitedCheatResources() && thew < ATTACK_THEW_COST)
 	{
 		gm->showMessage(THEW_LOW_MSG);
 		return;
@@ -2679,7 +2685,7 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	{
 		return;
 	}
-	if (!hasUnlimitedCheatResources())
+	if (!scripted && !hasUnlimitedCheatResources())
 	{
 		thew -= ATTACK_THEW_COST;
 	}
@@ -2689,7 +2695,7 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target)
 	magicDest = dest;
 	attackReleaseMode = (target == nullptr) ? armGroundTarget : armLockedRelease;
 	
-	actionManager->changeAction(acAttack);
+	actionManager->changeAction(acAttack, scripted);
 }
 
 void Player::beginHurt(Point dest)

@@ -1,54 +1,42 @@
 #pragma once
 
-#include <cstdint>
+#include <algorithm>
 
-// The legacy runtime intentionally uses different closed random ranges for
-// NPC and Player targets. EngineBase::getRand(maximum) includes both endpoints.
-inline std::int64_t calculateMagicDamageEvadeDifference(
-	int attackerEvade,
-	int targetEvade)
+// Damage evasion stays within 5..70 percent on the shared ratio curve.
+inline int calculateMagicDamageHitPercent(int attackerEvade, int targetEvade)
 {
-	return static_cast<std::int64_t>(targetEvade)
-		- static_cast<std::int64_t>(attackerEvade);
-}
-
-inline bool isMagicDamageHitAgainstNPC(
-	int attackerEvade,
-	int targetEvade,
-	int rollInclusive0To100)
-{
-	return static_cast<std::int64_t>(rollInclusive0To100)
-		> calculateMagicDamageEvadeDifference(attackerEvade, targetEvade);
-}
-
-inline int calculatePlayerMagicDamageHitRollMaximum(
-	int attackerEvade,
-	int targetEvade)
-{
-	std::int64_t evadeDifference = calculateMagicDamageEvadeDifference(
-		attackerEvade, targetEvade);
-	if (evadeDifference < 0)
+	attackerEvade = std::max(attackerEvade, 0);
+	targetEvade = std::max(targetEvade, 0);
+	float hitRatio = 0.1f;
+	if (targetEvade >= attackerEvade)
 	{
-		evadeDifference = 0;
+		// Equal zero evades use the equal-evade rate without dividing by zero.
+		hitRatio += targetEvade > 0
+			? static_cast<float>(attackerEvade) / static_cast<float>(targetEvade) * 0.5f
+			: 0.5f;
 	}
-	return evadeDifference < 50
-		? static_cast<int>(evadeDifference) + 50
-		: 100;
+	else
+	{
+		const float advantage = (static_cast<float>(attackerEvade)
+			- static_cast<float>(targetEvade)) / 100.0f;
+		hitRatio += 0.5f + std::min(advantage, 1.0f) * 0.4f;
+	}
+	return std::clamp(static_cast<int>(hitRatio * 100.0f), 30, 95);
 }
 
-inline bool isMagicDamageHitAgainstPlayer(
-	int attackerEvade,
-	int targetEvade,
-	int rollInclusive0ToConfiguredMaximum)
+inline bool isMagicDamageHit(int attackerEvade, int targetEvade, int rollInclusive0To99)
 {
-	std::int64_t evadeDifference = calculateMagicDamageEvadeDifference(
-		attackerEvade, targetEvade);
-	if (evadeDifference < 0)
-	{
-		evadeDifference = 0;
-	}
-	return static_cast<std::int64_t>(rollInclusive0ToConfiguredMaximum)
-		> evadeDifference;
+	return rollInclusive0To99 < calculateMagicDamageHitPercent(attackerEvade, targetEvade);
+}
+
+inline int calculateMagicAbnormalStateHitPercent(int attackerEvade, int targetEvade)
+{
+	return calculateMagicDamageHitPercent(attackerEvade, targetEvade) - 10;
+}
+
+inline bool isMagicAbnormalStateHit(int attackerEvade, int targetEvade, int rollInclusive0To99)
+{
+	return rollInclusive0To99 < calculateMagicAbnormalStateHitPercent(attackerEvade, targetEvade);
 }
 
 inline bool shouldBeginHurtActionAfterMagicDamage(

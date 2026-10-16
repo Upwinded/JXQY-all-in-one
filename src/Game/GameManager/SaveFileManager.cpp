@@ -170,7 +170,7 @@ SaveFileManager::CurrentPathScope::~CurrentPathScope()
 bool SaveFileManager::RecoverInterruptedSaveOperations()
 {
 	OperationScope operation;
-	const std::array<std::string, 9> directories =
+	const std::array<std::string, SaveSlots::Automatic + 1> directories =
 	{
 		SAVE_CURRENT_FOLDER,
 		SAVE_AUTO_FOLDER,
@@ -180,7 +180,9 @@ bool SaveFileManager::RecoverInterruptedSaveOperations()
 		convert::formatString(SAVE_FOLDER, 4),
 		convert::formatString(SAVE_FOLDER, 5),
 		convert::formatString(SAVE_FOLDER, 6),
-		convert::formatString(SAVE_FOLDER, 7)
+		convert::formatString(SAVE_FOLDER, 7),
+		convert::formatString(SAVE_FOLDER, 8),
+		convert::formatString(SAVE_FOLDER, 9)
 	};
 	bool recovered = true;
 	for (const std::string& directory : directories)
@@ -237,14 +239,14 @@ std::string SaveFileManager::calculateFolderName(int index)
 	}
 	else
 	{
-		return convert::formatString(SAVE_FOLDER, index);
+		return "save/" + SaveSlots::directoryName(index) + "/";
 	}
 }
 
 bool SaveFileManager::CopySaveFileTo(int index, const std::function<bool()>& cancellationRequested)
 {
 	OperationScope operation;
-	if (index < 1 || index > 7)
+	if (!SaveSlots::isManual(index))
 	{
 		return false;
 	}
@@ -258,6 +260,7 @@ bool SaveFileManager::CopySaveFileTo(int index, const std::function<bool()>& can
 
 bool SaveFileManager::CopySaveFileFrom(int index)
 {
+	if (index == SaveSlots::Automatic) return CopySaveFileFromAuto();
 	std::string dst = SAVE_CURRENT_FOLDER;
 	GameLog::write("SaveFileManager: load save index %d\n", index);
 	if (index == 0)
@@ -265,7 +268,7 @@ bool SaveFileManager::CopySaveFileFrom(int index)
 		return copySaveDirectory(
 			INI_SAVE_FOLDER, dst);
 	}
-	if (index < 1 || index > 7)
+	if (!SaveSlots::isManual(index))
 	{
 		return false;
 	}
@@ -294,12 +297,16 @@ bool SaveFileManager::CopySaveFileFromAuto()
 
 bool SaveFileManager::HasSaveFile(int index)
 {
+	if (index == SaveSlots::Automatic)
+	{
+		return File::fileExist(std::string(SAVE_AUTO_FOLDER) + GLOBAL_INI);
+	}
 	if (index == 0)
 	{
 		return File::fileExist(
 			std::string(INI_SAVE_FOLDER) + GLOBAL_INI);
 	}
-	if (index < 1 || index > 7)
+	if (!SaveSlots::isManual(index))
 	{
 		return false;
 	}
@@ -310,7 +317,7 @@ bool SaveFileManager::HasSaveFile(int index)
 bool SaveFileManager::ClearAllSaveData()
 {
 	bool ok = true;
-	for (int index = 1; index <= 7; index++)
+	for (int index = 1; index <= SaveSlots::ManualCount; index++)
 	{
 		const std::string folderName = convert::formatString(SAVE_FOLDER, index);
 		ok = File::clearDirectoryFiles(folderName) && ok;

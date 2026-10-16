@@ -410,7 +410,7 @@ void Title::showSceneFailureNotice(
 			std::to_string(saveIndex) + u8"）：";
 	}
 	message += failureMessage;
-	message += u8"。请保留日志以便进一步排查。";
+	message += u8"。";
 	GameLog::write("Title: %s\n", message.c_str());
 	systemNotice->showMessage(message, FailureNoticeTime);
 }

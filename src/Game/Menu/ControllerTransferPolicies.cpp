@@ -49,7 +49,8 @@ bool isMagicAddressValid(
 	case ControllerSlotDomain::MagicQuick:
 		return gameManager->magicManager.isBottomIndex(address.logicalIndex);
 	case ControllerSlotDomain::Practice:
-		return gameManager->magicManager.isPracticeIndex(address.logicalIndex);
+		return !gameManager->global.feature.practiceMenuDisabled
+			&& gameManager->magicManager.isPracticeIndex(address.logicalIndex);
 	case ControllerSlotDomain::GoodsBag:
 	case ControllerSlotDomain::GoodsQuick:
 	case ControllerSlotDomain::PlayerEquipment:
@@ -106,7 +107,7 @@ bool isPartnerGoodsAddressValid(
 		return false;
 	}
 	const std::shared_ptr<NPC> partner = currentPartner();
-	if (partner == nullptr || partner->canEquip <= 0
+	if (partner == nullptr || !partner->canChangePartnerEquipment()
 		|| !gameManager->partnerManager.isActivePartner(partner)
 		|| address.context
 			!= std::static_pointer_cast<const void>(partner))
@@ -116,7 +117,8 @@ bool isPartnerGoodsAddressValid(
 	if (address.domain == ControllerSlotDomain::PartnerBag)
 	{
 		return address.logicalIndex < gameManager->goodsManager.listLength()
-			&& gameManager->goodsManager.isStoreIndex(address.logicalIndex);
+			&& (gameManager->goodsManager.isStoreIndex(address.logicalIndex)
+				|| gameManager->goodsManager.isBottomIndex(address.logicalIndex));
 	}
 	return address.domain == ControllerSlotDomain::PartnerEquipment
 		&& address.logicalIndex < GOODS_BODY_COUNT;
@@ -194,15 +196,45 @@ ControllerTransferCoordinator::Policy createGoodsControllerTransferPolicy(
 		ControllerSlotDomain::GoodsQuick,
 		ControllerSlotDomain::PlayerEquipment
 	};
-	policy.identifySource = [gameManager](const ControllerSlotAddress& address)
+	auto currentPartner = [gameManager]() -> std::shared_ptr<NPC>
 	{
+		return gameManager && gameManager->menu && gameManager->menu->equipMenu
+			&& gameManager->menu->equipMenu->visible ? gameManager->menu->equipMenu->getSelectedPartner() : nullptr;
+	};
+	const auto partnerPolicy = createPartnerGoodsControllerTransferPolicy(gameManager, currentPartner,
+		[gameManager]() { gameManager->goodsManager.updateMenu(); });
+	auto partnerAddress = [gameManager, currentPartner](ControllerSlotAddress address)
+	{
+		address.kind = ControllerSlotKind::PartnerGoods;
+		if (address.domain == ControllerSlotDomain::PlayerEquipment)
+		{
+			address.domain = ControllerSlotDomain::PartnerEquipment;
+			address.logicalIndex = gameManager->goodsManager.equipSlot(address.logicalIndex);
+		}
+		else if (address.domain == ControllerSlotDomain::GoodsBag
+			|| address.domain == ControllerSlotDomain::GoodsQuick)
+		{
+			address.domain = ControllerSlotDomain::PartnerBag;
+			address.context = currentPartner();
+		}
+		return address;
+	};
+	policy.identifySource = [gameManager, currentPartner, partnerPolicy, partnerAddress](const ControllerSlotAddress& address)
+	{
+		if (address.domain == ControllerSlotDomain::PlayerEquipment && (currentPartner() || address.context))
+			return partnerPolicy.identifySource(partnerAddress(address));
 		return identifyGoods(gameManager, address);
 	};
-	policy.submit = [gameManager](
+	policy.submit = [gameManager, currentPartner, partnerPolicy, partnerAddress](
 		const ControllerSlotAddress& source,
 		const ControllerSlotAddress& target,
 		std::string& message)
 	{
+		if ((currentPartner() || source.context || target.context)
+			&& (source.domain == ControllerSlotDomain::PlayerEquipment || target.domain == ControllerSlotDomain::PlayerEquipment))
+		{
+			return partnerPolicy.submit(partnerAddress(source), partnerAddress(target), message);
+		}
 		if (!isGoodsAddressValid(gameManager, source)
 			|| !gameManager->goodsManager.goodsListExists(source.logicalIndex))
 		{
@@ -228,8 +260,9 @@ ControllerTransferCoordinator::Policy createGoodsControllerTransferPolicy(
 		}
 		if (source.logicalIndex != target.logicalIndex)
 		{
-			gameManager->goodsManager.exchange(
-				source.logicalIndex, target.logicalIndex);
+			if (!gameManager->goodsManager.exchange(
+				source.logicalIndex, target.logicalIndex, &message))
+				return ControllerTransferSubmitResult::Rejected;
 			gameManager->goodsManager.updateMenu();
 		}
 		return ControllerTransferSubmitResult::Completed;

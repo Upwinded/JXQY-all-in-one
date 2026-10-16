@@ -294,7 +294,7 @@ constexpr std::array<ExpectedControllerPolicy, 36>
 	{ SurfaceId::PartnerEquipment, "partner-equipment",
 		ControllerInteractionKind::FocusGraph },
 	{ SurfaceId::RpgState, "rpg.state",
-		ControllerInteractionKind::Passive },
+		ControllerInteractionKind::FocusGraph },
 	{ SurfaceId::RpgEquipment, "rpg.equipment",
 		ControllerInteractionKind::FocusGraph },
 	{ SurfaceId::RpgPractice, "rpg.practice",
@@ -482,10 +482,10 @@ bool testAllSurfaceClassifications()
 	}
 
 	const std::array<std::size_t, 4> expectedKindCounts =
-		{ 20, 6, 8, 2 };
+		{ 21, 6, 7, 2 };
 	ok = checkContract(
 		kindCounts == expectedKindCounts,
-		"surface=<catalog> phase=kind-counts expected=20/6/8/2 actual="
+		"surface=<catalog> phase=kind-counts expected=21/6/7/2 actual="
 			+ std::to_string(kindCounts[0]) + "/"
 			+ std::to_string(kindCounts[1]) + "/"
 			+ std::to_string(kindCounts[2]) + "/"
@@ -1327,6 +1327,7 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 	{
 		optionCandidates.push_back("ui-theme");
 	}
+	if (GameManager::getInstance()->global.feature.automaticSave) optionCandidates.push_back("automatic-save");
 
 	std::vector<PhysicalTraversalSpec> specs;
 	// Rect half-plane checks apply to non-wrapping spatial contracts.
@@ -1484,6 +1485,7 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 			{
 				candidates.push_back({ "ui-theme", option->themeButton });
 			}
+			if (option->automaticSaveButton) candidates.push_back({ "automatic-save", option->automaticSaveButton });
 			return PhysicalFocusFixture
 			{
 				option,

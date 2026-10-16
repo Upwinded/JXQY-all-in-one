@@ -122,9 +122,8 @@ int entrySlot(const std::string& path)
 	for (int slot = 1; slot <= SavePackage::AutomaticSlot; ++slot)
 	{
 		if (path.rfind(SavePackage::slotDirectory(slot) + "/", 0) == 0) return slot;
-		if (slot != SavePackage::AutomaticSlot &&
-			(path == "shot/rpg" + std::to_string(slot) + ".png" ||
-			 path == "shot/rpg" + std::to_string(slot) + ".bmp")) return slot;
+		if (path == SaveSlots::screenshot(slot) ||
+			path == SaveSlots::screenshot(slot, ".bmp")) return slot;
 	}
 	return 0;
 }
@@ -144,8 +143,7 @@ namespace SavePackage
 {
 std::string slotDirectory(int slot)
 {
-	if (slot == AutomaticSlot) return "rpg_auto";
-	return slot >= 1 && slot <= 7 ? "rpg" + std::to_string(slot) : "";
+	return SaveSlots::directoryName(slot);
 }
 
 std::string slotLabel(int slot)
@@ -202,11 +200,10 @@ bool write(const std::filesystem::path& root, const GameIdentity& game,
 					if (fold(relative) != "list.ini") files.emplace_back(directory + "/" + relative, item.path());
 				}
 			}
-			if (selected != AutomaticSlot)
 			{
 				for (const char* extension : { ".png", ".bmp" })
 				{
-					const std::string name = "shot/rpg" + std::to_string(selected) + extension;
+					const std::string name = SaveSlots::screenshot(selected, extension);
 					if (isLink(root / "shot") || isLink(root / name))
 						return fail(error, u8"存档截图不能是链接");
 					if (std::filesystem::is_regular_file(root / name)) files.emplace_back(name, root / name);
@@ -391,10 +388,9 @@ bool importTo(const Package& package, const GameIdentity& game,
 			const int target = targetSlot == AllSlots ? slot.index : targetSlot;
 			std::filesystem::remove_all(root / slotDirectory(target));
 			std::filesystem::create_directories(root / slotDirectory(target));
-			if (target != AutomaticSlot)
 			{
 				for (const char* extension : { ".png", ".bmp" })
-					std::filesystem::remove(root / ("shot/rpg" + std::to_string(target) + extension));
+					std::filesystem::remove(root / (SaveSlots::screenshot(target, extension)));
 			}
 		}
 		for (const auto& entry : package.entries)
@@ -404,8 +400,7 @@ bool importTo(const Package& package, const GameIdentity& game,
 			std::string path;
 			if (entry.path.rfind("shot/", 0) == 0)
 			{
-				if (target == AutomaticSlot) continue;
-				path = "shot/rpg" + std::to_string(target) + entry.path.substr(entry.path.size() - 4);
+				path = SaveSlots::screenshot(target, entry.path.substr(entry.path.size() - 4).c_str());
 			}
 			else
 			{
