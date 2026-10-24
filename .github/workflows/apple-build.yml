@@ -23,7 +23,7 @@ jobs:
           - toolchain: xcode-26.5
             runner: macos-26
             developer-directory: /Applications/Xcode_26.5.app/Contents/Developer
-            macos-minimum: '10.15'
+            macos-minimum: '12.0'
             ios-minimum: '13.0'
           - toolchain: xcode-27.1
             runner: xcode-27
@@ -92,7 +92,7 @@ jobs:
             -destination 'generic/platform=macOS' \
             -derivedDataPath "$RUNNER_TEMP/apple-derived" \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/apple-packages" \
-            -onlyUsePackageVersionsFromResolvedFile -jobs 2 \
+            -onlyUsePackageVersionsFromResolvedFile -jobs 3 \
             build 'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
@@ -111,7 +111,7 @@ jobs:
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/apple-derived" \
             -clonedSourcePackagesDirPath "$RUNNER_TEMP/apple-packages" \
-            -onlyUsePackageVersionsFromResolvedFile -jobs 2 \
+            -onlyUsePackageVersionsFromResolvedFile -jobs 3 \
             build ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
