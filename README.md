@@ -131,8 +131,8 @@ macos_ios/jxqy/jxqy.xcodeproj
 
 共享 Scheme：
 
-- `jxqy macOS`：macOS 10.15+，Release 同时构建 arm64 与 x86_64；
-- `jxqy iOS`：iOS 13.0+，支持真机与模拟器。
+- `jxqy macOS`：macOS 12.0+，Release 同时构建 arm64 与 x86_64；
+- `jxqy iOS`：iOS 15.0+，支持真机与模拟器。
 
 macOS 工程会通过 Swift Package Manager 解析 Sparkle。Xcode 的构建位置应使用默认设置。Release 构建前请确认 `assets/engine/` 和 `assets/resources.ini` 已准备完整。
 

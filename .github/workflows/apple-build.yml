@@ -24,7 +24,7 @@ jobs:
             runner: macos-26
             developer-directory: /Applications/Xcode_26.5.app/Contents/Developer
             macos-minimum: '12.0'
-            ios-minimum: '13.0'
+            ios-minimum: '15.0'
           - toolchain: xcode-27.1
             runner: xcode-27
             developer-directory: /Applications/Xcode_27.1.app/Contents/Developer
