@@ -27,6 +27,7 @@
 #include <QImage>
 #include <QHash>
 #include <QRegularExpression>
+#include <QtEndian>
 
 #include <algorithm>
 #include <array>
@@ -296,6 +297,176 @@ bool isCompleteProjectMigration(const QList<AssetResourceType>& resourceTypes)
         resourceTypes.first() == AssetResourceType::All;
 }
 
+bool isLegacyContentAudioPath(const QString& relativePath)
+{
+    const QString path = lowerPathKey(relativePath);
+    return path == "content/sound" || path.startsWith("content/sound/") ||
+        path == "content/music" || path.startsWith("content/music/");
+}
+
+bool isLegacyXnbSound(const QString& relativePath)
+{
+    const QString path = lowerPathKey(relativePath);
+    return path.startsWith("content/sound/") && path.endsWith(".xnb");
+}
+
+// XNA/MonoGame SoundEffectReader stores WAVEFORMATEX, PCM, then loop/duration.
+// Other readers and compressed XNB need a decoder, rather than a byte copy.
+bool decodeLegacyXnbSound(const QString& sourcePath, QByteArray& wav, QString& error)
+{
+    wav.clear();
+    error = QStringLiteral("unsupported or malformed uncompressed Windows XNB v5 PCM sound");
+    QFile source(sourcePath);
+    constexpr qint64 maximumSoundBytes = 64 * 1024 * 1024;
+    if (!source.open(QIODevice::ReadOnly) || source.size() < 10 || source.size() > maximumSoundBytes)
+        return false;
+    const QByteArray data = source.readAll();
+    if (data.size() != source.size() || data.first(5) != QByteArray("XNBw\x05", 5))
+        return false;
+    if ((static_cast<unsigned char>(data[5]) & ~1u) != 0)
+    {
+        error = QStringLiteral("compressed or unsupported XNB flags; sound was not converted");
+        return false;
+    }
+    if (qFromLittleEndian<quint32>(data.constData() + 6) != data.size())
+        return false;
+    qsizetype position = 10;
+    auto readNumber = [&](quint32& number)
+    {
+        number = 0;
+        for (int shift = 0; shift <= 28 && position < data.size(); shift += 7)
+        {
+            const quint32 byte = static_cast<unsigned char>(data[position++]);
+            if (shift == 28 && byte > 15)
+                return false;
+            number |= (byte & 127) << shift;
+            if ((byte & 128) == 0)
+                return true;
+        }
+        return false;
+    };
+    auto readUInt32 = [&](quint32& number)
+    {
+        if (data.size() - position < 4)
+            return false;
+        number = qFromLittleEndian<quint32>(data.constData() + position);
+        position += 4;
+        return true;
+    };
+    auto readBlock = [&](quint32 length, QByteArray& block)
+    {
+        if (length > static_cast<quint32>(data.size() - position))
+            return false;
+        block = data.mid(position, length);
+        position += length;
+        return true;
+    };
+    quint32 number = 0;
+    QByteArray reader;
+    if (!readNumber(number) || number != 1 || !readNumber(number) ||
+        !readBlock(number, reader) ||
+        reader.split(',').first().trimmed() != "Microsoft.Xna.Framework.Content.SoundEffectReader" ||
+        !readUInt32(number) || number != 0 || !readNumber(number) || number != 0 ||
+        !readNumber(number) || number != 1)
+    {
+        return false;
+    }
+    QByteArray format;
+    QByteArray pcm;
+    if (!readUInt32(number) || (number != 16 && number != 18) || !readBlock(number, format) ||
+        !readUInt32(number) || !readBlock(number, pcm) || pcm.isEmpty() || data.size() - position != 12)
+    {
+        return false;
+    }
+    const quint16 tag = qFromLittleEndian<quint16>(format.constData());
+    const quint16 channels = qFromLittleEndian<quint16>(format.constData() + 2);
+    const quint32 rate = qFromLittleEndian<quint32>(format.constData() + 4);
+    const quint32 byteRate = qFromLittleEndian<quint32>(format.constData() + 8);
+    const quint16 alignment = qFromLittleEndian<quint16>(format.constData() + 12);
+    const quint16 bits = qFromLittleEndian<quint16>(format.constData() + 14);
+    if (tag != 1 || (channels != 1 && channels != 2) || (bits != 8 && bits != 16) ||
+        rate == 0 || alignment != channels * bits / 8 ||
+        static_cast<quint64>(rate) * alignment != byteRate || pcm.size() % alignment != 0 ||
+        (format.size() == 18 && qFromLittleEndian<quint16>(format.constData() + 16) != 0))
+    {
+        return false;
+    }
+    const qint32 loopStart = qFromLittleEndian<qint32>(data.constData() + position);
+    const qint32 loopLength = qFromLittleEndian<qint32>(data.constData() + position + 4);
+    const qint32 duration = qFromLittleEndian<qint32>(data.constData() + position + 8);
+    if (loopStart < 0 || loopLength < 0 || duration < 0 ||
+        static_cast<qint64>(loopStart) + loopLength > pcm.size() / alignment)
+    {
+        return false;
+    }
+    if (loopStart != 0 || (loopLength != 0 && loopLength != pcm.size() / alignment))
+    {
+        error = QStringLiteral("XNB partial sample loop requires runtime loop-range support; sound was not converted");
+        return false;
+    }
+    auto appendUInt32 = [&](quint32 value)
+    {
+        const quint32 little = qToLittleEndian(value);
+        wav.append(reinterpret_cast<const char*>(&little), sizeof(little));
+    };
+    wav.append("RIFF", 4);
+    appendUInt32(36 + pcm.size() + pcm.size() % 2);
+    wav.append("WAVEfmt ", 8);
+    appendUInt32(16);
+    wav.append(format.first(16));
+    wav.append("data", 4);
+    appendUInt32(pcm.size());
+    wav.append(pcm);
+    if (pcm.size() % 2 != 0)
+        wav.append('\0');
+    error.clear();
+    return true;
+}
+
+bool hasSamePcmWaveSamples(const QByteArray& convertedWav, const QString& sourcePath)
+{
+    QFile source(sourcePath);
+    if (!source.open(QIODevice::ReadOnly) || source.size() < 12 || source.size() > 64 * 1024 * 1024)
+        return false;
+    const QByteArray data = source.readAll();
+    if (data.size() != source.size() || data.first(4) != "RIFF" || data.mid(8, 4) != "WAVE" ||
+        qFromLittleEndian<quint32>(data.constData() + 4) != data.size() - 8)
+    {
+        return false;
+    }
+    QByteArray format;
+    QByteArray pcm;
+    qsizetype position = 12;
+    while (data.size() - position >= 8)
+    {
+        const QByteArray kind = data.mid(position, 4);
+        const quint32 length = qFromLittleEndian<quint32>(data.constData() + position + 4);
+        position += 8;
+        if (length > static_cast<quint32>(data.size() - position))
+            return false;
+        if (kind == "fmt ")
+        {
+            if (!format.isEmpty() || (length != 16 && length != 18) ||
+                (length == 18 && qFromLittleEndian<quint16>(data.constData() + position + 16) != 0))
+            {
+                return false;
+            }
+            format = data.mid(position, 16);
+        }
+        else if (kind == "data")
+        {
+            if (!pcm.isEmpty() || length == 0)
+                return false;
+            pcm = data.mid(position, length);
+        }
+        position += length + length % 2;
+    }
+    // Keep the original WAV, including cue/LIST metadata, only when every PCM
+    // format field and sample agrees with the decoded XNB.
+    return position == data.size() && format == convertedWav.mid(20, 16) &&
+        pcm == convertedWav.mid(44, qFromLittleEndian<quint32>(convertedWav.constData() + 40));
+}
+
 AssetResourceType resourceTypeForRelativePath(const QString& relativePath)
 {
     const QString path = lowerPathKey(relativePath);
@@ -309,7 +480,8 @@ AssetResourceType resourceTypeForRelativePath(const QString& relativePath)
     {
         return AssetResourceType::Images;
     }
-    if (root == QStringLiteral("music") || root == QStringLiteral("sound"))
+    if (root == QStringLiteral("music") || root == QStringLiteral("sound") ||
+        isLegacyContentAudioPath(path))
         return AssetResourceType::Audio;
     return AssetResourceType::Other;
 }
@@ -3013,18 +3185,27 @@ void applyExplicitProfileValues(
     bool titleMusicIsExplicit,
     AssetMigrationOptions& options)
 {
+    if (!options.attackReleaseFrameRatioDefined && profile.attackReleaseFrameRatioDefined)
+    {
+        options.attackReleaseFrameRatio = profile.attackReleaseFrameRatio;
+        options.attackReleaseFrameRatioDefined = true;
+    }
+    if (!options.specialAttackReleaseFrameRatioDefined && profile.specialAttackReleaseFrameRatioDefined)
+    {
+        options.specialAttackReleaseFrameRatio = profile.specialAttackReleaseFrameRatio;
+        options.specialAttackReleaseFrameRatioDefined = true;
+    }
+    if (!options.magicReleaseFrameRatioDefined && profile.magicReleaseFrameRatioDefined)
+    {
+        options.magicReleaseFrameRatio = profile.magicReleaseFrameRatio;
+        options.magicReleaseFrameRatioDefined = true;
+    }
     if (!options.defeatedNpcExperienceModeDefined &&
         profile.defeatedNpcExperienceModeDefined)
     {
         options.defeatedNpcExperienceMode =
             profile.defeatedNpcExperienceMode;
         options.defeatedNpcExperienceModeDefined = true;
-    }
-    if (!options.experienceMultiplierDefined &&
-        profile.experienceMultiplierDefined)
-    {
-        options.experienceMultiplier = profile.experienceMultiplier;
-        options.experienceMultiplierDefined = true;
     }
     if (!options.levelUpThresholdModeDefined &&
         profile.levelUpThresholdModeDefined)
@@ -3109,14 +3290,6 @@ void applyProfileDefaults(
                 ? DefeatedNpcExperienceMode::StoredExperience
                 : DefeatedNpcExperienceMode::LevelProductWithBonus);
         options.defeatedNpcExperienceModeDefined = true;
-    }
-    if (!options.experienceMultiplierDefined)
-    {
-        options.experienceMultiplier =
-            profile.experienceMultiplierDefined
-            ? profile.experienceMultiplier
-            : (fallbackType >= 0 && fallbackType <= 2 ? 3.0 : 1.0);
-        options.experienceMultiplierDefined = true;
     }
     if (!options.levelUpThresholdModeDefined)
     {
@@ -3206,10 +3379,6 @@ void applyProfileDefaults(
     {
         setFeatureDefault(options.features, feature.key(), feature.value());
     }
-    setFeatureDefault(
-        options.features,
-        QStringLiteral("MagicTriggerAtAnimationEnd"),
-        trilogy);
     setFeatureDefault(
         options.features,
         QStringLiteral("LumAsBrightness"),
@@ -3372,6 +3541,11 @@ bool isIgnoredLegacyNonRuntimeFile(const QString& filePath, const QString& relat
         path = path.mid(2);
 
     QString extension = fileInfo.suffix().toLower();
+    if (isLegacyContentAudioPath(path))
+    {
+        return !fileInfo.isDir() && !isLegacyXnbSound(path) &&
+            extension != "wav" && extension != "mp3" && extension != "ogg" && extension != "wma";
+    }
     if (extension == "exe" || extension == "dll" || extension == "pdb" || extension == "xnb")
         return true;
     if (extension == "zip" || extension == "rar" || extension == "7z")
@@ -4349,19 +4523,22 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     {
         QString sourcePath;
         QString outputPath;
+        bool directory = false;
     };
     QList<SourceOutputCandidate>
         sourceOutputCandidates;
     bool sourceProvidesModProfile = false;
     auto registerSourceOutput =
         [&](const QString& sourceRelativePath,
-            const QString& outputRelativePath)
+            const QString& outputRelativePath,
+            bool directory = false)
     {
         SourceOutputCandidate candidate;
         candidate.sourcePath =
             sourceRelativePath;
         candidate.outputPath =
             outputRelativePath;
+        candidate.directory = directory;
         sourceOutputCandidates.append(
             std::move(candidate));
     };
@@ -4397,7 +4574,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             registerSourceOutput(
                 relativePath,
                 mapOutputRelativePath(
-                    relativePath));
+                    relativePath), true);
         }
 
         for (const QString& filePath :
@@ -4473,11 +4650,69 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         }
     }
 
+    QMap<QString, QList<int>> audioOutputOwners;
+    for (int index = 0; index < sourceOutputCandidates.size(); ++index)
+        audioOutputOwners[canonicalMigrationPathKey(sourceOutputCandidates[index].outputPath)].append(index);
+    QSet<QString> redundantContentAudioSources;
+    QSet<QString> equivalentPcmContentAudioSources;
+    QSet<QString> mergedContentAudioDirectories;
+    for (const QList<int>& owners : audioOutputOwners)
+    {
+        if (owners.size() != 2)
+            continue;
+        const SourceOutputCandidate* content = &sourceOutputCandidates[owners[0]];
+        const SourceOutputCandidate* direct = &sourceOutputCandidates[owners[1]];
+        if (!isLegacyContentAudioPath(content->sourcePath))
+            std::swap(content, direct);
+        if (!isLegacyContentAudioPath(content->sourcePath) || isLegacyContentAudioPath(direct->sourcePath) ||
+            content->directory != direct->directory)
+        {
+            continue;
+        }
+        if (content->directory)
+        {
+            mergedContentAudioDirectories.insert(content->sourcePath);
+            continue;
+        }
+        const QString contentPath = appendPath(sourceRoot, content->sourcePath);
+        const QString directPath = appendPath(sourceRoot, direct->sourcePath);
+        QString contentDigest;
+        QString directDigest;
+        QByteArray convertedWav;
+        bool contentRead = false;
+        if (isLegacyXnbSound(content->sourcePath))
+        {
+            QString error;
+            contentRead = decodeLegacyXnbSound(contentPath, convertedWav, error);
+            if (contentRead)
+                contentDigest = QString::fromLatin1(QCryptographicHash::hash(convertedWav, QCryptographicHash::Sha256).toHex());
+        }
+        else
+        {
+            contentRead = calculateFileSha256(contentPath, contentDigest);
+        }
+        if (contentRead && calculateFileSha256(directPath, directDigest))
+        {
+            if (contentDigest != directDigest)
+            {
+                if (convertedWav.isEmpty() || !hasSamePcmWaveSamples(convertedWav, directPath))
+                    continue;
+                equivalentPcmContentAudioSources.insert(content->sourcePath);
+            }
+            redundantContentAudioSources.insert(content->sourcePath);
+        }
+    }
+
     QList<QPair<QString, QString>>
         sourceOutputPaths;
     for (const SourceOutputCandidate& candidate :
          sourceOutputCandidates)
     {
+        if (redundantContentAudioSources.contains(candidate.sourcePath) ||
+            mergedContentAudioDirectories.contains(candidate.sourcePath))
+        {
+            continue;
+        }
         sourceOutputPaths.append(
             qMakePair(
                 candidate.sourcePath,
@@ -5032,6 +5267,15 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         }
         QString outputRelativePath = mapOutputRelativePath(relativePath);
         QString outputPath = appendPath(outputRoot, outputRelativePath);
+        if (redundantContentAudioSources.contains(sourceRelativePath))
+        {
+            appendFileOutcome(report, sourceRelativePath, outputRelativePath, resourceType,
+                AssetMigrationFileAction::Skip,
+                equivalentPcmContentAudioSources.contains(sourceRelativePath)
+                    ? QStringLiteral("equivalent-pcm-runtime-audio") : QStringLiteral("identical-to-runtime-audio"),
+                QString::fromUtf8("音频字节或已解码 PCM 格式及采样相同，保留源目录中的运行时副本及其元数据"));
+            continue;
+        }
         QString extension = QFileInfo(filePath).suffix().toLower();
         const std::optional<LegacyImageCategory> legacyImageCategory =
             LegacyImageMigrationPolicy::classifyRelativePath(relativePath);
@@ -5066,11 +5310,26 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         resourceDomainReport.processedFiles++;
         const int previousWrittenFiles = report.writtenFiles;
         bool ok = false;
+        QString processingError;
         AssetMigrationFileAction successfulAction =
             AssetMigrationFileAction::Copy;
         QString successReason =
             QStringLiteral("raw-byte-copy");
-        if (normalizeRuntimeJpeg)
+        if (isLegacyXnbSound(relativePath))
+        {
+            successfulAction = AssetMigrationFileAction::Convert;
+            successReason = QStringLiteral("xnb-pcm-sound-to-wav");
+            QByteArray wav;
+            if (decodeLegacyXnbSound(filePath, wav, processingError) && ensureParentDirectory(outputPath))
+            {
+                QSaveFile output(outputPath);
+                output.setDirectWriteFallback(false);
+                ok = output.open(QIODevice::WriteOnly) && output.write(wav) == wav.size() && output.commit();
+                if (ok)
+                    report.writtenFiles++;
+            }
+        }
+        else if (normalizeRuntimeJpeg)
         {
             successfulAction = AssetMigrationFileAction::Convert;
             successReason = QStringLiteral("runtime-entry-jpeg-normalized");
@@ -5156,6 +5415,8 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             }
             report.errorCount++;
             appendReportLog(report, logCallback, QString::fromUtf8("错误: 转换失败 %1").arg(relativePath));
+            if (!processingError.isEmpty())
+                appendReportLog(report, logCallback, processingError);
             appendFileOutcome(
                 report,
                 sourceRelativePath,
@@ -5163,8 +5424,8 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
                 resourceType,
                 AssetMigrationFileAction::Fail,
                 QStringLiteral("processing-failed"),
-                QString::fromUtf8(
-                    "文件读取、转换或写入失败"));
+                processingError.isEmpty() ? QString::fromUtf8(
+                    "文件读取、转换或写入失败") : processingError);
         }
         else if (report.writtenFiles ==
                  previousWrittenFiles)
@@ -5245,6 +5506,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     if (completeProject)
     {
         const int previousWrittenFiles = report.writtenFiles;
+        migrateLegacyUiLayout(sourceRoot, outputRoot, uiBaseRoot, effectiveOptions, report);
         ensureChooseMenuDefinition(
             outputRoot,
             uiBaseRoot,
@@ -5969,6 +6231,16 @@ QString JxAssetMigrator::mapOutputRelativePath(const QString& relativePath) cons
     if (parts.isEmpty())
         return normalized;
 
+    if (isLegacyContentAudioPath(normalized))
+    {
+        parts.removeFirst();
+        if (isLegacyXnbSound(normalized))
+        {
+            parts.last().chop(4);
+            parts.last().append(".wav");
+        }
+    }
+
     // Preserve original directory structure: do not remap asf/ to mpc/.
     // The engine auto-detects image format from file headers, so both
     // asf/ and mpc/ paths work at runtime regardless of directory name.
@@ -6547,6 +6819,280 @@ std::string JxAssetMigrator::replacePlayMusicWavWithMp3(const std::string& conte
     return result;
 }
 
+void JxAssetMigrator::migrateLegacyUiLayout(
+    const QString& sourceDir, const QString& outputDir, const QString& uiBaseRoot,
+    const AssetMigrationOptions& options, AssetMigrationReport& report)
+{
+    // The C# edition reads UI_Settings.ini, not the bundled 640x480 window INIs.
+    // Migrate texture sizes and HUD offsets, retaining the C++ UI family's
+    // viewport anchors rather than copying the unused fixed coordinates.
+    QString settingsPath;
+    QDirIterator files(sourceDir, QDir::Files, QDirIterator::Subdirectories);
+    while (files.hasNext())
+    {
+        const QString path = files.next();
+        if (lowerPathKey(QDir(sourceDir).relativeFilePath(path)) ==
+            "content/ui/ui_settings.ini")
+        {
+            settingsPath = path;
+            break;
+        }
+    }
+    INIFileEditor settings;
+    if (!settingsPath.isEmpty())
+    {
+        const auto bytes = Util::readFileToBuffer(settingsPath.toUtf8().toStdString());
+        std::string decoded;
+        if (!convertLegacyJxTextToUtf8(std::string(bytes.begin(), bytes.end()),
+                options.sourceEncoding, decoded) || !settings.loadFromString(decoded))
+        {
+            report.errorCount++;
+            report.logLines.append(QString::fromUtf8("错误: 无法读取 C# UI 布局配置 %1").arg(settingsPath));
+            return;
+        }
+    }
+    struct WindowLayout
+    {
+        const char* directory;
+        const char* section;
+        const char* anchor;
+        int horizontalSide;
+    };
+    const WindowLayout layouts[] = {
+        {"equip", "Equip", "alLTCorner", -1},
+        {"state", "State", "alLTCorner", -1},
+        {"xiulian", "XiuLian", "alLTCorner", -1},
+        {"buysell", "BuySell", "alLTCorner", -1},
+        {"goods", "Goods", "alRTCorner", 1},
+        {"magic", "Magics", "alRTCorner", 1},
+        {"memo", "Memo", "alRTCorner", 1},
+        {"saveload", "SaveLoad", "alCenter", 0},
+        {"option", "", "alCenter", 0},
+        {"system", "System", "alCenter", 0},
+        {"littlemap", "LittleMap", "alCenter", 0},
+        {"tooltip", "ToolTip_Type1", "alTopCenter", 0},
+        {"yesno", "", "alCenter", 0},
+        {"dialog", "Dialog", "alBottomCenter", 0},
+        {"message", "Message", "alBottomCenter", 0},
+        {"bottom", "Bottom", "alBottomCenter", 0},
+        {"column", "BottomState", "alBottomCenter", 1},
+        {"top", "Top", "alTopCenter", 0},
+        {"timer", "Timer", "alRTCorner", 1}
+    };
+    for (const auto& layout : layouts)
+    {
+        if (settingsPath.isEmpty())
+            break;
+        const QString relativePath = QString("ini/ui/%1/window.ini").arg(layout.directory);
+        const QString outputPath = appendPath(outputDir, relativePath);
+        if (!QFileInfo(outputPath).isFile())
+            continue;
+        const auto windowBytes = Util::readFileToBuffer(outputPath.toUtf8().toStdString());
+        INIFileEditor window;
+        if (!window.loadFromString(std::string(windowBytes.begin(), windowBytes.end())))
+            continue;
+        if (window.hasKey("Init", "Align"))
+            continue;
+        int width = static_cast<int>(window.getInteger("Init", "Width", 0));
+        int height = static_cast<int>(window.getInteger("Init", "Height", 0));
+        // C# uses texture dimensions. In particular its practice and dialogue
+        // rectangles differ from the unused legacy window declarations.
+        QString image = QString::fromUtf8(settings.get(layout.section, "Image").c_str());
+        image.replace('\\', '/');
+        while (image.startsWith('/'))
+            image.remove(0, 1);
+        PicFileEditor picture;
+        if (!image.isEmpty() && isSafeRelativeSubdirectory(image) &&
+            picture.loadFromFile(appendPath(sourceDir, image).toUtf8().toStdString()))
+        {
+            const QImage frame = picture.getFrameImage(0);
+            if (!frame.isNull())
+            {
+                width = frame.width();
+                height = frame.height();
+            }
+        }
+        if (width <= 0 || height <= 0)
+            continue;
+        const int left = static_cast<int>(settings.getInteger(layout.section, "LeftAdjust", 0));
+        const int top = static_cast<int>(settings.getInteger(layout.section, "TopAdjust", 0));
+        const std::string anchor = layout.anchor;
+        int offsetX = left + layout.horizontalSide * (width / 2);
+        int offsetY = top;
+        if (anchor == "alLTCorner" || anchor == "alRTCorner")
+        {
+            offsetX = anchor == "alLTCorner" ? -30 : 30;
+            if (std::string(layout.directory) != "timer")
+                offsetX += left;
+        }
+        if (std::string(layout.directory) == "dialog")
+            offsetY += height; // C#: WindowHeight + TopAdjust.
+        // Native standalone windows and notices already define their intended
+        // centered/edge layout, including clearance above the quick bar.
+        const std::string directory = layout.directory;
+        if (directory == "system" || directory == "littlemap")
+            offsetY = 0;
+        INIFileEditor baseWindow;
+        if (!uiBaseRoot.isEmpty())
+            baseWindow.loadFromFile(appendPath(uiBaseRoot, relativePath).toUtf8().toStdString());
+        const bool inheritAnchor = baseWindow.hasKey("Init", "Align") &&
+            directory != "bottom" && directory != "column" &&
+            directory != "top" && directory != "dialog";
+        window.setInteger("Init", "Width", width);
+        window.setInteger("Init", "Height", height);
+        window.set("Init", "Align", inheritAnchor ? baseWindow.get("Init", "Align") : anchor);
+        window.setInteger("Init", "AlignX", inheritAnchor ? baseWindow.getInteger("Init", "AlignX", 0) : offsetX);
+        window.setInteger("Init", "AlignY", inheritAnchor ? baseWindow.getInteger("Init", "AlignY", 0) : offsetY);
+        const bool written = writeTextFileUtf8(outputPath, window.saveToString(), false, report);
+        appendFileOutcome(report, "content/ui/ui_settings.ini", relativePath,
+            AssetResourceType::Other,
+            written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+            written ? "legacy-ui-viewport-layout" : "legacy-ui-layout-write-failed",
+            QString::fromUtf8("将 C# UI 布局转换为窗口锚点"), false);
+        if (!written)
+        {
+            report.errorCount++;
+            domainReportFor(report, AssetResourceType::Other).failedFiles++;
+        }
+    }
+    if (settings.hasSection("NpcInfoShow"))
+    {
+        const int width = static_cast<int>(settings.getInteger("NpcInfoShow", "Width", 0));
+        const int height = static_cast<int>(settings.getInteger("NpcInfoShow", "Height", 0));
+        const QString relativePath = "ini/ui/npcinfo/window.ini";
+        const QString outputPath = appendPath(outputDir, relativePath);
+        INIFileEditor window;
+        if (width > 0 && height > 0 &&
+            !QFileInfo(appendPath(sourceDir, relativePath)).isFile())
+        {
+            window.setInteger("Init", "Width", width);
+            window.setInteger("Init", "Height", height);
+            window.set("Init", "Align", "alTopCenter");
+            window.setInteger("Init", "AlignX", settings.getInteger("NpcInfoShow", "LeftAdjust", 0));
+            window.setInteger("Init", "AlignY", settings.getInteger("NpcInfoShow", "TopAdjust", 50));
+            const bool written = writeTextFileUtf8(outputPath, window.saveToString(), false, report);
+            appendFileOutcome(report, "content/ui/ui_settings.ini", relativePath,
+                AssetResourceType::Other,
+                written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+                written ? "legacy-ui-viewport-layout" : "legacy-ui-layout-write-failed",
+                QString::fromUtf8("转换 C# 目标血条尺寸与顶部偏移"), false);
+            if (!written)
+            {
+                report.errorCount++;
+                domainReportFor(report, AssetResourceType::Other).failedFiles++;
+            }
+        }
+    }
+    const QString titleWindowPath = "ini/ui/title/window.ini";
+    const QString titleWindowOutput = appendPath(outputDir, titleWindowPath);
+    INIFileEditor titleWindow;
+    const bool titleWindowLoaded = titleWindow.loadFromFile(titleWindowOutput.toUtf8().toStdString());
+    if (titleWindowLoaded && titleWindow.hasKey("Init", "Align"))
+    {
+        return;
+    }
+    if (titleWindowLoaded &&
+        titleWindow.getBoolean("Init", "ScaleChildren", true) &&
+        (!titleWindow.hasKey("Init", "Stretch") || titleWindow.getBoolean("Init", "Stretch")) &&
+        titleWindow.getInteger("Init", "Width", 0) > 0 && titleWindow.getInteger("Init", "Height", 0) > 0)
+    {
+        QString image = QString::fromUtf8(titleWindow.get("Init", "Image", titleWindow.get("Init", "Bitmap")).c_str());
+        image.replace('\\', '/');
+        while (image.startsWith('/'))
+            image.remove(0, 1);
+        PicFileEditor picture;
+        if (!image.isEmpty() && isSafeRelativeSubdirectory(image) &&
+            (picture.loadFromFile(appendPath(outputDir, image).toUtf8().toStdString()) ||
+                picture.loadFromFile(appendPath(sourceDir, image).toUtf8().toStdString()) ||
+                (!uiBaseRoot.isEmpty() && picture.loadFromFile(appendPath(uiBaseRoot, image).toUtf8().toStdString()))))
+        {
+            // A legacy title's viewport anchor is required even when it has no
+            // C# settings file. Otherwise child scaling still uses a fixed window.
+            titleWindow.set("Init", "Align", "alClient");
+            for (const char* key : {"AlignX", "AlignY"})
+            {
+                if (!titleWindow.hasKey("Init", key))
+                    titleWindow.setInteger("Init", key, 0);
+            }
+            titleWindow.setBoolean("Init", "Stretch", true);
+            if (!titleWindow.hasKey("Init", "KeepAspect"))
+                titleWindow.setBoolean("Init", "KeepAspect", true);
+            const bool written = writeTextFileUtf8(titleWindowOutput, titleWindow.saveToString(), false, report);
+            appendFileOutcome(report, titleWindowPath, titleWindowPath, AssetResourceType::Other,
+                written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+                written ? "legacy-title-window-layout" : "legacy-title-window-layout-write-failed",
+                QString::fromUtf8("补齐旧标题背景与按钮共用的窗口缩放锚点"), false);
+            if (!written)
+            {
+                report.errorCount++;
+                domainReportFor(report, AssetResourceType::Other).failedFiles++;
+            }
+        }
+    }
+    const QPair<const char*, const char*> titleButtons[] = {
+        {"initbtn", "Title_Btn_Begin"}, {"loadbtn", "Title_Btn_Load"},
+        {"teambtn", "Title_Btn_Team"}, {"exitbtn", "Title_Btn_Exit"}
+    };
+    for (const auto& item : titleButtons)
+    {
+        const bool hasSettings = settings.hasSection(item.second);
+        if (!hasSettings && !titleWindow.getBoolean("Init", "ScaleChildren", true))
+            continue;
+        const QString relativePath = QString("ini/ui/title/%1.ini").arg(item.first);
+        const QString outputPath = appendPath(outputDir, relativePath);
+        INIFileEditor button;
+        if (!button.loadFromFile(outputPath.toUtf8().toStdString()) ||
+            button.hasKey("Init", "Align") ||
+            button.hasKey("Init", "Stretch"))
+            continue;
+        int width = static_cast<int>(settings.getInteger(item.second, "Width", button.getInteger("Init", "Width", 0)));
+        int height = static_cast<int>(settings.getInteger(item.second, "Height", button.getInteger("Init", "Height", 0)));
+        QString image = QString::fromUtf8(settings.get(item.second, "Image", button.get("Init", "Image")).c_str());
+        image.replace('\\', '/');
+        while (image.startsWith('/'))
+            image.remove(0, 1);
+        PicFileEditor picture;
+        if (image.isEmpty() || !isSafeRelativeSubdirectory(image))
+            continue;
+        const bool imageLoaded = picture.loadFromFile(appendPath(sourceDir, image).toUtf8().toStdString()) ||
+            (!uiBaseRoot.isEmpty() && picture.loadFromFile(appendPath(uiBaseRoot, image).toUtf8().toStdString()));
+        if (imageLoaded)
+        {
+            const QImage frame = picture.getFrameImage(0);
+            if (!frame.isNull())
+            {
+                width = frame.width();
+                height = frame.height();
+            }
+        }
+        else if (!hasSettings)
+            continue;
+        if (width <= 0 || height <= 0)
+            continue;
+        // C# draws the texture at its native size. Make the hit rectangle use
+        // that same size, then let both follow the title's uniform transform.
+        if (hasSettings)
+        {
+            button.setInteger("Init", "Left", settings.getInteger(item.second, "Left", 0));
+            button.setInteger("Init", "Top", settings.getInteger(item.second, "Top", 0));
+        }
+        button.setInteger("Init", "Width", width);
+        button.setInteger("Init", "Height", height);
+        button.setBoolean("Init", "Stretch", true);
+        const bool written = writeTextFileUtf8(outputPath, button.saveToString(), false, report);
+        appendFileOutcome(report, hasSettings ? "content/ui/ui_settings.ini" : relativePath, relativePath,
+            AssetResourceType::Other,
+            written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+            written ? "legacy-title-button-layout" : "legacy-title-button-layout-write-failed",
+            QString::fromUtf8("将标题按钮图像与点击区域置于同一缩放布局"), false);
+        if (!written)
+        {
+            report.errorCount++;
+            domainReportFor(report, AssetResourceType::Other).failedFiles++;
+        }
+    }
+}
+
 void JxAssetMigrator::ensureChooseMenuDefinition(
     const QString& outputDir,
     const QString& uiBaseRoot,
@@ -6677,9 +7223,6 @@ bool JxAssetMigrator::writeModProfileFile(const QString& outputDir, const AssetM
         options.defeatedNpcExperienceMode;
     profile.defeatedNpcExperienceModeDefined =
         options.defeatedNpcExperienceModeDefined;
-    profile.experienceMultiplier = options.experienceMultiplier;
-    profile.experienceMultiplierDefined =
-        options.experienceMultiplierDefined;
     profile.levelUpThresholdMode = options.levelUpThresholdMode;
     profile.levelUpThresholdModeDefined =
         options.levelUpThresholdModeDefined;
@@ -6690,6 +7233,12 @@ bool JxAssetMigrator::writeModProfileFile(const QString& outputDir, const AssetM
     profile.partnerFollowRunRadiusDefined =
         options.partnerFollowRunRadiusDefined;
     profile.minimumMagicDamage = options.minimumMagicDamage;
+    profile.attackReleaseFrameRatio = options.attackReleaseFrameRatio;
+    profile.attackReleaseFrameRatioDefined = options.attackReleaseFrameRatioDefined;
+    profile.specialAttackReleaseFrameRatio = options.specialAttackReleaseFrameRatio;
+    profile.specialAttackReleaseFrameRatioDefined = options.specialAttackReleaseFrameRatioDefined;
+    profile.magicReleaseFrameRatio = options.magicReleaseFrameRatio;
+    profile.magicReleaseFrameRatioDefined = options.magicReleaseFrameRatioDefined;
     profile.minimumMagicDamageDefined = true;
     profile.magicEffectCalculationMode =
         options.magicEffectCalculationMode;
@@ -6805,7 +7354,8 @@ void JxAssetMigrator::scanUnsupportedScriptApis(const std::string& convertedCont
     for (const QString& call : calls)
     {
         if (ScriptConverter::isSupportedRuntimeApi(call.toStdString()) ||
-            call == "if" || call == "goto" || call == "return")
+            call == "if" || call == "goto" || call == "return" ||
+            call == "and" || call == "or" || call == "not")
             continue;
         QString item = QString("%1: %2").arg(call, sourcePath);
         if (!existing.contains(item))

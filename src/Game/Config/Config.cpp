@@ -15,6 +15,7 @@ bool Config::loadAsync = true;
 bool Config::externalResourcesEnabled = false;
 bool Config::useQingyuUi = false;
 bool Config::automaticSaveEnabled = false;
+int Config::experienceMultiplier = 2;
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
 float Config::gameSpeed = SPEED_TIME_DEFAULT;
@@ -64,6 +65,8 @@ void Config::load()
 	externalResourcesEnabled = ini.GetBoolean("game", "externalresources", externalResourcesEnabled);
 	useQingyuUi = ini.GetBoolean("game", "qingyuui", false);
 	automaticSaveEnabled = ini.GetBoolean("game", "automaticsave", false);
+	const std::string multiplier = ini.Get("game", "experiencemultiplier", "2");
+	experienceMultiplier = multiplier == "1" ? 1 : multiplier == "3" ? 3 : 2;
 
 	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
 	gameSpeed = convSpeedTofloat(speed);
@@ -104,6 +107,11 @@ void Config::save()
 	ini.SetBoolean("game", "externalresources", externalResourcesEnabled);
 	ini.SetBoolean("game", "qingyuui", useQingyuUi);
 	ini.SetBoolean("game", "automaticsave", automaticSaveEnabled);
+	if (experienceMultiplier < 1 || experienceMultiplier > 3)
+	{
+		experienceMultiplier = 2;
+	}
+	ini.SetInteger("game", "experiencemultiplier", experienceMultiplier);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();
 	//ini.SetReal("game", "speed", gameSpeed);

@@ -5,8 +5,9 @@
 
 namespace SaveVersionCompatibility
 {
-inline bool validateEngineVersion(const std::string& version, bool initialTemplate,
-	std::string& failureMessage)
+// Callers use EngineVersion when a legacy save has no MinimumReaderVersion.
+inline bool validateEngineVersion(const std::string& version,
+	const std::string& minimumReaderVersion, bool initialTemplate, std::string& failureMessage)
 {
 	failureMessage.clear();
 	const auto saved = ModRelease::parseSemanticVersion(version);
@@ -29,9 +30,20 @@ inline bool validateEngineVersion(const std::string& version, bool initialTempla
 			: u8"抱歉，之前有严重bug，旧存档不兼容，需要重开，请谅解！";
 		return false;
 	}
-	if (ModRelease::compareSemanticVersionPrecedence(saved.version, current.version) > 0)
+	const auto reader = ModRelease::parseSemanticVersion(minimumReaderVersion);
+	if (!reader.succeeded())
 	{
-		failureMessage = u8"存档由更高版本引擎创建，请更新程序后重试";
+		failureMessage = u8"存档最低读取引擎版本格式错误";
+		return false;
+	}
+	if (ModRelease::compareSemanticVersionPrecedence(reader.version, saved.version) > 0)
+	{
+		failureMessage = u8"存档最低读取引擎版本高于保存引擎版本";
+		return false;
+	}
+	if (ModRelease::compareSemanticVersionPrecedence(reader.version, current.version) > 0)
+	{
+		failureMessage = u8"存档要求更高版本引擎（最低 " + minimumReaderVersion + u8"），请更新程序后重试";
 		return false;
 	}
 	return true;

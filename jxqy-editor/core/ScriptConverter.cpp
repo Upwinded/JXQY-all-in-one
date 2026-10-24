@@ -721,6 +721,10 @@ void normalizeLegacyOutputArguments(const std::string& lowerName, std::vector<st
     {
         args[2] = outputLiteral;
     }
+    else if (lowerName == "showminigame" && args.size() == 5 && outputVariableNameLiteral(args[4], outputLiteral))
+    {
+        args[4] = outputLiteral;
+    }
     else if ((lowerName == "getplayermagiclevel" || lowerName == "getplayerstate") &&
              args.size() >= 2 && outputVariableNameLiteral(args[1], outputLiteral))
     {
@@ -894,7 +898,7 @@ const std::set<std::string>& knownRuntimeScriptApis()
         "addrandgoods", "addrandmoney", "addtalent", "addthew", "addthewmax",
         "addtomemo", "assign", "beginrain", "buygoods", "buygoodsonly",
         "changeasfcolor", "changeflyini", "changeflyini2", "changelife", "changemana",
-        "changemapcolor", "changethew", "checkfreegoodsspace", "checkfreemagicspace",
+        "changemapcolor", "changemapcolorplus", "changenpcres", "changethew", "checkfreegoodsspace", "checkfreemagicspace",
         "checkyear", "choose", "chooseex", "choosemultiple", "chooseplus",
         "clearallsave", "clearallvar", "clearbody", "cleareffect", "cleargoods",
         "clearmagic", "clearmemo", "closebox", "closetimelimit", "closewatereffect",
@@ -918,10 +922,10 @@ const std::set<std::string>& knownRuntimeScriptApis()
         "loadgame", "loadgoods", "loadgoodssnapshot", "loadmap", "loadnpc", "loadobj",
         "loadonenpc", "loadplayer", "loadplayersnapshot", "memo", "mergenpc",
         "movemagic", "movescreen", "movescreenex", "npcattack", "npcgoto",
-        "npcgotodir", "npcgotoex", "npcspecialaction", "npcspecialactionex",
-        "npcusemagic", "openbox", "openobj", "opentimelimit", "openwatereffect",
+        "npcgotodir", "npcgotoex", "npcrunto", "npcspecialaction", "npcspecialactionex",
+        "npcusemagic", "openbox", "openobj", "openpaper", "opentimelimit", "openwatereffect",
         "petrifymillisecond", "playeraddemotion", "playeraddjustice", "playerchange",
-        "playergoto", "playergotodir", "playergotoex", "playerjumpto", "playerrunto",
+        "playergoto", "playergotodir", "playergotodirex", "playergotoex", "playerjumpto", "playerrunto",
         "playerruntoex", "playmovie", "playmusic", "playrandommusic", "playsound",
         "poisonmillisecond", "printf", "randrun", "returntotitle",
         "runobjrightscript", "runobjscript", "runparallelscript", "runscript",
@@ -934,7 +938,7 @@ const std::set<std::string>& knownRuntimeScriptApis()
         "setmaptime", "setmaptrap", "setmoneynum", "setnpcaction",
         "setnpcactionfile", "setnpcactiontype", "setnpcaienabled", "setnpcclickscript",
         "setnpcdeathscript", "setnpcdestination", "setnpcdir", "setnpckind",
-        "setnpclevel", "setnpcmagicfile", "setnpcmagiclevel",
+        "setnpclevel", "setnpclevelequalplayer", "setnpcmagicfile", "setnpcmagiclevel",
         "setnpcmagictousewhenbeattacked", "setnpcpartner", "setnpcpos",
         "setnpcrelation", "setnpcres", "setnpcscript", "setnpcstate",
         "setnpctalkcontent", "setobjkind", "setobjofs", "setobjpos", "setobjscript",
@@ -942,7 +946,7 @@ const std::set<std::string>& knownRuntimeScriptApis()
         "setplayermagictousewhenbeattacked", "setplayerpos", "setplayerscn",
         "setplayerstate", "setrunenabled", "setsaveenabled", "setshowmappos",
         "setsignaltiphidden", "settimescript", "settrap", "setwalkisrun",
-        "showbottomwnd", "showdicegame", "showfishgame", "showgamble",
+        "showbottomwnd", "showdicegame", "showfishgame", "showgamble", "showminigame",
         "showgivegoodswin", "showinterface", "showmessage", "showmousecursor", "shownpc",
         "showrain", "showrandomsnow", "showsignaltip", "showsnow", "showstealwin",
         "showsystemmsg", "showtalk", "sleep", "stopmovie", "stopmusic", "stopsound",
@@ -985,6 +989,7 @@ struct StatementContinuationState
 {
     bool inString = false;
     bool escaped = false;
+    int parenthesisDepth = 0;
 };
 
 StatementContinuationState scanStatementContinuation(const std::string& text)
@@ -1012,6 +1017,10 @@ StatementContinuationState scanStatementContinuation(const std::string& text)
             continue;
         if (ch == '/' && i + 1 < text.size() && text[i + 1] == '/')
             break;
+        if (ch == '(')
+            ++state.parenthesisDepth;
+        else if (ch == ')')
+            --state.parenthesisDepth;
     }
     return state;
 }
@@ -1559,6 +1568,73 @@ std::string ScriptConverter::convertLegacyConditionToLua(const std::string& cond
     };
 
     std::string compact = removeSpaces(condition);
+    std::vector<std::pair<std::string, std::string>> logicalTerms;
+    size_t operandStart = 0;
+    size_t outerGroupEnd = std::string::npos;
+    int depth = 0;
+    bool inString = false;
+    bool escaped = false;
+    for (size_t i = 0; i < compact.size(); ++i)
+    {
+        const char character = compact[i];
+        if (escaped)
+        {
+            escaped = false;
+            continue;
+        }
+        if (inString && character == '\\')
+        {
+            escaped = true;
+            continue;
+        }
+        if (character == '"')
+        {
+            inString = !inString;
+            continue;
+        }
+        if (inString)
+            continue;
+        if (character == '(')
+            ++depth;
+        else if (character == ')')
+        {
+            if (--depth < 0)
+                return "";
+            if (depth == 0 && outerGroupEnd == std::string::npos)
+                outerGroupEnd = i;
+        }
+        else if (depth == 0 && (compact.compare(i, 2, "&&") == 0 || compact.compare(i, 2, "||") == 0))
+        {
+            logicalTerms.emplace_back(compact.substr(operandStart, i - operandStart),
+                                      character == '&' ? " and " : " or ");
+            ++i;
+            operandStart = i + 1;
+        }
+    }
+    if (inString || depth != 0 || compact.empty())
+        return "";
+
+    if (!logicalTerms.empty())
+    {
+        std::string result = convertLegacyConditionToLua(compact.substr(operandStart));
+        for (auto term = logicalTerms.rbegin(); term != logicalTerms.rend(); ++term)
+        {
+            const std::string left = convertLegacyConditionToLua(term->first);
+            if (left.empty() || result.empty())
+                return "";
+            // MG evaluates each parenthesized level by popping operators from the right.
+            result = "(" + left + term->second + result + ")";
+        }
+        return result;
+    }
+    if (compact.front() == '(' && outerGroupEnd == compact.size() - 1)
+    {
+        const std::string inner = convertLegacyConditionToLua(compact.substr(1, compact.size() - 2));
+        return inner.empty() ? "" : "(" + inner + ")";
+    }
+    if (compact == "true" || compact == "false")
+        return compact;
+
     for (const auto& op : operators)
     {
         size_t opPos = findOperatorOutsideStrings(compact, op);
@@ -1660,6 +1736,8 @@ std::string ScriptConverter::convertCommand(const std::string& line)
     code = normalizeLegacyPunctuationOutsideStrings(code);
 
     std::string compact = removeSpaces(code);
+    if (!compact.empty() && compact.find_first_not_of(';') == std::string::npos)
+        return comment;
     compact = repairMissingCloseParenAfterNumericUnderscore(compact);
     compact = repairProductionFunctionCallTypos(compact);
     std::string lower = toLowerAscii(compact);
@@ -1793,19 +1871,37 @@ std::string ScriptConverter::convertScript(const std::string& scriptContent)
         std::string line = str[i];
         StatementContinuationState continuation = scanStatementContinuation(line);
         const std::string trimmedFirstLine = trimCopy(line);
-        const bool joinMultilineString = continuation.inString &&
-            !(trimmedFirstLine.size() >= 2 &&
+        const bool joinMultilineString = !(trimmedFirstLine.size() >= 2 &&
               trimmedFirstLine.compare(trimmedFirstLine.size() - 2, 2, ");") == 0);
         size_t joinedLines = 0;
-        while (joinMultilineString && continuation.inString &&
-               i + 1 < str.size() && joinedLines < 100)
+        std::vector<std::string> continuationComments;
+        while (i + 1 < str.size() && joinedLines < 100)
         {
+            const bool insideString = joinMultilineString && continuation.inString;
+            if (!insideString)
+            {
+                if (continuation.inString || continuation.parenthesisDepth <= 0)
+                    break;
+                const size_t commentStart = findLineCommentStart(line);
+                const std::string code = trimCopy(line.substr(0, commentStart));
+                const std::string nextLine = trimCopy(str[i + 1]);
+                if (code.empty() ||
+                    (code.back() != '(' && code.back() != ',' &&
+                     (nextLine.empty() || (nextLine.front() != ')' && nextLine.front() != ','))))
+                {
+                    break;
+                }
+                if (commentStart != std::string::npos)
+                    continuationComments.push_back("--" + line.substr(commentStart + 2));
+                line = code;
+            }
             ++i;
             ++joinedLines;
-            line += "\\n";
+            line += insideString ? "\\n" : " ";
             line += trimCopy(str[i]);
             continuation = scanStatementContinuation(line);
         }
+        convertedLines.insert(convertedLines.end(), continuationComments.begin(), continuationComments.end());
         std::string converted = convertCommand(line);
         if (converted.find(scriptReturnGotoStatement()) != std::string::npos)
             usesReturnLabel = true;

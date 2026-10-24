@@ -12,11 +12,14 @@ public:
 	virtual ~NpcInfoPanel();
 
 private:
+	friend class GamepadEssentialUITestAccess;
+
 	virtual void onDraw() override;
 
 	void drawLifeBar(NPC* npc, int screenCenterX, int topY);
 
-	static constexpr int BAR_WIDTH = 140;
-	static constexpr int BAR_HEIGHT = 18;
-	static constexpr int BAR_TOP_ADJUST = 4;
+	int lifeBarWidth = 140;
+	int lifeBarHeight = 18;
+	int lifeBarLeftAdjust = 0;
+	int lifeBarTopAdjust = 50;
 };

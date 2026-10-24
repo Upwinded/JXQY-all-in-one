@@ -477,73 +477,6 @@ def is_path_contained_by_root(root: Path, candidate: Path) -> bool:
         return False
 
 
-def media_file_stem(name: str) -> str:
-    return Path(name).stem
-
-
-def media_file_suffix(name: str) -> str:
-    return Path(name).suffix.lower()
-
-
-def stable_resource_alias_prefix(stem: str) -> str:
-    chars: list[str] = []
-    has_digit = False
-    for char in stem:
-        if ord(char) >= 0x80:
-            break
-        if char.isalnum() or char in {"-", "_"}:
-            chars.append(char.lower())
-            has_digit = has_digit or char.isdigit()
-            continue
-        break
-    while chars and chars[-1] in {"-", "_"}:
-        chars.pop()
-    prefix = "".join(chars)
-    if not has_digit or len(prefix) < 3:
-        return ""
-    return prefix
-
-
-def ascii_icon_suffix(stem: str) -> bool:
-    return bool(stem) and ord(stem[-1]) < 0x80 and stem[-1].lower() == "s"
-
-
-def find_unique_resource_alias(parent: Path, name: str) -> Path | None:
-    if not parent.exists() or not parent.is_dir():
-        return None
-    suffix = media_file_suffix(name)
-    if suffix not in {".asf", ".mpc", ".shd", ".png"}:
-        return None
-    stem = media_file_stem(name)
-    prefix = stable_resource_alias_prefix(stem)
-    if not prefix:
-        return None
-    wants_icon_suffix = ascii_icon_suffix(stem)
-    matches: list[Path] = []
-    for child in parent.iterdir():
-        if not child.is_file():
-            continue
-        if child.name.lower() == name.lower():
-            continue
-        if media_file_suffix(child.name) != suffix:
-            continue
-        child_stem = media_file_stem(child.name)
-        if ascii_icon_suffix(child_stem) != wants_icon_suffix:
-            continue
-        if stable_resource_alias_prefix(child_stem) == prefix:
-            matches.append(child)
-    if len(matches) == 1:
-        return matches[0]
-    return None
-
-
-def is_image_package_relative_path(relative_path: Path) -> bool:
-    if not relative_path.parts:
-        return False
-    first_part = relative_path.parts[0].lower()
-    return first_part == "asf" or first_part == "mpc"
-
-
 def exact_path_status(root: Path, relative_path: Path) -> tuple[bool, bool, Path]:
     current = root
     exact = True
@@ -551,10 +484,6 @@ def exact_path_status(root: Path, relative_path: Path) -> tuple[bool, bool, Path
     for index, part in enumerate(parts):
         actual = find_child_case_insensitive(current, part)
         if actual is None:
-            if index == len(parts) - 1 and is_image_package_relative_path(relative_path):
-                alias = find_unique_resource_alias(current, part)
-                if alias is not None and is_path_contained_by_root(root, alias):
-                    return True, False, alias
             return False, exact, current / part
         if actual.name != part:
             exact = False

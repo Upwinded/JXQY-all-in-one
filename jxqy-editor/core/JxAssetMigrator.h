@@ -40,11 +40,15 @@ struct AssetMigrationOptions
     MagicEffectCalculationMode magicEffectCalculationMode =
         MagicEffectCalculationMode::ReplaceAttack;
     bool magicEffectCalculationModeDefined = false;
+    ActionReleaseFrameRatio attackReleaseFrameRatio{2, 3};
+    bool attackReleaseFrameRatioDefined = false;
+    ActionReleaseFrameRatio specialAttackReleaseFrameRatio{1, 3};
+    bool specialAttackReleaseFrameRatioDefined = false;
+    ActionReleaseFrameRatio magicReleaseFrameRatio{4, 5};
+    bool magicReleaseFrameRatioDefined = false;
     DefeatedNpcExperienceMode defeatedNpcExperienceMode =
         DefeatedNpcExperienceMode::StoredExperience;
     bool defeatedNpcExperienceModeDefined = false;
-    double experienceMultiplier = 3.0;
-    bool experienceMultiplierDefined = false;
     LevelUpThresholdMode levelUpThresholdMode =
         LevelUpThresholdMode::GreaterThanOrEqual;
     bool levelUpThresholdModeDefined = false;
@@ -248,6 +252,8 @@ private:
         AssetMigrationReport& report);
     void ensureChooseMenuDefinition(const QString& outputDir, const QString& uiBaseRoot,
         AssetMigrationReport& report);
+    void migrateLegacyUiLayout(const QString& sourceDir, const QString& outputDir, const QString& uiBaseRoot,
+        const AssetMigrationOptions& options, AssetMigrationReport& report);
     void convertTalkDatToTalkIndex(const QString& inputDir, const QString& outputDir,
         const AssetMigrationOptions& options, AssetMigrationReport& report, const LogCallback& logCallback);
     void scanUnsupportedScriptApis(const std::string& convertedContent, const QString& sourcePath, AssetMigrationReport& report) const;

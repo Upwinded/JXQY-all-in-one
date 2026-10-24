@@ -287,6 +287,98 @@ bool testUtf8TextLayout()
 	return ok;
 }
 
+int measureProportionalTestText(const std::string& text)
+{
+	if (text == "AV")
+	{
+		return 10;
+	}
+	int width = 0;
+	for (unsigned char character : text)
+	{
+		if ((character & 0xC0) == 0x80)
+		{
+			continue;
+		}
+		width += character >= 0x80 ? 12 : character == 'W' ? 10 : character == 'i' ? 2 : 6;
+	}
+	return width;
+}
+
+bool testMeasuredTextLayout()
+{
+	bool ok = true;
+	ok = check(TextLayout::wrapUtf8Text("WiWi", 14, measureProportionalTestText)
+		== std::vector<std::string>({ "Wi", "Wi" }),
+		"pixel wrapping uses proportional ASCII glyph widths") && ok;
+	ok = check(TextLayout::wrapUtf8Text("11111", 17, measureProportionalTestText)
+		== std::vector<std::string>({ "11", "11", "1" }),
+		"numeric lines fit the measured pixel width") && ok;
+	ok = check(TextLayout::wrapUtf8Text(u8"甲1乙", 18, measureProportionalTestText)
+		== std::vector<std::string>({ u8"甲1", u8"乙" }),
+		"pixel wrapping preserves UTF-8 characters and mixed-width text") && ok;
+	ok = check(TextLayout::wrapUtf8Text("AV", 10, measureProportionalTestText)
+		== std::vector<std::string>({ "AV" }),
+		"whole-run measurement preserves kerning instead of summing isolated glyphs") && ok;
+	ok = check(TextLayout::wrapUtf8Text("A\n\nB<enter>C\r\nD", 20, measureProportionalTestText)
+		== std::vector<std::string>({ "A", "", "B", "C", "D" }),
+		"measured wrapping retains explicit breaks and blank lines") && ok;
+	ok = check(TextLayout::wrapUtf8Text("W", 2, measureProportionalTestText)
+		== std::vector<std::string>({ "W" })
+		&& TextLayout::wrapUtf8Text("", 20, measureProportionalTestText).empty(),
+		"oversized glyphs make progress without adding empty lines") && ok;
+
+	constexpr unsigned int defaultColor = 0xCC102030;
+	const auto colored = TextLayout::wrapColorTaggedUtf8Text(
+		"A<color=Red>V", 10, defaultColor, measureProportionalTestText);
+	ok = check(colored.size() == 2 && colored[0].size() == 1 && colored[1].size() == 1
+		&& colored[0][0].text == "A" && colored[0][0].color == defaultColor
+		&& colored[1][0].text == "V" && colored[1][0].color == 0xCCFF0000,
+		"different color runs measure separately just as their textures are composed") && ok;
+	const auto sameColor = TextLayout::wrapColorTaggedUtf8Text(
+		"<color=Red>A<color=Red>V", 10, defaultColor, measureProportionalTestText);
+	ok = check(sameColor.size() == 1 && sameColor[0].size() == 1 && sameColor[0][0].text == "AV",
+		"adjacent equal colors retain whole-run measurement") && ok;
+	const auto multiline = TextLayout::wrapColorTaggedUtf8Text(
+		"<color=Red>WW<enter><color=Default>ii", 12, defaultColor, measureProportionalTestText);
+	ok = check(multiline.size() == 3 && multiline[0][0].text == "W" && multiline[1][0].text == "W"
+		&& multiline[1][0].color == 0xCCFF0000 && multiline[2][0].text == "ii"
+		&& multiline[2][0].color == defaultColor,
+		"measured color wrapping carries colors across lines and restores the default") && ok;
+	return ok;
+}
+
+bool testMeasuredChoiceLayout()
+{
+	ChooseMenuLayoutInput input = makeJxqy2Input(1280, 720);
+	input.measureText = [](const std::string& text, int size)
+	{
+		return std::make_pair(measureProportionalTestText(text), size + 4);
+	};
+	input.message = std::string(55, 'W');
+	input.visibleItems = { { 0, std::string(55, 'W') } };
+	const auto layout = calculateChooseMenuLayout(input);
+	bool ok = check(layout.message.height >= 44 && layout.pageItems.size() == 1
+		&& layout.pageItems[0].rect.height >= 50,
+		"choice prompt and options reserve measured wrap count and actual font height")
+		&& checkAllRectanglesWithinViewport(layout, 1280, 720,
+			"measured choice layout keeps controls inside the viewport");
+	input = makeYycsInput(640, 480);
+	input.anchorPanelToPreferredTop = true;
+	input.compactDialogAlignedTwoChoice = true;
+	input.message = "A";
+	input.visibleItems = { { 0, "A" }, { 1, "B" } };
+	input.measureText = [](const std::string& text, int size)
+	{
+		return std::make_pair(measureProportionalTestText(text), size + 8);
+	};
+	const auto tallFontLayout = calculateChooseMenuLayout(input);
+	ok = check(tallFontLayout.message.height >= 26 && tallFontLayout.pageItems.size() == 2
+		&& tallFontLayout.pageItems[0].rect.height >= 32,
+		"native compact choices expand when actual glyph height exceeds the INI row") && ok;
+	return ok;
+}
+
 bool testDesktopLayout()
 {
 	bool ok = true;
@@ -505,6 +597,8 @@ int main()
 {
 	bool ok = true;
 	ok = testUtf8TextLayout() && ok;
+	ok = testMeasuredTextLayout() && ok;
+	ok = testMeasuredChoiceLayout() && ok;
 	ok = testYycsDialogAlignedChoice() && ok;
 	ok = testYuchenTalentInsets() && ok;
 	ok = testDesktopLayout() && ok;

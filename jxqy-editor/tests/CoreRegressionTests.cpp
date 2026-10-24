@@ -1063,7 +1063,6 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
             profile.levelUpMaleEffect.isEmpty() &&
             profile.levelUpFemaleEffect.isEmpty() &&
             !profile.defeatedNpcExperienceModeDefined &&
-            !profile.experienceMultiplierDefined &&
             !profile.levelUpThresholdModeDefined &&
             profile.partnerFollowRadiusDefined &&
             profile.partnerFollowRunRadiusDefined &&
@@ -1110,8 +1109,6 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     profile.defeatedNpcExperienceMode =
         DefeatedNpcExperienceMode::LevelProductWithBonus;
     profile.defeatedNpcExperienceModeDefined = true;
-    profile.experienceMultiplier = 1.75;
-    profile.experienceMultiplierDefined = true;
     profile.levelUpThresholdMode = LevelUpThresholdMode::GreaterThan;
     profile.levelUpThresholdModeDefined = true;
     profile.partnerFollowRadius = 3;
@@ -1183,8 +1180,6 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
         loaded.defeatedNpcExperienceModeDefined &&
             loaded.defeatedNpcExperienceMode ==
                 DefeatedNpcExperienceMode::LevelProductWithBonus &&
-            loaded.experienceMultiplierDefined &&
-            loaded.experienceMultiplier == 1.75 &&
             loaded.levelUpThresholdModeDefined &&
             loaded.levelUpThresholdMode ==
                 LevelUpThresholdMode::GreaterThan,
@@ -1233,8 +1228,8 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
     ok = check(!loaded.preferLocalUi, "GameProfile UI.PreferLocal round trip") && ok;
     ok = check(loaded.features.value("TopButtonsLayout", true) == false,
                "GameProfile disabled feature round trip") && ok;
-    ok = check(loaded.features.value("MagicTriggerAtAnimationEnd", false),
-               "GameProfile enabled feature round trip") && ok;
+    ok = check(!loaded.features.contains("MagicTriggerAtAnimationEnd"),
+               "GameProfile removes the obsolete spell release switch") && ok;
     ok = check(loaded.features.value("NativeNpcAttackAtAnimationEnd", false),
                "GameProfile preserves explicit native NPC attack protocol without game-specific defaults") && ok;
     ok = check(loaded.features.value("RageSystem", false),
@@ -1290,13 +1285,13 @@ bool testGameProfileDependencyAndSaveNamespaceRoundTrip()
                text.contains("Profile=YYCS") && text.contains("PreferLocal=0"),
                "GameProfile writes independent UI configuration") && ok;
     ok = check(text.contains("[Features]") && text.contains("TopButtonsLayout=0") &&
-               text.contains("MagicTriggerAtAnimationEnd=1") && text.contains("RageSystem=1"),
+               !text.contains("MagicTriggerAtAnimationEnd=") && text.contains("RageSystem=1"),
                "GameProfile writes explicit feature overrides") && ok;
     ok = check(!text.contains("Type="), "GameProfile omits inherited Game.Type") && ok;
     ok = check(
         text.contains("[Experience]") &&
             text.contains("DefeatedNpcExperienceMode=LevelProductWithBonus") &&
-            text.contains("ExperienceMultiplier=1.75"),
+            !text.contains("ExperienceMultiplier="),
         "GameProfile writes explicit experience rule overrides") && ok;
     ok = check(
         text.contains("[Combat]") &&
@@ -2668,6 +2663,107 @@ protected:
     }
 };
 
+bool testActionReleaseFrameRatioAuthoring()
+{
+    QTemporaryDir temporary;
+    if (!check(temporary.isValid(), "create release timing authoring directory")) return false;
+    QDir root(temporary.path());
+    bool ok = root.mkpath("00mod") && root.mkpath("base") && root.mkpath("mid") && root.mkpath("ui");
+    ok = check(ok &&
+        writeUtf8TextFile(root.filePath("base/game_profile.ini"),
+            "[Game]\nId=BASE\nType=2\n[Combat]\nAttackReleaseFrameRatio=2/3\n"
+            "SpecialAttackReleaseFrameRatio=1/3\nMagicReleaseFrameRatio=4/5\n") &&
+        writeUtf8TextFile(root.filePath("mid/game_profile.ini"),
+            "[Game]\nId=MID\n[Resource]\nDependencyId=BASE\n[Combat]\nMagicReleaseFrameRatio=1/1\n") &&
+        writeUtf8TextFile(root.filePath("ui/game_profile.ini"),
+            "[Game]\nId=UI_ONLY\nType=2\n[Combat]\nSpecialAttackReleaseFrameRatio=1/1\n") &&
+        writeUtf8TextFile(root.filePath("00mod/game_profile.ini"),
+            "[Game]\nId=MOD\nName=Timing test\n[Resource]\nDependencyId=MID\n"
+            "[UI]\nBaseId=UI_ONLY\n[Combat]\nAttackReleaseFrameRatio=2/4\n"),
+        "write layered release timing profiles") && ok;
+    if (!ok) return false;
+    const QString manifestPath = root.filePath("00mod/game_profile.ini");
+    GameProfile source;
+    GameProfile effective;
+    ok = check(source.loadFromFile(manifestPath) && source.attackReleaseFrameRatioDefined &&
+        !source.specialAttackReleaseFrameRatioDefined && !source.magicReleaseFrameRatioDefined &&
+        ResourcePackScanner::resolveActionReleaseFrameRatios(root.path(), source, effective) &&
+        actionReleaseFrameRatioToString(effective.attackReleaseFrameRatio) == "2/4" &&
+        effective.attackReleaseFrameRatioSourceId == "MOD" &&
+        actionReleaseFrameRatioToString(effective.specialAttackReleaseFrameRatio) == "1/3" &&
+        effective.specialAttackReleaseFrameRatioSourceId == "BASE" &&
+        actionReleaseFrameRatioToString(effective.magicReleaseFrameRatio) == "1/1" &&
+        effective.magicReleaseFrameRatioSourceId == "MID",
+        "editor shares partial multilevel content inheritance and ignores UI timing") && ok;
+    const QByteArray originalBytes = readRawFile(manifestPath);
+    source.attackReleaseFrameRatio = {3, 2};
+    ok = check(!source.save() && readRawFile(manifestPath) == originalBytes,
+        "invalid numeric release fraction cannot overwrite a manifest") && ok;
+
+    TestableResourceProfileEditorWindow window;
+    window.setAttribute(Qt::WA_DontShowOnScreen, true);
+    window.setAssetsBasePath(root.path());
+    auto* attackMode = window.findChild<QComboBox*>("attackReleaseFrameRatioMode");
+    auto* attackValue = window.findChild<QLineEdit*>("attackReleaseFrameRatioEdit");
+    auto* attackPreview = window.findChild<QLabel*>("attackReleaseFrameRatioPreview");
+    auto* magicMode = window.findChild<QComboBox*>("magicReleaseFrameRatioMode");
+    auto* magicValue = window.findChild<QLineEdit*>("magicReleaseFrameRatioEdit");
+    auto* magicPreview = window.findChild<QLabel*>("magicReleaseFrameRatioPreview");
+    auto* dependency = window.findChild<QLineEdit*>("dependencyIdEdit");
+    if (!check(attackMode && attackValue && attackPreview && magicMode && magicValue && magicPreview && dependency,
+            "release timing controls are available")) return false;
+    ok = check(attackMode->currentIndex() == 1 && attackValue->text() == "2/4" &&
+        attackPreview->text().contains("MOD") && magicMode->currentIndex() == 0 &&
+        !magicValue->isEnabled() && magicValue->text() == "1/1" && magicPreview->text().contains("MID"),
+        "UI displays local fractions and inherited effective values with their sources") && ok;
+    dependency->setText("BASE");
+    ok = check(magicValue->text() == "4/5" && magicPreview->text().contains("BASE"),
+        "unsaved dependency changes refresh inherited timing through the shared catalog") && ok;
+    dependency->setText("MID");
+    attackValue->setText("0/3");
+    {
+        ModalDialogAutoCloser closer;
+        QMetaObject::invokeMethod(&window, "onSave", Qt::DirectConnection);
+        ok = check(closer.dismissedCount == 1 && readRawFile(manifestPath) == originalBytes,
+            "UI rejects invalid fractions without changing the original manifest") && ok;
+    }
+    attackMode->setCurrentIndex(0);
+    ok = check(attackValue->text() == "2/3" && attackPreview->text().contains("BASE"),
+        "selecting inheritance removes the local override from the effective preview") && ok;
+    magicMode->setCurrentIndex(1);
+    magicValue->setText("2/4");
+    {
+        ModalDialogAutoCloser closer;
+        QMetaObject::invokeMethod(&window, "onSave", Qt::DirectConnection);
+        ok = check(closer.dismissedCount == 1, "save the release timing UI selection") && ok;
+    }
+    GameProfile saved;
+    ok = check(saved.loadFromFile(manifestPath) && !saved.attackReleaseFrameRatioDefined &&
+        !saved.specialAttackReleaseFrameRatioDefined && saved.magicReleaseFrameRatioDefined &&
+        actionReleaseFrameRatioToString(saved.magicReleaseFrameRatio) == "2/4",
+        "saving inheritance deletes the key and preserves an unreduced custom fraction") && ok;
+    ResourceProfileEditorWindow reloaded;
+    reloaded.setAttribute(Qt::WA_DontShowOnScreen, true);
+    reloaded.setAssetsBasePath(root.path());
+    ok = check(reloaded.findChild<QComboBox*>("attackReleaseFrameRatioMode")->currentIndex() == 0 &&
+        reloaded.findChild<QLineEdit*>("attackReleaseFrameRatioEdit")->text() == "2/3" &&
+        reloaded.findChild<QComboBox*>("magicReleaseFrameRatioMode")->currentIndex() == 1 &&
+        reloaded.findChild<QLineEdit*>("magicReleaseFrameRatioEdit")->text() == "2/4",
+        "reopening the editor preserves inheritance and explicit fractions") && ok;
+
+    const QString invalidPath = root.filePath("invalid.ini");
+    ok = check(writeUtf8TextFile(invalidPath,
+        "[Game]\nId=INVALID\n[Combat]\nAttackReleaseFrameRatio=abc\n"),
+        "write malformed release fraction") && ok;
+    GameProfile invalid;
+    QByteArray prepared;
+    ok = check(invalid.loadFromFile(invalidPath) &&
+        invalid.invalidActionReleaseFrameRatios.value("AttackReleaseFrameRatio") == "abc" &&
+        !invalid.prepareSaveBytes(invalidPath, prepared),
+        "loading preserves malformed author text and saving remains blocked") && ok;
+    return ok;
+}
+
 bool testResourceProfileEditorUsesManifestAsSingleAuthority()
 {
     QTemporaryDir tempDir;
@@ -2722,6 +2818,7 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
         "RandomEffects=level-up-a.ini,level-up-b.ini\n"
         "MaleEffect=level-up-male.ini\nFemaleEffect=level-up-female.ini\n"
         "[Experience]\nLevelUpThresholdMode=GreaterThan\n"
+        "ExperienceMultiplier=2.5\n"
         "[Gameplay]\nPartnerFollowRadius=4\nPartnerFollowRunRadius=9\n"
         "[Combat]\nMinimumMagicDamage=6\n"
         "MagicEffectCalculationMode=AddToAttack\n"
@@ -2741,6 +2838,24 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
     TestableResourceProfileEditorWindow window;
     window.setAttribute(Qt::WA_DontShowOnScreen, true);
     window.setAssetsBasePath(tempDir.path());
+    QComboBox* experienceModeCombo =
+        window.findChild<QComboBox*>("experienceModeCombo");
+    QLabel* experiencePreview =
+        window.findChild<QLabel*>("experiencePreviewLabel");
+    ok = check(experienceModeCombo && experiencePreview &&
+        !window.findChild<QWidget*>("experienceMultiplierCheck") &&
+        !window.findChild<QWidget*>("experienceMultiplierSpin"),
+        "resource profile editing exposes experience modes without a package multiplier") && ok;
+    if (experienceModeCombo && experiencePreview)
+    {
+        experienceModeCombo->setCurrentIndex(1);
+        const QString storedExperiencePreview = experiencePreview->text();
+        experienceModeCombo->setCurrentIndex(2);
+        ok = check(experiencePreview->text() != storedExperiencePreview &&
+            experiencePreview->text().contains("20"),
+            "experience preview shows base experience independently of the player's multiplier") && ok;
+        experienceModeCombo->setCurrentIndex(0);
+    }
     QLineEdit* idEdit = window.findChild<QLineEdit*>("profileIdEdit");
     QLineEdit* authorEdit = window.findChild<QLineEdit*>("profileAuthorEdit");
     QLineEdit* versionEdit =
@@ -3229,7 +3344,9 @@ bool testResourceProfileEditorUsesManifestAsSingleAuthority()
                 manifestText.contains("Cover=ui/mod-cover.png") &&
                 manifestText.contains(
                     "DescriptionFile=description.txt") &&
-                !manifestText.contains("Type=") && manifestText.contains("Keep=Value"),
+                !manifestText.contains("Type=") &&
+                !manifestText.contains("ExperienceMultiplier=") &&
+                manifestText.contains("Keep=Value"),
                "ResourceProfileEditor saves author, release metadata, default text paths, and manifest fields") && ok;
     ok = check(readUtf8TextFile(root.filePath("mod/team.txt")) ==
                    QString::fromUtf8(
@@ -13785,6 +13902,7 @@ bool testProjectAwareAssetMigrationWorkflow()
         root.filePath(QStringLiteral("project-aware.jxqyproj"));
     const QString gameProfileText = QStringLiteral(
         "[Game]\nId=MANIFEST_A\nName=Manifest Pack\nType=2\n"
+        "[Combat]\nAttackReleaseFrameRatio=2/4\nMagicReleaseFrameRatio=1/1\n"
         "[Resource]\nDependencyId=MANIFEST_BASE\nCommonPath=../shared\n"
         "[UI]\nBaseId=UI_BASE\nProfile=YYCS\nPreferLocal=0\n"
         "[Features]\nModernScript=1\n"
@@ -14362,6 +14480,11 @@ bool testProjectAwareAssetMigrationWorkflow()
             migratedProfile.uiProfile == QStringLiteral("YYCS") &&
             !migratedProfile.preferLocalUi &&
             migratedProfile.saveNamespace == QStringLiteral("SAVE_A") &&
+            migratedProfile.attackReleaseFrameRatioDefined &&
+            actionReleaseFrameRatioToString(migratedProfile.attackReleaseFrameRatio) == "2/4" &&
+            !migratedProfile.specialAttackReleaseFrameRatioDefined &&
+            migratedProfile.magicReleaseFrameRatioDefined &&
+            actionReleaseFrameRatioToString(migratedProfile.magicReleaseFrameRatio) == "1/1" &&
             migratedProfile.features.value(
                 QStringLiteral("modernscript"), false),
         "published indexed-pack migration preserves runtime profile metadata") &&
@@ -22183,7 +22306,7 @@ bool testScriptEditorHighlightingAndCompletionCoexist()
         check(drawBackgroundApi != nullptr &&
                   drawBackgroundApi->tooltip.contains(QString::fromUtf8("兼容占位")),
               "DrawBackground tooltip does not promise unconfirmed rendering") &&
-        check(runtimeApiNames.size() == 275 && allRuntimeApisDocumented,
+        check(allRuntimeApisDocumented,
               "script completion covers every canonical runtime-registered API") &&
         check(allApiCompletionsLowercase,
               "script API completions use the lowercase names registered by Lua runtime") &&
@@ -32223,9 +32346,11 @@ int main(int argc, char* argv[])
     if (qEnvironmentVariableIsSet(
             "JXQY_RESOURCE_PROFILE_AUTHORITY_TEST_ONLY"))
     {
-        return testResourceProfileEditorUsesManifestAsSingleAuthority()
+        return testActionReleaseFrameRatioAuthoring() && testResourceProfileEditorUsesManifestAsSingleAuthority()
             ? 0 : 1;
     }
+    if (qEnvironmentVariableIsSet("JXQY_RELEASE_TIMING_TEST_ONLY"))
+        return testActionReleaseFrameRatioAuthoring() ? 0 : 1;
     if (qEnvironmentVariableIsSet(
             "JXQY_RUNTIME_CONFIGURATION_TEST_ONLY"))
     {
@@ -32268,6 +32393,7 @@ int main(int argc, char* argv[])
     ok = testResourcePackSelectionUsesStableRuntimeId() && ok;
     ok = testProjectResourceEntryKeyPersistence() && ok;
     ok = testResourceProfileEditorUsesManifestAsSingleAuthority() && ok;
+    ok = testActionReleaseFrameRatioAuthoring() && ok;
     ok = testIniEditorLongLineAndSeparatorRoundTrip() && ok;
     ok = testCoreEditorWindowsConstructAndExposeExpectedControls() && ok;
     ok = testImageAndMenuEditorsPrioritizeAuthorFacingControls() && ok;

@@ -49,6 +49,8 @@ int main()
 		"unconfigured resources keep their existing NPC attack protocol") && ok;
 	ok = check(!global.feature.restorePartnerAttributes,
 		"unconfigured resources do not restore character attributes onto NPCs") && ok;
+	ok = check(global.feature.useThewWhenNormalRun,
+		"unconfigured resources retain their normal running stamina cost") && ok;
 
 	ResourceManifest yycsUi;
 	yycsUi.uiProfile = "YYCS";
@@ -57,10 +59,12 @@ int main()
 		global.feature.extendedInventoryLayout &&
 		global.feature.menuResourceProfile == mrpYycs,
 		"UI.Profile applies a coherent YYCS layout bundle") && ok;
-	ok = check(!global.feature.magicTriggerAtAnimationEnd && global.feature.lumAsBrightness,
-		"UI.Profile does not replace JXQY2 gameplay and rendering behavior defaults") && ok;
+	ok = check(global.feature.lumAsBrightness,
+		"UI.Profile does not replace rendering behavior defaults") && ok;
 	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,
 		"the YYCS layout does not enable a native combat protocol for dependent MODs") && ok;
+	ok = check(global.feature.useThewWhenNormalRun,
+		"the UI layout does not change normal running stamina rules") && ok;
 
 	const std::string overrideText =
 		"[Game]\n"
@@ -75,6 +79,7 @@ int main()
 		"MagicTriggerAtAnimationEnd=1\n"
 		"NativeNpcAttackAtAnimationEnd=1\n"
 		"RestorePartnerAttributes=1\n"
+		"UseThewWhenNormalRun=0\n"
 		"RageSystem=1\n"
 		"SeparateTalentSlots=1\n"
 		"MagicLevelLimitFromDefinition=1\n";
@@ -84,12 +89,14 @@ int main()
 	global.applyResourceManifestFeatures(explicitOverrides);
 	ok = check(!global.feature.topButtonsLayout,
 		"explicit disabled feature overrides UI.Profile default") && ok;
-	ok = check(global.feature.magicTriggerAtAnimationEnd,
-		"explicit enabled feature overrides the universal default") && ok;
+	ok = check(actionReleaseFrameRatioToString(global.magicReleaseFrameRatio) == "4/5",
+		"the obsolete magic timing feature does not change release ratios") && ok;
 	ok = check(global.feature.nativeNpcAttackAtAnimationEnd,
 		"the native NPC attack protocol is explicitly enabled through the generic feature parser") && ok;
 	ok = check(global.feature.restorePartnerAttributes,
 		"partner attribute restoration is enabled only by its explicit feature") && ok;
+	ok = check(!global.feature.useThewWhenNormalRun,
+		"the generic feature parser can disable normal running stamina costs") && ok;
 	ok = check(global.feature.rageSystem,
 		"explicit manifest feature enables the MG-only rage system") && ok;
 	ok = check(global.feature.separateTalentSlots,
@@ -103,11 +110,12 @@ int main()
 	independentBehavior.uiProfile = "JXQY2";
 	independentBehavior.partnerFollowRadius = 2;
 	independentBehavior.partnerFollowRadiusDefined = true;
-	independentBehavior.features["magictriggeratanimationend"] = true;
 	independentBehavior.features["lumasbrightness"] = false;
 	global.applyResourceManifestFeatures(independentBehavior);
 	ok = check(!global.feature.restorePartnerAttributes,
 		"switching resources resets partner restoration independently of UI layout") && ok;
+	ok = check(global.feature.useThewWhenNormalRun,
+		"switching resources restores the default running stamina rule") && ok;
 	ok = check(!global.feature.separateTalentSlots,
 		"switching resources does not leak the talent capacity into another game") && ok;
 	ok = check(!global.feature.nativeNpcAttackAtAnimationEnd,
@@ -115,8 +123,7 @@ int main()
 	ok = check(!global.feature.topButtonsLayout &&
 		global.feature.menuResourceProfile == mrpDefault,
 		"JXQY2 UI.Profile selects only the JXQY2 layout bundle") && ok;
-	ok = check(global.feature.magicTriggerAtAnimationEnd &&
-		!global.feature.lumAsBrightness &&
+	ok = check(!global.feature.lumAsBrightness &&
 		global.partnerFollowRadius == 2,
 		"explicit gameplay behavior remains independent from UI.Profile") && ok;
 
@@ -139,17 +146,11 @@ int main()
 	jxqy2Experience.type = GAME_JXQY2;
 	ok = check(
 		calculateDefeatedNpcBaseExperience(
-			jxqy2Experience, 4, 5, 100, 99) == 100 &&
-		roundAutomaticExperience(scaleAutomaticExperience(
-			100,
-			jxqy2Experience.resolvedExperienceMultiplier())) == 300,
-		"JXQY2 defaults to stored NPC.Exp with multiplier 3.0") && ok;
+			jxqy2Experience, 4, 5, 100, 99) == 100,
+		"JXQY2 defaults to stored NPC.Exp as the base reward") && ok;
 	ok = check(
 		calculateDefeatedNpcBaseExperience(
 			jxqy2Experience, 9, 7, 0, 0, true) == 63 &&
-		roundAutomaticExperience(scaleAutomaticExperience(
-			63,
-			jxqy2Experience.resolvedExperienceMultiplier())) == 189 &&
 		calculateDefeatedNpcBaseExperience(
 			jxqy2Experience, 9, 8, 0, 0, true) == 72 &&
 		calculateDefeatedNpcBaseExperience(
@@ -181,17 +182,11 @@ int main()
 	yycsExperience.type = GAME_YYCS;
 	const int yycsBase = calculateDefeatedNpcBaseExperience(
 		yycsExperience, 4, 5, 100, 0);
-	ok = check(yycsBase == 20 &&
-		roundAutomaticExperience(scaleAutomaticExperience(
-			yycsBase,
-			yycsExperience.resolvedExperienceMultiplier())) == 60,
-		"YYCS defaults to level product plus bonus with multiplier 3.0") && ok;
+	ok = check(yycsBase == 20,
+		"YYCS defaults to level product plus bonus as the base reward") && ok;
 	ok = check(
 		calculateDefeatedNpcBaseExperience(
-			yycsExperience, 4, 12, 100, 10) == 58 &&
-		roundAutomaticExperience(scaleAutomaticExperience(
-			58,
-			yycsExperience.resolvedExperienceMultiplier())) == 174,
+			yycsExperience, 4, 12, 100, 10) == 58,
 		"YYCS experience bonus is added after the recipient and defeated levels") && ok;
 	ok = check(
 		calculateDefeatedNpcBaseExperience(
@@ -204,17 +199,22 @@ int main()
 	xjxqyExperience.type = GAME_XJXQY;
 	ok = check(
 		xjxqyExperience.resolvedDefeatedNpcExperienceMode() ==
-			DefeatedNpcExperienceMode::LevelProductWithBonus &&
-		xjxqyExperience.resolvedExperienceMultiplier() == 3.0,
-		"XJXQY defaults to the new formula with multiplier 3.0") && ok;
+			DefeatedNpcExperienceMode::LevelProductWithBonus,
+		"XJXQY defaults to the level-product formula") && ok;
 
 	ResourceManifest customExperience;
 	customExperience.type = GAME_CUSTOM;
 	ok = check(
 		customExperience.resolvedDefeatedNpcExperienceMode() ==
-			DefeatedNpcExperienceMode::LevelProductWithBonus &&
-		customExperience.resolvedExperienceMultiplier() == 1.0,
-		"Type 3 defaults to the new formula with multiplier 1.0") && ok;
+			DefeatedNpcExperienceMode::LevelProductWithBonus,
+		"Type 3 defaults to the level-product formula") && ok;
+	for (int multiplier : { 1, 2, 3 })
+	{
+		ok = check(roundAutomaticExperience(scaleAutomaticExperience(100, multiplier)) == 100 * multiplier &&
+			roundAutomaticExperience(scaleAutomaticExperience(63, multiplier)) == 63 * multiplier &&
+			roundAutomaticExperience(scaleAutomaticExperience(58, multiplier)) == 58 * multiplier,
+			"each player multiplier scales stored, fallback and level-product rewards once") && ok;
+	}
 	ok = check(
 		floorAutomaticExperience(scaleAutomaticExperience(20, 3.0), 0.25) == 15 &&
 		floorAutomaticExperience(scaleAutomaticExperience(20, 3.0), 0.4) == 24,
@@ -224,17 +224,15 @@ int main()
 		"[Game]\nId=MOD\nType=0\n\n"
 		"[Resource]\nTextEncodingConverted=1\n\n"
 		"[Experience]\n"
-		"DefeatedNpcExperienceMode=LevelProductWithBonus\n"
-		"ExperienceMultiplier=1.5\n";
+		"DefeatedNpcExperienceMode=LevelProductWithBonus\n";
 	ResourceManifest explicitExperience;
 	ok = check(explicitExperience.loadFromBuffer(
 		explicitExperienceText.c_str(),
 		static_cast<int>(explicitExperienceText.size())) &&
 		explicitExperience.resolvedDefeatedNpcExperienceMode() ==
 			DefeatedNpcExperienceMode::LevelProductWithBonus &&
-		explicitExperience.resolvedExperienceMultiplier() == 1.5 &&
 		explicitExperience.textEncodingConverted,
-		"a Type 0 MOD can explicitly opt into independently configurable new experience rules") && ok;
+		"a Type 0 MOD can explicitly opt into the level-product experience formula") && ok;
 
 	const std::string combatText =
 		"[Game]\nId=COMBAT_TEST\nType=0\n\n"
@@ -250,6 +248,67 @@ int main()
 		combatManifest.resolvedMagicEffectCalculationMode() ==
 			MagicEffectCalculationMode::AddToAttack,
 		"minimum magic damage parses from resource-wide combat configuration") && ok;
+	ActionReleaseFrameRatio parsedRatio{ 7, 9 };
+	for (const std::string& invalid : { "", "2", "0/3", "1/0", "-1/3", "3/2",
+		"1/2/3", "1.0/2", "1/2x", "2147483648/2147483648", "+1/2" })
+	{
+		ok = check(!tryParseActionReleaseFrameRatio(invalid, parsedRatio)
+			&& parsedRatio.numerator == 7 && parsedRatio.denominator == 9,
+			"invalid release ratios are rejected without changing the output: " + invalid) && ok;
+	}
+	ok = check(tryParseActionReleaseFrameRatio(" 2 / 4 ", parsedRatio)
+		&& actionReleaseFrameRatioToString(parsedRatio) == "2/4",
+		"release ratios retain their unreduced integer frame calculation") && ok;
+	ok = check(tryParseActionReleaseFrameRatio("2147483647/2147483647", parsedRatio)
+		&& parsedRatio.numerator == 2147483647 && parsedRatio.denominator == 2147483647,
+		"release ratios accept positive int boundaries") && ok;
+	const std::string releaseText =
+		"[Game]\nId=RELEASE_TEST\nType=0\n"
+		"[Combat]\nAttackReleaseFrameRatio=2/4\n"
+		"SpecialAttackReleaseFrameRatio=1/1\nMagicReleaseFrameRatio=3/7\n";
+	ResourceManifest releaseManifest;
+	ok = check(releaseManifest.loadFromBuffer(releaseText.c_str(), static_cast<int>(releaseText.size()))
+		&& releaseManifest.attackReleaseFrameRatioDefined
+		&& releaseManifest.specialAttackReleaseFrameRatioDefined
+		&& releaseManifest.magicReleaseFrameRatioDefined
+		&& actionReleaseFrameRatioToString(releaseManifest.attackReleaseFrameRatio) == "2/4"
+		&& actionReleaseFrameRatioToString(releaseManifest.specialAttackReleaseFrameRatio) == "1/1"
+		&& actionReleaseFrameRatioToString(releaseManifest.magicReleaseFrameRatio) == "3/7"
+		&& releaseManifest.attackReleaseFrameRatioSourceId == "RELEASE_TEST"
+		&& releaseManifest.specialAttackReleaseFrameRatioSourceId == "RELEASE_TEST"
+		&& releaseManifest.magicReleaseFrameRatioSourceId == "RELEASE_TEST",
+		"each explicit release ratio retains its independent value and local source") && ok;
+	global.applyResourceManifestFeatures(releaseManifest);
+	ok = check(actionReleaseFrameRatioToString(global.attackReleaseFrameRatio) == "2/4"
+		&& actionReleaseFrameRatioToString(global.specialAttackReleaseFrameRatio) == "1/1"
+		&& actionReleaseFrameRatioToString(global.magicReleaseFrameRatio) == "3/7",
+		"runtime installs the three effective resource release ratios") && ok;
+	global.applyResourceManifestFeatures(defaultManifest);
+	ok = check(actionReleaseFrameRatioToString(global.attackReleaseFrameRatio) == "2/3"
+		&& actionReleaseFrameRatioToString(global.specialAttackReleaseFrameRatio) == "1/3"
+		&& actionReleaseFrameRatioToString(global.magicReleaseFrameRatio) == "4/5",
+		"switching resources clears all previously installed release ratios") && ok;
+	const std::string missingReleaseText = "[Game]\nId=NO_RELEASE\nType=2\n";
+	ok = check(releaseManifest.loadFromBuffer(missingReleaseText.c_str(), static_cast<int>(missingReleaseText.size()))
+		&& !releaseManifest.attackReleaseFrameRatioDefined
+		&& !releaseManifest.specialAttackReleaseFrameRatioDefined
+		&& !releaseManifest.magicReleaseFrameRatioDefined
+		&& releaseManifest.attackReleaseFrameRatioSourceId.empty()
+		&& releaseManifest.specialAttackReleaseFrameRatioSourceId.empty()
+		&& releaseManifest.magicReleaseFrameRatioSourceId.empty()
+		&& actionReleaseFrameRatioToString(releaseManifest.attackReleaseFrameRatio) == "2/3"
+		&& actionReleaseFrameRatioToString(releaseManifest.specialAttackReleaseFrameRatio) == "1/3"
+		&& actionReleaseFrameRatioToString(releaseManifest.magicReleaseFrameRatio) == "4/5",
+		"reloading a manifest resets absent declarations and sources to universal defaults") && ok;
+	const std::string invalidReleaseText =
+		"[Game]\nId=BAD_RELEASE\n[Combat]\nAttackReleaseFrameRatio=0/3\n"
+		"SpecialAttackReleaseFrameRatio=3/2\nMagicReleaseFrameRatio=\n";
+	ok = check(releaseManifest.loadFromBuffer(invalidReleaseText.c_str(), static_cast<int>(invalidReleaseText.size()))
+		&& !releaseManifest.attackReleaseFrameRatioDefined
+		&& !releaseManifest.specialAttackReleaseFrameRatioDefined
+		&& !releaseManifest.magicReleaseFrameRatioDefined
+		&& releaseManifest.invalidActionReleaseFrameRatioKeys.size() == 3,
+		"invalid and empty declarations are missing for inheritance and retain diagnostic keys") && ok;
 	combatManifest.type = GAME_YYCS;
 	ok = check(
 		combatManifest.resolvedMinimumMagicDamage() == 5 &&

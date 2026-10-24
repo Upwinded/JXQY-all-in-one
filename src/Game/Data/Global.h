@@ -1,10 +1,12 @@
 #pragma once
 
 #include <string>
+#include <map>
 #include <vector>
 #include "../GameTypes.h"
 #include "../../File/INIReader.h"
 #include "../../Resource/ResourceManifest.h"
+#include "AttributePoints.h"
 
 enum MapTime
 {
@@ -27,6 +29,7 @@ struct GlobalData
 
 	uint32_t asfStyle = 0xFFFFFF;
 	uint32_t mpcStyle = 0xFFFFFF;
+	uint32_t screenColor = 0xFFFFFF;
 
 	uint32_t mainLum = 31;
 	uint32_t fadeLum = 0;
@@ -72,9 +75,9 @@ struct GameFeatureFlags
 	bool freezeVisualEffect = true;
 	bool poisonVisualEffect = true;
 	bool petrifyVisualEffect = true;
-	bool magicTriggerAtAnimationEnd = false;
 	bool nativeNpcAttackAtAnimationEnd = false;
 	bool restorePartnerAttributes = false;
+	bool useThewWhenNormalRun = true;
 	bool lumAsBrightness = true;
 	bool ambientLumOverlay = true;
 	bool topButtonsLayout = false;
@@ -147,10 +150,21 @@ public:
 
 	bool useWav = false;
 	int minimumMagicDamage = 10;
+	ActionReleaseFrameRatio attackReleaseFrameRatio{2, 3};
+	ActionReleaseFrameRatio specialAttackReleaseFrameRatio{1, 3};
+	ActionReleaseFrameRatio magicReleaseFrameRatio{4, 5};
 	MagicEffectCalculationMode magicEffectCalculationMode =
 		MagicEffectCalculationMode::ReplaceAttack;
 	int partnerFollowRadius = NPC_FOLLOW_RADIUS;
 	int partnerFollowRunRadius = NPC_FOLLOW_RADIUS_RUN;
+	int runSpeedPixelsPerSecond = 0;
+	AttributePointRules attributePointRules;
+	bool skillPointsEnabled = false;
+	int skillPointLevelUpRatio = 0;
+	int skillPointMaximum = 0;
+	bool skillTreeEnabled = false;
+	bool skillTreeUsesCharacterFiles = false;
+	std::map<int, std::string> skillTreeFiles;
 	LevelUpThresholdMode levelUpThresholdMode =
 		LevelUpThresholdMode::GreaterThanOrEqual;
 	ScriptNpcActionProfile npcActionProfile =
@@ -175,6 +189,7 @@ public:
 	int getPartnerFollowRadius() const;
 	int getPartnerFollowRunRadius() const;
 	void loadUiSettings();
+	bool setScreenColor(const std::string& value);
 	bool load();
 	bool save();
 

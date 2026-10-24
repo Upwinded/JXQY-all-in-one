@@ -58,4 +58,8 @@ namespace AndroidExternalStorage
 	// 消费一次资源包选择结果。Pending 表示 Java 仍在等待用户选择或复制；
 	// Selected 的 archivePath 是应用私有缓存中的普通文件路径。
 	ResourcePackageImportSelection consumeResourcePackageImportSelection();
+
+	// 删除系统文件选择器授权的 content:// 文档，失败原因通过 SDL_GetError() 返回。
+	// 非 Android 平台始终返回 false。
+	bool removeDocument(const std::string& uri);
 }

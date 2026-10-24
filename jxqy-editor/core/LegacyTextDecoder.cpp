@@ -117,12 +117,8 @@ bool LegacyTextDecoder::decodeToUtf8(
         : Util::isUtf8(
             reinterpret_cast<const std::uint8_t*>(utf8Candidate.data()),
             utf8Candidate.size());
-    if (sourceEncoding == LegacyTextEncoding::Auto &&
-        hadUtf8Bom && !validUtf8)
-    {
-        return false;
-    }
-    if (sourceEncoding == LegacyTextEncoding::Utf8)
+    // A file's explicit BOM takes precedence over the pack's default encoding.
+    if (hadUtf8Bom || sourceEncoding == LegacyTextEncoding::Utf8)
     {
         if (!validUtf8)
         {

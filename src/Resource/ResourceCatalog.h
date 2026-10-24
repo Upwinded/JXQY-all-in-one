@@ -209,7 +209,9 @@ struct ExactResourceSelection
 	std::filesystem::path assetsCollectionRoot;
 	std::filesystem::path activeResourceRoot;
 	// Fully materialized for runtime use, including inherited Game.Type and
-	// UI.Profile. Consumers must not reload the manifest after catalog selection.
+	// UI.Profile and per-action release ratios. Ratio SourceId is empty only for
+	// universal defaults; catalog entry manifests retain their local declarations.
+	// Consumers must not reload the manifest after catalog selection.
 	ResourceManifest activeManifest;
 	std::string canonicalActiveResourcePackId;
 	std::vector<ContentRoot> orderedContentRoots;

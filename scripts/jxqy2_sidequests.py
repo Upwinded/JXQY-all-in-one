@@ -342,7 +342,8 @@ def longmen_sidequests(client, output):
             raise AutomationError("The Longmen guide fee was not exactly 100 money")
     verify(client, GotoZMG=1, LMKZOZhanMaGang=1)
     checkpoint(client, output, "side-longmen-accepted")
-    for point in ((37, 65), (31, 56), (25, 66), (24, 95)):
+    go(client, 37, 65, script="龙门客栈/地图切换5.txt", combat=False)
+    for point in ((31, 56), (25, 66), (24, 95)):
         go(client, *point, combat=False)
     go(client, 16, 102, destination="葬马岗.map",
        script="龙门客栈/地图切换4.txt", combat=False)
@@ -394,8 +395,9 @@ def longmen_sidequests(client, output):
                   (60, 26), (63, 8)):
         go(client, *point)
     go(client, 64, 5, destination="龙门客栈.map", script="葬马岗/地图切换1.txt", combat=False)
-    for point in ((24, 95), (25, 66), (31, 56), (37, 65), (46, 55)):
+    for point in ((24, 95), (25, 66), (31, 56), (37, 65)):
         go(client, *point, combat=False)
+    go(client, 46, 55, script="龙门客栈/地图切换5.txt", combat=False)
     talk(client, "无赖1", (44, 57))
     state = idle(client)
     if any(target["name"] == "无赖1" for target in state["targets"]):

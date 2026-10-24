@@ -35,18 +35,6 @@ public:
         return fallbackShadow;
     }
 
-    static UTime resolveMagicTriggerTime(UTime actionTime, bool isPlayer, bool triggerAtAnimationEnd)
-    {
-        if (!isPlayer || triggerAtAnimationEnd)
-        {
-            return actionTime;
-        }
-        if (actionTime < PLAYER_MAGIC_DELAY)
-        {
-            return actionTime;
-        }
-        return PLAYER_MAGIC_DELAY;
-    }
 private:
     _shared_imp getMagicActionImagePackage() const;
     _shared_imp getMagicActionShadowPackage() const;
@@ -58,4 +46,6 @@ private:
     std::shared_ptr<Magic> _sourceMagic = nullptr;
     std::weak_ptr<GameElement> _target;
     bool _magicDone = false;
+    UTime _releaseTime = 0;
+    bool _requiresFriendlyTarget = false;
 };

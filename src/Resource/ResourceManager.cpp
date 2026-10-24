@@ -2302,6 +2302,30 @@ ResourceManager::buildResourceRemovalPlan(int packIndex) const
 		return plan;
 	}
 
+	std::vector<std::string> gameIds;
+	std::vector<std::vector<std::string>> dependencyIds;
+	for (const ResourcePack& pack : discoveredPacks)
+	{
+		gameIds.push_back(toLowerAscii(pack.manifest.id));
+		std::vector<std::string> dependencies = pack.manifest.getDependencyIds();
+		const std::string uiBaseId = trimAscii(pack.manifest.uiBaseId);
+		if (!uiBaseId.empty())
+		{
+			dependencies.push_back(uiBaseId);
+		}
+		for (std::string& dependency : dependencies)
+		{
+			dependency = toLowerAscii(dependency);
+		}
+		dependencyIds.push_back(std::move(dependencies));
+	}
+	const auto dependsOn = [&dependencyIds, &gameIds](
+		std::size_t dependent, std::size_t dependency)
+	{
+		const auto& ids = dependencyIds[dependent];
+		return std::find(ids.begin(), ids.end(), gameIds[dependency]) != ids.end();
+	};
+
 	std::vector<bool> included(discoveredPacks.size(), false);
 	included[static_cast<std::size_t>(packIndex)] = true;
 	bool changed = true;
@@ -2316,7 +2340,7 @@ ResourceManager::buildResourceRemovalPlan(int packIndex) const
 				continue;
 			}
 			for (const std::string& dependencyId :
-				discoveredPacks[candidateIndex].manifest.getDependencyIds())
+				dependencyIds[candidateIndex])
 			{
 				bool dependencyFound = false;
 				bool dependencyWillBeRemoved = true;
@@ -2324,9 +2348,7 @@ ResourceManager::buildResourceRemovalPlan(int packIndex) const
 					dependencyIndex < discoveredPacks.size();
 					dependencyIndex++)
 				{
-					if (toLowerAscii(
-							discoveredPacks[dependencyIndex].manifest.id) !=
-							toLowerAscii(dependencyId))
+					if (gameIds[dependencyIndex] != dependencyId)
 					{
 						continue;
 					}
@@ -2364,6 +2386,60 @@ ResourceManager::buildResourceRemovalPlan(int packIndex) const
 		return plan;
 	}
 
+	// Only consider shared dependencies reached from this deletion group.
+	std::vector<bool> candidates = included;
+	changed = true;
+	while (changed)
+	{
+		changed = false;
+		for (std::size_t index = 0; index < discoveredPacks.size(); index++)
+		{
+			if (!candidates[index])
+			{
+				continue;
+			}
+			for (std::size_t dependency = 0; dependency < discoveredPacks.size(); dependency++)
+			{
+				if (candidates[dependency] ||
+					!discoveredPacks[dependency].manifest.resourceOnly ||
+					!dependsOn(index, dependency))
+				{
+					continue;
+				}
+				std::filesystem::path resolvedRoot;
+				if (removableRoot(discoveredPacks[dependency], resolvedRoot))
+				{
+					candidates[dependency] = true;
+					changed = true;
+				}
+			}
+		}
+	}
+
+	// Retaining one shared pack also retains its dependencies, including cycles.
+	changed = true;
+	while (changed)
+	{
+		changed = false;
+		for (std::size_t index = 0; index < discoveredPacks.size(); index++)
+		{
+			if (candidates[index])
+			{
+				continue;
+			}
+			for (std::size_t dependency = 0; dependency < discoveredPacks.size(); dependency++)
+			{
+				if (candidates[dependency] && !included[dependency] &&
+					dependsOn(index, dependency))
+				{
+					candidates[dependency] = false;
+					changed = true;
+				}
+			}
+		}
+	}
+	included = std::move(candidates);
+
 	std::vector<bool> remaining = included;
 	std::vector<std::size_t> removalOrder;
 	for (;;)
@@ -2394,18 +2470,9 @@ ResourceManager::buildResourceRemovalPlan(int packIndex) const
 				{
 					continue;
 				}
-				for (const std::string& dependencyId :
-					discoveredPacks[dependentIndex].manifest.getDependencyIds())
+				if (dependsOn(dependentIndex, candidateIndex))
 				{
-					if (toLowerAscii(dependencyId) == toLowerAscii(
-							discoveredPacks[candidateIndex].manifest.id))
-					{
-						hasRemainingDependent = true;
-						break;
-					}
-				}
-				if (hasRemainingDependent)
-				{
+					hasRemainingDependent = true;
 					break;
 				}
 			}
@@ -2441,8 +2508,12 @@ ResourceManager::buildResourceRemovalPlan(int packIndex) const
 		entry.name = pack.getDisplayName();
 		entry.version = pack.manifest.releaseMetadata.displayVersion;
 		entry.rootPath = pack.rootPath;
-		entry.saveNamespace = File::sanitizeSaveNamespace(
-			pack.effectiveSaveNamespace);
+		entry.resourceOnly = pack.manifest.resourceOnly;
+		if (!entry.resourceOnly)
+		{
+			entry.saveNamespace = File::sanitizeSaveNamespace(
+				pack.effectiveSaveNamespace);
+		}
 		std::filesystem::path resolvedRoot;
 		if (!removableRoot(pack, resolvedRoot))
 		{

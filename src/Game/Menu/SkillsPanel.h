@@ -43,6 +43,7 @@ public:
 	Point getDragEndPosition() { return dragEndPosition; }
 
 	int getClickIndex() { return clickIndex; }
+	int getDraggingSkill(Point& direction) const;
 
 protected:
 	virtual void initFromIni(INIReader& ini);

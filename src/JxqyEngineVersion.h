@@ -14,6 +14,9 @@ inline constexpr char EngineVersion[] =
 inline constexpr char ReleaseStage[] = "Preview";
 // Raise independently of EngineVersion when older saves become incompatible.
 inline constexpr char MinimumCompatibleSaveEngineVersion[] = "1.1.0";
+// Minimum reader required by newly written saves. Raise only when their data
+// becomes incompatible with earlier readers, independently of EngineVersion.
+inline constexpr char MinimumSaveReaderEngineVersion[] = "1.2.0";
 
 #if defined(__ANDROID__)
 inline constexpr char ProgramUpdateTarget[] = "android";

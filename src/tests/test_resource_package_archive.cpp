@@ -2943,8 +2943,26 @@ void testResumableResourcePreparation()
 		!std::filesystem::exists(partial), "a corrupted complete partial file is discarded and never installed");
 }
 
-int main()
+int main(int argc, char** argv)
 {
+	if (argc == 3)
+	{
+		const auto result = OnlineUpdate::prepareImportedFullResourcePackageArchive(
+			std::filesystem::u8path(argv[1]), std::filesystem::u8path(argv[2]));
+		if (!result.succeeded())
+		{
+			std::cerr << "Resource import failed: "
+				<< static_cast<int>(result.archive.status) << " "
+				<< result.archive.archiveEntryPath << " "
+				<< result.archive.filesystemError.message() << std::endl;
+			return 1;
+		}
+		std::cout << "Imported " << (result.package.common ? "common" : result.package.gameId)
+			<< " version " << result.package.displayVersion << ", "
+			<< result.archive.fileCount << " files, CRC32 "
+			<< result.package.artifactCrc32 << std::endl;
+		return 0;
+	}
 	TemporaryTree tree;
 	if (tree.root.empty())
 	{

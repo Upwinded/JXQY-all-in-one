@@ -12186,8 +12186,8 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+1"/>
-        <source>每行一项，例如 MagicTriggerAtAnimationEnd=1 或 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</source>
-        <translation>每行一項，例如 MagicTriggerAtAnimationEnd=1 或 RageSystem=1；未設定的玩法鍵使用通用預設值，版面配置鍵由 UI.Profile 成套決定；資源轉換會寫入實際基底預設值</translation>
+        <source>每行一项，例如 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</source>
+        <translation>每行一項，例如 RageSystem=1；未設定的玩法鍵使用通用預設值，版面配置鍵由 UI.Profile 成套決定；資源轉換會寫入實際基底預設值</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -12752,6 +12752,18 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>已建立預設 Manifest：
 </translation>
     </message>
+    <message><source>普通攻击释放:</source><translation>普通攻擊釋放:</translation></message>
+    <message><source>特殊攻击释放:</source><translation>特殊攻擊釋放:</translation></message>
+    <message><source>施法释放:</source><translation>施法釋放:</translation></message>
+    <message><source>继承</source><translation>繼承</translation></message>
+    <message><source>自定义</source><translation>自訂</translation></message>
+    <message><source>分子/分母</source><translation>分子/分母</translation></message>
+    <message><source>正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。</source><translation>正整數分數，分子不大於分母。先用單方向影格數除以分母取整，再乘分子；不約分。1/1 表示動作結束時釋放。</translation></message>
+    <message><source>释放帧比例必须是正整数分数，且分子不大于分母：%1</source><translation>釋放影格比例必須是正整數分數，且分子不大於分母：%1</translation></message>
+    <message><source>分数无效</source><translation>分數無效</translation></message>
+    <message><source>无法解析有效值</source><translation>無法解析有效值</translation></message>
+    <message><source>有效值 %1；来源：%2</source><translation>有效值 %1；來源：%2</translation></message>
+    <message><source>通用默认</source><translation>通用預設</translation></message>
 </context>
 <context>
     <name>SaveEditContext</name>

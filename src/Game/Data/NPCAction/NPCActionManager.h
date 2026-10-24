@@ -14,6 +14,7 @@ public:
 
     void changeAction(NPCActionType type, bool scripted = false);
     void forceChangeAction(NPCActionType type);
+    bool beginOffsetWalk(PointEx destination, int direction);
     // Reserved for explicit script/runtime state resets that must leave terminal actions.
     void resetActionIgnoringTransitions(NPCActionType type);
     // Scripted one-shot actions must also restart when the requested type is already active.

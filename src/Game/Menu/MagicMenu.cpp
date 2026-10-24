@@ -314,6 +314,7 @@ void MagicMenu::onUpdate()
 {
 	if (visible && gm != nullptr)
 	{
+		updateSkillTreeEntry();
 		updateDetails();
 		for (size_t i = 0; i < item.size(); ++i)
 		{
@@ -324,6 +325,11 @@ void MagicMenu::onUpdate()
 
 void MagicMenu::onEvent()
 {
+	if (skillTreeEntry && skillTreeEntry->visible && skillTreeEntry->getResult(erClick))
+	{
+		gm->menu->openSkillTree();
+		return;
+	}
 	if (showingDetails)
 	{
 		updateDetails();
@@ -511,6 +517,8 @@ void MagicMenu::init()
 
 void MagicMenu::freeResource()
 {
+	skillTreeEntry = nullptr;
+	skillTreeEntryFocused = false;
 	showingDetails = false;
 	detailFocused = false;
 	detailFocus.clear();
@@ -571,16 +579,20 @@ bool MagicMenu::focusControllerDefault()
 {
 	deactivateControllerFocus();
 	if (showingDetails) return detailFocused = detailFocus.focusDefault();
+	updateSkillTreeEntry();
+	if (skillTreeEntry && skillTreeEntry->visible) return focusControllerElement(skillTreeEntry);
 	return slotController.activate();
 }
 
 bool MagicMenu::isControllerFocusActive() const
 {
-	return (showingDetails && detailFocused) || tabFocused || slotController.isActive();
+	return skillTreeEntryFocused || (showingDetails && detailFocused) || tabFocused || slotController.isActive();
 }
 
 void MagicMenu::deactivateControllerFocus()
 {
+	skillTreeEntryFocused = false;
+	if (skillTreeEntry) skillTreeEntry->setFocused(false);
 	detailFocused = false;
 	detailFocus.suspendFocus();
 	tabFocused = false;
@@ -591,6 +603,7 @@ void MagicMenu::deactivateControllerFocus()
 
 PElement MagicMenu::controllerFocusedElement() const
 {
+	if (skillTreeEntryFocused) return skillTreeEntry;
 	if (showingDetails) return detailFocused ? detailFocus.getFocusedElement() : nullptr;
 	if (tabFocused) return showingTalents ? talentTab : magicTab;
 	return slotController.controllerFocusedElement();
@@ -600,6 +613,7 @@ std::vector<PElement> MagicMenu::controllerFocusCandidates() const
 {
 	if (showingDetails) return detailFocus.getAvailableFocusElements();
 	auto candidates = slotController.controllerFocusCandidates();
+	if (skillTreeEntry && skillTreeEntry->visible && skillTreeEntry->activated) candidates.push_back(skillTreeEntry);
 	if (magicTab && talentTab && talentTab->visible)
 	{
 		candidates.push_back(magicTab);
@@ -610,6 +624,13 @@ std::vector<PElement> MagicMenu::controllerFocusCandidates() const
 
 bool MagicMenu::focusControllerElement(const PElement& element)
 {
+	if (element != nullptr && element == skillTreeEntry && element->visible && element->activated)
+	{
+		deactivateControllerFocus();
+		skillTreeEntryFocused = true;
+		element->setFocused(true);
+		return true;
+	}
 	if (showingDetails) return detailFocused = detailFocus.focusElement(element);
 	if (element != nullptr && element->visible && element->activated
 		&& (element == magicTab || element == talentTab))
@@ -726,6 +747,19 @@ void MagicMenu::cancelControllerInteraction()
 
 bool MagicMenu::onHandleUIAction(UIAction action)
 {
+	if (skillTreeEntryFocused)
+	{
+		if (action == UIAction::Confirm) return gm->menu->openSkillTree();
+		if (action == UIAction::NavigateDown)
+		{
+			deactivateControllerFocus();
+			return slotController.activate();
+		}
+		return false;
+	}
+	if (!showingDetails && skillTreeEntry && skillTreeEntry->visible && action == UIAction::NavigateUp
+		&& scrollbar && scrollbar->position == 0 && slotController.focusedVisibleIndex() >= 0
+		&& slotController.focusedVisibleIndex() < scrollbar->lineSize) return focusControllerElement(skillTreeEntry);
 	if (showingDetails) return detailFocused && detailFocus.handleAction(action);
 	if (magicTab && talentTab && talentTab->visible)
 	{
@@ -759,4 +793,27 @@ bool MagicMenu::onHandleUIAction(UIAction action)
 		}
 	}
 	return slotController.handleAction(action);
+}
+
+void MagicMenu::updateSkillTreeEntry()
+{
+	const bool available = gm != nullptr && gm->global.skillTreeEnabled && !gm->magicManager.skillTree().nodes.empty();
+	if (!skillTreeEntry && available)
+	{
+		skillTreeEntry = std::make_shared<FlatTextButton>();
+		skillTreeEntry->setUTF8Str(u8"技能树");
+		skillTreeEntry->setFontSize(16);
+		addChild(skillTreeEntry);
+	}
+	if (skillTreeEntry)
+	{
+		skillTreeEntry->visible = skillTreeEntry->activated = available && !showingDetails;
+		skillTreeEntry->rect = { rect.x + std::max(0, rect.w - 100), rect.y + 8, 88, 44 };
+		if (!skillTreeEntry->visible) { skillTreeEntryFocused = false; skillTreeEntry->setFocused(false); }
+	}
+}
+
+void MagicMenu::onSetChildRect()
+{
+	updateSkillTreeEntry();
 }

@@ -426,6 +426,19 @@ for reason in ("no_progress", "action_timeout"):
         assert [call.kwargs["target_id"] for call in fight.call_args_list] == [7, 8]
         assert fight.call_args.kwargs["single_target"] is True and fight.call_args.kwargs["choice"] == ("last-kill", 1)
 
+# A stalled ranged skill can switch to a normal approach even for the same distant enemy.
+magic_state = dict(combat_state, player=dict(mana=10000, position=dict(x=0, y=0)),
+                   targets=[dict(foe, position=dict(x=20, y=20))])
+with patch.object(route, "checkpoint", return_value=magic_state), \
+        patch.object(route, "fight_named", side_effect=[route.AutomationError("StartCombat: no_progress"), None]) as fight:
+    combat_client.states = iter([magic_state, dict(magic_state, targets=[])])
+    route.fight_hostiles(combat_client, root / "tmp", resource, choice=("last-kill", 0))
+    assert [call.kwargs["target_id"] for call in fight.call_args_list] == [7, 7]
+    assert fight.call_args_list[0].kwargs["use_magic"] is True
+    assert fight.call_args_list[1].kwargs["use_magic"] is False
+    assert fight.call_args_list[1].kwargs["single_target"] is True
+    assert fight.call_args_list[1].kwargs["choice"] == ("last-kill", 0)
+
 with patch.object(route, "checkpoint", return_value=combat_state), \
         patch.object(route, "fight_named", side_effect=route.AutomationError("StartCombat: no_progress")) as fight:
     combat_client.states = iter([combat_state])

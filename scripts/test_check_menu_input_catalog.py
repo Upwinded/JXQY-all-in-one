@@ -27,6 +27,19 @@ def run_git(repository: Path, *arguments: str) -> None:
 
 
 class MenuInputCatalogScannerTests(unittest.TestCase):
+    def test_theme_paths_keep_the_surface_scope_and_unknown_paths(self) -> None:
+        for path, expected in {
+            "pack/ini/ui/state/state.menu.ini": "state",
+            r"INI\\UI\\QINGYU\\State\\state.menu.ini": "state",
+            "common/ini/ui/qingyu/partner/partner.menu.ini": "partner",
+            "common/ini/ui/qingyu/unknown/unknown.menu.ini": "unknown",
+            "common/ini/ui/mobile/skills/skills.menu.ini": "mobile/skills",
+            "common/ini/ui/future/state/state.menu.ini": "future",
+            "unrelated/state.menu.ini": None,
+        }.items():
+            with self.subTest(path=path):
+                self.assertEqual(catalog.resource_directory(path), expected)
+
     def make_repository(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
         temporary_directory = tempfile.TemporaryDirectory()
         repository = Path(temporary_directory.name) / "repository"

@@ -473,7 +473,7 @@ def kill_group(client, output, resource, variable, total, names, *, skills=(0,))
 def walk_to(client, resource, point, *, combat=False, stop_when=None, avoid_traps=()):
     state = idle(client)
     occupied = {(row["position"]["x"], row["position"]["y"]) for row in state["targets"]
-                if row.get("kind") == "npc" and row.get("life",0)>0
+                if row.get("kind") == "npc"
                 and (not combat or not row.get("hostile") or not npc_attackable(row))}
     avoid = {position for trap in avoid_traps for position in trap_points(resource,state["map"],trap)}
     path = reachable_trap(resource, state["map"], None, state["player"]["position"],
@@ -536,7 +536,7 @@ def approach_target(client, resource, target, *, attackable=True):
     if near_target(state):
         return state
     occupied = {(row["position"]["x"], row["position"]["y"]) for row in state["targets"]
-                if row.get("kind") == "npc" and row.get("life",0)>0}
+                if row.get("kind") == "npc"}
     paths = []
     for goal in ((x,y+2),(x+y%2-1,y+1),(x-1,y),(x+y%2-1,y-1),
                  (x,y-2),(x+y%2,y-1),(x+1,y),(x+y%2,y+1)):

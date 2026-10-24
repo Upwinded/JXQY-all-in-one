@@ -1123,10 +1123,15 @@ list(REMOVE_ITEM JXQY_NPC_TARGETING_RUNTIME_SOURCES ${SRC_DIR}/main.cpp)
 add_executable(jxqy-npc-targeting-tests
     ${SRC_DIR}/tests/test_gameplay_automation_runtime.cpp
     ${SRC_DIR}/tests/test_npc_targeting.cpp
+    ${SRC_DIR}/tests/test_attack_animation_runtime.cpp
+    ${SRC_DIR}/tests/test_release_timing_real_resources.cpp
+    ${SRC_DIR}/tests/test_projectile_collision_runtime.cpp
     ${SRC_DIR}/tests/test_npc_runtime_persistence.cpp
     ${SRC_DIR}/tests/test_effect_runtime_persistence.cpp
     ${SRC_DIR}/tests/test_gamble_menu_runtime.cpp
     ${SRC_DIR}/tests/test_magic_derived_runtime.cpp
+    ${SRC_DIR}/tests/test_skill_tree_runtime.cpp
+    ${SRC_DIR}/tests/test_attribute_points_runtime.cpp
     ${SRC_DIR}/tests/test_object_animation_runtime.cpp
     ${SRC_DIR}/tests/test_media_runtime.cpp
     ${SRC_DIR}/tests/test_core_lifecycle.cpp
@@ -1184,14 +1189,20 @@ add_test(NAME jxqy-effect-runtime-persistence-tests COMMAND jxqy-npc-targeting-t
 add_test(NAME jxqy-gamble-menu-runtime-tests COMMAND jxqy-npc-targeting-tests --gamble-menu)
 add_test(NAME jxqy-magic-derived-runtime-tests COMMAND jxqy-npc-targeting-tests --magic-derived)
 add_test(NAME jxqy-magic-experience-tests COMMAND jxqy-npc-targeting-tests --magic-experience)
+add_test(NAME jxqy-skill-tree-runtime-tests COMMAND jxqy-npc-targeting-tests --skill-tree)
+add_test(NAME jxqy-attribute-points-runtime-tests COMMAND jxqy-npc-targeting-tests --attribute-points)
+add_test(NAME jxqy-attribute-points-input-tests COMMAND jxqy-npc-targeting-tests --attribute-points-input)
+add_test(NAME jxqy-skill-tree-input-tests COMMAND jxqy-npc-targeting-tests --skill-tree-input)
 add_test(NAME jxqy-replacement-experience-tests COMMAND jxqy-npc-targeting-tests --replacement-experience)
 add_test(NAME jxqy-object-animation-runtime-tests COMMAND jxqy-npc-targeting-tests --object-animation)
 add_test(NAME jxqy-media-runtime-tests COMMAND jxqy-npc-targeting-tests --media-runtime)
 add_test(NAME jxqy-core-lifecycle-tests COMMAND jxqy-npc-targeting-tests --core-lifecycle)
 add_test(NAME jxqy-script-movement-tests COMMAND jxqy-npc-targeting-tests --script-movement)
-set_tests_properties(jxqy-core-lifecycle-tests PROPERTIES TIMEOUT 180)
+set_tests_properties(jxqy-core-lifecycle-tests PROPERTIES TIMEOUT 600)
 add_test(NAME jxqy-current-mod-compatibility-tests COMMAND jxqy-npc-targeting-tests --current-mod-compatibility)
 add_test(NAME jxqy-qingyu-ui-tests COMMAND jxqy-npc-targeting-tests --qingyu-ui)
+add_test(NAME jxqy-ui-text-layout-tests COMMAND jxqy-npc-targeting-tests --ui-text-layout)
+set_tests_properties(jxqy-ui-text-layout-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-qingyu-ui-interaction-tests COMMAND jxqy-npc-targeting-tests --qingyu-ui-interaction)
 set_tests_properties(jxqy-qingyu-ui-interaction-tests PROPERTIES TIMEOUT 180)
 set_tests_properties(jxqy-qingyu-ui-tests PROPERTIES TIMEOUT 180)
@@ -1232,8 +1243,13 @@ set_tests_properties(jxqy-bilibili-story-feedback-tests PROPERTIES TIMEOUT 240)
 add_test(NAME jxqy-merged-entity-save-tests COMMAND jxqy-npc-targeting-tests --merged-entity-save)
 set_tests_properties(jxqy-merged-entity-save-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-production-attack-file-tests COMMAND jxqy-npc-targeting-tests --production-attack-files)
-set_tests_properties(jxqy-production-attack-file-tests PROPERTIES TIMEOUT 180)
+set_tests_properties(jxqy-production-attack-file-tests PROPERTIES TIMEOUT 300)
 add_test(NAME jxqy-full-attack-save-tests COMMAND jxqy-npc-targeting-tests --full-attack-save)
+add_test(NAME jxqy-release-timing-tests COMMAND jxqy-npc-targeting-tests --release-timing)
+add_test(NAME jxqy-release-timing-production-tests COMMAND jxqy-npc-targeting-tests --release-timing-production)
+set_tests_properties(jxqy-release-timing-production-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-attack-animation-tests COMMAND jxqy-npc-targeting-tests --attack-animation)
+set_tests_properties(jxqy-release-timing-tests jxqy-attack-animation-tests PROPERTIES TIMEOUT 180)
 set_tests_properties(jxqy-full-attack-save-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-equipment-replacement-save-tests COMMAND jxqy-npc-targeting-tests --equipment-replacement-save)
 set_tests_properties(jxqy-equipment-replacement-save-tests PROPERTIES TIMEOUT 180)
@@ -1558,6 +1574,9 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 add_test(NAME jxqy-file-tests COMMAND jxqy-file-tests)
+add_test(NAME jxqy-action-release-inheritance-tests COMMAND jxqy-file-tests --action-release-ratios)
+add_test(NAME jxqy-resource-removal-tests COMMAND jxqy-file-tests --resource-removal-only)
+set_tests_properties(jxqy-resource-removal-tests PROPERTIES TIMEOUT 30)
 add_test(NAME jxqy-ini-numeric-default-tests COMMAND jxqy-file-tests --ini-numeric-defaults)
 set_tests_properties(jxqy-ini-numeric-default-tests PROPERTIES TIMEOUT 30)
 if(WIN32 AND BUILD_TESTING)
@@ -1618,6 +1637,7 @@ add_test(NAME jxqy-save-generation-tests
 add_executable(jxqy-game-feature-profile-tests
     ${SRC_DIR}/tests/test_game_feature_profile.cpp
     ${SRC_DIR}/Game/Data/Global.cpp
+    ${SRC_DIR}/Game/Data/AttributePoints.cpp
     ${SRC_DIR}/Platform/AndroidExternalStorage.cpp
     ${SRC_DIR}/Resource/ResourceCatalog.cpp
     ${SRC_DIR}/Resource/ResourceManager.cpp

@@ -1,6 +1,7 @@
 #pragma once
 #include "NPC.h"
 #include "Object.h"
+#include "AttributePoints.h"
 #include <cstdint>
 #include <map>
 
@@ -56,6 +57,7 @@ struct NextAction
 	int distance = 0;
 	bool useRightScript = false;
 	bool strictWorldInteraction = false;
+	bool requiresFriendlyMagicTarget = false;
 };
 
 // ===================== 常量定义 =====================
@@ -93,6 +95,11 @@ public:
 
 	// ---- 装备后属性 ----
 	PlayerInfo info;
+	// MG result state is transient: 0 undecided, 1 player won, 2 player lost.
+	int miniGameResult = 0;
+	int skillPoints = 0;
+	AttributePoints attributePoints;
+	bool allocateAttributePoints(const AttributePointAmounts& amounts, std::string* failureReason = nullptr);
 	void calInfo();
 	void resetEquipmentGrantedMagicSync();
 	void updateLevel();
@@ -124,7 +131,7 @@ public:
 	virtual int getManaMax() {return info.manaMax;}
 	virtual int getThewMax() {return info.thewMax;}
 	bool hasUnlimitedCheatResources() const;
-	bool ignoresRunThewCost() const { return equipmentIgnoresRunThewCost || hasUnlimitedCheatResources(); }
+	bool ignoresRunThewCost() const;
 	bool canPayRunThewCost() const;
 
 	// ---- 经验与升级 ----
@@ -176,6 +183,10 @@ public:
 	virtual void hurtLife(int damage, bool ignoreDefense = false);
 	bool canHurt();
 	void suppressTrapAtScriptPosition();
+	void scheduleTrapCheckAtScriptPosition();
+	bool hasPendingScriptPositionTrap() const;
+	void checkPendingScriptPositionTrap();
+	void cancelPendingScriptPositionTrap();
 	void checkTrap();
 
 	// ---- 交互 ----
@@ -275,6 +286,7 @@ private:
 	std::shared_ptr<NextAction> controlledNextAction = nullptr;
 	bool controlCharacterSessionActive = false;
 	bool scriptPositionTrapSuppressed = false;
+	bool scriptPositionTrapCheckPending = false;
 	Point scriptTrapPosition = { 0, 0 };
 	std::string scriptTrapMapName;
 	void syncEquipmentGrantedMagic(const std::map<std::string, int>& activeCounts);

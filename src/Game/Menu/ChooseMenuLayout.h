@@ -1,6 +1,8 @@
 #pragma once
 
+#include <functional>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct ChooseMenuLayoutRectangle
@@ -33,6 +35,8 @@ struct ChooseMenuLayoutInput
 	int messageFontSize = 14;
 	int optionFontSize = 14;
 	int speakerFontSize = 14;
+	// Optional renderer metrics (width, height); absent in legacy cell-based callers.
+	std::function<std::pair<int, int>(const std::string&, int)> measureText;
 	int rowGap = 2;
 	int columnGap = 8;
 	int columnCount = 1;

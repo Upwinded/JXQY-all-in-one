@@ -171,8 +171,11 @@ void PracticeMenu::init()
 	if (intro)
 	{
 		intro->autoNextLine = true;
+		intro->autoShrink = true;
 		intro->setColorTagsEnabled(true);
 	}
+	if (level) level->autoShrink = true;
+	if (exp) exp->autoShrink = true;
 	if (magic)
 	{
 		magic->dragIndex = gm->magicManager.practiceIndex();

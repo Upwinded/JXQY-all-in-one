@@ -108,6 +108,7 @@ void Option::init()
 	automaticSaveButton = getComponentByName<FlatTextButton>("automaticSaveButton");
 
 	setChildRectReferToParent();
+	resourceCheatSettingsButtonRect = cheatSettingsButton != nullptr ? cheatSettingsButton->rect : Rect{};
 
 	if (music && getScrollbarFocusElement(music) != nullptr)
 	{
@@ -221,6 +222,7 @@ void Option::freeResource()
 	focusManager.clear();
 	touchControlsButton = nullptr;
 	cheatSettingsButton = nullptr;
+	experienceMultiplierButton = nullptr;
 	themeButton = nullptr;
 	automaticSaveButton = nullptr;
 	cheatPanelTitle = nullptr;
@@ -320,8 +322,11 @@ void Option::configureFocus(const std::string& preferredFocusId)
 		[this]() { toggleTouchControlsOption(); },
 		[this](UIFocusDirection direction)
 		{
-			if (consumeHorizontalNavigation(direction)
-				&& cheatSettingsButton != nullptr)
+			if (direction == UIFocusDirection::Left)
+			{
+				return focusManager.focusNode("experience-multiplier");
+			}
+			if (direction == UIFocusDirection::Right)
 			{
 				return focusManager.focusNode("cheat-settings");
 			}
@@ -331,10 +336,29 @@ void Option::configureFocus(const std::string& preferredFocusId)
 		[this]() { openCheatPanel(); },
 		[this](UIFocusDirection direction)
 		{
-			if (consumeHorizontalNavigation(direction)
-				&& touchControlsButton != nullptr)
+			if (direction == UIFocusDirection::Left)
 			{
-				return focusManager.focusNode("touch-controls");
+				return focusManager.focusNode(touchControlsButton != nullptr
+					? "touch-controls" : "experience-multiplier");
+			}
+			if (direction == UIFocusDirection::Right)
+			{
+				return focusManager.focusNode("experience-multiplier");
+			}
+			return false;
+		});
+	addRow("experience-multiplier", experienceMultiplierButton,
+		[this]() { toggleExperienceMultiplierOption(); },
+		[this](UIFocusDirection direction)
+		{
+			if (direction == UIFocusDirection::Left)
+			{
+				return focusManager.focusNode("cheat-settings");
+			}
+			if (direction == UIFocusDirection::Right)
+			{
+				return focusManager.focusNode(touchControlsButton != nullptr
+					? "touch-controls" : "cheat-settings");
 			}
 			return false;
 		});
@@ -673,14 +697,16 @@ float Option::posToSpeed(int pos)
 
 void Option::onEvent()
 {
-	if (touchControlsButton == nullptr || cheatSettingsButton == nullptr)
+	if (touchControlsButton == nullptr || cheatSettingsButton == nullptr || experienceMultiplierButton == nullptr)
 	{
 		const bool hadTouchControlsButton = touchControlsButton != nullptr;
 		const bool hadCheatSettingsButton = cheatSettingsButton != nullptr;
+		const bool hadExperienceMultiplierButton = experienceMultiplierButton != nullptr;
 		createFooterOptions();
 		if (!cheatPanelVisible
 			&& (hadTouchControlsButton != (touchControlsButton != nullptr)
-				|| hadCheatSettingsButton != (cheatSettingsButton != nullptr)))
+				|| hadCheatSettingsButton != (cheatSettingsButton != nullptr)
+				|| hadExperienceMultiplierButton != (experienceMultiplierButton != nullptr)))
 		{
 			configureFocus(focusManager.getFocusedNodeId());
 		}
@@ -793,13 +819,38 @@ void Option::onDrawEnd()
 		{ InputAction::Cancel,
 			cheatPanelVisible ? "返回选项" : "返回" }
 	};
-	ControllerPromptPresenter::drawBottomBar(
-		engine, engine->inputActions(), items, controllerPromptTextureCache);
+	auto options = ControllerPromptPresenter::bottomBarOptions(engine);
+	if (!cheatPanelVisible)
+	{
+		const auto promptLayout = ControllerPromptPresenter::layout(
+			items, ControllerPromptPresenter::captureTheme(engine->inputActions()), options);
+		const int promptHeight = std::min(options.height,
+			promptLayout.contentHeight + options.verticalPadding * 2);
+		const Rect promptRect = { options.x, options.y + (options.height - promptHeight) / 2,
+			options.width, promptHeight };
+		for (const auto& button : { touchControlsButton, cheatSettingsButton,
+			experienceMultiplierButton, themeButton, automaticSaveButton })
+		{
+			if (button != nullptr && button->visible
+				&& button->rect.x < promptRect.x + promptRect.w
+				&& button->rect.x + button->rect.w > promptRect.x
+				&& button->rect.y < promptRect.y + promptRect.h
+				&& button->rect.y + button->rect.h > promptRect.y)
+			{
+				// Full-height original skins leave space above their first setting row.
+				options.y = std::max(8, rect.y - promptHeight - 8);
+				options.height = promptHeight;
+				break;
+			}
+		}
+	}
+	ControllerPromptPresenter::draw(
+		engine, engine->inputActions(), items, options, controllerPromptTextureCache);
 }
 
 void Option::onRun()
 {
-	if (touchControlsButton == nullptr || cheatSettingsButton == nullptr)
+	if (touchControlsButton == nullptr || cheatSettingsButton == nullptr || experienceMultiplierButton == nullptr)
 	{
 		createFooterOptions();
 		if (!cheatPanelVisible)
@@ -839,6 +890,11 @@ void Option::onChildCallBack(PElement child)
 	if (child == cheatSettingsButton && child->getResult(erClick))
 	{
 		openCheatPanel();
+		return;
+	}
+	if (child == experienceMultiplierButton && child->getResult(erClick))
+	{
+		toggleExperienceMultiplierOption();
 		return;
 	}
 	if (child == cheatModeButton && child->getResult(erClick))
@@ -916,6 +972,18 @@ void Option::createFooterOptions()
 		cheatSettingsButton->setUTF8Str("作弊设置");
 		addChild(cheatSettingsButton);
 	}
+	if (experienceMultiplierButton == nullptr)
+	{
+		experienceMultiplierButton = std::make_shared<FlatTextButton>();
+		experienceMultiplierButton->name = "experienceMultiplierButton";
+		experienceMultiplierButton->setStyle(cheatSettingsButton->getStyle());
+		experienceMultiplierButton->setFontSize(cheatSettingsButton->getFontSize());
+		experienceMultiplierButton->stretch = cheatSettingsButton->stretch;
+		std::copy(std::begin(cheatSettingsButton->image), std::end(cheatSettingsButton->image),
+			std::begin(experienceMultiplierButton->image));
+		addChild(experienceMultiplierButton);
+	}
+	experienceMultiplierButton->setUTF8Str(u8"经验×" + std::to_string(Config::experienceMultiplier));
 	syncTouchControlsOption();
 	if (themeButton == nullptr
 		&& File::fileExist("ini\\ui\\qingyu\\theme.ini")
@@ -945,6 +1013,23 @@ void Option::createFooterOptions()
 		if (!gameManager->global.feature.automaticSave) automaticSaveButton.reset();
 	}
 	layoutFooterOptions();
+	const Rect settingsRect = getComponentByName("cheatSettingsButton") != nullptr
+		? resourceCheatSettingsButtonRect : cheatSettingsButton->rect;
+	constexpr int ButtonGap = 8;
+	const int buttonWidth = std::max(1, (settingsRect.w - ButtonGap) / 2);
+	cheatSettingsButton->rect = { settingsRect.x, settingsRect.y, buttonWidth, settingsRect.h };
+	experienceMultiplierButton->rect = { settingsRect.x + buttonWidth + ButtonGap, settingsRect.y,
+		std::max(1, settingsRect.w - buttonWidth - ButtonGap), settingsRect.h };
+}
+
+void Option::toggleExperienceMultiplierOption()
+{
+	Config::experienceMultiplier = Config::experienceMultiplier % 3 + 1;
+	Config::save();
+	if (experienceMultiplierButton != nullptr)
+	{
+		experienceMultiplierButton->setUTF8Str(u8"经验×" + std::to_string(Config::experienceMultiplier));
+	}
 }
 
 void Option::toggleThemeOption()

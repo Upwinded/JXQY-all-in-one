@@ -3,6 +3,7 @@
 #include "../GameTypes.h"
 #include "ControllerFocusParticipant.h"
 #include "SlotGridController.h"
+#include "../../Component/FlatTextButton.h"
 #include <vector>
 
 class NPC;
@@ -62,6 +63,10 @@ private:
 	std::weak_ptr<NPC> selectedPartner;
 	bool showingPartner = false;
 	bool characterSelectorFocused = false;
+	bool attributePointEntryFocused = false;
+	std::shared_ptr<FlatTextButton> attributePointEntry;
+	void updateAttributePointEntry();
+	void onSetChildRect() override;
 	std::shared_ptr<Goods> partnerGoods[GOODS_BODY_COUNT];
 	void updateCharacterBindings();
 	bool showingAttributes = false;

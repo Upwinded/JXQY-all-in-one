@@ -20,6 +20,34 @@ constexpr int SECTION_GAP = 4;
 constexpr int FOOTER_GAP = 4;
 constexpr int PORTRAIT_SIZE = 72;
 
+int measureWrappedTextHeight(const ChooseMenuLayoutInput& input,
+	const std::string& text, int width, int fontSize, int* lineCount = nullptr)
+{
+	if (!input.measureText)
+	{
+		if (lineCount != nullptr)
+		{
+			*lineCount = TextLayout::wrappedLineCount(text, width, fontSize);
+		}
+		return TextLayout::wrappedTextHeight(text, width, fontSize, TEXT_LINE_GAP);
+	}
+	int lineHeight = std::max(1, input.measureText("", fontSize).second);
+	const auto measureWidth = [&](const std::string& run)
+	{
+		const auto size = input.measureText(run, fontSize);
+		lineHeight = std::max(lineHeight, size.second);
+		return size.first;
+	};
+	const int count = static_cast<int>(text.find("<color=") != std::string::npos
+		? TextLayout::wrapColorTaggedUtf8Text(text, width, 0xFFFFFFFF, measureWidth).size()
+		: TextLayout::wrapUtf8Text(text, width, measureWidth).size());
+	if (lineCount != nullptr)
+	{
+		*lineCount = count;
+	}
+	return count > 0 ? count * lineHeight + (count - 1) * TEXT_LINE_GAP : 0;
+}
+
 struct ChooseMenuLayoutRow
 {
 	std::size_t firstItemIndex = 0;
@@ -209,31 +237,21 @@ bool canUseCompactDialogAlignedTwoChoice(
 		return false;
 	}
 
+	int messageLineCount = 0;
+	const int messageHeight = measureWrappedTextHeight(input, input.message,
+		input.preferredMessage.width, input.messageFontSize, &messageLineCount);
 	if (!input.message.empty()
-		&& (TextLayout::wrappedLineCount(
-			input.message,
-			input.preferredMessage.width,
-			input.messageFontSize) != 1
-			|| TextLayout::wrappedTextHeight(
-				input.message,
-				input.preferredMessage.width,
-				input.messageFontSize,
-				TEXT_LINE_GAP) > input.preferredMessage.height))
+		&& (messageLineCount != 1 || messageHeight > input.preferredMessage.height))
 	{
 		return false;
 	}
 
 	for (const ChooseMenuLayoutItem& item : visibleItems)
 	{
-		if (TextLayout::wrappedLineCount(
-			item.text,
-			input.preferredOption.width,
-			input.optionFontSize) != 1
-			|| TextLayout::wrappedTextHeight(
-				item.text,
-				input.preferredOption.width,
-				input.optionFontSize,
-				TEXT_LINE_GAP) > input.preferredOption.height)
+		int lineCount = 0;
+		const int height = measureWrappedTextHeight(input, item.text,
+			input.preferredOption.width, input.optionFontSize, &lineCount);
+		if (lineCount != 1 || height > input.preferredOption.height)
 		{
 			return false;
 		}
@@ -341,11 +359,10 @@ ChooseMenuLayoutOutput calculateChooseMenuLayout(const ChooseMenuLayoutInput& in
 		for (std::size_t itemOffset = 0; itemOffset < row.itemCount; ++itemOffset)
 		{
 			const ChooseMenuLayoutItem& item = visibleItems[firstItemIndex + itemOffset];
-			const int textHeight = TextLayout::wrappedTextHeight(
+			const int textHeight = measureWrappedTextHeight(input,
 				item.text,
 				optionColumnWidth,
-				std::max(1, input.optionFontSize),
-				TEXT_LINE_GAP);
+				std::max(1, input.optionFontSize));
 			row.height = std::max(row.height, textHeight + TEXT_VERTICAL_PADDING * 2);
 		}
 		rows.push_back(row);
@@ -370,13 +387,13 @@ ChooseMenuLayoutOutput calculateChooseMenuLayout(const ChooseMenuLayoutInput& in
 		: 0;
 	const int portraitGap = portraitVisible ? SECTION_GAP : 0;
 	const int textHeaderWidth = std::max(1, contentWidth - portraitSize - portraitGap);
-	const int speakerHeight = speakerVisible ? std::max(1, input.speakerFontSize) : 0;
+	const int speakerHeight = speakerVisible ? std::max(1, input.measureText
+		? input.measureText(input.speakerName, input.speakerFontSize).second : input.speakerFontSize) : 0;
 	const int speakerMessageGap = speakerVisible && !input.message.empty() ? SECTION_GAP : 0;
-	const int measuredMessageHeight = TextLayout::wrappedTextHeight(
+	const int measuredMessageHeight = measureWrappedTextHeight(input,
 		input.message,
 		textHeaderWidth,
-		std::max(1, input.messageFontSize),
-		TEXT_LINE_GAP);
+		std::max(1, input.messageFontSize));
 	const int preferredMessageHeight = input.message.empty()
 		? 0
 		: std::max(0, input.preferredMessage.height);
@@ -388,7 +405,8 @@ ChooseMenuLayoutOutput calculateChooseMenuLayout(const ChooseMenuLayoutInput& in
 			SECTION_GAP,
 			input.preferredOption.y - input.preferredMessage.y - input.preferredMessage.height)
 		: 0;
-	const int footerHeight = std::max(MINIMUM_TOUCH_HEIGHT, std::max(1, input.preferredOption.height));
+	const int footerHeight = std::max({ MINIMUM_TOUCH_HEIGHT, input.preferredOption.height,
+		input.measureText ? input.measureText("", input.optionFontSize).second : 0 });
 	const int multipleFooterHeight = input.multipleFooter ? footerHeight : 0;
 	const int multipleFooterGap = input.multipleFooter ? FOOTER_GAP : 0;
 	const int minimumRowsHeight = rows.empty() ? 0 : MINIMUM_TOUCH_HEIGHT;

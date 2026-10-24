@@ -1428,6 +1428,17 @@ void finalizeCatalogEntries(Catalog& catalog)
 
 	for (CatalogPack& pack : catalog.packs)
 	{
+		for (const std::string& key : pack.manifest.invalidActionReleaseFrameRatioKeys)
+		{
+			addCatalogDiagnostic(
+				catalog,
+				RuntimeResource::CatalogDiagnosticSeverity::Warning,
+				"resource.catalog.action_release_frame_ratio_invalid",
+				"Invalid Combat." + key + "; content dependency inheritance or the universal default will be used",
+				pack.stableKey,
+				pack.manifest.id,
+				pack.manifestPath);
+		}
 		if (pack.effectiveSaveNamespace.empty())
 		{
 			pack.effectiveSaveNamespace =
@@ -1730,13 +1741,6 @@ void resolveEffectiveProgressionSettings(
 				materializedManifest.defeatedNpcExperienceMode =
 					source.defeatedNpcExperienceMode;
 				materializedManifest.defeatedNpcExperienceModeDefined = true;
-			}
-			if (!materializedManifest.experienceMultiplierDefined
-				&& source.experienceMultiplierDefined)
-			{
-				materializedManifest.experienceMultiplier =
-					source.experienceMultiplier;
-				materializedManifest.experienceMultiplierDefined = true;
 			}
 			if (!materializedManifest.levelUpThresholdModeDefined
 				&& source.levelUpThresholdModeDefined)
@@ -2154,6 +2158,61 @@ bool appendDependencyGraph(
 	}
 	return true;
 }
+
+void resolveActionReleaseFrameRatios(
+	const Catalog& catalog, RuntimeResource::ExactSelectionResult& result)
+{
+	ResourceManifest& destination = result.selection.activeManifest;
+	const auto inheritRatio = [](ActionReleaseFrameRatio& ratio, bool& defined,
+		std::string& sourceId, const ActionReleaseFrameRatio& sourceRatio,
+		bool sourceDefined, const std::string& packId)
+	{
+		if (!defined && sourceDefined)
+		{
+			ratio = sourceRatio;
+			defined = true;
+			sourceId = packId;
+		}
+	};
+	for (const auto& root : result.selection.orderedContentRoots)
+	{
+		if (root.kind == RuntimeResource::ContentRootKind::Common)
+		{
+			continue;
+		}
+		const auto pack = std::find_if(catalog.packs.begin(), catalog.packs.end(),
+			[&root](const CatalogPack& candidate)
+			{
+				return candidate.root == root.root;
+			});
+		if (pack == catalog.packs.end())
+		{
+			continue;
+		}
+		const ResourceManifest& source = pack->manifest;
+		inheritRatio(destination.attackReleaseFrameRatio, destination.attackReleaseFrameRatioDefined,
+			destination.attackReleaseFrameRatioSourceId, source.attackReleaseFrameRatio,
+			source.attackReleaseFrameRatioDefined, source.id);
+		inheritRatio(destination.specialAttackReleaseFrameRatio, destination.specialAttackReleaseFrameRatioDefined,
+			destination.specialAttackReleaseFrameRatioSourceId, source.specialAttackReleaseFrameRatio,
+			source.specialAttackReleaseFrameRatioDefined, source.id);
+		inheritRatio(destination.magicReleaseFrameRatio, destination.magicReleaseFrameRatioDefined,
+			destination.magicReleaseFrameRatioSourceId, source.magicReleaseFrameRatio,
+			source.magicReleaseFrameRatioDefined, source.id);
+		if (root.kind == RuntimeResource::ContentRootKind::DependencyId)
+		{
+			for (const auto& diagnostic : catalog.diagnostics)
+			{
+				if (diagnostic.stableEntryKey == pack->stableKey
+					&& diagnostic.code == "resource.catalog.action_release_frame_ratio_invalid")
+				{
+					result.diagnostics.push_back(diagnostic);
+				}
+			}
+		}
+	}
+}
+
 bool appendUniqueUiRoot(
 	std::vector<fs::path>& roots, const fs::path& root)
 {
@@ -2560,6 +2619,7 @@ ExactSelectionResult resolveCatalogSelection(
 		{
 			return result;
 		}
+		resolveActionReleaseFrameRatios(catalog, result);
 
 		visiting.clear();
 		completed.clear();

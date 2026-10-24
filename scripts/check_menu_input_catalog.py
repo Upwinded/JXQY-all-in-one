@@ -496,6 +496,8 @@ def resource_directory(path_text: str) -> str | None:
     if position < 0:
         return None
     relative = normalized[position + len(marker) :].lstrip("/")
+    if relative.startswith("qingyu/"):
+        relative = relative[len("qingyu/"):]
     if relative.startswith("mobile/"):
         parts = relative.split("/")
         return "/".join(parts[:2]) if len(parts) >= 2 else relative
@@ -1200,6 +1202,7 @@ def check_resources(
         ("src/Component/ConfigDrivenPanel.cpp", "menuDefinitionFile"),
         ("src/Component/ConfigDrivenPanel.cpp", "menuFile"),
         ("src/Game/Scene/Title.cpp", "menuName"),
+        ("src/Game/Menu/SaveLoad.cpp", "menuDefinition"),
     }
     for relative, argument in sorted(dynamic_calls - allowed_dynamic_calls):
         errors.append(

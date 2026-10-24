@@ -34,6 +34,7 @@ const std::vector<ControllerHelpOverlay::HelpLine>&
 		{ InputAction::UseQuickItem3, "快捷物品三" },
 		{ InputAction::Jump, "向摇杆方向跳跃" },
 		{ InputAction::CycleInteractionTarget, "切换附近目标" },
+		{ InputAction::CycleFriendlyTarget, "切换支援目标（自己或友方）" },
 		{ InputAction::ToggleMiniMap, "开关小地图" },
 		{ InputAction::ToggleSit, "打坐或起身" },
 		{ InputAction::OpenSystemMenu, "打开系统菜单" },

@@ -127,8 +127,34 @@ struct MagicLinkedLevel
 	std::shared_ptr<Magic> jumpEndMagic = nullptr;
 };
 
+struct MagicLevelRuntime
+{
+	bool configured = false;
+	unsigned int keepMilliseconds = 0;
+	std::string npcFile;
+	std::string npcIni;
+	int maxCount = 0;
+	int maxLevel = 0;
+	UTime disableMoveMilliseconds = 0;
+	UTime disableSkillMilliseconds = 0;
+	UTime blindMilliseconds = 0;
+	UTime weakMilliseconds = 0;
+	int weakAttackPercent = 0;
+	int weakDefendPercent = 0;
+	UTime morphMilliseconds = 0;
+	UTime changeToFriendMilliseconds = 0;
+	int attackAddPercent = 0;
+	int defendAddPercent = 0;
+	int evadeAddPercent = 0;
+	int speedAddPercent = 0;
+	std::string replaceMagic;
+	std::string specialKind9ReplaceFlyIni;
+	std::string specialKind9ReplaceFlyIni2;
+};
+
 struct MagicLevel
 {
+	MagicLevelRuntime runtime;
 	int effect = 0;
 	int effectExt = 0;
 	int effect2 = 0;
@@ -264,6 +290,11 @@ public:
 		const std::shared_ptr<GameElement>& user,
 		int level,
 		int fallbackAmount = 0);
+	bool supportsFriendlyTarget(int level) const;
+	static bool isValidFriendlyTarget(const std::shared_ptr<NPC>& target);
+	unsigned int getKeepMillisecondsForLevel(int level) const;
+	int getTargetLevelLimit(int level) const;
+	void applyRuntimeLevel(int level);
 
 	static float getAngle(Point from, Point to);
 	static int getDirection(Point from, Point to);

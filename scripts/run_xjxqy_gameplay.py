@@ -318,8 +318,9 @@ def transition(client, resource, destination, trap, output, name, choices=(), ex
             party = configparser.ConfigParser(interpolation=None)
             party.read(output / "user-data/save/xjxqy/game/partner0.ini", encoding="utf-8-sig")
             followers = {party.get(section, "name", fallback="") for section in party.sections()}
-            avoided = {(row["position"]["x"], row["position"]["y"]) for row in state["targets"] if row["name"] not in followers}
-            path = reachable_trap(resource, state["map"], trap, state["player"]["position"], occupied, with_path=True, avoid=avoided)
+            avoided = {(row["position"]["x"], row["position"]["y"]) for row in state["targets"]
+                       if row["name"] not in followers and row.get("kind") != "object" and row.get("life", 1) > 0}
+            path = reachable_trap(resource, state["map"], trap, state["player"]["position"], avoided, with_path=True, avoid=avoided)
         x, y = path[-1]
         action = client.submit("MoveTo", generation=state["generation"], x=x, y=y,
                                running=True, timeoutMs=180000)
@@ -2673,7 +2674,7 @@ def bixia_first_rescue(client, output, resource):
             raise AutomationError("Old Wang's native boat did not reach Bixia at Event 130")
         client.save_or_load(0)
         checkpoint(client, output, "226-bixia-island-source-slot0")
-    clear_enemies(client, output, "227-bixia-island-nearby-combat")
+    walk_required_battle(client, output, resource, None, "227-bixia-island", progress_variable=None)
     transition(client, resource, "map038_碧霞岛山洞.map", 1, output, "228-bixia-cave-entry")
     client.save_or_load(1)
     checkpoint(client, output, "229-bixia-cave-source-slot1")
@@ -2734,48 +2735,7 @@ def hemei_rescue(client, output, resource):
         checkpoint(client, output, "251-secret-battle-source-slot0")
         transition(client, resource, "map039_碧霞岛山洞秘道.map", 1, output, "252-secret-rescue-exit-refused")
         load_checkpoint(client, 0)
-    for step in range(50):
-        state = idle(client)
-        if state["map"] == "map034_1_海边小渔村.map" and state["variables"].get("Event") == "180":
-            break
-        if state["player"]["position"] == dict(x=3, y=42):
-            break
-        if any(row.get("hostile") and row.get("attackable") and row.get("visibleFromPlayer") for row in state["targets"]):
-            try:
-                clear_enemies(client, output, f"secret-route-combat-{step}-{time.time_ns()}", ranged=True)
-            except AutomationError as error:
-                if not any(reason in str(error) for reason in ("no_progress", "target_unreachable")):
-                    raise
-                checkpoint(client, output, f"secret-route-blocked-enemy-{step}-{time.time_ns()}")
-            state = idle(client)
-            if state["map"] != "map039_碧霞岛山洞秘道.map":
-                break
-        occupied = {(row["position"]["x"], row["position"]["y"]) for row in state["targets"]}
-        path = reachable_trap(resource, state["map"], None, state["player"]["position"], occupied,
-                              with_path=True, destination=(3, 42))
-        write_json(output / f"secret-waypoint-path-{step}-{time.time_ns()}.json", dict(map=state["map"], path=path))
-        point = next(point for point in reversed(path[1:3]) if point not in occupied)
-        try:
-            client.move(*point)
-        except AutomationError as error:
-            if not any(reason in str(error) for reason in ("blocked_destination", "no_progress")):
-                raise
-            checkpoint(client, output, f"secret-route-blocked-walk-{step}-{time.time_ns()}")
-            continue
-        checkpoint(client, output, f"secret-native-waypoint-{step}")
-        if any(row.get("hostile") and row.get("attackable") and row.get("visibleFromPlayer") for row in client.observe()["targets"]):
-            try:
-                clear_enemies(client, output, f"secret-route-combat-{step}", ranged=True)
-            except AutomationError as error:
-                if not any(reason in str(error) for reason in ("no_progress", "target_unreachable")):
-                    raise
-                state = checkpoint(client, output, f"secret-route-blocked-enemy-{step}")
-                write_json(output / f"secret-route-blocked-enemy-proof-{step}.json", dict(status="pending",
-                           error=str(error), remaining=[row for row in state["targets"] if row.get("hostile")],
-                           cheatAssisted=False))
-    else:
-        raise AutomationError("Secret passage walking exceeded its recorded route limit")
-    state = clear_enemies(client, output, "253-secret-native-combat")
+    state = walk_required_battle(client, output, resource, "4", "253-secret", progress_variable="map039Enemy")
     state = idle(client)
     if (state["map"] != "map034_1_海边小渔村.map" or state["variables"].get("Event") != "180"
             or state["variables"].get("map039Enemy") != "4"):
@@ -3256,7 +3216,7 @@ def defeat_nangong(client, output, resource, option):
         boss = next(row for row in state["targets"] if row["name"] == "南宫灭" and row.get("hostile") and row.get("attackable"))
         try:
             client.act("StartCombat", timeout=65, generation=state["generation"], targetId=boss["id"],
-                       kills=1, skills=[0], allowMeleeFallback=False, timeoutMs=60000)
+                       kills=1, skills=[0], allowMeleeFallback=True, timeoutMs=60000)
         except AutomationError as error:
             if not any(reason in str(error) for reason in ("no_progress", "configured_skill_unavailable")):
                 raise
@@ -3639,10 +3599,8 @@ def changan_rescue(client, output, resource):
     state = transition(client, resource, "map049_长安城.map", 10, output, "537-yao-official-gate")
     if state["variables"].get("yamen") != "1":
         raise AutomationError("Native official gate did not admit Yao's party")
-    # Yao stands in the only walking passage after the gate dialogue.
-    # Ordinary movement lets the following partner vacate that tile.
+    # Approach the guards through native interaction; Yao can occupy (3, 78).
     client.move(9, 90)
-    client.move(3, 78)
     for name, filename in (("大牢卫兵", "大牢门口士兵对话.txt"), ("衙门卫兵1", "衙门门口士兵对话.txt"),
                            ("衙门卫兵2", "衙门门口士兵对话.txt")):
         interact_at(client, output, resource, name, f"script/map/map049_长安城/{filename}", f"538-official-guard-{name}")
@@ -4802,7 +4760,7 @@ def nangong_showdown_source(client, output, resource):
                nativeNangongBattle=True, enemyLife=enemy["life"], nativeArmyEnemiesCleared=army_count - remaining_army,
                nativeArmyRemaining=remaining_army, nativeArmyClearScope="nearby" if remaining_army else "all",
                assistedPlayerLevel=60, playerInvincibilityForPreparation=True,
-               inheritedPartnerInvincibility=True, sourceSlots=[0, 1, 2], cheatAssisted=True))
+               sourceSlots=[0, 1, 2], cheatAssisted=True))
     print("Native Nangong battle source saved before required defeat", flush=True)
 
 
@@ -4811,16 +4769,16 @@ def nangong_medicine_departure(client, output, resource, partner_defeat, option)
     initial = client.observe(VARIABLES)
     if initial.get("map") != "map084_金兵主帅营.map" and not initial.get("inEvent"):
         raise AutomationError("Medicine departure requires the native Nangong battle checkpoint")
-    if not partner_defeat and initial.get("cheatInvincibilityEnabled"):
+    if initial.get("cheatInvincibilityEnabled"):
         client.open_menu("System")
         client.activate("options")
         client.activate("cheat-settings")
         client.activate("invincibility")
         while not client.observe().get("worldInput"):
             client.ui("Cancel")
-        initial = checkpoint(client, output, "901-required-player-defeat-invincibility-disabled")
+        initial = checkpoint(client, output, "901-required-defeat-invincibility-disabled")
         if initial.get("cheatInvincibilityEnabled"):
-            raise AutomationError("Required player defeat still has native invincibility enabled")
+            raise AutomationError("Required defeat still has native invincibility enabled")
     combat = None
     if not partner_defeat and initial.get("map") == "map084_金兵主帅营.map" and not initial.get("inEvent"):
         enemy = next(row for row in initial["targets"] if row.get("name") == "南宫灭")
@@ -5232,6 +5190,7 @@ def tianwang_password_and_hall(client, output, resource):
     state = idle(client)
     if state["map"] != "map100_天王岛.map" or state["variables"].get("Event") != "560":
         raise AutomationError("Tianwang passwords require the native island Event560 source")
+    restore_invincibility = state.get("cheatInvincibilityEnabled", False)
     client.save_or_load(0)
     source = "script/map/map100_天王岛/trap03.txt"
     sites = [row["id"] for row in catalog_for(resource)["choices"] if row["path"] == source]
@@ -5249,6 +5208,10 @@ def tianwang_password_and_hall(client, output, resource):
                 raise AutomationError("Wrong native password did not return to title")
         elif state["variables"].get("Event") != "570":
             raise AutomationError("Correct native passwords did not advance Event570")
+    # Expected returns to title rebuild the manager and reset native cheats.
+    if restore_invincibility and not state.get("cheatInvincibilityEnabled"):
+        assist(client, output, None, True)
+        checkpoint(client, output, "1000-password-assistance-restored")
     client.save_or_load(1)
     for actor in ("史初", "候忠", "周旱", "草草"):
         for repeat in range(2):

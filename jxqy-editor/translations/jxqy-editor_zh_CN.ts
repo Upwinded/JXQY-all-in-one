@@ -267,6 +267,18 @@
     <message><source>每行一个 ini/magic 下的 Magic INI；未配置男女特效时随机选择</source><translation>每行一个 ini/magic 下的 Magic INI；未配置男女特效时随机选择</translation></message>
     <message><source>ini/magic 下的 Magic INI 文件名，可留空</source><translation>ini/magic 下的 Magic INI 文件名，可留空</translation></message>
     <message><source>LevelUp 特效必须是 ini/magic 下的安全相对 INI 路径，且文件名不能包含逗号：%1</source><translation>LevelUp 特效必须是 ini/magic 下的安全相对 INI 路径，且文件名不能包含逗号：%1</translation></message>
+    <message><source>普通攻击释放:</source><translation>普通攻击释放:</translation></message>
+    <message><source>特殊攻击释放:</source><translation>特殊攻击释放:</translation></message>
+    <message><source>施法释放:</source><translation>施法释放:</translation></message>
+    <message><source>继承</source><translation>继承</translation></message>
+    <message><source>自定义</source><translation>自定义</translation></message>
+    <message><source>分子/分母</source><translation>分子/分母</translation></message>
+    <message><source>正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。</source><translation>正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。</translation></message>
+    <message><source>释放帧比例必须是正整数分数，且分子不大于分母：%1</source><translation>释放帧比例必须是正整数分数，且分子不大于分母：%1</translation></message>
+    <message><source>分数无效</source><translation>分数无效</translation></message>
+    <message><source>无法解析有效值</source><translation>无法解析有效值</translation></message>
+    <message><source>有效值 %1；来源：%2</source><translation>有效值 %1；来源：%2</translation></message>
+    <message><source>通用默认</source><translation>通用默认</translation></message>
 </context>
 
 <context>
@@ -291,7 +303,7 @@
     <message><source>覆盖在当前动作上</source><translation>覆盖在当前动作上</translation></message>
     <message><source>使用主角生命规则</source><translation>使用主角生命规则</translation></message>
     <message><source>直接增减并限制范围</source><translation>直接增减并限制范围</translation></message>
-    <message><source>每行一项，例如 MagicTriggerAtAnimationEnd=1 或 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</source><translation>每行一项，例如 MagicTriggerAtAnimationEnd=1 或 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</translation></message>
+    <message><source>每行一项，例如 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</source><translation>每行一项，例如 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</translation></message>
 </context>
 
 </TS>

@@ -356,6 +356,15 @@ bool runNPCIntentMatrixTests()
 		&& !WorldInteractionResolver::isNPCValidForIntent(
 			neutralFighter, WorldInteractionIntent::Attack, actor),
 		"true neutral fighter is excluded from talk and attack") && ok;
+	ok = check(WorldInteractionResolver::isNPCValidForIntent(
+		friendlyFighter, WorldInteractionIntent::FriendlyMagic, actor)
+		&& !WorldInteractionResolver::isNPCValidForIntent(
+			neutralFighter, WorldInteractionIntent::FriendlyMagic, actor)
+		&& !WorldInteractionResolver::isNPCValidForIntent(
+			hostileScripted, WorldInteractionIntent::FriendlyMagic, actor)
+		&& !WorldInteractionResolver::isNPCValidForIntent(
+			scriptedFriendly, WorldInteractionIntent::FriendlyMagic, actor),
+		"support targeting accepts living friendly fighters without requiring dialogue and excludes other roles") && ok;
 	const auto fastSelectionCandidates =
 		fixture.gameManager.npcManager->findRadiusFastSelectionNPC(
 			PlayerPosition, 4);
@@ -1404,6 +1413,30 @@ bool runStrictRevalidationTests()
 		&& player.nextDest == ndObj && player.destGE.lock() == movedObject
 		&& player.nextDestStrictWorldInteraction,
 		"strict resume revalidates and keeps a moved but still-legal target") && ok;
+	player.cancelQueuedInteraction(false);
+
+	auto movedNPC = fixture.addNPC(
+		{ 29, 22 }, nkNormal, nrNeutral, "npc_primary.lua", "");
+	ok = check(gameManager.queueNPCTalkInteraction(
+		movedNPC, WorldInteractionScriptSide::Primary, true),
+		"moving NPC talk queues its original approach") && ok;
+	WorldInteractionRuntimeTestAccess::processQueuedAction(player);
+	movedNPC->setPosition({ 31, 22 });
+	player.beginStand();
+	WorldInteractionRuntimeTestAccess::processQueuedAction(player);
+	ok = check(isStrictPendingFor(player, movedNPC, ndTalk, false, true)
+		&& player.isRunning(),
+		"moving NPC talk resumes after finishing the old approach path") && ok;
+	player.cancelQueuedInteraction(false);
+	ok = check(gameManager.queueNPCInteraction(movedNPC, false, true),
+		"pointer and touch NPC talk queues the original approach") && ok;
+	WorldInteractionRuntimeTestAccess::processQueuedAction(player);
+	movedNPC->setPosition({ 32, 22 });
+	player.beginStand();
+	WorldInteractionRuntimeTestAccess::processQueuedAction(player);
+	ok = check(player.nextDest == ndTalk && !player.nextDestStrictWorldInteraction
+		&& player.destGE.lock() == movedNPC && player.isRunning(),
+		"pointer and touch NPC talk resumes after finishing the old approach path") && ok;
 	player.cancelQueuedInteraction(false);
 	return ok;
 }

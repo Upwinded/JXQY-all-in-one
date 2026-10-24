@@ -203,8 +203,9 @@ bool PartnerManager::restoreCharacterEquipment(NPC& partner, int characterIndex)
 
 bool PartnerManager::saveCharacterSnapshot(const std::shared_ptr<NPC>& partner)
 {
+	const bool equipmentOnly = partner != nullptr && partner->relation == nrNeutral && partner->canEquip > 0;
 	if (gm == nullptr || !gm->global.feature.restorePartnerAttributes || partner == nullptr
-		|| !isActivePartner(partner) || partner->relation != nrFriendly) return true;
+		|| !isActivePartner(partner) || (partner->relation != nrFriendly && !equipmentOnly)) return true;
 	const int index = partner->getPartnerCharacterIndex();
 	if (index < 0) return true;
 	if (!partner->characterEquipmentSynchronized)
@@ -226,7 +227,7 @@ bool PartnerManager::saveCharacterSnapshot(const std::shared_ptr<NPC>& partner)
 		GameLog::write("PartnerManager: cannot update character record %s\n", playerFile.c_str());
 		return false;
 	}
-	if (savedLevel > partner->level) return true;
+	if (savedLevel > partner->level && !equipmentOnly) return true;
 	const auto goodsStatus = readCharacterRecord(goodsFile, goodsIni);
 	if (goodsStatus == SaveIniPersistence::ReadStatus::Missing) goodsIni = std::make_shared<INIReader>();
 	else if (goodsStatus != SaveIniPersistence::ReadStatus::Loaded || !goodsIni->HasSection("Head")
@@ -256,8 +257,11 @@ bool PartnerManager::saveCharacterSnapshot(const std::shared_ptr<NPC>& partner)
 		{ "Defend", partner->defend }, { "Defend2", partner->defend2 }, { "Defend3", partner->defend3 },
 		{ "Evade", partner->evade }
 	};
-	for (const auto& attribute : attributes) playerIni->SetInteger("Init", attribute.first, attribute.second);
-	playerIni->Set("Init", "LevelIni", partner->npcLevelIni);
+	if (!equipmentOnly)
+	{
+		for (const auto& attribute : attributes) playerIni->SetInteger("Init", attribute.first, attribute.second);
+		playerIni->Set("Init", "LevelIni", partner->npcLevelIni);
+	}
 	for (int i = 0; i < GOODS_BODY_COUNT; ++i)
 	{
 		const std::string section = std::to_string(gm->goodsManager.equipIndex(i) + 1);
@@ -272,9 +276,9 @@ bool PartnerManager::saveCharacterSnapshot(const std::shared_ptr<NPC>& partner)
 		if (!goodsIni->Get(section, "IniFile", "").empty() && goodsIni->GetInteger(section, "Number", 0) > 0) ++count;
 	}
 	goodsIni->SetInteger("Head", "Count", count);
-	if (!playerIni->saveToFile(SaveFileManager::CurrentPath() + playerFile)
+	if ((!equipmentOnly && !playerIni->saveToFile(SaveFileManager::CurrentPath() + playerFile))
 		|| !goodsIni->saveToFile(SaveFileManager::CurrentPath() + goodsFile)) return false;
-	SaveFileManager::AppendFile(playerFile);
+	if (!equipmentOnly) SaveFileManager::AppendFile(playerFile);
 	SaveFileManager::AppendFile(goodsFile);
 	return true;
 }

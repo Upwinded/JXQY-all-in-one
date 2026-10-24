@@ -1950,6 +1950,61 @@ bool runExclusiveMeteorMovementTest(GameManager& gameManager)
 		"meteor path movement is not followed by a second ordinary projectile step");
 }
 
+bool runMeteorLifetimeUntilArrivalTest(GameManager& gameManager, int lifeFrames)
+{
+	gameManager.effectManager->freeResource();
+	auto magic = std::make_shared<Magic>();
+	magic->initFromIni("meteor.ini");
+	magic->meteorMove = 8;
+	magic->level[1].moveKind = mmkPoint;
+	magic->level[1].speed = 8;
+	magic->level[1].lifeFrame = lifeFrames;
+	const Point destination = { 11, 10 };
+	auto effects = Magic::addEffect(
+		magic, gameManager.player, { 10, 10 }, destination,
+		1, 10, 0, lkSelf, nullptr);
+	if (!check(effects.size() == 1 && effects[0] != nullptr,
+		"short-lived meteor creates a projectile"))
+	{
+		return false;
+	}
+	auto effect = effects[0];
+	effect->waitTime = 160;
+	const UTime startTime = effect->beginTime;
+	bool stayedFlying = true;
+	for (UTime frame = 1; frame <= 256 && effect->isEnteringWithMeteor(); ++frame)
+	{
+		EffectTestAccess::setFrameTime(*effect, 40);
+		effect->setTime(startTime + frame * 40);
+		EffectTestAccess::update(*effect);
+		if (effect->doing != ekFlying || (effect->result & erLifeExhaust))
+		{
+			stayedFlying = false;
+			break;
+		}
+	}
+	const bool arrived = stayedFlying && !effect->isEnteringWithMeteor()
+		&& effect->position == destination && !effect->skipsCharacterCollision();
+	if (!arrived)
+	{
+		std::cerr << "Meteor lifetime case=" << lifeFrames
+			<< " flying=" << stayedFlying << " entering=" << effect->isEnteringWithMeteor()
+			<< " state=" << effect->doing << " result=" << effect->result
+			<< " position=" << effect->position.x << ',' << effect->position.y
+			<< " offset=" << effect->offset.x << ',' << effect->offset.y << '\n';
+	}
+	bool ok = check(arrived,
+		"meteor delay and path finish before ordinary animation lifetime can retire it");
+	effect->finishMeteorArrivalWithoutCollision();
+	const auto resultAfterArrival = effect->result;
+	effect->finishMeteorArrivalWithoutCollision();
+	ok = check((effect->doing == ekExploding || effect->doing == ekHiding)
+		&& resultAfterArrival != erNone && effect->result == resultAfterArrival,
+		"meteor arrival ends once after leaving the landing collision available") && ok;
+	gameManager.effectManager->freeResource();
+	return ok;
+}
+
 bool runExclusiveRoundMovementTest(GameManager& gameManager)
 {
 	gameManager.effectManager->freeResource();
@@ -2445,6 +2500,8 @@ bool runEffectRuntimePersistenceTests()
 	ok = runSummonTransientPersistenceTest(gameManager) && ok;
 	ok = runMeteorPathRoundTripTest(gameManager) && ok;
 	ok = runExclusiveMeteorMovementTest(gameManager) && ok;
+	ok = runMeteorLifetimeUntilArrivalTest(gameManager, 0) && ok;
+	ok = runMeteorLifetimeUntilArrivalTest(gameManager, 1) && ok;
 	ok = runExclusiveRoundMovementTest(gameManager) && ok;
 	ok = runTimeStopDurationTest(gameManager) && ok;
 	ok = runHeartCircleSpeedRoundTripTest(gameManager) && ok;

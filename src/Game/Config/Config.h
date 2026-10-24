@@ -24,6 +24,7 @@ public:
 	static bool externalResourcesEnabled;
 	static bool useQingyuUi;
 	static bool automaticSaveEnabled;
+	static int experienceMultiplier;
 
 	static void load();
 	static void save();

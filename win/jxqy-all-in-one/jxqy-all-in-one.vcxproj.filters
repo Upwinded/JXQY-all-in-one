@@ -253,6 +253,12 @@
     <ClCompile Include="..\..\src\Game\Data\GameElement.cpp">
       <Filter>Src\Game\Data</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\AttributePoints.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Data\SkillTree.cpp">
+      <Filter>Src\Game\Data</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Game\Data\Global.cpp">
       <Filter>Src\Game\Data</Filter>
     </ClCompile>
@@ -685,6 +691,15 @@
     <ClCompile Include="..\..\ThirdParty\miniz\miniz_tdef.c">
       <Filter>ThirdParty\miniz</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\AttributePointMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\PaperMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\Game\Menu\SkillTreeMenu.cpp">
+      <Filter>Src\Game\Menu</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Game\Menu\GambleMenu.cpp">
       <Filter>Src\Game\Menu</Filter>
     </ClCompile>
@@ -922,6 +937,12 @@
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Data\GameElement.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\AttributePoints.h">
+      <Filter>Src\Game\Data</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Data\SkillTree.h">
       <Filter>Src\Game\Data</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Data\Global.h">
@@ -1338,6 +1359,15 @@
     </ClInclude>
     <ClInclude Include="..\..\src\Update\ArtifactChecksum.h">
       <Filter>Src\Update</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\AttributePointMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\PaperMenu.h">
+      <Filter>Src\Game\Menu</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Game\Menu\SkillTreeMenu.h">
+      <Filter>Src\Game\Menu</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Game\Menu\GambleMenu.h">
       <Filter>Src\Game\Menu</Filter>

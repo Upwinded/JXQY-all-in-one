@@ -4,11 +4,13 @@
 #include "../../libconvert/libconvert.h"
 #include "ColorStyle.h"
 #include "../../File/log.h"
+#include "../../File/File.h"
 #include "../../Resource/ResourceManager.h"
 #include "../../Resource/ResourceManifest.h"
 #include "../GameManager/SaveFileManager.h"
 #include "../Config/Config.h"
 #include <algorithm>
+#include <charconv>
 #include <set>
 
 
@@ -327,10 +329,14 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	scriptPlayerName = manifest.scriptPlayerName;
 	feature = GameFeatureFlags();
 	minimumMagicDamage = manifest.resolvedMinimumMagicDamage();
+	attackReleaseFrameRatio = manifest.attackReleaseFrameRatio;
+	specialAttackReleaseFrameRatio = manifest.specialAttackReleaseFrameRatio;
+	magicReleaseFrameRatio = manifest.magicReleaseFrameRatio;
 	magicEffectCalculationMode =
 		manifest.resolvedMagicEffectCalculationMode();
 	partnerFollowRadius = manifest.resolvedPartnerFollowRadius();
 	partnerFollowRunRadius = manifest.resolvedPartnerFollowRunRadius();
+	runSpeedPixelsPerSecond = manifest.runSpeedPixelsPerSecond;
 	levelUpThresholdMode = manifest.resolvedLevelUpThresholdMode();
 	npcActionProfile = manifest.resolvedNpcActionProfile();
 	npcRuntimeProfile = manifest.resolvedNpcRuntimeProfile();
@@ -349,9 +355,9 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	applyBooleanFeatureOverride(manifest, "FreezeVisualEffect", feature.freezeVisualEffect);
 	applyBooleanFeatureOverride(manifest, "PoisonVisualEffect", feature.poisonVisualEffect);
 	applyBooleanFeatureOverride(manifest, "PetrifyVisualEffect", feature.petrifyVisualEffect);
-	applyBooleanFeatureOverride(manifest, "MagicTriggerAtAnimationEnd", feature.magicTriggerAtAnimationEnd);
 	applyBooleanFeatureOverride(manifest, "NativeNpcAttackAtAnimationEnd", feature.nativeNpcAttackAtAnimationEnd);
 	applyBooleanFeatureOverride(manifest, "RestorePartnerAttributes", feature.restorePartnerAttributes);
+	applyBooleanFeatureOverride(manifest, "UseThewWhenNormalRun", feature.useThewWhenNormalRun);
 	applyBooleanFeatureOverride(manifest, "LumAsBrightness", feature.lumAsBrightness);
 	applyBooleanFeatureOverride(manifest, "AmbientLumOverlay", feature.ambientLumOverlay);
 	applyBooleanFeatureOverride(manifest, "TopButtonsLayout", feature.topButtonsLayout);
@@ -386,6 +392,7 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 		"magictriggeratanimationend",
 		"nativenpcattackatanimationend",
 		"restorepartnerattributes",
+		"usethewwhennormalrun",
 		"lumasbrightness",
 		"ambientlumoverlay",
 		"topbuttonslayout",
@@ -431,6 +438,58 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 
 void Global::loadUiSettings()
 {
+	attributePointRules.load();
+	skillPointsEnabled = false;
+	skillPointLevelUpRatio = 0;
+	skillPointMaximum = 0;
+	skillTreeEnabled = false;
+	skillTreeUsesCharacterFiles = false;
+	skillTreeFiles.clear();
+	std::unique_ptr<char[]> skillData;
+	int skillLength = 0;
+	if (File::readActiveResourceFile("ini/other/Skill.ini", skillData, skillLength, 64 * 1024)
+		&& skillData != nullptr && skillLength > 0)
+	{
+		INIReader skillIni(skillData);
+		const auto readNonNegative = [&](const char* key, int& value)
+		{
+			const std::string text = skillIni.Get("Init", key, "0");
+			const char* first = text.data();
+			const char* last = first + text.size();
+			if (first != last && *first == '+') ++first;
+			const auto parsed = std::from_chars(first, last, value);
+			return parsed.ec == std::errc() && parsed.ptr == last && value >= 0;
+		};
+		int enabled = 0;
+		int ratio = 0;
+		int maximum = 0;
+		if (skillIni.ParseError() == 0 && readNonNegative("PointEnable", enabled)
+			&& enabled > 0 && readNonNegative("LevelUpRatio", ratio) && readNonNegative("MaxValue", maximum))
+		{
+			skillPointsEnabled = true;
+			skillPointLevelUpRatio = ratio;
+			skillPointMaximum = maximum;
+		}
+		int treeEnabled = 0;
+		if (skillIni.ParseError() == 0 && readNonNegative("TreeEnable", treeEnabled) && treeEnabled > 0)
+		{
+			skillTreeEnabled = true;
+			// Explicit adaptation bindings; MG 5.3.12 itself uses skilltree.json.
+			skillTreeUsesCharacterFiles = skillIni.HasSection("TreeFiles");
+			for (const auto& key : skillIni.GetSectionKeys("TreeFiles"))
+			{
+				int character = -2;
+				const auto parsed = std::from_chars(key.data(), key.data() + key.size(), character);
+				const std::string path = skillIni.Get("TreeFiles", key, "");
+				if (parsed.ec == std::errc() && parsed.ptr == key.data() + key.size()
+					&& character >= -1 && File::isSafeResourcePath(path) && !path.empty())
+				{
+					skillTreeFiles[character] = path;
+				}
+			}
+		}
+	}
+
 	GoodsListLayout defaultGoodsLayout = makeDefaultGoodsLayout(feature);
 	MagicListLayout defaultMagicLayout = makeDefaultMagicLayout(feature);
 	goodsLayout = defaultGoodsLayout;
@@ -476,6 +535,23 @@ void Global::loadUiSettings()
 	}
 }
 
+bool Global::setScreenColor(const std::string& value)
+{
+	if (value.empty() || value == "#000000")
+	{
+		data.screenColor = ColorStyle::Normal;
+		return true;
+	}
+	const std::size_t begin = value.front() == '#' ? 1 : 0;
+	if (value.size() - begin < 6) return false;
+	uint32_t color = 0;
+	const char* first = value.data() + begin;
+	const auto parsed = std::from_chars(first, first + 6, color, 16);
+	if (parsed.ec != std::errc() || parsed.ptr != first + 6) return false;
+	data.screenColor = color;
+	return true;
+}
+
 bool Global::load()
 {
 	const std::string fileName =
@@ -503,6 +579,7 @@ bool Global::load()
 
     data.asfStyle = ini.GetColor("Option", "AsfStyle", 0xFFFFFF);
     data.mpcStyle = ini.GetColor("Option", "MpcStyle", 0xFFFFFF);
+	if (!setScreenColor(ini.Get("Option", "ScreenColor", ""))) data.screenColor = ColorStyle::Normal;
 	const std::string legacyAsfStyle = ini.Get("Option", "AsfStyle", "");
 	const std::string legacyMpcStyle = ini.Get("Option", "MpcStyle", "");
 	if ((data.asfStyle & 0x00FFFFFF) == 0 &&
@@ -559,6 +636,7 @@ bool Global::save()
 	INIReader ini;
 
 	ini.Set("Save", "EngineVersion", JxqyBuildVersion::EngineVersion);
+	ini.Set("Save", "MinimumReaderVersion", JxqyBuildVersion::MinimumSaveReaderEngineVersion);
 	ini.Set("Save", "ResourceVersion",
 		SaveVersionCompatibility::resourceVersionOrDefault(
 			ResourceManager::instance().getActiveManifest()
@@ -572,6 +650,7 @@ bool Global::save()
     
     ini.SetColor("Option", "AsfStyle", data.asfStyle);
     ini.SetColor("Option", "MpcStyle", data.mpcStyle);
+	ini.Set("Option", "ScreenColor", convert::formatString("#%06X", data.screenColor & 0xFFFFFF));
 
 	ini.SetInteger("Option", "MainLum", data.mainLum);
 	ini.SetInteger("Option", "FadeLum", data.fadeLum);

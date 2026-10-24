@@ -176,6 +176,7 @@ private:
 	bool touchControlsChordFired = false;
 	std::uint64_t touchControlsChordStartedAt = 0;
 	bool leftTriggerPressed = false;
+	bool leftTriggerChordConsumed = false;
 	bool rightTriggerPressed = false;
 	std::array<std::uint64_t, 4> navigationNextRepeatAt{};
 	std::array<std::uint64_t, 4> rightStickScrollNextRepeatAt{};

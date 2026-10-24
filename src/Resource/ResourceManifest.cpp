@@ -150,16 +150,6 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 		}
 	}
 
-	experienceMultiplierDefined =
-		hasIniKey(ini, "Experience", "ExperienceMultiplier");
-	if (experienceMultiplierDefined &&
-		!tryParseFiniteNonNegativeDouble(
-			ini.get("Experience", "ExperienceMultiplier", ""),
-			experienceMultiplier))
-	{
-		experienceMultiplierDefined = false;
-	}
-
 	levelUpThresholdModeDefined =
 		hasIniKey(ini, "Experience", "LevelUpThresholdMode");
 	if (levelUpThresholdModeDefined)
@@ -212,6 +202,12 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 		}
 	}
 
+	double configuredRunSpeed = 0.0;
+	runSpeedPixelsPerSecond = tryParseFiniteNonNegativeDouble(
+		trimAscii(ini.get("Gameplay", "RunSpeedPixelsPerSecond", "")), configuredRunSpeed)
+		&& configuredRunSpeed <= INT_MAX && std::floor(configuredRunSpeed) == configuredRunSpeed
+		? static_cast<int>(configuredRunSpeed) : 0;
+
 	minimumMagicDamage = 10;
 	minimumMagicDamageDefined =
 		hasIniKey(ini, "Combat", "MinimumMagicDamage");
@@ -250,6 +246,33 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 			magicEffectCalculationModeDefined = false;
 		}
 	}
+
+	invalidActionReleaseFrameRatioKeys.clear();
+	const auto loadReleaseRatio = [&](const char* key, ActionReleaseFrameRatio fallback,
+		ActionReleaseFrameRatio& ratio, bool& defined, std::string& sourceId)
+	{
+		ratio = fallback;
+		defined = false;
+		sourceId.clear();
+		if (hasIniKey(ini, "Combat", key))
+		{
+			defined = tryParseActionReleaseFrameRatio(ini.get("Combat", key, ""), ratio);
+			if (defined)
+			{
+				sourceId = id;
+			}
+			else
+			{
+				invalidActionReleaseFrameRatioKeys.emplace_back(key);
+			}
+		}
+	};
+	loadReleaseRatio("AttackReleaseFrameRatio", { 2, 3 }, attackReleaseFrameRatio,
+		attackReleaseFrameRatioDefined, attackReleaseFrameRatioSourceId);
+	loadReleaseRatio("SpecialAttackReleaseFrameRatio", { 1, 3 }, specialAttackReleaseFrameRatio,
+		specialAttackReleaseFrameRatioDefined, specialAttackReleaseFrameRatioSourceId);
+	loadReleaseRatio("MagicReleaseFrameRatio", { 4, 5 }, magicReleaseFrameRatio,
+		magicReleaseFrameRatioDefined, magicReleaseFrameRatioSourceId);
 
 	scriptPlayerName = trimAscii(ini.get("Script", "PlayerName", ""));
 	npcActionProfileDefined =
@@ -481,8 +504,6 @@ ResourceManifest ResourceManifest::createDefault(const std::string& root)
 	manifest.defeatedNpcExperienceMode =
 		DefeatedNpcExperienceMode::StoredExperience;
 	manifest.defeatedNpcExperienceModeDefined = false;
-	manifest.experienceMultiplier = 3.0;
-	manifest.experienceMultiplierDefined = false;
 	manifest.levelUpThresholdMode =
 		LevelUpThresholdMode::GreaterThanOrEqual;
 	manifest.levelUpThresholdModeDefined = false;
@@ -581,15 +602,6 @@ ResourceManifest::resolvedDefeatedNpcExperienceMode() const
 	return type == 0
 		? DefeatedNpcExperienceMode::StoredExperience
 		: DefeatedNpcExperienceMode::LevelProductWithBonus;
-}
-
-double ResourceManifest::resolvedExperienceMultiplier() const
-{
-	if (experienceMultiplierDefined)
-	{
-		return experienceMultiplier;
-	}
-	return type >= 0 && type <= 2 ? 3.0 : 1.0;
 }
 
 LevelUpThresholdMode ResourceManifest::resolvedLevelUpThresholdMode() const

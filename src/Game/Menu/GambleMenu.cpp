@@ -78,12 +78,12 @@ void GambleMenu::init()
 	makeLabel(costLabel, { 24, 62, 352, 28 }, 18, 0xFFFFFFFF);
 	makeLabel(diceLabel, { 24, 100, 352, 32 }, 22, 0xFFFFFFFF);
 	makeLabel(resultLabel, { 24, 140, 352, 34 }, 18, 0xFFFFFFFF);
-	makeButton(decreaseBetButton, { 28, 196, 76, 34 }, "减注");
-	makeButton(increaseBetButton, { 116, 196, 76, 34 }, "加注");
-	makeButton(smallButton, { 208, 196, 76, 34 }, "押小");
-	makeButton(bigButton, { 296, 196, 76, 34 }, "押大");
-	makeButton(rollButton, { 76, 254, 100, 36 }, "开盅");
-	makeButton(exitButton, { 224, 254, 100, 36 }, "离开");
+	makeButton(decreaseBetButton, { 28, 196, 76, 44 }, "减注");
+	makeButton(increaseBetButton, { 116, 196, 76, 44 }, "加注");
+	makeButton(smallButton, { 208, 196, 76, 44 }, "押小");
+	makeButton(bigButton, { 296, 196, 76, 44 }, "押大");
+	makeButton(rollButton, { 76, 254, 100, 44 }, "开盅");
+	makeButton(exitButton, { 224, 254, 100, 44 }, "离开");
 
 	setChildRectReferToParent();
 	updateLabels();
@@ -704,6 +704,22 @@ void GambleMenu::updateDiceLayout()
 	diceAddMoneyButton->rect = scaleDiceRect({ 351, 263, 82, 28 });
 	diceOpenButton->rect = scaleDiceRect({ 260, 262, 82, 29 });
 	diceCloseButton->rect = scaleDiceRect({ 521, 4, 24, 24 });
+	if (miniGameRules)
+	{
+		diceStartButton->rect = scaleDiceRect({ 443, 247, 82, 44 });
+		diceAddMoneyButton->rect = scaleDiceRect({ 351, 247, 82, 44 });
+		diceOpenButton->rect = scaleDiceRect({ 260, 247, 82, 44 });
+		diceCloseButton->rect = scaleDiceRect({ 505, 0, 44, 44 });
+		for (const auto& button : { diceStartButton, diceAddMoneyButton, diceOpenButton, diceCloseButton })
+		{
+			button->rect.w = std::max(44, button->rect.w);
+			button->rect.h = std::max(44, button->rect.h);
+			button->rect.x = std::clamp(button->rect.x, diceWindowRect.x,
+				diceWindowRect.x + diceWindowRect.w - button->rect.w);
+			button->rect.y = std::clamp(button->rect.y, diceWindowRect.y,
+				diceWindowRect.y + diceWindowRect.h - button->rect.h);
+		}
+	}
 	DiceGambleState::Phase phase = diceState.phase();
 	diceStartButton->visible = phase == DiceGambleState::Phase::WaitingForBet;
 	diceAddMoneyButton->visible = phase == DiceGambleState::Phase::WaitingForBet;
@@ -726,6 +742,19 @@ void GambleMenu::resolveDiceRound()
 	dicePlayerTalk = diceState.outcome().playerTalk;
 	diceNpcTalk = diceState.outcome().npcTalk;
 	updateLabels();
+	if (miniGameRules && gm != nullptr && gm->player != nullptr)
+	{
+		if (diceState.outcome().result == DiceGambleState::Result::PlayerWin) gm->player->miniGameResult = 1;
+		else if (diceState.outcome().result == DiceGambleState::Result::NpcWin) gm->player->miniGameResult = 2;
+		if (npcType == 1)
+		{
+			if (diceState.npcMoney() <= 0) gm->player->miniGameResult = 1;
+			else if (gm->player->money < 100) gm->player->miniGameResult = 2;
+			else return;
+			requestExit();
+		}
+		else if (npcType == 2) requestExit();
+	}
 }
 
 void GambleMenu::updateDiceState()
@@ -827,11 +856,15 @@ void GambleMenu::updateFishLayout()
 	fishWindowRect.y = (windowHeight - fishWindowRect.h) / 2;
 
 	Rect actionRect = scaleFishRect({ 670, 330, 55, 51 });
+	actionRect.w = std::max(44, actionRect.w);
+	actionRect.h = std::max(44, actionRect.h);
 	fishCastButton->rect = actionRect;
 	fishPullButton->rect = actionRect;
 	fishStruggleButton->rect = actionRect;
 	fishReelButton->rect = scaleFishRect({ 652, 311, 92, 89 });
-	fishCloseButton->rect = scaleFishRect({ 770, 0, 26, 28 });
+	fishReelButton->rect.w = std::max(44, fishReelButton->rect.w);
+	fishReelButton->rect.h = std::max(44, fishReelButton->rect.h);
+	fishCloseButton->rect = { fishWindowRect.x + fishWindowRect.w - 44, fishWindowRect.y, 44, 44 };
 	fishCastButton->visible = fishState.showCastButton();
 	fishPullButton->visible = fishState.showPullButton();
 	fishStruggleButton->visible = fishState.showStruggleButton();
@@ -1006,8 +1039,23 @@ bool GambleMenu::openFishGame()
 	return win;
 }
 
+int GambleMenu::openMiniGameGamble(int opponentMoney, int gameType, const std::string& npcName)
+{
+	prepareControllerModal();
+	resetForMiniGameGamble(opponentMoney, gameType, npcName);
+	visible = true;
+	configureControllerFocus();
+	eventOccupied = true;
+	run();
+	eventOccupied = false;
+	controllerFocusManager.clear();
+	visible = false;
+	return gm != nullptr && gm->player != nullptr ? gm->player->miniGameResult : 0;
+}
+
 void GambleMenu::resetForRound(int roundCost, int roundNpcType)
 {
+	miniGameRules = false;
 	mode = mmGamble;
 	cost = roundCost;
 	npcType = roundNpcType;
@@ -1030,6 +1078,7 @@ void GambleMenu::resetForRound(int roundCost, int roundNpcType)
 
 void GambleMenu::resetForDiceGame(const std::string& npcName)
 {
+	miniGameRules = false;
 	if (!diceResourceLoaded)
 	{
 		loadDiceResourceLayout();
@@ -1059,8 +1108,22 @@ void GambleMenu::resetForDiceGame(const std::string& npcName)
 	updateLabels();
 }
 
+void GambleMenu::resetForMiniGameGamble(int opponentMoney, int gameType, const std::string& npcName)
+{
+	resetForDiceGame(npcName);
+	miniGameRules = true;
+	npcType = gameType;
+	if (gm != nullptr && gm->player != nullptr)
+	{
+		gm->player->miniGameResult = 0;
+		diceState.reset(gm->player->money, opponentMoney, 100);
+	}
+	updateLabels();
+}
+
 void GambleMenu::resetForFishGame()
 {
+	miniGameRules = false;
 	if (!fishResourceLoaded)
 	{
 		loadFishResourceLayout();
@@ -1282,10 +1345,10 @@ void GambleMenu::updateLabels()
 	{
 		if (mode == mmDiceGame)
 		{
-			costLabel->setStr(convert::formatString(
-				"银两:%d  下注:%d",
-				diceState.playerMoney(),
-				diceState.stake()));
+			costLabel->setStr(miniGameRules
+				? convert::formatString("银两:%d  庄家:%d  注:%d",
+					diceState.playerMoney(), diceState.npcMoney(), diceState.stake())
+				: convert::formatString("银两:%d  下注:%d", diceState.playerMoney(), diceState.stake()));
 		}
 		else if (mode == mmFishGame)
 		{
@@ -1401,7 +1464,7 @@ void GambleMenu::updateLabels()
 			|| (mode == mmDiceGame && !diceResourceLoaded);
 		if (mode == mmDiceGame)
 		{
-			increaseBetButton->setStr("下注50");
+			increaseBetButton->setStr("下注" + std::to_string(diceState.betStep()));
 		}
 	}
 	if (smallButton != nullptr)
@@ -1439,6 +1502,11 @@ void GambleMenu::settleOnExit()
 	else if (mode == mmDiceGame)
 	{
 		win = diceState.outcome().result == DiceGambleState::Result::PlayerWin;
+		if (miniGameRules && gm != nullptr && gm->player != nullptr)
+		{
+			if (npcType == 0) gm->player->miniGameResult = 0;
+			win = gm->player->miniGameResult == 1;
+		}
 	}
 	else
 	{
@@ -1516,6 +1584,13 @@ void GambleMenu::configureControllerFocus()
 
 void GambleMenu::requestExit()
 {
+	if (miniGameRules && npcType == 1 && gm != nullptr && gm->player != nullptr
+		&& gm->player->money > 100 && diceState.npcMoney() > 0)
+	{
+		diceNpcTalk = "想走？你身上还有银两呢！";
+		updateLabels();
+		return;
+	}
 	settleOnExit();
 	logicRunning = false;
 }
@@ -1590,7 +1665,7 @@ std::vector<ControllerPromptItem> GambleMenu::controllerPromptItems() const
 		{
 		case DiceGambleState::Phase::WaitingForBet:
 			items.push_back({ InputAction::Confirm, "开始" });
-			items.push_back({ InputAction::NextPage, "下注50" });
+			items.push_back({ InputAction::NextPage, "下注" + std::to_string(diceState.betStep()) });
 			break;
 		case DiceGambleState::Phase::Rolling:
 			items.push_back({ InputAction::Confirm, "开盅" });
@@ -2006,8 +2081,12 @@ void GambleMenu::drawDiceGame()
 	drawWrappedTalk(
 		diceNpcTalk, { 308, 60, 153, 42 }, diceTalkTextTextures[1]);
 	Rect betRect = scaleDiceRect({ 36, 267, 85, 19 });
+	const std::string moneyText = miniGameRules && gm != nullptr && gm->player != nullptr
+		? "银两 " + std::to_string(gm->player->money) + "  庄家 " + std::to_string(diceState.npcMoney())
+			+ "  注 " + std::to_string(diceState.stake())
+		: std::to_string(diceState.stake());
 	diceStakeTextTexture.draw(
-		engine, std::to_string(diceState.stake()), betRect.x, betRect.y,
+		engine, moneyText, betRect.x, betRect.y,
 		fontSize, 0xFFFFFFFF);
 
 	auto drawButton = [this, fontSize](
@@ -2028,7 +2107,7 @@ void GambleMenu::drawDiceGame()
 			button->rect.x + std::max(2, (button->rect.w - textWidth) / 2),
 			button->rect.y + std::max(2, (button->rect.h - fontSize) / 2), fontSize, 0xFFFFFFFF);
 	};
-	drawButton(diceAddMoneyButton, "下注50", diceButtonTextTextures[0]);
+	drawButton(diceAddMoneyButton, "下注" + std::to_string(diceState.betStep()), diceButtonTextTextures[0]);
 	drawButton(diceStartButton, "开始", diceButtonTextTextures[1]);
 	drawButton(diceOpenButton, "开盅", diceButtonTextTextures[2]);
 }

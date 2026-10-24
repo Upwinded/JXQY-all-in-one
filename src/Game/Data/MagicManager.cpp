@@ -412,6 +412,152 @@ bool MagicManager::load(int index, std::string* failureReason)
 	// Character load/rollback also replaces Goods next. Its final refresh must
 	// see both saved lists; outgoing equipment can otherwise clamp the loaded
 	// attributes or grant its magic into the incoming character's list.
+	loadSkillTree(index);
+	return true;
+}
+
+bool MagicManager::loadSkillTree(int characterIndex, std::string* failureReason)
+{
+	activeSkillTree = {};
+	if (failureReason != nullptr) failureReason->clear();
+	if (gm == nullptr || !gm->global.skillTreeEnabled) return true;
+	std::string path = "ini/other/skilltree.json";
+	if (gm->global.skillTreeUsesCharacterFiles)
+	{
+		const auto found = gm->global.skillTreeFiles.find(characterIndex);
+		if (found == gm->global.skillTreeFiles.end()) return true;
+		path = found->second;
+	}
+	std::unique_ptr<char[]> data;
+	int length = 0;
+	std::string reason;
+	if (!File::readActiveResourceFile(path, data, length, 1024 * 1024) || data == nullptr || length <= 0)
+	{
+		reason = u8"技能树文件无法读取：" + path;
+	}
+	else
+	{
+		activeSkillTree.parse(std::string(data.get(), static_cast<std::size_t>(length)), reason);
+	}
+	if (!reason.empty())
+	{
+		GameLog::write("MagicManager: %s\n", reason.c_str());
+		if (failureReason != nullptr) *failureReason = reason;
+		return false;
+	}
+	refreshSkillTree();
+	return true;
+}
+
+MagicInfo* MagicManager::findSkillTreeMagic(const std::string& file)
+{
+	if (auto* info = findPrimaryMagic(file)) return info;
+	for (auto& info : hiddenMagicList)
+	{
+		if (magicInfoIsUsable(info) && equalsMagicFileName(info.iniFile, file)) return &info;
+	}
+	return nullptr;
+}
+
+void MagicManager::refreshSkillTree()
+{
+	if (gm == nullptr || gm->player == nullptr) return;
+	std::map<int, std::int64_t> groupPoints;
+	for (auto& node : activeSkillTree.nodes)
+	{
+		const auto* info = findSkillTreeMagic(node.magicFile);
+		node.currentLevel = info == nullptr ? 0 : info->level;
+		groupPoints[node.groupId] += node.currentLevel;
+		if (node.currentLevel > 0) node.unlocked = true;
+	}
+	// Resolve prerequisites even when the authored array lists children first.
+	for (std::size_t pass = 0; pass < activeSkillTree.nodes.size(); ++pass)
+	{
+		bool changed = false;
+		for (auto& node : activeSkillTree.nodes)
+		{
+			if (node.unlocked || gm->player->level < node.requiredLevel
+				|| groupPoints[node.groupId] < node.requiredTotalPoints) continue;
+			std::int64_t parentPoints = 0;
+			for (auto parent : node.parents) parentPoints += activeSkillTree.nodes[parent].currentLevel;
+			if (parentPoints < node.requiredPoints) continue;
+			if (std::all_of(node.requiredSkills.begin(), node.requiredSkills.end(), [&](std::size_t required)
+			{
+				return activeSkillTree.nodes[required].unlocked;
+			}))
+			{
+				node.unlocked = true;
+				changed = true;
+			}
+		}
+		if (!changed) break;
+	}
+}
+
+const SkillTree& MagicManager::skillTree()
+{
+	refreshSkillTree();
+	return activeSkillTree;
+}
+
+std::string MagicManager::skillTreeLearningFailure(const std::string& nodeId)
+{
+	if (gm == nullptr || gm->player == nullptr || !gm->global.skillTreeEnabled) return u8"当前角色没有技能树";
+	refreshSkillTree();
+	const auto found = std::find_if(activeSkillTree.nodes.begin(), activeSkillTree.nodes.end(),
+		[&](const SkillTreeNode& node) { return node.id == nodeId; });
+	if (found == activeSkillTree.nodes.end()) return u8"技能节点不存在";
+	if (gm->player->skillPoints <= 0) return u8"需要 1 个技能点";
+	if (!found->unlocked) return u8"尚未达到角色等级、分支投入或前置解锁条件";
+	if (found->currentLevel >= found->maximumLevel) return u8"技能已达到最高等级";
+	if (found->currentLevel == 0)
+	{
+		for (auto required : found->requiredSkills)
+		{
+			if (activeSkillTree.nodes[required].currentLevel == 0) return u8"需要先学会前置技能";
+		}
+		if (primaryFreeIndex() < 0) return u8"武功栏已满";
+	}
+	else
+	{
+		const auto* info = findSkillTreeMagic(found->magicFile);
+		if (info == nullptr || (info->magic->definedLearningLevelLimit > 0
+			&& info->level >= info->magic->definedLearningLevelLimit)) return u8"武功资源已达到最高等级";
+		if (info->magic->level[info->level].levelupExp <= 0) return u8"武功缺少本级升级经验门槛";
+	}
+	return "";
+}
+
+bool MagicManager::learnSkillTreeNode(const std::string& nodeId, std::string* failureReason)
+{
+	std::string reason = skillTreeLearningFailure(nodeId);
+	if (!reason.empty())
+	{
+		if (failureReason != nullptr) *failureReason = reason;
+		return false;
+	}
+	const auto node = std::find_if(activeSkillTree.nodes.begin(), activeSkillTree.nodes.end(),
+		[&](const SkillTreeNode& value) { return value.id == nodeId; });
+	MagicInfo* info = findSkillTreeMagic(node->magicFile);
+	if (info == nullptr)
+	{
+		info = addPrimaryMagic(node->magicFile, false, false);
+		if (info == nullptr)
+		{
+			if (failureReason != nullptr) *failureReason = u8"武功资源无法读取或武功栏已满";
+			return false;
+		}
+	}
+	else
+	{
+		info->exp = info->magic->level[info->level].levelupExp;
+		tryAdvanceMagicLevel(*info, info->level + 1);
+	}
+	--gm->player->skillPoints;
+	refreshPlayerMagicAttributes();
+	refreshSkillTree();
+	updateMenu();
+	if (failureReason != nullptr) failureReason->clear();
 	return true;
 }
 
@@ -479,6 +625,7 @@ bool MagicManager::save(int index)
 
 void MagicManager::freeResource()
 {
+	activeSkillTree = {};
 	if (isInReplaceMagicList)
 	{
 		magicList = replaceMagicListBackup;
@@ -680,11 +827,11 @@ void MagicManager::addTalentJumpRadius(const MagicInfo& info)
 	}
 }
 
-bool MagicManager::tryAdvanceMagicLevel(MagicInfo& info)
+bool MagicManager::tryAdvanceMagicLevel(MagicInfo& info, int maximumLevel)
 {
 	bool leveledUp = false;
-	const int levelLimit = info.magic->definedLearningLevelLimit > 0
-		? std::min(MAGIC_MAX_LEVEL, info.magic->definedLearningLevelLimit) : MAGIC_MAX_LEVEL;
+	const int levelLimit = std::min(maximumLevel, info.magic->definedLearningLevelLimit > 0
+		? std::min(MAGIC_MAX_LEVEL, info.magic->definedLearningLevelLimit) : MAGIC_MAX_LEVEL);
 	while (info.level < levelLimit)
 	{
 		const int levelUpExperience =

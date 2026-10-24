@@ -322,6 +322,17 @@ void Player::updateLevel()
 		increaseAttribute(manaMax, levelList[level].manaMax, levelList[level - 1].manaMax);
 		levelUpExp = levelList[level].levelUpExp;
 		level++;
+		if (gm != nullptr && gm->global.attributePointRules.enabled)
+		{
+			attributePoints.available = static_cast<int>(std::min<std::int64_t>(INT_MAX,
+				static_cast<std::int64_t>(std::max(0, attributePoints.available)) + gm->global.attributePointRules.levelUpPoints));
+		}
+		if (gm != nullptr && gm->global.skillPointsEnabled)
+		{
+			const std::int64_t earnedPoints = static_cast<std::int64_t>(std::max(0, skillPoints))
+				+ gm->global.skillPointLevelUpRatio;
+			skillPoints = static_cast<int>(std::min<std::int64_t>(gm->global.skillPointMaximum, earnedPoints));
+		}
 		calInfo();
 		fullLife();
 		fullThew();
@@ -388,6 +399,12 @@ bool Player::canPayRunThewCost() const
 {
 	return ignoresRunThewCost()
 		|| thew >= RUN_THEW_COST;
+}
+
+bool Player::ignoresRunThewCost() const
+{
+	return equipmentIgnoresRunThewCost || hasUnlimitedCheatResources()
+		|| (gm != nullptr && !gm->global.feature.useThewWhenNormalRun && !fightState.get());
 }
 
 void Player::fullThew()
@@ -572,12 +589,13 @@ void Player::addRage(int value)
 
 float Player::getCriticalChancePercent() const
 {
-	if (gm == nullptr || !gm->global.feature.rageSystem)
+	if (gm == nullptr || (!gm->global.feature.rageSystem && !gm->global.attributePointRules.enabled
+		&& attributePoints.criticalChanceBonus == 0 && attributePoints.criticalDamageBonus == 0))
 	{
 		return 0.0f;
 	}
 
-	float chance = static_cast<float>(std::max(0, level)) * 0.1f;
+	float chance = static_cast<float>(std::max(0, level)) * 0.1f + attributePoints.criticalChanceBonus;
 	if (auto effect = attributeChangeEffect.lock())
 	{
 		if (!effect->vanishing
@@ -592,12 +610,13 @@ float Player::getCriticalChancePercent() const
 
 int Player::getCriticalDamagePercent() const
 {
-	if (gm == nullptr || !gm->global.feature.rageSystem)
+	if (gm == nullptr || (!gm->global.feature.rageSystem && !gm->global.attributePointRules.enabled
+		&& attributePoints.criticalChanceBonus == 0 && attributePoints.criticalDamageBonus == 0))
 	{
 		return 0;
 	}
 
-	int percent = std::max(0, level);
+	std::int64_t percent = static_cast<std::int64_t>(std::max(0, level)) + attributePoints.criticalDamageBonus;
 	if (auto effect = attributeChangeEffect.lock())
 	{
 		if (!effect->vanishing
@@ -607,7 +626,7 @@ int Player::getCriticalDamagePercent() const
 			percent += effect->magic.level[effectLevel].critDamageAddPercent;
 		}
 	}
-	return std::max(0, percent);
+	return static_cast<int>(std::clamp<std::int64_t>(percent, 0, INT_MAX));
 }
 
 int Player::applyCriticalDamage(int damage, int roll, bool* wasCritical) const
@@ -624,8 +643,58 @@ int Player::applyCriticalDamage(int damage, int roll, bool* wasCritical) const
 	{
 		*wasCritical = true;
 	}
-	return static_cast<int>(std::round(static_cast<float>(damage)
-		* (1.0f + static_cast<float>(getCriticalDamagePercent()) / 100.0f)));
+	const float scaled = std::round(static_cast<float>(damage)
+		* (1.0f + static_cast<float>(getCriticalDamagePercent()) / 100.0f));
+	return scaled >= static_cast<float>(INT_MAX) ? INT_MAX : static_cast<int>(scaled);
+}
+
+bool Player::allocateAttributePoints(const AttributePointAmounts& amounts, std::string* failureReason)
+{
+	const auto reject = [&](const char* reason)
+	{
+		if (failureReason != nullptr) *failureReason = reason;
+		return false;
+	};
+	if (failureReason != nullptr) failureReason->clear();
+	if (gm == nullptr || !gm->global.attributePointRules.enabled) return reject(u8"属性分配未启用");
+	if (gm->inEvent || !gm->global.data.canInput) return reject(u8"剧情进行中，暂不能分配");
+	std::int64_t cost = 0;
+	AttributePoints next = attributePoints;
+	for (std::size_t i = 0; i < amounts.size(); ++i)
+	{
+		if (amounts[i] < 0) return reject(u8"分配点数无效");
+		cost += amounts[i];
+		const std::int64_t total = static_cast<std::int64_t>(next.spent[i]) + amounts[i];
+		if (total > INT_MAX) return reject(u8"已投入点数达到上限");
+		next.spent[i] = static_cast<int>(total);
+	}
+	if (cost <= 0) return reject(u8"请先选择要分配的属性");
+	if (cost > attributePoints.available) return reject(u8"属性点不足");
+	const auto& ratios = gm->global.attributePointRules.ratios;
+	const std::array<int*, 6> attributes = { &lifeMax, &thewMax, &manaMax, &attack, &evade, &defend };
+	std::array<int, 6> values{};
+	for (std::size_t i = 0; i < attributes.size(); ++i)
+	{
+		const std::int64_t value = static_cast<std::int64_t>(*attributes[i])
+			+ static_cast<std::int64_t>(amounts[i]) * static_cast<std::int64_t>(ratios[i]);
+		if (value > INT_MAX) return reject(u8"属性数值达到上限");
+		values[i] = static_cast<int>(value);
+	}
+	const auto chance = static_cast<std::size_t>(PlayerAttribute::CriticalChance);
+	const auto damage = static_cast<std::size_t>(PlayerAttribute::CriticalDamage);
+	next.criticalChanceBonus = static_cast<float>(std::min(100.0,
+		static_cast<double>(next.criticalChanceBonus) + amounts[chance] * ratios[chance]));
+	const std::int64_t damageBonus = static_cast<std::int64_t>(next.criticalDamageBonus)
+		+ static_cast<std::int64_t>(amounts[damage]) * static_cast<std::int64_t>(ratios[damage]);
+	if (damageBonus > INT_MAX) return reject(u8"暴击伤害达到上限");
+	next.criticalDamageBonus = static_cast<int>(damageBonus);
+	for (std::size_t i = 0; i < attributes.size(); ++i) *attributes[i] = values[i];
+	next.available -= static_cast<int>(cost);
+	attributePoints = next;
+	calInfo();
+	limitAttribute();
+	updatePlayerStateMenu();
+	return true;
 }
 
 void Player::recordActualDamageForRage(int damage)
@@ -1115,7 +1184,7 @@ void Player::onUpdate()
 	triggerTouchObjects();
 	processControlledNextAction();
 	if (!isControllingCharacter() && nextAction == nullptr && isStanding()
-		&& nextDest != ndNone && nextDestStrictWorldInteraction)
+		&& nextDest != ndNone && (nextDestStrictWorldInteraction || nextDest == ndTalk))
 	{
 		if (handleQueuedInteractionAtCurrentPosition())
 		{
@@ -1178,7 +1247,12 @@ void Player::onUpdate()
 		}
 		else if (queuedAction.action == acMagic)
 		{
-			if (canFight)
+			if (queuedAction.requiresFriendlyMagicTarget
+				&& !Magic::isValidFriendlyTarget(std::dynamic_pointer_cast<NPC>(queuedAction.destGE.lock())))
+			{
+				gm->showMessage("施法目标已失效");
+			}
+			else if (canFight)
             {
 				nextDest = ndNone;
 				nextDestUseRightScript = false;
@@ -1298,6 +1372,7 @@ void Player::freeResource()
 	lastRunThewLowMessageTime = 0;
 	destGE.reset();
 	scriptPositionTrapSuppressed = false;
+	scriptPositionTrapCheckPending = false;
 	scriptTrapMapName.clear();
 
 	clearFrozenState();
@@ -1453,8 +1528,7 @@ void Player::hurtLife(int damage, bool ignoreDefense)
 				it = shieldEffects.erase(it);
 				continue;
 			}
-			int shieldLevel = shield->level;
-			damage -= shield->magic.level[shieldLevel].effect;
+			damage -= getShieldEffectAmount(*shield);
 		}
 		else
 		{
@@ -1666,6 +1740,19 @@ bool Player::addNextAction(NextAction& act)
 	nextAction->destGE = act.destGE;
 	nextAction->useRightScript = act.useRightScript;
 	nextAction->strictWorldInteraction = act.strictWorldInteraction;
+	if (act.action == acMagic && act.actionParam >= 0
+		&& act.actionParam < gm->magicManager.bottomCount())
+	{
+		const int listIndex = gm->magicManager.bottomIndex(act.actionParam);
+		if (gm->magicManager.magicListExists(listIndex))
+		{
+			const auto& info = gm->magicManager.magicList[listIndex];
+			auto magic = resolveMagicReplacement(info.magic);
+			nextAction->requiresFriendlyMagicTarget = magic != nullptr
+				&& magic->supportsFriendlyTarget(info.level)
+				&& Magic::isValidFriendlyTarget(std::dynamic_pointer_cast<NPC>(act.destGE.lock()));
+		}
+	}
 	return true;
 }
 
@@ -2177,7 +2264,8 @@ bool Player::handleQueuedInteractionAtCurrentPosition()
 
 bool Player::resumeStrictQueuedInteraction()
 {
-	if (nextDest == ndNone || !nextDestStrictWorldInteraction)
+	// Pointer and touch NPC talk also retain their target while approaching.
+	if (nextDest == ndNone || (!nextDestStrictWorldInteraction && nextDest != ndTalk))
 	{
 		return false;
 	}
@@ -2675,14 +2763,15 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target, bool s
 		gm->showMessage(THEW_LOW_MSG);
 		return;
 	}
-	std::shared_ptr<Magic> attackMagicForDirection = nullptr;
-	int practiceIndex = gm->magicManager.practiceIndex();
-	if (gm->magicManager.magicListExists(practiceIndex))
+	const auto releaseMode = (target == nullptr) ? armGroundTarget : armLockedRelease;
+	auto attackMagicForDirection = prepareAttackMagicForAction(dest, target, releaseMode);
+	if (attackMagicForDirection == nullptr)
 	{
-		attackMagicForDirection = resolveMagicReplacement(gm->magicManager.magicList[practiceIndex].magic);
+		return;
 	}
 	if (!canActToward(dest, getAttackActionDirectionCount(attackMagicForDirection)))
 	{
+		clearPreparedAttackMagic();
 		return;
 	}
 	if (!scripted && !hasUnlimitedCheatResources())
@@ -2693,7 +2782,7 @@ void Player::beginAttack(Point dest, std::shared_ptr<GameElement> target, bool s
 	direction = getDirection(dest);
 	attackDone = false;
 	magicDest = dest;
-	attackReleaseMode = (target == nullptr) ? armGroundTarget : armLockedRelease;
+	attackReleaseMode = releaseMode;
 	
 	actionManager->changeAction(acAttack, scripted);
 }
@@ -2736,13 +2825,51 @@ bool Player::canHurt()
 
 void Player::suppressTrapAtScriptPosition()
 {
+	cancelPendingScriptPositionTrap();
 	scriptPositionTrapSuppressed = true;
 	scriptTrapPosition = position;
 	scriptTrapMapName = gm->global.data.mapName;
 }
 
+void Player::scheduleTrapCheckAtScriptPosition()
+{
+	scriptPositionTrapSuppressed = false;
+	scriptPositionTrapCheckPending = true;
+	scriptTrapPosition = position;
+	scriptTrapMapName = gm->global.data.mapName;
+}
+
+bool Player::hasPendingScriptPositionTrap() const
+{
+	return scriptPositionTrapCheckPending;
+}
+
+void Player::cancelPendingScriptPositionTrap()
+{
+	scriptPositionTrapCheckPending = false;
+}
+
+void Player::checkPendingScriptPositionTrap()
+{
+	if (!scriptPositionTrapCheckPending)
+	{
+		return;
+	}
+	// A later move or map change supersedes a placement before its update.
+	cancelPendingScriptPositionTrap();
+	if (gm == nullptr || gm->map == nullptr || gm->map->data == nullptr
+		|| life <= 0 || isDying()
+		|| !isStanding() || position != scriptTrapPosition
+		|| gm->global.data.mapName != scriptTrapMapName)
+	{
+		return;
+	}
+	checkTrap();
+}
+
 void Player::checkTrap()
 {
+	cancelPendingScriptPositionTrap();
 	if (scriptPositionTrapSuppressed)
 	{
 		if (scriptTrapPosition == position && scriptTrapMapName == gm->global.data.mapName)
@@ -2885,20 +3012,13 @@ bool Player::doSpecialAttack(Point dest, std::shared_ptr<GameElement> target)
 
 std::shared_ptr<Magic> Player::prepareSpecialAttackMagicForAction(Point dest, std::shared_ptr<GameElement> target)
 {
-	clearPreparedAttackMagic();
 	int practiceIndex = gm->magicManager.practiceIndex();
 	if (!gm->magicManager.magicListExists(practiceIndex))
 	{
 		return nullptr;
 	}
 	auto practiceMagic = gm->magicManager.magicList[practiceIndex].magic;
-	auto magic = resolveMagicReplacement(practiceMagic->getLinkedLevel(attackLevel).specialMagic);
-	if (magic == nullptr)
-	{
-		return nullptr;
-	}
-	setPreparedAttackMagic(magic, false);
-	return magic;
+	return resolveMagicReplacement(practiceMagic->getLinkedLevel(attackLevel).specialMagic);
 }
 
 bool Player::releasePreparedSpecialAttackMagic(Point dest, std::shared_ptr<GameElement> target)
@@ -2984,6 +3104,7 @@ void Player::beginDie()
 		return;
 	}
 	deathTransitionInProgress = true;
+	cancelPendingScriptPositionTrap();
 	if (deathScript != "")
 	{
 		result |= erRunDeathScript;
@@ -3036,7 +3157,9 @@ bool Player::load(int index, std::string* failureReason)
 	}
 	fName += PLAYER_INI_EXT;
 	displayName += PLAYER_INI_EXT;
-	return loadFromFile(fName, displayName, failureReason);
+	if (!loadFromFile(fName, displayName, failureReason)) return false;
+	attributePoints.load(index);
+	return true;
 }
 
 bool Player::loadInitialTemplate(
@@ -3049,10 +3172,12 @@ bool Player::loadInitialTemplate(
 		fileName += convert::formatString("%d", index);
 	}
 	fileName += PLAYER_INI_EXT;
-	return loadFromFile(
+	if (!loadFromFile(
 		std::string(INI_SAVE_FOLDER) + fileName,
 		fileName,
-		failureReason);
+		failureReason)) return false;
+	attributePoints.load(index, true);
+	return true;
 }
 
 bool Player::loadFromFile(
@@ -3109,6 +3234,8 @@ bool Player::loadFromFile(
 
 	std::string section = "Init";
 	initFromIni(&ini, section);
+	miniGameResult = 0;
+	skillPoints = static_cast<int>(std::clamp<long>(ini.GetInteger(section, "SkillPoint", 0), 0, INT_MAX));
 
 	magic = ini.GetInteger(section, "Magic", 0);
 	setMoney(ini.GetInteger(section, "Money", 0));
@@ -3172,6 +3299,10 @@ bool Player::save(int index)
 	position = tempPos;
 
 	ini.SetInteger(section, "Magic", magic);
+	if (skillPoints != 0 || (gm != nullptr && gm->global.skillPointsEnabled))
+	{
+		ini.SetInteger(section, "SkillPoint", std::max(0, skillPoints));
+	}
 	ini.SetInteger(section, "Money", money);
 	if (gm != nullptr && gm->global.feature.rageSystem)
 	{
@@ -3191,7 +3322,11 @@ bool Player::save(int index)
         fName += convert::formatString("%d", index);
     }
     fName += PLAYER_INI_EXT;
-	const bool saved = ini.saveToFile(SaveFileManager::CurrentPath() + fName);
+	bool saved = ini.saveToFile(SaveFileManager::CurrentPath() + fName);
+	if (saved && (attributePoints.hasProgress() || (gm != nullptr && gm->global.attributePointRules.enabled)))
+	{
+		saved = attributePoints.save(index);
+	}
     
     SaveFileManager::AppendFile(fName);
 	return saved;

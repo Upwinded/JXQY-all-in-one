@@ -347,10 +347,23 @@ void ToolTip::init()
 
 	if (image) image->stretch = true;
 	if (name) name->autoShrink = true;
-	if (cost) cost->autoNextLine = true;
-	if (intro1) intro1->autoNextLine = layoutProfile == LayoutProfile::Xjxqy || layoutProfile == LayoutProfile::Qingyu;
+	if (cost)
+	{
+		cost->autoNextLine = layoutProfile == LayoutProfile::Xjxqy;
+		cost->autoShrink = layoutProfile != LayoutProfile::Xjxqy;
+	}
+	if (intro1)
+	{
+		intro1->autoNextLine = layoutProfile != LayoutProfile::Jxqy2;
+		intro1->autoShrink = layoutProfile != LayoutProfile::Xjxqy;
+	}
 	if (intro2) intro2->autoNextLine = true;
 	if (magicIntro) magicIntro->autoNextLine = true;
+	if (layoutProfile == LayoutProfile::Jxqy2 || layoutProfile == LayoutProfile::Yycs)
+	{
+		if (intro2) intro2->autoShrink = true;
+		if (magicIntro) magicIntro->autoShrink = true;
+	}
 	if (layoutProfile == LayoutProfile::Jxqy2)
 	{
 		auto setCompactFont = [](const std::shared_ptr<Label>& label,
@@ -366,6 +379,7 @@ void ToolTip::init()
 		};
 		setCompactFont(name, 18);
 		setCompactFont(cost, 18);
+		if (cost) cost->minimumFontSize = std::min(cost->fontSize, 9);
 		setCompactFont(intro1, 16);
 		setCompactFont(intro2, 16);
 		setCompactFont(magicIntro, 16);
@@ -416,8 +430,20 @@ void ToolTip::finishContentLayout()
 		lines.clear();
 		std::string text = intro1 ? intro1->getStr() : "";
 		appendDetailLine(text, intro2 ? intro2->getStr() : "");
-		for (const auto& line : TextLayout::wrapColorTaggedUtf8Text(text,
-			TextLayout::charactersPerLineForWidth(body->mstr.front()->rect.w, body->fontSize), body->color))
+		int measuredWidth = 0;
+		int measuredHeight = 0;
+		const auto wrappedLines = engine->measureText("", body->fontSize, measuredWidth, measuredHeight)
+			? TextLayout::wrapColorTaggedUtf8Text(text, body->mstr.front()->rect.w, body->color,
+				[this](const std::string& run)
+				{
+					int width = 0;
+					int height = 0;
+					engine->measureText(run, body->fontSize, width, height);
+					return width;
+				})
+			: TextLayout::wrapColorTaggedUtf8Text(text,
+				TextLayout::charactersPerLineForWidth(body->mstr.front()->rect.w, body->fontSize), body->color);
+		for (const auto& line : wrappedLines)
 		{
 			std::string formatted;
 			for (const auto& run : line)

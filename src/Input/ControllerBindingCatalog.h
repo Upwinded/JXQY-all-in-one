@@ -219,7 +219,11 @@ inline constexpr std::array<ControllerActionBinding, InputActionCount>
 	makeControllerBinding(InputAction::ScrollRight,
 		ControllerControl::RightStick,
 		ControllerBindingTrigger::StickDirectional,
-		ControllerControl::None, ControllerDirection::Right)
+		ControllerControl::None, ControllerDirection::Right),
+	makeControllerBinding(InputAction::CycleFriendlyTarget,
+		ControllerControl::LeftTrigger,
+		ControllerBindingTrigger::TriggerThreshold,
+		ControllerControl::RightShoulder)
 };
 
 constexpr bool defaultControllerBindingIsWellFormed(
@@ -260,7 +264,9 @@ constexpr bool defaultControllerBindingIsWellFormed(
 				|| binding.primary == ControllerControl::DPad)
 			&& (binding.primary == ControllerControl::DPad) == hasDirection;
 	case ControllerBindingTrigger::TriggerThreshold:
-		return !hasModifier && !hasDirection
+		return !hasDirection
+			&& (!hasModifier || (binding.modifier == ControllerControl::RightShoulder
+				&& binding.primary == ControllerControl::LeftTrigger))
 			&& (binding.primary == ControllerControl::LeftTrigger
 				|| binding.primary == ControllerControl::RightTrigger);
 	case ControllerBindingTrigger::StickContinuous:

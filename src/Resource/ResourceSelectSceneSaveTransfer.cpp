@@ -32,7 +32,8 @@ bool ResourceSelectScene::resolveSaveTransferGame(
 {
 	for (const auto& pack : ResourceManager::instance().getDiscoveredPacks())
 	{
-		if (!pack.manifest.resourceOnly && pack.isLaunchable() &&
+		if (!pack.manifest.resourceOnly &&
+			(saveTransferAction == SaveTransferAction::Export || pack.isLaunchable()) &&
 			OnlineUpdate::foldGameId(pack.effectiveSaveNamespace) == OnlineUpdate::foldGameId(saveNamespace) &&
 			(gameId.empty() || OnlineUpdate::foldGameId(pack.manifest.id) == OnlineUpdate::foldGameId(gameId)))
 		{
@@ -48,8 +49,14 @@ bool ResourceSelectScene::resolveSaveTransferGame(
 
 std::filesystem::path ResourceSelectScene::saveTransferRoot() const
 {
+	const std::string& saveNamespace = saveTransferAction == SaveTransferAction::Export &&
+		selectedSaveNamespaceIndex >= 0 && selectedSaveNamespaceIndex < static_cast<int>(saveNamespaceEntries.size())
+		? saveNamespaceEntries[selectedSaveNamespaceIndex].saveNamespace : saveTransferGame.saveNamespace;
+	const auto directory = File::sanitizeSaveNamespace(saveNamespace);
+	// Ordinary runtime save routing folds ASCII letters in the relative path.
 	return std::filesystem::u8path(File::getUserDataRoot()) / "save" /
-		std::filesystem::u8path(File::sanitizeSaveNamespace(saveTransferGame.saveNamespace));
+		std::filesystem::u8path(saveTransferAction == SaveTransferAction::Export
+			? directory : OnlineUpdate::foldGameId(directory));
 }
 
 void ResourceSelectScene::chooseSaveExport()
@@ -59,16 +66,14 @@ void ResourceSelectScene::chooseSaveExport()
 	saveTransferAction = SaveTransferAction::Export;
 	if (!resolveSaveTransferGame(saveNamespaceEntries[selectedSaveNamespaceIndex].saveNamespace))
 	{
-		resourceInstallDialogMessage = u8"请先安装该存档对应的游戏资源，再导出存档。";
-		resourceInstallDialogState = ResourceInstallDialogState::Failed;
+		const auto& saved = saveNamespaceEntries[selectedSaveNamespaceIndex];
+		saveTransferGame = { "", saved.resourceName.empty() ? saved.saveNamespace : saved.resourceName,
+			saved.saveNamespace, "" };
 	}
-	else
-	{
-		saveExportSlots = SavePackage::listSlots(saveTransferRoot());
-		if (!saveExportSlots.empty()) saveExportSlots.insert(saveExportSlots.begin(), SavePackage::AllSlots);
-		selectedTransferSlot = 0;
-		resourceInstallDialogState = ResourceInstallDialogState::ChoosingSaveExport;
-	}
+	saveExportSlots = SavePackage::listSlots(saveTransferRoot());
+	if (!saveExportSlots.empty()) saveExportSlots.insert(saveExportSlots.begin(), SavePackage::AllSlots);
+	selectedTransferSlot = 0;
+	resourceInstallDialogState = ResourceInstallDialogState::ChoosingSaveExport;
 	resourceInstallOperation = ResourceInstallOperation::SaveTransfer;
 	refreshResourceInstallDialogControls();
 	semanticFocusVisible = focusManager.focusNode("install-primary") || focusManager.focusNode("install-secondary");

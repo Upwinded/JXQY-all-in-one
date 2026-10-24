@@ -4075,7 +4075,7 @@ void ResourceSelectScene::executeResourceRemoval()
 	{
 		resourceInstallDialogState = ResourceInstallDialogState::Completed;
 		resourceInstallDialogMessage = u8"已删除 " +
-			std::to_string(result.removedGameIds.size()) + u8" 个游戏资源";
+			std::to_string(result.removedGameIds.size()) + u8" 个资源包";
 		if (pendingResourceRemovalSavePolicy ==
 			ResourceManager::ResourceRemovalSavePolicy::Delete)
 		{
@@ -9117,7 +9117,7 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 			ResourceInstallOperation::ResourceRemoval)
 		{
 			drawTextLine(
-				u8"以下游戏会按依赖顺序直接删除。请另外选择是否删除相关存档。",
+				u8"以下游戏及公共资源会按依赖顺序删除。请选择是否删除相关存档。",
 				dialog.x + 22, dialog.y + 62, 16, 0xFFFFFFFF,
 				std::max(1, dialog.w - 44), 14);
 			int lineY = dialog.y + 92;
@@ -9133,6 +9133,10 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				const ResourceManager::ResourceRemovalEntry& entry =
 					pendingResourceRemoval.entries[index];
 				std::string line = u8"删除：" + entry.name;
+				if (entry.resourceOnly)
+				{
+					line += u8"（公共资源）";
+				}
 				if (!entry.version.empty())
 				{
 					line += u8"    版本：" + entry.version;
@@ -9152,7 +9156,7 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 				drawTextLine(
 					u8"其余 " + std::to_string(
 						pendingResourceRemoval.entries.size() - visibleCount) +
-						u8" 个依赖游戏也会删除",
+						u8" 个资源包也会删除",
 					dialog.x + 26, lineY, 14, 0xFFB9AA87,
 					std::max(1, dialog.w - 52), 13);
 			}
@@ -9437,7 +9441,7 @@ void ResourceSelectScene::drawResourceInstallOverlay()
 		};
 		if (exporting)
 		{
-			drawLine(saveExportSlots.empty() ? u8"没有可导出的完整存档。"
+			drawLine(saveExportSlots.empty() ? u8"未找到可导出的存档档位。"
 				: SavePackage::slotLabel(saveExportSlots[selectedTransferSlot]), 0);
 			if (!saveExportSlots.empty()) drawLine(u8"包含档位文件及对应截图。", 1);
 		}

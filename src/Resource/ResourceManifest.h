@@ -3,6 +3,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "ActionReleaseFrameRatio.h"
 #include "ModReleaseMetadata.h"
 
 enum class DefeatedNpcExperienceMode
@@ -78,8 +79,6 @@ struct ResourceManifest
 	DefeatedNpcExperienceMode defeatedNpcExperienceMode =
 		DefeatedNpcExperienceMode::StoredExperience;
 	bool defeatedNpcExperienceModeDefined = false;
-	double experienceMultiplier = 3.0;
-	bool experienceMultiplierDefined = false;
 	LevelUpThresholdMode levelUpThresholdMode =
 		LevelUpThresholdMode::GreaterThanOrEqual;
 	bool levelUpThresholdModeDefined = false;
@@ -89,6 +88,7 @@ struct ResourceManifest
 	bool partnerFollowRadiusDefined = false;
 	int partnerFollowRunRadius = 5;
 	bool partnerFollowRunRadiusDefined = false;
+	int runSpeedPixelsPerSecond = 0; // Zero retains the existing projected running speed.
 
 	// [Combat]
 	// Resource-wide lower bound for one magic damage application. This is
@@ -98,6 +98,17 @@ struct ResourceManifest
 	MagicEffectCalculationMode magicEffectCalculationMode =
 		MagicEffectCalculationMode::ReplaceAttack;
 	bool magicEffectCalculationModeDefined = false;
+	// Undefined fields retain universal defaults; catalog selection fills inherited sources.
+	ActionReleaseFrameRatio attackReleaseFrameRatio{ 2, 3 };
+	bool attackReleaseFrameRatioDefined = false;
+	std::string attackReleaseFrameRatioSourceId;
+	ActionReleaseFrameRatio specialAttackReleaseFrameRatio{ 1, 3 };
+	bool specialAttackReleaseFrameRatioDefined = false;
+	std::string specialAttackReleaseFrameRatioSourceId;
+	ActionReleaseFrameRatio magicReleaseFrameRatio{ 4, 5 };
+	bool magicReleaseFrameRatioDefined = false;
+	std::string magicReleaseFrameRatioSourceId;
+	std::vector<std::string> invalidActionReleaseFrameRatioKeys;
 
 	// [Script]
 	std::string scriptPlayerName; // Optional fixed story name for #name.
@@ -183,7 +194,6 @@ struct ResourceManifest
 	std::vector<std::string> getDependencyIds() const;
 
 	DefeatedNpcExperienceMode resolvedDefeatedNpcExperienceMode() const;
-	double resolvedExperienceMultiplier() const;
 	LevelUpThresholdMode resolvedLevelUpThresholdMode() const;
 	int resolvedPartnerFollowRadius() const;
 	int resolvedPartnerFollowRunRadius() const;

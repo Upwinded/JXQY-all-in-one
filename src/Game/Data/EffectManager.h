@@ -75,6 +75,7 @@ protected:
 private:
 	friend class MagicDerivedRuntimeTestAccess;
 	friend class ProjectileCollisionTestAccess;
+	friend class ProjectileCollisionRuntimeTestAccess;
 
 	struct TrailMagicInfo
 	{

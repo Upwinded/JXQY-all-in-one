@@ -3124,6 +3124,15 @@ bool runStatusDurationInputSafety()
 
 bool runExperienceAndLowLifePersistence(GameManager& gameManager, const std::filesystem::path& root)
 {
+	struct ExperienceMultiplierRestore
+	{
+		int previous = Config::experienceMultiplier;
+		~ExperienceMultiplierRestore()
+		{
+			Config::experienceMultiplier = previous;
+		}
+	} restoreMultiplier;
+	Config::experienceMultiplier = 3;
 	const auto profileRoot = root / "field-profile";
 	ResourceManager& manager = ResourceManager::instance();
 	bool ok = true;
@@ -3146,7 +3155,7 @@ bool runExperienceAndLowLifePersistence(GameManager& gameManager, const std::fil
 		const std::string profile = "[Game]\nId=FIELD_PERSISTENCE\nName=Field persistence\nVersion=1.0.6\nType=" +
 			std::to_string(gameType) + "\n[Experience]\nDefeatedNpcExperienceMode=" +
 			(usesBonus ? "LevelProductWithBonus" : "StoredExperience") +
-			"\nExperienceMultiplier=3.0\n[Save]\nNamespace=field-persistence\n";
+			"\n[Save]\nNamespace=field-persistence\n";
 		if (!check(writeTextFile(profileRoot / "game_profile.ini", profile) &&
 			manager.initialize(profileRoot.string()) && manager.setActiveResourcePackById("FIELD_PERSISTENCE") &&
 			(manager.getActiveManifest().resolvedDefeatedNpcExperienceMode() ==

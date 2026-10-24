@@ -304,7 +304,7 @@ StepResult NPCActionRun::handlePlayerStepIn(Player* player)
     }
 
     // 检查当前位置是否有陷阱
-    if (gm->map->haveTraps(_npc->position) && !gm->inEvent)
+    if (gm->map->haveTraps(_npc->position))
     {
         NPC* npc = _npc;
         int trapIndex = gm->map->getTrapIndex(npc->position);
@@ -359,7 +359,7 @@ StepResult NPCActionRun::handleFollowerStepIn(Player* player, bool& canWalkNextS
     }
 
     // 非跟随NPC不处理
-    if (!_npc->isFollower())
+    if (!_npc->isFollowAIEnabled() || !_npc->isFollower())
     {
         return StepResult::Continue;
     }
@@ -606,7 +606,7 @@ void NPCActionRun::processStepOut()
     gm->map->deleteStepFromDataMap(_npc->stepList[0], std::dynamic_pointer_cast<NPC>(_npc->getMySharedPtr()));
     
     // 更新NPC到新位置，切换为踏入状态
-    _npc->setPosition(_npc->stepList[0], false);
+    _npc->setPosition(_npc->stepList[0], false, true);
     _npc->stepState = ssIn;
     _npc->stepBeginTime += _npc->stepLastTime;
 

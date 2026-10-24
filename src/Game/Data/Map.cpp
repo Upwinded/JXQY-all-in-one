@@ -1563,39 +1563,27 @@ Point Map::getJumpPath(Point from, Point to, int jumpRadius)
 	Point nowStep = from;
 	while (true)
 	{
-		bool nextStep = true;
 		std::vector<Point> stepList = getLineSubStep(nowStep, to, angle);
-		if (stepList.size() == 0)
+		if (stepList.empty())
 		{
 			break;
 		}
-		for (size_t i = 0; i < stepList.size(); i++)
+		// C# JumpAlongPath checks the next entered tile, not walls that only
+		// touch the ray at a corner. The final substep is that center tile.
+		nowStep = stepList.back();
+		if (!canJump(nowStep))
 		{
-
-			if (!canJump(stepList[i]))
-			{
-				nextStep = false;
-				break;
-			}
+			break;
 		}
-		if (nextStep)
+		if (canWalk(nowStep))
 		{
-			nowStep = stepList[stepList.size() - 1];
-
-			if (canWalk(stepList[stepList.size() - 1]))
-			{
-				lastStep = stepList[stepList.size() - 1];
-				if (haveTraps(nowStep))
-				{
-					break;
-				}
-			}
-			if (stepList[stepList.size() - 1] == to)
+			lastStep = nowStep;
+			if (haveTraps(nowStep))
 			{
 				break;
 			}
 		}
-		else
+		if (nowStep == to)
 		{
 			break;
 		}
@@ -1684,6 +1672,19 @@ bool Map::canSee(Point from, Point to)
 bool Map::canWalk(Point pos)
 {
 	return canWalkForActor(pos, nullptr);
+}
+
+bool Map::isCharacterTerrainBlocked(Point pos)
+{
+	if (!isInMap(pos) || !tileObstacleAllowsWalk(data->tile[pos.y][pos.x].obstacle))
+	{
+		return true;
+	}
+	const auto& objects = dataMap.tile[pos.y][pos.x].objList;
+	return std::any_of(objects.begin(), objects.end(), [](const auto& object)
+	{
+		return isObjectObstacleKind(object->kind);
+	});
 }
 
 bool Map::canWalkForActor(

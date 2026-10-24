@@ -176,6 +176,7 @@ public:
 	//绘制文字
 	void setFontName(const std::string& fontName);
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
+	bool measureText(const std::string& text, int size, int& width, int& height);
 	_shared_image createText(const std::string& text, int size, unsigned int color);
 	_shared_image createTextWithFontData(
 		const void* data,

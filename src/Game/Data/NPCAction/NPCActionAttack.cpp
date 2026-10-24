@@ -1,10 +1,12 @@
 #include "NPCActionAttack.h"
+#include "ActionReleaseTiming.h"
 #include "../../../Engine/Engine.h"
 #include "../Magic.h"
 #include "../NPC.h"
 #include "../Player.h"
 #include "../../GameManager/GameManager.h"
 #include "../../../Image/IMP.h"
+#include "../../../Image/ImageAnimationPlayback.h"
 
 NPCActionAttack::NPCActionAttack(NPC* npc)
     : NPCActionBase(npc)
@@ -19,96 +21,77 @@ void NPCActionAttack::enter()
     _npc->offset = { 0, 0 };
     _npc->actionBeginTime = _npc->getTime();
     _npc->attackDone = false;
+    _attackDone = false;
     _npc->fightState.set(true);
     _attackDest = _npc->attackDest;
     _target = _npc->destGE.lock();
     
     Player* player = dynamic_cast<Player*>(_npc);
-    _actionMagic = nullptr;
+    _practiceMagic = nullptr;
+    _specialAttackMagic = nullptr;
     if (player)
     {
         _attackDest = player->magicDest;
         int practiceIndex = gm->magicManager.practiceIndex();
         if (gm->magicManager.magicListExists(practiceIndex))
         {
-            _actionMagic = player->resolveMagicReplacement(gm->magicManager.magicList[practiceIndex].magic);
-        }
-    }
-    
-    std::vector<NPCActionType> attackList;
-    attackList.push_back(NPCActionType::acAttack);
-    
-    if (_npc->canDoAction(acAttack1))
-    {
-        attackList.push_back(NPCActionType::acAttack1);
-    }
-    
-    if (_npc->canDoAction(acAttack2))
-    {
-        attackList.push_back(NPCActionType::acAttack2);
-    }
-    
-    NPCActionType attackNum = NPCActionType::acAttack;
-    if (attackList.size() > 0)
-    {
-        int idx = attackList.size() > 1 ? _npc->engine->getRand((int)attackList.size() - 1) : 0;
-        attackNum = attackList[idx];
-    }
-    
-    if (attackNum == NPCActionType::acAttack)
-    {
-        _attackType = NPCActionType::acAttack;
-        _npc->nowAction = NPCActionType::acAttack;
-        _npc->actionLastTime = getActionTime();
-    }
-    else if (attackNum == NPCActionType::acAttack1)
-    {
-        _attackType = NPCActionType::acAttack1;
-        _npc->nowAction = NPCActionType::acAttack1;
-        _npc->actionLastTime = getActionTime();
-    }
-    else
-    {
-        auto attackActionImage = _actionMagic != nullptr && _actionMagic->useActionImage != nullptr
-            ? _actionMagic->useActionImage
-            : (_actionMagic != nullptr ? _actionMagic->getActionImageForNPC(_npc) : nullptr);
-        if (player && attackActionImage != nullptr)
-        {
-            _attackType = NPCActionType::acSpecialAttack;
-            _npc->nowAction = NPCActionType::acSpecialAttack;
-            _npc->actionLastTime = getActionTime();
-        }
-        else
-        {
-            _attackType = NPCActionType::acAttack2;
-            _npc->nowAction = NPCActionType::acAttack2;
-            _npc->actionLastTime = getActionTime();
+            _practiceMagic = gm->magicManager.magicList[practiceIndex].magic;
         }
     }
 
-    if (player && (_attackType == NPCActionType::acAttack2 || _attackType == NPCActionType::acSpecialAttack))
+    if (_npc->hasPreparedAttackMagic)
     {
-        _specialAttackMagic = player->prepareSpecialAttackMagicForAction(_attackDest, _target.lock());
-        // The practice magic adds an attack; it does not replace the primary attack.
-        // Preserve its animation choice while preparing the primary magic separately.
-        _npc->prepareAttackMagicForAction(_attackDest, _target.lock(), _npc->attackReleaseMode);
-    }
-    else if (!player && _npc->hasPreparedAttackMagic)
-    {
-        // Normal NPC attack admission already selected this magic. Keep it
-        // through the animation instead of making a second random selection.
         _actionMagic = _npc->preparedAttackMagic;
     }
     else
     {
         _actionMagic = _npc->prepareAttackMagicForAction(_attackDest, _target.lock(), _npc->attackReleaseMode);
     }
+
+    if (player)
+    {
+        // C# keeps the practice branch at one of three rolls even if Attack1 is absent.
+        _attackType = selectAttackType(_npc->engine->getRand(2),
+            _npc->canDoAction(acAttack1), _npc->canDoAction(acAttack2));
+    }
+    else
+    {
+        std::vector<NPCActionType> attackTypes = {acAttack};
+        if (_npc->canDoAction(acAttack1))
+        {
+            attackTypes.push_back(acAttack1);
+        }
+        if (_npc->canDoAction(acAttack2))
+        {
+            attackTypes.push_back(acAttack2);
+        }
+        const int index = attackTypes.size() > 1 ? _npc->engine->getRand(static_cast<int>(attackTypes.size()) - 1) : 0;
+        _attackType = attackTypes[index];
+    }
+    if (player && _attackType == acAttack2)
+    {
+        _specialAttackMagic = player->prepareSpecialAttackMagicForAction(_attackDest, _target.lock());
+        if (_specialAttackMagic != nullptr && _practiceMagic != nullptr
+            && _practiceMagic->getActionImageForNPC(_npc) != nullptr)
+        {
+            _attackType = acSpecialAttack;
+        }
+    }
+    _npc->nowAction = _attackType;
+    _animationDuration = IMP::getIMPImageActionTime(getAttackImagePackage());
     _npc->actionLastTime = getActionTime();
+    const auto actionImage = getAttackImagePackage();
+    const auto framesPerDirection = actionImage != nullptr
+        ? ImageAnimationPlayback::calculateLayout(actionImage->frame.size(), actionImage->directions).framesPerDirection
+        : 0;
+    _releaseTime = calculateActionReleaseTime(_npc->actionLastTime, framesPerDirection,
+        _attackType == acSpecialAttack
+            ? gm->global.specialAttackReleaseFrameRatio : gm->global.attackReleaseFrameRatio);
     
     playSound();
 }
 
-// 更新攻击状态，当攻击动画播放到释放点时触发伤害计算，然后回到站立
+// 到释放点生成一次攻击，完整收招后回到站立。
 void NPCActionAttack::update(UTime frameTime)
 {
 	// Do not release an attack after the owner has already crossed the partner
@@ -119,24 +102,23 @@ void NPCActionAttack::update(UTime frameTime)
 		return;
 	}
 
-    if (_npc->getTime() - _npc->actionBeginTime >= _npc->actionLastTime)
+    const UTime elapsedTime = _npc->getTime() - _npc->actionBeginTime;
+    if (!_attackDone && elapsedTime >= _releaseTime)
     {
         bool released = false;
-        if (!_attackDone)
+        _attackDone = true;
+        _npc->attackDone = true;
+        Player* player = dynamic_cast<Player*>(_npc);
+        auto targetPtr = _target.lock();
+        released = _npc->releasePreparedAttackMagic(_attackDest, targetPtr);
+        if (!released)
         {
-            _attackDone = true;
-            Player* player = dynamic_cast<Player*>(_npc);
-            auto targetPtr = _target.lock();
-            released = _npc->releasePreparedAttackMagic(_attackDest, targetPtr);
-            if (!released)
-            {
-                released = _npc->doAttack(_attackDest, targetPtr, _npc->attackReleaseMode);
-            }
-            if (player && _specialAttackMagic != nullptr)
-            {
-                player->setPreparedAttackMagic(_specialAttackMagic, false);
-                released = player->releasePreparedSpecialAttackMagic(_attackDest, targetPtr) || released;
-            }
+            released = _npc->doAttack(_attackDest, targetPtr, _npc->attackReleaseMode);
+        }
+        if (player && _specialAttackMagic != nullptr)
+        {
+            player->setPreparedAttackMagic(_specialAttackMagic, false);
+            released = player->releasePreparedSpecialAttackMagic(_attackDest, targetPtr) || released;
         }
         if (released)
         {
@@ -144,6 +126,9 @@ void NPCActionAttack::update(UTime frameTime)
             _npc->lastBattleScanTime = _npc->getTime();
         }
         _npc->revealMagicInvisibilityOnAction();
+    }
+    if (elapsedTime >= _npc->actionLastTime)
+    {
         _npc->actionManager->forceChangeAction(NPCActionType::acStand);
     }
 }
@@ -168,9 +153,9 @@ _shared_imp NPCActionAttack::getAttackImagePackage() const
     {
         return _actionMagic->useActionImage;
     }
-    if (_attackType == NPCActionType::acSpecialAttack && _actionMagic != nullptr)
+    if (_attackType == NPCActionType::acSpecialAttack && _practiceMagic != nullptr)
     {
-        auto actionImage = _actionMagic->getActionImageForNPC(_npc);
+        auto actionImage = _practiceMagic->getActionImageForNPC(_npc);
         if (actionImage != nullptr)
         {
             return actionImage;
@@ -205,9 +190,9 @@ _shared_imp NPCActionAttack::getAttackShadowPackage() const
         return _npc->res.attack2.shadowPackage;
     case NPCActionType::acSpecialAttack:
         return selectSpecialAttackShadowPackage(
-            _actionMagic != nullptr ? _actionMagic->actionShadow : nullptr,
-            _actionMagic != nullptr ? _actionMagic->useActionImage : nullptr,
-            _actionMagic != nullptr ? _actionMagic->actionImage : nullptr,
+            _practiceMagic != nullptr ? _practiceMagic->actionShadow : nullptr,
+            _practiceMagic != nullptr ? _practiceMagic->useActionImage : nullptr,
+            _practiceMagic != nullptr ? _practiceMagic->actionImage : nullptr,
             _npc->res.specialAttack.shadowPackage);
     default:
         return _npc->res.attack.shadowPackage;
@@ -218,14 +203,26 @@ _shared_imp NPCActionAttack::getAttackShadowPackage() const
 _shared_image NPCActionAttack::getActionImage(int* offsetx, int* offsety)
 {
     return IMP::loadImageForDirection(getAttackImagePackage(), _npc->direction,
-        _npc->getTime() - _npc->actionBeginTime, offsetx, offsety, true);
+        getAnimationTime(), offsetx, offsety, true);
 }
 
 // 获取当前帧的攻击动画阴影
 _shared_image NPCActionAttack::getActionShadow(int* offsetx, int* offsety)
 {
     return IMP::loadImageForDirection(getAttackShadowPackage(), _npc->direction,
-        _npc->getTime() - _npc->actionBeginTime, offsetx, offsety, true);
+        getAnimationTime(), offsetx, offsety, true);
+}
+
+UTime NPCActionAttack::getAnimationTime() const
+{
+    const UTime elapsed = _npc->getTime() - _npc->actionBeginTime;
+    if (_npc->actionLastTime == 0 || elapsed >= _npc->actionLastTime)
+    {
+        return _animationDuration;
+    }
+    // Follow the duration fixed at entry, including its integer rounding;
+    // changing AttackSpeed during this action must not move its visual clock.
+    return elapsed * _animationDuration / _npc->actionLastTime;
 }
 
 // 获取当前攻击类型的动画总时长

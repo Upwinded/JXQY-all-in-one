@@ -29,6 +29,7 @@ class Element : public std::enable_shared_from_this<Element>
 	friend class GamepadEssentialUITestAccess;
 	friend class GamepadRPGMenuActionsTestAccess;
 	friend class GamepadWorldRuntimeTestAccess;
+	friend class GambleMenuTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
 	friend class UIFocusTestAccess;
 public:

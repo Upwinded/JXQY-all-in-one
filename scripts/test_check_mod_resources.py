@@ -25,6 +25,17 @@ def main() -> int:
     module = load_module()
 
     with tempfile.TemporaryDirectory() as temp_dir:
+        root = Path(temp_dir)
+        images = root / "asf" / "character"
+        images.mkdir(parents=True)
+        (images / "npc013_st (2).asf").write_bytes(b"monk")
+        found, _, _ = module.exact_path_status(root, Path("asf/character/npc013_st.asf"))
+        assert not found
+        (images / "npc013_st.asf").write_bytes(b"white-woman")
+        found, _, path = module.exact_path_status(root, Path("asf/character/NPC013_ST.ASF"))
+        assert found and path.read_bytes() == b"white-woman"
+
+    with tempfile.TemporaryDirectory() as temp_dir:
         profile_path = Path(temp_dir) / "game_profile.ini"
         profile_path.write_text(
             "[gAmE]\n"

@@ -5525,14 +5525,22 @@ bool MainWindow::configureProjectAssetMigration(
             profile.minimumMagicDamage;
         context.migrationOptions.minimumMagicDamageDefined =
             profile.minimumMagicDamageDefined;
+        context.migrationOptions.attackReleaseFrameRatio =
+            profile.attackReleaseFrameRatio;
+        context.migrationOptions.attackReleaseFrameRatioDefined =
+            profile.attackReleaseFrameRatioDefined;
+        context.migrationOptions.specialAttackReleaseFrameRatio =
+            profile.specialAttackReleaseFrameRatio;
+        context.migrationOptions.specialAttackReleaseFrameRatioDefined =
+            profile.specialAttackReleaseFrameRatioDefined;
+        context.migrationOptions.magicReleaseFrameRatio =
+            profile.magicReleaseFrameRatio;
+        context.migrationOptions.magicReleaseFrameRatioDefined =
+            profile.magicReleaseFrameRatioDefined;
         context.migrationOptions.defeatedNpcExperienceMode =
             profile.defeatedNpcExperienceMode;
         context.migrationOptions.defeatedNpcExperienceModeDefined =
             profile.defeatedNpcExperienceModeDefined;
-        context.migrationOptions.experienceMultiplier =
-            profile.experienceMultiplier;
-        context.migrationOptions.experienceMultiplierDefined =
-            profile.experienceMultiplierDefined;
         context.migrationOptions.levelUpThresholdMode =
             profile.levelUpThresholdMode;
         context.migrationOptions.levelUpThresholdModeDefined =

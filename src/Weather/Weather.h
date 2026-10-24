@@ -12,6 +12,7 @@ struct WeatherDrop
 	float y = -1;
 	float speed = 1.0f;
 	float horizontalSpeed = 0.0f;
+	float windScale = 1.0f;
 	float cameraParallax = 0.0f;
 	float swayPhase = 0.0f;
 	float swayAngularSpeed = 0.0f;
@@ -76,11 +77,11 @@ private:
 	const int dropRange = 200;
 	const int dropWRange = 100;
 	
-	const int maxDropNum = 500;
-	const int lrainDropNum = 50;
-	const int rainDropNum = 200;
-	const int hrainDropNum = 500;
-	const int lnDropNum = 200;
+	const int maxDropNum = 600;
+	const int lrainDropNum = 60;
+	const int rainDropNum = 240;
+	const int hrainDropNum = 600;
+	const int lnDropNum = 240;
 	const int snowDropNum = 250;
 
 	std::list<WeatherDrop> rainDrops;

@@ -410,10 +410,6 @@ def make_profile(args: argparse.Namespace, base_pack: BasePack, pack_path: str) 
         ])
     lines.extend([
         "",
-        "[Features]",
-        # Effect scenarios measure time from release, after the cast action ends.
-        "MagicTriggerAtAnimationEnd=1",
-        "",
         "[Resource]",
         f"DependencyId={args.base_id}",
         "TextEncodingConverted=1",

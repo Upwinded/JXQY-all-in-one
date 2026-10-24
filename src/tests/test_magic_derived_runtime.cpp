@@ -1,6 +1,7 @@
 #include "../File/File.h"
 #include "../File/INIReader.h"
 #include "../Engine/Engine.h"
+#include "../Game/Config/Config.h"
 #include "../Game/Data/Effect.h"
 #include "../Game/Data/EffectManager.h"
 #include "../Game/Data/Magic.h"
@@ -13,10 +14,12 @@
 #include "../Game/Menu/PracticeMenu.h"
 #include "../Game/Menu/StateMenu.h"
 #include "../Game/Menu/SystemNotice.h"
+#include "../Resource/ResourceManager.h"
 #include "TestTemporaryDirectory.h"
 
 #include <filesystem>
 #include <fstream>
+#include <cmath>
 #include <initializer_list>
 #include <iostream>
 #include <limits>
@@ -31,6 +34,11 @@ public:
 	{
 		player.onUpdate();
 	}
+	static void advancePlayerMagic(Player& player)
+	{
+		player.setTime(player.getTime() + player.actionLastTime);
+		player.actionManager->update(0);
+	}
 	static void updateEffect(Effect& effect)
 	{
 		effect.onUpdate();
@@ -44,6 +52,10 @@ public:
 	static void updateCarryUserPosition(Effect& effect)
 	{
 		effect.updateCarryUserPosition();
+	}
+	static void updateAttachedNPCs(Effect& effect)
+	{
+		effect.updateAttachedNPCs();
 	}
 	static void updateRangeEffect(Effect& effect, UTime frameTime)
 	{
@@ -104,17 +116,132 @@ bool runEffectProjectedDirectionTest()
 	Effect effect;
 	effect.magic.flyImage = std::make_shared<IMPImage>();
 	effect.magic.flyImage->directions = 16;
-	bool ok = check(effect.getDirection({ 1000, 1000 }) == 13,
-		"effect direction uses the y-compressed projected movement angle");
+	bool ok = check(effect.getDirection({ 1000, 1000 }) == 14,
+		"effect direction uses the unprojected angle of the animation frames");
 	effect.magic.flyImage->directions = 32;
-	ok = check(effect.getDirection({ 1000, 1000 }) == 26,
+	ok = check(effect.getDirection({ 1000, 1000 }) == 28,
 		"effect direction uses the actual 32-direction flying image") && ok;
 	effect.magic.flyImage->directions = 8;
 	ok = check(effect.getDirection({ 1000, 1000 }) == 7,
 		"effect direction uses the actual 8-direction flying image") && ok;
 	effect.magic.flyImage->directions = 32;
-	ok = check(effect.getDirection({ 1000, 2000 }) == 28,
-		"pre-compensated target direction keeps its screen-space angle") && ok;
+	ok = check(effect.getDirection({ 1000, 2000 }) == 30,
+		"target direction is not projected a second time for animation selection") && ok;
+	const Point origin = { 100, 100 };
+	for (int directionCount : { 8, 16, 32 })
+	{
+		effect.magic.flyImage->directions = directionCount;
+		for (int expectedDirection = 0; expectedDirection < directionCount; ++expectedDirection)
+		{
+			const double angle = 2.0 * std::acos(-1.0) * expectedDirection / directionCount;
+			const Point target =
+			{
+				origin.x - (int)std::lround(std::sin(angle) * 1000.0),
+				origin.y + (int)std::lround(std::cos(angle) * 1000.0) * 2
+			};
+			const Point projected = Map::getTilePosition(target, origin);
+			const Point flyingDirection = { projected.x, (int)(projected.y * MapXRatio) };
+			ok = check(Magic::getDirection(origin, target, directionCount) == expectedDirection,
+				"tile-target animation direction uses the unprojected angle in every quadrant") && ok;
+			ok = check(effect.getDirection(flyingDirection) == expectedDirection,
+				"moving-effect animation direction agrees with the tile-target direction") && ok;
+		}
+		ok = check(Magic::getDirection(-0.01f, directionCount) == 0
+			&& Magic::getDirection((float)(2.0 * std::acos(-1.0) - 0.01), directionCount) == 0,
+			"angles just before a full turn wrap to the first animation direction") && ok;
+	}
+	ok = check(Magic::getDirection(1.0f, 0) == 0 && Magic::getDirection(-0.01f, 1) == 0,
+		"single-direction and absent direction metadata select the first frame") && ok;
+	return ok;
+}
+
+bool runEffectPathWidthTest()
+{
+	Effect effect;
+	bool ok = true;
+	for (float width : { 0.0f, 0.5f, 1.0f })
+	{
+		effect.width = width;
+		for (int direction = 0; direction < 8; ++direction)
+		{
+			const Point projected = Map::getTilePosition(Map::getSubPoint({ 0, 0 }, direction), { 0, 0 });
+			effect.flyingDirection = { projected.x, (int)(projected.y * MapXRatio) };
+			const auto offsets = effect.getPathOffsets();
+			const PointEx side = offsets[1];
+			ok = check(std::abs(Map::getTileDistance({ 0, 0 }, { 0, 0 }, { 0, 0 }, side) - width * 0.5f) < 0.0001f,
+				"wall edge paths use the same tile radius as character and projectile collisions") && ok;
+			ok = check(std::abs(side.x / MapXRatio * effect.flyingDirection.x
+				+ side.y * effect.flyingDirection.y) < 0.0001f,
+				"wall edge offset is perpendicular before the map projection") && ok;
+			effect.flyingDirection = { -effect.flyingDirection.x, -effect.flyingDirection.y };
+			const auto reversedOffsets = effect.getPathOffsets();
+			ok = check(offsets[0].x == 0 && offsets[0].y == 0
+				&& offsets[1].x == -offsets[2].x && offsets[1].y == -offsets[2].y
+				&& offsets[1].x == reversedOffsets[2].x && offsets[1].y == reversedOffsets[2].y,
+				"reversing flight preserves the same center and two edge paths") && ok;
+		}
+	}
+	for (int carryMode : { 3, 4 })
+	{
+		effect.magic.carryUser = carryMode;
+		for (const auto offset : effect.getPathOffsets())
+		{
+			ok = check(offset.x == 0 && offset.y == 0,
+				"point-path carry modes retain zero wall edge offsets") && ok;
+		}
+	}
+	return ok;
+}
+
+bool runEffectInitialDirectionTest(GameManager& gameManager)
+{
+	const auto originalMap = gameManager.map->data;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = gameManager.map->data->head.height = 64;
+	gameManager.map->data->tile.assign(64, std::vector<MapTile>(64));
+	gameManager.map->createDataMap();
+	const Point origin = { 20, 20 };
+	const Point target = { 24, 24 };
+	bool ok = true;
+	for (int directionCount : { 8, 16, 32 })
+	{
+		auto magic = std::make_shared<Magic>();
+		magic->flyImage = std::make_shared<IMPImage>();
+		magic->flyImage->directions = directionCount;
+		magic->level[1].lifeFrame = 100;
+		for (int moveKind : { mmkLine, mmkMoveLine, mmkVMove })
+		{
+			magic->level[1].moveKind = moveKind;
+			auto effects = moveKind == mmkLine
+				? Magic::addLineEffect(magic, gameManager.player, origin, target, 1, 0, 0, lkSelf)
+				: moveKind == mmkMoveLine
+					? Magic::addMoveLineEffect(magic, gameManager.player, origin, target, 1, 0, 0, lkSelf)
+					: Magic::addVMoveEffect(magic, gameManager.player, origin, target, 1, 0, 0, lkSelf);
+			ok = check(!effects.empty(), "line and V-shaped magic create their initial effects") && ok;
+			for (const auto& effect : effects)
+			{
+				ok = check(effect->direction == 7 * directionCount / 8,
+					"line and V-shaped animations follow the actual eight-way cast or flight direction") && ok;
+			}
+			gameManager.effectManager->freeResource();
+		}
+
+		auto effect = std::make_shared<Effect>();
+		effect->magic.flyImage = magic->flyImage;
+		effect->magic.ball = 1;
+		effect->doing = ekFlying;
+		effect->position = origin;
+		effect->flyingDirection = { 1000, 0 };
+		auto hitTarget = std::make_shared<NPC>();
+		hitTarget->setPosition({ origin.x + 1, origin.y }, false);
+		ok = check(effect->handleBallAfterHit(hitTarget, origin)
+			&& effect->position == Point{ origin.x - 1, origin.y }
+			&& effect->direction == directionCount / 4,
+			"ball reflection steps to the same neighboring tile for 8, 16 and 32 animation directions") && ok;
+		gameManager.effectManager->freeResource();
+	}
+	gameManager.map->data = originalMap;
+	gameManager.map->createDataMap();
 	return ok;
 }
 
@@ -194,6 +321,49 @@ bool runDirectDamageShieldTest(GameManager& gameManager)
 		const int reducedLoss = kind == nkPlayer ? static_cast<int>(std::round(80 * DAMAGE_RATE)) : 80;
 		ok = check(target->life == 1000 - loss - reducedLoss && target->shieldLife == 300,
 			"direct damage retains numeric reduction without consuming capacity shields") && ok;
+		target->attack = 60;
+		target->attack2 = 12;
+		target->attack3 = 7;
+		if (kind == nkPlayer)
+		{
+			gameManager.player->info.lifeMax = 1000;
+			gameManager.player->info.attack = 60;
+			gameManager.player->calInfo();
+		}
+		block->magic.level[1].effect = 0;
+		block->magic.level[1].effectExt = 10;
+		incoming->damage2 = 20;
+		incoming->damage3 = 10;
+		const int primaryReduction = target->getAttack() + 10;
+		const int expectedDamage = std::max(
+			100 - primaryReduction
+				+ std::max(0, 20 - target->getAttack2())
+				+ std::max(0, 10 - target->getAttack3()),
+			gameManager.global.minimumMagicDamage);
+		ok = check(target->calculateEffectDamage(incoming) == expectedDamage,
+			"zero-Effect reduction uses the current beneficiary attack channels and primary extension") && ok;
+		target->life = 1000;
+		target->shieldLife = 0;
+		target->hurtLife(100, true);
+		const int rawLoss = std::max(0, 100 - primaryReduction);
+		const int reducedRawLoss = kind == nkPlayer
+			? static_cast<int>(std::round(rawLoss * DAMAGE_RATE)) : rawLoss;
+		ok = check(target->life == 1000 - reducedRawLoss,
+			"raw life damage uses the same zero-Effect reduction for player, NPC and partner") && ok;
+		block->level = 2;
+		block->magic.level[2].effect = 25;
+		block->magic.level[2].effectExt = 5;
+		target->life = 1000;
+		target->hurtLife(100, true);
+		const int explicitLoss = kind == nkPlayer
+			? static_cast<int>(std::round(70 * DAMAGE_RATE)) : 70;
+		ok = check(target->life == 1000 - explicitLoss,
+			"explicit numeric reduction keeps its amount and adds only the current level extension") && ok;
+		block->vanishing = true;
+		target->life = 1000;
+		target->hurtLife(100, true);
+		ok = check(target->life == 1000 - loss,
+			"expired reduction never applies an attack fallback or extension") && ok;
 		target->magicToUseWhenBeAttacked.reset();
 		target->shieldEffects.clear();
 	}
@@ -598,6 +768,204 @@ bool runAutomaticSelfMagicAdmissionContract(GameManager& gameManager)
 	return ok;
 }
 
+bool runInvisibleRangeContract(GameManager& gameManager)
+{
+	class RangeTarget : public NPC
+	{
+	public:
+		int hitCount = 0;
+		void hurt(std::shared_ptr<Effect> effect, int = -1) override
+		{
+			++hitCount;
+			NPC::hurt(effect, 0);
+		}
+	};
+	auto target = std::make_shared<RangeTarget>();
+	target->npcName = "INVISIBLE_RANGE_ENEMY";
+	target->kind = nkBattle;
+	target->relation = nrHostile;
+	target->life = target->lifeMax = 1000;
+	target->invisibleMilliseconds = 10000;
+	target->setPosition(gameManager.player->getPosition(), false);
+	auto ally = std::make_shared<NPC>();
+	ally->npcName = "INVISIBLE_RANGE_ALLY";
+	ally->kind = nkBattle;
+	ally->relation = nrFriendly;
+	ally->life = 50;
+	ally->lifeMax = 100;
+	ally->invisibleMilliseconds = 10000;
+	ally->setPosition(target->getPosition(), false);
+	gameManager.npcManager->addNPC(target);
+	gameManager.npcManager->addNPC(ally);
+	auto effect = std::make_shared<Effect>();
+	effect->level = 1;
+	effect->user = gameManager.player;
+	effect->launcherKind = lkSelf;
+	effect->position = target->getPosition();
+	effect->magic.rangeEffect = 1;
+	effect->magic.rangeRadius = 4;
+	effect->magic.level[1].rangeDamage = 20;
+	effect->magic.level[1].rangeAddLife = 10;
+	RageSystemTestAccess::updateRangeEffect(*effect, 1);
+	bool ok = check(target->hitCount == 1 && ally->life == 60,
+		"range damage and allied recovery affect magic-invisible characters");
+	target->scriptHidden = ally->scriptHidden = true;
+	RageSystemTestAccess::updateRangeEffect(*effect, 1);
+	ok = check(target->hitCount == 1 && ally->life == 60,
+		"range effects still exclude characters hidden by a script") && ok;
+	gameManager.npcManager->deleteNPC(target->npcName);
+	gameManager.npcManager->deleteNPC(ally->npcName);
+	return ok;
+}
+
+bool runCarryFlyMagicDamageContract(GameManager& gameManager)
+{
+	class CollisionTargetNPC : public NPC
+	{
+	public:
+		void hurt(std::shared_ptr<Effect> effect, int = -1) override
+		{
+			NPC::hurt(effect, 0);
+		}
+	};
+	const auto originalMap = gameManager.map->data;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = gameManager.map->data->head.height = 32;
+	gameManager.map->data->tile.assign(32, std::vector<MapTile>(32));
+	gameManager.map->createDataMap();
+	bool ok = true;
+	for (Point targetPosition : { Point{ 9, 10 }, Point{ 10, 10 }, Point{ 8, 8 }, Point{ 12, 27 } })
+	{
+		gameManager.effectManager->clearEffect();
+		const bool corridor = targetPosition == Point{ 12, 27 };
+		gameManager.map->data->tile.assign(32, std::vector<MapTile>(32));
+		if (corridor) gameManager.map->data->tile[28][13].obstacle = toObstacle;
+		const Point origin = corridor ? Point{ 12, 29 } : Point{ 8, 10 };
+		gameManager.player->setPosition(origin, false);
+		gameManager.player->life = gameManager.player->lifeMax = 1000;
+		auto target = std::make_shared<CollisionTargetNPC>();
+		target->npcName = "CARRY_FLY_MAGIC_TARGET";
+		target->kind = nkBattle;
+		target->relation = nrHostile;
+		target->life = target->lifeMax = 1000;
+		target->defend = target->defend2 = target->defend3 = 0;
+		target->setPosition(targetPosition, false);
+		gameManager.npcManager->addNPC(target);
+		gameManager.map->createDataMap();
+		auto child = std::make_shared<Magic>();
+		child->loadSucceeded = true;
+		child->iniName = "carry_fly_child.ini";
+		child->passThrough = 1;
+		child->bounce = 30;
+		child->noSpecialKindEffect = 1;
+		child->level[1].moveKind = mmkCircle;
+		child->level[1].speed = 7;
+		child->level[1].lifeFrame = 5;
+		child->level[1].effectExt = 340;
+		auto parent = std::make_shared<Magic>();
+		parent->loadSucceeded = true;
+		parent->iniName = "carry_fly_parent.ini";
+		parent->carryUser = 3;
+		parent->bounce = 500;
+		parent->level[1].moveKind = mmkFly;
+		parent->level[1].speed = 8;
+		parent->level[1].waitFrame = 4;
+		parent->level[1].lifeFrame = 10;
+		parent->linkedLevel[1].flyMagic = child;
+		parent->linkedLevel[1].flyInterval = 100;
+		const auto effects = Magic::addEffect(parent, gameManager.player, origin, targetPosition,
+			1, 100, 1000, lkSelf, target);
+		bool childSpawned = false;
+		for (UTime elapsed = 0; elapsed < 600; elapsed += 20)
+		{
+			const auto active = gameManager.effectManager->effectList;
+			for (const auto& effect : active)
+			{
+				childSpawned = childSpawned || effect->magic.iniName == child->iniName;
+				RageSystemTestAccess::advanceEffect(*effect, 20);
+			}
+			gameManager.effectManager->onUpdate();
+		}
+		if (!childSpawned || target->life == 1000)
+		{
+			std::cerr << "CarryFly target=" << targetPosition.x << ',' << targetPosition.y
+				<< " spawned=" << childSpawned << " life=" << target->life << '\n';
+		}
+		ok = check(effects.size() == 1 && childSpawned && target->life < 1000,
+			"CarryUser3 dispatches short-lived invisible circle children that damage nearby targets") && ok;
+		gameManager.effectManager->clearEffect();
+		gameManager.npcManager->deleteNPC(target->npcName);
+	}
+	gameManager.map->data = originalMap;
+	gameManager.map->createDataMap();
+	return ok;
+}
+
+bool runCarriedVictimTranslationContract(GameManager& gameManager)
+{
+	const auto originalMap = gameManager.map->data;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = gameManager.map->data->head.height = 32;
+	bool ok = true;
+	for (bool crossedWall : { false, true })
+	{
+		for (int row : { 10, 11 })
+		{
+			gameManager.map->data->tile.assign(32, std::vector<MapTile>(32));
+			if (crossedWall) gameManager.map->data->tile[row + 1][11].obstacle = toObstacle;
+			auto caster = std::make_shared<NPC>();
+			caster->npcName = "CARRIED_TRANSLATION_CASTER";
+			caster->kind = nkBattle;
+			caster->relation = nrFriendly;
+			caster->life = caster->lifeMax = 100;
+			caster->setPosition({ 10, row }, false);
+			gameManager.npcManager->addNPC(caster);
+			auto victim = std::make_shared<NPC>();
+			victim->npcName = "CARRIED_TRANSLATION_VICTIM";
+			victim->kind = nkBattle;
+			victim->relation = nrHostile;
+			victim->life = victim->lifeMax = 100;
+			victim->setPosition({ 10, row + 1 }, false);
+			victim->setOffset({ 5, -2 });
+			gameManager.npcManager->addNPC(victim);
+			gameManager.map->createDataMap();
+			auto effect = std::make_shared<Effect>();
+			effect->level = 1;
+			effect->magic.carryUser = 4;
+			effect->magic.level[1].moveKind = mmkFly;
+			effect->user = caster;
+			effect->position = effect->src = { 10, row };
+			effect->offset = { -4, 1 };
+			effect->doing = ekFlying;
+			gameManager.effectManager->addEffect(effect);
+			effect->attachCarryUser(caster);
+			effect->handleCarryUser4AfterHit(victim);
+			auto relativePixels = [&]()
+			{
+				const auto tiles = Map::getTilePositionEx(victim->getPosition(), effect->position, { 0, 0 }, { 0, 0 });
+				const auto offset = victim->getOffset();
+				return PointEx{ tiles.x + offset.x - effect->offset.x, tiles.y + offset.y - effect->offset.y };
+			};
+			const auto before = relativePixels();
+			effect->position = crossedWall ? Point{ 13, row } : Point{ 10, row + 1 };
+			RageSystemTestAccess::updateCarryUserPosition(*effect);
+			RageSystemTestAccess::updateAttachedNPCs(*effect);
+			const auto after = relativePixels();
+			ok = check(crossedWall
+				? victim->getPosition() == Point{ 10, row + 1 } && effect->doing != ekFlying
+				: std::abs(before.x - after.x) < 0.01f && std::abs(before.y - after.y) < 0.01f,
+				crossedWall ? "carried victim cannot skip a wall into an open destination in one update"
+				: "carried victim preserves its pixel displacement across both row parities") && ok;
+			gameManager.effectManager->freeResource();
+			gameManager.npcManager->deleteNPC(caster->npcName);
+			gameManager.npcManager->deleteNPC(victim->npcName);
+		}
+	}
+	gameManager.map->data = originalMap;
+	gameManager.map->createDataMap();
+	return ok;
+}
+
 bool runCarryWallCollisionContract(GameManager& gameManager)
 {
 	class CollisionTargetNPC : public NPC
@@ -732,6 +1100,48 @@ bool runCarryWallCollisionContract(GameManager& gameManager)
 			}
 		}
 	}
+	for (const auto obstacle : {toTrans, toJumpTrans})
+	{
+		gameManager.map->data->tile.assign(32, std::vector<MapTile>(32));
+		gameManager.map->data->tile[11][11].obstacle = obstacle;
+		auto caster = std::make_shared<NPC>();
+		caster->npcName = "CARRY_SIDE_CASTER";
+		caster->kind = nkBattle;
+		caster->relation = nrFriendly;
+		caster->life = caster->lifeMax = 100;
+		caster->setPosition({10, 10}, false);
+		gameManager.npcManager->addNPC(caster);
+		auto target = std::make_shared<NPC>();
+		target->npcName = "CARRY_SIDE_TARGET";
+		target->kind = nkBattle;
+		target->relation = nrHostile;
+		target->life = target->lifeMax = 100;
+		target->setPosition({10, 11}, false);
+		gameManager.npcManager->addNPC(target);
+		gameManager.map->createDataMap();
+		auto effect = std::make_shared<Effect>();
+		effect->magic.carryUser = 4;
+		effect->magic.level[1].moveKind = mmkFly;
+		effect->user = caster;
+		effect->position = effect->src = {10, 10};
+		effect->doing = ekFlying;
+		gameManager.effectManager->addEffect(effect);
+		effect->attachCarryUser(caster);
+		if (!effect->hasAttachedNPC(target))
+		{
+			effect->handleCarryUser4AfterHit(target);
+		}
+		ok = check(effect->hasAttachedNPC(target), "offset CarryUser4 victim attaches") && ok;
+		effect->position = {11, 10};
+		RageSystemTestAccess::updateCarryUserPosition(*effect);
+		RageSystemTestAccess::updateAttachedNPCs(*effect);
+		ok = check(caster->getPosition() == Point{11, 10}
+			&& target->getPosition() == Point{10, 11} && effect->doing != ekFlying,
+			"CarryUser4 stops when an offset victim reaches water while the caster stays on open ground") && ok;
+		gameManager.effectManager->freeResource();
+		gameManager.npcManager->deleteNPC(caster->npcName);
+		gameManager.npcManager->deleteNPC(target->npcName);
+	}
 	gameManager.map->data = originalMap;
 	gameManager.map->createDataMap();
 	return ok;
@@ -748,6 +1158,157 @@ bool writeTextFile(const std::filesystem::path& path, const std::string& content
 	}
 	output << content;
 	return true;
+}
+
+bool runMagicLevelRuntimeTest(const std::filesystem::path& root)
+{
+	// 剑之缘 2 高清 1.10 分身术的 Init、Level1、Level2、Level10 数值。
+	const std::string summonDefinition =
+		"[Init]\nName=LevelSummon\nMoveKind=22\nNpcFile=level-summon-1.ini\n"
+		"KeepMilliseconds=40000\nMaxCount=5\n"
+		"[Level1]\nNpcFile=level-summon-1.ini\nKeepMilliseconds=40000\nMaxCount=1\n"
+		"[Level2]\nNpcFile=level-summon-2.ini\nKeepMilliseconds=50000\nMaxCount=2\n"
+		"[Level10]\nNpcFile=level-summon-10.ini\nKeepMilliseconds=260000\nMaxCount=10\n";
+	const std::string stateDefinition =
+		"[Init]\nName=LevelStates\nMoveKind=1\nMaxLevel=5\n"
+		"NpcIni=init-morph.ini\nReplaceMagic=init-replacement.ini\n"
+		"SpecialKind9ReplaceFlyIni=init-fly.ini\nSpecialKind9ReplaceFlyIni2=init-fly2.ini\n"
+		"DisableMoveMilliseconds=100\nDisableSkillMilliseconds=200\nBlindMilliseconds=300\n"
+		"WeakMilliseconds=400\nWeakAttackPercent=10\nWeakDefendPercent=20\n"
+		"MorphMilliseconds=0\nChangeToFriendMilliseconds=500\n"
+		"AttackAddPercent=10\nDefendAddPercent=20\nEvadeAddPercent=30\nSpeedAddPercent=40\n"
+		"[Level2]\nMoveKind=21\nMaxLevel=50\n"
+		"NpcIni=\nReplaceMagic=\nSpecialKind9ReplaceFlyIni=level-fly.ini\nSpecialKind9ReplaceFlyIni2=\n"
+		"DisableMoveMilliseconds=5500\nDisableSkillMilliseconds=5600\nBlindMilliseconds=5700\n"
+		"WeakMilliseconds=6000\nWeakAttackPercent=30\nWeakDefendPercent=40\n"
+		"MorphMilliseconds=7000\nChangeToFriendMilliseconds=8000\n"
+		"AttackAddPercent=100\nDefendAddPercent=110\nEvadeAddPercent=120\nSpeedAddPercent=130\n"
+		"[Level3]\nEffect=111\n"
+		"[Level4]\nKeepMilliseconds=-1\nNpcFile=\nMaxCount=-1\n"
+		"DisableMoveMilliseconds=0\nDisableSkillMilliseconds=0\nBlindMilliseconds=0\n"
+		"WeakMilliseconds=0\nWeakAttackPercent=105\nWeakDefendPercent=-2\n"
+		"MorphMilliseconds=-1\nChangeToFriendMilliseconds=0\n";
+	if (!check(writeTextFile(root / "ini/magic/level-summon.ini", summonDefinition)
+		&& writeTextFile(root / "ini/magic/level-states.ini", stateDefinition)
+		&& writeTextFile(root / "ini/magic/level-trail.ini",
+			"[Init]\nName=LevelTrail\nMoveKind=19\nKeepMilliseconds=0\n[Level2]\nKeepMilliseconds=9000\n"),
+		"write level runtime definitions")) return false;
+	for (int level : { 1, 2, 10 })
+	{
+		if (!check(writeTextFile(root / "ini/npc" / ("level-summon-" + std::to_string(level) + ".ini"),
+			"[Init]\nName=LevelSummonNpc\nKind=3\nRelation=0\nLife=" + std::to_string(level * 100)
+			+ "\nLifeMax=" + std::to_string(level * 100) + "\n"), "write distinct summon NPC levels")) return false;
+	}
+	GameManager game;
+	game.map->data = std::make_shared<MapData>();
+	game.map->data->head.width = game.map->data->head.height = 40;
+	game.map->data->tile.assign(40, std::vector<MapTile>(40));
+	game.map->createDataMap();
+	game.player->setPosition({ 20, 20 }, false);
+	auto summon = std::make_shared<Magic>();
+	summon->initFromIni("level-summon.ini");
+	bool ok = check(summon->loadSucceeded, "load summon level definition");
+	std::shared_ptr<Effect> levelTwoSnapshot;
+	for (int level : { 1, 2, 10 })
+	{
+		game.effectManager->clearEffect();
+		game.npcManager->npcList.clear();
+		const UTime duration = level == 10 ? 260000 : level == 2 ? 50000 : 40000;
+		for (int count = 0; count <= level; ++count)
+		{
+			auto effects = Magic::addEffect(summon, game.player, { 20, 20 }, { 22, 20 }, level, 0, 0, lkSelf, nullptr);
+			if (!check(effects.size() == 1, "a summon level creates its effect")) return false;
+			auto npc = effects.front()->summonedNPC.lock();
+			ok = check(npc != nullptr && npc->lifeMax == level * 100
+				&& effects.front()->lifeTime == duration && effects.front()->magic.maxCount == level,
+				"summon level selects its NPC file, duration and cap instead of Init values") && ok;
+			if (level == 2) levelTwoSnapshot = effects.front();
+		}
+		ok = check(game.player->summonedNpcsCount(*summon) == level,
+			"summoning again replaces the oldest NPC at the current level cap") && ok;
+	}
+	ok = check(summon->npcFile == "level-summon-1.ini" && summon->keepMilliseconds == 40000
+		&& summon->maxCount == 5 && levelTwoSnapshot != nullptr
+		&& levelTwoSnapshot->magic.npcFile == "level-summon-2.ini"
+		&& levelTwoSnapshot->magic.keepMilliseconds == 50000,
+		"level casts preserve both the shared Init definition and an earlier level's effect snapshot") && ok;
+	game.effectManager->clearEffect();
+	game.npcManager->npcList.clear();
+	auto timedSummon = Magic::addEffect(summon, game.player, { 20, 20 }, { 22, 20 }, 2, 0, 0, lkSelf, nullptr);
+	if (!check(timedSummon.size() == 1, "create a level-two summon for expiry verification")) return false;
+	auto timedNpc = timedSummon.front()->summonedNPC.lock();
+	RageSystemTestAccess::advanceEffect(*timedSummon.front(), 40001);
+	ok = check(timedNpc != nullptr && timedNpc->life > 0,
+		"a level-two summon survives the shorter Init duration") && ok;
+	RageSystemTestAccess::advanceEffect(*timedSummon.front(), 10000);
+	ok = check(timedNpc != nullptr && timedNpc->life == 0,
+		"a level-two summon expires at its own configured duration") && ok;
+	game.effectManager->clearEffect();
+	game.npcManager->npcList.clear();
+	auto states = std::make_shared<Magic>();
+	states->initFromIni("level-states.ini");
+	auto target = std::make_shared<NPC>();
+	target->kind = nkBattle;
+	target->relation = nrHostile;
+	target->level = 40;
+	target->setPosition({ 22, 20 }, false);
+	game.npcManager->npcList = { target };
+	auto controlled = Magic::addEffect(states, game.player, { 20, 20 }, { 22, 20 }, 2, 0, 0, lkSelf, target);
+	ok = check(controlled.size() == 1 && game.player->isControllingCharacter(),
+		"control admission uses the current spell level's target MaxLevel") && ok;
+	game.effectManager->clearEffect();
+	Effect stateEffect;
+	stateEffect.level = 2;
+	stateEffect.user = game.player;
+	stateEffect.initFromMagic(states);
+	target->applyEffectRuntimeStates(stateEffect);
+	ok = check(target->disableMoveMilliseconds == 5500 && target->disableSkillMilliseconds == 5600
+		&& target->blindMilliseconds == 5700 && target->weakMilliseconds == 6000
+		&& target->morphMilliseconds == 7000 && target->changeToOppositeMilliseconds == 8000
+		&& target->relation == nrFriendly && target->weakMagic->weakAttackPercent == 30
+		&& target->weakMagic->weakDefendPercent == 40 && target->morphMagic->attackAddPercent == 100
+		&& target->morphMagic->defendAddPercent == 110 && target->morphMagic->evadeAddPercent == 120
+		&& target->morphMagic->speedAddPercent == 130 && target->morphMagic->npcIni.empty()
+		&& target->morphMagic->replaceMagic.empty() && stateEffect.magic.specialKind9ReplaceFlyIni == "level-fly.ini"
+		&& stateEffect.magic.specialKind9ReplaceFlyIni2.empty(),
+		"the current level reaches action locks, blind, weak, morph attributes and temporary relation") && ok;
+	INIReader saved;
+	stateEffect.saveToIni(&saved, "Effect1");
+	Effect restored;
+	restored.initFromIni(&saved, "Effect1");
+	ok = check(restored.level == 2 && restored.magic.disableSkillMilliseconds == 5600
+		&& restored.magic.maxLevel == 50 && restored.magic.weakAttackPercent == 30,
+		"effect reload reapplies the saved spell level without adding a new save format") && ok;
+	auto copiedState = std::make_shared<Magic>();
+	copiedState->copy(stateEffect.magic);
+	Effect sparseCopy;
+	sparseCopy.level = 3;
+	sparseCopy.initFromMagic(copiedState);
+	ok = check(sparseCopy.magic.disableSkillMilliseconds == 200 && sparseCopy.magic.maxLevel == 5
+		&& sparseCopy.magic.npcIni == "init-morph.ini" && sparseCopy.magic.replaceMagic == "init-replacement.ini",
+		"copying a resolved level still preserves the independent Init defaults for another level") && ok;
+	stateEffect.level = 3;
+	stateEffect.initFromMagic(states);
+	ok = check(stateEffect.magic.disableSkillMilliseconds == 200 && stateEffect.magic.maxLevel == 5
+		&& stateEffect.magic.weakAttackPercent == 10 && stateEffect.magic.attackAddPercent == 10,
+		"a sparse level starts from Init instead of inheriting another level's runtime overrides") && ok;
+	stateEffect.level = 4;
+	stateEffect.initFromMagic(states);
+	ok = check(stateEffect.magic.disableMoveMilliseconds == 0 && stateEffect.magic.disableSkillMilliseconds == 0
+		&& stateEffect.magic.keepMilliseconds == 0 && stateEffect.magic.npcFile.empty()
+		&& stateEffect.magic.maxCount == 0 && stateEffect.magic.morphMilliseconds == 0
+		&& stateEffect.magic.changeToFriendMilliseconds == 0 && stateEffect.magic.weakAttackPercent == 100
+		&& stateEffect.magic.weakDefendPercent == 0,
+		"explicit zero, empty and negative level values preserve disabling and existing numeric bounds") && ok;
+	auto trail = std::make_shared<Magic>();
+	trail->initFromIni("level-trail.ini");
+	Magic::addEffect(trail, game.player, { 20, 20 }, { 22, 20 }, 2, 0, 0, lkSelf, nullptr);
+	INIReader trailSave;
+	game.effectManager->saveToIni(trailSave);
+	ok = check(game.effectManager->getPendingTrailMagicCount() == 1
+		&& trailSave.GetTime("Trail1", "RemainingTime", 0) == 9000,
+		"a trail can enable its level duration when Init disables the duration") && ok;
+	return ok;
 }
 
 bool prepareMagicFixtures(const std::filesystem::path& root)
@@ -2310,6 +2871,316 @@ bool runResourceConfiguredMagicEffectCalculationTest(GameManager& gameManager)
 	return ok;
 }
 
+bool runFriendlySelfMagicTargetTest(GameManager& gameManager)
+{
+	const auto originalPlayer = gameManager.player;
+	auto player = std::make_shared<Player>();
+	gameManager.player = player;
+	const auto originalNpcs = gameManager.npcManager->npcList;
+	const auto originalEffects = gameManager.effectManager->effectList;
+	player->info.lifeMax = 100;
+	player->life = 20;
+
+	auto recipient = std::make_shared<NPC>();
+	recipient->npcName = "FRIENDLY_SELF_MAGIC_RECIPIENT";
+	recipient->kind = nkPartner;
+	recipient->relation = nrFriendly;
+	recipient->lifeMax = 100;
+	recipient->life = 30;
+	recipient->setPosition({ 12, 12 }, false);
+	gameManager.npcManager->npcList = { recipient };
+
+	auto magic = std::make_shared<Magic>();
+	magic->iniName = "friendly-self-magic.ini";
+	magic->level[1].moveKind = mmkSelf;
+	magic->level[1].specialKind = mskAddLife;
+	magic->level[1].effect = 25;
+	magic->level[1].effectExt = 5;
+	const auto cast = [&](std::shared_ptr<GameElement> target)
+	{
+		return Magic::addEffect(magic, player, player->getPosition(),
+			recipient->getPosition(), 1, 25, 0, lkSelf, target);
+	};
+
+	auto effects = cast(recipient);
+	bool ok = check(player->life == 20 && recipient->life == 60,
+		"a player self-heal with an explicit friendly partner target heals that partner")
+		&& check(effects.size() == 1 && effects.front()->user.lock() == recipient
+			&& effects.front()->position == recipient->getPosition(),
+			"the friendly recipient owns the attached effect and its position");
+
+	for (int specialKind = mskAddLife; specialKind <= mskChangeFlyIni; ++specialKind)
+	{
+		recipient->invisibleMilliseconds = 0;
+		recipient->shieldEffects.clear();
+		recipient->life = 30;
+		magic->level[1].specialKind = specialKind;
+		effects = cast(recipient);
+		ok = check(effects.size() == 1 && effects.front()->user.lock() == recipient,
+			"all nine CSharp friendly self-effect kinds attach to the explicit recipient") && ok;
+	}
+
+	magic->level[1].specialKind = mskAddLife;
+	for (int kind : { nkBattle, nkPartner })
+	{
+		recipient->kind = kind;
+		recipient->relation = nrFriendly;
+		recipient->life = 30;
+		player->life = 20;
+		cast(recipient);
+		ok = check(recipient->life == 60 && player->life == 20,
+			"friendly fighters and partners both accept a player's self-effect target") && ok;
+	}
+
+	for (int relation : { nrNeutral, nrHostile })
+	{
+		recipient->relation = relation;
+		recipient->life = 30;
+		player->life = 20;
+		cast(recipient);
+		ok = check(recipient->life == 30 && player->life == 50,
+			"neutral and hostile targets preserve the original self recipient") && ok;
+	}
+
+	recipient->relation = nrFriendly;
+	recipient->life = 0;
+	player->life = 20;
+	cast(recipient);
+	ok = check(recipient->life == 0 && player->life == 50,
+		"a dead friendly target is never revived by redirecting a self effect") && ok;
+	recipient->life = 30;
+	recipient->nowAction = acHide;
+	player->life = 20;
+	cast(recipient);
+	ok = check(recipient->life == 30 && player->life == 50,
+		"a hidden friendly target cannot receive a redirected effect") && ok;
+	recipient->nowAction = acStand;
+	gameManager.npcManager->npcList.clear();
+	player->life = 20;
+	cast(recipient);
+	ok = check(recipient->life == 30 && player->life == 50,
+		"a retained pointer to a removed character cannot receive a redirected effect") && ok;
+	gameManager.npcManager->npcList = { recipient };
+
+	player->life = 20;
+	cast(nullptr);
+	ok = check(player->life == 50 && recipient->life == 30,
+		"a self effect without a target continues to affect the caster") && ok;
+	player->life = 20;
+	recipient->life = 30;
+	Magic::addEffect(magic, recipient, recipient->getPosition(), player->getPosition(),
+		1, 25, 0, lkFriend, player);
+	ok = check(recipient->life == 60 && player->life == 20,
+		"an NPC caster keeps its own self effect instead of redirecting to another actor") && ok;
+
+	magic->level[1].moveKind = mmkTimeStop;
+	effects = cast(recipient);
+	ok = check(effects.size() == 1 && effects.front()->user.lock() == player,
+		"time-stop effects retain their caster even with an explicit friendly target") && ok;
+	magic->level[1].moveKind = mmkSelf;
+	effects = Magic::addSelfEffect(magic, player, player->getPosition(),
+		player->getPosition(), 1, 0, 0, lkSelf, 0);
+	ok = check(effects.size() == 1 && effects.front()->user.lock() == player,
+		"direct self-effect callers such as level-up effects retain their original owner") && ok;
+
+	gameManager.effectManager->effectList = originalEffects;
+	gameManager.npcManager->npcList = originalNpcs;
+	gameManager.player = originalPlayer;
+	return ok;
+}
+
+bool runSelfMagicRecoveryAmountsTest(GameManager& gameManager, const std::filesystem::path& root)
+{
+	// 剑之缘 1 高清清心术使用 EffectExt，未填写 Effect。
+	if (!check(writeTextFile(root / "ini/magic/zero-recovery.ini",
+		"[Init]\nName=ZeroRecovery\nMoveKind=13\nSpecialKind=1\n"
+		"[Level1]\nEffectExt=25\nManaCost=6\n"
+		"[Level2]\nEffectExt=40\nManaCost=8\n"), "write the actual zero-Effect recovery definition")) return false;
+	const auto originalPlayer = gameManager.player;
+	const auto originalNpcs = gameManager.npcManager->npcList;
+	const auto originalEffects = gameManager.effectManager->effectList;
+	const auto originalMode = gameManager.global.magicEffectCalculationMode;
+	auto player = std::make_shared<Player>();
+	player->info.attack = 90;
+	player->info.lifeMax = player->info.thewMax = 1000;
+	gameManager.player = player;
+	auto recipient = std::make_shared<NPC>();
+	recipient->kind = nkPartner;
+	recipient->relation = nrFriendly;
+	recipient->attack = 40;
+	recipient->lifeMax = recipient->thewMax = 1000;
+	gameManager.npcManager->npcList = { recipient };
+	auto magic = std::make_shared<Magic>();
+	magic->level[1].moveKind = mmkSelf;
+	magic->level[1].effectExt = 5;
+	bool ok = true;
+	for (auto mode : { MagicEffectCalculationMode::ReplaceAttack, MagicEffectCalculationMode::AddToAttack })
+	{
+		gameManager.global.magicEffectCalculationMode = mode;
+		for (int specialKind : { mskAddLife, mskAddThew })
+		{
+			magic->level[1].specialKind = specialKind;
+			for (int effect : { 0, 25, -10 })
+			{
+				magic->level[1].effect = effect;
+				for (bool useFriendlyTarget : { false, true })
+				{
+					player->life = player->thew = 300;
+					recipient->life = recipient->thew = 200;
+					auto beneficiary = useFriendlyTarget ? recipient : std::static_pointer_cast<NPC>(player);
+					const int amount = (effect == 0 ? beneficiary->getAttack() : effect) + 5;
+					auto effects = Magic::addEffect(magic, player, player->getPosition(),
+						recipient->getPosition(), 1, Magic::calculatePrimaryEffectAmount(magic, player, 1),
+						0, lkSelf, useFriendlyTarget ? recipient : nullptr);
+					const int expected = (useFriendlyTarget ? 200 : 300) + amount;
+					ok = check((specialKind == mskAddLife ? beneficiary->life : beneficiary->thew) == expected,
+						"self and friendly recovery use the beneficiary attack for zero Effect, and add EffectExt once") && ok;
+					ok = check(effects.size() == 1 && effects.front()->damage == amount
+						&& effects.front()->user.lock() == beneficiary,
+						"the attached recovery effect records the same amount and beneficiary as its settlement") && ok;
+					ok = check(useFriendlyTarget ? player->life == 300 && player->thew == 300
+						: recipient->life == 200 && recipient->thew == 200,
+						"recovery never changes the other character's life or stamina") && ok;
+				}
+			}
+			magic->level[1].effect = 0;
+			recipient->life = recipient->thew = 200;
+			Magic::addEffect(magic, recipient, recipient->getPosition(), player->getPosition(), 1,
+				Magic::calculatePrimaryEffectAmount(magic, recipient, 1), 0, lkFriend, player);
+			ok = check((specialKind == mskAddLife ? recipient->life : recipient->thew) == 245,
+				"an NPC's zero-Effect recovery continues to use its own attack") && ok;
+		}
+	}
+	magic->level[1].specialKind = mskAddLife;
+	magic->sideEffectProbability = 100;
+	magic->sideEffectPercent = 100;
+	magic->sideEffectType = 1;
+	player->info.manaMax = 1000;
+	player->mana = 300;
+	recipient->life = 200;
+	Magic::addEffect(magic, player, player->getPosition(), recipient->getPosition(), 1,
+		Magic::calculatePrimaryEffectAmount(magic, player, 1), 0, lkSelf, recipient);
+	ok = check(recipient->life == 245 && player->mana == 205,
+		"friendly zero-Effect recovery keeps the caster amount for the caster's side effect") && ok;
+	auto loadedMagic = std::make_shared<Magic>();
+	loadedMagic->initFromIni("zero-recovery.ini");
+	ok = check(loadedMagic->loadSucceeded && loadedMagic->level[1].effect == 0
+		&& loadedMagic->level[1].effectExt == 25 && loadedMagic->level[2].effectExt == 40,
+		"the actual MOD layout keeps an omitted Effect at zero and loads each level's EffectExt") && ok;
+	for (int level : { 1, 2 })
+	{
+		recipient->life = 200;
+		Magic::addEffect(loadedMagic, player, player->getPosition(), recipient->getPosition(), level,
+			Magic::calculatePrimaryEffectAmount(loadedMagic, player, level), 0, lkSelf, recipient);
+		ok = check(recipient->life == (level == 1 ? 265 : 280),
+			"the loaded clear-mind levels restore recipient attack plus the matching extension") && ok;
+	}
+	magic->level[1].specialKind = mskAddShield;
+	ok = check(Magic::calculatePrimaryEffectAmount(magic, player, 1) == 0,
+		"a zero shield amount is not converted into attack-based recovery") && ok;
+	gameManager.effectManager->effectList = originalEffects;
+	gameManager.npcManager->npcList = originalNpcs;
+	gameManager.player = originalPlayer;
+	gameManager.global.magicEffectCalculationMode = originalMode;
+	return ok;
+}
+
+bool runFriendlySelfMagicReleaseTest(GameManager& gameManager)
+{
+	const auto originalPlayer = gameManager.player;
+	const auto originalNpcs = gameManager.npcManager->npcList;
+	const auto originalEffects = gameManager.effectManager->effectList;
+	auto player = std::make_shared<Player>();
+	gameManager.player = player;
+	player->setPosition({ 10, 10 }, false);
+	player->info.lifeMax = player->info.manaMax = player->info.thewMax = 100;
+	auto image = std::make_shared<IMPImage>();
+	image->directions = 8;
+	image->interval = 40;
+	image->frame.resize(8);
+	player->res.magic.imagePackage = player->res.stand.imagePackage = image;
+	auto magic = std::make_shared<Magic>();
+	magic->iniName = "friendly-release.ini";
+	magic->coldMilliSeconds = 400;
+	magic->level[1].moveKind = mmkSelf;
+	magic->level[1].specialKind = mskAddLife;
+	magic->level[1].effect = 25;
+	magic->level[1].effectExt = 5;
+	magic->level[1].manaCost = 7;
+	magic->level[1].thewCost = 5;
+	magic->level[1].lifeCost = 3;
+	const int slot = gameManager.magicManager.bottomIndex(0);
+	const auto originalInfo = gameManager.magicManager.magicList[slot];
+	auto& info = gameManager.magicManager.magicList[slot];
+	info = {};
+	info.magic = magic;
+	info.level = 1;
+	bool ok = true;
+	for (int invalidation = -1; invalidation < 5; ++invalidation)
+	{
+		player->life = player->mana = player->thew = 80;
+		info.remainColdMilliseconds = 0;
+		gameManager.effectManager->effectList.clear();
+		auto recipient = std::make_shared<NPC>();
+		recipient->kind = nkPartner;
+		recipient->relation = nrFriendly;
+		recipient->lifeMax = 100;
+		recipient->life = 30;
+		recipient->setPosition({ 12, 12 }, false);
+		gameManager.npcManager->npcList = { recipient };
+		player->beginMagic(info, recipient->getPosition(), recipient, slot);
+		ok = check(player->isMagicing() && player->mana == 80,
+			"a friendly cast queues its animation before charging resources") && ok;
+		if (invalidation == 0) recipient->life = 0;
+		if (invalidation == 1) recipient->nowAction = acHide;
+		if (invalidation == 2) gameManager.npcManager->npcList.clear();
+		if (invalidation == 3) recipient->relation = nrNeutral;
+		if (invalidation == 4)
+		{
+			gameManager.npcManager->npcList.clear();
+			recipient.reset();
+		}
+		RageSystemTestAccess::advancePlayerMagic(*player);
+		if (invalidation < 0)
+		{
+			ok = check(player->life == 77 && player->mana == 73 && player->thew == 75
+				&& recipient->life == 60 && info.remainColdMilliseconds == 400,
+				"the caster pays once and starts cooldown while the friendly target receives healing") && ok;
+		}
+		else
+		{
+			ok = check(player->life == 80 && player->mana == 80 && player->thew == 80
+				&& info.remainColdMilliseconds == 0 && gameManager.effectManager->effectList.empty(),
+				"a friendly target invalidated during the animation cancels without cost, cooldown or self healing") && ok;
+		}
+	}
+	for (int specialKind : { mskAddLife, mskClearAbnormalState })
+	{
+		magic->level[1].specialKind = specialKind;
+		info.remainColdMilliseconds = 0;
+		auto recipient = std::make_shared<NPC>();
+		recipient->kind = nkPartner;
+		recipient->life = 30;
+		gameManager.npcManager->npcList = { recipient };
+		NextAction action;
+		action.action = acMagic;
+		action.actionParam = 0;
+		action.dest = recipient->getPosition();
+		action.destGE = recipient;
+		ok = check(player->addNextAction(action), "queue a friendly skill through the shared input action path") && ok;
+		gameManager.npcManager->npcList.clear();
+		RageSystemTestAccess::updatePlayer(*player);
+		ok = check(!player->isMagicing() && player->life == 80 && player->mana == 80
+			&& info.remainColdMilliseconds == 0 && gameManager.effectManager->effectList.empty(),
+			"a queued friendly cast, including immediate cleanse, cancels if its target leaves before animation") && ok;
+	}
+	gameManager.magicManager.magicList[slot] = originalInfo;
+	gameManager.effectManager->effectList = originalEffects;
+	gameManager.npcManager->npcList = originalNpcs;
+	gameManager.player = originalPlayer;
+	return ok;
+}
+
 bool runSelfLifeExchangeTest(GameManager& gameManager)
 {
 	auto player = gameManager.player;
@@ -2364,6 +3235,38 @@ bool runSelfLifeExchangeTest(GameManager& gameManager)
 	player->invincible = originalInvincible;
 	player->nowAction = originalAction;
 	gameManager.menu->stateMenu = originalStateMenu;
+	return ok;
+}
+
+bool runPermanentNpcResourceDuringMorphTest(const std::filesystem::path& root)
+{
+	if (!check(writeTextFile(root / "ini/npcres/empty-model.ini", "[Stand]\nImage=\n"),
+		"prepare a valid empty character resource for morph restoration")) return false;
+	bool ok = true;
+	for (int change = 0; change < 3; ++change)
+	{
+		auto actor = std::make_shared<NPC>();
+		auto originalImage = std::make_shared<IMPImage>();
+		originalImage->directions = 8;
+		originalImage->interval = 40;
+		originalImage->frame.resize(8);
+		actor->res.stand.imagePackage = originalImage;
+		Magic morph;
+		morph.npcIni = "empty-model.ini";
+		actor->applyTemporaryMorph(morph, 1000);
+		ok = check(actor->res.stand.imagePackage == nullptr && actor->morphMilliseconds == 1000,
+			"morph replaces the current image and retains a restoration deadline") && ok;
+		if (change != 0)
+		{
+			actor->initRes(change == 1 ? "" : "empty-model.ini");
+			ok = check(actor->res.stand.imagePackage == nullptr && actor->morphMilliseconds == 1000,
+				"a permanent resource change applies without cancelling the morph's other effects") && ok;
+		}
+		actor->updateMagicRuntimeStateTimers(1000);
+		ok = check(actor->morphMilliseconds == 0 && actor->morphMagic == nullptr
+			&& actor->res.stand.imagePackage == (change == 0 ? originalImage : nullptr),
+			"morph expiry restores its original image only when no permanent resource change superseded it") && ok;
+	}
 	return ok;
 }
 
@@ -2498,18 +3401,28 @@ bool runMagicDerivedRuntimeTests()
 	auto firstFallbackRoot = root / "dependency_fallback_first";
 	auto secondFallbackRoot = root / "dependency_fallback_second";
 	bool ok = runEffectProjectedDirectionTest();
+	ok = runEffectPathWidthTest() && ok;
 	ok = runLinkedMagicGraphLoadingTest(root, firstFallbackRoot, secondFallbackRoot) && ok;
 	ok = runExplodeMagicLevelLoadingTest(root, copiedParent) && ok;
+	ok = runMagicLevelRuntimeTest(root) && ok;
 	GameManager gameManager;
+	ok = runEffectInitialDirectionTest(gameManager) && ok;
 	ok = runExplicitAttackDistanceContract() && ok;
 	ok = runSelfMagicLifetimeContract(gameManager) && ok;
 	ok = runSelfMagicSelectionContract(gameManager) && ok;
 	ok = runPositionCastRangeContract(gameManager) && ok;
 	ok = runMagicAdmissionContract(gameManager) && ok;
 	ok = runAutomaticSelfMagicAdmissionContract(gameManager) && ok;
+	ok = runInvisibleRangeContract(gameManager) && ok;
+	ok = runCarryFlyMagicDamageContract(gameManager) && ok;
 	ok = runCarryWallCollisionContract(gameManager) && ok;
+	ok = runCarriedVictimTranslationContract(gameManager) && ok;
 	ok = runResourceConfiguredMinimumMagicDamageTest(gameManager) && ok;
 	ok = runResourceConfiguredMagicEffectCalculationTest(gameManager) && ok;
+	ok = runFriendlySelfMagicTargetTest(gameManager) && ok;
+	ok = runSelfMagicRecoveryAmountsTest(gameManager, root) && ok;
+	ok = runFriendlySelfMagicReleaseTest(gameManager) && ok;
+	ok = runPermanentNpcResourceDuringMorphTest(root) && ok;
 	ok = runSelfLifeExchangeTest(gameManager) && ok;
 	ok = runLinkedMagicRuntimeBudgetTest(gameManager) && ok;
 	ok = runRageSystemTest(gameManager, root) && ok;
@@ -2999,6 +3912,15 @@ bool runReplacementExperienceOwnershipTests()
 
 bool runMagicExperienceTests()
 {
+	struct ExperienceMultiplierRestore
+	{
+		int previous = Config::experienceMultiplier;
+		~ExperienceMultiplierRestore()
+		{
+			Config::experienceMultiplier = previous;
+		}
+	} restoreMultiplier;
+	Config::experienceMultiplier = 3;
 	auto root = makeUniqueTestDirectory("jxqy_magic_experience_test");
 	std::error_code errorCode;
 	std::filesystem::remove_all(root, errorCode);
@@ -3493,6 +4415,159 @@ bool runMagicExperienceTests()
 		gameManager.magicManager.magicList[static_cast<std::size_t>(guardUseIndex)].exp == 500 &&
 			gameManager.magicManager.magicList[static_cast<std::size_t>(guardUseIndex)].level == 1,
 		"zero experience awards leave magic state untouched") && ok;
+	{
+		const auto skillFallback = root / "skill-fallback";
+		const std::string skillSettings =
+			u8"\uFEFF[Init]\r\n"
+			u8"//升级点数启用\r\nPointEnable=1\r\n"
+			u8"//技能树启用\r\nTreeEnable=1\r\n"
+			u8"//每升一级给的技能点数\r\nLevelUpRatio=1\r\n"
+			u8"//点数上限\r\nMaxValue=100";
+		ok = check(writeTextFile(skillFallback / "ini/other/Skill.ini", skillSettings),
+			"write skill-point dependency fixture") && ok;
+		File::setResourceFallbackRoots({ skillFallback.string() });
+		gameManager.global.loadUiSettings();
+		ok = check(!gameManager.global.skillPointsEnabled,
+			"skill points are disabled without an active-package Skill.ini") && ok;
+		ok = check(writeTextFile(root / "ini/other/Skill.ini", skillSettings),
+			"write actual MG skill-point settings") && ok;
+		std::unique_ptr<char[]> authoredBytes;
+		int authoredLength = 0;
+		const bool authoredRead = File::readActiveResourceFile("ini/other/Skill.ini", authoredBytes, authoredLength);
+		ok = check(authoredRead && authoredLength == 159 && skillSettings.size() == 159
+			&& std::string(authoredBytes.get(), static_cast<size_t>(authoredLength)) == skillSettings,
+			"compiled UTF-8 BOM and Chinese fixture bytes match the published MG settings") && ok;
+		INIReader authoredSkillIni(authoredBytes);
+		ok = check(authoredSkillIni.ParseError() == 0, "actual MG skill-point INI parses without errors") && ok;
+		if (authoredSkillIni.ParseError() != 0)
+		{
+			std::cerr << "MG Skill.ini read=" << authoredRead << " size=" << authoredLength
+				<< " parse=" << authoredSkillIni.ParseError() << " fixture=" << skillSettings.size() << std::endl;
+		}
+		gameManager.global.loadUiSettings();
+		ok = check(gameManager.global.skillPointsEnabled
+			&& gameManager.global.skillPointLevelUpRatio == 1
+			&& gameManager.global.skillPointMaximum == 100,
+			"active MG Skill.ini configures one point per level and a 100-point cap") && ok;
+		gameManager.player->levelList.assign(4, LevelInfo{});
+		for (int i = 0; i < 4; ++i)
+		{
+			gameManager.player->levelList[i].levelUpExp = (i + 1) * 10;
+			gameManager.player->levelList[i].lifeMax = 100;
+		}
+		const auto resetPlayerLevel = [&]()
+		{
+			gameManager.player->setLevel(1);
+			gameManager.player->exp = 0;
+		};
+		gameManager.global.levelUpThresholdMode = LevelUpThresholdMode::GreaterThanOrEqual;
+		resetPlayerLevel();
+		gameManager.player->skillPoints = 0;
+		gameManager.player->addExp(30);
+		ok = check(gameManager.player->level == 4 && gameManager.player->skillPoints == 3,
+			"one experience award grants skill points for every earned player level") && ok;
+		resetPlayerLevel();
+		gameManager.player->skillPoints = 99;
+		gameManager.player->addExp(10);
+		gameManager.player->addExp(20);
+		ok = check(gameManager.player->level == 4 && gameManager.player->skillPoints == 100,
+			"earned skill points stop at the authored cap") && ok;
+		resetPlayerLevel();
+		gameManager.player->skillPoints = 7;
+		gameManager.player->setLevel(3);
+		ok = check(gameManager.player->skillPoints == 7,
+			"explicit level replacement does not award natural-level skill points") && ok;
+		gameManager.player->addExp(0);
+		gameManager.player->addExp(-1);
+		ok = check(gameManager.player->skillPoints == 7,
+			"zero and negative experience without a level gain do not award skill points") && ok;
+		for (const std::string& invalid : {
+			"PointEnable=0\nLevelUpRatio=1\nMaxValue=100\n",
+			"PointEnable=1\nLevelUpRatio=-1\nMaxValue=100\n",
+			"PointEnable=1\nLevelUpRatio=1\nMaxValue=invalid\n",
+			"PointEnable=1\nLevelUpRatio=2147483648\nMaxValue=100\n" })
+		{
+			ok = check(writeTextFile(root / "ini/other/Skill.ini", "[Init]\n" + invalid),
+				"write disabled or invalid skill-point settings") && ok;
+			gameManager.global.loadUiSettings();
+			resetPlayerLevel();
+			gameManager.player->skillPoints = 7;
+			gameManager.player->addExp(30);
+			ok = check(!gameManager.global.skillPointsEnabled && gameManager.player->skillPoints == 7,
+				"disabled or invalid skill settings reset previous rules without altering saved points") && ok;
+		}
+		ok = check(writeTextFile(root / "ini/other/Skill.ini",
+			"[Init]\nPointEnable=1\nLevelUpRatio=2147483647\nMaxValue=2147483647\n"),
+			"write maximum integer skill-point settings") && ok;
+		gameManager.global.loadUiSettings();
+		resetPlayerLevel();
+		gameManager.player->skillPoints = std::numeric_limits<int>::max() - 1;
+		gameManager.player->addExp(10);
+		ok = check(gameManager.player->skillPoints == std::numeric_limits<int>::max(),
+			"skill-point awards use a wide intermediate before applying the cap") && ok;
+		File::setResourceFallbackRoots({});
+	}
+	ResourceManager& resources = ResourceManager::instance();
+	ok = check(writeTextFile(root / "ini/level/MagicExp.ini", baseEngineExperience),
+		"write kill-share and fixed hit-experience rules for the player multiplier matrix") && ok;
+	for (int gameType : { 0, 1, 2, 3 })
+	{
+		const std::string profile = "[Game]\nId=PLAYER_MULTIPLIER\nType=" + std::to_string(gameType) +
+			"\n[Experience]\nExperienceMultiplier=" + (gameType == 0 ? "99" : "0") + "\n";
+		if (!check(writeTextFile(root / "game_profile.ini", profile) && resources.initialize(root.string()) &&
+			resources.setActiveResourcePackById("PLAYER_MULTIPLIER"),
+			"activate a real resource profile containing an obsolete experience multiplier"))
+		{
+			ok = false;
+			continue;
+		}
+		gameManager.magicManager.configureLayout();
+		for (int multiplier : { 1, 2, 3 })
+		{
+			Config::experienceMultiplier = multiplier;
+			for (int storedExperience : { 100, 0 })
+			{
+				const auto [selectedPracticeIndex, selectedUseIndex] = resetExperienceSlots(10000);
+				gameManager.player->level = 9;
+				gameManager.player->exp = 0;
+				gameManager.player->levelUpExp = 1000000;
+				auto victim = std::make_shared<NPC>();
+				victim->kind = nkBattle;
+				victim->relation = nrHostile;
+				victim->level = 7;
+				victim->exp = storedExperience;
+				chainEffect->user = gameManager.player;
+				chainEffect->launcherKind = lkSelf;
+				victim->awardDefeatedNpcExperience(chainEffect);
+				const bool fallback = gameType == 0 && storedExperience == 0;
+				const int expectedReward = (gameType == 0 && storedExperience != 0 ? 100 : 63) * multiplier;
+				const int expectedPractice = fallback ? (multiplier == 1 ? 13 : multiplier == 2 ? 27 : 41)
+					: expectedReward / 2;
+				const int expectedUse = fallback ? 2 * multiplier : expectedReward / 4;
+				const auto& practice = gameManager.magicManager.magicList[static_cast<size_t>(selectedPracticeIndex)];
+				const auto& current = gameManager.magicManager.magicList[static_cast<size_t>(selectedUseIndex)];
+				ok = check(gameManager.player->exp == expectedReward && practice.exp == expectedPractice &&
+					current.exp == expectedUse,
+					"global 1/2/3 choices replace obsolete resource multipliers for player and kill-magic rewards") && ok;
+				victim->awardDefeatedNpcExperience(chainEffect);
+				ok = check(gameManager.player->exp == expectedReward && practice.exp == expectedPractice &&
+					current.exp == expectedUse,
+					"scaled stored, level-product and zero-exp fallback kills are awarded only once") && ok;
+				gameManager.scriptAPI.addExp(7);
+				gameManager.magicManager.addHitExp(chainEffect, 3);
+				ok = check(gameManager.player->exp == expectedReward + 7 && practice.exp == expectedPractice &&
+					current.exp == expectedUse + 15,
+					"script rewards and magic-hit experience retain their fixed amounts under every player choice") && ok;
+			}
+		}
+	}
+	const auto emptyCollection = root / "empty-collection";
+	std::filesystem::create_directories(emptyCollection, errorCode);
+	ok = check(!errorCode && resources.initialize(emptyCollection.string()),
+		"clear the isolated experience resource profile") && ok;
+	File::setAssetsCollectionRoot((root / "assets").string());
+	File::setActiveResourceRoot(root.string());
+	File::setActiveSaveNamespace(MagicDerivedSaveNamespace);
 	std::filesystem::remove_all(root, errorCode);
 	return ok;
 }

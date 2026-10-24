@@ -1,9 +1,11 @@
 #include "NPCActionMagic.h"
+#include "ActionReleaseTiming.h"
 #include "../Magic.h"
 #include "../NPC.h"
 #include "../Player.h"
 #include "../../GameManager/GameManager.h"
 #include "../../../Image/IMP.h"
+#include "../../../Image/ImageAnimationPlayback.h"
 
 NPCActionMagic::NPCActionMagic(NPC* npc)
     : NPCActionBase(npc)
@@ -43,8 +45,17 @@ void NPCActionMagic::enter()
             _magicListIndex = listIndex;
         }
     }
+    _requiresFriendlyTarget = player != nullptr && !scripted
+        && _magicToUse != nullptr && _magicToUse->supportsFriendlyTarget(_magicLevel)
+        && Magic::isValidFriendlyTarget(std::dynamic_pointer_cast<NPC>(_target.lock()));
     _npc->nowAction = acMagic;
     _npc->actionLastTime = getActionTime();
+    const auto actionImage = getMagicActionImagePackage();
+    const auto framesPerDirection = actionImage != nullptr
+        ? ImageAnimationPlayback::calculateLayout(actionImage->frame.size(), actionImage->directions).framesPerDirection
+        : 0;
+    _releaseTime = calculateActionReleaseTime(_npc->actionLastTime, framesPerDirection,
+        gm->global.magicReleaseFrameRatio);
     _npc->fightState.set(true);
 
     playSound();
@@ -54,19 +65,23 @@ void NPCActionMagic::update(UTime frameTime)
 {
     Player* player = dynamic_cast<Player*>(_npc);
     UTime elapsedTime = _npc->getTime() - _npc->actionBeginTime;
-    UTime magicTriggerTime = resolveMagicTriggerTime(
-        _npc->actionLastTime,
-        player != nullptr,
-        gm->global.feature.magicTriggerAtAnimationEnd);
-
-    if (!_magicDone && elapsedTime >= magicTriggerTime)
+    if (!_magicDone && elapsedTime >= _releaseTime)
     {
         _magicDone = true;
         _npc->attackDone = true;
-        _npc->revealMagicInvisibilityOnAction();
+        const bool targetValid = !_requiresFriendlyTarget
+            || Magic::isValidFriendlyTarget(std::dynamic_pointer_cast<NPC>(_target.lock()));
+        if (targetValid)
+        {
+            _npc->revealMagicInvisibilityOnAction();
+        }
+        else
+        {
+            gm->showMessage("施法目标已失效");
+        }
         if (_magicToUse != nullptr)
         {
-            bool canUse = true;
+            bool canUse = targetValid;
             int level = _magicLevel;
             if (level < 1 || level > MAGIC_MAX_LEVEL)
             {
@@ -123,11 +138,6 @@ _shared_imp NPCActionMagic::getMagicActionImagePackage() const
         if (_magicToUse->useActionImage != nullptr)
         {
             return _magicToUse->useActionImage;
-        }
-        auto actionImage = _magicToUse->getActionImageForNPC(_npc);
-        if (actionImage != nullptr)
-        {
-            return actionImage;
         }
     }
     return _npc->res.magic.imagePackage;

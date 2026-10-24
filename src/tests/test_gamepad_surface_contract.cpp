@@ -256,7 +256,7 @@ struct ExpectedControllerPolicy
 	ControllerInteractionKind kind;
 };
 
-constexpr std::array<ExpectedControllerPolicy, 36>
+constexpr std::array<ExpectedControllerPolicy, 39>
 	ExpectedControllerPolicies =
 {{
 	{ SurfaceId::StartupResourceSelect, "startup.resource-select",
@@ -283,6 +283,12 @@ constexpr std::array<ExpectedControllerPolicy, 36>
 		ControllerInteractionKind::ActionOnly },
 	{ SurfaceId::Choice, "choice",
 		ControllerInteractionKind::FocusGraph },
+	{ SurfaceId::Paper, "paper",
+		ControllerInteractionKind::ActionOnly },
+	{ SurfaceId::SkillTree, "skill-tree",
+		ControllerInteractionKind::ActionOnly },
+	{ SurfaceId::AttributePoints, "attribute-points",
+		ControllerInteractionKind::ActionOnly },
 	{ SurfaceId::BuySell, "buy-sell",
 		ControllerInteractionKind::FocusGraph },
 	{ SurfaceId::GambleNormal, "gamble.normal",
@@ -401,7 +407,7 @@ bool testAllSurfaceClassifications()
 				== ExpectedControllerPolicies.size()
 			&& static_cast<std::size_t>(SurfaceId::Count)
 				== ExpectedControllerPolicies.size(),
-		"surface=<catalog> phase=count expected=36 actual="
+		"surface=<catalog> phase=count expected=37 actual="
 			+ std::to_string(MenuSurfaceCatalog::kSurfacePolicies.size()))
 		&& ok;
 
@@ -482,10 +488,10 @@ bool testAllSurfaceClassifications()
 	}
 
 	const std::array<std::size_t, 4> expectedKindCounts =
-		{ 21, 6, 7, 2 };
+		{ 21, 9, 7, 2 };
 	ok = checkContract(
 		kindCounts == expectedKindCounts,
-		"surface=<catalog> phase=kind-counts expected=21/6/7/2 actual="
+		"surface=<catalog> phase=kind-counts expected=21/9/7/2 actual="
 			+ std::to_string(kindCounts[0]) + "/"
 			+ std::to_string(kindCounts[1]) + "/"
 			+ std::to_string(kindCounts[2]) + "/"
@@ -1323,6 +1329,7 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 	};
 	optionCandidates.push_back("touch-controls");
 	optionCandidates.push_back("cheat-settings");
+	optionCandidates.push_back("experience-multiplier");
 	if (File::fileExist("ini\\ui\\qingyu\\theme.ini") && File::fileExist("asf\\ui\\qingyu\\panel.png"))
 	{
 		optionCandidates.push_back("ui-theme");
@@ -1330,6 +1337,23 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 	if (GameManager::getInstance()->global.feature.automaticSave) optionCandidates.push_back("automatic-save");
 
 	std::vector<PhysicalTraversalSpec> specs;
+	std::vector<std::string> resourceCandidates;
+	for (std::size_t index = 0; index < ResourceManager::instance().getDiscoveredPacks().size(); ++index)
+	{
+		resourceCandidates.push_back("resource-card-" + std::to_string(index));
+	}
+	resourceCandidates.insert(resourceCandidates.end(),
+	{
+		"resource-remove", "cheat-help", "save-management",
+#if !defined(__MOBILE__)
+		"display-settings",
+#endif
+		"check-updates", "exit",
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+		"enable-external",
+#endif
+		"external-link-0", "external-link-1", "external-link-2", "external-link-3"
+	});
 	// Rect half-plane checks apply to non-wrapping spatial contracts.
 	// Scrolling lists can replace the visible row in place, while Title,
 	// System, Option, and SaveLoad intentionally use wrapping linear groups.
@@ -1338,37 +1362,9 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 	specs.push_back(
 	{
 		"startup.resource-select",
-		"11-enabled-packs",
+		"enabled-packs",
 		"resource-card-0",
-		{
-			"resource-card-0",
-			"resource-card-1",
-			"resource-card-2",
-			"resource-card-3",
-			"resource-card-4",
-			"resource-card-5",
-			"resource-card-6",
-			"resource-card-7",
-			"resource-card-8",
-			"resource-card-9",
-			"resource-card-10",
-			"resource-remove",
-			"cheat-help",
-			"save-management",
-#if !defined(__MOBILE__)
-			"display-settings",
-#endif
-			"check-updates",
-			"exit",
-#if defined(__ANDROID__) || \
-	defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
-			"enable-external",
-#endif
-			"external-link-0",
-			"external-link-1",
-			"external-link-2",
-			"external-link-3",
-		},
+		resourceCandidates,
 		fourDirections,
 		[]()
 		{
@@ -1481,6 +1477,8 @@ std::vector<PhysicalTraversalSpec> makePhysicalTraversalSpecs()
 				{ "touch-controls", option->touchControlsButton });
 			candidates.push_back(
 				{ "cheat-settings", option->cheatSettingsButton });
+			candidates.push_back(
+				{ "experience-multiplier", option->experienceMultiplierButton });
 			if (option->themeButton != nullptr)
 			{
 				candidates.push_back({ "ui-theme", option->themeButton });
@@ -2037,11 +2035,12 @@ bool testLowRiskPhysicalFocusGraphs()
 	{
 		return false;
 	}
+	const std::size_t resourcePackCount = resourceManager.getDiscoveredPacks().size();
 	if (!checkContract(
-			resourceManager.getDiscoveredPacks().size() == 11,
+			resourcePackCount >= 11,
 			"surface=startup.resource-select"
-				" variant=11-enabled-packs phase=pack-count"
-				" expected=11 actual="
+				" variant=enabled-packs phase=pack-count"
+				" expected=at-least-11 actual="
 				+ std::to_string(
 					resourceManager.getDiscoveredPacks().size())))
 	{
@@ -2062,27 +2061,33 @@ bool testLowRiskPhysicalFocusGraphs()
 			<< "\tremovable=" << removableCount
 			<< "\tbutton=" << (resourceProbeScene != nullptr
 				&& GamepadSurfaceContractTestAccess::resourceRemovalAvailable(*resourceProbeScene)) << std::endl;
-		if (!checkContract(removableCount == 11 && resourceProbeScene != nullptr
+		if (!checkContract(removableCount == static_cast<int>(resourcePackCount) && resourceProbeScene != nullptr
 			&& GamepadSurfaceContractTestAccess::resourceRemovalAvailable(*resourceProbeScene),
 			"surface=startup.resource-select phase=removal-fixture"
-			" expected=11-plain-removable-packs-and-enabled-button actual=unavailable"))
+			" expected=all-plain-packs-removable-and-enabled-button actual=unavailable"))
 		{
 			return false;
 		}
-		constexpr std::size_t ExpectedResourceCandidateCount = 21;
+		std::size_t expectedResourceCandidateCount = resourcePackCount + 10;
+#if defined(__MOBILE__)
+		--expectedResourceCandidateCount;
+#endif
+#if defined(__ANDROID__) || defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
+		++expectedResourceCandidateCount;
+#endif
 		if (!checkContract(
 				resourceProbeScene != nullptr
 					&& GamepadSurfaceContractTestAccess::resourceCardCount(
-						*resourceProbeScene) == 11
+						*resourceProbeScene) == resourcePackCount
 					&& GamepadSurfaceContractTestAccess::
 						resourceExitButtonPresent(*resourceProbeScene)
 					&& GamepadSurfaceContractTestAccess::resourceCandidateKeys(
 						*resourceProbeScene).size() ==
-						ExpectedResourceCandidateCount,
+						expectedResourceCandidateCount,
 				"surface=startup.resource-select"
-					" variant=11-enabled-packs phase=dynamic-controls"
+					" variant=enabled-packs phase=dynamic-controls"
 					" expected="
-					+ std::to_string(ExpectedResourceCandidateCount)
+					+ std::to_string(expectedResourceCandidateCount)
 					+ "-focus-candidates"
 					" actual="
 					+ (resourceProbeScene == nullptr

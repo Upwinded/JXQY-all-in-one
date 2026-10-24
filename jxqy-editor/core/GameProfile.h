@@ -35,8 +35,6 @@ struct GameProfile
     DefeatedNpcExperienceMode defeatedNpcExperienceMode =
         DefeatedNpcExperienceMode::StoredExperience;
     bool defeatedNpcExperienceModeDefined = false;
-    double experienceMultiplier = 3.0;
-    bool experienceMultiplierDefined = false;
     LevelUpThresholdMode levelUpThresholdMode =
         LevelUpThresholdMode::GreaterThanOrEqual;
     bool levelUpThresholdModeDefined = false;
@@ -53,6 +51,17 @@ struct GameProfile
     MagicEffectCalculationMode magicEffectCalculationMode =
         MagicEffectCalculationMode::ReplaceAttack;
     bool magicEffectCalculationModeDefined = false;
+    ActionReleaseFrameRatio attackReleaseFrameRatio{2, 3};
+    bool attackReleaseFrameRatioDefined = false;
+    QString attackReleaseFrameRatioSourceId;
+    ActionReleaseFrameRatio specialAttackReleaseFrameRatio{1, 3};
+    bool specialAttackReleaseFrameRatioDefined = false;
+    QString specialAttackReleaseFrameRatioSourceId;
+    ActionReleaseFrameRatio magicReleaseFrameRatio{4, 5};
+    bool magicReleaseFrameRatioDefined = false;
+    QString magicReleaseFrameRatioSourceId;
+    // Keep invalid source text visible until the author corrects it or selects inheritance.
+    QMap<QString, QString> invalidActionReleaseFrameRatios;
 
     // [Script]
     QString scriptPlayerName;
@@ -243,4 +252,10 @@ public:
     // 无 manifest 的普通 assets 目录退化为单一本地根。
     static ResourceContentRootResolution resolveContentRoots(
         const QString& activeAssetsPath);
+
+    // Preview an unsaved profile through the shared runtime catalog without writing it.
+    static bool resolveActionReleaseFrameRatios(
+        const QString& assetsPath,
+        const GameProfile& profile,
+        GameProfile& effectiveProfile);
 };

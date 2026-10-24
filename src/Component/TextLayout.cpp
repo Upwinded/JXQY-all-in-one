@@ -262,13 +262,20 @@ std::size_t countUtf8Characters(const std::string& text)
 
 std::vector<std::string> wrapUtf8Text(const std::string& text, int maxFullWidthCharactersPerLine)
 {
+	return wrapUtf8Text(text, std::max(1, maxFullWidthCharactersPerLine) * 5,
+		{});
+}
+
+std::vector<std::string> wrapUtf8Text(
+	const std::string& text, int maximumWidth, const TextWidthMeasure& measureWidth)
+{
 	const std::vector<std::string> explicitLines = splitExplicitLines(text);
 	if (explicitLines.empty())
 	{
 		return {};
 	}
 
-	const int lineWidthUnitLimit = std::max(1, maxFullWidthCharactersPerLine) * 5;
+	const int lineWidthLimit = std::max(1, maximumWidth);
 	std::vector<std::string> wrappedLines;
 	for (const std::string& explicitLine : explicitLines)
 	{
@@ -280,19 +287,20 @@ std::vector<std::string> wrapUtf8Text(const std::string& text, int maxFullWidthC
 		}
 
 		std::string wrappedLine;
-		int wrappedWidthUnits = 0;
+		int wrappedWidth = 0;
 		for (const std::string& character : characters)
 		{
-			const int characterWidthUnits = character.size() == 1 ? 2 : 5;
-			if (wrappedWidthUnits > 0 &&
-				wrappedWidthUnits + characterWidthUnits > lineWidthUnitLimit)
+			int candidateWidth = measureWidth ? measureWidth(wrappedLine + character)
+				: wrappedWidth + (character.size() == 1 ? 2 : 5);
+			if (!wrappedLine.empty()
+				&& candidateWidth > lineWidthLimit)
 			{
 				wrappedLines.push_back(wrappedLine);
 				wrappedLine.clear();
-				wrappedWidthUnits = 0;
+				candidateWidth = measureWidth ? measureWidth(character) : (character.size() == 1 ? 2 : 5);
 			}
 			wrappedLine += character;
-			wrappedWidthUnits += characterWidthUnits;
+			wrappedWidth = candidateWidth;
 		}
 		wrappedLines.push_back(wrappedLine);
 	}
@@ -304,15 +312,23 @@ std::vector<ColorTaggedTextLine> wrapColorTaggedUtf8Text(
 	int maxFullWidthCharactersPerLine,
 	unsigned int defaultColor)
 {
+	return wrapColorTaggedUtf8Text(text,
+		std::max(1, maxFullWidthCharactersPerLine) * 5, defaultColor, {});
+}
+
+std::vector<ColorTaggedTextLine> wrapColorTaggedUtf8Text(
+	const std::string& text, int maximumWidth, unsigned int defaultColor,
+	const TextWidthMeasure& measureWidth)
+{
 	if (text.empty())
 	{
 		return {};
 	}
 
-	const int lineWidthUnitLimit =
-		std::max(1, maxFullWidthCharactersPerLine) * 5;
+	const int lineWidthLimit = std::max(1, maximumWidth);
 	std::vector<ColorTaggedTextLine> lines(1);
-	int lineWidthUnits = 0;
+	int lineWidth = 0;
+	int lastRunWidth = 0;
 	unsigned int currentColor = defaultColor;
 	unsigned int rangeDefaultColor = defaultColor;
 	bool rangeDefaultActive = false;
@@ -320,15 +336,22 @@ std::vector<ColorTaggedTextLine> wrapColorTaggedUtf8Text(
 	auto startLine = [&]()
 	{
 		lines.emplace_back();
-		lineWidthUnits = 0;
+		lineWidth = 0;
+		lastRunWidth = 0;
 	};
 	auto appendCharacter = [&](const std::string& character)
 	{
-		const int characterWidthUnits = character.size() == 1 ? 2 : 5;
-		if (lineWidthUnits > 0
-			&& lineWidthUnits + characterWidthUnits > lineWidthUnitLimit)
+		const auto& previousLine = lines.back();
+		const bool extendsRun = !previousLine.empty() && previousLine.back().color == currentColor;
+		int runWidth = measureWidth
+			? measureWidth(extendsRun ? previousLine.back().text + character : character)
+			: (extendsRun ? lastRunWidth : 0) + (character.size() == 1 ? 2 : 5);
+		int candidateWidth = lineWidth + runWidth - (extendsRun ? lastRunWidth : 0);
+		if (!previousLine.empty() && candidateWidth > lineWidthLimit)
 		{
 			startLine();
+			runWidth = measureWidth ? measureWidth(character) : (character.size() == 1 ? 2 : 5);
+			candidateWidth = runWidth;
 		}
 		ColorTaggedTextLine& line = lines.back();
 		if (line.empty() || line.back().color != currentColor)
@@ -336,7 +359,8 @@ std::vector<ColorTaggedTextLine> wrapColorTaggedUtf8Text(
 			line.push_back({ {}, currentColor });
 		}
 		line.back().text += character;
-		lineWidthUnits += characterWidthUnits;
+		lastRunWidth = runWidth;
+		lineWidth = candidateWidth;
 	};
 
 	std::size_t offset = 0;

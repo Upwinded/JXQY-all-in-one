@@ -194,6 +194,40 @@ void testSemanticVersion()
 		"SemVer compares long numeric prerelease identifiers exactly");
 }
 
+void testSaveEngineVersions()
+{
+	expect(std::string(JxqyBuildVersion::MinimumSaveReaderEngineVersion) == "1.2.0",
+		"new saves retain the explicitly maintained 1.2.0 reader baseline");
+	struct VersionCase
+	{
+		const char* writer;
+		const char* reader;
+		const char* error;
+	};
+	for (const auto& versionCase : std::vector<VersionCase>
+	{
+		{ "1.1.0", "1.1.0", "" },
+		{ "1.1.9", "1.1.9", "" },
+		{ JxqyBuildVersion::EngineVersion, JxqyBuildVersion::MinimumSaveReaderEngineVersion, "" },
+		{ "1.2.1", "1.2.0", "" },
+		{ "999.0.0", "1.2.0", "" },
+		{ "999.0.0", "999.0.0", u8"更高版本引擎" },
+		{ "1.0.6", "1.0.6", u8"旧存档不兼容" },
+		{ "invalid", "1.2.0", u8"存档引擎版本格式错误" },
+		{ "1.2.0", "invalid", u8"最低读取引擎版本格式错误" },
+		{ "1.2.0", "", u8"最低读取引擎版本格式错误" },
+		{ "1.2.0", "1.2.1", u8"高于保存引擎版本" },
+	})
+	{
+		std::string error = "stale error";
+		const bool accepted = SaveVersionCompatibility::validateEngineVersion(
+			versionCase.writer, versionCase.reader, false, error);
+		expect(accepted == (versionCase.error[0] == '\0') &&
+			(versionCase.error[0] == '\0' ? error.empty() : error.find(versionCase.error) != std::string::npos),
+			std::string("save writer ") + versionCase.writer + " / reader " + versionCase.reader);
+	}
+}
+
 void testSaveResourceVersions()
 {
 	for (const auto& versions : std::vector<std::pair<std::string, std::string>>
@@ -1000,6 +1034,7 @@ int main()
 	}
 
 	testSemanticVersion();
+	testSaveEngineVersions();
 	testSaveResourceVersions();
 	testMetadataAndCompatibility();
 	testStrictRelativePaths();

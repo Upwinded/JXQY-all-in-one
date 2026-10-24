@@ -5,6 +5,7 @@
 #include <climits>
 #include <cmath>
 #include <list>
+#include <unordered_set>
 #include <vector>
 
 namespace
@@ -203,26 +204,27 @@ namespace
 				npc->getPosition(), npc->getOffset()) <= combinedRadius;
 		}
 
-		const PointEx movement = getCollisionSpaceDelta(
+		PointEx movement = getCollisionSpaceDelta(
 			effect->collisionSweepStartPosition,
 			effect->collisionSweepStartOffset,
 			effect->position,
 			effect->offset);
-		const float movementLengthSquared =
-			movement.x * movement.x + movement.y * movement.y;
-		if (movementLengthSquared <= 0.0f)
+		Point targetStart = npc->getPosition();
+		PointEx targetStartOffset = npc->getOffset();
+		const auto frame = gm->effectManager->getProjectileCollisionFrame();
+		// A newly released projectile cannot hit an earlier part of the actor's frame.
+		if (effect->projectileCollisionCreationFrame != frame
+			&& effect->characterCollisionActivationFrame != frame
+			&& npc->getProjectileCollisionStart(frame, targetStart, targetStartOffset))
 		{
-			collisionFraction = 1.0f;
-			return Map::getTileDistance(
-				effect->position, effect->offset,
-				npc->getPosition(), npc->getOffset()) <= combinedRadius;
+			movement = movement - getCollisionSpaceDelta(targetStart, targetStartOffset,
+				npc->getPosition(), npc->getOffset());
 		}
-
 		const PointEx target = getCollisionSpaceDelta(
 			effect->collisionSweepStartPosition,
 			effect->collisionSweepStartOffset,
-			npc->getPosition(),
-			npc->getOffset());
+			targetStart,
+			targetStartOffset);
 		constexpr float diagonalTileStepLength =
 			(float)TILE_HEIGHT / 1.41421356237f;
 		const float combinedRadiusInPixels =
@@ -306,63 +308,125 @@ namespace
 			getCollisionPosition(effect, collisionFraction));
 	}
 
-	void considerBestCollisionTarget(
-		const std::list<std::shared_ptr<NPC>>& candidateList,
-		std::shared_ptr<Effect> effect,
-		std::shared_ptr<NPC>& bestTarget,
-		int& bestPriority,
-		float& bestCollisionFraction)
+	PointEx getCharacterCollisionReach()
 	{
-		for (auto& npc : candidateList)
+		PointEx reach = { 0, 0 };
+		const auto frame = gm->effectManager->getProjectileCollisionFrame();
+		auto include = [&](const std::shared_ptr<NPC>& npc)
 		{
-			float collisionFraction = 1.0f;
-			if (!checkNPCAtPosition(npc, effect) || effect == nullptr || effect->skipsCharacterCollision() || !canCollide(npc, effect) || !getNPCCollisionFraction(npc, effect, collisionFraction))
-			{
-				continue;
-			}
-			int priority = getCollisionPriority(npc, effect);
-			if (priority < bestPriority ||
-				(priority == bestPriority &&
-					collisionFraction < bestCollisionFraction))
-			{
-				bestTarget = npc;
-				bestPriority = priority;
-				bestCollisionFraction = collisionFraction;
-			}
-		}
+			if (!npc || !npc->isPresentForRuntime()) return;
+			Point start = npc->getPosition();
+			PointEx startOffset = npc->getOffset();
+			npc->getProjectileCollisionStart(frame, start, startOffset);
+			const auto movement = getCollisionSpaceDelta(start, startOffset,
+				npc->getPosition(), npc->getOffset());
+			const float radius = std::max(0.0f, npc->radius) * TILE_HEIGHT / std::sqrt(2.0f);
+			reach.x = std::max(reach.x, (std::abs(movement.x) + radius) * MapXRatio + std::abs(npc->getOffset().x));
+			reach.y = std::max(reach.y, std::abs(movement.y) + radius + std::abs(npc->getOffset().y));
+		};
+		include(gm->player);
+		for (const auto& npc : gm->npcManager->npcList) include(npc);
+		return reach;
 	}
 
 	std::shared_ptr<NPC> findBestCollisionTarget(
-		const std::list<std::shared_ptr<NPC>>& npcList,
-		const std::list<std::shared_ptr<NPC>>& stepNPCList,
-		std::shared_ptr<Effect> effect,
+		const std::shared_ptr<Effect>& effect,
+		PointEx characterReach,
 		float& collisionFraction)
 	{
-		std::shared_ptr<NPC> bestTarget = nullptr;
+		std::shared_ptr<NPC> bestTarget;
 		int bestPriority = INT_MAX;
 		collisionFraction = 1.0f;
-		considerBestCollisionTarget(
-			npcList,
-			effect,
-			bestTarget,
-			bestPriority,
-			collisionFraction);
-		considerBestCollisionTarget(
-			stepNPCList,
-			effect,
-			bestTarget,
-			bestPriority,
-			collisionFraction);
+		if (effect->skipsCharacterCollision()) return bestTarget;
+		const auto& tiles = gm->map->dataMap.tile;
+		if (tiles.empty() || tiles.front().empty()) return bestTarget;
+		const Point startTile = effect->collisionSweepInitialized
+			? effect->collisionSweepStartPosition : effect->position;
+		const PointEx startOffset = effect->collisionSweepInitialized
+			? effect->collisionSweepStartOffset : effect->offset;
+		const auto start = Map::getTilePositionEx(startTile, { 0, 0 }) + startOffset;
+		const auto end = Map::getTilePositionEx(effect->position, { 0, 0 }) + effect->offset;
+		const float radius = std::max(0.0f, effect->width * 0.5f) * TILE_HEIGHT / std::sqrt(2.0f);
+		characterReach.x += radius * MapXRatio;
+		characterReach.y += radius;
+		auto index = [](double value, size_t size)
+		{
+			return static_cast<int>(std::clamp(value, 0.0, static_cast<double>(size - 1)));
+		};
+		// The extra column covers the half-tile horizontal shift of odd rows.
+		const int left = index(std::floor((std::min(start.x, end.x) - characterReach.x) / TILE_WIDTH) - 1, tiles.front().size());
+		const int right = index(std::ceil((std::max(start.x, end.x) + characterReach.x) / TILE_WIDTH) + 1, tiles.front().size());
+		const int top = index(std::floor((std::min(start.y, end.y) - characterReach.y) / (TILE_HEIGHT / 2)) - 1, tiles.size());
+		const int bottom = index(std::ceil((std::max(start.y, end.y) + characterReach.y) / (TILE_HEIGHT / 2)) + 1, tiles.size());
+		std::unordered_set<NPC*> visited;
+		auto consider = [&](const std::list<std::shared_ptr<NPC>>& candidates)
+		{
+			for (const auto& npc : candidates)
+			{
+				if (!npc || !visited.insert(npc.get()).second || !checkNPCAtPosition(npc, effect) || !canCollide(npc, effect)) continue;
+				float fraction = 1.0f;
+				if (!getNPCCollisionFraction(npc, effect, fraction)) continue;
+				const int priority = getCollisionPriority(npc, effect);
+				if (!bestTarget || fraction < collisionFraction || (fraction == collisionFraction && priority < bestPriority))
+				{
+					bestTarget = npc;
+					bestPriority = priority;
+					collisionFraction = fraction;
+				}
+			}
+		};
+		for (int y = top; y <= bottom; ++y)
+		{
+			for (int x = left; x <= right; ++x)
+			{
+				consider(tiles[y][x].npcList);
+				consider(tiles[y][x].stepNPCList);
+			}
+		}
 		return bestTarget;
+	}
+
+	float getWallCollisionFraction(const std::shared_ptr<Effect>& effect, Point wall)
+	{
+		if (!effect->collisionSweepInitialized) return 1.0f;
+		const auto tile = Map::getTilePositionEx(wall, effect->collisionSweepStartPosition);
+		const auto displacement = Map::getTilePositionEx(effect->position, effect->collisionSweepStartPosition)
+			+ effect->offset - effect->collisionSweepStartOffset;
+		float firstContact = 1.0f;
+		for (const auto offset : effect->getPathOffsets())
+		{
+			const auto start = effect->collisionSweepStartOffset + offset - tile;
+			float entry = 0.0f;
+			float exit = 1.0f;
+			// A tile is a diamond: clipping its two diagonal coordinates gives
+			// the entry time of the same centre/edge rays used by getPassPath.
+			for (const float sign : { -1.0f, 1.0f })
+			{
+				const float position = start.x / (TILE_WIDTH / 2) + sign * start.y / (TILE_HEIGHT / 2);
+				const float movement = displacement.x / (TILE_WIDTH / 2) + sign * displacement.y / (TILE_HEIGHT / 2);
+				if (movement == 0.0f)
+				{
+					if (std::abs(position) > 1.0f) exit = -1.0f;
+					continue;
+				}
+				float begin = (-1.0f - position) / movement;
+				float end = (1.0f - position) / movement;
+				if (begin > end) std::swap(begin, end);
+				entry = std::max(entry, begin);
+				exit = std::min(exit, end);
+			}
+			if (entry <= exit) firstContact = std::min(firstContact, entry);
+		}
+		return firstContact;
 	}
 
 	bool checkNPCAtPosition(std::shared_ptr<NPC> npc, std::shared_ptr<Effect> effect)
 	{
-		if (!npc) return false;
+		if (!npc || !npc->isPresentForRuntime() || npc->isDying() || npc->isHiding()) return false;
 		if (npc->getJumpState() == jsJumping) return false;
 		if (npc == gm->player)
 		{
-			return npc->isVisibleForRuntime() && npc->nowAction != acHide && npc->nowAction != acDeath;
+			return true;
 		}
 		if (!npc->isFighterLike() || !gm->npcManager->findNPC(npc))
 		{
@@ -536,7 +600,7 @@ namespace
 void CollisionDetector::detectCollision()
 {
 	auto effectList = gm->effectManager->effectList;
-	auto& dataMap = gm->map->dataMap;
+	const PointEx characterReach = getCharacterCollisionReach();
 	const bool hasSpecialProjectile = std::any_of(
 		effectList.begin(),
 		effectList.end(),
@@ -566,73 +630,47 @@ void CollisionDetector::detectCollision()
 
 		bool collided = false;
 
-		if (effect->doing != ekThrowing)
+		float characterFraction = 1.0f;
+		auto target = effect->doing == ekThrowing ? nullptr
+			: findBestCollisionTarget(effect, characterReach, characterFraction);
+		bool wallFound = false;
+		float wallFraction = 1.0f;
+		Point wallPosition = effect->position;
+		Point wallFallback = effect->position;
+		if (!effect->canPassThroughWall())
 		{
-			Point fallbackPosition = effect->position;
-			for (const auto& pos : effect->passPath)
+			Point fallback = effect->position;
+			auto considerWall = [&](Point position)
 			{
-				if (!effect || effect->doing == ekThrowing) break;
-
-				if (gm->map->isInMap(pos))
+				if (gm->map->canFly(position))
 				{
-					auto& tile = dataMap.tile[pos.y][pos.x];
-					float collisionFraction = 1.0f;
-					auto target = findBestCollisionTarget(
-						tile.npcList,
-						tile.stepNPCList,
-						effect,
-						collisionFraction);
-					if (target != nullptr && processCollision(
-						target,
-						effect,
-						getCollisionPosition(effect, collisionFraction)))
-					{
-						collided = true;
-					}
+					fallback = position;
+					return;
 				}
-
-				if (collided) break;
-
-				if (!effect->canPassThroughWall() && !gm->map->canFly(pos))
+				const float fraction = getWallCollisionFraction(effect, position);
+				if (!wallFound || fraction < wallFraction)
 				{
-					if (!effect->handleBallWallCollision(pos, fallbackPosition))
-					{
-						effect->beginExplode(pos);
-					}
-					collided = true;
-					break;
+					wallFound = true;
+					wallFraction = fraction;
+					wallPosition = position;
+					wallFallback = fallback;
 				}
-				if (gm->map->canFly(pos))
-				{
-					fallbackPosition = pos;
-				}
+			};
+			if (effect->doing != ekThrowing && effect->collisionSweepInitialized)
+			{
+				for (const auto position : effect->passPath) considerWall(position);
 			}
+			considerWall(effect->position);
 		}
-
-		if (!collided && effect && effect->doing != ekThrowing)
+		if (target && (!wallFound || characterFraction <= wallFraction))
 		{
-			Point pos = effect->position;
-			if (gm->map->isInMap(pos))
-			{
-				auto& tile = dataMap.tile[pos.y][pos.x];
-				float collisionFraction = 1.0f;
-				auto target = findBestCollisionTarget(
-					tile.npcList,
-					tile.stepNPCList,
-					effect,
-					collisionFraction);
-				if (target != nullptr && processCollisionWithCheck(target, effect))
-				{
-					collided = true;
-				}
-			}
+			collided = processCollision(target, effect, getCollisionPosition(effect, characterFraction));
 		}
-
-		if (!collided && effect && !effect->canPassThroughWall() && !gm->map->canFly(effect->position))
+		if (!collided && wallFound)
 		{
-			if (!effect->handleBallWallCollision(effect->position, effect->position))
+			if (!effect->handleBallWallCollision(wallPosition, wallFallback))
 			{
-				effect->beginExplode(effect->position);
+				effect->beginExplode(wallPosition);
 			}
 			collided = true;
 		}

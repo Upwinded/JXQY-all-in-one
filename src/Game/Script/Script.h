@@ -116,6 +116,7 @@ public:
 		std::uint64_t capturedParentExecutionId = 0,
 		bool parentWasCaptured = false);
 	std::uint64_t currentExecutionId() const noexcept;
+	void reportCommandFailure(const std::string& message);
 	bool running = false;
 private:	
 	friend class ScriptEngineRuntimeTestAccess;
@@ -138,6 +139,7 @@ private:
 	void enqueueApiCall(std::string_view apiName);
 
 	std::string name = "script";
+	std::string commandFailureMessage;
 	EditorRun::RuntimeTraceWriter* runtimeTraceWriter = nullptr;
 	std::uint64_t nextExecutionId = 1;
 	std::vector<std::uint64_t> executionStack;
@@ -180,6 +182,7 @@ private:
 
 	static int lua_ChangeASFColor(lua_State* l);
 	static int lua_ChangeMapColor(lua_State* l);
+	static int lua_ChangeMapColorPlus(lua_State* l);
 
 	static int lua_LoadObj(lua_State * l);
 	static int lua_SaveObj(lua_State * l);
@@ -203,12 +206,14 @@ private:
 	static int lua_DelNpc(lua_State * l);
 	static int lua_GetNpcPos(lua_State* l);
 	static int lua_SetNpcRes(lua_State * l);
+	static int lua_ChangeNpcRes(lua_State* l);
 	static int lua_SetNpcScript(lua_State * l);
 	static int lua_SetNpcDeathScript(lua_State * l);
 	static int lua_SetAllNpcScript(lua_State* l);
 	static int lua_SetAllNpcDeathScript(lua_State* l);
 	static int lua_InteractNearestNpc(lua_State* l);
 	static int lua_NpcGoto(lua_State * l);
+	static int lua_NpcRunTo(lua_State* l);
 	static int lua_NpcGotoEx(lua_State * l);
 	static int lua_NpcGotoDir(lua_State * l);
 	static int lua_SetNpcDestination(lua_State * l);
@@ -225,6 +230,7 @@ private:
 	static int lua_SetNpcDir(lua_State * l);
 	static int lua_SetNpcKind(lua_State * l);
 	static int lua_SetNpcLevel(lua_State * l);
+	static int lua_SetNpcLevelEqualPlayer(lua_State* l);
 	static int lua_SetNpcState(lua_State* l);
 	static int lua_SetNpcAction(lua_State * l);
 	static int lua_SetNpcRelation(lua_State * l);
@@ -285,6 +291,7 @@ private:
 	static int lua_PlayerRunToEx(lua_State* l);
 	static int lua_PlayerJumpTo(lua_State * l);
 	static int lua_PlayerGotoDir(lua_State * l);
+	static int lua_PlayerGotoDirEx(lua_State* l);
 	static int lua_SetWalkIsRun(lua_State * l);
 	static int lua_AddMoveSpeedPercent(lua_State* l);
 	static int lua_UseMagic(lua_State* l);
@@ -348,12 +355,14 @@ private:
 	static int lua_ShowGamble(lua_State* l);
 	static int lua_ShowDiceGame(lua_State* l);
 	static int lua_ShowFishGame(lua_State* l);
+	static int lua_ShowMiniGame(lua_State* l);
 	static int lua_ShowStealWin(lua_State* l);
 	static int lua_ShowGiveGoodsWin(lua_State* l);
 
 	static int lua_ShowMessage(lua_State * l);
 	static int lua_ShowSystemMsg(lua_State * l);
 	static int lua_Memo(lua_State* l);
+	static int lua_OpenPaper(lua_State* l);
 	static int lua_AddToMemo(lua_State * l);
 	static int lua_DelMemo(lua_State* l);
 	static int lua_ClearMemo(lua_State * l);

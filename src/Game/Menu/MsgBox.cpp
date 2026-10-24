@@ -83,6 +83,7 @@ void MsgBox::init()
 	{
 		label->coverMouse = false;
 		label->autoNextLine = true;
+		label->autoShrink = true;
 	}
 	setChildRectReferToParent();
 }

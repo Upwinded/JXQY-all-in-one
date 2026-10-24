@@ -18,6 +18,7 @@ enum class WorldInteractionIntent
 	Primary,
 	Alternate,
 	Attack,
+	FriendlyMagic,
 };
 
 enum class WorldInteractionTargetType

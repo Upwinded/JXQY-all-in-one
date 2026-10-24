@@ -509,7 +509,7 @@ def main():
         assert commands == expected, (mana, cooldown, damage, commands)
         checks += 1
 
-    for name, radius, has_walk, fallback in (("高级弓箭兵", 10, None, False), ("陈三", 5, None, False),
+    for name, radius, has_walk, melee_only in (("高级弓箭兵", 10, None, False), ("陈三", 5, None, False),
                                             ("唐萧", 10, None, False), ("唐门弟子1", 10, None, False),
                                             ("灰狼", 1, None, True), ("近程敌人", 4, None, True),
                                             ("木人1", 11, False, True), ("可移动远程敌人", 11, True, False)):
@@ -519,8 +519,8 @@ def main():
 
         def combat(command, **arguments):
             assert command == "StartCombat"
-            assert arguments["allowMeleeFallback"] is fallback
-            assert arguments["skills"] == ([] if fallback else [0])
+            assert arguments["allowMeleeFallback"] is True
+            assert arguments["skills"] == ([] if melee_only else [0])
             assert "manaItem" not in arguments and "manaPercent" not in arguments
             commands.append(command)
             return {"kills": 1}
@@ -549,7 +549,7 @@ def main():
             return copy.deepcopy(client.state)
         def ranged_combat(command, **arguments):
             assert command == "StartCombat" and arguments["skills"] == [0]
-            assert not arguments["allowMeleeFallback"] and arguments["targetId"] == 7
+            assert arguments["allowMeleeFallback"] and arguments["targetId"] == 7
             assert ("manaItem" in arguments) is blue_stock
             commands.append(command)
             return dict(kills=1)
@@ -586,7 +586,7 @@ def main():
             return copy.deepcopy(client.state)
         def ongoing_combat(command, **arguments):
             assert command == "StartCombat" and arguments["targetId"] == 7
-            assert not arguments["allowMeleeFallback"]
+            assert arguments["allowMeleeFallback"]
             commands.append((command, arguments["timeoutMs"]))
             if len(commands) == 1:
                 c.state["player"]["mana"] = 0
@@ -618,7 +618,7 @@ def main():
         c.state["targets"] = [enemy]
         def depleted_combat(command, **arguments):
             assert command == "StartCombat" and arguments["targetId"] == 7
-            assert not arguments["allowMeleeFallback"]
+            assert arguments["allowMeleeFallback"]
             commands.append((command, arguments))
             if len(commands) == 1:
                 assert arguments["manaItem"] == blue
@@ -1188,9 +1188,9 @@ def main():
                                   [dict(file="player-magic-大梦心法.ini", level=1)]})
         c.observe = lambda variables=(): copy.deepcopy(c.state)
 
-        def camp_go(client, x, y, *, destination, combat):
+        def camp_go(client, x, y, *, destination, combat=True):
             assert client.state["map"] == "金兵营寨.map"
-            assert (x, y, destination, combat) == (97, 6, "汉阳-中都1.map", False)
+            assert (x, y, destination, combat) == (97, 6, "汉阳-中都1.map", True)
             commands.append(("camp-exit",))
             client.state["map"] = destination
 
@@ -1278,6 +1278,12 @@ def main():
             commands.append(("checkpoint", name))
             return client.observe()
 
+        def wait_for_meng(predicate, *, timeout):
+            assert timeout == 30
+            if outcome != "wrong-return":
+                assert predicate(c.observe())
+            return c.observe()
+        c.wait_until = wait_for_meng
         namespace.update(idle=state, talk=meng_talk, fight=meng_fight, verify=visit_verify,
                          _move_script_evidence=meng_trace, checkpoint=meng_checkpoint)
         exec(compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"), namespace)

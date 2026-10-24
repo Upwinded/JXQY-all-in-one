@@ -6,12 +6,13 @@
 #include "../File/File.h"
 #include "../Game/Game.h"
 #include "../Game/Data/NPC.h"
+#include "../Game/Data/NPCManager.h"
 #include "../Game/GameManager/GameManager.h"
+#include "../Game/Menu/EquipMenu.h"
 #include "../Game/Menu/GoodsMenu.h"
 #include "../Game/Menu/JoystickPanel.h"
 #include "../Game/Menu/MapThumbnailMenu.h"
 #include "../Game/Menu/MsgBox.h"
-#include "../Game/Menu/PartnerEquipMenu.h"
 #include "../Game/Menu/SkillsPanel.h"
 #include "../Game/Menu/SystemNotice.h"
 #include "../Game/Scene/TitleTeam.h"
@@ -1014,19 +1015,12 @@ bool testGlobalTouchControlsInputFlow(
 	return ok;
 }
 
-bool testPartnerModalCancelsHeldTouchControls()
+bool testPartnerEquipmentCancelsHeldTouchControls(int relation)
 {
 	GameManager gameManager;
 	MobilePanelFixture panels = attachMobilePanels(gameManager);
 	gameManager.global.data.canInput = true;
-	gameManager.menu->upMenu = std::make_shared<Panel>();
-	gameManager.menu->goodsMenu = std::make_shared<GoodsMenu>();
-	gameManager.menu->partnerEquipMenu =
-		std::make_shared<PartnerEquipMenu>();
-	gameManager.menu->addChild(gameManager.menu->upMenu);
-	gameManager.menu->upMenu->addChild(gameManager.menu->goodsMenu);
-	gameManager.menu->upMenu->addChild(
-		gameManager.menu->partnerEquipMenu);
+	gameManager.menu->init();
 	// Production runs the global lifecycle stage before any pointer hit-test.
 	// Synchronize this standalone fixture before seeding the held contact so
 	// the first mouse down belongs to the current lifecycle instead of being
@@ -1037,27 +1031,31 @@ bool testPartnerModalCancelsHeldTouchControls()
 	seedTouchControlsTransientState(gameManager, panels, heldPointerID);
 	auto partner = std::make_shared<NPC>();
 	partner->kind = nkPartner;
+	partner->relation = relation;
 	partner->canEquip = 1;
+	partner->life = partner->lifeMax = 100;
+	gameManager.npcManager->addNPC(partner);
 	bool ok = check(gameManager.menu->openPartnerEquipment(partner, false),
-		"partner modal did not open for held virtual-control cancellation");
+		"partner equipment did not open for held virtual-control cancellation");
 	ok = checkTouchControlsStateAfterToggle(
 		gameManager,
 		panels,
 		true,
 		gameManager.controller->visible,
 		gameManager.controller->activated,
-		"partner modal opening") && ok;
-	ok = check(gameManager.menu->partnerEquipMenu->visible
-		&& gameManager.menu->partnerEquipMenu->isControllerFocusActive(),
-		"partner modal lost its focus after canceling lower touch controls") && ok;
+		"partner equipment opening") && ok;
+	ok = check(gameManager.menu->equipMenu->visible
+		&& gameManager.menu->equipMenu->isControllerFocusActive()
+		&& gameManager.menu->equipMenu->getSelectedPartner() == partner,
+		"partner equipment lost its focus after canceling lower touch controls") && ok;
 
-	const std::vector<PElement> modalCandidates =
-		gameManager.menu->partnerEquipMenu->controllerFocusCandidates();
+	const std::vector<PElement> equipmentCandidates =
+		gameManager.menu->equipMenu->controllerFocusCandidates();
 	const std::vector<PElement> goodsCandidates =
 		gameManager.menu->goodsMenu->controllerFocusCandidates();
 	auto menuOwnsPoint = [&](int x, int y)
 	{
-		if (gameManager.menu->partnerEquipMenu->rect.PointInRect(x, y)
+		if (gameManager.menu->equipMenu->rect.PointInRect(x, y)
 			|| gameManager.menu->goodsMenu->rect.PointInRect(x, y))
 		{
 			return true;
@@ -1074,7 +1072,7 @@ bool testPartnerModalCancelsHeldTouchControls()
 						&& candidate->rect.PointInRect(x, y);
 				});
 		};
-		return candidateOwnsPoint(modalCandidates)
+		return candidateOwnsPoint(equipmentCandidates)
 			|| candidateOwnsPoint(goodsCandidates);
 	};
 	int virtualX = -1;
@@ -1092,7 +1090,7 @@ bool testPartnerModalCancelsHeldTouchControls()
 		}
 	}
 	ok = check(virtualX >= 0,
-		"partner modal left no uncovered point for virtual-control testing")
+		"partner equipment left no uncovered point for virtual-control testing")
 		&& ok;
 	if (virtualX >= 0)
 	{
@@ -1106,7 +1104,7 @@ bool testPartnerModalCancelsHeldTouchControls()
 		ok = check(panels.skillProbe->clickCount == 2
 				&& gameManager.player->nextAction == nullptr,
 			"visible virtual control rejected mouse or touch behind"
-			" PartnerEquip, or leaked the same edge into the world") && ok;
+			" partner equipment, or leaked the same edge into the world") && ok;
 	}
 
 	const int clickCountBeforeStaleRelease =
@@ -1124,9 +1122,9 @@ bool testPartnerModalCancelsHeldTouchControls()
 		&& panels.skillProbe->dragEndCount == 0
 		&& panels.skillProbe->touchingID == TOUCH_UNTOUCHEDID
 		&& panels.skillProbe->touchingDownID == TOUCH_UNTOUCHEDID,
-		"release captured by the partner modal committed a lower virtual control")
+		"release captured before partner equipment opened committed a lower virtual control")
 		&& ok;
-	gameManager.menu->closePartnerEquipment(false);
+	gameManager.menu->clearMenu();
 	return ok;
 }
 
@@ -2387,9 +2385,12 @@ bool runMobileExternalInputRuntimeTests()
 			ok = testGlobalTouchControlsInputFlow(inputManager) && ok;
 			ok = checkStrictlyHeadless(
 				"after global touch fixture teardown") && ok;
-			ok = testPartnerModalCancelsHeldTouchControls() && ok;
-			ok = checkStrictlyHeadless(
-				"after partner-modal touch cancellation") && ok;
+			for (const int relation : { nrFriendly, nrNeutral })
+			{
+				ok = testPartnerEquipmentCancelsHeldTouchControls(relation) && ok;
+				ok = checkStrictlyHeadless(
+					"after partner-equipment touch cancellation") && ok;
+			}
 
 			{
 				GameManager gameManager;

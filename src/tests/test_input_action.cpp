@@ -186,6 +186,9 @@ void testControllerBindingCatalogContract()
 		ExpectedBinding{ InputAction::ScrollRight, ControllerControl::RightStick,
 			ControllerControl::None, ControllerDirection::Right,
 			ControllerBindingTrigger::StickDirectional, false },
+		ExpectedBinding{ InputAction::CycleFriendlyTarget, ControllerControl::LeftTrigger,
+			ControllerControl::RightShoulder, ControllerDirection::None,
+			ControllerBindingTrigger::TriggerThreshold, false },
 	};
 
 	require(GameInput::DefaultControllerBindings.size()
@@ -494,6 +497,58 @@ void testTouchControlsGamepadChordOrdersAndCancellation()
 			+ PhysicalInputManager::ToggleTouchControlsHoldMilliseconds + 60);
 		require(!inputManager.wasActionPressed(InputAction::OpenSystemMenu),
 			"cancelled touch-control chord leaked the Start action");
+		inputManager.shutdown();
+	}
+}
+
+void testFriendlyTargetChord()
+{
+	for (bool modifierFirst : { true, false })
+	{
+		VirtualGamepad gamepad("JXQY Friendly Target Chord Pad");
+		PhysicalInputManager inputManager;
+		require(inputManager.initialize(), "friendly chord input manager did not initialize");
+		std::uint64_t now = 0;
+		runFrame(inputManager, now);
+		gamepad.setButton(SDL_GAMEPAD_BUTTON_MISC1, true);
+		runFrame(inputManager, now += 10);
+		gamepad.setButton(SDL_GAMEPAD_BUTTON_MISC1, false);
+		runFrame(inputManager, now += 10);
+		if (modifierFirst)
+		{
+			gamepad.setButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, true);
+		}
+		else
+		{
+			gamepad.setAxis(SDL_GAMEPAD_AXIS_LEFT_TRIGGER, triggerAxisValue(0.8f));
+		}
+		runFrame(inputManager, now += 10);
+		gamepad.setButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, true);
+		gamepad.setAxis(SDL_GAMEPAD_AXIS_LEFT_TRIGGER, triggerAxisValue(0.8f));
+		runFrame(inputManager, now += 10);
+		requireOnlyPressed(inputManager, { InputAction::CycleFriendlyTarget },
+			"RB+LT friendly target chord");
+		runFrame(inputManager, now += 10);
+		requireOnlyPressed(inputManager, {}, "held friendly target chord");
+		gamepad.setButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, false);
+		runFrame(inputManager, now += 10);
+		requireOnlyPressed(inputManager, {}, "RB release after friendly target chord");
+		require(!inputManager.isActionDown(InputAction::CycleFriendlyTarget),
+			"friendly target chord stayed down after releasing RB");
+		runFrame(inputManager, now += 10);
+		requireOnlyPressed(inputManager, {}, "LT held after releasing chord modifier");
+		gamepad.setAxis(SDL_GAMEPAD_AXIS_LEFT_TRIGGER, triggerAxisValue(0.0f));
+		runFrame(inputManager, now += 10);
+		gamepad.setAxis(SDL_GAMEPAD_AXIS_LEFT_TRIGGER, triggerAxisValue(0.8f));
+		runFrame(inputManager, now += 10);
+		requireOnlyPressed(inputManager,
+			{ InputAction::CycleInteractionTarget, InputAction::PreviousPage },
+			"fresh plain LT after friendly target chord");
+		gamepad.setButton(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, true);
+		runFrame(inputManager, now += 10);
+		inputManager.releaseForContextTransition();
+		require(!inputManager.isActionDown(InputAction::CycleFriendlyTarget),
+			"context transition retained the friendly target chord");
 		inputManager.shutdown();
 	}
 }
@@ -1038,6 +1093,7 @@ int main()
 		testKeyboardTouchControlsShortcut();
 		testTouchControlsGamepadChordOrdersAndCancellation();
 		testControllerBindingCatalogContract();
+		testFriendlyTargetChord();
 		testDefaultBindingTable();
 		testActionsAndAxisHysteresis();
 		testContextAndLifecycleNeutralGates();

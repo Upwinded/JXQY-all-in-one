@@ -25,6 +25,7 @@ public:
 	void beginMapVisit();
 	bool load(std::string* failureReason = nullptr);
 	bool loadInitialTemplate(std::string* failureReason = nullptr);
+	bool saveMap(const std::string& mapName);
 	bool saveDefinitions();
 	bool save();
 	void resetToEmpty();

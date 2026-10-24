@@ -2,12 +2,28 @@
 #include "../../Engine/Engine.h"
 #include "../Data/NPC.h"
 #include "../GameManager/GameManager.h"
+#include "../GameManager/GameController.h"
+#include "../../File/INIReader.h"
 
 NpcInfoPanel::NpcInfoPanel()
 {
 	name = "NpcInfoPanel";
 	coverMouse = false;
 	needEvents = false;
+	std::unique_ptr<char[]> content;
+	if (File::readFile("ini\\ui\\npcinfo\\window.ini", content) > 0 && content)
+	{
+		INIReader ini(content);
+		const int width = ini.GetInteger("Init", "Width", lifeBarWidth);
+		const int height = ini.GetInteger("Init", "Height", lifeBarHeight);
+		if (ini.ParseError() == 0 && width > 0 && height > 0)
+		{
+			lifeBarWidth = width;
+			lifeBarHeight = height;
+			lifeBarLeftAdjust = ini.GetInteger("Init", "AlignX", lifeBarLeftAdjust);
+			lifeBarTopAdjust = ini.GetInteger("Init", "AlignY", lifeBarTopAdjust);
+		}
+	}
 }
 
 NpcInfoPanel::~NpcInfoPanel()
@@ -16,8 +32,9 @@ NpcInfoPanel::~NpcInfoPanel()
 
 void NpcInfoPanel::onDraw()
 {
-	NPC* selectedNPC = nullptr;
-	for (size_t i = 0; i < gm->npcManager->npcList.size(); i++)
+	auto friendlyTarget = gm->controller != nullptr ? gm->controller->getFriendlyMagicTarget() : nullptr;
+	NPC* selectedNPC = friendlyTarget.get();
+	for (size_t i = 0; selectedNPC == nullptr && i < gm->npcManager->npcList.size(); i++)
 	{
 		if (gm->npcManager->npcList[i] != nullptr && gm->npcManager->npcList[i]->selecting)
 		{
@@ -36,7 +53,7 @@ void NpcInfoPanel::onDraw()
 
 	bool isBattle = (selectedNPC->kind == nkBattle);
 	bool isPartnerCombat = (selectedNPC->kind == nkPartner && gm->global.data.PartnerCombat);
-	if (!isBattle && !isPartnerCombat)
+	if (friendlyTarget == nullptr && !isBattle && !isPartnerCombat)
 	{
 		return;
 	}
@@ -44,9 +61,15 @@ void NpcInfoPanel::onDraw()
 	int w, h;
 	engine->getWindowSize(w, h);
 	int screenCenterX = w / 2;
-	int topY = BAR_TOP_ADJUST;
+	int topY = lifeBarTopAdjust;
 
 	drawLifeBar(selectedNPC, screenCenterX, topY);
+	if (friendlyTarget != nullptr)
+	{
+		const auto position = friendlyTarget->getScreenPosition(gm->camera->position, gm->camera->offset);
+		engine->fillRect(position.x - 10, position.y - 1, 20, 2, 80, 255, 100, 230);
+		engine->fillRect(position.x - 1, position.y - 6, 2, 12, 80, 255, 100, 230);
+	}
 }
 
 void NpcInfoPanel::drawLifeBar(NPC* npc, int screenCenterX, int topY)
@@ -61,7 +84,7 @@ void NpcInfoPanel::drawLifeBar(NPC* npc, int screenCenterX, int topY)
 	if (lifePercent > 1.0f) lifePercent = 1.0f;
 	if (lifePercent < 0.0f) lifePercent = 0.0f;
 
-	int topLeftX = screenCenterX - BAR_WIDTH / 2;
+	int topLeftX = screenCenterX - lifeBarWidth / 2 + lifeBarLeftAdjust;
 
 	uint8_t lifeR, lifeG, lifeB;
 	if (npc->relation == nrHostile)
@@ -77,12 +100,12 @@ void NpcInfoPanel::drawLifeBar(NPC* npc, int screenCenterX, int topY)
 		lifeR = 40; lifeG = 30; lifeB = 245;
 	}
 
-	engine->fillRect(topLeftX, topY, BAR_WIDTH, BAR_HEIGHT, 0, 0, 0, 180);
+	engine->fillRect(topLeftX, topY, lifeBarWidth, lifeBarHeight, 0, 0, 0, 180);
 
 	if (npc->displayLifePercent > lifePercent)
 	{
-		int lagWidth = (int)(BAR_WIDTH * npc->displayLifePercent);
-		int currentWidth = (int)(BAR_WIDTH * lifePercent);
+		int lagWidth = (int)(lifeBarWidth * npc->displayLifePercent);
+		int currentWidth = (int)(lifeBarWidth * lifePercent);
 		int lagPartWidth = lagWidth - currentWidth;
 		if (lagPartWidth > 0)
 		{
@@ -99,14 +122,14 @@ void NpcInfoPanel::drawLifeBar(NPC* npc, int screenCenterX, int topY)
 			{
 				lagR = 140; lagG = 140; lagB = 255;
 			}
-			engine->fillRect(topLeftX + currentWidth, topY, lagPartWidth, BAR_HEIGHT, lagR, lagG, lagB, 160);
+			engine->fillRect(topLeftX + currentWidth, topY, lagPartWidth, lifeBarHeight, lagR, lagG, lagB, 160);
 		}
 	}
 
-	int lifeWidth = (int)(BAR_WIDTH * lifePercent);
+	int lifeWidth = (int)(lifeBarWidth * lifePercent);
 	if (lifeWidth > 0)
 	{
-		engine->fillRect(topLeftX, topY, lifeWidth, BAR_HEIGHT, lifeR, lifeG, lifeB, 230);
+		engine->fillRect(topLeftX, topY, lifeWidth, lifeBarHeight, lifeR, lifeG, lifeB, 230);
 	}
 
 	std::string displayName = npc->getDisplayName();
@@ -121,7 +144,7 @@ void NpcInfoPanel::drawLifeBar(NPC* npc, int screenCenterX, int topY)
 		int textW = 0, textH = 0;
 		engine->getImageSize(textImage, textW, textH);
 		int textX = screenCenterX - textW / 2;
-		int textY = topY + (BAR_HEIGHT - textH) / 2;
+		int textY = topY + (lifeBarHeight - textH) / 2;
 		engine->drawImage(textImage, textX, textY);
 	}
 }

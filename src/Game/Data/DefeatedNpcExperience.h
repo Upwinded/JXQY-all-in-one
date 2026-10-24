@@ -6,8 +6,8 @@
 #include <cmath>
 #include <climits>
 
-// 存储经验缺失（exp=0 的敌对战斗 NPC）时整套借用的月影击杀规则：
-// 人物拿等级乘积原值，武功按下述比例获得经验。
+// 存储经验缺失（exp=0 的敌对战斗 NPC）时借用月影的等级乘积基础经验；
+// 先应用玩家选择的经验倍率，再按下述比例分配武功经验。
 inline constexpr float FallbackPracticeKillFraction = 0.2222f;
 inline constexpr float FallbackUseKillFraction = 0.0333f;
 

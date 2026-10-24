@@ -1,6 +1,7 @@
 #pragma once
 #include "Magic.h"
 #include "Effect.h"
+#include "SkillTree.h"
 #include <map>
 #include <vector>
 
@@ -26,6 +27,10 @@ public:
 
 	bool load(int index, std::string* failureReason = nullptr);
 	bool save(int index);
+	bool loadSkillTree(int characterIndex, std::string* failureReason = nullptr);
+	const SkillTree& skillTree();
+	std::string skillTreeLearningFailure(const std::string& nodeId);
+	bool learnSkillTreeNode(const std::string& nodeId, std::string* failureReason = nullptr);
 
 	void freeResource();
 	void clearMagicList();
@@ -97,6 +102,9 @@ private:
 	float currentUseKillExperienceFraction = 1.0f;
 	bool usesConfiguredExperienceRules = false;
 	std::weak_ptr<Magic> currentUseMagic;
+	SkillTree activeSkillTree;
+	MagicInfo* findSkillTreeMagic(const std::string& file);
+	void refreshSkillTree();
 
 	std::vector<MagicInfo>& primaryMagicList();
 	const std::vector<MagicInfo>& primaryMagicList() const;
@@ -104,7 +112,7 @@ private:
 	void addUseExperience(MagicInfo& info, int addexp);
 	MagicInfo* findExperienceOwner(const MagicExperienceOwner& owner,
 		std::string* listKey = nullptr, int* slot = nullptr);
-	bool tryAdvanceMagicLevel(MagicInfo& info);
+	bool tryAdvanceMagicLevel(MagicInfo& info, int maximumLevel = MAGIC_MAX_LEVEL);
 	void addTalentJumpRadius(const MagicInfo& info);
 	void loadExperienceRules();
 	int hitExperienceForTargetLevel(int targetLevel) const;

@@ -9,14 +9,22 @@
 #include "../Game/Menu/MapThumbnailMenu.h"
 #include "../Game/Menu/MemoMemu.h"
 #include "../Game/Menu/MsgBox.h"
+#include "../Game/Menu/SkillsPanel.h"
 #include "../Game/Menu/UIFocusManager.h"
+#include "../Game/Config/Config.h"
 #include "../Image/IMP.h"
 #include "../Input/InputAction.h"
 #include "../Resource/ResourceManager.h"
 #include "HeadlessPhysicalInputTestHarness.h"
+#include "TestTemporaryDirectory.h"
+#include <SDL3_ttf/SDL_ttf.h>
+#include <SDL3_image/SDL_image.h>
 
 #include <array>
+#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 #include <initializer_list>
 #include <iostream>
 #include <memory>
@@ -27,6 +35,85 @@
 class GamepadWorldRuntimeTestAccess
 {
 public:
+	static void resizeAttributes(AttributePointMenu& menu, int width, int height) { menu.layout(width, height); }
+	static int pendingAttributes(const AttributePointMenu& menu) { return menu.pendingTotal(); }
+	static int firstAttributeRow(const AttributePointMenu& menu) { return menu.firstRow; }
+	static Rect attributeAdjust(const AttributePointMenu& menu, std::size_t row, bool add = true) { return (add ? menu.plus[row] : menu.minus[row])->rect; }
+	static Rect attributeAction(const AttributePointMenu& menu, int action)
+	{
+		return (action == 0 ? menu.submitButton : action == 1 ? menu.resetButton : action == 2 ? menu.closeButton : menu.nextButton)->rect;
+	}
+	static bool attributeLayoutFits(const AttributePointMenu& menu)
+	{
+		const auto fits = [&](const auto& button)
+		{
+			const auto& r = button->rect;
+			return !button->visible || (r.w >= 44 && r.h >= 44 && r.x >= menu.panel.x && r.y >= menu.panel.y
+				&& r.x + r.w <= menu.panel.x + menu.panel.w && r.y + r.h <= menu.panel.y + menu.panel.h);
+		};
+		for (const auto& b : { menu.submitButton, menu.resetButton, menu.closeButton, menu.previousButton, menu.nextButton }) if (!fits(b)) return false;
+		for (std::size_t i = 0; i < menu.plus.size(); ++i) if (!fits(menu.plus[i]) || !fits(menu.minus[i])) return false;
+		return true;
+	}
+	static void resizeTree(SkillTreeMenu& menu, int width, int height) { menu.layout(width, height); }
+	static std::size_t selectedTreeNode(const SkillTreeMenu& menu) { return menu.selected; }
+	static bool confirmingTree(const SkillTreeMenu& menu) { return menu.confirming; }
+	static int treeDetailPage(const SkillTreeMenu& menu) { return menu.detailPage; }
+	static int treeScroll(const SkillTreeMenu& menu) { return menu.scrollOffset; }
+	static void noteVisibleTreeNodes(const SkillTreeMenu& menu, std::vector<bool>& visited)
+	{
+		for (std::size_t i = 0; i < menu.nodeButtons.size(); ++i)
+			if (menu.nodeButtons[i]->visible) visited[i] = true;
+	}
+	static Rect treeNode(const SkillTreeMenu& menu, std::size_t index) { return menu.nodeButtons[index]->rect; }
+	static Rect treeLearnButton(const SkillTreeMenu& menu) { return menu.learnButton->rect; }
+	static Rect treeScrollButton(const SkillTreeMenu& menu) { return menu.downButton->rect; }
+	static bool treeLayoutFits(const SkillTreeMenu& menu)
+	{
+		const auto inside = [](const Rect& a, const Rect& b)
+		{
+			return a.x >= b.x && a.y >= b.y && a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h;
+		};
+		for (const auto& button : { menu.learnButton, menu.closeButton, menu.upButton, menu.downButton,
+			menu.previousDetails, menu.nextDetails, menu.previousGroup, menu.nextGroup })
+			if (button->visible && (button->rect.w < 44 || button->rect.h < 44 || !inside(button->rect, menu.panel))) return false;
+		for (const auto& button : menu.nodeButtons)
+			if (button->visible && (button->rect.w < 44 || button->rect.h < 44 || !inside(button->rect, menu.chart))) return false;
+		return menu.chart.y + menu.chart.h <= menu.learnButton->rect.y
+			&& menu.details.y + menu.details.h <= menu.learnButton->rect.y;
+	}
+	static void drawTree(SkillTreeMenu& menu) { menu.drawSelf(); }
+	static void drawMenu(Element& menu) { menu.drawSelf(); }
+	static SDL_Renderer* exchangeRenderer(SDL_Renderer* value) { return Engine::renderer.exchange(value); }
+	static Point logicalSize() { return { Engine::getInstance()->EngineBase::width, Engine::getInstance()->EngineBase::height }; }
+	static void logicalSize(Point size) { Engine::getInstance()->EngineBase::width = size.x; Engine::getInstance()->EngineBase::height = size.y; }
+	static std::size_t paperPage(const PaperMenu& paper) { return paper.pageIndex; }
+	static std::size_t paperPageCount(const PaperMenu& paper) { return paper.pages.size(); }
+	static Rect paperButton(const PaperMenu& paper, int index)
+	{
+		return index == 0 ? paper.previousButton->rect
+			: (index == 1 ? paper.nextButton->rect : paper.closeButton->rect);
+	}
+	static void resizePaper(PaperMenu& paper, int width, int height) { paper.layout(width, height); }
+	static std::string paperText(const PaperMenu& paper)
+	{
+		std::string result;
+		for (const auto& page : paper.pages)
+			for (const auto& line : page.lines)
+				for (const auto& run : line) result += run.text;
+		return result;
+	}
+	static bool paperContentFits(const PaperMenu& paper)
+	{
+		for (const auto& page : paper.pages)
+			if (page.lines.size() * paper.lineHeight > static_cast<std::size_t>(paper.contentRect.h)) return false;
+		for (const auto& button : { paper.previousButton, paper.nextButton, paper.closeButton })
+			if (button->rect.h < 44 || button->rect.x < 0 || button->rect.y < 0
+				|| button->rect.x + button->rect.w > paper.rect.w
+				|| button->rect.y + button->rect.h > paper.rect.h) return false;
+		return paper.contentRect.y + paper.contentRect.h <= paper.previousButton->rect.y;
+	}
+
 	static void advanceActorFrame(Element& element, UTime elapsed)
 	{
 		element.setTime(element.getTime() + elapsed);
@@ -2448,6 +2535,64 @@ bool runMovementAndAttackTests()
 		"combat Shift-mouse run did not resume at the exact stamina cost") && ok;
 	player.fightState.set(false);
 	player.thew = 100;
+	controller.joystickPanel = std::make_shared<JoystickPanel>();
+	controller.addChild(controller.joystickPanel);
+	auto movementPanel = controller.joystickPanel;
+	movementPanel->removeAllChild();
+	movementPanel->rect = { 0, 0, 640, 480 };
+	auto joystick = std::make_shared<Joystick>();
+	joystick->rect = { 350, 100, 100, 100 };
+	joystick->setRange(100);
+	movementPanel->joystick = joystick;
+	movementPanel->addChild(joystick);
+	controller.skillPanel = std::make_shared<SkillsPanel>();
+	controller.addChild(controller.skillPanel);
+	controller.setTouchControlsVisible(true);
+	GamepadWorldRuntimeTestAccess::arrangeChildren(controller);
+	GamepadWorldRuntimeTestAccess::dispatchElementEvents(controller);
+	constexpr EventTouchID movementFinger = 9193;
+	for (bool useThewWhenNormalRun : { false, true })
+	{
+		ResourceManifest runPolicy;
+		runPolicy.features["usethewwhennormalrun"] = useThewWhenNormalRun;
+		gameManager.global.applyResourceManifestFeatures(runPolicy);
+		for (bool fighting : { false, true })
+		{
+			player.fightState.set(fighting);
+			player.thew = 0;
+			const auto expectedAction = !useThewWhenNormalRun && !fighting ? acARun : acAWalk;
+			player.nextAction.reset();
+			GamepadWorldRuntimeTestAccess::move(controller, 1.0f, 0.0f, 1.0f, true);
+			ok = check(player.nextAction != nullptr && player.nextAction->action == expectedAction,
+				"controller running uses the resource's normal/combat stamina policy") && ok;
+			player.nextAction.reset();
+			GamepadWorldRuntimeTestAccess::moveWithLegacyKeyboard(controller, false, false, false, true, true);
+			ok = check(player.nextAction != nullptr && player.nextAction->action == expectedAction,
+				"Shift-key running uses the resource's normal/combat stamina policy") && ok;
+			player.nextAction.reset();
+			shiftMouseRunAction.action = acRun;
+			ok = check(GamepadWorldRuntimeTestAccess::submitLegacyWorldAction(controller, shiftMouseRunAction)
+				&& player.nextAction != nullptr
+				&& player.nextAction->action == (expectedAction == acARun ? acRun : acWalk),
+				"Shift-mouse running uses the resource's normal/combat stamina policy") && ok;
+			player.nextAction.reset();
+			dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, movementFinger, 400, 150, false));
+			dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, movementFinger, 450, 150, false));
+			ok = check(joystick->isRunning() && player.nextAction != nullptr && player.nextAction->action == expectedAction,
+				"touch joystick running uses the resource's normal/combat stamina policy: use="
+					+ std::to_string(useThewWhenNormalRun) + " fight=" + std::to_string(fighting)
+					+ " run=" + std::to_string(joystick->isRunning()) + " action="
+					+ std::to_string(player.nextAction != nullptr ? static_cast<int>(player.nextAction->action) : -1)) && ok;
+			dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERCANCEL, movementFinger, 450, 150, false));
+		}
+	}
+	controller.removeChild(controller.joystickPanel);
+	controller.joystickPanel.reset();
+	controller.removeChild(controller.skillPanel);
+	controller.skillPanel.reset();
+	gameManager.global.applyResourceManifestFeatures(ResourceManifest::createDefault(""));
+	player.fightState.set(false);
+	player.thew = 100;
 	player.res.arun.imagePackage.reset();
 	player.nextAction = nullptr;
 	GamepadWorldRuntimeTestAccess::move(
@@ -3522,6 +3667,734 @@ bool runQuickItemAndSitTests()
 	return ok;
 }
 
+bool runFriendlySupportInputTests()
+{
+	VirtualGamepadTest::SDLSession sdlSession;
+	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Friendly Support Pad");
+	GamepadWorldFixture fixture;
+	auto& game = fixture.gameManager;
+	auto& controller = *game.controller;
+	auto& player = *game.player;
+	auto& input = GamepadWorldRuntimeTestAccess::inputManager();
+	HeadlessPhysicalInputTest::ScopedPhysicalInputManager inputScope(input);
+	if (!check(inputScope.isInitialized(), "support input fixture initializes physical input")) return false;
+	auto friendly = fixture.addHeadlessPointerNPC({ 22, 20 }, "support friend");
+	friendly->scriptFile.clear();
+	attachHeadlessWorldPointerTarget(game.npcManager, friendly, { 50, 50, 30, 30 });
+	friendly->kind = nkPartner;
+	friendly->life = 30;
+	auto neutral = fixture.addNPC({ 21, 20 }, "neutral follower", "");
+	neutral->kind = nkPartner;
+	neutral->relation = nrNeutral;
+	neutral->life = 30;
+	auto enemy = fixture.addNPC({ 23, 20 }, "support enemy", "");
+	enemy->kind = nkBattle;
+	enemy->relation = nrHostile;
+	enemy->life = 30;
+	auto& info = game.magicManager.magicList[game.magicManager.bottomIndex(0)];
+	info.iniFile = "support-input.ini";
+	info.magic = std::make_shared<Magic>();
+	info.level = 1;
+	info.magic->level[1].moveKind = mmkSelf;
+	info.magic->level[1].specialKind = mskAddLife;
+	std::uint64_t now = SDL_GetTicks();
+	runControllerInputFrame(controller, input, now);
+	tapButtonThroughController(gamepad, SDL_GAMEPAD_BUTTON_MISC1, controller, input, now);
+	setButtonAndRunControllerFrame(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, true, controller, input, now);
+	pulseTriggerThroughController(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, controller, input, now);
+	bool ok = check(controller.getFriendlyMagicTarget() == friendly
+		&& GamepadWorldRuntimeTestAccess::focusedTarget(controller) == nullptr,
+		"RB+LT selects an unscripted friendly partner without changing interaction focus");
+	setButtonAndRunControllerFrame(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, false, controller, input, now);
+	ok = check(player.nextAction == nullptr, "RB release after support selection does not queue an interaction") && ok;
+	pulseTriggerThroughController(gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER, controller, input, now);
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == friendly
+		&& player.nextAction->requiresFriendlyMagicTarget,
+		"a real controller skill event retains its selected friendly recipient") && ok;
+	player.nextAction.reset();
+	setButtonAndRunControllerFrame(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, true, controller, input, now);
+	pulseTriggerThroughController(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, controller, input, now);
+	ok = check(controller.getFriendlyMagicTarget() == game.player,
+		"cycling past the last friendly recipient explicitly selects self") && ok;
+	pulseTriggerThroughController(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, controller, input, now);
+	ok = check(controller.getFriendlyMagicTarget() == friendly,
+		"cycling from self returns to the nearby friendly recipient") && ok;
+	setButtonAndRunControllerFrame(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER, false, controller, input, now);
+	GameInput::GamepadAxisState aim;
+	aim.rightStick = { 1.0f, 0.0f, 1.0f };
+	GamepadWorldRuntimeTestAccess::dispatch(controller, GameInput::InputAction::CastSkill1, aim);
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == friendly,
+		"right-stick support aim chooses the friendly target instead of a nearer neutral or enemy") && ok;
+	player.nextAction.reset();
+	friendly->life = 0;
+	ok = check(controller.getFriendlyMagicTarget() == nullptr,
+		"an invalid controller support recipient is no longer previewed") && ok;
+	GamepadWorldRuntimeTestAccess::dispatch(controller, GameInput::InputAction::CastSkill1);
+	ok = check(player.nextAction == nullptr,
+		"losing an explicitly selected controller recipient cancels instead of healing self") && ok;
+	player.nextAction.reset();
+	friendly->life = 30;
+	game.npcManager->clickIndex = 0;
+	GamepadWorldRuntimeTestAccess::handleLegacyEvent(controller, AEvent(ET_KEYDOWN, KEY_A, 0, 0, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == friendly
+		&& player.nextAction->requiresFriendlyMagicTarget,
+		"the desktop skill key captures the hovered friendly recipient") && ok;
+	player.nextAction.reset();
+	dispatchPointerEventThroughElementTree(game, AEvent(ET_MOUSEDOWN, MBC_MOUSE_RIGHT, 60, 60, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == friendly,
+		"desktop right-click reuses the selected support skill and friendly recipient") && ok;
+	dispatchPointerEventThroughElementTree(game, AEvent(ET_MOUSEUP, MBC_MOUSE_RIGHT, 60, 60, false));
+	player.nextAction.reset();
+	friendly->scriptFileRight = "support-right-script.lua";
+	dispatchPointerEventThroughElementTree(game, AEvent(ET_MOUSEDOWN, MBC_MOUSE_RIGHT, 60, 60, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->destKind == ndTalk
+		&& player.nextAction->useRightScript,
+		"an NPC's dedicated right-click story retains priority over the support shortcut") && ok;
+	dispatchPointerEventThroughElementTree(game, AEvent(ET_MOUSEUP, MBC_MOUSE_RIGHT, 60, 60, false));
+	friendly->scriptFileRight.clear();
+	player.nextAction.reset();
+
+	controller.skillPanel = std::make_shared<SkillsPanel>();
+	controller.addChild(controller.skillPanel);
+	auto panel = controller.skillPanel;
+	controller.setTouchControlsVisible(true);
+	panel->removeAllChild();
+	panel->rect = { 0, 0, 640, 480 };
+	auto button = std::make_shared<DragRoundButton>();
+	button->rect = { 100, 100, 80, 80 };
+	button->setRange(80);
+	panel->skillBtn[0] = button;
+	panel->addChild(button);
+	panel->resetInput();
+	GamepadWorldRuntimeTestAccess::arrangeChildren(controller);
+	constexpr EventTouchID finger = 9191;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 140, 140, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->action == acMagic
+		&& player.nextAction->destGE.expired() && !player.nextAction->requiresFriendlyMagicTarget,
+		"tapping a touch support skill uses self even when a friendly actor is hovered") && ok;
+	player.nextAction.reset();
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	ok = check(controller.getFriendlyMagicTarget() == friendly,
+		"touch support drag previews the friendly recipient") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 260, 140, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == friendly
+		&& player.nextAction->requiresFriendlyMagicTarget,
+		"releasing the touch support drag commits the previewed recipient") && ok;
+	player.nextAction.reset();
+	auto alternative = fixture.addNPC({ 24, 20 }, "other support friend", "");
+	alternative->kind = nkPartner;
+	alternative->life = 30;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	ok = check(controller.getFriendlyMagicTarget() == friendly,
+		"a new support drag initially previews the nearest friendly actor") && ok;
+	friendly->setPosition({ 26, 20 });
+	alternative->setPosition({ 21, 20 });
+	ok = check(controller.getFriendlyMagicTarget() == friendly,
+		"moving actors do not replace the recipient while the support aim is held still") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 260, 140, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == friendly,
+		"touch release keeps the previewed recipient when a different friend becomes nearer") && ok;
+	player.nextAction.reset();
+	friendly->setPosition({ 22, 20 });
+	alternative->setPosition({ 24, 20 });
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	friendly->setPosition({ 26, 20 });
+	alternative->setPosition({ 21, 20 });
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 145, false));
+	ok = check(controller.getFriendlyMagicTarget() == alternative,
+		"steering an existing support drag can deliberately select a different friend") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 260, 145, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->destGE.lock() == alternative,
+		"touch release commits a deliberately changed support preview") && ok;
+	player.nextAction.reset();
+	friendly->setPosition({ 22, 20 });
+	alternative->setPosition({ 24, 20 });
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	ok = check(controller.getFriendlyMagicTarget() == friendly,
+		"a support drag records its recipient before target invalidation") && ok;
+	friendly->life = 0;
+	ok = check(controller.getFriendlyMagicTarget() == nullptr,
+		"an invalid touch recipient disappears without selecting a different friend") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 260, 140, false));
+	ok = check(player.nextAction == nullptr,
+		"touch release cancels when its previewed recipient died") && ok;
+	player.nextAction.reset();
+	friendly->life = 30;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 140, 140, false));
+	ok = check(player.nextAction == nullptr, "returning a support drag to its button cancels the cast") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERCANCEL, finger, 260, 140, false));
+	ok = check(player.nextAction == nullptr && controller.getFriendlyMagicTarget() == nullptr,
+		"touch cancellation discards the support preview without committing a cast") && ok;
+	controller.joystickPanel = std::make_shared<JoystickPanel>();
+	controller.addChild(controller.joystickPanel);
+	auto movementPanel = controller.joystickPanel;
+	movementPanel->removeAllChild();
+	movementPanel->rect = { 0, 0, 640, 480 };
+	auto joystick = std::make_shared<Joystick>();
+	joystick->rect = { 350, 100, 100, 100 };
+	joystick->setRange(100);
+	movementPanel->joystick = joystick;
+	movementPanel->addChild(joystick);
+	GamepadWorldRuntimeTestAccess::arrangeChildren(controller);
+	constexpr EventTouchID movementFinger = 9192;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, movementFinger, 400, 150, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, movementFinger, 450, 150, false));
+	ok = check(joystick->isRunning() && player.nextAction != nullptr && player.nextAction->action == acARun,
+		"one finger can hold the movement joystick while preparing a support skill") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERDOWN, finger, 140, 140, false));
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERMOTION, finger, 260, 140, false));
+	ok = check(controller.getFriendlyMagicTarget() == friendly
+		&& joystick->hasPointerDownInTree(movementFinger),
+		"a second finger previews support without releasing movement ownership") && ok;
+	player.setPosition({ 20, 21 });
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERUP, finger, 260, 140, false));
+	ok = check(player.nextAction != nullptr && player.nextAction->action == acMagic
+		&& player.nextAction->destGE.lock() == friendly && joystick->hasPointerDownInTree(movementFinger),
+		"support release during movement preserves its recipient and the other finger") && ok;
+	dispatchPointerEventThroughElementTree(controller, AEvent(ET_FINGERCANCEL, movementFinger, 450, 150, false));
+	player.nextAction.reset();
+	player.setPosition({ 20, 20 });
+	controller.cancelControllerWorldInteraction();
+	ok = check(controller.getFriendlyMagicTarget() == nullptr,
+		"world input cancellation clears the retained support recipient") && ok;
+	return ok;
+}
+
+bool runAttributePointInputTests()
+{
+	VirtualGamepadTest::SDLSession sdlSession;
+	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Attribute Points Pad");
+	const auto root = makeUniqueTestDirectory("jxqy_attribute_input");
+	std::filesystem::create_directories(root / "ini/other");
+	std::filesystem::create_directories(root / "state");
+	{
+		std::ofstream file(root / "ini/other/Point.ini", std::ios::binary);
+		file << "[Init]\nEnable=1\nTotalRatio=10\nLifeRatio=10\nThewRatio=10\nManaRatio=10\n"
+			"AttackRatio=2\nDefendRatio=2\nEvadeRatio=2\nCritChanceRatio=0.05\nCritDamageRatio=1\n";
+	}
+	File::setActiveResourceRoot(root.u8string());
+	File::setResourceFallbackRoots({});
+	File::setPlatformStateParentForTests((root / "state").u8string());
+	const auto assets = std::filesystem::u8path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	File::setUiResourceFallbackRoots({ (assets / "yycs").u8string() }, true, (assets / "common").u8string());
+	const bool previousTheme = Config::useQingyuUi;
+	Config::useQingyuUi = true;
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (initializeTtf && !TTF_Init()) return false;
+	auto canvas = make_shared_surface(SDL_CreateSurface(1280, 720, SDL_PIXELFORMAT_RGBA32));
+	auto* renderer = SDL_CreateSoftwareRenderer(canvas.get());
+	if (!renderer) return false;
+	auto* previousRenderer = GamepadWorldRuntimeTestAccess::exchangeRenderer(renderer);
+	const Point previousSize = GamepadWorldRuntimeTestAccess::logicalSize();
+	GamepadWorldRuntimeTestAccess::logicalSize({800, 600});
+	auto* engine = Engine::getInstance();
+	engine->setFontName((assets / "engine/font/font.ttf").u8string());
+	bool ok = true;
+	{
+		GamepadWorldFixture fixture;
+		auto& game = fixture.gameManager;
+		auto& menu = *game.menu;
+		game.global.feature.qingyuUi = true;
+		game.global.feature.stateEquipIntegratedLayout = false;
+		game.global.loadUiSettings();
+		game.global.data.characterIndex = 1;
+		game.player->attributePoints.available = 10;
+		game.player->skillPoints = 2;
+		game.player->lifeMax = 200; game.player->manaMax = game.player->thewMax = 100;
+		game.player->calInfo();
+		menu.stateMenu = std::make_shared<StateMenu>();
+		menu.stateMenu->visible = true;
+		menu.addChild(menu.stateMenu);
+		ok = check(menu.stateMenu->activateControllerFocus(ControllerFocusTarget::Default), "state panel focuses its allocation entrance") && ok;
+		auto entrance = menu.stateMenu->controllerFocusedElement();
+		const auto captureEntrance = [&](Element& panel, const char* filename)
+		{
+			if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+			{
+				std::filesystem::create_directories(std::filesystem::u8path(directory));
+				engine->renderClear(13, 20, 24, 255);
+				GamepadWorldRuntimeTestAccess::drawMenu(panel);
+				auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+				const auto path = std::filesystem::u8path(directory) / filename;
+				ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()), "capture allocation entrance in its actual character panel") && ok;
+			}
+		};
+		captureEntrance(*menu.stateMenu, "attribute-points-state-entrance.png");
+		menu.adoptControllerPointerFocus(menu.stateMenu, entrance);
+		auto& input = GamepadWorldRuntimeTestAccess::inputManager();
+		HeadlessPhysicalInputTest::ScopedPhysicalInputManager inputScope(input);
+		auto uiRoot = std::make_shared<HeadlessGamepadUIRoot>(game);
+		HeadlessPhysicalInputTest::ScopedRunningOwner runningOwner(uiRoot);
+		std::uint64_t milliseconds = SDL_GetTicks();
+		HeadlessPhysicalInputTest::FrameDriver driver(input, milliseconds,
+			[]() { return dispatchPhysicalUIActions(Engine::getInstance()); }, [&]() { game.controller->processPhysicalInputFrame(); });
+		driver.runFrame(); driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_MISC1);
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+		ok = check(menu.attributePointMenu && menu.attributePointMenu->visible, "physical confirm opens allocation through the state panel") && ok;
+		if (menu.attributePointMenu && menu.attributePointMenu->visible)
+		{
+		auto allocation = menu.attributePointMenu;
+		GamepadWorldRuntimeTestAccess::arrangeChildren(game);
+		ok = check(menu.blocksWorldInput() && menu.blocksWorldKeyboardInput() && menu.blocksWorldPointerInput(), "allocation owns every world-input channel") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+		ok = check(GamepadWorldRuntimeTestAccess::pendingAttributes(*allocation) == 2
+			&& game.player->attributePoints.available == 10 && game.player->lifeMax == 200, "D-pad changes only uncommitted allocation") && ok;
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_RETURN, 0, 0, true));
+		ok = check(game.player->attributePoints.available == 10, "a repeated keyboard confirm cannot spend pending points") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_WEST);
+		ok = check(GamepadWorldRuntimeTestAccess::pendingAttributes(*allocation) == 0 && game.player->attributePoints.available == 10, "physical secondary undoes only the pending allocation") && ok;
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_DOWN, 0, 0, false));
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_RIGHT, 0, 0, false));
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_RETURN, 0, 0, false));
+		ok = check(game.player->manaMax == 110 && game.player->attributePoints.available == 9 && game.player->skillPoints == 2,
+			"keyboard allocation commits the selected real attribute without spending skill points") && ok;
+		const auto tap = [&](const Rect& r) { dispatchPointerTapThroughElementTree(game, r.x + 10, r.y + 10); };
+		constexpr EventTouchID finger = 7728;
+		const auto touch = [&](const Rect& r)
+		{
+			dispatchPointerEventsThroughElementTree(game, { AEvent(ET_FINGERDOWN, finger, r.x + 10, r.y + 10, false),
+				AEvent(ET_FINGERUP, finger, r.x + 10, r.y + 10, false) });
+		};
+		tap(GamepadWorldRuntimeTestAccess::attributeAdjust(*allocation, 0));
+		const Rect submit = GamepadWorldRuntimeTestAccess::attributeAction(*allocation, 0);
+		dispatchPointerEventsThroughElementTree(game, { AEvent(ET_FINGERDOWN, finger, submit.x + 10, submit.y + 10, false),
+			AEvent(ET_FINGERCANCEL, finger, submit.x + 10, submit.y + 10, false), AEvent(ET_FINGERUP, finger, submit.x + 10, submit.y + 10, false) });
+		ok = check(game.player->attributePoints.available == 9, "cancelled touch does not commit a preview") && ok;
+		tap(submit);
+		ok = check(game.player->attributePoints.available == 8 && game.player->lifeMax == 210, "mouse plus and submit use the common allocation backend") && ok;
+		touch(GamepadWorldRuntimeTestAccess::attributeAdjust(*allocation, 1));
+		touch(GamepadWorldRuntimeTestAccess::attributeAdjust(*allocation, 1));
+		touch(GamepadWorldRuntimeTestAccess::attributeAdjust(*allocation, 1, false));
+		ok = check(GamepadWorldRuntimeTestAccess::pendingAttributes(*allocation) == 1, "touch minus can remove only an uncommitted point") && ok;
+		touch(GamepadWorldRuntimeTestAccess::attributeAction(*allocation, 1));
+		ok = check(GamepadWorldRuntimeTestAccess::pendingAttributes(*allocation) == 0 && game.player->attributePoints.available == 8, "touch reset preserves committed stats and balance") && ok;
+		for (const Point size : { Point{1280,720}, Point{800,480}, Point{400,360}, Point{320,480} })
+		{
+			GamepadWorldRuntimeTestAccess::logicalSize(size);
+			GamepadWorldRuntimeTestAccess::resizeAttributes(*allocation, size.x, size.y);
+			ok = check(GamepadWorldRuntimeTestAccess::attributeLayoutFits(*allocation), "allocation controls fit wide and narrow viewports with 44-pixel targets") && ok;
+			engine->renderClear(0,0,0,255);
+			GamepadWorldRuntimeTestAccess::drawMenu(*allocation);
+			if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+			{
+				std::filesystem::create_directories(std::filesystem::u8path(directory));
+				SDL_Rect crop{0,0,size.x,size.y}; auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, &crop));
+				const auto path = std::filesystem::u8path(directory) / ("attribute-points-" + std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+				ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()), "capture actual allocation composition") && ok;
+			}
+		}
+		GamepadWorldRuntimeTestAccess::resizeAttributes(*allocation, 400, 360);
+		for (int page = 0; page < 3; ++page) touch(GamepadWorldRuntimeTestAccess::attributeAction(*allocation, 3));
+		ok = check(GamepadWorldRuntimeTestAccess::firstAttributeRow(*allocation) == 6, "touch paging reaches the final two attributes on the smallest viewport") && ok;
+		touch(GamepadWorldRuntimeTestAccess::attributeAdjust(*allocation, 7));
+		touch(GamepadWorldRuntimeTestAccess::attributeAction(*allocation, 0));
+		ok = check(game.player->attributePoints.criticalDamageBonus == 1 && game.player->attributePoints.available == 7, "touch can allocate the last attribute through the same backend") && ok;
+		driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFTX, SDL_JOYSTICK_AXIS_MAX);
+		ok = check(game.player->nextAction == nullptr, "movement stays blocked while allocation is active") && ok;
+		driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFTX, 0);
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_EAST);
+		ok = check(!allocation->visible && menu.stateMenu->isControllerFocusActive(), "closing restores the originating state-panel focus") && ok;
+		GamepadWorldRuntimeTestAccess::logicalSize({800,600});
+		driver.runFrame(); driver.runFrame();
+		tap(entrance->rect);
+		ok = check(allocation->visible, "mouse reopens the actual state-panel entrance") && ok;
+		touch(GamepadWorldRuntimeTestAccess::attributeAction(*allocation, 2));
+		touch(entrance->rect);
+		ok = check(allocation->visible, "touch reopens the same state-panel entrance") && ok;
+		menu.handleUIAction(UIAction::NavigateRight);
+		game.global.data.characterIndex = 2;
+		menu.handleUIAction(UIAction::Confirm);
+		ok = check(!allocation->visible && game.player->attributePoints.available == 7, "role changes between preview and confirm cannot charge a new character") && ok;
+		game.global.data.characterIndex = 1;
+		menu.openAttributePoints(menu.stateMenu, entrance);
+		game.inEvent = true;
+		GamepadWorldRuntimeTestAccess::advanceActorFrame(*allocation, 0);
+		ok = check(!allocation->visible, "script takeover discards pending allocation") && ok;
+		game.inEvent = false;
+		menu.stateMenu->visible = false;
+		game.global.feature.stateEquipIntegratedLayout = true;
+		menu.equipMenu = std::make_shared<EquipMenu>(); menu.equipMenu->visible = true; menu.addChild(menu.equipMenu);
+		menu.equipMenu->showAttributes(true);
+		ok = check(menu.equipMenu->isShowingAttributes() && menu.equipMenu->focusControllerEquipment(), "integrated character panel exposes an allocation focus target") && ok;
+		GamepadWorldRuntimeTestAccess::arrangeChildren(game);
+		captureEntrance(*menu.equipMenu, "attribute-points-equip-entrance.png");
+		menu.adoptControllerPointerFocus(menu.equipMenu, menu.equipMenu->controllerFocusedElement());
+		driver.runFrame(); driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+		ok = check(allocation->visible, "physical confirm also opens the integrated panel entrance") && ok;
+		menu.clearMenu();
+		ok = check(!allocation->visible && !menu.blocksWorldInput(), "clearing menus discards allocation and world-input ownership") && ok;
+		}
+	}
+	Config::useQingyuUi = previousTheme; File::setUiResourceFallbackRoots({});
+	BaseComponent resourceCache; resourceCache.tryCleanRes(); engine->setFontName("");
+	GamepadWorldRuntimeTestAccess::logicalSize(previousSize); GamepadWorldRuntimeTestAccess::exchangeRenderer(previousRenderer);
+	SDL_DestroyRenderer(renderer); if (initializeTtf) TTF_Quit();
+	File::setPlatformStateParentForTests("");
+	std::error_code error; std::filesystem::remove_all(root, error);
+	return ok;
+}
+
+bool runSkillTreeInputTests()
+{
+	const auto root = makeUniqueTestDirectory("jxqy_skill_tree_input");
+	std::filesystem::create_directories(root / "ini/other");
+	std::filesystem::create_directories(root / "ini/magic");
+	std::filesystem::create_directories(root / "state");
+	const auto write = [&](const std::filesystem::path& path, const std::string& text)
+	{
+		std::ofstream out(root / path, std::ios::binary);
+		out << text;
+		return out.good();
+	};
+	std::ifstream source(std::filesystem::u8path(__FILE__).parent_path() / "fixtures/mg-yuemeier-skilltree.json", std::ios::binary);
+	const std::string json((std::istreambuf_iterator<char>(source)), std::istreambuf_iterator<char>());
+	SkillTree definition;
+	std::string reason;
+	if (!check(definition.parse(json, reason), "read actual seven-node UI definition")) return false;
+	write("ini/other/Skill.ini", "[Init]\nTreeEnable=1\n[TreeFiles]\n1=ini/other/skilltree1.json\n");
+	write("ini/other/skilltree1.json", json);
+	for (const auto& node : definition.nodes)
+	{
+		std::string title = node.magicFile.substr(std::string("player-magic-").size());
+		title.resize(title.size() - 4);
+		write(std::filesystem::path("ini/magic") / std::filesystem::u8path(node.magicFile),
+			"[Init]\nName=" + title + u8"\nIntro=测试说明：学习前查看等级和前置技能。<enter>"
+			+ u8"这是用于检查完整分页和颜色文字的隔离界面夹具。<color=Red>学习需要一个技能点。<color=Black>\n"
+			+ "[Level1]\nLevelupExp=200\n[Level2]\nLevelupExp=800\n[Level3]\n");
+	}
+	File::setAssetsCollectionRoot((root / "assets").u8string());
+	File::setActiveResourceRoot(root.u8string());
+	File::setResourceFallbackRoots({});
+	File::setPlatformStateParentForTests((root / "state").u8string());
+	VirtualGamepadTest::SDLSession sdlSession;
+	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Skill Tree Pad");
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (initializeTtf && !TTF_Init()) return check(false, "initialize skill tree text renderer");
+	auto surface = make_shared_surface(SDL_CreateSurface(1280, 720, SDL_PIXELFORMAT_ARGB8888));
+	auto* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+	if (!check(renderer != nullptr, "create skill tree software renderer")) return false;
+	auto* previousRenderer = GamepadWorldRuntimeTestAccess::exchangeRenderer(renderer);
+	const Point previousSize = GamepadWorldRuntimeTestAccess::logicalSize();
+	GamepadWorldRuntimeTestAccess::logicalSize({ 800, 600 });
+	auto* engine = Engine::getInstance();
+	const auto assets = std::filesystem::u8path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	engine->setFontName((assets / "engine/font/font.ttf").u8string());
+	const bool previousTheme = Config::useQingyuUi;
+	Config::useQingyuUi = true;
+	File::setUiResourceFallbackRoots({ (assets / "yycs").u8string() }, true, (assets / "common").u8string());
+	bool ok = true;
+	{
+		GamepadWorldFixture fixture;
+		auto& game = fixture.gameManager;
+		auto& menu = *game.menu;
+		game.global.feature.qingyuUi = true;
+		game.global.loadUiSettings();
+		game.magicManager.configureLayout();
+		game.global.data.characterIndex = 1;
+		game.player->level = 4;
+		game.player->skillPoints = 5;
+		ok = check(game.magicManager.loadSkillTree(1), "load the incoming character's tree for UI") && ok;
+		menu.magicMenu = std::make_shared<MagicMenu>();
+		menu.magicMenu->visible = true;
+		menu.addChild(menu.magicMenu);
+		ok = check(menu.magicMenu->focusControllerDefault(), "empty magic menu focuses its skill-tree entrance") && ok;
+		auto entrance = menu.magicMenu->controllerFocusedElement();
+		if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+		{
+			std::filesystem::create_directories(std::filesystem::u8path(directory));
+			engine->renderClear(13, 20, 24, 255);
+			GamepadWorldRuntimeTestAccess::drawMenu(*menu.magicMenu);
+			auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+			const auto file = std::filesystem::u8path(directory) / "skill-tree-menu-entrance.png";
+			ok = check(pixels && IMG_SavePNG(pixels.get(), file.u8string().c_str()), "capture the entrance with the actual Qingyu magic menu") && ok;
+		}
+		menu.adoptControllerPointerFocus(menu.magicMenu, entrance);
+		auto& input = GamepadWorldRuntimeTestAccess::inputManager();
+		HeadlessPhysicalInputTest::ScopedPhysicalInputManager inputScope(input);
+		auto uiRoot = std::make_shared<HeadlessGamepadUIRoot>(game);
+		HeadlessPhysicalInputTest::ScopedRunningOwner runningOwner(uiRoot);
+		std::uint64_t milliseconds = SDL_GetTicks();
+		HeadlessPhysicalInputTest::FrameDriver driver(input, milliseconds,
+			[]() { return dispatchPhysicalUIActions(Engine::getInstance()); },
+			[&]() { game.controller->processPhysicalInputFrame(); });
+		driver.runFrame();
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_MISC1);
+		ok = check(driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH) && menu.skillTreeMenu && menu.skillTreeMenu->visible,
+			"physical confirm opens the tree from the real magic-menu entrance") && ok;
+		if (!menu.skillTreeMenu || !menu.skillTreeMenu->visible) return false;
+		auto tree = menu.skillTreeMenu;
+		GamepadWorldRuntimeTestAccess::resizeTree(*tree, 800, 480);
+		GamepadWorldRuntimeTestAccess::arrangeChildren(game);
+		ok = check(menu.blocksWorldInput() && menu.blocksWorldKeyboardInput() && menu.blocksWorldPointerInput(),
+			"the tree owns all three world-input channels") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT);
+		ok = check(GamepadWorldRuntimeTestAccess::selectedTreeNode(*tree) == 3, "physical D-pad selects the other authored branch") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+		ok = check(GamepadWorldRuntimeTestAccess::confirmingTree(*tree) && game.player->skillPoints == 5,
+			"the first confirm previews the cost without spending points") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_EAST);
+		ok = check(tree->visible && !GamepadWorldRuntimeTestAccess::confirmingTree(*tree) && game.player->skillPoints == 5,
+			"B cancels a pending purchase while retaining the tree") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH);
+		ok = check(game.player->skillPoints == 4 && game.magicManager.skillTree().nodes[3].currentLevel == 1,
+			"physical confirmation learns the actual selected magic for exactly one point") && ok;
+		driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFTX, SDL_JOYSTICK_AXIS_MAX);
+		ok = check(game.player->nextAction == nullptr, "held movement cannot escape the skill-tree modal") && ok;
+		driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFTX, 0);
+		game.player->level = 20;
+		const auto tap = [&](const Rect& bounds)
+		{
+			dispatchPointerTapThroughElementTree(game, bounds.x + bounds.w / 2, bounds.y + bounds.h / 2);
+		};
+		tap(GamepadWorldRuntimeTestAccess::treeNode(*tree, 0));
+		tap(GamepadWorldRuntimeTestAccess::treeLearnButton(*tree));
+		constexpr EventTouchID finger = 7723;
+		const Rect learn = GamepadWorldRuntimeTestAccess::treeLearnButton(*tree);
+		dispatchPointerEventsThroughElementTree(game, { AEvent(ET_FINGERDOWN, finger, learn.x + 10, learn.y + 10, false),
+			AEvent(ET_FINGERCANCEL, finger, learn.x + 10, learn.y + 10, false),
+			AEvent(ET_FINGERUP, finger, learn.x + 10, learn.y + 10, false) });
+		ok = check(game.player->skillPoints == 4, "a cancelled touch never commits a pending purchase") && ok;
+		tap(learn);
+		ok = check(game.player->skillPoints == 3 && game.magicManager.skillTree().nodes[0].currentLevel == 1,
+			"mouse selection and the two-step learning button use the same backend") && ok;
+		const auto touch = [&](const Rect& bounds)
+		{
+			dispatchPointerEventsThroughElementTree(game,
+				{ AEvent(ET_FINGERDOWN, finger, bounds.x + 10, bounds.y + 10, false),
+				  AEvent(ET_FINGERUP, finger, bounds.x + 10, bounds.y + 10, false) });
+		};
+		touch(GamepadWorldRuntimeTestAccess::treeNode(*tree, 1));
+		touch(learn);
+		touch(learn);
+		ok = check(game.player->skillPoints == 2 && game.magicManager.skillTree().nodes[1].currentLevel == 1,
+			"touch selects the unlocked child and learns it through actual element callbacks") && ok;
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_DOWN, 0, 0, false));
+		ok = check(GamepadWorldRuntimeTestAccess::selectedTreeNode(*tree) == 2, "keyboard navigation selects the next branch node") && ok;
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_RETURN, 0, 0, false));
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_RETURN, 0, 0, true));
+		ok = check(game.player->skillPoints == 2 && GamepadWorldRuntimeTestAccess::confirmingTree(*tree),
+			"held Enter cannot turn the preview into a purchase") && ok;
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, KEY_ESCAPE, 0, 0, false));
+		ok = check(tree->visible && !GamepadWorldRuntimeTestAccess::confirmingTree(*tree) && game.player->skillPoints == 2,
+			"keyboard Escape cancels the cost confirmation without closing or spending") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_UP);
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN);
+		for (const Point size : { Point{1280, 720}, Point{800, 480}, Point{400, 360}, Point{320, 480} })
+		{
+			GamepadWorldRuntimeTestAccess::logicalSize(size);
+			GamepadWorldRuntimeTestAccess::resizeTree(*tree, size.x, size.y);
+			ok = check(GamepadWorldRuntimeTestAccess::treeLayoutFits(*tree), "tree controls fit wide and compact viewports with touch-sized targets") && ok;
+			engine->renderClear(0, 0, 0, 255);
+			GamepadWorldRuntimeTestAccess::drawTree(*tree);
+			if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+			{
+				std::filesystem::create_directories(std::filesystem::u8path(directory));
+				SDL_Rect crop = { 0, 0, size.x, size.y };
+				auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, &crop));
+				const auto file = std::filesystem::u8path(directory) / ("skill-tree-" + std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+				ok = check(pixels && IMG_SavePNG(pixels.get(), file.u8string().c_str()), "capture the composed tree, controls and text") && ok;
+			}
+		}
+		GamepadWorldRuntimeTestAccess::resizeTree(*tree, 400, 360);
+		menu.handleUIAction(UIAction::NavigateUp);
+		menu.handleUIAction(UIAction::NavigateUp);
+		std::vector<bool> visibleNodes(7, false);
+		for (int scroll = 0; scroll < 12; ++scroll)
+		{
+			GamepadWorldRuntimeTestAccess::noteVisibleTreeNodes(*tree, visibleNodes);
+			touch(GamepadWorldRuntimeTestAccess::treeScrollButton(*tree));
+		}
+		ok = check(std::all_of(visibleNodes.begin(), visibleNodes.end(), [](bool visited) { return visited; }),
+			"touch scrolling can expose every authored node even in the smallest viewport") && ok;
+		touch(GamepadWorldRuntimeTestAccess::treeScrollButton(*tree));
+		ok = check(GamepadWorldRuntimeTestAccess::treeScroll(*tree) > 0, "touch scrolling exposes nodes outside a compact viewport") && ok;
+		menu.handleUIAction(UIAction::PageNext);
+		ok = check(GamepadWorldRuntimeTestAccess::treeDetailPage(*tree) == 1, "long skill information remains available on following pages") && ok;
+		dispatchPointerEventThroughElementTree(game, AEvent(ET_KEYDOWN, SDL_SCANCODE_PAGEUP, 0, 0, false));
+		ok = check(GamepadWorldRuntimeTestAccess::treeDetailPage(*tree) == 0, "PageUp returns to the first conditions page") && ok;
+		menu.handleUIAction(UIAction::Cancel);
+		ok = check(!tree->visible && !menu.blocksWorldPointerInput()
+			&& menu.magicMenu->isControllerFocusActive() && game.player->nextAction == nullptr,
+			"closing restores the magic menu focus without releasing a world action") && ok;
+		GamepadWorldRuntimeTestAccess::logicalSize({ 800, 600 });
+		driver.runFrame();
+		driver.runFrame();
+		tap(entrance->rect);
+		ok = check(tree->visible, "mouse can reopen the skill tree through the actual menu entrance") && ok;
+		menu.handleUIAction(UIAction::Cancel);
+		touch(entrance->rect);
+		ok = check(tree->visible, "touch can open the same magic-menu entrance") && ok;
+		menu.clearMenu();
+		ok = check(!tree->visible && !menu.blocksWorldInput(), "menu lifecycle closes the tree and restores world input") && ok;
+		menu.openSkillTree();
+		menu.handleUIAction(UIAction::Confirm);
+		const int beforeRoleChange = game.player->skillPoints;
+		game.global.data.characterIndex = 2;
+		menu.handleUIAction(UIAction::Confirm);
+		ok = check(!tree->visible && game.player->skillPoints == beforeRoleChange,
+			"changing character between preview and confirm cancels the old purchase") && ok;
+		game.global.data.characterIndex = 1;
+		const std::string grouped = u8"{\"Groups\":[{\"GroupId\":0,\"GroupName\":\"分支甲\",\"Nodes\":["
+			u8"{\"Id\":\"a\",\"SkillFile\":\"player-magic-冰心仙子.ini\"}]},{\"GroupId\":1,\"GroupName\":\"分支乙\",\"Nodes\":["
+			u8"{\"Id\":\"b\",\"SkillFile\":\"player-magic-清心咒.ini\"}]}]}";
+		write("ini/other/skilltree1.json", grouped);
+		ok = check(game.magicManager.loadSkillTree(1) && menu.openSkillTree(), "open an explicit two-group definition") && ok;
+		driver.runFrame();
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER);
+		ok = check(GamepadWorldRuntimeTestAccess::selectedTreeNode(*tree) == 1,
+			"right shoulder selects the next authored group") && ok;
+		driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_LEFT_SHOULDER);
+		GamepadWorldRuntimeTestAccess::resizeTree(*tree, 320, 480);
+		ok = check(GamepadWorldRuntimeTestAccess::selectedTreeNode(*tree) == 0
+			&& GamepadWorldRuntimeTestAccess::treeLayoutFits(*tree),
+			"left shoulder returns to the previous group and compact group controls still fit") && ok;
+		game.inEvent = true;
+		GamepadWorldRuntimeTestAccess::advanceActorFrame(*tree, 0);
+		ok = check(!tree->visible, "a script taking input closes an existing tree before further learning") && ok;
+		ok = check(!menu.openSkillTree(), "script-owned input cannot open a learning modal") && ok;
+	}
+	Config::useQingyuUi = previousTheme;
+	File::setUiResourceFallbackRoots({});
+	BaseComponent resourceCache;
+	resourceCache.tryCleanRes();
+	engine->setFontName("");
+	GamepadWorldRuntimeTestAccess::logicalSize(previousSize);
+	GamepadWorldRuntimeTestAccess::exchangeRenderer(previousRenderer);
+	SDL_DestroyRenderer(renderer);
+	if (initializeTtf) TTF_Quit();
+	File::setPlatformStateParentForTests("");
+	std::error_code error;
+	std::filesystem::remove_all(root, error);
+	return ok;
+}
+
+bool runPaperInputTests()
+{
+	VirtualGamepadTest::SDLSession sdlSession;
+	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Paper Reader Pad");
+	GamepadWorldFixture fixture;
+	auto& gameManager = fixture.gameManager;
+	auto& menu = *gameManager.menu;
+	auto& input = GamepadWorldRuntimeTestAccess::inputManager();
+	HeadlessPhysicalInputTest::ScopedPhysicalInputManager inputScope(input);
+	if (!inputScope.isInitialized()) return check(false, "paper input manager initializes");
+	auto uiRoot = std::make_shared<HeadlessGamepadUIRoot>(gameManager);
+	HeadlessPhysicalInputTest::ScopedRunningOwner runningOwner(uiRoot);
+	std::uint64_t milliseconds = SDL_GetTicks();
+	HeadlessPhysicalInputTest::FrameDriver driver(input, milliseconds,
+		[]() { return dispatchPhysicalUIActions(Engine::getInstance()); },
+		[&]() { gameManager.controller->processPhysicalInputFrame(); });
+	driver.runFrame();
+	driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_MISC1);
+	menu.openPaper(3, { "First", "Second", "Third" });
+	auto paper = menu.paperMenu;
+	GamepadWorldRuntimeTestAccess::resizePaper(*paper, 800, 480);
+	GamepadWorldRuntimeTestAccess::arrangeChildren(gameManager);
+	driver.runFrame();
+	driver.runFrame();
+	bool ok = check(!GamepadWorldRuntimeTestAccess::canHandleWorldInput(*gameManager.controller),
+		"paper reader blocks gameplay without pausing or disabling the world globally");
+	menu.openPaper(3, { "Replacement" });
+	ok = check(GamepadWorldRuntimeTestAccess::paperText(*paper) == "FirstSecondThird",
+		"opening an already visible paper retains its current contents") && ok;
+	ok = check(driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_RIGHT)
+		&& GamepadWorldRuntimeTestAccess::paperPage(*paper) == 1,
+		"physical D-pad advances paper through production UI dispatch") && ok;
+	driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, SDL_JOYSTICK_AXIS_MAX);
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 0,
+		"physical left trigger turns back without world interaction") && ok;
+	driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER, 0);
+	driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFTX, SDL_JOYSTICK_AXIS_MAX);
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 0
+		&& gameManager.player->nextAction == nullptr,
+		"paper owns input while the world movement stick is held") && ok;
+	driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_LEFTX, 0);
+	driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_RIGHTX, SDL_JOYSTICK_AXIS_MAX);
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 1,
+		"physical right stick turns paper through the existing scroll action") && ok;
+	driver.runAxisFrame(gamepad, SDL_GAMEPAD_AXIS_RIGHTX, 0);
+	driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_EAST);
+	ok = check(!paper->visible && gameManager.player->nextAction == nullptr,
+		"B closes paper without leaking a world skill") && ok;
+	menu.openPaper(3, { "First", "Second", "Third" });
+	GamepadWorldRuntimeTestAccess::resizePaper(*paper, 800, 480);
+	GamepadWorldRuntimeTestAccess::arrangeChildren(gameManager);
+	const Rect next = GamepadWorldRuntimeTestAccess::paperButton(*paper, 1);
+	dispatchPointerTapThroughElementTree(gameManager, next.x + 10, next.y + 10);
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 1,
+		"mouse click turns the paper page through the actual element tree") && ok;
+	const Rect previous = GamepadWorldRuntimeTestAccess::paperButton(*paper, 0);
+	constexpr EventTouchID finger = 1861;
+	dispatchPointerEventsThroughElementTree(gameManager,
+		{ AEvent(ET_FINGERDOWN, finger, previous.x + 10, previous.y + 10, false),
+		  AEvent(ET_FINGERUP, finger, previous.x + 10, previous.y + 10, false) });
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 0,
+		"touch tap turns back through the actual element tree") && ok;
+	dispatchPointerEventsThroughElementTree(gameManager,
+		{ AEvent(ET_FINGERDOWN, finger, next.x + 10, next.y + 10, false),
+		  AEvent(ET_FINGERCANCEL, finger, next.x + 10, next.y + 10, false),
+		  AEvent(ET_FINGERUP, finger, next.x + 10, next.y + 10, false) });
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 0,
+		"cancelled paper touch does not turn a page on stale release") && ok;
+	dispatchPointerEventThroughElementTree(gameManager, AEvent(ET_KEYDOWN, KEY_RIGHT, 0, 0, false));
+	ok = check(GamepadWorldRuntimeTestAccess::paperPage(*paper) == 1,
+		"keyboard arrows turn paper without activating lower menus") && ok;
+	menu.handleUIAction(UIAction::PageNext);
+	menu.handleUIAction(UIAction::PageNext);
+	ok = check(paper->visible && GamepadWorldRuntimeTestAccess::paperPage(*paper) == 2,
+		"paper page navigation clamps at the last page") && ok;
+	menu.handleUIAction(UIAction::Confirm);
+	ok = check(!paper->visible && !menu.blocksWorldInput(),
+		"confirm on the final page closes the reader and restores world input") && ok;
+	std::string body;
+	for (int index = 0; index < 160; ++index) body += "完整正文";
+	menu.openPaper(3, { "开头<enter><color=Red>红字<color=Black>" + body, "最后一页" });
+	for (const Point size : { Point{ 1280, 720 }, Point{ 800, 480 }, Point{ 400, 360 } })
+	{
+		GamepadWorldRuntimeTestAccess::resizePaper(*paper, size.x, size.y);
+		ok = check(GamepadWorldRuntimeTestAccess::paperContentFits(*paper)
+			&& GamepadWorldRuntimeTestAccess::paperText(*paper) == "开头红字" + body + "最后一页"
+			&& GamepadWorldRuntimeTestAccess::paperPageCount(*paper) > 2,
+			"paper reflows complete rich text into readable subpages with touch-sized controls") && ok;
+	}
+	menu.clearMenu();
+	ok = check(!paper->visible && GamepadWorldRuntimeTestAccess::paperPageCount(*paper) == 0,
+		"menu lifecycle clears paper contents and input ownership") && ok;
+	menu.openPaper(1, { "Only", "Ignored" });
+	ok = check(GamepadWorldRuntimeTestAccess::paperText(*paper) == "Only",
+		"paper type one reads only its first content argument") && ok;
+	GamepadWorldRuntimeTestAccess::resizePaper(*paper, 800, 480);
+	const Rect close = GamepadWorldRuntimeTestAccess::paperButton(*paper, 2);
+	dispatchPointerEventsThroughElementTree(gameManager,
+		{ AEvent(ET_FINGERDOWN, finger, close.x + 10, close.y + 10, false),
+		  AEvent(ET_FINGERUP, finger, close.x + 10, close.y + 10, false) });
+	ok = check(!paper->visible && !menu.blocksWorldInput() && gameManager.player->nextAction == nullptr,
+		"touch close restores input without releasing a world action") && ok;
+	menu.openPaper(2, { "missing.png", "another.png" });
+	ok = check(GamepadWorldRuntimeTestAccess::paperPageCount(*paper) == 2
+		&& GamepadWorldRuntimeTestAccess::paperText(*paper).empty(),
+		"paper type two treats filenames as image pages rather than letter text") && ok;
+	paper->close();
+	menu.openPaper(8, { "Invalid" });
+	menu.openPaper(3, {});
+	ok = check(!paper->visible && !menu.blocksWorldInput(),
+		"invalid or missing paper parameters do not capture world input") && ok;
+	return ok;
+}
+
 bool runGP03PhysicalLinkTests()
 {
 	bool ok = check(SDL_WasInit(SDL_INIT_VIDEO) == 0,
@@ -3838,6 +4711,22 @@ bool runGP03PhysicalLinkTests()
 }
 }
 
+bool runSkillTreeInputRuntimeTests()
+{
+	try { return runSkillTreeInputTests(); }
+	catch (const std::exception& exception)
+	{
+		std::cerr << "FAILED: skill tree input fixture: " << exception.what() << '\n';
+		return false;
+	}
+}
+
+bool runAttributePointInputRuntimeTests()
+{
+	try { return runAttributePointInputTests(); }
+	catch (const std::exception& error) { std::cerr << "FAILED: attribute allocation input: " << error.what() << '\n'; return false; }
+}
+
 bool runGamepadWorldRuntimeTests()
 {
 	bool ok = check(SDL_WasInit(SDL_INIT_VIDEO) == 0,
@@ -3864,6 +4753,7 @@ bool runGamepadWorldRuntimeTests()
 		ok = runHeldMouseLifecycleTransactionTests() && ok;
 		ok = runHeldWorldMouseAcrossMenuTransitionTests() && ok;
 		ok = runTouchControlsVisibilityHeldMouseTests() && ok;
+		ok = runPaperInputTests() && ok;
 		ok = runHeldWorldMouseBehindOrdinaryMenuTests() && ok;
 	}
 	catch (const std::exception& exception)
@@ -3879,6 +4769,7 @@ bool runGamepadWorldRuntimeTests()
 	ok = runQueuedSkillStepCompletionTests() && ok;
 	ok = runLegacyWorldInputCompatibilityTests() && ok;
 	ok = runQuickItemAndSitTests() && ok;
+	ok = runFriendlySupportInputTests() && ok;
 	ok = runGP03PhysicalLinkTests() && ok;
 	// ResourceManager has no reset API. Keep the production resource-backed
 	// shortcut fixture last so its active roots cannot affect headless peers.

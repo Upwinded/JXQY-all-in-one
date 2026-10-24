@@ -673,6 +673,19 @@ void ChooseMenu::updateChoiceButtons()
 	layoutInput.messageFontSize = messageLabel != nullptr ? messageLabel->fontSize : 14;
 	layoutInput.optionFontSize = selectA != nullptr ? selectA->getFontSize() : 14;
 	layoutInput.speakerFontSize = speakerLabel != nullptr ? speakerLabel->fontSize : layoutInput.messageFontSize;
+	int measuredWidth = 0;
+	int measuredHeight = 0;
+	if (engine->measureText("", layoutInput.optionFontSize, measuredWidth, measuredHeight)
+		&& measuredHeight > 0)
+	{
+		layoutInput.measureText = [this](const std::string& text, int size)
+		{
+			int width = 0;
+			int height = 0;
+			engine->measureText(text, size, width, height);
+			return std::make_pair(width, height);
+		};
+	}
 	layoutInput.rowGap = preferredOptionRowGap;
 	layoutInput.columnGap = 10;
 	layoutInput.columnCount = multipleSelectionMode ? multipleColumnCount : 1;
@@ -720,11 +733,16 @@ void ChooseMenu::updateChoiceButtons()
 		speakerLabel->activated = speakerLabel->visible;
 		if (speakerLabel->visible && layout.speakerRight)
 		{
-			int estimatedTextWidth = static_cast<int>(TextLayout::countUtf8Characters(currentSpeakerName))
-				* std::max(1, speakerLabel->fontSize);
-			estimatedTextWidth = std::max(1, std::min(estimatedTextWidth, speakerLabel->rect.w));
-			speakerLabel->rect.x += speakerLabel->rect.w - estimatedTextWidth;
-			speakerLabel->rect.w = estimatedTextWidth;
+			int textWidth = 0;
+			int textHeight = 0;
+			if (!engine->measureText(currentSpeakerName, speakerLabel->fontSize, textWidth, textHeight))
+			{
+				textWidth = static_cast<int>(TextLayout::countUtf8Characters(currentSpeakerName))
+					* std::max(1, speakerLabel->fontSize);
+			}
+			textWidth = std::max(1, std::min(textWidth, speakerLabel->rect.w));
+			speakerLabel->rect.x += speakerLabel->rect.w - textWidth;
+			speakerLabel->rect.w = textWidth;
 		}
 		speakerLabel->setStr(currentSpeakerName);
 	}

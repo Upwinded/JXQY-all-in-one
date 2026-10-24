@@ -1,6 +1,7 @@
 #include "WorldInteractionResolver.h"
 
 #include "../Data/Map.h"
+#include "../Data/Magic.h"
 #include "../Data/NPC.h"
 #include "../Data/NPCManager.h"
 #include "../Data/Object.h"
@@ -92,6 +93,8 @@ bool WorldInteractionResolver::isNPCValidForIntent(
 		return !npc->scriptFileRight.empty();
 	case WorldInteractionIntent::Attack:
 		return NPCManager::canLauncherHitNPC(lkSelf, npc, actionActor);
+	case WorldInteractionIntent::FriendlyMagic:
+		return Magic::isValidFriendlyTarget(npc);
 	default:
 		return false;
 	}
@@ -141,7 +144,8 @@ std::vector<WorldInteractionCandidate> WorldInteractionResolver::findCandidates(
 	const int nearRadius = std::clamp(query.nearRadius, 0, radius);
 	auto preferredTarget = query.preferredTarget.lock();
 
-	if (intent != WorldInteractionIntent::Attack && objectManager != nullptr)
+	if ((intent == WorldInteractionIntent::Primary || intent == WorldInteractionIntent::Alternate)
+		&& objectManager != nullptr)
 	{
 		for (std::size_t index = 0; index < objectManager->objectList.size(); ++index)
 		{

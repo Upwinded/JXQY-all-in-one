@@ -9,6 +9,7 @@
 class JoystickPanel;
 class SkillsPanel;
 class GameElement;
+class NPC;
 class GamepadWorldRuntimeTestAccess;
 struct NextAction;
 enum class WorldInteractionIntent;
@@ -54,6 +55,7 @@ public:
 	void cancelTouchControlInput();
 	bool synchronizeInputLifecycle();
 	void processPhysicalInputFrame();
+	std::shared_ptr<NPC> getFriendlyMagicTarget();
 
 protected:
 	virtual bool shouldUpdateChild(PElement child) override;
@@ -83,6 +85,11 @@ private:
 	bool worldInputWasEnabled = false;
 	bool mouseWorldInputSuppressedUntilRelease = false;
 	std::weak_ptr<GameElement> controllerFocusedTarget;
+	std::weak_ptr<NPC> controllerFriendlyTarget;
+	bool controllerFriendlyTargetChosen = false;
+	std::weak_ptr<NPC> touchFriendlyTarget;
+	int touchFriendlySkillIndex = -1;
+	Point touchFriendlyDirection = { 0, 0 };
 	std::set<EventTouchID> virtualControlPointerTransactions;
 	ControllerPromptTextureCache controllerPromptTextureCache;
 	struct FastInteractionPressBinding
@@ -100,6 +107,11 @@ private:
 	void handlePhysicalMovement(float axisX, float axisY, float magnitude, bool running);
 	void handlePhysicalAttack(bool running);
 	void handlePhysicalSkill(int skillIndex, float aimX, float aimY, float aimMagnitude);
+	bool isFriendlyTargetSkill(int skillIndex) const;
+	std::shared_ptr<NPC> findFriendlyTargetForAim(float aimX, float aimY);
+	std::shared_ptr<NPC> findTouchFriendlyTarget(int skillIndex, Point direction);
+	void clearFriendlyMagicTargets();
+	void cycleControllerFriendlyTarget();
 	void handlePhysicalJump(float axisX, float axisY, float magnitude);
 	void useQuickItem(int slotIndex);
 	void prepareLegacyWorldAction();

@@ -13,6 +13,7 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.widget.Toast;
 
@@ -158,6 +159,30 @@ public class JxqyActivity extends SDLActivity
 			}
 		}
 		super.startActivityForResult(intent, requestCode);
+	}
+
+	// Called through JNI after a failed export closes its output stream.
+	// Null means success; otherwise return the provider's failure reason.
+	public static String removeDocument(String uri)
+	{
+		SDLActivity activity = mSingleton;
+		if (activity == null)
+		{
+			return "Android Activity is unavailable";
+		}
+		try
+		{
+			if (!DocumentsContract.deleteDocument(
+				activity.getContentResolver(), Uri.parse(uri)))
+			{
+				return "Android document provider rejected deletion";
+			}
+			return null;
+		}
+		catch (Exception exception)
+		{
+			return exception.toString();
+		}
 	}
 
 	@Override

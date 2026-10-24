@@ -123,6 +123,7 @@ bool GameController::shouldUpdateChild(PElement child)
 	}
 void GameController::freeResource()
 {
+	clearFriendlyMagicTargets();
 	controllerPromptTextureCache.itemTextTextures.clear();
 	virtualControlPointerTransactions.clear();
 	mouseWorldInputSuppressedUntilRelease = false;
@@ -197,6 +198,8 @@ void GameController::isolateHeldMouseForTouchControlsVisibilityChange(
 
 void GameController::resetTouchControlsInputState()
 {
+	touchFriendlyTarget.reset();
+	touchFriendlySkillIndex = -1;
 	for (FastInteractionPressBinding& binding :
 		fastInteractionPressBindings)
 	{
@@ -289,6 +292,7 @@ bool GameController::canHandleWorldInput() const
 	return gm != nullptr
 		&& gm->global.data.canInput
 		&& !gm->inEvent
+		&& !gm->hasPendingTrapScript()
 		&& !gm->isGameplayPaused()
 		&& gm->player != nullptr
 		&& gm->map != nullptr
@@ -412,7 +416,33 @@ void GameController::handlePhysicalSkill(
 	NextAction action;
 	action.action = acMagic;
 	action.actionParam = skillIndex;
-	if (aimMagnitude > 0.0f)
+	if (isFriendlyTargetSkill(skillIndex))
+	{
+		auto recipient = aimMagnitude > 0.0f
+			? findFriendlyTargetForAim(aimX, aimY) : getFriendlyMagicTarget();
+		if (recipient == nullptr && aimMagnitude > 0.0f)
+		{
+			gm->showMessage("该方向没有可用的友方目标");
+			return;
+		}
+		if (recipient == nullptr && controllerFriendlyTargetChosen)
+		{
+			gm->showMessage("支援目标已失效，请重新选择");
+			return;
+		}
+		if (recipient == nullptr)
+		{
+			recipient = gm->player;
+		}
+		action.dest = recipient->getPosition();
+		if (recipient != gm->player)
+		{
+			action.destGE = recipient;
+		}
+		controllerFriendlyTarget = recipient;
+		controllerFriendlyTargetChosen = true;
+	}
+	else if (aimMagnitude > 0.0f)
 	{
 		const float angle = std::atan2(-aimX, aimY);
 		controllerFocusedTarget.reset();
@@ -438,6 +468,131 @@ void GameController::handlePhysicalSkill(
 
 	_last_magic_index = skillIndex;
 	gm->player->addNextAction(action);
+}
+
+bool GameController::isFriendlyTargetSkill(int skillIndex) const
+{
+	if (gm == nullptr || gm->player == nullptr || gm->player->isControllingCharacter()
+		|| skillIndex < 0 || skillIndex >= gm->magicManager.bottomCount())
+	{
+		return false;
+	}
+	const int index = gm->magicManager.bottomIndex(skillIndex);
+	if (!gm->magicManager.magicListExists(index))
+	{
+		return false;
+	}
+	const auto& info = gm->magicManager.magicList[index];
+	auto magic = gm->player->resolveMagicReplacement(info.magic);
+	return magic != nullptr && magic->supportsFriendlyTarget(info.level);
+}
+
+std::shared_ptr<NPC> GameController::findFriendlyTargetForAim(float aimX, float aimY)
+{
+	if (aimX == 0.0f && aimY == 0.0f)
+	{
+		return nullptr;
+	}
+	const auto origin = gm->player->getPosition();
+	const auto destination = getPlayerRelativePosition(std::atan2(-aimX, aimY), 400.0f, MapXRatio);
+	WorldInteractionQuery query;
+	query.origin = origin;
+	query.facingDirection = NPC::getDirection(origin, destination);
+	query.radius = KeyboardAutoInteractionTileDistance;
+	query.nearRadius = 0;
+	auto candidates = WorldInteractionResolver::findCandidates(WorldInteractionIntent::FriendlyMagic,
+		query, gm->map.get(), gm->npcManager.get(), nullptr, gm->player);
+	for (const auto& candidate : candidates)
+	{
+		if (candidate.facingDifference <= 1)
+		{
+			return candidate.npc;
+		}
+	}
+	return nullptr;
+}
+
+std::shared_ptr<NPC> GameController::findTouchFriendlyTarget(int skillIndex, Point direction)
+{
+	if (skillPanel == nullptr || skillIndex < 0 || skillIndex >= SKILL_PANEL_SKILL_COUNT)
+	{
+		return nullptr;
+	}
+	const auto& button = skillPanel->skillBtn[skillIndex];
+	if (button == nullptr || std::hypot(direction.x, direction.y) <= button->rect.w / 2.0f)
+	{
+		touchFriendlyTarget.reset();
+		touchFriendlySkillIndex = -1;
+		return nullptr;
+	}
+	if (touchFriendlySkillIndex != skillIndex
+		|| touchFriendlyDirection.x != direction.x || touchFriendlyDirection.y != direction.y)
+	{
+		touchFriendlySkillIndex = skillIndex;
+		touchFriendlyDirection = direction;
+		touchFriendlyTarget = findFriendlyTargetForAim(static_cast<float>(direction.x), static_cast<float>(direction.y));
+	}
+	auto target = touchFriendlyTarget.lock();
+	return Magic::isValidFriendlyTarget(target)
+		&& Map::calDistance(gm->player->getPosition(), target->getPosition()) <= KeyboardAutoInteractionTileDistance
+		? target : nullptr;
+}
+
+void GameController::clearFriendlyMagicTargets()
+{
+	controllerFriendlyTarget.reset();
+	controllerFriendlyTargetChosen = false;
+	touchFriendlyTarget.reset();
+	touchFriendlySkillIndex = -1;
+}
+
+std::shared_ptr<NPC> GameController::getFriendlyMagicTarget()
+{
+	if (!canHandleWorldInput() || gm->player->isControllingCharacter())
+	{
+		clearFriendlyMagicTargets();
+		return nullptr;
+	}
+	Point direction;
+	const int index = skillPanel != nullptr && skillPanel->visible
+		? skillPanel->getDraggingSkill(direction) : SKILL_PANEL_NONE;
+	if (index >= 0 && isFriendlyTargetSkill(index))
+	{
+		return findTouchFriendlyTarget(index, direction);
+	}
+	touchFriendlyTarget.reset();
+	touchFriendlySkillIndex = -1;
+	auto target = controllerFriendlyTarget.lock();
+	if (target != nullptr && target != gm->player
+		&& (!Magic::isValidFriendlyTarget(target)
+			|| Map::calDistance(gm->player->getPosition(), target->getPosition()) > KeyboardAutoInteractionTileDistance))
+	{
+		return nullptr;
+	}
+	return target;
+}
+
+void GameController::cycleControllerFriendlyTarget()
+{
+	if (gm->player->isControllingCharacter())
+	{
+		return;
+	}
+	auto candidates = gm->findWorldInteractionCandidates(
+		WorldInteractionIntent::FriendlyMagic, KeyboardAutoInteractionTileDistance, 0);
+	auto current = getFriendlyMagicTarget();
+	std::shared_ptr<NPC> next = candidates.empty() ? gm->player : candidates.front().npc;
+	for (std::size_t index = 0; index < candidates.size(); ++index)
+	{
+		if (candidates[index].npc == current)
+		{
+			next = index + 1 < candidates.size() ? candidates[index + 1].npc : gm->player;
+			break;
+		}
+	}
+	controllerFriendlyTarget = next;
+	controllerFriendlyTargetChosen = true;
+	gm->showMessage("支援目标：" + (next == gm->player ? std::string("自己") : next->getDisplayName()));
 }
 
 void GameController::handlePhysicalJump(float axisX, float axisY, float magnitude)
@@ -828,6 +983,7 @@ void GameController::cancelPendingControllerInteraction(bool clearTarget)
 	if (clearTarget)
 	{
 		controllerFocusedTarget.reset();
+		clearFriendlyMagicTargets();
 	}
 }
 
@@ -843,6 +999,7 @@ void GameController::cancelControllerWorldInteraction(bool stopCurrentMovement)
 	}
 	controllerFocusedTarget.reset();
 	MouseAlreadyDown = false;
+	clearFriendlyMagicTargets();
 	mouseWorldInputSuppressedUntilRelease =
 		engine != nullptr && engine->getMousePressed(MBC_MOUSE_LEFT);
 }
@@ -976,6 +1133,10 @@ void GameController::handlePhysicalInput()
 	{
 		cycleControllerInteractionTarget();
 	}
+	if (engine->consumeInputAction(GameInput::InputAction::CycleFriendlyTarget))
+	{
+		cycleControllerFriendlyTarget();
+	}
 	if (engine->consumeInputAction(GameInput::InputAction::InteractPrimary))
 	{
 		queueControllerInteraction(
@@ -1017,7 +1178,7 @@ void GameController::handlePhysicalInput()
 
 void GameController::onChildCallBack(PElement child)
 {
-	if (child == nullptr || !gm->global.data.canInput) { return; }
+	if (child == nullptr || !gm->global.data.canInput || gm->hasPendingTrapScript()) { return; }
 	auto ret = child->getResult();
 	if (child == joystickPanel)
 	{
@@ -1030,6 +1191,11 @@ void GameController::onChildCallBack(PElement child)
 	else if (child == skillPanel)
 	{
 		int clickIndex = skillPanel->getClickIndex();
+		if ((ret & erMouseLDown) && clickIndex >= 0 && clickIndex < SKILL_PANEL_SKILL_COUNT)
+		{
+			touchFriendlyTarget.reset();
+			touchFriendlySkillIndex = -1;
+		}
 		if ((ret & erMouseLDown)
 			&& clickIndex >= SKILL_PANEL_FAST_SELECT
 			&& clickIndex < SKILL_PANEL_FAST_SELECT + FASTBTN_COUNT)
@@ -1098,6 +1264,16 @@ void GameController::onChildCallBack(PElement child)
 						act.destGE.reset();
 						act.dest = pos;
 						act.actionParam = clickIndex;
+						if (isFriendlyTargetSkill(clickIndex))
+						{
+							auto target = findTouchFriendlyTarget(clickIndex, dragPos);
+							if (target == nullptr)
+							{
+								break;
+							}
+							act.destGE = target;
+							act.dest = target->getPosition();
+						}
 						submitLegacyWorldAction(act);
 					}
 					break;
@@ -1172,6 +1348,13 @@ void GameController::onChildCallBack(PElement child)
 					{
 						NextAction act;
 						act.action = acMagic;
+						if (isFriendlyTargetSkill(clickIndex))
+						{
+							act.dest = gm->player->getPosition();
+							act.actionParam = clickIndex;
+							submitLegacyWorldAction(act);
+							break;
+						}
 						std::shared_ptr<NPC> tempNPC = nullptr;
 						if (std::shared_ptr<NPC> clickedNPC = getClickedNPC(gm))
 						{
@@ -1300,10 +1483,11 @@ void GameController::onEvent()
 	// onEvent reads the virtual joystick below. Synchronize first so a contact
 	// held across background/focus loss cannot enqueue one stale NextAction.
 	synchronizeInputLifecycle();
-	if (!gm->global.data.canInput)
+	if (!gm->global.data.canInput || gm->hasPendingTrapScript())
 	{
 		return;
 	}
+	getFriendlyMagicTarget();
 	const bool worldInputBlocked =
 		gm->menu != nullptr && gm->menu->blocksWorldInput();
 	if (mouseWorldInputSuppressedUntilRelease
@@ -1571,13 +1755,14 @@ void GameController::processPhysicalInputFrame()
 
 void GameController::onUpdate()
 {
-	const bool shouldBeVisible = !gm->inEvent;
+	const bool shouldBeVisible = !gm->inEvent && !gm->hasPendingTrapScript();
 	if (visible && !shouldBeVisible)
 	{
 		// Once this observer becomes hidden, pointer-up/cancel no longer visits
 		// it. End all virtual-control transactions at the visibility boundary
 		// so a release during the story event cannot leave UI ownership behind.
 		cancelTouchControlPointerTransactions();
+		clearFriendlyMagicTargets();
 	}
 	visible = shouldBeVisible;
 
@@ -1600,7 +1785,7 @@ void GameController::onUpdate()
 			minimapButton->setChecked(menuVisible);
 		}
 		// 游戏进入事件剧情时隐藏按钮，避免遮挡对话
-		minimapButton->visible = !gm->inEvent;
+		minimapButton->visible = shouldBeVisible;
 	}
 }
 
@@ -1685,7 +1870,7 @@ bool GameController::onHandleEvent(AEvent & e)
 	{
 		virtualControlPointerTransactions.erase(completedPointerID);
 	}
-	if (!gm->global.data.canInput)
+	if (!gm->global.data.canInput || gm->hasPendingTrapScript())
 	{
 		return false;
 	}
@@ -1924,6 +2109,17 @@ bool GameController::onHandleEvent(AEvent & e)
 		dragging == TOUCH_UNTOUCHEDID && e.eventType == ET_MOUSEDOWN
 		&& clickedNPC != nullptr)
 	{
+		if (e.eventData == MBC_MOUSE_RIGHT && clickedNPC->scriptFileRight.empty()
+			&& isFriendlyTargetSkill(_last_magic_index) && Magic::isValidFriendlyTarget(clickedNPC))
+		{
+			NextAction support;
+			support.action = acMagic;
+			support.actionParam = _last_magic_index;
+			support.dest = clickedNPC->getPosition();
+			support.destGE = clickedNPC;
+			submitLegacyWorldAction(support);
+			return true;
+		}
 		NextAction act;
 		if (engine->getKeyPress(KEY_LALT) || engine->getKeyPress(KEY_RALT))
 		{

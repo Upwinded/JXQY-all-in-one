@@ -2,6 +2,7 @@
 
 #if defined(__ANDROID__)
 #include <jni.h>
+#include <SDL3/SDL_error.h>
 #include <SDL3/SDL_system.h>
 #include <atomic>
 #include <mutex>
@@ -21,6 +22,7 @@ struct CachedBindings
 	jmethodID getApplicationResourceDirectoryMethod = nullptr;
 	jmethodID requestResourcePackageImportMethod = nullptr;
 	jmethodID consumeResourcePackageImportResultMethod = nullptr;
+	jmethodID removeDocumentMethod = nullptr;
 	bool valid = false;
 };
 
@@ -115,13 +117,17 @@ bool ensureBindings(CachedBindings& result)
 	candidate.consumeResourcePackageImportResultMethod = getStaticMethod(
 		env, localClass, "consumeResourcePackageImportResult",
 		"()Ljava/lang/String;");
+	candidate.removeDocumentMethod = getStaticMethod(
+		env, localClass, "removeDocument",
+		"(Ljava/lang/String;)Ljava/lang/String;");
 	if (candidate.isGrantedMethod == nullptr
 		|| candidate.requestMethod == nullptr
 		|| candidate.consumeRequestCompletedMethod == nullptr
 		|| candidate.getRootMethod == nullptr
 		|| candidate.getApplicationResourceDirectoryMethod == nullptr
 		|| candidate.requestResourcePackageImportMethod == nullptr
-		|| candidate.consumeResourcePackageImportResultMethod == nullptr)
+		|| candidate.consumeResourcePackageImportResultMethod == nullptr
+		|| candidate.removeDocumentMethod == nullptr)
 	{
 		env->DeleteLocalRef(localClass);
 		return false;
@@ -375,6 +381,48 @@ ResourcePackageImportSelection consumeResourcePackageImportSelection()
 			: std::string(u8"Android 返回了无效的资源包选择结果");
 	return selection;
 }
+
+bool removeDocument(const std::string& uri)
+{
+	if (uri.rfind("content://", 0) != 0)
+	{
+		return SDL_SetError("Expected an Android content URI");
+	}
+	CachedBindings bindings;
+	if (!ensureBindings(bindings))
+	{
+		return SDL_SetError("Cannot access Android document deletion");
+	}
+	JNIEnv* env = getJNIEnv();
+	if (env == nullptr)
+	{
+		return SDL_SetError("Cannot access Android JNI environment");
+	}
+	jstring document = env->NewStringUTF(uri.c_str());
+	if (clearPendingException(env, "NewStringUTF(document URI)") || document == nullptr)
+	{
+		return SDL_SetError("Cannot prepare Android document URI");
+	}
+	jstring result = static_cast<jstring>(env->CallStaticObjectMethod(
+		bindings.activityClass, bindings.removeDocumentMethod, document));
+	env->DeleteLocalRef(document);
+	if (clearPendingException(env, "CallStaticObjectMethod(removeDocument)"))
+	{
+		if (result != nullptr) env->DeleteLocalRef(result);
+		return SDL_SetError("Android document deletion failed");
+	}
+	if (result == nullptr) return true;
+	const char* message = env->GetStringUTFChars(result, nullptr);
+	if (clearPendingException(env, "GetStringUTFChars(removeDocument)") || message == nullptr)
+	{
+		env->DeleteLocalRef(result);
+		return SDL_SetError("Android document deletion failed");
+	}
+	SDL_SetError("%s", message);
+	env->ReleaseStringUTFChars(result, message);
+	env->DeleteLocalRef(result);
+	return false;
+}
 }
 
 #else // 非 Android 平台：空实现。
@@ -392,6 +440,7 @@ ResourcePackageImportSelection consumeResourcePackageImportSelection()
 {
 	return {};
 }
+bool removeDocument(const std::string&) { return false; }
 }
 
 #endif

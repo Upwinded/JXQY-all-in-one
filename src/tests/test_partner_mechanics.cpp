@@ -1,5 +1,6 @@
 #include "../File/File.h"
 #include "../File/INIReader.h"
+#include "../Game/Config/Config.h"
 #include "../Game/GameManager/GameManager.h"
 #include "../Game/GameManager/SaveFileManager.h"
 #include "../Image/IMP.h"
@@ -7,6 +8,7 @@
 #include "../Resource/ResourceManager.h"
 #include "TestTemporaryDirectory.h"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -66,6 +68,156 @@ std::shared_ptr<NPC> addPartner(GameManager& game, const std::string& name)
 	}
 	game.npcManager->addNPC(partner);
 	return partner;
+}
+
+bool checkPartnerFollowWithDisabledAI(GameManager& game)
+{
+	const Point originalPlayerPosition = game.player->getPosition();
+	game.player->setPosition({ 20, 10 });
+	game.global.data.NPCAI = false;
+	auto partner = addPartner(game, "AI follow partner");
+	partner->setPosition({ 10, 10 });
+	NPCActionRes movement;
+	movement.imagePackage = std::make_shared<IMPImage>();
+	movement.imagePackage->directions = 8;
+	movement.imagePackage->interval = 100;
+	movement.imagePackage->frame.resize(16);
+	partner->res.stand = partner->res.walk = partner->res.run = movement;
+	partner->setTime(1000);
+	partner->beginStand();
+	partner->nextFollowCheckTime = 1;
+	auto enemy = std::make_shared<NPC>();
+	enemy->kind = nkBattle;
+	enemy->relation = nrHostile;
+	enemy->npcName = "AI follow target";
+	enemy->life = 100;
+	enemy->setPosition({ 10, 12 });
+	game.npcManager->addNPC(enemy);
+	partner->currentCombatTarget = enemy;
+	partner->lastCombatTarget = enemy;
+	partner->lastKnownCombatTarget = enemy;
+	partner->hasLastKnownCombatTargetPosition = true;
+	partner->actionPlan.state = npsApproaching;
+	partner->actionPlan.planTarget = enemy;
+	partner->destGE = enemy;
+	partner->actionManager->update(1);
+	bool ok = check(!partner->isAIEnabled() && partner->isFollower()
+		&& (partner->isWalking() || partner->isRunning()),
+		"global AI disable preserves the partner's actual owner-follow movement");
+	ok = check(partner->currentCombatTarget.expired() && partner->lastCombatTarget.expired()
+		&& partner->lastKnownCombatTarget.expired() && !partner->actionPlan.isActive()
+		&& partner->destGE.expired(),
+		"disabled combat memory and destination cannot block partner following") && ok;
+	partner->currentCombatTarget = enemy;
+	partner->actionPlan.state = npsApproaching;
+	partner->actionPlan.planTarget = enemy;
+	const UTime stepTime = partner->stepLastTime * 2;
+	partner->setTime(partner->getTime() + stepTime);
+	partner->actionManager->update(stepTime);
+	ok = check(partner->currentCombatTarget.expired() && !partner->actionPlan.isActive()
+		&& !partner->stepList.empty()
+		&& game.map->calDistance(partner->stepList.back(), game.player->getPosition())
+			<= game.global.getPartnerFollowRadius(),
+		"moving partners discard combat work and keep following with global AI disabled") && ok;
+	if (!partner->stepList.empty())
+	{
+		const Point issuedDestination = partner->stepList.back();
+		partner->setAIDisabled(true);
+		game.player->setPosition({ 26, 18 });
+		for (int step = 0; step < 32 && (partner->isWalking() || partner->isRunning()); ++step)
+		{
+			const UTime elapsed = partner->stepLastTime * 2;
+			partner->setTime(partner->getTime() + elapsed);
+			partner->actionManager->update(elapsed);
+		}
+		ok = check(partner->isStanding() && partner->getPosition() == issuedDestination,
+			"local AI disable completes the issued follow path without replanning toward the moving owner") && ok;
+		game.player->setPosition({ 20, 10 });
+	}
+	partner->stopMovement();
+	partner->setPosition({ 10, 10 });
+	partner->setAIDisabled(true);
+	partner->nextFollowCheckTime = 1;
+	partner->actionManager->update(1);
+	ok = check(!partner->isFollowAIEnabled() && partner->isStanding(),
+		"per-character AI disable prevents partner follow decisions") && ok;
+
+	for (const bool localDisabled : { false, true })
+	{
+		partner->setAIDisabled(localDisabled);
+		partner->haveAsyncDest = true;
+		partner->gotoExDest = { 10, 18 };
+		partner->beginWalk(partner->gotoExDest);
+		ok = check(!partner->isFollowAIEnabled() && partner->isWalking(),
+			"explicit asynchronous script movement bypasses both AI switches") && ok;
+		for (int step = 0; step < 32 && partner->isWalking(); ++step)
+		{
+			const UTime elapsed = partner->stepLastTime * 2;
+			partner->setTime(partner->getTime() + elapsed);
+			partner->actionManager->update(elapsed);
+		}
+		ok = check(partner->getPosition() == partner->gotoExDest && partner->isStanding(),
+			"partner following cannot replace the script's explicit destination") && ok;
+		partner->haveAsyncDest = false;
+		partner->setPosition({ 10, 10 });
+	}
+	partner->setAIDisabled(false);
+	partner->destinationMapPosition = { 40, 40 };
+	partner->fixedPathTilePositions = { { 10, 10 }, { 10, 18 } };
+	partner->nextFollowCheckTime = 1;
+	partner->actionManager->update(1);
+	ok = check(partner->isFollowAIEnabled() && (partner->isWalking() || partner->isRunning())
+		&& !partner->stepList.empty()
+		&& game.map->calDistance(partner->stepList.back(), game.player->getPosition())
+			<= game.global.getPartnerFollowRadius(),
+		"stored destination and fixed-path settings preserve existing owner-follow priority") && ok;
+	partner->stopMovement();
+	partner->setPosition({ 10, 10 });
+	partner->destinationMapPosition = { 0, 0 };
+	partner->fixedPathTilePositions.clear();
+	enemy->relation = nrFriendly;
+	for (const int kind : { nkNormal, nkBattle })
+	{
+		partner->kind = kind;
+		partner->relation = nrHostile;
+		partner->followNPC = enemy->npcName;
+		game.global.data.NPCAI = true;
+		ok = check(partner->isFollower(), "AI follow gate has a real named target") && ok;
+		game.global.data.NPCAI = false;
+		partner->nextFollowCheckTime = 1;
+		partner->actionManager->update(1);
+		ok = check(!partner->isFollowAIEnabled() && partner->isStanding(),
+			"global AI disable still blocks ordinary FollowNPC and enemy pursuit") && ok;
+	}
+	partner->kind = nkPartner;
+	partner->relation = nrFriendly;
+	partner->followNPC.clear();
+	partner->setPosition({ 1, 1 });
+	game.inEvent = true;
+	ok = check(!partner->tryRegroupWithPlayer(), "AI-disabled regroup still respects script events") && ok;
+	game.inEvent = false;
+	partner->haveAsyncDest = true;
+	ok = check(!partner->tryRegroupWithPlayer(), "regroup cannot replace asynchronous script movement") && ok;
+	partner->haveAsyncDest = false;
+	partner->fixedPathTilePositions = { { 1, 1 }, { 2, 2 } };
+	ok = check(!partner->tryRegroupWithPlayer(), "regroup cannot replace a fixed path") && ok;
+	partner->fixedPathTilePositions.clear();
+	partner->setAIDisabled(true);
+	ok = check(!partner->tryRegroupWithPlayer(), "per-character AI disable also blocks distant regroup") && ok;
+	partner->setAIDisabled(false);
+	auto control = std::make_shared<Effect>();
+	game.player->beginControlCharacter(partner, control);
+	ok = check(!partner->isFollowAIEnabled() && !partner->tryRegroupWithPlayer(),
+		"controlled characters never use autonomous partner follow or regroup") && ok;
+	game.player->endControlCharacter();
+	ok = check(partner->tryRegroupWithPlayer()
+		&& game.map->calDistance(partner->getPosition(), game.player->getPosition()) <= 3,
+		"global AI disable preserves distant partner regroup") && ok;
+	game.npcManager->removeNPCOnlyFromList(partner);
+	game.npcManager->removeNPCOnlyFromList(enemy);
+	game.player->setPosition(originalPlayerPosition);
+	game.global.data.NPCAI = true;
+	return ok;
 }
 
 bool checkSummonAttackPersistence(GameManager& game, const std::shared_ptr<NPC>& shared,
@@ -207,6 +359,8 @@ bool checkSummonAttackPersistence(GameManager& game, const std::shared_ptr<NPC>&
 
 bool runPartnerMechanicsTests()
 {
+	const int previousExperienceMultiplier = Config::experienceMultiplier;
+	Config::experienceMultiplier = 3;
 	// No renderer, window or game loop: exercise the real runtime objects directly.
 	const auto root = makeUniqueTestDirectory("jxqy_partner_mechanics");
 	File::setAssetsCollectionRoot(root.string());
@@ -241,6 +395,7 @@ bool runPartnerMechanicsTests()
 		game.map->data->tile.assign(64, std::vector<MapTile>(64));
 		game.map->dataMap.tile.assign(64, std::vector<DataTile>(64));
 		game.player->setPosition({ 32, 32 });
+		ok = checkPartnerFollowWithDisabledAI(game) && ok;
 		auto partner = addPartner(game, "Registered");
 		partner->life = partner->thew = partner->mana = 10;
 		partner->updatePartnerRecovery(5000);
@@ -428,6 +583,41 @@ bool runPartnerMechanicsTests()
 		partner = game.npcManager->findNPC("Registered").front();
 		ok = check(!partner->canChangePartnerEquipment() && !game.partnerManager.saveCharacterSnapshots(),
 			"unresolved legacy equipment blocks destructive writeback and inventory transfers") && ok;
+		const auto execute = [&](const std::string& source)
+		{
+			auto bytes = std::make_unique<char[]>(source.size());
+			std::copy(source.begin(), source.end(), bytes.get());
+			return game.script.runScript(bytes, static_cast<int>(source.size()));
+		};
+		for (const std::string& command : { "setnpckind('Registered',1)", "setnpcrelation('Registered',1)",
+			"setnpckind('',1)", "addnpcproperty('Registered','Kind',-2)" })
+		{
+			game.scriptNPC = partner;
+			game.varList.setInteger("DepartureContinued", 0);
+			ok = check(execute(command + "; assign('DepartureContinued',1)") != LUA_OK
+				&& game.varList.getInteger("DepartureContinued") == 0
+				&& partner->kind == nkPartner && partner->relation == nrFriendly,
+				"failed partner writeback stops the Lua scene and preserves membership") && ok;
+		}
+		game.scriptNPC.reset();
+		game.varList.setInteger("DepartureContinued", 0);
+		ok = check(execute("pcall(setnpckind,'Registered',1); assign('DepartureContinued',1)") != LUA_OK
+			&& game.varList.getInteger("DepartureContinued") == 0,
+			"catching a departure error cannot execute another registered command") && ok;
+		ok = check(execute("pcall(setnpckind,'Registered',1); return") != LUA_OK,
+			"catching a departure error cannot report the scene as completed") && ok;
+		ok = write(root / "script/common/departure-child.txt", "setnpckind('Registered',1)") && ok;
+		for (const std::string& command : { "runscript('departure-child.txt')",
+			"randrun('DepartureChance','departure-child.txt','departure-child.txt')" })
+		{
+			game.varList.setInteger("DepartureContinued", 0);
+			ok = check(execute(command + "; assign('DepartureContinued',1)") != LUA_OK
+				&& game.varList.getInteger("DepartureContinued") == 0,
+				"failed departure in a child script also stops its parent scene") && ok;
+		}
+		ok = check(execute("assign('AfterDepartureFailure',1)") == LUA_OK
+			&& game.varList.getInteger("AfterDepartureFailure") == 1,
+			"a failed departure does not poison the next independent script") && ok;
 		ok = check(!game.saveGame(0), "unresolved equipment also rejects a complete save") && ok;
 		INIReader rejectedSave(SaveFileManager::CurrentPath() + GLOBAL_INI);
 		ok = check(rejectedSave.Get("Save", "EngineVersion", "") == "1.1.4",
@@ -688,6 +878,104 @@ bool runPartnerMechanicsTests()
 			"returning from protagonist retains same-level experience and equipment") && ok;
 		game.npcManager->freeResource();
 	}
+	{
+		GameManager game;
+		game.global.data.characterIndex = 0;
+		auto neutral = addPartner(game, "Neutral");
+		neutral->setKindAndRelation(nkPartner, nrNeutral);
+		neutral->canEquip = 1;
+		neutral->canLevelUp = 1;
+		neutral->life = neutral->thew = neutral->mana = 10;
+		ok = check(neutral->canChangePartnerEquipment() && !neutral->isLivingPartner(),
+			"explicit neutral equipment permission is independent from friendly partner mechanics") && ok;
+		neutral->updatePartnerRecovery(15000);
+		neutral->addPartnerExperience(1000);
+		ok = check(neutral->life == 10 && neutral->thew == 10 && neutral->mana == 10
+			&& neutral->exp == 0 && neutral->level == 1,
+			"allowing neutral equipment does not grant recovery or partner experience") && ok;
+		neutral->canEquip = 0;
+		ok = check(!neutral->canChangePartnerEquipment(), "neutral followers without equipment permission remain read-only") && ok;
+		neutral->canEquip = 1;
+		neutral->headEquip = "head.ini";
+		neutral->updateEquipmentAttributes(false);
+		game.partnerManager.extractPartnerListFromNPCManager();
+		ok = check(game.partnerManager.findPartnersFromNPCManager().empty(), "neutral partner is carried outside the map list") && ok;
+		game.partnerManager.transferPartnerListToNPCManager();
+		ok = check(game.partnerManager.isActivePartner(neutral) && neutral->relation == nrNeutral
+			&& neutral->headEquip == "head.ini", "neutral transfer preserves identity, relation and equipment") && ok;
+		ok = check(game.partnerManager.save(0) && game.partnerManager.load(0), "neutral equipped companion saves and reloads") && ok;
+		const auto reloaded = game.partnerManager.findPartnersFromNPCManager();
+		ok = check(reloaded.size() == 1 && reloaded.front()->relation == nrNeutral
+			&& reloaded.front()->canChangePartnerEquipment() && reloaded.front()->headEquip == "head.ini",
+			"neutral equipment permission and worn item survive the existing partner format") && ok;
+		if (!reloaded.empty())
+		{
+			neutral = reloaded.front();
+			game.global.feature.restorePartnerAttributes = true;
+			neutral->npcName = "Registered";
+			neutral->canEquip = 0;
+			ok = check(neutral->getPartnerCharacterIndex() == 1 && !neutral->canChangePartnerEquipment(),
+				"registration alone does not enable equipment on a neutral follower") && ok;
+			ok = writeSave("player1.ini", "[Init]\nName=Registered\nLevel=20\nLife=400\nLifeMax=500\nAttack=222\nMoney=777\n") && ok;
+			ok = writeSave("goods1.ini", "[Head]\nCount=0\n") && ok;
+			neutral->canEquip = 1;
+			ok = check(game.partnerManager.saveCharacterSnapshot(neutral), "neutral registered equipment record saves") && ok;
+			INIReader character(SaveFileManager::CurrentPath() + "player1.ini");
+			INIReader equipment(SaveFileManager::CurrentPath() + "goods1.ini");
+			const std::string headSlot = std::to_string(game.goodsManager.equipIndex(0) + 1);
+			ok = check(equipment.Get(headSlot, "IniFile", "") == "head.ini"
+				&& equipment.GetInteger(headSlot, "Number", 0) == 1
+				&& character.GetInteger("Init", "Level", 0) == 20
+				&& character.GetInteger("Init", "Life", 0) == 400
+				&& character.GetInteger("Init", "Attack", 0) == 222
+				&& character.GetInteger("Init", "Money", 0) == 777,
+				"neutral equipment writes back without replacing the registered character's attributes") && ok;
+			neutral->headEquip.clear();
+			neutral->updateEquipmentAttributes(false);
+			ok = check(neutral->setKindAndRelation(nkPartner, nrFriendly) && neutral->headEquip.empty()
+				&& neutral->level == 20, "becoming friendly retains a neutral companion's deliberate unequip") && ok;
+		}
+		game.npcManager->freeResource();
+		game.global.feature.restorePartnerAttributes = true;
+		game.global.data.characterIndex = 0;
+		auto multiplierShared = addPartner(game, "Shared");
+		auto multiplierKiller = addPartner(game, "MultiplierKiller");
+		auto multiplierOther = addPartner(game, "MultiplierOther");
+		multiplierKiller->canLevelUp = multiplierOther->canLevelUp = 1;
+		multiplierKiller->level = 2;
+		multiplierShared->levelUpExp = multiplierKiller->levelUpExp = 1000000;
+		game.player->level = 3;
+		game.player->levelUpExp = 1000000;
+		for (int multiplier : { 1, 2, 3 })
+		{
+			Config::experienceMultiplier = multiplier;
+			for (int storedExperience : { 10, 0 })
+			{
+				for (bool partnerKill : { false, true })
+				{
+					game.player->exp = multiplierShared->exp = multiplierKiller->exp = multiplierOther->exp = 0;
+					auto victim = std::make_shared<NPC>();
+					victim->kind = nkBattle;
+					victim->relation = nrHostile;
+					victim->level = 4;
+					victim->exp = storedExperience;
+					auto owner = partnerKill ? multiplierKiller : std::static_pointer_cast<NPC>(game.player);
+					victim->awardDefeatedNpcExperience(nullptr, owner);
+					const int playerAward = (storedExperience == 0 ? 12 : 10) * multiplier;
+					const int killerAward = partnerKill ? (storedExperience == 0 ? 8 : 10) * multiplier : 0;
+					ok = check(game.player->exp == playerAward && multiplierShared->exp == playerAward &&
+						multiplierKiller->exp == killerAward && multiplierOther->exp == 0,
+						"player choices scale shared and killer-owned rewards using each recipient's fallback level") && ok;
+					victim->awardDefeatedNpcExperience(nullptr, owner);
+					ok = check(game.player->exp == playerAward && multiplierShared->exp == playerAward &&
+						multiplierKiller->exp == killerAward,
+						"each multiplier still settles a defeated NPC only once") && ok;
+				}
+			}
+		}
+		game.npcManager->freeResource();
+	}
+	Config::experienceMultiplier = previousExperienceMultiplier;
 	File::setActiveSaveNamespace("");
 	File::setPlatformStateParentForTests("");
 	std::error_code error;

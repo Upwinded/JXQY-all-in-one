@@ -108,11 +108,13 @@ def main():
         assert not route.table_reward_matches(resource,root,sword.name,{'goods-w15-莫邪剑.ini'})
     path = [(x,0) for x in range(18)]
     state = dict(map="test",player=dict(position=dict(x=0,y=0)),
-                 targets=[dict(kind="object",position=dict(x=8,y=0))])
+                 targets=[dict(kind="object",position=dict(x=8,y=0)),
+                          dict(kind="npc",life=0,action=0,position=dict(x=6,y=0))])
     with patch.object(route,"idle",return_value=state),patch.object(route,"reachable_trap",return_value=path) as planned, \
          patch.object(route,"go") as moved:
         route.walk_to(Mock(),resource,(17,0))
     assert (8,0) not in planned.call_args.kwargs["avoid"]
+    assert (6,0) in planned.call_args.kwargs["avoid"]
     assert all(call.args[1:3] != (8,0) for call in moved.call_args_list)
     assert moved.call_args_list[-1].args[1:3] == (17,0)
     with patch.object(route,"idle",return_value=state),patch.object(route,"reachable_trap",side_effect=[(17,0),path]), \

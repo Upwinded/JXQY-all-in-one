@@ -10,6 +10,7 @@
 #include "MenuController.h"
 #include "../Menu/Menu.h"
 #include <functional>
+#include <atomic>
 #include <mutex>
 #include <cstdint>
 #include <utility>
@@ -241,6 +242,7 @@ public:
 	void runEventList();
 	void runScriptTaskList();
 	bool addScriptTask(const ScriptTask& task);
+	bool hasPendingTrapScript() const;
 	void clearParallelScriptTasks();
 	bool saveScriptRuntimeState();
 	void loadScriptRuntimeState();
@@ -251,7 +253,7 @@ public:
 	void runTrapScript(int idx);
 	std::vector<EventInfo> eventList;
 	std::vector<ScriptTask> scriptTaskList;
-	std::mutex scriptTaskMutex;
+	mutable std::mutex scriptTaskMutex;
 	ScriptType scriptType = stNone;
 
 	int getBindValue(const std::string& bindPath);
@@ -332,6 +334,9 @@ private:
 
 	void applyStartupIntegerVariables();
 	void drainImmediateScriptTasksForAutomation();
+	void runCapturedTrapScript(const ScriptTask& task);
+	std::atomic<std::size_t> dispatchingTrapScriptCount{0};
+	std::uint64_t playerDeathScriptGeneration = 0;
 	void checkExpectedIntegerVariables();
 	void finishNewGameAutomationAndExit();
 	bool runPendingPlayerDeathScript();
@@ -354,6 +359,12 @@ private:
 private:
 
 	virtual void onUpdate();
+	_shared_image worldColorCanvas;
+	_image worldColorOriginalTarget = nullptr;
+	bool drawingWorldColor = false;
+	virtual bool onBeginDrawComposition() override;
+	virtual bool shouldDrawChildAfterComposition(const PElement& child) const override;
+	virtual void onEndDrawComposition(bool completed) override;
 	virtual void onDraw();
 	virtual bool onInitial();
 	virtual void onRun();

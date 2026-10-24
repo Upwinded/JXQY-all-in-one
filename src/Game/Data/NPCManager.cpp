@@ -416,9 +416,10 @@ bool addCustomDefeatedNPCDrop(std::shared_ptr<NPC> npc, ObjectManager* objectMan
 	return true;
 }
 
-bool isAutoStrollIntent(int strollIntent)
+bool isAutoStrollIntent(int strollIntent, bool hasFixedPath)
 {
-	return strollIntent == nsiStroll || strollIntent == nsiGo;
+	// C# Action=2 loops over FixedPos; an absent route does not enable RandWalk.
+	return strollIntent == nsiStroll || (strollIntent == nsiGo && hasFixedPath);
 }
 
 bool isPlayerCandidate(GameManager* gameManager, const std::shared_ptr<NPC>& candidate)
@@ -880,7 +881,7 @@ int NPCManager::getRelationOf(std::shared_ptr<GameElement> element, int fallback
 
 bool NPCManager::canLauncherHitNPC(int launcherKind, std::shared_ptr<NPC> target)
 {
-	if (target == nullptr || !target->isVisibleForRuntime())
+	if (target == nullptr || !target->isPresentForRuntime())
 	{
 		return false;
 	}
@@ -890,7 +891,7 @@ bool NPCManager::canLauncherHitNPC(int launcherKind, std::shared_ptr<NPC> target
 
 int NPCManager::getLauncherHitPriority(int launcherKind, std::shared_ptr<NPC> target, std::shared_ptr<GameElement> launcher)
 {
-	if (target == nullptr || !target->isVisibleForRuntime())
+	if (target == nullptr || !target->isPresentForRuntime())
 	{
 		return INT_MAX;
 	}
@@ -987,9 +988,9 @@ void NPCManager::npcAutoAction()
 
 	for (size_t i = 0; i < npcList.size(); i++)
 	{
-		if (npcList[i] != nullptr && npcList[i]->isVisibleByVariable && !npcList[i]->isAIDisabled)
+		if (npcList[i] != nullptr && npcList[i]->isVisibleByVariable && npcList[i]->isAIEnabled())
 		{
-			bool canAutoStroll = isAutoStrollIntent(npcList[i]->strollIntent);
+			bool canAutoStroll = isAutoStrollIntent(npcList[i]->strollIntent, npcList[i]->hasFixedPath());
 			bool hasPendingDestination = npcList[i]->hasDestinationMapPosition();
 			bool hasCombatContext = npcList[i]->fightState.get()
 				|| npcList[i]->actionPlan.isActive()

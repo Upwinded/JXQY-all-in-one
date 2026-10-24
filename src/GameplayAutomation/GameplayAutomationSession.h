@@ -102,7 +102,7 @@ private:
 	void cancelWorld(const std::string& reason);
 	void stopQueuedWorldInput();
 	bool queueSkill(int slot, const std::shared_ptr<NPC>& target, bool requireReach = false,
-		std::string* unavailableReason = nullptr);
+		std::string* unavailableReason = nullptr, const Point* positionTarget = nullptr);
 	void record(const std::string& event, Value data);
 	void tick();
 };

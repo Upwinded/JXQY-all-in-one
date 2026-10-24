@@ -43,6 +43,7 @@ ChangeFlyIni2
 ChangeLife
 ChangeMana
 ChangeMapColor
+ChangeMapColorPlus
 ChangeNpcFlyIni
 ChangeNpcFlyIni2
 ChangeNpcLife
@@ -292,3 +293,8 @@ UpdateState
 UseMagic
 Watch
 printf
+
+ChangeNpcRes
+NpcRunTo
+PlayerGotoDirEx
+SetNpcLevelEqualPlayer

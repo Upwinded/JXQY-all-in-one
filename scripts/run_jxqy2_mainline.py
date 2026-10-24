@@ -114,7 +114,9 @@ def fight(client, target, skills=None, *, prefer_melee=False):
             if area:
                 skills = (*area, 0)
     if ranged_required and not skills:
-        skills = (0,)
+        needle = next((spell for spell in state["magic"] if spell["file"] == "player-magic-无影神针.ini"
+                       and state["layout"]["magicQuickBegin"] <= spell["slot"] < state["layout"]["practiceSlot"]), None)
+        skills = (needle["slot"] - state["layout"]["magicQuickBegin"],) if needle else (0,)
     if (ranged_required and state["player"]["mana"] * 2 < state["player"]["manaMax"]
             and not select_medicine(state, "mana", require_ready=False)):
         state = meditate(client, allow_combat=True)
@@ -153,7 +155,7 @@ def fight(client, target, skills=None, *, prefer_melee=False):
         try:
             result = client.act("StartCombat", timeout=remaining + 5, generation=state["generation"],
                                 targetId=target["id"], radius=20, kills=1, skills=list(skills),
-                                allowMeleeFallback=not ranged_required, timeoutMs=max(1000, int(remaining * 1000)), **supplies)
+                                allowMeleeFallback=True, timeoutMs=max(1000, int(remaining * 1000)), **supplies)
             break
         except AutomationError as error:
             after = idle(client)
@@ -999,6 +1001,8 @@ def meng_sparring(client, output, *, magic_file_prefix="player-magic-"):
             raise AutomationError(f"Expected one living Meng sparring opponent: {targets}")
         # fight verifies StartCombat kills=1 and selects range from the observed NPC.
         state = fight(client, targets[0])
+        client.wait_until(lambda value: value.get("map") == "汉阳.map", timeout=30)
+        state = idle(client)
         if (state["map"] != "汉阳.map" or state["player"]["life"] <= 0
                 or state["player"]["position"] != dict(x=65, y=128)):
             raise AutomationError("Meng sparring did not return alive through its normal victory scene")
@@ -1034,7 +1038,7 @@ def hanyang_to_zhongdu(client, output, *, magic_file_prefix="player-magic-", cam
     if camp_source_slot is not None:
         client.save_or_load(camp_source_slot)
         checkpoint(client, output, "middle-jin-camp-normal-branch-source")
-    go(client, 97, 6, destination="汉阳-中都1.map", combat=False)
+    go(client, 97, 6, destination="汉阳-中都1.map")
     if any(target["name"] == "老人" for target in idle(client)["targets"]):
         talk(client, "老人", (4, 12))
     late_jump(client, (10, 47), (18, 47))
@@ -1557,7 +1561,7 @@ def linan_approach(client, x, y, **arguments):
 
 def linan_and_fengchi(client, output, *, magic_file_prefix="player-magic-"):
     assert idle(client)["map"] == "临安城.map"
-    if client.observe(("FromFengChi",))["variables"].get("FromFengChi") != "1":
+    if client.observe(("FromFengChi",))["variables"].get("FromFengChi") not in ("1", "2"):
         # Jie'er occupies the only entrance to the courtyard containing the chest.
         talk(client, "婕儿")
         go(client, 142, 108, script="临安城/trap4.txt")
@@ -1574,17 +1578,22 @@ def linan_and_fengchi(client, output, *, magic_file_prefix="player-magic-"):
         talk(client, "守门家丁")
         verify(client, FenCiDaMenJiaDin=1)
         late_return_to_linan(client)
-    verify(client, FromFengChi=1)
-    linan_approach(client, 141, 139, script="临安城/trap9.txt")
-    talk(client, "柴嵩")
+    if client.observe(("FromFengChi",))["variables"].get("FromFengChi") != "2":
+        verify(client, FromFengChi=1)
+        linan_approach(client, 141, 139, script="临安城/trap9.txt")
+        talk(client, "柴嵩")
     state = verify(client, FromFengChi=2)
+    tianyi = item(state, magic_file_prefix + "天意剑诀.ini", "magic")
+    if tianyi["slot"] != state["layout"]["magicQuickBegin"]:
+        client.assign_magic(tianyi["slot"], 0)
+        state = idle(client)
     # The newly learned level-one Mengdie is weaker against the upcoming bosses.
     # Keep Tianyi attacking while Mengdie receives normal practice experience.
     dream_slot = item(state, magic_file_prefix + "梦蝶神功.ini", "magic")["slot"]
     previous_practice = next((entry["file"] for entry in state["magic"]
                               if entry["slot"] == state["layout"]["practiceSlot"]), None)
     if (item(state, magic_file_prefix + "天意剑诀.ini", "magic")["slot"] != state["layout"]["magicQuickBegin"]
-            or previous_practice not in (magic_file_prefix + "风雪狂刀.ini", magic_file_prefix + "弯刀冷光.ini")
+            or previous_practice is None
             or dream_slot >= state["layout"]["magicQuickBegin"]):
         raise AutomationError("Unexpected Tianyi/practice/Mengdie arrangement after Chai Song's lesson")
     client.assign_practice(dream_slot)
@@ -1627,30 +1636,31 @@ def pilitang_and_tournament(client, output, *, magic_file_prefix="player-magic-"
     go(client, 20, 153, script="霹雳堂/trap1.txt", combat=False)
     # Enter the hall through its walking corridor before selecting the boss;
     # firing from the entrance-side wall wastes mana on blocked projectiles.
-    go(client, 60, 56, combat=False)
-    go(client, 66, 44, combat=False)
-    boss = late_target(client, "雷同", (70, 40))
-    # Lei retreats behind the hall obstacles. Immobilize him normally, then
-    # walk into weapon range rather than repeatedly firing into those tiles.
-    state = idle(client)
-    client.assign_magic(item(state, magic_file_prefix + "定身法.ini", "magic")["slot"], quick_slot=1)
-    state = idle(client)
-    continue_practice(client)
-    try:
-        client.act("CastSkill", generation=state["generation"], slot=1, targetId=boss["id"])
-    except AutomationError as error:
-        if "action_not_executed" not in str(error):
-            raise
-        print("Immobilization interrupted; approach through normal melee movement", flush=True)
-    state = idle(client)
-    medicine = select_medicine(state, "life", require_ready=False)
-    result = client.act("StartCombat", timeout=245, generation=state["generation"],
-                        targetId=boss["id"], radius=20, kills=1, skills=[],
-                        allowMeleeFallback=True, timeoutMs=240000,
-                        lifeItem=medicine["file"] if medicine else LIFE_ITEM, lifePercent=45)
-    assert result["kills"] == 1, result
-    idle(client)
-    verify(client, FromFengChi=8)
+    go(client, 60, 56)
+    go(client, 66, 44)
+    if client.observe(("FromFengChi",))["variables"].get("FromFengChi") != "8":
+        boss = late_target(client, "雷同", (70, 40))
+        # Lei retreats behind the hall obstacles. Immobilize him normally, then
+        # walk into weapon range rather than repeatedly firing into those tiles.
+        state = idle(client)
+        client.assign_magic(item(state, magic_file_prefix + "定身法.ini", "magic")["slot"], quick_slot=1)
+        state = idle(client)
+        continue_practice(client)
+        try:
+            client.act("CastSkill", generation=state["generation"], slot=1, targetId=boss["id"])
+        except AutomationError as error:
+            if "action_not_executed" not in str(error):
+                raise
+            print("Immobilization interrupted; approach through normal melee movement", flush=True)
+        state = idle(client)
+        medicine = select_medicine(state, "life", require_ready=False)
+        result = client.act("StartCombat", timeout=245, generation=state["generation"],
+                            targetId=boss["id"], radius=20, kills=1, skills=[],
+                            allowMeleeFallback=True, timeoutMs=240000,
+                            lifeItem=medicine["file"] if medicine else LIFE_ITEM, lifePercent=45)
+        assert result["kills"] == 1, result
+        idle(client)
+        verify(client, FromFengChi=8)
     # The death scene replaces the boss with z40-雷同 at 65,45. His
     # normal corpse owns 捡到书.txt; resolve it after the death animation.
     state = client.wait_until(
@@ -2031,11 +2041,19 @@ def tianren_dungeons(client, output, *, branch_source_slot=None):
     for point in ((97, 223), (84, 103)):
         go(client, *point)
     go(client, 47, 93, script="中都/龙音寺门口地图陷阱5.txt")
-    go(client, 48, 92, script="中都/龙音寺门口地图陷阱6.txt")
+    gate_path = "script/map/中都/龙音寺门口地图陷阱6.txt"
+    gate_starts_before = sum(record.get("eventType") == "script.start" and record.get("virtualPath") == gate_path
+                             for record in late_records(output, "trace.jsonl"))
+    # The earlier farewell was consumed; Liao Ran explicitly rebinds this index below.
+    go(client, 48, 92)
     go(client, 60, 35)
     talk(client, "大和尚", (60, 34))
     verify(client, LongYinShiLiaoRan=1)
     go(client, 48, 92, script="中都/龙音寺门口地图陷阱6.txt")
+    gate_starts_after = sum(record.get("eventType") == "script.start" and record.get("virtualPath") == gate_path
+                            for record in late_records(output, "trace.jsonl"))
+    assert gate_starts_after == gate_starts_before + 1, "Temple farewell repeated before its native rebind"
+    checkpoint(client, output, "tianren-temple-old-intro-consumed-and-new-binding-ran")
     go(client, 130, 77, script="中都/地图陷阱13.txt")
     verify(client, JieTouXiaoFan=1)
     state = idle(client)
@@ -2050,18 +2068,18 @@ def tianren_dungeons(client, output, *, branch_source_slot=None):
 
 def tianren_dungeon_floors(client, output, *, branch_source_slot=None):
     assert idle(client)["map"] == "天忍教-地下迷宫1.map"
-    go(client, 55, 44)
+    go(client, 55, 44, combat=False)
     state = client.observe(("TrjDxmgshijiang",))
     if int(state["variables"].get("TrjDxmgshijiang") or 0) != 2:
         boss = late_target(client, "天忍教双斧教众1", (59, 33))
         fight(client, boss)
     verify(client, TrjDxmgshijiang=2)
-    go(client, 75, 93)
+    go(client, 75, 93, combat=False)
     talk(client, "铁匠", (76, 93))
     if branch_source_slot is not None:
         client.save_or_load(branch_source_slot)
         checkpoint(client, output, f"tianren-before-second-floor-normal-slot{branch_source_slot}")
-    go(client, 75, 30, destination="天忍教-地下迷宫2.map")
+    go(client, 75, 30, destination="天忍教-地下迷宫2.map", combat=False)
     tianren_second_floor(client, output)
 
 
@@ -2115,7 +2133,11 @@ def tianren_second_floor_boss(client, output):
     boss = late_target(client, "金国狼牙棒兵1", (15, 45))
     fight(client, boss, skills=(0,))
     verify(client, TrjDxmg=3)
-    go(client, 45, 106, destination="天忍教-地下迷宫3.map")
+    # The two optional generals occupy the narrow return passage.
+    go(client, 27, 73, combat=False)
+    client.act("JumpTo", generation=client.observe()["generation"], x=31, y=74, timeoutMs=10000)
+    assert idle(client)["player"]["position"] == dict(x=31, y=74)
+    go(client, 45, 106, destination="天忍教-地下迷宫3.map", combat=False)
     late_checkpoint(client, output, "late-08-final-map")
 
 

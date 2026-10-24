@@ -5,6 +5,7 @@
 #include <QSet>
 #include <QString>
 #include <functional>
+#include <array>
 
 #include "../core/GameProfile.h"
 #include "AssetsPathSwitchParticipant.h"
@@ -13,7 +14,6 @@
 class QLineEdit;
 class QByteArray;
 class QSpinBox;
-class QDoubleSpinBox;
 class QCheckBox;
 class QListWidget;
 class QComboBox;
@@ -153,6 +153,7 @@ private:
     void updateReleaseCompatibilityLabel();
     void updateReleaseCoverPreview();
     void updateExperiencePreview();
+    void updateActionReleaseTimingPreview();
 
     // 获取当前选中资源包的根目录
     QString currentPackRoot() const;
@@ -196,8 +197,6 @@ private:
 
     // [Experience]
     QComboBox* m_experienceModeCombo = nullptr;
-    QCheckBox* m_experienceMultiplierCheck = nullptr;
-    QDoubleSpinBox* m_experienceMultiplierSpin = nullptr;
     QComboBox* m_levelUpThresholdModeCombo = nullptr;
     QLabel* m_experiencePreviewLabel = nullptr;
 
@@ -210,6 +209,14 @@ private:
     // [Combat]
     QSpinBox* m_minimumMagicDamageSpin = nullptr;
     QComboBox* m_magicEffectCalculationModeCombo = nullptr;
+    struct ActionReleaseTimingControls
+    {
+        QComboBox* mode = nullptr;
+        QLineEdit* value = nullptr;
+        QLabel* preview = nullptr;
+        QLabel* label = nullptr;
+    };
+    std::array<ActionReleaseTimingControls, 3> m_actionReleaseTimingControls;
 
     // [Script]
     QComboBox* m_npcActionProfileCombo = nullptr;

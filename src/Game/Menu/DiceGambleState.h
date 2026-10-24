@@ -43,7 +43,7 @@ public:
 		std::string npcTalk;
 	};
 
-	void reset(int playerMoney, int npcMoney = BetStep);
+	void reset(int playerMoney, int npcMoney = BetStep, int betStep = BetStep);
 	bool addBet();
 	bool start();
 	bool open(const std::array<int, DiceCount>& playerDice,
@@ -58,6 +58,7 @@ public:
 
 	Phase phase() const;
 	int stake() const;
+	int betStep() const;
 	int playerMoney() const;
 	int npcMoney() const;
 	int lastMoneyDelta() const;
@@ -73,6 +74,7 @@ private:
 
 	Phase currentPhase = Phase::WaitingForBet;
 	int currentStake = 0;
+	int currentBetStep = BetStep;
 	int currentPlayerMoney = 0;
 	int currentNpcMoney = BetStep;
 	int moneyDelta = 0;

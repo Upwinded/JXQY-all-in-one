@@ -768,7 +768,7 @@ void MapThumbnailMenu::drawEntityMarkers()
 			}
 
 			Point npcPos = tileToThumbnailPixel(npc->getPosition(), npc->getOffset());
-			const float markerAlpha = getMarkerEdgeAlpha(npcPos.x, npcPos.y);
+			const float markerAlpha = 1.0f;
 
 			switch (npc->relation)
 			{

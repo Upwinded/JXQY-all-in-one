@@ -13,6 +13,82 @@
 #include "NPCActionSit.h"
 #include "NPCActionSpecial.h"
 #include "../NPC.h"
+#include "../Player.h"
+#include "../Map.h"
+#include "../../../Image/IMP.h"
+#include <algorithm>
+#include <cmath>
+
+namespace
+{
+class NPCActionOffsetWalk final : public NPCActionWalk
+{
+public:
+    NPCActionOffsetWalk(NPC* npc, PointEx destination, int direction)
+        : NPCActionWalk(npc), _destination(destination), _direction(direction)
+    {
+    }
+
+    void enter() override
+    {
+        _npc->destGE.reset();
+        _npc->haveAsyncDest = false;
+        _npc->clearStep();
+        _npc->stepList.clear();
+        _npc->cancelMoveResumeState();
+        _npc->direction = _direction;
+        _npc->nowAction = acWalk;
+        _npc->actionBeginTime = _beginTime = _npc->getTime();
+        _npc->actionLastTime = getActionTime();
+        _start = _npc->getOffset();
+        calStepLastTime(_npc->getAdjustedWalkSpeed());
+        const Point position = _npc->getPosition();
+        const float stepDistance = Map::getTileDistance(position, { 0, 0 },
+            Map::getSubPoint(position, _direction), { 0, 0 });
+        const float distance = Map::getTileDistance(position, _start, position, _destination);
+        _duration = std::max<UTime>(1, static_cast<UTime>(std::ceil(
+            static_cast<double>(_npc->stepLastTime) * distance / stepDistance)));
+        playSound();
+    }
+
+    void update(UTime) override
+    {
+        if (auto player = dynamic_cast<Player*>(_npc)) player->recoverWhenStandingOrWalking();
+        const UTime elapsed = _npc->getTime() - _beginTime;
+        if (elapsed >= _duration)
+        {
+            _npc->beginStand();
+            _npc->setOffset(_destination, true);
+            return;
+        }
+        const float progress = static_cast<float>(elapsed) / static_cast<float>(_duration);
+        _npc->setOffset({ _start.x + (_destination.x - _start.x) * progress,
+            _start.y + (_destination.y - _start.y) * progress }, true);
+    }
+
+    void exit() override {}
+    std::vector<Point> getStepPositions() const override { return {}; }
+    _shared_image getActionImage(int* x, int* y) override
+    {
+        return IMP::loadImageForDirection(_npc->res.walk.imagePackage, _direction,
+            _npc->getTime() - _npc->actionBeginTime, x, y);
+    }
+    _shared_image getActionShadow(int* x, int* y) override
+    {
+        return IMP::loadImageForDirection(_npc->res.walk.shadowPackage, _direction,
+            _npc->getTime() - _npc->actionBeginTime, x, y);
+    }
+    UTime getActionTime() const override { return IMP::getIMPImageActionTime(_npc->res.walk.imagePackage); }
+    void playSound() override { _npc->playSound(acWalk); }
+
+private:
+    PointEx _start = {};
+    PointEx _destination = {};
+    int _direction = 0;
+    UTime _beginTime = 0;
+    UTime _duration = 1;
+};
+}
 
 NPCActionManager::NPCActionManager(NPC* npc)
     : _npc(npc)
@@ -47,6 +123,20 @@ void NPCActionManager::forceChangeAction(NPCActionType type)
     }
 
     resetAction(type);
+}
+
+bool NPCActionManager::beginOffsetWalk(PointEx destination, int direction)
+{
+    if (_npc->isDying() || _npc->isHiding() || !_npc->canDoAction(&_npc->res.walk)) return false;
+    forceChangeAction(acStand);
+    auto oldAction = _currentAction;
+    if (oldAction) oldAction->exit();
+    _currentAction = std::make_shared<NPCActionOffsetWalk>(_npc, destination, direction);
+    _currentActionType = acWalk;
+    ++_actionRevision;
+    _currentAction->scripted = true;
+    _currentAction->enter();
+    return true;
 }
 
 void NPCActionManager::resetActionIgnoringTransitions(NPCActionType type)

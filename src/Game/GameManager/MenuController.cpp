@@ -679,7 +679,7 @@ void MenuController::openSystemMenu(bool focusOptions)
 	{
 		return;
 	}
-	if (gm->inEvent)
+	if (gm->inEvent || gm->hasPendingTrapScript())
 	{
 		showMessage("事件进行中，暂时无法打开系统菜单");
 		return;
@@ -759,11 +759,11 @@ void MenuController::init()
 	}
 
 	AddMenuChild(Panel, upMenu);
-	// System notices and script messages are top overlays. Story dialogs stay above ordinary
-	// in-scene panels, while normal gameplay messages retain their old layer.
+	// Passive messages draw after story dialogs and ordinary in-scene panels.
 	upMenu->setPriority(epMax + 2);
 
-	AddUpMenuChild(MsgBox, messageBox);
+	AddMenuChild(MsgBox, messageBox);
+	messageBox->setPriority(epMax);
 	AddUpMenuChild(StateMenu, stateMenu);
 	AddUpMenuChild(ToolTip, toolTip);
 	AddUpMenuChild(MemoMenu, memoMenu);
@@ -792,6 +792,9 @@ void MenuController::init()
 	mapThumbnailMenu->visible = false;
 	AddUpMenuChild(GambleMenu, gambleMenu);
 	gambleMenu->visible = false;
+	AddUpMenuChild(PaperMenu, paperMenu);
+	AddUpMenuChild(SkillTreeMenu, skillTreeMenu);
+	AddUpMenuChild(AttributePointMenu, attributePointMenu);
 	AddUpMenuChild(PartnerEquipMenu, partnerEquipMenu);
 	partnerEquipMenu->visible = false;
 	AddUpMenuChild(PartnerHeadMenu, partnerHeadMenu);
@@ -840,7 +843,7 @@ void MenuController::freeResource()
 	ownedPointerTransactions.clear();
 	observedInputLifecycleRevision = 0;
 
-	freeMenuofUp(messageBox);
+	freeMenu(messageBox);
 	freeMenuofUp(stateMenu);
 	freeMenuofUp(toolTip);
 	freeMenuofUp(memoMenu);
@@ -853,6 +856,9 @@ void MenuController::freeResource()
 	freeMenuofUp(buySellMenu);
 	freeMenuofUp(mapThumbnailMenu);
 	freeMenuofUp(gambleMenu);
+	freeMenuofUp(paperMenu);
+	freeMenuofUp(skillTreeMenu);
+	freeMenuofUp(attributePointMenu);
 	freeMenuofUp(partnerEquipMenu);
 	freeMenuofUp(partnerHeadMenu);
 	freeMenuofUp(npcInfoPanel);
@@ -1073,7 +1079,7 @@ bool MenuController::openPartnerEquipment(
 	bool returnToPartnerList)
 {
 	(void)returnToPartnerList;
-	if (!partner || !partner->isLivingPartner() || !equipMenu || !goodsMenu
+	if (!partner || !partner->canViewPartnerDetails() || !equipMenu || !goodsMenu
 		|| !equipMenu->selectPartner(partner)) return false;
 	if (!equipMenu->visible) toggleEquipView();
 	if (!goodsMenu->visible) toggleGoodsView();
@@ -1290,6 +1296,9 @@ bool MenuController::menuDisplayed()
 	addMenuVis(magicMenu);
 	addMenuVis(mapThumbnailMenu);
 	addMenuVis(partnerEquipMenu);
+	addMenuVis(paperMenu);
+	addMenuVis(skillTreeMenu);
+	addMenuVis(attributePointMenu);
 	vis = vis || (controllerFocusedRole == ControllerMenuRole::PartnerList
 		&& controllerFocusedMenu.lock() == partnerHeadMenu);
 
@@ -1330,6 +1339,9 @@ bool MenuController::blocksWorldInput() const
 			buySellMenu, MenuSurfaceCatalog::SurfaceId::BuySell)
 		|| blocksSemanticInput(
 			gambleMenu, MenuSurfaceCatalog::SurfaceId::GambleNormal)
+		|| blocksSemanticInput(paperMenu, MenuSurfaceCatalog::SurfaceId::Paper)
+		|| blocksSemanticInput(skillTreeMenu, MenuSurfaceCatalog::SurfaceId::SkillTree)
+		|| blocksSemanticInput(attributePointMenu, MenuSurfaceCatalog::SurfaceId::AttributePoints)
 		|| blocksSemanticInput(
 			partnerEquipMenu,
 			MenuSurfaceCatalog::SurfaceId::PartnerEquipment)
@@ -1355,6 +1367,9 @@ bool MenuController::blocksWorldKeyboardInput() const
 			buySellMenu, MenuSurfaceCatalog::SurfaceId::BuySell)
 		|| blocksKeyboardInput(
 			gambleMenu, MenuSurfaceCatalog::SurfaceId::GambleNormal)
+		|| blocksKeyboardInput(paperMenu, MenuSurfaceCatalog::SurfaceId::Paper)
+		|| blocksKeyboardInput(skillTreeMenu, MenuSurfaceCatalog::SurfaceId::SkillTree)
+		|| blocksKeyboardInput(attributePointMenu, MenuSurfaceCatalog::SurfaceId::AttributePoints)
 		|| blocksKeyboardInput(
 			partnerEquipMenu,
 			MenuSurfaceCatalog::SurfaceId::PartnerEquipment);
@@ -1386,6 +1401,9 @@ bool MenuController::blocksWorldPointerInput() const
 			buySellMenu, MenuSurfaceCatalog::SurfaceId::BuySell)
 		|| blocksPointerInput(
 			gambleMenu, MenuSurfaceCatalog::SurfaceId::GambleNormal)
+		|| blocksPointerInput(paperMenu, MenuSurfaceCatalog::SurfaceId::Paper)
+		|| blocksPointerInput(skillTreeMenu, MenuSurfaceCatalog::SurfaceId::SkillTree)
+		|| blocksPointerInput(attributePointMenu, MenuSurfaceCatalog::SurfaceId::AttributePoints)
 		|| blocksPointerInput(
 			partnerEquipMenu,
 			MenuSurfaceCatalog::SurfaceId::PartnerEquipment);
@@ -1402,7 +1420,7 @@ bool MenuController::hasActiveControllerPromptOwner()
 		return element != nullptr && element->visible && element->activated;
 	};
 	if (isVisible(dialog) || isVisible(chooseMenu) || isVisible(buySellMenu)
-		|| isVisible(gambleMenu) || isVisible(partnerEquipMenu))
+		|| isVisible(gambleMenu) || isVisible(partnerEquipMenu) || isVisible(paperMenu) || isVisible(skillTreeMenu) || isVisible(attributePointMenu))
 	{
 		return true;
 	}
@@ -1418,8 +1436,70 @@ bool MenuController::hasActiveControllerPromptOwner()
 	return getControllerFocusedMenu() != nullptr;
 }
 
+void MenuController::openPaper(int type, const std::vector<std::string>& contents)
+{
+	if (type < 1 || type > 3 || contents.empty()
+		|| (paperMenu != nullptr && paperMenu->visible)) return;
+	if (paperMenu == nullptr)
+	{
+		paperMenu = std::make_shared<PaperMenu>();
+		if (upMenu != nullptr) upMenu->addChild(paperMenu);
+		else addChild(paperMenu);
+	}
+	cancelWorldInteractionForMenuOpen();
+	cancelControllerInteraction();
+	ownedPointerTransactions.clear();
+	cancelPointerInteraction();
+	if (toolTip != nullptr) toolTip->hide();
+	paperMenu->open(type, contents);
+	if (engine != nullptr) engine->releasePhysicalInputsForContextTransition();
+}
+
+bool MenuController::openSkillTree()
+{
+	if (gm == nullptr || gm->inEvent || !gm->global.data.canInput || hasExclusiveControllerSurface()
+		|| !gm->global.skillTreeEnabled || gm->magicManager.skillTree().nodes.empty()) return false;
+	if (skillTreeMenu == nullptr)
+	{
+		skillTreeMenu = std::make_shared<SkillTreeMenu>();
+		if (upMenu != nullptr) upMenu->addChild(skillTreeMenu);
+		else addChild(skillTreeMenu);
+	}
+	cancelWorldInteractionForMenuOpen();
+	cancelControllerInteraction();
+	ownedPointerTransactions.clear();
+	cancelPointerInteraction();
+	if (toolTip != nullptr) toolTip->hide();
+	const bool opened = skillTreeMenu->open();
+	if (engine != nullptr) engine->releasePhysicalInputsForContextTransition();
+	return opened;
+}
+
+bool MenuController::openAttributePoints(const PElement& origin, const PElement& returnFocus)
+{
+	if (gm == nullptr || gm->inEvent || !gm->global.data.canInput || hasExclusiveControllerSurface()
+		|| !gm->global.attributePointRules.enabled || (equipMenu && equipMenu->getSelectedPartner())) return false;
+	if (attributePointMenu == nullptr)
+	{
+		attributePointMenu = std::make_shared<AttributePointMenu>();
+		if (upMenu != nullptr) upMenu->addChild(attributePointMenu);
+		else addChild(attributePointMenu);
+	}
+	cancelWorldInteractionForMenuOpen();
+	cancelControllerInteraction();
+	ownedPointerTransactions.clear();
+	cancelPointerInteraction();
+	if (toolTip != nullptr) toolTip->hide();
+	const bool opened = attributePointMenu->open(origin, returnFocus);
+	if (engine != nullptr) engine->releasePhysicalInputsForContextTransition();
+	return opened;
+}
+
 void MenuController::clearMenu()
 {
+	if (attributePointMenu != nullptr && attributePointMenu->visible) attributePointMenu->close(false);
+	if (skillTreeMenu != nullptr && skillTreeMenu->visible) skillTreeMenu->close(false);
+	if (paperMenu != nullptr && paperMenu->visible) paperMenu->close();
 	closePartnerEquipment(false);
 	cancelControllerInteraction();
 	controllerFocusedMenu.reset();
@@ -1457,7 +1537,7 @@ PElement MenuController::getControllerFocusedMenu()
 	// Nested modal owners dispatch their own semantic actions. Do not route an
 	// underlying ordinary menu while one of them is active.
 	if (isVisible(dialog) || isVisible(chooseMenu) || isVisible(buySellMenu)
-		|| isVisible(gambleMenu))
+		|| isVisible(gambleMenu) || isVisible(paperMenu) || isVisible(skillTreeMenu) || isVisible(attributePointMenu))
 	{
 		cancelControllerInteraction();
 		return nullptr;
@@ -1606,6 +1686,9 @@ bool MenuController::hasExclusiveControllerSurface() const
 		|| isVisible(chooseMenu)
 		|| isVisible(buySellMenu)
 		|| isVisible(gambleMenu)
+		|| isVisible(paperMenu)
+		|| isVisible(skillTreeMenu)
+		|| isVisible(attributePointMenu)
 		|| isVisible(partnerEquipMenu);
 }
 
@@ -2775,6 +2858,15 @@ bool MenuController::closeVisibleUnfocusedControllerSurface(
 bool MenuController::onHandleUIAction(UIAction action)
 {
 	synchronizeInputLifecycle();
+	if (attributePointMenu != nullptr && attributePointMenu->visible) return attributePointMenu->handleUIAction(action);
+	if (skillTreeMenu != nullptr && skillTreeMenu->visible)
+	{
+		return skillTreeMenu->handleUIAction(action);
+	}
+	if (paperMenu != nullptr && paperMenu->visible)
+	{
+		return paperMenu->handleUIAction(action);
+	}
 	if (toolTip && toolTip->turnPage(action)) return true;
 	UIFocusDirection direction = UIFocusDirection::Up;
 	bool directionalAction = true;
@@ -2982,7 +3074,7 @@ void MenuController::onDrawEnd()
 	else
 	{
 		const PElement focusedMenu = getControllerFocusedMenu();
-		if (isVisible(buySellMenu) || isVisible(gambleMenu)
+		if (isVisible(buySellMenu) || isVisible(gambleMenu) || isVisible(paperMenu) || isVisible(skillTreeMenu) || isVisible(attributePointMenu)
 			|| (mapThumbnailMenu != nullptr
 				&& focusedMenu == mapThumbnailMenu
 				&& mapThumbnailMenu->isControllerFocusActive()))

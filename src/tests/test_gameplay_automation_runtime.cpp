@@ -45,6 +45,26 @@ public:
 		auto state = session.observe(object());
 		require(member(state, "choices").arrayValues.size() == 1, "hidden choice is not observed");
 		require(textMember(state, "choiceMessage") == configuration.message, "Chinese choice text survives snapshot");
+		{
+			auto effect = std::make_shared<Effect>();
+			effect->magic.iniName = "observed_fly_magic.ini";
+			effect->level = 1;
+			effect->damage = 340;
+			effect->position = { 7, 9 };
+			effect->flyMagicElapsedMilliseconds = 40;
+			manager.effectManager->effectList.push_back(effect);
+			auto arguments = object();
+			arguments.objectValues["includeEffects"] = GameplayAutomation::boolean(true);
+			const auto observed = session.observe(arguments);
+			const auto& row = member(observed, "effects").arrayValues.front();
+			require(!session.observe(object()).objectValues.count("effects")
+				&& textMember(row, "file") == effect->magic.iniName
+				&& integer(member(row, "damage")) == 340
+				&& integer(member(row, "flyElapsedMs")) == 40
+				&& effect->position == Point{ 7, 9 } && effect->flyMagicElapsedMilliseconds == 40,
+				"optional effect observation reads active magic without advancing or modifying it");
+			manager.effectManager->effectList.pop_back();
+		}
 		auto requireCheatState = [&](bool enabled, bool invincibility)
 		{
 			const auto observed = session.observe(object());
@@ -291,6 +311,137 @@ public:
 		auto* engine = Engine::getInstance();
 		const bool previousFrameReady = engine->currentFrameReady.exchange(true);
 		manager.global.data.canInput = true;
+		{
+			const auto previousNpcs = manager.npcManager->npcList;
+			const bool previousAI = manager.global.data.NPCAI;
+			auto looper = std::make_shared<NPC>();
+			looper->kind = nkNormal;
+			looper->isVisibleByVariable = true;
+			looper->res.stand.imagePackage = player->res.magic.imagePackage;
+			looper->res.walk.imagePackage = player->res.magic.imagePackage;
+			looper->setPosition({15, 15}, false);
+			looper->setTime(NPC_WALK_INTERVAL + 1);
+			looper->strollIntent = nsiGo;
+			looper->actionPathTilePositions = {{15, 15}, {16, 16}};
+			manager.npcManager->npcList = {looper};
+			manager.global.data.NPCAI = true;
+			manager.npcManager->npcAutoAction();
+			require(looper->isStanding() && looper->stepList.empty(),
+				"Action=2 without FixedPos remains stationary instead of blocking a passage by random walking");
+			looper->fixedPathTilePositions = {{15, 15}, {16, 16}};
+			manager.npcManager->npcAutoAction();
+			require(looper->isWalking() && !looper->stepList.empty()
+				&& looper->stepList.back() == Point{16, 16},
+				"Action=2 with a fixed route still starts its native loop walk");
+			looper->actionManager->changeAction(acStand);
+			looper->fixedPathTilePositions.clear();
+			looper->strollIntent = nsiStroll;
+			looper->walkTime = 0;
+			manager.npcManager->npcAutoAction();
+			require(looper->isWalking(), "Action=1 retains native random walking");
+			looper->actionManager->changeAction(acStand);
+			auto controlEffect = std::make_shared<Effect>();
+			manager.player->beginControlCharacter(looper, controlEffect);
+			require(!looper->isAIEnabled(), "player control suspends autonomous NPC decisions");
+			looper->walkTime = 0;
+			manager.npcManager->npcAutoAction();
+			require(looper->isStanding(), "a controlled NPC does not start random walking");
+			looper->setDestinationMapPosition({16, 16});
+			require(!looper->tryMoveToDestinationMapPosition()
+				&& looper->hasDestinationMapPosition(),
+				"player control pauses an autonomous destination without discarding it");
+			looper->clearDestinationMapPosition();
+			looper->beginWalk({16, 16});
+			require(looper->isWalking(), "a controlled NPC still accepts explicit movement");
+			manager.player->endControlCharacter();
+			require(looper->isAIEnabled(), "autonomous NPC decisions resume after control ends");
+			looper->walkTime = 0;
+			manager.npcManager->npcAutoAction();
+			require(looper->isWalking(), "random walking resumes after player control ends");
+			looper->actionManager->changeAction(acStand);
+			manager.npcManager->npcList = previousNpcs;
+			manager.global.data.NPCAI = previousAI;
+		}
+		{
+			HeadlessPhysicalInputTest::ScopedRunningOwner worldOwner(nullptr);
+			const auto previousSkill = equippedMagic;
+			const auto previousNpcs = manager.npcManager->npcList;
+			auto recipient = std::make_shared<NPC>();
+			recipient->kind = nkPartner;
+			recipient->relation = nrFriendly;
+			recipient->life = 10;
+			recipient->lifeMax = 100;
+			recipient->mana = 20;
+			recipient->manaMax = 80;
+			recipient->level = 7;
+			recipient->exp = 123;
+			recipient->setPosition({11, 10}, false);
+			manager.npcManager->npcList = { recipient };
+			auto support = std::make_shared<Magic>();
+			support->level[1].moveKind = mmkSelf;
+			support->level[1].specialKind = mskAddLife;
+			support->level[1].effect = 25;
+			equippedMagic.magic = support;
+			equippedMagic.level = 1;
+			equippedMagic.remainColdMilliseconds = 0;
+			auto castArguments = object();
+			castArguments.objectValues = {{"generation", number(session.generation)},
+				{"slot", number(0)}, {"targetId", number(session.identify(recipient))}};
+			const int manaBefore = player->mana;
+			require(textMember(command("CastSkill", castArguments), "status") == "running"
+				&& player->nextAction && player->nextAction->destGE.lock() == recipient
+				&& player->nextAction->requiresFriendlyMagicTarget && player->mana == manaBefore,
+				"CastSkill accepts a support recipient through the native explicit-target queue");
+			session.cancelWorld("test_complete");
+			const auto observed = session.observe(object());
+			const auto& row = member(observed, "targets").arrayValues.front();
+			require(integer(member(row, "lifeMax")) == 100 && integer(member(row, "mana")) == 20
+				&& integer(member(row, "manaMax")) == 80 && integer(member(row, "level")) == 7
+				&& integer(member(row, "exp")) == 123 && integer(member(row, "relation")) == nrFriendly,
+				"Observe reads actual companion resources, level, experience and relation without changing them");
+			support->level[1].moveKind = mmkFly;
+			require(textMember(command("CastSkill", castArguments), "reason") == "invalid_enemy"
+				&& !player->nextAction, "offensive skills cannot use an allied test target");
+			support->level[1].moveKind = mmkSelf;
+			recipient->relation = nrNeutral;
+			require(textMember(command("CastSkill", castArguments), "reason") == "invalid_enemy"
+				&& !player->nextAction, "neutral companions do not become support targets through automation");
+			recipient->relation = nrFriendly;
+			castArguments.objectValues.erase("slot");
+			require(textMember(command("Attack", castArguments), "reason") == "invalid_enemy"
+				&& !player->nextAction, "support targeting does not relax normal attack eligibility");
+			equippedMagic = previousSkill;
+			manager.npcManager->npcList = previousNpcs;
+		}
+		{
+			HeadlessPhysicalInputTest::ScopedRunningOwner worldOwner(nullptr);
+			auto castArguments = object();
+			castArguments.objectValues = {{"generation", number(session.generation)},
+				{"slot", number(0)}, {"x", number(12)}, {"y", number(10)}};
+			const int manaBefore = player->mana;
+			require(textMember(command("CastSkill", castArguments), "status") == "running"
+				&& player->nextAction && player->nextAction->dest == Point{12, 10}
+				&& player->nextAction->destGE.expired() && player->mana == manaBefore,
+				"ground casting queues an ordinary skill at the requested position without a target lock or upfront mana change");
+			session.cancelWorld("test_complete");
+			castArguments.objectValues["x"] = number(64);
+			require(textMember(command("CastSkill", castArguments), "status") == "failed"
+				&& !player->nextAction, "ground casting rejects positions outside the current map");
+			castArguments.objectValues["x"] = number(12);
+			castArguments.objectValues.erase("y");
+			require(textMember(command("CastSkill", castArguments), "status") == "failed"
+				&& !player->nextAction, "ground casting requires both coordinates");
+			castArguments.objectValues["y"] = number(10);
+			castArguments.objectValues["targetId"] = number(1);
+			require(textMember(command("CastSkill", castArguments), "reason") == "invalid_skill_destination"
+				&& !player->nextAction, "ground casting cannot also specify a target lock");
+			castArguments.objectValues.erase("targetId");
+			equippedMagic.remainColdMilliseconds = 100;
+			require(textMember(command("CastSkill", castArguments), "status") == "failed"
+				&& !player->nextAction && player->mana == manaBefore,
+				"ground casting retains the skill cooldown and normal resource checks");
+			equippedMagic.remainColdMilliseconds = 0;
+		}
 		player->canRun = true;
 		player->res.stand.imagePackage = player->res.magic.imagePackage;
 		player->res.walk.imagePackage = player->res.magic.imagePackage;
@@ -307,6 +458,28 @@ public:
 		state = session.observe(object());
 		require(boolMember(member(state, "targets").arrayValues.front(), "visibleFromPlayer"),
 			"NPC snapshot reports a visible enemy in the same corridor");
+		{
+			const int originalAttack = distantTarget->attack;
+			distantTarget->attack = 80;
+			distantTarget->disableMoveMilliseconds = 5500;
+			distantTarget->blindMilliseconds = 4500;
+			distantTarget->weakMilliseconds = 3500;
+			distantTarget->weakMagic = std::make_shared<Magic>();
+			distantTarget->weakMagic->weakAttackPercent = 25;
+			const auto observed = session.observe(object());
+			const auto& target = member(observed, "targets").arrayValues.front();
+			require(integerMember(target, "attack", 0, 100) == 60
+				&& integerMember(target, "disableMoveMs", 0, 10000) == 5500
+				&& integerMember(target, "blindMs", 0, 10000) == 4500
+				&& integerMember(target, "weakMs", 0, 10000) == 3500,
+				"NPC snapshot reports effective attack and the actual control-state timers");
+			require(distantTarget->disableMoveMilliseconds == 5500 && distantTarget->blindMilliseconds == 4500
+				&& distantTarget->weakMilliseconds == 3500 && distantTarget->getAttack() == 60,
+				"observing NPC status does not advance or change the native state");
+			distantTarget->attack = originalAttack;
+			distantTarget->disableMoveMilliseconds = distantTarget->blindMilliseconds = distantTarget->weakMilliseconds = 0;
+			distantTarget->weakMagic.reset();
+		}
 		manager.map->data->tile[10][11].obstacle = 0x80;
 		manager.map->data->tile[10][12].obstacle = 0x80;
 		state = session.observe(object());
@@ -349,6 +522,8 @@ public:
 		const auto previousAttackOptions = player->attackOptions;
 		const int previousEvade = player->evade;
 		const auto previousDeathImage = distantTarget->res.death.imagePackage;
+		const int previousHitRoll = distantTarget->testMagicHitRoll;
+		distantTarget->testMagicHitRoll = 0;
 		player->npcMagic = manager.magicManager.loadAttackMagic(u8"player-magic-长剑.ini");
 		player->rebuildAttackOptions();
 		player->evade = distantTarget->getEvade() + 1;
@@ -388,6 +563,7 @@ public:
 		player->attackOptions = previousAttackOptions;
 		player->evade = previousEvade;
 		distantTarget->res.death.imagePackage = previousDeathImage;
+		distantTarget->testMagicHitRoll = previousHitRoll;
 		distantTarget->result = 0;
 		distantTarget->actionManager->resetActionIgnoringTransitions(acStand);
 		manager.npcManager->npcList = {distantTarget};
@@ -628,6 +804,26 @@ public:
 			&& player->getPosition() == interruptedArrival && player->offset == PointEx{0, 0},
 			"failed combat stops at the next tile center without continuing its chase");
 
+		player->actionManager->resetActionIgnoringTransitions(acStand);
+		player->nextAction.reset();
+		player->setPosition({10, 10}, false);
+		distantTarget->setPosition({11, 10}, false);
+		player->mana = 1000;
+		player->bounceVelocity = 50;
+		player->actionManager->forceChangeAction(acBounce);
+		auto& bouncingCombat = startCombat(distantTarget, 1);
+		bouncingCombat.arguments = strictEmptyCombat.arguments;
+		session.updateWorldAction();
+		require(player->isStanding() && player->isBouncing() && bouncingCombat.status == "running"
+			&& !player->nextAction && player->actionManager->getCurrentActionType() == acBounce,
+			"combat waits for knockback even though its presentation uses a standing pose");
+		player->bounceVelocity = 0;
+		player->actionManager->resetActionIgnoringTransitions(acStand);
+		session.updateWorldAction();
+		require(player->nextAction && player->nextAction->action == acMagic,
+			"normal skill admission resumes after knockback ends");
+		session.cancelWorld("test_complete");
+
 		// Recorded Bieli forest cast: the caster's visibility line is clear, but
 		// the forward projectile spawn changes its slope and crosses a tree.
 		const auto previousMapData = manager.map->data;
@@ -743,6 +939,7 @@ public:
 			INIReader npcFixture(npcBytes);
 			auto xuanci = std::make_shared<NPC>();
 			xuanci->initFromIni(&npcFixture, "npc137");
+			xuanci->testMagicHitRoll = 0;
 			xuanci->relation = nrHostile;
 			manager.npcManager->npcList = {xuanci};
 			manager.map->createDataMap();
@@ -897,6 +1094,26 @@ public:
 				<= player->estimatePhysicalReach(*equippedMagic.magic, equippedMagic.level),
 			"mandatory ranged approach reaches a firing tile on this side of an uncrossable barrier");
 		session.cancelWorld("test_complete");
+		player->setPosition({56, 32}, false);
+		equippedMagic.magic->carryUser = 4;
+		std::string carryReason;
+		require(!session.queueSkill(0, distantTarget, true, &carryReason)
+			&& carryReason == "skill_out_of_range" && !player->nextAction && player->mana == 1000,
+			"ground-carrying combat rejects water that permits ordinary projectiles");
+		require(session.queueSkill(0, distantTarget, false) && player->nextAction,
+			"explicit ground-carry casting retains native terrain collision");
+		player->nextAction.reset();
+		equippedMagic.magic->passThroughWall = 1;
+		require(session.queueSkill(0, distantTarget, true) && player->nextAction,
+			"wall-passing carry retains its native terrain bypass");
+		player->nextAction.reset();
+		equippedMagic.magic->passThroughWall = 0;
+		equippedMagic.magic->carryUser = 1;
+		require(session.queueSkill(0, distantTarget, true) && player->nextAction,
+			"carry-one projectile can continue after its caster detaches at water");
+		player->nextAction.reset();
+		equippedMagic.magic->carryUser = 0;
+		player->setPosition({2, 32}, false);
 		for (auto& row : manager.map->data->tile) row[58].obstacle = 0x80;
 		auto& blockedCombat = startCombat(distantTarget, 1);
 		blockedCombat.arguments = strictEmptyCombat.arguments;
@@ -939,6 +1156,41 @@ public:
 			"recovered mana permits the next targeted skill without a melee fallback");
 		session.cancelWorld("test_complete");
 		manager.goodsManager.clearItemByFileName(manaMedicine);
+
+		const std::string thewMedicine = u8"goods-yaowu-9-三花散.ini";
+		const int previousThew = player->thew;
+		const int previousThewMax = player->thewMax;
+		require(manager.goodsManager.addItem(thewMedicine, 2), "thew medicine fixture loads");
+		int thewSlot = -1;
+		for (int i = 0; i < manager.goodsManager.listLength(); ++i)
+			if (manager.goodsManager.goodsList[i].iniFile == thewMedicine) { thewSlot = i; break; }
+		require(thewSlot >= 0, "thew medicine occupies the normal inventory");
+		player->thewMax = 1000;
+		player->calInfo();
+		player->thew = 0;
+		manager.goodsManager.goodsList[thewSlot].remainColdMilliseconds = 100;
+		auto thewArguments = object();
+		thewArguments.objectValues = {{"generation", number(session.generation)},
+			{"targetId", number(session.identify(distantTarget))}, {"thewItem", string(thewMedicine)},
+			{"thewPercent", number(10)}};
+		auto thewResult = command("StartCombat", thewArguments);
+		const std::string thewFailure = "combat accepts an optional thew supply: " + textMember(thewResult, "reason");
+		require(textMember(thewResult, "status") == "running", thewFailure.c_str());
+		session.updateWorldAction();
+		require(player->thew == 0 && manager.goodsManager.goodsList[thewSlot].number == 2,
+			"combat respects thew medicine cooldown without inventing resources");
+		manager.goodsManager.goodsList[thewSlot].remainColdMilliseconds = 0;
+		session.updateWorldAction();
+		require(player->thew == 180 && manager.goodsManager.goodsList[thewSlot].number == 1,
+			"combat restores thew by consuming one real inventory medicine");
+		session.cancelWorld("test_complete");
+		manager.goodsManager.clearItemByFileName(thewMedicine);
+		player->thewMax = previousThewMax;
+		player->calInfo();
+		player->thew = previousThew;
+		player->nextAction.reset();
+		player->nextDest = ndNone;
+		player->actionManager->resetActionIgnoringTransitions(acStand);
 
 		// A normal path stops when an NPC enters its next tile. Only the test
 		// controller retains the requested destination and retries through Player.
@@ -1219,6 +1471,12 @@ public:
 		require(player->isStanding() && player->mana == 100 && player->thew == SIT_THEW_COST - 1,
 			"native sitting stops when thew cannot pay its cost");
 
+		const auto staminaTestAttackMagic = player->npcMagic;
+		const auto staminaTestAttackOptions = player->attackOptions;
+		player->npcMagic = manager.magicManager.loadAttackMagic(u8"player-magic-长剑.ini");
+		require(player->npcMagic != nullptr && player->npcMagic->loadSucceeded,
+			"stamina fixture loads the normal attack required to enter its action");
+		player->rebuildAttackOptions();
 		manager.setCheatModeEnabled(true);
 		manager.performCheatAction(GameManager::CheatAction::ToggleInvincibility);
 		player->mana = player->thew = 40;
@@ -1265,6 +1523,8 @@ public:
 		player->beginJump({10, 18});
 		require(player->isStanding() && !player->canPayRunThewCost(),
 			"turning cheats off restores zero-stamina movement restrictions");
+		player->npcMagic = staminaTestAttackMagic;
+		player->attackOptions = staminaTestAttackOptions;
 		CloseHandle(manualConnection);
 		engine->currentFrameReady.store(previousFrameReady);
 

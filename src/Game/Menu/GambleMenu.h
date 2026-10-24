@@ -20,6 +20,7 @@ public:
 
 	bool open(int cost, int npcType);
 	bool openDiceGame(const std::string& npcName);
+	int openMiniGameGamble(int opponentMoney, int gameType, const std::string& npcName);
 	bool openFishGame();
 
 	virtual void init() override;
@@ -39,6 +40,7 @@ private:
 	UTime roundResolvedBeginTime = 0;
 	bool roundWin = false;
 	bool betBig = false;
+	bool miniGameRules = false;
 	std::string displayName;
 
 	enum MenuMode
@@ -156,6 +158,7 @@ private:
 
 	void resetForRound(int roundCost, int roundNpcType);
 	void resetForDiceGame(const std::string& npcName);
+	void resetForMiniGameGamble(int opponentMoney, int gameType, const std::string& npcName);
 	void resetForFishGame();
 	bool loadResourceLayout();
 	bool loadDiceResourceLayout();

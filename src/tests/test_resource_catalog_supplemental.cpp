@@ -310,7 +310,6 @@ bool createFixture(const fs::path& root)
 			"Type=1\n"
 			"[Experience]\n"
 			"DefeatedNpcExperienceMode=StoredExperience\n"
-			"ExperienceMultiplier=2.5\n"
 			"[UI]\n"
 			"Profile=YYCS\n"
 			"[Save]\n"
@@ -333,8 +332,7 @@ bool createFixture(const fs::path& root)
 			"Name=External Support\n"
 			"Type=2\n"
 			"[Experience]\n"
-			"LevelUpThresholdMode=GreaterThan\n"
-			"ExperienceMultiplier=4.5\n") &&
+			"LevelUpThresholdMode=GreaterThan\n") &&
 		writeText(
 			root / "external/c-single/game_profile.ini",
 			"[Game]\n"
@@ -514,12 +512,10 @@ bool testCombinedSelection(const fs::path& root)
 		selected.selection.activeManifest.defeatedNpcExperienceModeDefined &&
 			selected.selection.activeManifest.defeatedNpcExperienceMode ==
 				DefeatedNpcExperienceMode::StoredExperience &&
-			selected.selection.activeManifest.experienceMultiplierDefined &&
-			selected.selection.activeManifest.experienceMultiplier == 2.5 &&
 			selected.selection.activeManifest.levelUpThresholdModeDefined &&
 			selected.selection.activeManifest.levelUpThresholdMode ==
 				LevelUpThresholdMode::GreaterThan,
-		"active pack inherits undefined experience settings from the declared dependency chain in order") && ok;
+		"active pack inherits its experience formula and level threshold from the declared dependency chain in order") && ok;
 	ok = check(
 		!hasDiagnostic(
 			selected.diagnostics,
@@ -639,7 +635,7 @@ bool testLevelUpInheritance(const fs::path& root)
 			"[Game]\nId=LEVEL_MOD\nType=0\n"
 			"[Resource]\nDependencyId=LEVEL_MIDDLE,LEVEL_OTHER\n"
 			"[Experience]\nDefeatedNpcExperienceMode=StoredExperience\n"
-			"ExperienceMultiplier=3\nLevelUpThresholdMode=GreaterThanOrEqual\n");
+			"LevelUpThresholdMode=GreaterThanOrEqual\n");
 	RuntimeResource::ResourceCatalogRequest request;
 	request.primaryCollectionRoot = collection;
 	const auto inherited = RuntimeResource::resolveExactResourceSelection(request, "LEVEL_MOD");

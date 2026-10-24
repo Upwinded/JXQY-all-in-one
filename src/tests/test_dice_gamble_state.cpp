@@ -1,6 +1,7 @@
 #include "../Game/Menu/DiceGambleState.h"
 
 #include <iostream>
+#include <limits>
 
 namespace
 {
@@ -76,6 +77,21 @@ int main()
 		"tie leaves both economies unchanged") && ok;
 
 	auto outcome = DiceGambleState::evaluate({ 4, 4, 6 }, { 2, 3, 4 });
+	state.reset(150, 5000, 100);
+	ok = check(state.betStep() == 100 && state.addBet() && state.addBet() && state.stake() == 200,
+		"MG ShowMiniGame uses hundred-silver steps and permits the final partial-bankroll bet") && ok;
+	state.start();
+	state.open({ 1, 2, 4 }, { 6, 6, 6 });
+	state.update(4000);
+	ok = check(state.playerMoney() == 0 && state.npcMoney() == 5200 && state.lastMoneyDelta() == -200,
+		"an overcommitted MG loss clamps player currency while transferring the stated bet") && ok;
+	state.reset(std::numeric_limits<int>::max(), std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
+	state.addBet();
+	state.start();
+	state.open({ 6, 6, 6 }, { 1, 2, 4 });
+	state.update(4000);
+	ok = check(state.playerMoney() == std::numeric_limits<int>::max() && state.npcMoney() == 0,
+		"large dice bankrolls settle without signed overflow") && ok;
 	ok = check(outcome.playerTalk.rfind("好运连连，对子……", 0) == 0,
 		"player talk includes MG pair prefix") && ok;
 	ok = check(outcome.npcTalk.rfind("顺子……", 0) == 0,

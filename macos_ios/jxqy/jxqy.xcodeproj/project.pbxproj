@@ -499,6 +499,16 @@
 		1220D9FC0A6AB05159308598 /* AutomationPipe.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 080F2163E9A2E75D8F575346 /* AutomationPipe.cpp */; };
 		1F908660507AA679A5BE4A57 /* GameplayAutomationSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */; };
 		D981D37D3D7F60CE844899FF /* GameplayAutomationSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */; };
+		CCDD084EF34B14506E6A6DF3 /* AttributePoints.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 876F2CE95D213E75168566EA /* AttributePoints.cpp */; };
+		C9C3E6B75B4E1ACC3C5BC589 /* AttributePoints.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 876F2CE95D213E75168566EA /* AttributePoints.cpp */; };
+		22AF6CC70CEE1DD20C5C1FDD /* SkillTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 64462775F13F441CEBCB3A3D /* SkillTree.cpp */; };
+		BD1956D3414FB527D72436E1 /* SkillTree.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 64462775F13F441CEBCB3A3D /* SkillTree.cpp */; };
+		9C09B0A81AF733BCCCF32549 /* AttributePointMenu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 698FA164B7DF056F91D57E30 /* AttributePointMenu.cpp */; };
+		A5C938A7135EFA0D9065F990 /* AttributePointMenu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 698FA164B7DF056F91D57E30 /* AttributePointMenu.cpp */; };
+		E08A79F2D3419BAC5BDD4122 /* PaperMenu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 77F0D410CD7727109F591B91 /* PaperMenu.cpp */; };
+		7FB66E695E53B572D9E06128 /* PaperMenu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 77F0D410CD7727109F591B91 /* PaperMenu.cpp */; };
+		5472124EE4E2C3DD98E86BD7 /* SkillTreeMenu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52082DB959A6191D75D4ED86 /* SkillTreeMenu.cpp */; };
+		FD9447D901E3B62D4246C9A4 /* SkillTreeMenu.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 52082DB959A6191D75D4ED86 /* SkillTreeMenu.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -1026,6 +1036,16 @@
 		D25000000000000000000003 /* ExclusiveLoadingRunner.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ExclusiveLoadingRunner.cpp; sourceTree = "<group>"; };
 		080F2163E9A2E75D8F575346 /* AutomationPipe.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = GameplayAutomation/AutomationPipe.cpp; sourceTree = "<group>"; };
 		E51D8EB80892BF272041EC5C /* GameplayAutomationSession.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = GameplayAutomation/GameplayAutomationSession.cpp; sourceTree = "<group>"; };
+		876F2CE95D213E75168566EA /* AttributePoints.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AttributePoints.cpp; sourceTree = "<group>"; };
+		4F86DCCEE8BCE8ECD47DBB18 /* AttributePoints.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AttributePoints.h; sourceTree = "<group>"; };
+		64462775F13F441CEBCB3A3D /* SkillTree.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SkillTree.cpp; sourceTree = "<group>"; };
+		C0296FEB7EC33AB8F04B1713 /* SkillTree.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SkillTree.h; sourceTree = "<group>"; };
+		698FA164B7DF056F91D57E30 /* AttributePointMenu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = AttributePointMenu.cpp; sourceTree = "<group>"; };
+		A8EC4703F6D5C7E0493FA55C /* AttributePointMenu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AttributePointMenu.h; sourceTree = "<group>"; };
+		77F0D410CD7727109F591B91 /* PaperMenu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = PaperMenu.cpp; sourceTree = "<group>"; };
+		0B6988B8E8C7C4D67DE54F0D /* PaperMenu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = PaperMenu.h; sourceTree = "<group>"; };
+		52082DB959A6191D75D4ED86 /* SkillTreeMenu.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = SkillTreeMenu.cpp; sourceTree = "<group>"; };
+		4C94257C409BEE59AF1C0ABB /* SkillTreeMenu.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SkillTreeMenu.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -1343,6 +1363,12 @@
 		8DCE5B4B2AC41A3D00BBCF22 /* Menu */ = {
 			isa = PBXGroup;
 			children = (
+				698FA164B7DF056F91D57E30 /* AttributePointMenu.cpp */,
+				A8EC4703F6D5C7E0493FA55C /* AttributePointMenu.h */,
+				77F0D410CD7727109F591B91 /* PaperMenu.cpp */,
+				0B6988B8E8C7C4D67DE54F0D /* PaperMenu.h */,
+				52082DB959A6191D75D4ED86 /* SkillTreeMenu.cpp */,
+				4C94257C409BEE59AF1C0ABB /* SkillTreeMenu.h */,
 				A10000000000000000000009 /* ControllerPromptPresenter.cpp */,
 				A1000000000000000000000A /* ControllerPromptPresenter.h */,
 				8DCE5B4C2AC41A3D00BBCF22 /* SkillsPanel.cpp */,
@@ -1446,6 +1472,10 @@
 		8DCE5B7D2AC41A3D00BBCF22 /* Data */ = {
 			isa = PBXGroup;
 			children = (
+				876F2CE95D213E75168566EA /* AttributePoints.cpp */,
+				4F86DCCEE8BCE8ECD47DBB18 /* AttributePoints.h */,
+				64462775F13F441CEBCB3A3D /* SkillTree.cpp */,
+				C0296FEB7EC33AB8F04B1713 /* SkillTree.h */,
 				A10000000000000000000007 /* ColorStyle.cpp */,
 				A10000000000000000000008 /* ColorStyle.h */,
 				8DCE5B7E2AC41A3D00BBCF22 /* GameElement.h */,
@@ -2004,6 +2034,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CCDD084EF34B14506E6A6DF3 /* AttributePoints.cpp in Sources */,
+				22AF6CC70CEE1DD20C5C1FDD /* SkillTree.cpp in Sources */,
+				9C09B0A81AF733BCCCF32549 /* AttributePointMenu.cpp in Sources */,
+				E08A79F2D3419BAC5BDD4122 /* PaperMenu.cpp in Sources */,
+				5472124EE4E2C3DD98E86BD7 /* SkillTreeMenu.cpp in Sources */,
 				D25100000000000000000001 /* RuntimeSaveGenerationPolicy.cpp in Sources */,
 				D25100000000000000000003 /* SaveGeneration.cpp in Sources */,
 				D25100000000000000000005 /* ExclusiveLoadingRunner.cpp in Sources */,
@@ -2230,6 +2265,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C9C3E6B75B4E1ACC3C5BC589 /* AttributePoints.cpp in Sources */,
+				BD1956D3414FB527D72436E1 /* SkillTree.cpp in Sources */,
+				A5C938A7135EFA0D9065F990 /* AttributePointMenu.cpp in Sources */,
+				7FB66E695E53B572D9E06128 /* PaperMenu.cpp in Sources */,
+				FD9447D901E3B62D4246C9A4 /* SkillTreeMenu.cpp in Sources */,
 				D25100000000000000000002 /* RuntimeSaveGenerationPolicy.cpp in Sources */,
 				D25100000000000000000004 /* SaveGeneration.cpp in Sources */,
 				D25100000000000000000006 /* ExclusiveLoadingRunner.cpp in Sources */,
@@ -2587,7 +2627,7 @@
 				CLANG_ENABLE_CPP_STATIC_DESTRUCTORS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.1.9;
+				CURRENT_PROJECT_VERSION = 1.2.1;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_APP_SANDBOX = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2620,7 +2660,7 @@
 					"@executable_path/Frameworks",
 				);
 				LINK_WITH_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.1.9;
+				MARKETING_VERSION = 1.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2643,7 +2683,7 @@
 				CLANG_ENABLE_CPP_STATIC_DESTRUCTORS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.1.9;
+				CURRENT_PROJECT_VERSION = 1.2.1;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_APP_SANDBOX = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2676,7 +2716,7 @@
 					"@executable_path/Frameworks",
 				);
 				LINK_WITH_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.1.9;
+				MARKETING_VERSION = 1.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2702,7 +2742,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.1.9;
+				CURRENT_PROJECT_VERSION = 1.2.1;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				FRAMEWORK_SEARCH_PATHS = (
 					../../ThirdParty/devel/mac_ios/SDL,
@@ -2731,7 +2771,7 @@
 				);
 				MACH_O_TYPE = mh_execute;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 1.1.9;
+				MARKETING_VERSION = 1.2.1;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
@@ -2758,7 +2798,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.1.9;
+				CURRENT_PROJECT_VERSION = 1.2.1;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2787,7 +2827,7 @@
 				);
 				MACH_O_TYPE = mh_execute;
 				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				MARKETING_VERSION = 1.1.9;
+				MARKETING_VERSION = 1.2.1;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";

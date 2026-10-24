@@ -248,5 +248,43 @@ int main()
                    emptyDefinitionTraps.hasTriggered(2),
                "a zero-byte trap definition file remains a valid empty state") && ok;
 
+    Traps mapTraps(makeReader(
+        "[current]\n1=intro.txt\n2=rearmed.txt\n3=exit.txt\n255=last.txt\n"
+        "[other]\n1=other-intro.txt\n255=other-last.txt\n"));
+    mapTraps.markTriggered(1);
+    mapTraps.markTriggered(2);
+    mapTraps.markTriggered(255);
+    mapTraps.reactivate(2);
+    ok = check(mapTraps.save(), "ordinary save preserves pending map consumption") && ok;
+    Traps ordinarySave;
+    ok = check(ordinarySave.load() && ordinarySave.hasTriggered(1) &&
+                   ordinarySave.get("current", 1) == "intro.txt",
+               "ordinary save and reload keep the definition and this visit's consumed state") && ok;
+    ordinarySave.beginMapVisit();
+    ok = check(!ordinarySave.hasTriggered(1) &&
+                   ordinarySave.get("current", 1) == "intro.txt",
+               "a later visit can activate a conditionally skipped trap after an ordinary save") && ok;
+    ok = check(!mapTraps.saveMap("") &&
+                   mapTraps.get("current", 1) == "intro.txt",
+               "SaveMapTrap without a current map does not consume bindings") && ok;
+    ok = check(mapTraps.saveMap("current") &&
+                   mapTraps.get("current", 1).empty() &&
+                   mapTraps.get("current", 255).empty() &&
+                   mapTraps.get("current", 2) == "rearmed.txt" &&
+                   mapTraps.get("current", 3) == "exit.txt" &&
+                   mapTraps.get("other", 1) == "other-intro.txt" &&
+                   mapTraps.get("other", 255) == "other-last.txt",
+               "SaveMapTrap commits only consumed current-map bindings, preserving rearmed traps, exits and other maps") && ok;
+    ok = check(mapTraps.save(), "an ordinary save after SaveMapTrap succeeds") && ok;
+    Traps committedSave;
+    ok = check(committedSave.load() &&
+                   committedSave.get("current", 1).empty(),
+               "an ordinary save cannot resurrect an explicitly consumed trap") && ok;
+    committedSave.beginMapVisit();
+    ok = check(committedSave.get("current", 1).empty() &&
+                   committedSave.get("current", 2) == "rearmed.txt" &&
+                   committedSave.get("other", 1) == "other-intro.txt",
+               "map reentry keeps the committed intro disabled and other bindings intact") && ok;
+
     return ok ? 0 : 1;
 }

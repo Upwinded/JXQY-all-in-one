@@ -70,8 +70,9 @@ inline PointEx getEffectProjectedMovementVector(Point flyingDirection)
 
 inline float getEffectProjectedMovementAngle(Point flyingDirection)
 {
-	PointEx movementVector = getEffectProjectedMovementVector(flyingDirection);
-	return std::atan2(-movementVector.x, movementVector.y);
+	// Animation directions are spaced before the map's 2:1 projection.
+	// flyingDirection already has that projection removed by its producers.
+	return std::atan2(-(float)flyingDirection.x, (float)flyingDirection.y);
 }
 
 inline PointEx advanceProjectedMovement(PointEx currentOffset, PointEx remainingOffset, float stepLength)

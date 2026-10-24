@@ -22,5 +22,8 @@
 #include "TimerMenu.h"
 #include "MapThumbnailMenu.h"
 #include "GambleMenu.h"
+#include "PaperMenu.h"
+#include "SkillTreeMenu.h"
+#include "AttributePointMenu.h"
 #include "PartnerEquipMenu.h"
 #include "PartnerHeadMenu.h"

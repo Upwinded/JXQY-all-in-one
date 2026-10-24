@@ -182,6 +182,8 @@ public:
 	std::string getTrapName(Point pos);
 	bool haveTraps(Point pos);
 	bool canWalk(Point pos);
+	// Carrying effects check terrain and solid objects while handling NPCs separately.
+	bool isCharacterTerrainBlocked(Point pos);
 	bool canWalkForActor(
 		Point pos, const std::shared_ptr<NPC>& ignoredActor);
     bool canWalkDirectlyTo(Point pos, int dir);

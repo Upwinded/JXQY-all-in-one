@@ -52,6 +52,7 @@ private:
 class Label :
 	public Item
 {
+	friend class CoreLifecycleTestAccess;
 public:
 	Label();
 	virtual ~Label();
@@ -74,6 +75,7 @@ protected:
 	void freeResource() override;
 	std::vector<_shared_image> strImage;
 	int renderedFontSize = 0;
+	int renderedLineHeight = 0;
 	std::string renderedText;
 	int renderedRectWidth = -1;
 	int renderedRectHeight = -1;

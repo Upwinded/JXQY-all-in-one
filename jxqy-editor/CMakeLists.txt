@@ -959,6 +959,10 @@ if(BUILD_TESTING)
     add_executable(jxqy-editor-online-resource-package-tests
         tests/OnlineResourcePackageExporterTests.cpp
     )
+    target_include_directories(jxqy-editor-online-resource-package-tests PRIVATE
+        "${JXQY_EDITOR_GENERATED_INCLUDE_DIRECTORY}"
+        "${THIRD_PARTY_DIR}/miniz"
+    )
     target_link_libraries(
         jxqy-editor-online-resource-package-tests
         PRIVATE

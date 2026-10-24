@@ -1,14 +1,19 @@
 #include "SavePackage.h"
-#include "RuntimeSaveGenerationPolicy.h"
 
 #include "../Data/SaveVersionCompatibility.h"
 #include "../../File/StrictRelativeResourcePath.h"
 #include "../../Resource/ResourceIniReader.h"
 
+#if defined(__ANDROID__)
+#include "../../Platform/AndroidExternalStorage.h"
+#endif
+
 #include <SDL3/SDL.h>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <fstream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <set>
@@ -20,10 +25,6 @@ extern "C"
 
 namespace
 {
-constexpr std::size_t MaximumArchiveBytes = 256 * 1024 * 1024;
-constexpr std::size_t MaximumExpandedBytes = 128 * 1024 * 1024;
-constexpr std::size_t MaximumFileBytes = 32 * 1024 * 1024;
-constexpr std::size_t MaximumFiles = 32768;
 constexpr const char* ManifestName = "save_package.ini";
 
 using Stream = std::unique_ptr<SDL_IOStream, decltype(&SDL_CloseIO)>;
@@ -78,32 +79,90 @@ bool plainTree(const std::filesystem::path& root)
 	return true;
 }
 
-bool readBytes(const std::string& path, std::size_t limit,
-	std::vector<char>& bytes, std::string& error)
+std::size_t readStream(void* context, mz_uint64 offset, void* bytes, std::size_t size)
 {
-	Stream input(SDL_IOFromFile(path.c_str(), "rb"), SDL_CloseIO);
-	if (!input) return fail(error, u8"无法打开文件：" + std::string(SDL_GetError()));
-	bytes.clear();
-	std::array<char, 64 * 1024> buffer;
-	for (;;)
-	{
-		const std::size_t count = SDL_ReadIO(input.get(), buffer.data(), buffer.size());
-		if (count > limit - bytes.size()) return fail(error, u8"存档包或文件超过容量限制");
-		bytes.insert(bytes.end(), buffer.data(), buffer.data() + count);
-		if (count < buffer.size())
-		{
-			if (SDL_GetIOStatus(input.get()) == SDL_IO_STATUS_EOF) return true;
-			if (count == 0 || SDL_GetIOStatus(input.get()) != SDL_IO_STATUS_READY)
-				return fail(error, u8"文件读取失败：" + std::string(SDL_GetError()));
-		}
-	}
+	auto* stream = static_cast<SDL_IOStream*>(context);
+	if (offset > static_cast<mz_uint64>(std::numeric_limits<Sint64>::max()) ||
+		SDL_SeekIO(stream, static_cast<Sint64>(offset), SDL_IO_SEEK_SET) < 0) return 0;
+	return SDL_ReadIO(stream, bytes, size);
 }
 
-bool validIdentity(const SavePackage::GameIdentity& game)
+struct Output
 {
+	SDL_IOStream* stream;
+	mz_uint64 position = 0;
+};
+
+std::size_t writeStream(void* context, mz_uint64 offset, const void* bytes, std::size_t size)
+{
+	auto& output = *static_cast<Output*>(context);
+	if (offset != output.position &&
+		(offset > static_cast<mz_uint64>(std::numeric_limits<Sint64>::max()) ||
+			SDL_SeekIO(output.stream, static_cast<Sint64>(offset), SDL_IO_SEEK_SET) < 0)) return 0;
+	const auto written = SDL_WriteIO(output.stream, bytes, size);
+	output.position = offset + written;
+	return written;
+}
+
+std::size_t discardBytes(void*, mz_uint64, const void*, std::size_t size)
+{
+	return size;
+}
+
+std::size_t writeFile(void* context, mz_uint64, const void* bytes, std::size_t size)
+{
+	auto& stream = *static_cast<std::ofstream*>(context);
+	stream.write(static_cast<const char*>(bytes), static_cast<std::streamsize>(size));
+	return stream ? size : 0;
+}
+
+unsigned int littleEndian16(const unsigned char* bytes)
+{
+	return bytes[0] | (static_cast<unsigned int>(bytes[1]) << 8);
+}
+
+bool entryName(mz_zip_archive& zip, const mz_zip_archive_file_stat& info, std::string& name)
+{
+	// ZIP APPNOTE 4.6.9: ordinary Windows archivers can keep a local-code-page
+	// filename alongside its authoritative UTF-8 Unicode Path extra field.
+	std::array<unsigned char, 46> header;
+	const mz_uint64 offset = zip.m_central_directory_file_ofs + info.m_central_dir_ofs;
+	if (mz_zip_read_archive_data(&zip, offset, header.data(), header.size()) != header.size()) return false;
+	const auto length = littleEndian16(header.data() + 28);
+	if (length == 0) return false;
+	std::vector<unsigned char> fields(length + littleEndian16(header.data() + 30));
+	if (mz_zip_read_archive_data(&zip, offset + header.size(), fields.data(), fields.size()) != fields.size()) return false;
+	name.assign(reinterpret_cast<const char*>(fields.data()), length);
+	if ((info.m_bit_flag & (1 << 11)) != 0) return true;
+	for (std::size_t index = length; index + 4 <= fields.size();)
+	{
+		const auto tag = littleEndian16(fields.data() + index);
+		const auto size = littleEndian16(fields.data() + index + 2);
+		index += 4;
+		if (size > fields.size() - index) return false;
+		if (tag == 0x7075 && size >= 5 && fields[index] == 1)
+		{
+			const auto checksum = static_cast<mz_uint32>(fields[index + 1]) |
+				(static_cast<mz_uint32>(fields[index + 2]) << 8) |
+				(static_cast<mz_uint32>(fields[index + 3]) << 16) |
+				(static_cast<mz_uint32>(fields[index + 4]) << 24);
+			if (checksum == mz_crc32(0, fields.data(), length))
+			{
+				name.assign(reinterpret_cast<const char*>(fields.data() + index + 5), size - 5);
+				return true;
+			}
+		}
+		index += size;
+	}
+	return true;
+}
+
+bool validIdentity(const SavePackage::GameIdentity& game, bool requireGameId = true)
+{
+	if (game.name.empty() || game.saveNamespace.empty() || (requireGameId && game.id.empty())) return false;
 	for (const auto* field : { &game.id, &game.name, &game.saveNamespace })
 	{
-		if (field->empty() || field->size() > 1024 ||
+		if (field->size() > 1024 ||
 			!ResourcePathSafety::isValidUtf8(*field) ||
 			std::any_of(field->begin(), field->end(), [](unsigned char character)
 			{
@@ -135,12 +194,31 @@ bool slotMetadata(int index, const std::vector<char>& bytes,
 	if (ini.parseError() != 0) return fail(error, u8"存档 game.ini 格式错误");
 	slot = { index, ini.get("Save", "EngineVersion", "1.0.0"),
 		ini.get("Save", "ResourceVersion", "1.0.0") };
+	slot.minimumReaderVersion = ini.get("Save", "MinimumReaderVersion", slot.engineVersion);
 	return true;
 }
 }
 
 namespace SavePackage
 {
+// Keep a compressed snapshot until the import is confirmed. Large payloads and
+// non-seekable Android providers never require a complete ZIP in RAM.
+struct Package::Source
+{
+	std::filesystem::path directory;
+	Stream stream{ nullptr, SDL_CloseIO };
+	~Source()
+	{
+		stream.reset();
+		std::error_code error;
+		if (!directory.empty())
+		{
+			std::filesystem::remove(directory / "package.zip", error);
+			std::filesystem::remove(directory, error);
+		}
+	}
+};
+
 std::string slotDirectory(int slot)
 {
 	return SaveSlots::directoryName(slot);
@@ -165,13 +243,13 @@ std::vector<int> listSlots(const std::filesystem::path& root)
 	return slots;
 }
 
-bool write(const std::filesystem::path& root, const GameIdentity& game,
-	int slot, const std::string& destination, std::string& error)
+static bool writeArchive(const std::filesystem::path& root, const GameIdentity& game,
+	int slot, const std::string& destination, bool& destinationOpened, std::string& error)
 {
 	error.clear();
 	try
 	{
-		if (!validIdentity(game) || slot < AllSlots || slot > AutomaticSlot)
+		if (!validIdentity(game, false) || slot < AllSlots || slot > AutomaticSlot)
 			return fail(error, u8"游戏或存档选择无效");
 		const std::vector<int> slots = slot == AllSlots ? listSlots(root) : std::vector<int>{ slot };
 		if (slots.empty()) return fail(error, u8"没有可导出的存档");
@@ -210,35 +288,34 @@ bool write(const std::filesystem::path& root, const GameIdentity& game,
 				}
 			}
 		}
-		if (files.size() > MaximumFiles) return fail(error, u8"存档文件数量超过限制");
+		Stream stream(SDL_IOFromFile(destination.c_str(), "wb"), SDL_CloseIO);
+		if (!stream) return fail(error, u8"无法打开导出位置：" + std::string(SDL_GetError()));
+		destinationOpened = true;
+		Output output{ stream.get() };
 		Zip zip;
-		if (!mz_zip_writer_init_heap(&zip.value, 0, 0)) return fail(error, u8"无法创建存档包");
+		zip.value.m_pWrite = writeStream;
+		zip.value.m_pIO_opaque = &output;
+		if (!mz_zip_writer_init(&zip.value, 0)) return fail(error, u8"无法创建存档包");
 		const std::string manifest = "[Package]\nFormat=JXQY-SAVE\nVersion=1\nGameId=" + game.id +
 			"\nGameName=" + game.name + "\nSaveNamespace=" + game.saveNamespace + "\n";
 		if (!mz_zip_writer_add_mem(&zip.value, ManifestName, manifest.data(), manifest.size(), MZ_BEST_SPEED))
 			return fail(error, u8"无法写入存档包信息");
 		std::set<std::string> names;
-		std::size_t total = manifest.size();
-		std::vector<char> bytes;
 		for (const auto& file : files)
 		{
 			const auto name = ResourcePathSafety::normalizeStrictRelativeResourcePath(file.first);
 			if (!name.succeeded() || !names.insert(fold(name.normalizedPath)).second)
 				return fail(error, u8"存档含不兼容或重复的文件名");
-			if (!readBytes(file.second.u8string(), MaximumFileBytes, bytes, error)) return false;
-			if (bytes.size() > MaximumExpandedBytes - total) return fail(error, u8"存档内容超过 128 MiB");
-			total += bytes.size();
-			if (!mz_zip_writer_add_mem(&zip.value, name.normalizedPath.c_str(),
-				bytes.data(), bytes.size(), MZ_BEST_SPEED)) return fail(error, u8"存档压缩失败");
+			Stream input(SDL_IOFromFile(file.second.u8string().c_str(), "rb"), SDL_CloseIO);
+			const Sint64 size = input ? SDL_GetIOSize(input.get()) : -1;
+			if (size < 0) return fail(error, u8"无法读取存档文件：" + std::string(SDL_GetError()));
+			if (!mz_zip_writer_add_read_buf_callback(&zip.value, name.normalizedPath.c_str(),
+				readStream, input.get(), static_cast<mz_uint64>(size), nullptr, nullptr, 0,
+				MZ_BEST_SPEED, nullptr, 0, nullptr, 0) || SDL_TellIO(input.get()) != size)
+				return fail(error, u8"存档读取、压缩或导出写入失败，请检查可用空间");
 		}
-		void* output = nullptr;
-		std::size_t size = 0;
-		if (!mz_zip_writer_finalize_heap_archive(&zip.value, &output, &size))
-			return fail(error, u8"存档打包失败");
-		std::unique_ptr<void, decltype(&mz_free)> buffer(output, mz_free);
-		Stream stream(SDL_IOFromFile(destination.c_str(), "wb"), SDL_CloseIO);
-		if (!stream || SDL_WriteIO(stream.get(), buffer.get(), size) != size)
-			return fail(error, u8"存档包写入失败：" + std::string(SDL_GetError()));
+		if (!mz_zip_writer_finalize_archive(&zip.value))
+			return fail(error, u8"存档打包或写入失败，请检查可用空间");
 		if (!SDL_CloseIO(stream.release())) return fail(error, u8"存档包未能完整保存");
 		return true;
 	}
@@ -248,35 +325,115 @@ bool write(const std::filesystem::path& root, const GameIdentity& game,
 	}
 }
 
+bool write(const std::filesystem::path& root, const GameIdentity& game,
+	int slot, const std::string& destination, std::string& error)
+{
+	bool destinationOpened = false;
+	const bool succeeded = writeArchive(root, game, slot, destination, destinationOpened, error);
+	if (!succeeded && destinationOpened)
+	{
+		// writeArchive has closed the stream, including on exceptions or a failed close.
+		// Android document URIs must be removed through the document provider.
+#if defined(__ANDROID__)
+		const bool removed = destination.rfind("content://", 0) == 0
+			? AndroidExternalStorage::removeDocument(destination)
+			: SDL_RemovePath(destination.c_str());
+#else
+		const bool removed = SDL_RemovePath(destination.c_str());
+#endif
+		if (!removed)
+		{
+			const std::string removalError = SDL_GetError();
+			// SDL maps "wb" to Android's truncating "wt" document mode.
+			Stream remainder(SDL_IOFromFile(destination.c_str(), "wb"), SDL_CloseIO);
+			const bool empty = remainder && SDL_GetIOSize(remainder.get()) == 0;
+			const bool closed = remainder && SDL_CloseIO(remainder.release());
+			error += empty && closed
+				? u8"\n未能删除未完成的存档包，已清空内容，请在导出位置手动删除空文件："
+				: u8"\n未能删除或确认清空未完成的存档包，请在导出位置手动删除：";
+			error += removalError;
+		}
+	}
+	return succeeded;
+}
+
 bool read(const std::string& source, Package& package, std::string& error)
 {
 	error.clear();
 	package = {};
 	try
 	{
-		std::vector<char> bytes;
-		if (!readBytes(source, MaximumArchiveBytes, bytes, error)) return false;
+		Stream input(SDL_IOFromFile(source.c_str(), "rb"), SDL_CloseIO);
+		if (!input) return fail(error, u8"无法打开文件：" + std::string(SDL_GetError()));
+		auto snapshot = std::make_shared<Package::Source>();
+#if defined(__ANDROID__)
+		const char* cache = SDL_GetAndroidCachePath();
+		if (!cache) return fail(error, u8"无法访问导入缓存目录");
+		const auto temporaryRoot = std::filesystem::u8path(cache);
+#else
+		const auto temporaryRoot = std::filesystem::temp_directory_path();
+#endif
+		static std::atomic<unsigned int> sequence{ 0 };
+		for (;;)
+		{
+			const auto directory = temporaryRoot / ("jxqy-save-import-" +
+				std::to_string(SDL_GetTicksNS()) + "-" + std::to_string(sequence++));
+			if (std::filesystem::create_directory(directory))
+			{
+				snapshot->directory = directory;
+				break;
+			}
+		}
+		snapshot->stream.reset(SDL_IOFromFile((snapshot->directory / "package.zip").u8string().c_str(), "w+b"));
+		if (!snapshot->stream) return fail(error, u8"无法创建导入缓存，请检查可用空间");
+		std::array<char, 64 * 1024> buffer;
+		for (;;)
+		{
+			const auto count = SDL_ReadIO(input.get(), buffer.data(), buffer.size());
+			if (SDL_WriteIO(snapshot->stream.get(), buffer.data(), count) != count)
+				return fail(error, u8"无法缓存存档包，请检查可用空间");
+			if (SDL_GetIOStatus(input.get()) == SDL_IO_STATUS_EOF) break;
+			if (count == 0 || SDL_GetIOStatus(input.get()) != SDL_IO_STATUS_READY)
+				return fail(error, u8"存档包读取未完成：" + std::string(SDL_GetError()));
+		}
+		if (!SDL_FlushIO(snapshot->stream.get())) return fail(error, u8"存档包缓存写入失败");
+		const Sint64 archiveSize = SDL_GetIOSize(snapshot->stream.get());
 		Zip zip;
-		if (!mz_zip_reader_init_mem(&zip.value, bytes.data(), bytes.size(), 0))
+		zip.value.m_pRead = readStream;
+		zip.value.m_pIO_opaque = snapshot->stream.get();
+		if (archiveSize < 0 || !mz_zip_reader_init(&zip.value, static_cast<mz_uint64>(archiveSize), 0))
 			return fail(error, u8"所选文件不是有效的 ZIP 存档包");
 		const mz_uint count = mz_zip_reader_get_num_files(&zip.value);
-		if (count > MaximumFiles + 32) return fail(error, u8"存档包文件数量超过限制");
+		std::string prefix;
+		if (mz_zip_reader_locate_file(&zip.value, ManifestName, nullptr, MZ_ZIP_FLAG_CASE_SENSITIVE) < 0)
+		{
+			for (mz_uint index = 0; index < count; ++index)
+			{
+				mz_zip_archive_file_stat info;
+				if (!mz_zip_reader_file_stat(&zip.value, index, &info))
+					return fail(error, u8"无法读取存档包目录");
+				std::string name;
+				if (!entryName(zip.value, info, name)) return fail(error, u8"无法读取存档包文件名");
+				const auto slash = name.find('/');
+				if (slash == std::string::npos || name.substr(slash + 1) != ManifestName) continue;
+				if (!prefix.empty()) return fail(error, u8"存档包包含多个游戏目录，请分别导入");
+				prefix = name.substr(0, slash + 1);
+			}
+		}
 		Package candidate;
+		candidate.source = std::move(snapshot);
 		std::set<std::string> names;
 		std::map<int, Slot> slots;
 		std::set<int> usedSlots;
-		const auto limits = createRuntimeSaveGenerationPolicy().limits;
-		std::array<std::size_t, AutomaticSlot + 1> slotFileCounts{};
-		std::array<std::uint64_t, AutomaticSlot + 1> slotBytes{};
-		std::size_t total = 0;
 		bool manifestFound = false;
 		for (mz_uint index = 0; index < count; ++index)
 		{
 			mz_zip_archive_file_stat info;
 			if (!mz_zip_reader_file_stat(&zip.value, index, &info) || info.m_is_encrypted ||
-				!info.m_is_supported || mz_zip_reader_get_filename(&zip.value, index, nullptr, 0) > sizeof(info.m_filename))
+				!info.m_is_supported)
 				return fail(error, u8"存档包含不支持的文件条目");
-			std::string name = info.m_filename;
+			std::string name;
+			if (!entryName(zip.value, info, name)) return fail(error, u8"无法读取存档包文件名");
 			if (info.m_is_directory && !name.empty()) name.pop_back();
 			const auto path = ResourcePathSafety::normalizeStrictRelativeResourcePath(name);
 			const unsigned type = (info.m_external_attr >> 16) & 0170000;
@@ -284,50 +441,49 @@ bool read(const std::string& source, Package& package, std::string& error)
 				return fail(error, u8"存档包含非法路径或链接");
 			name = path.normalizedPath;
 			if (info.m_is_directory) continue;
+			if (name.rfind("__MACOSX/", 0) == 0 || name == ".DS_Store" ||
+				(name.size() >= 10 && name.compare(name.size() - 10, 10, "/.DS_Store") == 0))
+			{
+				if (!mz_zip_reader_extract_to_callback(&zip.value, index, discardBytes, nullptr, 0))
+					return fail(error, u8"存档包内容损坏或未传输完整");
+				continue;
+			}
+			if (!prefix.empty())
+			{
+				if (name.rfind(prefix, 0) != 0) return fail(error, u8"文件不属于所选存档目录");
+				name.erase(0, prefix.size());
+			}
 			if (!names.insert(fold(name)).second) return fail(error, u8"存档包含重复文件");
 			const int slot = entrySlot(name);
 			if (name != ManifestName && slot == 0) return fail(error, u8"文件不属于存档档位");
-			if (slot != 0 && name.rfind("shot/", 0) != 0)
+			const bool metadata = name == ManifestName || (slot != 0 && name == slotDirectory(slot) + "/game.ini");
+			std::vector<char> bytes;
+			if (metadata)
 			{
-				const std::string relative = name.substr(name.find('/') + 1);
-				if (relative.find('/') != std::string::npos)
-					return fail(error, u8"不支持的存档结构：档位内不能包含子目录");
-				// Count only files that importTo writes into the flat runtime slot.
-				if (fold(relative) != "list.ini")
-				{
-					if (++slotFileCounts[slot] > limits.maximumFileCount)
-						return fail(error, slotLabel(slot) + u8"的文件数量超过读档限制");
-					if (info.m_uncomp_size > static_cast<std::uint64_t>(limits.maximumSingleFileBytes))
-						return fail(error, slotLabel(slot) + u8"的单文件大小超过读档限制");
-					if (info.m_uncomp_size > limits.maximumTotalBytes - slotBytes[slot])
-						return fail(error, slotLabel(slot) + u8"的总大小超过读档限制");
-					slotBytes[slot] += info.m_uncomp_size;
-				}
+				if (info.m_uncomp_size > bytes.max_size()) return fail(error, u8"存档信息超出系统可处理范围");
+				bytes.resize(static_cast<std::size_t>(info.m_uncomp_size));
+				if (!mz_zip_reader_extract_to_mem(&zip.value, index, bytes.data(), bytes.size(), 0))
+					return fail(error, u8"存档包内容损坏或未传输完整");
 			}
-			if (info.m_uncomp_size > MaximumFileBytes || info.m_uncomp_size > MaximumExpandedBytes - total ||
-				(name == ManifestName && info.m_uncomp_size > 65536))
-				return fail(error, u8"存档包解压内容超过容量限制");
-			total += static_cast<std::size_t>(info.m_uncomp_size);
-			Package::Entry entry{ name, std::vector<char>(static_cast<std::size_t>(info.m_uncomp_size)) };
-			if (!mz_zip_reader_extract_to_mem(&zip.value, index, entry.bytes.data(), entry.bytes.size(), 0))
+			else if (!mz_zip_reader_extract_to_callback(&zip.value, index, discardBytes, nullptr, 0))
 				return fail(error, u8"存档包内容损坏或未传输完整");
 			if (name == ManifestName)
 			{
-				ResourceIniReader ini(entry.bytes.data(), entry.bytes.size());
+				ResourceIniReader ini(bytes.data(), bytes.size());
 				if (ini.parseError() != 0 || ini.get("Package", "Format", "") != "JXQY-SAVE" ||
 					ini.get("Package", "Version", "") != "1") return fail(error, u8"不支持此存档包格式");
 				candidate.identity.id = ini.get("Package", "GameId", "");
 				candidate.identity.name = ini.get("Package", "GameName", "");
 				candidate.identity.saveNamespace = ini.get("Package", "SaveNamespace", "");
-				manifestFound = validIdentity(candidate.identity);
+				manifestFound = validIdentity(candidate.identity, false);
 				continue;
 			}
 			usedSlots.insert(slot);
 			if (name == slotDirectory(slot) + "/game.ini")
 			{
-				if (!slotMetadata(slot, entry.bytes, slots[slot], error)) return false;
+				if (!slotMetadata(slot, bytes, slots[slot], error)) return false;
 			}
-			candidate.entries.push_back(std::move(entry));
+			candidate.entries.push_back({ name, index });
 		}
 		if (!manifestFound || slots.empty() || slots.size() != usedSlots.size())
 			return fail(error, u8"存档包缺少游戏信息或档位 game.ini");
@@ -352,12 +508,12 @@ bool compatible(const Package& package, const GameIdentity& game, std::string& e
 {
 	error.clear();
 	if (!validIdentity(game) || package.slots().empty() ||
-		fold(package.game().id) != fold(game.id) ||
+		(!package.game().id.empty() && fold(package.game().id) != fold(game.id)) ||
 		fold(package.game().saveNamespace) != fold(game.saveNamespace))
 		return fail(error, u8"存档包与所选游戏不匹配，请安装对应游戏或 MOD");
 	for (const Slot& slot : package.slots())
 	{
-		if (!SaveVersionCompatibility::validateEngineVersion(slot.engineVersion, false, error) ||
+		if (!SaveVersionCompatibility::validateEngineVersion(slot.engineVersion, slot.minimumReaderVersion, false, error) ||
 			!SaveVersionCompatibility::validateResourceVersion(slot.resourceVersion,
 				game.resourceVersion, game.minimumResourceVersion, false, error)) return false;
 	}
@@ -373,6 +529,13 @@ bool importTo(const Package& package, const GameIdentity& game,
 		return fail(error, u8"导入目标档位无效");
 	try
 	{
+		if (!package.source) return fail(error, u8"存档包尚未读取");
+		Zip zip;
+		zip.value.m_pRead = readStream;
+		zip.value.m_pIO_opaque = package.source->stream.get();
+		const Sint64 archiveSize = SDL_GetIOSize(package.source->stream.get());
+		if (archiveSize < 0 || !mz_zip_reader_init(&zip.value, static_cast<mz_uint64>(archiveSize), 0))
+			return fail(error, u8"存档包缓存不可读取，请重新选择文件");
 		if (isLink(root) || !plainTree(root / "shot")) return fail(error, u8"目标存档目录或截图目录不可用");
 		for (const Slot& slot : package.slots())
 		{
@@ -411,9 +574,10 @@ bool importTo(const Package& package, const GameIdentity& game,
 			const auto output = root / std::filesystem::u8path(path);
 			std::filesystem::create_directories(output.parent_path());
 			std::ofstream stream(output, std::ios::binary | std::ios::trunc);
-			stream.write(entry.bytes.data(), static_cast<std::streamsize>(entry.bytes.size()));
+			const bool extracted = stream && mz_zip_reader_extract_to_callback(
+				&zip.value, entry.archiveIndex, writeFile, &stream, 0);
 			stream.close();
-			if (!stream) return fail(error, u8"存档导入未完成，请检查可用空间后重试");
+			if (!extracted || !stream) return fail(error, u8"存档导入未完成，请检查可用空间后重试");
 		}
 		return true;
 	}

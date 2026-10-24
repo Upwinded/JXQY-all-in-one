@@ -1,6 +1,7 @@
 #include "../core/OnlineResourcePackageExporter.h"
 #include "../core/OnlineUpdateCatalogPublisher.h"
 #include "../core/AssetCliRunner.h"
+#include "../core/GameProfile.h"
 #include "../../src/Update/OnlineUpdateCatalog.h"
 
 #include <QCoreApplication>
@@ -12,6 +13,11 @@
 
 #include <iostream>
 #include <cstdio>
+
+extern "C"
+{
+#include "miniz.h"
+}
 
 namespace
 {
@@ -38,6 +44,24 @@ QByteArray readAll(const QString& path)
 {
     QFile file(path);
     return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+}
+
+QByteArray readArchiveManifest(const QByteArray& bytes)
+{
+    mz_zip_archive archive{};
+    if (!mz_zip_reader_init_mem(&archive, bytes.constData(), bytes.size(), 0))
+    {
+        return {};
+    }
+    size_t size = 0;
+    void* extracted = mz_zip_reader_extract_file_to_heap(
+        &archive, "game_profile.ini", &size, 0);
+    const QByteArray manifest = extracted
+        ? QByteArray(static_cast<const char*>(extracted), static_cast<qsizetype>(size))
+        : QByteArray();
+    mz_free(extracted);
+    mz_zip_reader_end(&archive);
+    return manifest;
 }
 
 bool createDirectoryJunction(
@@ -93,16 +117,26 @@ void testDeterministicFullPackage()
         "InstalledArtifactCrc32=deadbeef\n"
         "InstalledIncrementalArtifactCrc32=feedface\n"
         "InstalledIncrementalChainCrc32s=deadbeef,feedface\n\n[Resource]\n"
-        "ResourceOnly=1\n"),
+        "ResourceOnly=1\n\n[Combat]\nAttackReleaseFrameRatio=2/4\n"
+        "MagicReleaseFrameRatio=1/1\n\n[Features]\n"
+        "MagicTriggerAtAnimationEnd=1\nNativeNpcAttackAtAnimationEnd=1\n"),
         "manifest fixture writes");
     expect(writeFile(
         QDir(root).filePath(QString::fromUtf8("script/剧情.txt")),
         QByteArray::fromStdString("print('ok')\n")),
         "UTF-8 resource fixture writes");
+    const QString mixedPath = QString::fromUtf8(
+        "AsF/Effect/explod-大型白色爆炸ÉA.asf");
+    expect(writeFile(QDir(root).filePath(mixedPath), "effect-bytes"),
+        "mixed ASCII and UTF-8 resource fixture writes");
     expect(writeFile(
         QDir(root).filePath(".jxqy_editor/session.ini"),
         "must not be packaged"),
         "editor-state fixture writes");
+    expect(writeFile(
+        QDir(root).filePath("pending.asf.baiduyun.uploading.cfg"),
+        "private sync state"),
+        "cloud-sync state fixture writes");
     const QString first = QDir(temporary.path()).filePath("first.zip");
     const QString second = QDir(temporary.path()).filePath("second.zip");
     const auto firstResult =
@@ -111,8 +145,34 @@ void testDeterministicFullPackage()
         OnlineResourcePackageExporter::exportPackage(root, second);
     expect(firstResult.succeeded() && secondResult.succeeded(),
         "valid resource roots export");
-    expect(firstResult.fileCount == 2,
-        "editor-private state is excluded from exports");
+    expect(firstResult.fileCount == 3,
+        "editor-private and cloud-sync state are excluded from exports");
+    const QByteArray archiveBytes = readAll(first);
+    const QByteArray publishedManifest = readArchiveManifest(archiveBytes);
+    const QString publishedManifestPath =
+        QDir(temporary.path()).filePath("published-game_profile.ini");
+    expect(writeFile(publishedManifestPath, publishedManifest),
+        "published manifest round-trip fixture writes");
+    GameProfile publishedProfile;
+    expect(publishedProfile.loadFromFile(publishedManifestPath) &&
+            publishedProfile.attackReleaseFrameRatioDefined &&
+            publishedProfile.attackReleaseFrameRatio.numerator == 2 &&
+            publishedProfile.attackReleaseFrameRatio.denominator == 4 &&
+            !publishedProfile.specialAttackReleaseFrameRatioDefined &&
+            publishedProfile.magicReleaseFrameRatioDefined &&
+            publishedProfile.magicReleaseFrameRatio.numerator == 1 &&
+            publishedProfile.magicReleaseFrameRatio.denominator == 1 &&
+            !publishedManifest.contains("MagicTriggerAtAnimationEnd") &&
+            publishedProfile.features.value("NativeNpcAttackAtAnimationEnd"),
+        "ZIP manifest preserves explicit unreduced fractions and missing fields while removing obsolete timing");
+    expect(archiveBytes.contains(
+               QString::fromUtf8("asf/effect/explod-大型白色爆炸Éa.asf").toUtf8()) &&
+            !archiveBytes.contains(mixedPath.toUtf8()),
+        "ZIP entry names lowercase ASCII only and preserve UTF-8 characters");
+    expect(QDir(QDir(root).filePath("AsF/Effect")).entryList(QDir::Files).
+               contains(QString::fromUtf8("explod-大型白色爆炸ÉA.asf")) &&
+            readAll(QDir(root).filePath(mixedPath)) == QByteArray("effect-bytes"),
+        "publication preserves the source file name and bytes");
     expect(firstResult.crc32Hex == secondResult.crc32Hex &&
         firstResult.archiveSize == secondResult.archiveSize,
         "repeated exports have the same checksum and size");
@@ -126,7 +186,9 @@ void testDeterministicFullPackage()
                 "InstalledArtifactCrc32=deadbeef\n"
                 "InstalledIncrementalArtifactCrc32=feedface\n"
                 "InstalledIncrementalChainCrc32s=deadbeef,feedface\n\n[Resource]\n"
-                "ResourceOnly=1\n"),
+                "ResourceOnly=1\n\n[Combat]\nAttackReleaseFrameRatio=2/4\n"
+                "MagicReleaseFrameRatio=1/1\n\n[Features]\n"
+                "MagicTriggerAtAnimationEnd=1\nNativeNpcAttackAtAnimationEnd=1\n"),
         "publication does not modify the source manifest");
     expect(QFileInfo::exists(firstResult.catalogPath) &&
             QFileInfo::exists(secondResult.catalogPath),
@@ -224,23 +286,35 @@ void testInvalidSources()
         "export rejects a manifest without release display metadata");
     expect(writeFile(
         QDir(root).filePath("game_profile.ini"),
+        "[Game]\nId=TEST\nName=Test\nVersion=1.0\n\n[Release]\n"
+        "MinimumEngineVersion=2.0.0\n\n[Combat]\nMagicReleaseFrameRatio=3/2\n"),
+        "invalid release fraction fixture writes");
+    expect(
+        OnlineResourcePackageExporter::exportPackage(root, output).status ==
+            OnlineResourcePackageExporter::Status::InvalidManifest &&
+            !QFileInfo::exists(output),
+        "export rejects invalid release fractions before writing an archive");
+    expect(writeFile(
+        QDir(root).filePath("game_profile.ini"),
         "[Game]\nId=TEST\nVersion=1.0\n\n[Release]\n"
         "MinimumEngineVersion=2.0.0\n"),
         "complete manifest fixture writes");
-    expect(writeFile(QDir(root).filePath("Upper.txt"), "bad"),
-        "uppercase fixture writes");
-    expect(
-        OnlineResourcePackageExporter::exportPackage(root, output).status ==
-            OnlineResourcePackageExporter::Status::NonLowercasePath,
-        "export rejects uppercase ASCII resource paths");
-
-    expect(QFile::remove(QDir(root).filePath("Upper.txt")),
-        "uppercase fixture is removed");
     const QString nestedOutput = QDir(root).filePath("package.zip");
     expect(
         OnlineResourcePackageExporter::exportPackage(root, nestedOutput).status ==
             OnlineResourcePackageExporter::Status::InvalidInput,
         "export rejects an output archive inside its source root");
+    const QString composed = QDir(root).filePath(QString::fromUtf8("é.txt"));
+    const QString decomposed = QDir(root).filePath(QString::fromUtf8("E\xCC\x81.txt"));
+    expect(writeFile(composed, "first") && writeFile(decomposed, "second"),
+        "portable path collision fixtures write");
+    if (readAll(composed) == QByteArray("first") &&
+        readAll(decomposed) == QByteArray("second"))
+    {
+        expect(OnlineResourcePackageExporter::exportPackage(root, output).status ==
+                OnlineResourcePackageExporter::Status::DuplicatePortablePath,
+            "canonical path collisions remain rejected");
+    }
 }
 
 void testWindowsJunctionSourceRoot()
@@ -344,10 +418,10 @@ void testCommonPackagePublishing()
     QTemporaryDir temporary;
     expect(temporary.isValid(), "common package temporary directory is available");
     const QString root = QDir(temporary.path()).filePath("common");
-    expect(writeFile(QDir(root).filePath("sound/click.wav"), "sound-data"),
+    expect(writeFile(QDir(root).filePath("Sound/Click.WAV"), "sound-data"),
         "common sound fixture writes");
     expect(writeFile(
-        QDir(root).filePath("version.ini"),
+        QDir(root).filePath("Version.INI"),
         "[Common]\nVersion=old\nInstalledArtifactCrc32=deadbeef\n"),
         "stale source common version fixture writes");
 
@@ -361,6 +435,12 @@ void testCommonPackagePublishing()
         "valid common roots export");
     expect(firstResult.fileCount == 2,
         "common export replaces the source marker with its published version");
+    const QByteArray archiveBytes = readAll(first);
+    expect(archiveBytes.contains("sound/click.wav") &&
+            archiveBytes.contains("version.ini") &&
+            !archiveBytes.contains("Sound/Click.WAV") &&
+            !archiveBytes.contains("Version.INI"),
+        "common paths and source version markers use the same ASCII normalization");
     expect(firstResult.crc32Hex == secondResult.crc32Hex &&
             readAll(first) == readAll(second),
         "common exports are deterministic");
@@ -408,7 +488,7 @@ void testCommonPackagePublishing()
         "common package CLI publishes the archive");
     expect(readAll(stdoutFilePath).contains("CRC32:"),
         "common package CLI reports the checksum");
-    expect(readAll(QDir(root).filePath("version.ini")) ==
+    expect(readAll(QDir(root).filePath("Version.INI")) ==
             QByteArray(
                 "[Common]\nVersion=old\nInstalledArtifactCrc32=deadbeef\n"),
         "common publication does not modify the source version marker");

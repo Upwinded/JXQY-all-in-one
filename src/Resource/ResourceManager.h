@@ -33,6 +33,7 @@ public:
 		std::string name;
 		std::string version;
 		std::string rootPath;
+		bool resourceOnly = false;
 		std::string saveNamespace;
 		std::uint64_t saveBytes = 0;
 		bool saveExists = false;
@@ -131,6 +132,7 @@ public:
 
 	// Builds an exact deletion list. Reverse dependencies are ordered before
 	// their bases. A read-only/external dependent blocks the whole operation.
+	// Includes unused writable ResourceOnly dependencies, preserving playable bases.
 	bool isResourcePackRemovable(int packIndex) const;
 	ResourceRemovalPlan buildResourceRemovalPlan(int packIndex) const;
 

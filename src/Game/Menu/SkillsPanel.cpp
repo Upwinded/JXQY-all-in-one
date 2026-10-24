@@ -105,6 +105,20 @@ void SkillsPanel::onChildCallBack(PElement child)
 	}
 }
 
+int SkillsPanel::getDraggingSkill(Point& direction) const
+{
+	for (int index = 0; index < SKILL_PANEL_SKILL_COUNT; ++index)
+	{
+		const auto& button = skillBtn[index];
+		if (button != nullptr && button->isDragging())
+		{
+			direction = button->getDragPosition() - Point{ button->rect.x, button->rect.y };
+			return index;
+		}
+	}
+	return SKILL_PANEL_NONE;
+}
+
 void SkillsPanel::onDraw()
 {
 	ConfigDrivenPanel::onDraw();

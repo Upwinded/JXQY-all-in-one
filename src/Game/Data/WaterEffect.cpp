@@ -8,7 +8,7 @@
 
 namespace
 {
-constexpr float WaterDisplacementScale = 0.70f;
+constexpr float WaterDisplacementScale = 0.55f;
 }
 
 
@@ -68,7 +68,7 @@ void WaterEffect::applyPresetParams()
 	WaterRippleParams fixedRippleParams;
 	fixedRippleParams.amplitude = 25.0f;
 	fixedRippleParams.density = 0.015f;
-	fixedRippleParams.frequency = 3.0f;
+	fixedRippleParams.frequency = 2.4f;
 	fixedRippleParams.pos = { -100.0f, 600.0f };
 	addFixedRipple(fixedRippleParams);
 
@@ -76,14 +76,14 @@ void WaterEffect::applyPresetParams()
 	waveParams.amplitude = 6.0f;
 	waveParams.angle = 5 * M_PI / 6;
 	waveParams.density = 0.02f;
-	waveParams.frequency = 8.0f;
+	waveParams.frequency = 6.4f;
 	waveParams.phi = 1.0f;
 	addWave(waveParams);
 
 	waveParams.amplitude = 10.0f;
 	waveParams.angle = 7 * M_PI / 6;
 	waveParams.density = 0.01f;
-	waveParams.frequency = 3.0f;
+	waveParams.frequency = 2.4f;
 	waveParams.phi = 0.0f;
 	addWave(waveParams);
 
@@ -286,18 +286,30 @@ void WaterEffect::_update(UTime time, PointEx cameraPos)
 		offsetX += pointerSample.offset.x;
 		offsetY += pointerSample.offset.y;
 
-		_vertices[vertexIndex].position =
-			_verticesOrigin[vertexIndex].position;
-		_vertices[vertexIndex].tex_coord.x = std::clamp(
-			_verticesOrigin[vertexIndex].tex_coord.x -
-				offsetX * WaterDisplacementScale / _canvasWidth,
-			0.0f,
-			1.0f);
-		_vertices[vertexIndex].tex_coord.y = std::clamp(
-			_verticesOrigin[vertexIndex].tex_coord.y -
-				offsetY * WaterDisplacementScale / _canvasHeight,
-			0.0f,
-			1.0f);
+		Vertex& vertex = _vertices[vertexIndex];
+		vertex.position.x = _verticesOrigin[vertexIndex].position.x + offsetX * WaterDisplacementScale;
+		vertex.position.y = _verticesOrigin[vertexIndex].position.y + offsetY * WaterDisplacementScale;
+		vertex.tex_coord = _verticesOrigin[vertexIndex].tex_coord;
+
+		// Border vertices may move outside the viewport, but must not uncover its edges.
+		const std::size_t column = vertexIndex % (_params.gridSize + 1);
+		const std::size_t row = vertexIndex / (_params.gridSize + 1);
+		if (column == 0)
+		{
+			vertex.position.x = (std::min)(vertex.position.x, 0.0f);
+		}
+		else if (column == static_cast<std::size_t>(_params.gridSize))
+		{
+			vertex.position.x = (std::max)(vertex.position.x, static_cast<float>(_canvasWidth));
+		}
+		if (row == 0)
+		{
+			vertex.position.y = (std::min)(vertex.position.y, 0.0f);
+		}
+		else if (row == static_cast<std::size_t>(_params.gridSize))
+		{
+			vertex.position.y = (std::max)(vertex.position.y, static_cast<float>(_canvasHeight));
+		}
 
 		float ambientBrightness = 1.0f;
 		const float motionDistance = std::sqrt(

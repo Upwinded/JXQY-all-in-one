@@ -253,6 +253,14 @@ def main():
         assert [command[1] for command in client.commands if command[0] == "fight"] == [2000, 2004, 2001, 2002, 2003]
         assert ("Interact", 2005) in client.commands and item(state, "zangma-grade-four")["quantity"] == 1
         assert client.commands[-2:] == [("talk", "无赖1", (44, 57)), ("talk", "燕若雪", (46, 54))]
+        moves = [command for command in client.commands if command[0] == "go"]
+        assert [command[1:3] for command in moves[:4]] == [(37, 65), (31, 56), (25, 66), (24, 95)]
+        assert [command[1:3] for command in moves[-5:]] == [(24, 95), (25, 66), (31, 56), (37, 65), (46, 55)]
+        reminders = [command for command in moves
+                     if command[3].get("script") == "龙门客栈/地图切换5.txt"]
+        assert [command[1:3] for command in reminders] == [(37, 65), (46, 55)], \
+            "Both native Longmen reminders require explicit completed-script evidence"
+        assert all(command[3]["combat"] is False for command in reminders)
         count = len(client.commands)
         longmen_sidequests(client, Path("unused"))
         assert len(client.commands) == count

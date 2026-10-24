@@ -54,7 +54,6 @@ surface-resource	rpg.memo	src/Game/Menu/MemoMenu.cpp	MemoMenu::init	resource-loa
 surface-resource	message	src/Game/Menu/MsgBox.cpp	MsgBox::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\message\\\\msgbox.menu.ini"
 surface-resource	option	src/Game/Menu/Option.cpp	Option::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\option\\\\option.menu.ini"
 surface-resource	rpg.practice	src/Game/Menu/PracticeMenu.cpp	PracticeMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\xiulian\\\\xiulian.menu.ini"
-surface-resource	save-load.title,save-load.system	src/Game/Menu/SaveLoad.cpp	SaveLoad::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\saveload\\\\saveload.menu.ini"
 surface-resource	mobile.skills	src/Game/Menu/SkillsPanel.cpp	SkillsPanel::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\mobile\\\\skills\\\\skills.menu.ini"
 surface-resource	rpg.state	src/Game/Menu/StateMenu.cpp	StateMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\state\\\\state.menu.ini"
 surface-resource	system	src/Game/Menu/System.cpp	System::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\system\\\\system.menu.ini"
@@ -76,3 +75,14 @@ surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::lo
 surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::loadObjectAsync	function-call	ScriptAPI::runExclusiveLoadingTask	statusText, worker, successFinalizer
 surface-function	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::runExclusiveLoadingTask	function-definition	ScriptAPI::runExclusiveLoadingTask	<entry>
 surface-instance	video.playback	src/Game/Script/ScriptAPI.cpp	ScriptAPI::playMovie	make-shared	VideoPlayer	gameManager->video
+
+surface-instance	paper	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	PaperMenu	paperMenu
+surface-instance	paper	src/Game/GameManager/MenuController.cpp	MenuController::openPaper	make-shared	PaperMenu	paperMenu
+surface-instance	skill-tree	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	SkillTreeMenu	skillTreeMenu
+surface-instance	skill-tree	src/Game/GameManager/MenuController.cpp	MenuController::openSkillTree	make-shared	SkillTreeMenu	skillTreeMenu
+surface-instance	attribute-points	src/Game/GameManager/MenuController.cpp	MenuController::init	AddUpMenuChild	AttributePointMenu	attributePointMenu
+surface-instance	attribute-points	src/Game/GameManager/MenuController.cpp	MenuController::openAttributePoints	make-shared	AttributePointMenu	attributePointMenu
+surface-instance	system-notice	src/Game/GameManager/MenuController.cpp	MenuController::init	make-shared	SystemNotice	scriptMessages
+surface-resource	partner-equipment	src/Game/Menu/PartnerEquipMenu.cpp	PartnerEquipMenu::init	resource-load	loadMenuDefinition	this:"ini\\\\ui\\\\qingyu\\\\partner\\\\partner.menu.ini"
+surface-resource	save-load.title,save-load.system	src/Game/Menu/SaveLoad.cpp	SaveLoad::init	resource-load	loadMenuDefinition	this:menuDefinition
+surface-trigger	loading-text-overlay	src/Game/Script/ScriptAPI.cpp	ScriptAPI::saveGameWithFeedback	function-call	ScriptAPI::runExclusiveLoadingTask	u8"\u6b63\u5728\u4fdd\u5b58", [](const GameLoading::LoadingCancellationToken&) { return GameLoading::LoadingTaskResult::success(); }, [this, index](const std::function<bool()>& checkpoint) { return gameManager->saveGame(index, checkpoint) ? GameLoading::LoadingTaskResult::success() : GameLoading::LoadingTaskResult::failure(u8"\u5b58\u6863\u5931\u8d25"); }, {}, background

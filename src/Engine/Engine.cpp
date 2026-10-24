@@ -919,6 +919,20 @@ void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 	EngineBase::setFontFromMem(data, size);
 }
 
+bool Engine::measureText(const std::string& text, int size, int& width, int& height)
+{
+	width = 0;
+	height = 0;
+	if (!SDL_IsMainThread())
+	{
+		GameLog::write(
+			"Engine: cached text measurement must run on the SDL main thread\n");
+		return false;
+	}
+	ConditionalLock locker(_mutex, multiThreadedMode);
+	return EngineBase::measureText(text, size, width, height);
+}
+
 _shared_image Engine::createText(const std::string & text, int size, unsigned int color)
 {
 	if (!SDL_IsMainThread())

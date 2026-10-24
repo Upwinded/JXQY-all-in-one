@@ -112,6 +112,21 @@ void Traps::resetToEmpty()
 	triggeredIndices.clear();
 }
 
+bool Traps::saveMap(const std::string& mapName)
+{
+	if (ini == nullptr || mapName.empty())
+	{
+		return false;
+	}
+	// Only the explicit script command commits this visit's consumed traps.
+	// Ordinary game saves keep definitions and visit state separate.
+	for (int index : triggeredIndices)
+	{
+		ini->Remove(mapName, std::to_string(index));
+	}
+	return saveDefinitions();
+}
+
 bool Traps::saveDefinitions()
 {
 	if (ini == nullptr)

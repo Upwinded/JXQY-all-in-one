@@ -274,6 +274,8 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClCompile Include="..\..\src\Game\Data\Effect.cpp" />
     <ClCompile Include="..\..\src\Game\Data\EffectManager.cpp" />
     <ClCompile Include="..\..\src\Game\Data\GameElement.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\AttributePoints.cpp" />
+    <ClCompile Include="..\..\src\Game\Data\SkillTree.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Global.cpp" />
     <ClCompile Include="..\..\src\Game\Data\Goods.cpp" />
     <ClCompile Include="..\..\src\Game\Data\GoodsManager.cpp" />
@@ -335,6 +337,9 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClCompile Include="..\..\src\Game\Menu\DiceGambleState.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\EquipMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\FishGameState.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\AttributePointMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\PaperMenu.cpp" />
+    <ClCompile Include="..\..\src\Game\Menu\SkillTreeMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\GambleMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\GoodsMenu.cpp" />
     <ClCompile Include="..\..\src\Game\Menu\JoystickPanel.cpp" />
@@ -495,6 +500,8 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClInclude Include="..\..\src\Game\Data\Effect.h" />
     <ClInclude Include="..\..\src\Game\Data\EffectManager.h" />
     <ClInclude Include="..\..\src\Game\Data\GameElement.h" />
+    <ClInclude Include="..\..\src\Game\Data\AttributePoints.h" />
+    <ClInclude Include="..\..\src\Game\Data\SkillTree.h" />
     <ClInclude Include="..\..\src\Game\Data\Global.h" />
     <ClInclude Include="..\..\src\Game\Data\Goods.h" />
     <ClInclude Include="..\..\src\Game\Data\GoodsManager.h" />
@@ -547,6 +554,9 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClInclude Include="..\..\src\Game\Menu\DiceGambleState.h" />
     <ClInclude Include="..\..\src\Game\Menu\EquipMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\FishGameState.h" />
+    <ClInclude Include="..\..\src\Game\Menu\AttributePointMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\PaperMenu.h" />
+    <ClInclude Include="..\..\src\Game\Menu\SkillTreeMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\GambleMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\GoodsMenu.h" />
     <ClInclude Include="..\..\src\Game\Menu\JoystickPanel.h" />

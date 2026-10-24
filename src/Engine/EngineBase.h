@@ -660,6 +660,7 @@ private:
 	void clearFontCache();
 protected:
 	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
+	bool measureText(const std::string& text, int size, int& width, int& height);
 	_shared_image createText(const std::string& text, int size, unsigned int color, bool safe = false);
 	_shared_image createTextWithFontData(
 		const void* data,

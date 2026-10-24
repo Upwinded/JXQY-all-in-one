@@ -218,7 +218,7 @@ def classify_source_match(index: SourceIndex | None, candidates: Iterable[str], 
     if hits:
         return "original_exact", hits
     if resolved:
-        return "runtime_alias_only", []
+        return "runtime_exact_only", []
     return "missing_in_original", []
 
 
@@ -246,7 +246,7 @@ def build_markdown(output: dict[str, Any]) -> str:
     lines.append("## Interpretation")
     lines.append("")
     lines.append("- `original_exact`: at least one checker candidate exists in the supplied original source.")
-    lines.append("- `runtime_alias_only`: original exact candidate is absent, but the current runtime/checker resolves a unique image-package alias. Do not copy or rename automatically; verify visually in a real MOD scene.")
+    lines.append("- `runtime_exact_only`: original exact candidate is absent, but the current resource roots contain an exact candidate. Check the recorded source and dependency roots before copying.")
     lines.append("- `missing_in_original`: no checker candidate exists in the supplied original source. Treat this as a reported source/MOD defect, not as a required lookup task.")
     lines.append("- `no_source_mapping`: no original source was supplied for that pack.")
     lines.append("- Only `original_exact` is a safe resource-copy candidate. Fan-made MODs can legitimately contain broken or incomplete references; reporting those gaps is sufficient unless a later real-scene review proves a visible blocker.")

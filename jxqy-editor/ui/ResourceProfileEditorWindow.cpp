@@ -18,7 +18,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QSpinBox>
-#include <QDoubleSpinBox>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QListWidget>
@@ -38,13 +37,31 @@
 #include <QSignalBlocker>
 #include <QRegularExpression>
 
-#include <cmath>
 #include <limits>
 #include <utility>
 
 namespace
 {
 constexpr qsizetype MaximumTeamInfoBytes = 64 * 1024;
+
+struct ActionReleaseTimingField
+{
+    const char* key;
+    const char* objectName;
+    ActionReleaseFrameRatio GameProfile::*value;
+    bool GameProfile::*defined;
+    QString GameProfile::*sourceId;
+};
+
+constexpr ActionReleaseTimingField ActionReleaseTimingFields[] =
+{
+    {"AttackReleaseFrameRatio", "attackReleaseFrameRatio", &GameProfile::attackReleaseFrameRatio,
+        &GameProfile::attackReleaseFrameRatioDefined, &GameProfile::attackReleaseFrameRatioSourceId},
+    {"SpecialAttackReleaseFrameRatio", "specialAttackReleaseFrameRatio", &GameProfile::specialAttackReleaseFrameRatio,
+        &GameProfile::specialAttackReleaseFrameRatioDefined, &GameProfile::specialAttackReleaseFrameRatioSourceId},
+    {"MagicReleaseFrameRatio", "magicReleaseFrameRatio", &GameProfile::magicReleaseFrameRatio,
+        &GameProfile::magicReleaseFrameRatioDefined, &GameProfile::magicReleaseFrameRatioSourceId}
+};
 
 enum class LogicalResourceReadStatus
 {
@@ -421,7 +438,7 @@ void ResourceProfileEditorWindow::setupUi()
     gameLayout->addRow("", m_useWavCheck);
     mainLayout->addWidget(gameGroup);
 
-    // [Experience] 区：模式和倍率都可以独立使用 Game.Type 默认值。
+    // [Experience] 区：经验模式和升级门槛可以独立使用 Game.Type 默认值。
     auto* experienceGroup = new QGroupBox(this);
     experienceGroup->setObjectName(QStringLiteral("experienceGroup"));
     auto* experienceLayout = new QFormLayout(experienceGroup);
@@ -433,26 +450,6 @@ void ResourceProfileEditorWindow::setupUi()
         QStringLiteral("experienceModeFieldLabel"));
     experienceLayout->addRow(
         experienceModeFieldLabel, m_experienceModeCombo);
-
-    m_experienceMultiplierCheck = new QCheckBox(this);
-    m_experienceMultiplierCheck->setObjectName(
-        QStringLiteral("experienceMultiplierCheck"));
-    m_experienceMultiplierSpin = new QDoubleSpinBox(this);
-    m_experienceMultiplierSpin->setObjectName(
-        QStringLiteral("experienceMultiplierSpin"));
-    m_experienceMultiplierSpin->setRange(0.0, 1000.0);
-    m_experienceMultiplierSpin->setDecimals(3);
-    m_experienceMultiplierSpin->setSingleStep(0.1);
-    auto* multiplierRow = new QWidget(this);
-    auto* multiplierLayout = new QHBoxLayout(multiplierRow);
-    multiplierLayout->setContentsMargins(0, 0, 0, 0);
-    multiplierLayout->addWidget(m_experienceMultiplierCheck);
-    multiplierLayout->addWidget(m_experienceMultiplierSpin, 1);
-    auto* experienceMultiplierFieldLabel = new QLabel(this);
-    experienceMultiplierFieldLabel->setObjectName(
-        QStringLiteral("experienceMultiplierFieldLabel"));
-    experienceLayout->addRow(
-        experienceMultiplierFieldLabel, multiplierRow);
 
     m_levelUpThresholdModeCombo = new QComboBox(this);
     m_levelUpThresholdModeCombo->setObjectName(
@@ -543,6 +540,39 @@ void ResourceProfileEditorWindow::setupUi()
     combatLayout->addRow(
         magicEffectCalculationModeFieldLabel,
         m_magicEffectCalculationModeCombo);
+    for (std::size_t index = 0; index < m_actionReleaseTimingControls.size(); ++index)
+    {
+        auto& controls = m_actionReleaseTimingControls[index];
+        const QString prefix = QString::fromLatin1(ActionReleaseTimingFields[index].objectName);
+        auto* row = new QWidget(this);
+        auto* layout = new QHBoxLayout(row);
+        layout->setContentsMargins(0, 0, 0, 0);
+        controls.mode = new QComboBox(row);
+        controls.mode->setObjectName(prefix + QStringLiteral("Mode"));
+        controls.value = new QLineEdit(row);
+        controls.value->setObjectName(prefix + QStringLiteral("Edit"));
+        controls.value->setMaximumWidth(120);
+        controls.preview = new QLabel(row);
+        controls.preview->setObjectName(prefix + QStringLiteral("Preview"));
+        controls.preview->setWordWrap(true);
+        controls.label = new QLabel(this);
+        layout->addWidget(controls.mode);
+        layout->addWidget(controls.value);
+        layout->addWidget(controls.preview, 1);
+        combatLayout->addRow(controls.label, row);
+        connect(controls.mode, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this, index](int mode)
+            {
+                m_actionReleaseTimingControls[index].value->setEnabled(mode == 1);
+                updateActionReleaseTimingPreview();
+                onFieldChanged();
+            });
+        connect(controls.value, &QLineEdit::textChanged, this, [this]()
+        {
+            updateActionReleaseTimingPreview();
+            onFieldChanged();
+        });
+    }
     mainLayout->addWidget(combatGroup);
 
     // [Script] 区：脚本协议独立于 Game.Type，可为旧资源保留回退。
@@ -864,20 +894,6 @@ void ResourceProfileEditorWindow::setupUi()
             updateExperiencePreview();
             onFieldChanged();
         });
-    connect(m_experienceMultiplierCheck, &QCheckBox::toggled,
-        this, [this](bool checked)
-        {
-            m_experienceMultiplierSpin->setEnabled(checked);
-            updateExperiencePreview();
-            onFieldChanged();
-        });
-    connect(m_experienceMultiplierSpin,
-        QOverload<double>::of(&QDoubleSpinBox::valueChanged),
-        this, [this]()
-        {
-            updateExperiencePreview();
-            onFieldChanged();
-        });
     connect(m_levelUpThresholdModeCombo,
         QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ResourceProfileEditorWindow::onFieldChanged);
@@ -1054,8 +1070,6 @@ void ResourceProfileEditorWindow::retranslateUi()
     findChild<QLabel*>(QStringLiteral("featuresFieldLabel"))->setText(tr("功能开关:"));
     findChild<QLabel*>(QStringLiteral("experienceModeFieldLabel"))->setText(
         tr("击杀 NPC 经验模式:"));
-    findChild<QLabel*>(QStringLiteral("experienceMultiplierFieldLabel"))->setText(
-        tr("自动经验倍率:"));
     findChild<QLabel*>(QStringLiteral("levelUpThresholdModeFieldLabel"))->setText(
         tr("升级经验阈值:"));
     findChild<QLabel*>(QStringLiteral("experiencePreviewFieldLabel"))->setText(
@@ -1117,7 +1131,6 @@ void ResourceProfileEditorWindow::retranslateUi()
         m_experienceModeCombo->setCurrentIndex(
             previousExperienceMode >= 0 ? previousExperienceMode : 0);
     }
-    m_experienceMultiplierCheck->setText(tr("写入配置"));
     const auto refillCombo = [](QComboBox* combo, const QStringList& items)
     {
         const int previousIndex = combo->currentIndex();
@@ -1129,6 +1142,19 @@ void ResourceProfileEditorWindow::retranslateUi()
                 ? previousIndex
                 : 0);
     };
+    const QStringList releaseTimingLabels =
+    {
+        tr("普通攻击释放:"), tr("特殊攻击释放:"), tr("施法释放:")
+    };
+    for (std::size_t index = 0; index < m_actionReleaseTimingControls.size(); ++index)
+    {
+        auto& controls = m_actionReleaseTimingControls[index];
+        controls.label->setText(releaseTimingLabels[static_cast<qsizetype>(index)]);
+        refillCombo(controls.mode, {tr("继承"), tr("自定义")});
+        controls.value->setPlaceholderText(tr("分子/分母"));
+        controls.value->setToolTip(tr(
+            "正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。"));
+    }
     refillCombo(
         m_levelUpThresholdModeCombo,
         { tr("使用 Game.Type 默认值"),
@@ -1201,7 +1227,7 @@ void ResourceProfileEditorWindow::retranslateUi()
     m_uiProfileEdit->setPlaceholderText(tr("布局族，例如 JXQY2 / YYCS / XJXQY"));
     m_preferLocalUiCheck->setText(tr("当前资源包 UI 优先（允许局部覆盖）"));
     m_featuresEdit->setPlaceholderText(tr(
-        "每行一项，例如 MagicTriggerAtAnimationEnd=1 或 RageSystem=1；"
+        "每行一项，例如 RageSystem=1；"
         "缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；"
         "资源转换会写入实际基底默认值"));
     m_teamInfoFileEdit->setPlaceholderText(tr(
@@ -1245,6 +1271,7 @@ void ResourceProfileEditorWindow::retranslateUi()
     updateReleaseCompatibilityLabel();
     updateReleaseCoverPreview();
     updateExperiencePreview();
+    updateActionReleaseTimingPreview();
 }
 
 void ResourceProfileEditorWindow::setProjectResourceContext(
@@ -1499,6 +1526,7 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
     ModRelease::ModReleaseMetadata releaseMetadata =
         profile.releaseMetadata;
     GameProfile sourceProfile;
+    GameProfile releaseTimingProfile = profile;
     if (!profile.manifestPath.isEmpty() &&
         sourceProfile.loadFromFile(profile.manifestPath))
     {
@@ -1508,6 +1536,7 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
         // never rewritten merely because the shared catalog could read it.
         releaseMetadata =
             sourceProfile.releaseMetadata;
+        releaseTimingProfile = sourceProfile;
     }
     auto decodeReleaseField =
         [this](const std::string& value,
@@ -1542,11 +1571,6 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
                        DefeatedNpcExperienceMode::StoredExperience
                    ? 1
                    : 2));
-    m_experienceMultiplierCheck->setChecked(
-        profile.experienceMultiplierDefined);
-    m_experienceMultiplierSpin->setValue(profile.experienceMultiplier);
-    m_experienceMultiplierSpin->setEnabled(
-        profile.experienceMultiplierDefined);
     m_levelUpThresholdModeCombo->setCurrentIndex(
         !profile.levelUpThresholdModeDefined
             ? 0
@@ -1575,6 +1599,19 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
                     MagicEffectCalculationMode::AddToAttack
             ? 1
             : 0);
+    for (std::size_t index = 0; index < m_actionReleaseTimingControls.size(); ++index)
+    {
+        const auto& field = ActionReleaseTimingFields[index];
+        auto& controls = m_actionReleaseTimingControls[index];
+        const QString key = QString::fromLatin1(field.key);
+        const bool invalid = releaseTimingProfile.invalidActionReleaseFrameRatios.contains(key);
+        const bool custom = releaseTimingProfile.*field.defined || invalid;
+        controls.mode->setCurrentIndex(custom ? 1 : 0);
+        controls.value->setText(invalid
+            ? releaseTimingProfile.invalidActionReleaseFrameRatios.value(key)
+            : QString::fromStdString(actionReleaseFrameRatioToString(releaseTimingProfile.*field.value)));
+        controls.value->setEnabled(custom);
+    }
     m_scriptPlayerNameEdit->setText(profile.scriptPlayerName);
     int npcActionProfileIndex = 0;
     if (profile.npcActionProfileDefined)
@@ -1669,6 +1706,7 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
     updateReleaseCompatibilityLabel();
     updateReleaseCoverPreview();
     updateExperiencePreview();
+    updateActionReleaseTimingPreview();
 }
 
 GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
@@ -1697,10 +1735,6 @@ GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
         m_experienceModeCombo->currentIndex() == 1
             ? DefeatedNpcExperienceMode::StoredExperience
             : DefeatedNpcExperienceMode::LevelProductWithBonus;
-    profile.experienceMultiplierDefined =
-        m_experienceMultiplierCheck->isChecked();
-    profile.experienceMultiplier =
-        m_experienceMultiplierSpin->value();
     profile.levelUpThresholdModeDefined =
         m_levelUpThresholdModeCombo->currentIndex() > 0;
     profile.levelUpThresholdMode =
@@ -1722,6 +1756,18 @@ GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
             ? MagicEffectCalculationMode::AddToAttack
             : MagicEffectCalculationMode::ReplaceAttack;
     profile.magicEffectCalculationModeDefined = true;
+    for (std::size_t index = 0; index < m_actionReleaseTimingControls.size(); ++index)
+    {
+        const auto& field = ActionReleaseTimingFields[index];
+        const auto& controls = m_actionReleaseTimingControls[index];
+        profile.*field.defined = controls.mode->currentIndex() == 1;
+        if (profile.*field.defined && !tryParseActionReleaseFrameRatio(
+                controls.value->text().toUtf8().toStdString(), profile.*field.value))
+        {
+            profile.invalidActionReleaseFrameRatios.insert(
+                QString::fromLatin1(field.key), controls.value->text());
+        }
+    }
     profile.scriptPlayerName = m_scriptPlayerNameEdit->text().trimmed();
     profile.npcActionProfileDefined =
         m_npcActionProfileCombo->currentIndex() > 0;
@@ -2529,12 +2575,11 @@ void ResourceProfileEditorWindow::updateExperiencePreview()
     }
 
     if (m_inheritTypeCheck->isChecked() &&
-        (m_experienceModeCombo->currentIndex() == 0 ||
-         !m_experienceMultiplierCheck->isChecked()))
+        m_experienceModeCombo->currentIndex() == 0)
     {
         m_experiencePreviewLabel->setText(tr(
-            "当前资源继承 Game.Type，默认经验模式或倍率由内容依赖决定；"
-            "请显式配置两项后再查看数值示例。"));
+            "当前资源继承 Game.Type，默认经验模式由内容依赖决定；"
+            "请显式配置经验模式后再查看数值示例。"));
         return;
     }
 
@@ -2547,10 +2592,6 @@ void ResourceProfileEditorWindow::updateExperiencePreview()
         m_experienceModeCombo->currentIndex() == 1
             ? DefeatedNpcExperienceMode::StoredExperience
             : DefeatedNpcExperienceMode::LevelProductWithBonus;
-    previewManifest.experienceMultiplierDefined =
-        m_experienceMultiplierCheck->isChecked();
-    previewManifest.experienceMultiplier =
-        m_experienceMultiplierSpin->value();
 
     // Use fixed, visible inputs so authors can immediately see whether the
     // selected mode reads NPC.Exp or calculates the level product.
@@ -2560,16 +2601,63 @@ void ResourceProfileEditorWindow::updateExperiencePreview()
         5,
         100,
         0);
-    const double scaledExperience = scaleAutomaticExperience(
-        baseExperience,
-        previewManifest.resolvedExperienceMultiplier());
-    const int automaticExperience =
-        roundAutomaticExperience(scaledExperience);
     m_experiencePreviewLabel->setText(tr(
         "示例：角色等级 4、NPC 等级 5、NPC.Exp=100、ExpBonus=0。"
-        "角色获得 %1；修炼武功和当前使用武功按各自 Fraction 乘同一倍率后向下取整；"
+        "基础经验为 %1。玩家在游戏选项中选择 1、2 或 3 倍经验，默认 2 倍；"
+        "修炼武功和当前使用武功按各自 Fraction 乘同一倍率后向下取整；"
         "命中经验仍只使用 HitMagicExp.LevelFactor，不乘此倍率。")
-        .arg(automaticExperience));
+        .arg(baseExperience));
+}
+
+void ResourceProfileEditorWindow::updateActionReleaseTimingPreview()
+{
+    if (m_updatingFromCode || m_dependencyIdEdit == nullptr)
+    {
+        return;
+    }
+    GameProfile proposed = collectProfileFromUi();
+    proposed.rootPath = currentPackRoot();
+    if (m_currentPackIndex >= 0 && m_currentPackIndex < m_packs.size())
+    {
+        proposed.manifestPath = m_packs[m_currentPackIndex].manifestPath;
+    }
+    const auto invalidValues = proposed.invalidActionReleaseFrameRatios;
+    proposed.invalidActionReleaseFrameRatios.clear();
+    for (const auto& field : ActionReleaseTimingFields)
+    {
+        if (invalidValues.contains(QString::fromLatin1(field.key)))
+        {
+            proposed.*field.defined = false;
+        }
+    }
+    GameProfile effective;
+    const bool resolved = !proposed.rootPath.isEmpty() &&
+        ResourcePackScanner::resolveActionReleaseFrameRatios(m_assetsBasePath, proposed, effective);
+    for (std::size_t index = 0; index < m_actionReleaseTimingControls.size(); ++index)
+    {
+        const auto& field = ActionReleaseTimingFields[index];
+        auto& controls = m_actionReleaseTimingControls[index];
+        if (invalidValues.contains(QString::fromLatin1(field.key)))
+        {
+            controls.preview->setText(tr("分数无效"));
+            continue;
+        }
+        if (!resolved)
+        {
+            controls.preview->setText(tr("无法解析有效值"));
+            continue;
+        }
+        const QString sourceId = effective.*field.sourceId;
+        controls.preview->setText(tr("有效值 %1；来源：%2")
+            .arg(QString::fromStdString(actionReleaseFrameRatioToString(effective.*field.value)),
+                sourceId.isEmpty() ? tr("通用默认") : sourceId));
+        if (controls.mode->currentIndex() == 0)
+        {
+            const QSignalBlocker blocker(controls.value);
+            controls.value->setText(QString::fromStdString(
+                actionReleaseFrameRatioToString(effective.*field.value)));
+        }
+    }
 }
 
 bool ResourceProfileEditorWindow::saveProfileTransaction(
@@ -3177,6 +3265,13 @@ QString ResourceProfileEditorWindow::chooseProfileAssetFile(
 bool ResourceProfileEditorWindow::validateProfileForSave(
     const GameProfile& profile, const QString& packRoot)
 {
+    if (!profile.invalidActionReleaseFrameRatios.isEmpty())
+    {
+        QMessageBox::warning(this, tr("清单无效"), tr(
+            "释放帧比例必须是正整数分数，且分子不大于分母：%1")
+            .arg(profile.invalidActionReleaseFrameRatios.keys().join(QStringLiteral(", "))));
+        return false;
+    }
     if (!m_invalidLoadedReleaseFields.isEmpty())
     {
         QMessageBox::warning(
@@ -3189,14 +3284,6 @@ bool ResourceProfileEditorWindow::validateProfileForSave(
     {
         QMessageBox::warning(this, tr("清单无效"),
             tr("Game.Id 不能为空。"));
-        return false;
-    }
-    if (profile.experienceMultiplierDefined &&
-        (!std::isfinite(profile.experienceMultiplier) ||
-         profile.experienceMultiplier < 0.0))
-    {
-        QMessageBox::warning(this, tr("清单无效"),
-            tr("Experience.ExperienceMultiplier 必须是有限的非负数。"));
         return false;
     }
     QStringList levelUpEffectFiles = profile.levelUpRandomEffects;
@@ -3527,6 +3614,10 @@ void ResourceProfileEditorWindow::onFieldChanged()
         return;
     }
     const QObject* changedField = sender();
+    if (changedField == m_dependencyIdEdit || changedField == m_idEdit)
+    {
+        updateActionReleaseTimingPreview();
+    }
     if (changedField == m_profileVersionEdit)
     {
         m_invalidLoadedReleaseFields.remove(static_cast<int>(

@@ -6,6 +6,7 @@
 #include "../File/INIReader.h"
 #include "../JxqyEngineVersion.h"
 #include "../Resource/ResourceManager.h"
+#include "../Resource/ResourceCatalog.h"
 #include "../Game/Game.h"
 #include "../Game/Data/MemoPersistence.h"
 #include "../Game/Data/BuySellInventory.h"
@@ -14,6 +15,9 @@
 #include "../Game/GameManager/SaveGeneration.h"
 #include "../Game/GameManager/GameManager.h"
 #include "../Game/Data/ColorStyle.h"
+#include "../Game/Data/WaterEffect.h"
+#include "../Game/Data/NPCAction/ActionReleaseTiming.h"
+#include "../Image/ImageAnimationPlayback.h"
 #include "../Game/Data/NewYearPeriod.h"
 #include "../Game/Menu/SaveLoad.h"
 #include "../Game/Menu/BuySellMenu.h"
@@ -53,6 +57,12 @@
 class CoreLifecycleTestAccess
 {
 public:
+	static const std::vector<_shared_image>& labelTextImages(Label& label)
+	{
+		label.refreshTextLayout();
+		return label.strImage;
+	}
+
 	static void automaticSaveStep(GameManager& game, UTime elapsed) { game.updateAutomaticSave(elapsed, elapsed); }
 	static bool automaticSavePending(const GameManager& game) { return game.automaticSavePending; }
 	static bool canAutomaticallySave(GameManager& game) { return game.canAutomaticallySave(); }
@@ -312,6 +322,10 @@ public:
 	{
 		gameManager.onDraw();
 	}
+	static void drawGameComposition(GameManager& gameManager)
+	{
+		gameManager.drawSelf();
+	}
 
 	static bool timerPaused(Element& element)
 	{
@@ -564,6 +578,7 @@ class ScopedActiveResourceRoot final
 public:
 	ScopedActiveResourceRoot()
 		: previousRoot(File::getActiveResourceRoot())
+		, previousSaveNamespace(File::getActiveSaveNamespace())
 	{
 		const auto uniqueSuffix =
 			std::chrono::steady_clock::now().
@@ -581,6 +596,8 @@ public:
 		{
 			File::setActiveResourceRoot(
 				root.u8string());
+			// Derive this fixture's save namespace from its unique resource root.
+			File::setActiveSaveNamespace("");
 		}
 	}
 
@@ -591,6 +608,7 @@ public:
 			return;
 		}
 		File::setActiveResourceRoot(previousRoot);
+		File::setActiveSaveNamespace(previousSaveNamespace);
 		std::error_code error;
 		std::filesystem::remove_all(root, error);
 	}
@@ -607,6 +625,7 @@ public:
 
 private:
 	std::string previousRoot;
+	std::string previousSaveNamespace;
 	std::filesystem::path root;
 	bool active = false;
 };
@@ -863,6 +882,122 @@ protected:
 		}
 	}
 };
+
+bool runScriptMovementTrapQueueTests()
+{
+	bool ok = true;
+	for (bool running : { false, true })
+	{
+		ScopedActiveResourceRoot resourceRoot;
+		SaveFileManager::CurrentPathScope currentPath("save\\script-movement-traps");
+		if (!check(resourceRoot.valid() && currentPath.valid(), "script movement traps isolate fixture and save writes")) return false;
+		Element::resetApplicationQuitState();
+		auto mapBytes = MapV3ContractFixture::build();
+		std::fill(mapBytes.begin() + MapV3ContractFixture::BaseHeaderLength, mapBytes.end(), std::uint8_t{ 0 });
+		const std::string movement = running ? "playerrunto(4,12);" : "playergoto(4,12);";
+		if (!check(writeVirtualFile("map/trap-target.map", std::string(reinterpret_cast<const char*>(mapBytes.data()), mapBytes.size()))
+			&& writeVirtualFile("script/map/trap-source/parent.lua", "assign('ParentStage',1);" + movement
+				+ "assign('ParentStage',2); savemaptrap(); observe_trap_parent(); setmaptrap(7,'rebound.lua'); "
+				"loadmap('trap-target.map'); setmaptrap(7,'target.lua'); assign('ParentStage',3);")
+			&& writeVirtualFile("script/map/trap-source/captured.lua",
+				"add('CapturedRuns',1); assign('CapturedParentStage',getvar('ParentStage')); observe_trap_context();")
+			&& writeVirtualFile("script/map/trap-source/rebound.lua", "add('WrongBindingRuns',1);")
+			&& writeVirtualFile("script/map/trap-target/captured.lua", "add('WrongMapRuns',1);")
+			&& writeVirtualFile("script/map/trap-target/target.lua", "add('WrongTargetRuns',1);")
+			&& writeVirtualFile("script/map/trap-target/rearmed-first.lua", "assign('RearmedOrder',getvar('RearmedOrder')*10+1);")
+			&& writeVirtualFile("script/map/trap-target/rearmed-second.lua", "assign('RearmedOrder',getvar('RearmedOrder')*10+2);"),
+			"write real parent, captured and conflicting map-local scripts")) return false;
+		GameManager game;
+		game.mapFolderName = "trap-source";
+		game.global.data.mapName = "trap-source.map";
+		game.global.data.NPCAI = false;
+		game.varList.ensureInitialized();
+		game.map->data = std::make_shared<MapData>();
+		game.map->data->head.width = game.map->data->head.height = 16;
+		game.map->data->tile.assign(16, std::vector<MapTile>(16));
+		for (int y : { 6, 8 })
+			for (auto& tile : game.map->data->tile[y]) tile.trap = 7;
+		auto player = std::make_shared<ScriptReplacementActor<Player>>();
+		game.controller->removeChild(game.player);
+		game.player = player;
+		game.npcManager->setPlayer(player);
+		game.controller->addChild(player);
+		player->kind = nkPlayer;
+		player->npcName = "TrapPlayer";
+		player->life = player->lifeMax = player->thew = player->thewMax = 100;
+		player->setPosition({ 4, 4 }, false);
+		NPCActionRes animation;
+		animation.imagePackage = std::make_shared<IMPImage>();
+		animation.imagePackage->directions = 8;
+		animation.imagePackage->interval = 100;
+		animation.imagePackage->frame.resize(24);
+		player->res.stand = player->res.walk = player->res.run = animation;
+		auto owner = std::make_shared<NPC>();
+		owner->scriptFile = "parent.lua";
+		game.npcManager->addNPC(owner);
+		game.map->createDataMap();
+		game.traps.resetToEmpty();
+		game.traps.set("trap-source", 7, "captured.lua");
+		game.traps.set("trap-source", 9, "exit.lua");
+		bool observedQueue = false;
+		bool queueStayedDeferred = true;
+		player->beforeFrame = [&](int)
+		{
+			if (game.scriptTaskList.empty()) return;
+			observedQueue = true;
+			const auto task = game.scriptTaskList.front();
+			queueStayedDeferred = queueStayedDeferred && game.inEvent && game.traps.hasTriggered(7)
+				&& task.type == stTraps && task.trapIndex == 7 && task.scriptName == "captured.lua" && task.scriptMapName == "trap-source";
+			game.runTrapScript(7);
+			game.runTrapScript(7);
+			game.runScriptTaskList();
+			queueStayedDeferred = queueStayedDeferred && game.scriptTaskList.size() == 1
+				&& game.varList.getInteger("CapturedRuns") == 0;
+		};
+		CoreLifecycleTestAccess::registerScriptProbe(game.script, "observe_trap_parent", [](lua_State*)
+		{
+			gm->varList.setInteger("ParentReachedDestination", gm->player->getPosition() == Point{ 4, 12 });
+			gm->varList.setInteger("ParentSavedConsumedTrap", gm->inEvent && gm->traps.get("trap-source", 7).empty()
+				&& gm->traps.get("trap-source", 9) == "exit.lua" && gm->scriptTaskList.size() == 1
+				&& gm->varList.getInteger("CapturedRuns") == 0);
+			return 0;
+		});
+		CoreLifecycleTestAccess::registerScriptProbe(game.script, "observe_trap_context", [](lua_State*)
+		{
+			gm->varList.setInteger("CapturedContext", gm->scriptMapName == "trap-source" && gm->scriptTrapIndex == 7);
+			return 0;
+		});
+		game.runNPCScript(owner);
+		ok = check(observedQueue && queueStayedDeferred && !player->exhaustedFrames
+			&& game.varList.getInteger("ParentReachedDestination") == 1 && game.varList.getInteger("ParentSavedConsumedTrap") == 1,
+			"script Walk/Run reaches its original destination while duplicate trap contacts remain deferred across SaveMapTrap") && ok;
+		game.runScriptTaskList();
+		game.runScriptTaskList();
+		ok = check(!game.inEvent && game.scriptTaskList.empty() && game.mapFolderName == "trap-target"
+			&& game.varList.getInteger("CapturedRuns") == 1 && game.varList.getInteger("CapturedParentStage") == 3
+			&& game.varList.getInteger("CapturedContext") == 1 && game.varList.getInteger("WrongBindingRuns") == 0
+			&& game.varList.getInteger("WrongMapRuns") == 0 && game.varList.getInteger("WrongTargetRuns") == 0
+			&& game.traps.get("trap-source", 7) == "rebound.lua" && game.traps.get("trap-target", 7) == "target.lua"
+			&& !game.traps.hasTriggered(7),
+			"queued trap executes its captured source script once after the parent, without consuming rebound or destination-map traps") && ok;
+		std::cout << "Script movement trap queue: " << (running ? "Run" : "Walk") << " observed=" << observedQueue
+			<< " deferred=" << queueStayedDeferred << " runs=" << game.varList.getInteger("CapturedRuns") << '\n';
+		game.inEvent = true;
+		game.scriptAPI.setMapTrap(7, "rearmed-first.lua");
+		game.runTrapScript(7);
+		game.scriptAPI.setMapTrap(7, "rearmed-second.lua");
+		game.runTrapScript(7);
+		game.runTrapScript(7);
+		ok = check(game.scriptTaskList.size() == 2 && game.traps.hasTriggered(7)
+			&& game.scriptTaskList[0].scriptName == "rearmed-first.lua" && game.scriptTaskList[1].scriptName == "rearmed-second.lua",
+			"SetMapTrap reactivation allows a second contact with the same index to queue its new binding") && ok;
+		game.inEvent = false;
+		game.runScriptTaskList();
+		ok = check(game.scriptTaskList.empty() && game.varList.getInteger("RearmedOrder") == 12,
+			"reactivated same-index trap contacts both execute once in contact order") && ok;
+	}
+	return ok;
+}
 
 bool runScriptAsyncMovementReplacementTests()
 {
@@ -4529,6 +4664,298 @@ bool runProductionMoonlightTrapRouteTests()
 	return ok;
 }
 
+bool runProductionMoonlightQueuedTrapTests()
+{
+	const auto packRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets/yycs";
+	if (!std::filesystem::exists(packRoot / "game_profile.ini"))
+	{
+		std::cout << "SKIP: optional production Moonlight queued-trap resources are absent\n";
+		return true;
+	}
+	ScopedActiveResourceRoot resourceRoot;
+	SaveFileManager::CurrentPathScope currentPath("save\\moonlight-queued-trap");
+	if (!check(resourceRoot.valid() && currentPath.valid(), "Moonlight queued trap isolates working files")) return false;
+	File::setResourceFallbackRoots({ packRoot.u8string() });
+	Element::resetApplicationQuitState();
+	GameManager game;
+	auto player = std::make_shared<ScriptReplacementActor<Player>>();
+	game.controller->removeChild(game.player);
+	game.player = player;
+	game.npcManager->setPlayer(player);
+	game.controller->addChild(player);
+	ResourceManifest manifest;
+	if (!check(manifest.loadFromFile("game_profile.ini"), "load actual Moonlight queued-trap profile")) return false;
+	game.global.applyResourceManifestFeatures(manifest);
+	game.global.data.NPCAI = false;
+	game.varList.ensureInitialized();
+	// This is an explicit old-branch stage fixture, not evidence that a new-game
+	// playthrough reaches Event764. Player movement, map tiles and both scripts stay real.
+	game.varList.setInteger("Event", 764);
+	game.varList.setInteger("Result", 2);
+	for (const char* command : { "fadeout", "fadein", "sleep", "movescreen", "watch", "talk" })
+		CoreLifecycleTestAccess::registerScriptProbe(game.script, command, [](lua_State*) { return 0; });
+	CoreLifecycleTestAccess::registerScriptProbe(game.script, "say", [](lua_State* state)
+	{
+		if (std::string(luaL_checkstring(state, 1)) == u8"对白")
+			gm->varList.setInteger("QueuedTrap5Runs", gm->varList.getInteger("QueuedTrap5Runs") + 1);
+		return 0;
+	});
+	const std::string mapName = u8"map_062_禁地密室";
+	if (!check(player->loadInitialTemplate(0) && game.traps.loadInitialTemplate()
+		&& game.scriptAPI.loadMap(mapName + ".map", false) && game.scriptAPI.loadNPC("map062.npc")
+		&& game.scriptAPI.loadObject("map062_obj.obj"), "load real chamber, objects, trap bindings and player action resources")) return false;
+	game.npcManager->addNPC(u8"纳兰真.ini", 16, 14, 5);
+	player->setPosition({ 15, 29 });
+	bool ok = check(game.map->getTrapIndex(player->getPosition()) == 4 && game.map->getTrapIndex({ 16, 16 }) == 5
+		&& game.traps.get(mapName, 4) == "trap04.txt" && game.traps.get(mapName, 5) == "trap05.txt",
+		"real old-branch parent destination lands on the chamber's trap 5");
+	game.runTrapScript(4);
+	const auto trap5 = std::find_if(game.scriptTaskList.begin(), game.scriptTaskList.end(),
+		[](const ScriptTask& task) { return task.type == stTraps && task.trapIndex == 5; });
+	const auto trap5Count = std::count_if(game.scriptTaskList.begin(), game.scriptTaskList.end(),
+		[](const ScriptTask& task) { return task.type == stTraps && task.trapIndex == 5; });
+	std::cout << "Moonlight queued trap parent: Event=" << game.varList.getInteger("Event")
+		<< " position=" << player->getPosition().x << "," << player->getPosition().y << " queued=";
+	for (const auto& task : game.scriptTaskList)
+		std::cout << " [" << task.trapIndex << ":" << task.scriptName << "]";
+	std::cout << '\n';
+	ok = check(!player->exhaustedFrames && player->getPosition() == Point{ 16, 16 }
+		&& game.varList.getInteger("Event") == 766 && game.varList.getInteger("QueuedTrap5Runs") == 0
+		&& game.traps.get(mapName, 4).empty() && game.traps.get(mapName, 5).empty()
+		&& trap5Count == 1 && trap5->scriptName == "trap05.txt" && trap5->scriptMapName == mapName,
+		"real trap04 Walk consumes and queues trap05 before its Event766 SaveMapTrap, without executing it early") && ok;
+	game.runScriptTaskList();
+	game.runScriptTaskList();
+	ok = check(game.scriptTaskList.empty() && game.varList.getInteger("Event") == 767
+		&& game.varList.getInteger("QueuedTrap5Runs") == 1 && game.traps.get(mapName, 5).empty(),
+		"captured real trap05 survives SaveMapTrap and advances the completed parent from Event766 to Event767 once") && ok;
+	std::cout << "Moonlight queued trap stage-assisted Event764/Result2: frames=" << player->frames
+		<< " Event=" << game.varList.getInteger("Event") << " trap5Runs=" << game.varList.getInteger("QueuedTrap5Runs") << '\n';
+	return ok;
+}
+
+bool runProductionMoonlightTrapStageTests()
+{
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	if (!std::filesystem::exists(assetsRoot / "yycs/game_profile.ini"))
+	{
+		std::cout << "SKIP: optional production Moonlight stage resources are absent\n";
+		return true;
+	}
+	auto& resources = ResourceManager::instance();
+	if (!check(resources.initialize(assetsRoot.u8string()), "stage regression discovers actual resource dependencies")) return false;
+	struct StageCase
+	{
+		const char* id;
+		bool hasMapBindings = true;
+		bool hasBattle = true;
+		bool hasLaterAmbush = true;
+	};
+	const StageCase cases[] = {
+		{ "YYCS" }, { "JIANGHU_YUCHEN_1_03", true, true, false }, { "JIANGHU_YUCHEN_2" },
+		{ "YUEMEIER_WAIZHUAN_1_053" }, { "YUEMEIER_WAIZHUAN_MG", true, true, false },
+		{ "XIAOXIANGXING_1_022", false, false, false },
+		{ "JIAN_ZHI_YUAN_4_HD" }, { "JIAN_ZHI_YUAN_5_HD" }, { "JIAN_ZHI_YUAN_6_HD", true, false, false }
+	};
+	const std::string mapName = u8"map_027_连接地图";
+	const std::string scriptDirectory = "script/map/" + mapName + "/";
+	const bool previousLoadAsync = Config::loadAsync;
+	bool ok = true;
+	for (const auto& fixture : cases)
+	{
+		const auto& packs = resources.getDiscoveredPacks();
+		if (std::none_of(packs.begin(), packs.end(), [&](const auto& pack) { return pack.manifest.id == fixture.id; }))
+		{
+			std::cout << "SKIP: optional stage regression pack is absent: " << fixture.id << '\n';
+			continue;
+		}
+		if (!check(resources.setActiveResourcePackById(fixture.id), "stage regression activates the actual pack and its dependency order"))
+		{
+			ok = false;
+			continue;
+		}
+		const std::string saveNamespace = File::getActiveSaveNamespace();
+		for (const char* file : { "ini/save/traps.ini", u8"script/map/map_027_连接地图/事件40.txt",
+			u8"script/map/map_027_连接地图/死亡.txt", u8"script/map/map_027_连接地图/trap04.txt",
+			u8"script/map/map_027_连接地图/事件61.txt" })
+		{
+			std::cout << "Moonlight stage source pack=" << fixture.id << " file=" << file
+				<< " local=" << File::activeResourceFileExist(file) << " resolved=" << File::getAssetsName(file) << '\n';
+		}
+		if (fixture.hasBattle && !fixture.hasLaterAmbush)
+		{
+			const std::string ambush = scriptDirectory + "trap04.txt";
+			ok = check(File::activeResourceFileExist(ambush) && readVirtualFile(ambush).find_first_not_of(" \t\r\n") == std::string::npos,
+				"an intentional local empty ambush overrides the dependency's Event520 script") && ok;
+		}
+		for (bool asynchronous : { false, true })
+		for (int earlyStage : { 390, 392 })
+		{
+			Config::loadAsync = asynchronous;
+			// The test entry point installs an isolated platform state parent. Keep
+			// ResourceManager's real read routes and give each case a separate save.
+			File::setActiveSaveNamespace(saveNamespace + "-trap-stage-" + std::to_string(earlyStage)
+				+ (asynchronous ? "-async" : "-sync"));
+			GameManager game;
+			game.global.applyResourceManifestFeatures(resources.getActiveManifest());
+			game.varList.ensureInitialized();
+			game.varList.setInteger("Event", 390);
+			game.talkTextList.load();
+			game.menu->dialog = std::make_shared<RecordingDialog>();
+			// Stage placement and death outcomes are explicit assistance. Execute
+			// the real Lua, entity loads, counters and saves, without timed presentation.
+			for (const char* command : { "fadeout", "fadein", "sleep", "playmusic", "stopmusic", "playsound",
+				"npcgoto", "npcgotoex", "playergoto", "playerrunto", "movescreen", "movescreenex",
+				"npcspecialaction", "npcspecialactionex", "npcattack" })
+			{
+				CoreLifecycleTestAccess::registerScriptProbe(game.script, command, [](lua_State*) { return 0; });
+			}
+			CoreLifecycleTestAccess::registerScriptProbe(game.script, "select", [](lua_State* state)
+			{
+				gm->varList.setInteger(luaL_checkstring(state, 4), 0);
+				return 0;
+			});
+			if (!check(game.traps.loadInitialTemplate(), "load the pack's actual initial trap table"))
+			{
+				ok = false;
+				continue;
+			}
+			if (!fixture.hasMapBindings)
+			{
+				for (int index = 1; index <= 5; ++index)
+					ok = check(game.traps.get(mapName, index).empty(), "local trap table does not inherit absent Moonlight map bindings") && ok;
+				std::cout << "Moonlight stage scope pack=" << fixture.id << " no-map027-bindings\n";
+				continue;
+			}
+			if (!check(game.player->loadInitialTemplate(0) && game.scriptAPI.loadMap(mapName + ".map", false),
+				"load the actual player and map containing the conditional trap tiles"))
+			{
+				ok = false;
+				continue;
+			}
+			const auto stepOnTrap = [&](int index)
+			{
+				for (int y = 0; y < game.map->data->head.height; ++y)
+				for (int x = 0; x < game.map->data->head.width; ++x)
+				{
+					const Point tile{ x, y };
+					if (game.map->getTrapIndex(tile) != index || !game.map->canWalk(tile)) continue;
+					game.player->setPosition(tile, false);
+					game.player->checkTrap();
+					return true;
+				}
+				return check(false, "the actual map has a walkable tile for the requested trap");
+			};
+			if (!fixture.hasBattle)
+			{
+				for (int index : { 3, 4, 5 })
+				{
+					const std::string script = scriptDirectory + game.traps.get(mapName, index);
+					const std::string contents = readVirtualFile(script);
+					ok = check(File::activeResourceFileExist(script)
+						&& contents.find_first_not_of(" \t\r\n") == contents.find("return;"),
+						"the local MOD explicitly disables this inherited Moonlight event") && ok;
+					ok = stepOnTrap(index) && ok;
+				}
+				ok = check(game.varList.getInteger("Event") == 390 && game.mapFolderName == mapName,
+					"local no-op traps do not execute the dependency's Moonlight chapter") && ok;
+				std::cout << "Moonlight stage scope pack=" << fixture.id << " local-disabled-events\n";
+				continue;
+			}
+			if (!check(game.scriptAPI.loadNPC("event390helpymr.npc") && game.scriptAPI.loadObject("map027_obj.obj"),
+				"load the real rescue encounter and its objects"))
+			{
+				ok = false;
+				continue;
+			}
+			const auto stepOnConditionalTraps = [&]()
+			{
+				bool stepped = stepOnTrap(4) && stepOnTrap(5);
+				return check(stepped && game.mapFolderName == mapName && game.varList.getInteger("Event") == earlyStage,
+					"premature trap tiles leave the current rescue stage unchanged");
+			};
+			if (earlyStage == 390) ok = stepOnConditionalTraps() && ok;
+			ok = stepOnTrap(3) && ok;
+			if (!check(game.varList.getInteger("Event") == 392 && game.traps.hasTriggered(3),
+				"the real rescue introduction starts the battle and consumes its current-visit trap"))
+			{
+				ok = false;
+				continue;
+			}
+			if (earlyStage == 392) ok = stepOnConditionalTraps() && ok;
+			ok = check(game.traps.save() && game.traps.load() && game.traps.hasTriggered(3)
+				&& game.traps.get(mapName, 4) == "trap04.txt" && game.traps.get(mapName, 5) == u8"事件61.txt",
+				"ordinary trap persistence keeps definitions separate from this visit's trigger flags") && ok;
+			std::vector<std::shared_ptr<NPC>> defeated;
+			for (const auto& actor : game.npcManager->npcList)
+				if (actor && actor->deathScript == u8"死亡.txt") defeated.push_back(actor);
+			if (!check(!defeated.empty() && game.varList.getInteger("NpcCount") == static_cast<int>(defeated.size()),
+				"real introduction counts exactly the enemies bound to the rescue death continuation"))
+			{
+				ok = false;
+				continue;
+			}
+			for (const auto& actor : defeated)
+			{
+				actor->life = 0;
+				game.runNPCDeathScript(actor, actor->deathScript, mapName);
+			}
+			const bool completed = game.varList.getInteger("NpcCount") == 0 && game.varList.getInteger("Event") == 402
+				&& game.mapFolderName == u8"map_028_连接地图" && !game.inEvent;
+			ok = check(completed, "actual final death saves the map traps and continues through the medicine choice") && ok;
+			const auto checkBindings = [&]()
+			{
+				return check(game.traps.get(mapName, 1) == "trap01.txt" && game.traps.get(mapName, 2) == "trap02.txt"
+					&& game.traps.get(mapName, 3).empty() && game.traps.get(mapName, 4).empty() && game.traps.get(mapName, 5).empty(),
+					"explicit SaveMapTrap consumes this visit's triggered definitions and preserves the rearmed exits");
+			};
+			ok = checkBindings() && ok;
+			ok = check(game.traps.save() && game.traps.load(), "completed story trap definitions survive ordinary file save and reload") && ok;
+			ok = checkBindings() && ok;
+			ok = check(game.scriptAPI.loadMap(mapName + ".map", false) && !game.traps.hasTriggered(4)
+				&& !game.traps.hasTriggered(5), "reentering the actual map resets visit flags") && ok;
+			ok = checkBindings() && ok;
+			std::cout << "Moonlight assisted stage pack=" << fixture.id << " async=" << asynchronous << " early=" << earlyStage
+				<< " completed=" << completed << " trap3=" << game.traps.get(mapName, 3) << " trap4=" << game.traps.get(mapName, 4)
+				<< " trap5=" << game.traps.get(mapName, 5) << '\n';
+			if (std::string(fixture.id) == "YYCS")
+			{
+				// Resume two later chapter checkpoints independently from the consumed
+				// definitions. The real Huian entrance, rather than the test, rearms 4.
+				for (int entryStage : { 480, 520 })
+				{
+					if (!check(game.traps.load() && game.traps.get(mapName, 4).empty()
+						&& game.scriptAPI.loadMap(u8"map_012_惠安镇.map", false)
+						&& game.scriptAPI.loadNPC("huianzhen.npc") && game.scriptAPI.loadObject("map012_obj.obj"),
+						"later entrance starts from consumed trap definitions and the actual Huian scene"))
+					{
+						ok = false;
+						continue;
+					}
+					game.varList.setInteger("Event", entryStage);
+					game.runTrapScript(3);
+					ok = check(game.mapFolderName == mapName && game.varList.getInteger("Event") == entryStage
+						&& game.traps.get(mapName, 4) == "trap04.txt" && !game.traps.hasTriggered(4)
+						&& game.traps.get(mapName, 5).empty(),
+						"actual Event480 and Event520 entrances restore the ambush binding after earlier SaveMapTrap consumption") && ok;
+					if (entryStage == 520)
+					{
+						ok = stepOnTrap(4) && ok;
+						ok = check(game.global.data.npcName == "map027-feilongkiller.npc"
+							&& game.npcManager->findNPC(u8"杀手头目").size() == 1 && game.varList.getInteger("NpcCount") > 0
+							&& game.traps.get(mapName, 4).empty(), "restored Event520 trap executes its real ambush and consumes its binding") && ok;
+					}
+					std::cout << "Moonlight assisted entrance async=" << asynchronous << " early=" << earlyStage
+						<< " entry=" << entryStage << " map=" << game.mapFolderName << " trap4=" << game.traps.get(mapName, 4) << '\n';
+				}
+			}
+		}
+		File::setActiveSaveNamespace(saveNamespace);
+	}
+	Config::loadAsync = previousLoadAsync;
+	return ok;
+}
+
 bool runProductionNewSwordBoatRouteTests()
 {
 	const auto packRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets/xjxqy";
@@ -5026,10 +5453,10 @@ bool runAttackSaveBoundaryContracts()
 				if (!check(actor->isAttacking() && actor->hasPreparedAttackMagic && actor->actionLastTime > 1,
 					"the complete production actor admits a real attack before snapshotting")) { ok = false; continue; }
 				const UTime duration = actor->actionLastTime;
-				const UTime elapsed = afterRelease ? duration : duration / 2;
+				const UTime elapsed = afterRelease ? duration - 1 : 0;
 				CoreLifecycleTestAccess::advanceActorFrame(*actor, elapsed);
-				ok = check(actor->isAttacking() == !afterRelease && gameManager.effectManager->effectList.empty() == !afterRelease,
-					"attack snapshots distinguish an unreleased animation from a completed release") && ok;
+				ok = check(actor->isAttacking() && gameManager.effectManager->effectList.empty() == !afterRelease,
+					"attack snapshots distinguish preparation from recovery after release") && ok;
 				const auto original = actor;
 				const auto beforeSave = describe(*actor);
 				const bool usesNativeProtocol = actor->usesNativeAttackProtocol();
@@ -5070,7 +5497,7 @@ bool runAttackSaveBoundaryContracts()
 					else
 					{
 						actor->beginAttack(destination, target);
-						CoreLifecycleTestAccess::advanceActorFrame(*actor, actor->actionLastTime / 2);
+						CoreLifecycleTestAccess::advanceActorFrame(*actor, 0);
 						ok = check(actor->isAttacking() && actor->hasPreparedAttackMagic && gameManager.effectManager->effectList.empty(),
 							"the reused player is in another live attack when its snapshot is loaded") && ok;
 					}
@@ -5170,14 +5597,26 @@ bool runNativeNpcAttackProtocolContracts()
 			if (!check(actor->isAttacking() && gameManager.effectManager->effectList.empty(),
 				"native and ordinary protocols begin an animation without early effects")) { ok = false; continue; }
 			const UTime duration = actor->actionLastTime;
+			const auto& attack = actor->nowAction == acAttack1 ? actor->res.attack1 :
+				actor->nowAction == acAttack2 ? actor->res.attack2 : actor->res.attack;
+			const auto image = actor->preparedAttackMagic && actor->preparedAttackMagic->useActionImage
+				? actor->preparedAttackMagic->useActionImage : attack.imagePackage;
+			const auto frames = image ? ImageAnimationPlayback::calculateLayout(image->frame.size(), image->directions).framesPerDirection : 0;
+			const UTime trigger = calculateActionReleaseTime(duration, frames, gameManager.global.attackReleaseFrameRatio);
+			if (!check(trigger > 0 && trigger <= duration, "the native protocol fixture has a positive configured release gate")) return false;
 			gameManager.scriptAPI.changeFlyIni(actor->npcName, clearAtRelease ? "" : healFile);
 			gameManager.scriptAPI.changeFlyIni2(actor->npcName, clearAtRelease ? "" : healFile);
-			if (duration > 1) CoreLifecycleTestAccess::advanceActorFrame(*actor, duration - 1);
-			ok = check(gameManager.effectManager->effectList.empty(), "changing native fields does not release before the last frame") && ok;
+			CoreLifecycleTestAccess::advanceActorFrame(*actor, trigger - 1);
+			ok = check(actor->isAttacking() && gameManager.effectManager->effectList.empty(),
+				"changing native fields does not release before the configured frame gate") && ok;
 			CoreLifecycleTestAccess::advanceActorFrame(*actor, 1);
 			const std::string expected = enabled ? (clearAtRelease ? "" : healFile) : attackFile;
-			ok = check(releasedOnly(expected) && actor->isStanding(),
+			ok = check(releasedOnly(expected) && (trigger < duration ? actor->isAttacking() : actor->isStanding()),
 				"late native fields determine release, including clearing both slots; the ordinary protocol keeps its admitted magic") && ok;
+			const auto count = gameManager.effectManager->effectList.size();
+			CoreLifecycleTestAccess::advanceActorFrame(*actor, duration - trigger);
+			ok = check(actor->isStanding() && gameManager.effectManager->effectList.size() == count,
+				"native and ordinary protocols finish recovery without releasing the admitted attack again") && ok;
 			std::cout << "Native protocol contract:\tenabled=" << enabled << "\tclear=" << clearAtRelease
 				<< "\texpected=" << expected << "\teffects=" << gameManager.effectManager->effectList.size() << std::endl;
 		}
@@ -6151,6 +6590,24 @@ bool runProductionScriptAttackContracts()
 				if (!started) continue;
 				const UTime duration = actor->actionLastTime;
 				const auto attackAction = actor->nowAction;
+				const auto& attackResource = attackAction == acAttack1 ? actor->res.attack1 :
+					attackAction == acAttack2 ? actor->res.attack2 :
+					attackAction == acSpecialAttack ? actor->res.specialAttack : actor->res.attack;
+				auto actionImage = attackResource.imagePackage;
+				if (attackAction == acSpecialAttack)
+				{
+					const auto& practice = gameManager.magicManager.magicList[gameManager.magicManager.practiceIndex()];
+					const auto practiceImage = practice.magic->getActionImageForNPC(actor.get());
+					if (practiceImage) actionImage = practiceImage;
+				}
+				if (actor->preparedAttackMagic && actor->preparedAttackMagic->useActionImage)
+				{
+					actionImage = actor->preparedAttackMagic->useActionImage;
+				}
+				const auto frames = actionImage ? ImageAnimationPlayback::calculateLayout(actionImage->frame.size(), actionImage->directions).framesPerDirection : 0;
+				const UTime trigger = calculateActionReleaseTime(duration, frames, attackAction == acSpecialAttack
+					? gameManager.global.specialAttackReleaseFrameRatio : gameManager.global.attackReleaseFrameRatio);
+				if (!check(trigger > 0 && trigger <= duration, "the script attack uses a positive gate from its admitted animation")) return false;
 				const auto attackRevision = actor->actionManager->getActionRevision();
 				const int attackThew = actor->thew;
 				const int attackDirection = actor->direction;
@@ -6164,15 +6621,15 @@ bool runProductionScriptAttackContracts()
 					&& (attackAction == acAttack2 || attackAction == acSpecialAttack);
 				checkedLinkedAttack = checkedLinkedAttack || expectLinkedAttack;
 				// Ordinary attacks retain the prepared magic; the explicit native
-				// protocol instead reads this replacement at its last frame.
+				// protocol instead reads this replacement at its configured release gate.
 				const std::string replacementMagic = withPractice ? magicFile : u8"player-magic-长剑.ini";
 				const std::string expectedPrimaryMagic = !playerActor && gameManager.global.feature.nativeNpcAttackAtAnimationEnd
 					? replacementMagic : primaryMagic;
 				ok = check(execute("setnpcmagicfile(\"" + name + "\",\"" + replacementMagic + "\");") == LUA_OK,
 					"change the primary magic after this attack has begun") && ok;
-				CoreLifecycleTestAccess::advanceActorFrame(*actor, duration - 1);
+				CoreLifecycleTestAccess::advanceActorFrame(*actor, trigger - 1);
 				ok = check(actor->isAttacking() && gameManager.effectManager->effectList.empty(),
-					"the prepared magic is not released before the animation ends") && ok;
+					"the prepared magic is not released before the configured frame gate") && ok;
 				CoreLifecycleTestAccess::advanceActorFrame(*actor, 1);
 				const auto count = gameManager.effectManager->effectList.size();
 				const auto hasEffect = [&](const std::string& file)
@@ -6180,12 +6637,15 @@ bool runProductionScriptAttackContracts()
 					return std::any_of(gameManager.effectManager->effectList.begin(), gameManager.effectManager->effectList.end(),
 						[&](const auto& effect) { return effect && effect->magic.iniName == file; });
 				};
-				ok = check(actor->isStanding() && count > 0
+				ok = check((trigger < duration ? actor->isAttacking() : actor->isStanding()) && count > 0
 					&& hasEffect(expectedPrimaryMagic) && (!expectLinkedAttack || hasEffect(linkedSpecialMagic->iniName))
 					&& std::all_of(gameManager.effectManager->effectList.begin(), gameManager.effectManager->effectList.end(),
 						[&](const auto& effect) { return effect && effect->user.lock() == actor
 							&& (effect->magic.iniName == expectedPrimaryMagic || (expectLinkedAttack && effect->magic.iniName == linkedSpecialMagic->iniName)); }),
-					"the action releases the exact primary required by its resource protocol plus any linked attack before returning to stand") && ok;
+					"the action releases the exact primary required by its resource protocol plus any linked attack at the frame gate") && ok;
+				CoreLifecycleTestAccess::advanceActorFrame(*actor, duration - trigger);
+				ok = check(actor->isStanding() && gameManager.effectManager->effectList.size() == count,
+					"the script attack completes its remaining animation without a second release") && ok;
 				CoreLifecycleTestAccess::advanceActorFrame(*actor, duration + 100);
 				ok = check(gameManager.effectManager->effectList.size() == count,
 					"the same completed attack does not release again on the next update") && ok;
@@ -6216,16 +6676,197 @@ bool runProductionScriptAttackContracts()
 	return ok;
 }
 
+bool runProductionPracticeActionContracts()
+{
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	if (!std::filesystem::exists(assetsRoot / "yycs/game_profile.ini"))
+	{
+		std::cout << "SKIP: optional moonlight practice resources are absent\n";
+		return true;
+	}
+	struct Fixture
+	{
+		int character;
+		const char* resource;
+		const char* spell;
+		int level;
+		UTime castDuration;
+	};
+	bool ok = true;
+	for (const auto& fixture : {
+		Fixture{1, u8"npc013-纳兰真.ini", u8"player-magic-逆转心经.ini", 1, 640},
+		Fixture{0, u8"z-杨影枫.ini", u8"player-magic-烈火情天.ini", 1, 1800},
+		Fixture{0, u8"z-杨影枫2.ini", u8"player-magic-烈火情天.ini", 10, 550}})
+	{
+		ScopedActiveResourceRoot resourceRoot;
+		SaveFileManager::CurrentPathScope currentPath("save/practice_action_contracts");
+		if (!check(resourceRoot.valid() && currentPath.valid(), "practice-action checks isolate resource and save writes")) return false;
+		File::setResourceFallbackRoots({(assetsRoot / "yycs").u8string(), (assetsRoot / "common").u8string()});
+		GameManager gameManager;
+		ResourceManifest manifest;
+		if (!check(manifest.loadFromFile("game_profile.ini"), "load the real moonlight action profile")) return false;
+		gameManager.global.applyResourceManifestFeatures(manifest);
+		gameManager.global.data.NPCAI = false;
+		gameManager.map->data = std::make_shared<MapData>();
+		gameManager.map->data->head.width = gameManager.map->data->head.height = 100;
+		gameManager.map->data->tile.assign(100, std::vector<MapTile>(100));
+		gameManager.map->createDataMap();
+		auto player = gameManager.player;
+		if (!check(player->loadInitialTemplate(fixture.character), "load the actual moonlight character")) return false;
+		gameManager.scriptAPI.setNPCRes(player->npcName, fixture.resource);
+		player->setPosition({24,24}, false);
+		player->canFight = player->canUseMana = true;
+		player->attackSpeed = 1;
+		player->info.lifeMax = player->info.manaMax = player->info.thewMax = 10000;
+		player->life = player->mana = player->thew = 10000;
+		player->actionManager->restartActionIgnoringTransitions(acStand);
+		MagicInfo spell;
+		spell.iniFile = fixture.spell;
+		spell.magic = gameManager.magicManager.loadAttackMagic(fixture.spell);
+		spell.level = fixture.level;
+		if (!check(spell.magic && spell.magic->loadSucceeded, "load the real practiced spell")) return false;
+		auto practiceImage = spell.magic->getActionImageForNPC(player.get());
+		auto linked = spell.magic->getLinkedLevel(player->attackLevel).specialMagic;
+		if (!check(practiceImage && linked && linked->loadSucceeded, "the fixture contains a numbered practice action and its AttackFile")) return false;
+		const auto originalDirections = practiceImage->directions;
+		practiceImage->directions = 1;
+		ok = check(player->getMagicActionDirectionCount(spell.magic) == player->getUseMagicDirectionCount(),
+			"a practice ActionFile cannot restrict the character's casting directions") && ok;
+		practiceImage->directions = originalDirections;
+		player->beginMagic(spell, {25,20});
+		ok = check(player->nowAction == acMagic && player->actionLastTime == fixture.castDuration
+			&& player->actionLastTime == IMP::getIMPImageActionTime(player->res.magic.imagePackage),
+			"ordinary casting uses this character's Magic animation, including level ten") && ok;
+		const auto castImage = spell.magic->useActionImage ? spell.magic->useActionImage : player->res.magic.imagePackage;
+		const auto castFrames = castImage ? ImageAnimationPlayback::calculateLayout(castImage->frame.size(), castImage->directions).framesPerDirection : 0;
+		const UTime castTrigger = calculateActionReleaseTime(fixture.castDuration, castFrames, gameManager.global.magicReleaseFrameRatio);
+		if (!check(castTrigger > 0 && castTrigger <= fixture.castDuration, "the character's casting animation has a positive configured release gate")) return false;
+		CoreLifecycleTestAccess::advanceActorFrame(*player, castTrigger - 1);
+		ok = check(player->nowAction == acMagic && player->mana == 10000,
+			"casting does not release before the character animation's configured frame gate") && ok;
+		CoreLifecycleTestAccess::advanceActorFrame(*player, 1);
+		const int releasedMana = 10000 - spell.magic->level[fixture.level].manaCost;
+		ok = check((castTrigger < fixture.castDuration ? player->nowAction == acMagic : player->isStanding())
+			&& player->mana == releasedMana, "the spell releases once at the character animation's configured frame gate") && ok;
+		CoreLifecycleTestAccess::advanceActorFrame(*player, fixture.castDuration - castTrigger);
+		ok = check(player->isStanding() && player->mana == releasedMana,
+			"casting completes the character's recovery frames without paying again") && ok;
+		CoreLifecycleTestAccess::advanceActorFrame(*player, 1);
+		ok = check(player->mana == releasedMana, "the completed cast does not charge twice") && ok;
+		const int practiceIndex = gameManager.magicManager.practiceIndex();
+		gameManager.magicManager.magicList.resize(static_cast<size_t>(practiceIndex + 1));
+		gameManager.magicManager.magicList[practiceIndex] = spell;
+		bool sawOrdinary = false;
+		bool sawSpecial = false;
+		for (int attempt = 0; attempt < 64; ++attempt)
+		{
+			gameManager.effectManager->freeResource();
+			player->actionManager->restartActionIgnoringTransitions(acStand);
+			player->beginAttack({25,20});
+			const auto action = player->nowAction;
+			const bool special = action == acSpecialAttack;
+			sawOrdinary = sawOrdinary || action == acAttack || action == acAttack1;
+			sawSpecial = sawSpecial || special;
+			const auto image = special ? practiceImage : (action == acAttack1
+				? player->res.attack1.imagePackage : player->res.attack.imagePackage);
+			ok = check(player->isAttacking() && player->actionLastTime == IMP::getIMPImageActionTime(image)
+				&& (fixture.character == 0 || action == acAttack),
+				"practice only replaces an existing Attack2; Nalan Zhen keeps her own ordinary attack") && ok;
+			const auto duration = player->actionLastTime;
+			if (duration == 0) return false;
+			const auto frames = image ? ImageAnimationPlayback::calculateLayout(image->frame.size(), image->directions).framesPerDirection : 0;
+			const UTime trigger = calculateActionReleaseTime(duration, frames, special
+				? gameManager.global.specialAttackReleaseFrameRatio : gameManager.global.attackReleaseFrameRatio);
+			if (!check(trigger > 0 && trigger <= duration, "the practice attack has a positive gate from its selected animation")) return false;
+			CoreLifecycleTestAccess::advanceActorFrame(*player, trigger - 1);
+			ok = check(player->isAttacking() && gameManager.effectManager->effectList.empty(),
+				"neither primary nor practice effects release before the configured frame gate") && ok;
+			CoreLifecycleTestAccess::advanceActorFrame(*player, 1);
+			const auto count = gameManager.effectManager->effectList.size();
+			const bool hasPracticeEffect = std::any_of(gameManager.effectManager->effectList.begin(), gameManager.effectManager->effectList.end(),
+				[&](const auto& effect) { return effect && effect->magic.iniName == linked->iniName; });
+			ok = check((trigger < duration ? player->isAttacking() : player->isStanding()) && count > 0 && hasPracticeEffect == special,
+				"AttackFile accompanies the primary attack exactly at the special branch's release gate") && ok;
+			CoreLifecycleTestAccess::advanceActorFrame(*player, duration - trigger);
+			ok = check(player->isStanding() && gameManager.effectManager->effectList.size() == count,
+				"ordinary and special attacks retain recovery frames without another practice effect") && ok;
+			CoreLifecycleTestAccess::advanceActorFrame(*player, 1);
+			ok = check(gameManager.effectManager->effectList.size() == count, "the completed attack never repeats its practice effect") && ok;
+		}
+		ok = check(sawOrdinary && sawSpecial == (fixture.character == 0),
+			"Yang Yingfeng has ordinary and special attacks; Nalan Zhen never gains a missing Attack2") && ok;
+		if (fixture.character == 0)
+		{
+			auto& attackLink = spell.magic->linkedLevel[std::clamp(player->attackLevel, 1, MAGIC_MAX_LEVEL)];
+			attackLink.specialMagic.reset();
+			bool sawAttack2 = false;
+			for (int attempt = 0; attempt < 64 && !sawAttack2; ++attempt)
+			{
+				gameManager.effectManager->freeResource();
+				player->actionManager->restartActionIgnoringTransitions(acStand);
+				player->beginAttack({25,20});
+				ok = check(player->nowAction != acSpecialAttack, "ActionFile alone cannot enable a practice animation without AttackFile") && ok;
+				if (player->nowAction == acAttack2)
+				{
+					sawAttack2 = true;
+					ok = check(player->actionLastTime == IMP::getIMPImageActionTime(player->res.attack2.imagePackage),
+						"missing AttackFile keeps the character's ordinary Attack2 animation") && ok;
+					CoreLifecycleTestAccess::advanceActorFrame(*player, player->actionLastTime);
+					ok = check(std::none_of(gameManager.effectManager->effectList.begin(), gameManager.effectManager->effectList.end(),
+						[&](const auto& effect) { return effect && effect->magic.iniName == linked->iniName; }),
+						"missing AttackFile produces no practice effect") && ok;
+				}
+			}
+			attackLink.specialMagic = linked;
+			ok = check(sawAttack2, "the missing-AttackFile check actually reaches Attack2") && ok;
+		}
+		// A practice spell's UseActionFile belongs to casting that spell, not to the primary attack.
+		spell.magic->useActionImage = std::make_shared<IMPImage>();
+		spell.magic->useActionImage->directions = 1;
+		player->actionManager->restartActionIgnoringTransitions(acStand);
+		player->beginAttack({25,20});
+		const auto action = player->nowAction;
+		const auto image = action == acSpecialAttack ? practiceImage : (action == acAttack1
+			? player->res.attack1.imagePackage : player->res.attack.imagePackage);
+		ok = check(player->isAttacking() && player->actionLastTime == IMP::getIMPImageActionTime(image),
+			"a practiced spell's UseActionFile cannot replace or restrict unrelated ordinary attacks") && ok;
+		player->actionManager->restartActionIgnoringTransitions(acStand);
+		player->npcMagic->useActionImage = spell.magic->useActionImage;
+		const int previousThew = player->thew;
+		player->beginAttack({25,20});
+		ok = check(player->isStanding() && player->thew == previousThew && !player->hasPreparedAttackMagic,
+			"the actual primary magic's UseActionFile restricts direction before paying attack costs") && ok;
+		player->npcMagic->useActionImage = player->res.magic.imagePackage;
+		player->beginAttack({25,20});
+		ok = check(player->isAttacking() && player->actionLastTime == fixture.castDuration,
+			"the actual primary magic's UseActionFile overrides even a selected practice animation") && ok;
+		spell.magic->useActionImage = practiceImage;
+		player->actionManager->restartActionIgnoringTransitions(acStand);
+		player->beginMagic(spell, {25,20});
+		ok = check(player->nowAction == acMagic && player->actionLastTime == IMP::getIMPImageActionTime(practiceImage),
+			"explicit UseActionFile remains effective when actually casting that spell") && ok;
+		std::cout << "Production practice actions checked: " << fixture.resource
+			<< " level=" << fixture.level << " cast-ms=" << fixture.castDuration << std::endl;
+	}
+	return ok;
+}
+
 bool runProductionScriptMagicContracts()
 {
 	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
 	bool ok = true;
 	for (const auto& pack : {std::string("xjxqy"), std::string("yycs"), std::string(u8"潇湘行")})
 	{
+		const auto packRoot = assetsRoot / std::filesystem::u8path(pack);
+		if (!std::filesystem::exists(packRoot / "game_profile.ini"))
+		{
+			std::cout << "SKIP: optional script-magic resources are absent: " << pack << '\n';
+			continue;
+		}
 		ScopedActiveResourceRoot resourceRoot;
 		SaveFileManager::CurrentPathScope currentPath("save/script_magic_contracts");
 		if (!check(resourceRoot.valid() && currentPath.valid(), "script magic isolates resource and save writes")) return false;
-		std::vector<std::string> roots = {(assetsRoot / std::filesystem::u8path(pack)).u8string()};
+		std::vector<std::string> roots = {packRoot.u8string()};
 		if (pack == u8"潇湘行")
 		{
 			roots.push_back((assetsRoot / "jxqy2").u8string());
@@ -6236,7 +6877,9 @@ bool runProductionScriptMagicContracts()
 		GameManager gameManager;
 		ResourceManifest manifest;
 		if (!check(manifest.loadFromFile("game_profile.ini"), "load the production script-magic profile")) return false;
-		gameManager.global.applyResourceManifestFeatures(manifest);
+		const auto selection = RuntimeResource::resolveExactResourceSelection(assetsRoot, manifest.id);
+		if (!check(selection.succeeded(), "resolve the production script-magic content rules")) return false;
+		gameManager.global.applyResourceManifestFeatures(selection.selection.activeManifest);
 		gameManager.global.data.NPCAI = false;
 		gameManager.global.data.canInput = false;
 		gameManager.varList.ensureInitialized();
@@ -6252,6 +6895,12 @@ bool runProductionScriptMagicContracts()
 		if (!check(learned && learned->magic && learned->magic->loadSucceeded, "learn an actual production magic outside the toolbar")) return false;
 		learned->level = 1;
 		auto sourceMagic = learned->magic;
+		const auto releaseTime = [&]()
+		{
+			const auto image = sourceMagic->useActionImage ? sourceMagic->useActionImage : player->res.magic.imagePackage;
+			const auto frames = image ? ImageAnimationPlayback::calculateLayout(image->frame.size(), image->directions).framesPerDirection : 0;
+			return calculateActionReleaseTime(player->actionLastTime, frames, gameManager.global.magicReleaseFrameRatio);
+		};
 		// Keep real animation/effect resources, but make costs and cooldown observable.
 		sourceMagic->level[1].manaCost = 5;
 		sourceMagic->level[1].thewCost = 3;
@@ -6293,21 +6942,20 @@ bool runProductionScriptMagicContracts()
 				&& player->magicDest == Point{25,20} && player->preparedMagicAction == sourceMagic,
 				"a busy script cast cannot overwrite the already prepared destination or magic") && ok;
 			const UTime duration = player->actionLastTime;
-			const UTime trigger = gameManager.global.feature.magicTriggerAtAnimationEnd
-				? duration : std::min<UTime>(duration, PLAYER_MAGIC_DELAY);
+			const UTime trigger = releaseTime();
 			CoreLifecycleTestAccess::advanceActorFrame(*player, trigger - 1);
 			ok = check(player->mana == 100 && gameManager.effectManager->effectList.empty(), "no script magic cost or effect before its configured release frame") && ok;
 			CoreLifecycleTestAccess::advanceActorFrame(*player, 1);
 			const auto count = gameManager.effectManager->effectList.size();
-			ok = check(count > 0 && player->mana == 95 && player->thew == 97 && player->life == 98
+			ok = check(count > 0 && player->mana == 100 && player->thew == 100 && player->life == 98
 				&& gameManager.magicManager.findPrimaryMagic(file)->remainColdMilliseconds == 10000,
-				"the actual release consumes each cost once and starts the source magic cooldown") && ok;
+				"script casting exempts mana and stamina, pays LifeCost once and starts the source cooldown") && ok;
 			CoreLifecycleTestAccess::advanceActorFrame(*player, duration + 1);
-			ok = check(gameManager.effectManager->effectList.size() == count && player->mana == 95,
-				"finishing the cast does not release or charge again") && ok;
+			ok = check(gameManager.effectManager->effectList.size() == count && player->mana == 100 && player->life == 98,
+				"finishing the script cast does not release or pay LifeCost again") && ok;
 			const auto finishedRevision = player->actionManager->getActionRevision();
 			ok = check(execute(cast) == LUA_OK && player->actionManager->getActionRevision() == finishedRevision
-				&& player->mana == 95, "the existing script cooldown gate remains effective") && ok;
+				&& player->mana == 100 && player->life == 98, "the existing script cooldown gate remains effective") && ok;
 		}
 		reset();
 		player->canFight = false;
@@ -6367,31 +7015,31 @@ bool runProductionScriptMagicContracts()
 		for (bool atEnd : {false, true})
 		{
 			reset();
-			const bool originalTrigger = gameManager.global.feature.magicTriggerAtAnimationEnd;
-			gameManager.global.feature.magicTriggerAtAnimationEnd = atEnd;
+			const auto originalTrigger = gameManager.global.magicReleaseFrameRatio;
+			gameManager.global.magicReleaseFrameRatio = atEnd ? ActionReleaseFrameRatio{1, 1} : ActionReleaseFrameRatio{4, 5};
 			player->applyMagicInvisibility(10000, true);
 			ok = check(execute(cast) == LUA_OK && player->nowAction == acMagic,
 				"prepare an invisibility spell while an earlier reveal-on-action invisibility is active") && ok;
 			const UTime duration = player->actionLastTime;
-			const UTime trigger = atEnd ? duration : std::min<UTime>(duration, PLAYER_MAGIC_DELAY);
+			const UTime trigger = releaseTime();
 			CoreLifecycleTestAccess::advanceActorFrame(*player, trigger);
 			ok = check(player->invisibleMilliseconds == 10000 && player->isVisibleWhenAttack,
 				"releasing the spell clears old invisibility before granting the new invisibility") && ok;
 			CoreLifecycleTestAccess::advanceActorFrame(*player, duration + 1);
 			ok = check(player->invisibleMilliseconds > 0 && player->isVisibleWhenAttack,
 				"ending the casting animation does not erase newly granted invisibility") && ok;
-			gameManager.global.feature.magicTriggerAtAnimationEnd = originalTrigger;
+			gameManager.global.magicReleaseFrameRatio = originalTrigger;
 		}
 		sourceMagic->level[1] = originalLevel;
 		const int originalFullLife = sourceMagic->lifeFullToUse;
 		const int originalDisabled = sourceMagic->disableUse;
-		const bool originalTrigger = gameManager.global.feature.magicTriggerAtAnimationEnd;
+		const auto originalTrigger = gameManager.global.magicReleaseFrameRatio;
 		sourceMagic->lifeFullToUse = 1;
 		// Inject admission flags into this isolated in-memory skill, retaining
 		// the production protagonist animation and magic effect resources.
 		for (bool atEnd : { false, true })
 		{
-			gameManager.global.feature.magicTriggerAtAnimationEnd = atEnd;
+			gameManager.global.magicReleaseFrameRatio = atEnd ? ActionReleaseFrameRatio{1, 1} : ActionReleaseFrameRatio{4, 5};
 			for (int disabled : { 1, -1 })
 			{
 				reset();
@@ -6404,33 +7052,43 @@ bool runProductionScriptMagicContracts()
 					"DisableUse does not block explicit script casting admitted at full life") && ok;
 				if (player->nowAction != acMagic || player->actionLastTime <= 1) continue;
 				const UTime duration = player->actionLastTime;
-				const UTime trigger = atEnd ? duration : std::min<UTime>(duration, PLAYER_MAGIC_DELAY);
+				const UTime trigger = releaseTime();
 				player->life = 90;
 				CoreLifecycleTestAccess::advanceActorFrame(*player, trigger - 1);
 				ok = check(player->mana == 100 && player->life == 90 && gameManager.effectManager->effectList.empty(),
 					"losing life mid-animation neither charges early nor releases early") && ok;
 				CoreLifecycleTestAccess::advanceActorFrame(*player, 1);
 				const auto count = gameManager.effectManager->effectList.size();
-				ok = check(count > 0 && player->mana == 95 && player->thew == 97 && player->life == 88,
+				ok = check(count > 0 && player->mana == 100 && player->thew == 100 && player->life == 88,
 					"an admitted full-life cast survives mid-animation life loss and releases after LifeCost") && ok;
 				CoreLifecycleTestAccess::advanceActorFrame(*player, duration + 1);
-				ok = check(gameManager.effectManager->effectList.size() == count && player->mana == 95 && player->life == 88,
+				ok = check(gameManager.effectManager->effectList.size() == count && player->mana == 100 && player->life == 88,
 					"full-life admission does not cause duplicate release or payment at animation end") && ok;
 			}
 		}
 		sourceMagic->disableUse = originalDisabled;
 		sourceMagic->lifeFullToUse = originalFullLife;
-		gameManager.global.feature.magicTriggerAtAnimationEnd = originalTrigger;
+		gameManager.global.magicReleaseFrameRatio = originalTrigger;
 		for (bool interrupt : {false, true})
 		{
 			reset();
-			ok = check(execute(cast) == LUA_OK && player->nowAction == acMagic, "prepare a cast before release-time cancellation or cost failure") && ok;
+			ok = check(execute(cast) == LUA_OK && player->nowAction == acMagic, "prepare a script cast before cancellation or loss of mana") && ok;
 			if (interrupt) player->actionManager->forceChangeAction(acStand);
 			else player->mana = 0;
 			CoreLifecycleTestAccess::advanceActorFrame(*player, player->actionLastTime + 1);
-			ok = check(gameManager.effectManager->effectList.empty() && player->thew == 100 && player->life == 100
-				&& gameManager.magicManager.findPrimaryMagic(file)->remainColdMilliseconds == 0,
-				"interruption or insufficient mana at release produces no effect, other cost or cooldown") && ok;
+			if (interrupt)
+			{
+				ok = check(gameManager.effectManager->effectList.empty() && player->thew == 100 && player->life == 100
+					&& gameManager.magicManager.findPrimaryMagic(file)->remainColdMilliseconds == 0,
+					"interrupted script casting produces no effect, LifeCost or cooldown") && ok;
+			}
+			else
+			{
+				ok = check(!gameManager.effectManager->effectList.empty() && player->mana == 0
+					&& player->thew == 100 && player->life == 98
+					&& gameManager.magicManager.findPrimaryMagic(file)->remainColdMilliseconds == 10000,
+					"script casting survives loss of mana while retaining LifeCost and cooldown") && ok;
+			}
 		}
 		reset();
 		gameManager.magicManager.replaceMagicList(u8"player-magic-长剑.ini");
@@ -6489,7 +7147,7 @@ bool runProductionScriptMagicContracts()
 			player->disableSkillMilliseconds = 1000;
 			const auto revision = player->actionManager->getActionRevision();
 			ok = check(execute(u8"usemagic('001燕归.ini');") == LUA_OK && !player->petrified && !player->immobilized
-				&& player->actionManager->getActionRevision() == revision && player->thew == 88,
+				&& player->actionManager->getActionRevision() == revision && player->thew == 100,
 				"actual YanGui cures disabled states immediately without waiting for a cast animation") && ok;
 		}
 		reset();
@@ -6651,8 +7309,17 @@ bool runProductionLegacyTalkTests()
 			"the actual ChangAn trap displays the complete SGBTS introduction in every battle state") && ok;
 		ok = check(gameManager.varList.getInteger("CAFight") == (fightState == 0 ? 1 : fightState) &&
 			gameManager.varList.getInteger("cafight") == 91 && !gameManager.inEvent &&
-			gameManager.traps.get(gameManager.mapFolderName, 7) == "maptrap7.txt",
-			"the actual ChangAn trap continues each branch without changing variable case or binding") && ok;
+			gameManager.traps.get(gameManager.mapFolderName, 7) ==
+				(fightState == 2 ? "" : "maptrap7.txt"),
+			"the actual ChangAn trap preserves variable case and rearms until its final SaveMapTrap branch") && ok;
+		if (fightState == 2)
+		{
+			const auto dialogueCount = dialog->entries.size();
+			gameManager.traps.beginMapVisit();
+			gameManager.runTrapScript(7);
+			ok = check(dialog->entries.size() == dialogueCount,
+				"the completed ChangAn battle dialogue cannot repeat on a later map visit") && ok;
+		}
 		if (fightState == 0)
 		{
 			dialog->entries.clear();
@@ -7266,6 +7933,25 @@ bool runMapThumbnailLoadingTests()
 				ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()),
 					"capture the actual menu after thumbnail creation failed") && ok;
 			}
+			gameManager.map->generateThumbnail();
+			menu.updateThumbnail();
+			ok = check(gameManager.map->getThumbnailImage() != nullptr,
+				"prepare a feathered thumbnail for edge NPC rendering") && ok;
+			Engine::getInstance()->renderClear(0, 0, 0, 255);
+			CoreLifecycleTestAccess::drawSubtree(menu);
+			pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+			ok = check(pixels && SDL_ReadSurfacePixel(pixels.get(), 40, 40, &red, &green, &blue, &alpha) &&
+				green > 180 && blue > 200 && red < 20,
+				"a top-left NPC stays fully visible over the feathered thumbnail edge") && ok;
+			ok = check(pixels && SDL_ReadSurfacePixel(pixels.get(), 360, 297, &red, &green, &blue, &alpha) &&
+				red > 200 && green < 20 && blue < 20,
+				"the last map row and column keep their NPC visible beyond the cropped thumbnail") && ok;
+			if (const char* directory = std::getenv("JXQY_MAP_THUMBNAIL_CAPTURE_DIR"))
+			{
+				const auto path = std::filesystem::path(directory) / "markers-with-map.png";
+				ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()),
+					"capture opaque edge NPC markers over the feathered thumbnail") && ok;
+			}
 		}
 	}
 	if (const char* directory = std::getenv("JXQY_MAP_THUMBNAIL_CAPTURE_DIR"))
@@ -7455,6 +8141,172 @@ bool runSaveFeedbackRenderingTests()
 	if (initializeTtf) TTF_Quit();
 	File::setResourceFallbackRoots({});
 	File::setUiResourceFallbackRoots({});
+	return ok;
+}
+
+bool runWaterEffectEdgeRenderingTests()
+{
+	if (!check(SDL_Init(0), "initialize water edge pixel test")) return false;
+	auto surface = make_shared_surface(SDL_CreateSurface(800, 600, SDL_PIXELFORMAT_ARGB8888));
+	SDL_Renderer* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+	if (!check(renderer != nullptr, "create water edge software renderer")) return false;
+	Engine* engine = Engine::getInstance();
+	auto previousRenderer = CoreLifecycleTestAccess::exchangeRenderer(renderer);
+	int previousWidth = 0, previousHeight = 0;
+	CoreLifecycleTestAccess::getLogicalSize(previousWidth, previousHeight);
+	bool ok = true;
+	for (const Point size : { Point{800, 600}, Point{641, 481}, Point{400, 360} })
+	{
+		CoreLifecycleTestAccess::setLogicalSize(size.x, size.y);
+		auto output = engine->createCanvasImage(size.x, size.y);
+		for (const bool preset : { false, true })
+		{
+			WaterEffect water;
+			if (preset)
+			{
+				water.applyPresetParams();
+				water.addDefaultClickRipple(size.x - 2.0f, size.y / 2.0f, 0);
+			}
+			else
+			{
+				water.setGridSize(60);
+				WaterWaveParams wave;
+				wave.amplitude = 30.0f;
+				wave.frequency = 1.0f;
+				water.addWave(wave);
+				wave.angle = 1.57079633f;
+				water.addWave(wave);
+			}
+			for (const UTime time : { 400u, 800u, 1571u, 3200u, 4712u, 6200u })
+			{
+				SDL_SetRenderTarget(renderer, output.get());
+				engine->fillRect(0, 0, size.x, size.y, 0, 255, 0, 255);
+				water.setupEffectCanvas();
+				engine->fillRect(0, 0, size.x, size.y, 0, 0, 255, 255);
+				engine->fillRect(0, 0, size.x, 1, 255, 0, 0, 255);
+				engine->fillRect(0, size.y - 1, size.x, 1, 255, 0, 0, 255);
+				engine->fillRect(0, 0, 1, size.y, 255, 0, 0, 255);
+				engine->fillRect(size.x - 1, 0, 1, size.y, 255, 0, 0, 255);
+				water.renderEffect(time, { 0.0f, 0.0f });
+				auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+				const auto hasCoverage = [&](Point point, bool border)
+				{
+					Uint8 red = 0, green = 0, blue = 0, alpha = 0;
+					return pixels && SDL_ReadSurfacePixel(pixels.get(), point.x, point.y, &red, &green, &blue, &alpha)
+						&& alpha == 255 && green < 30
+						&& (border ? red + blue > 180 : blue > 180 && red < 30);
+				};
+				bool edgesPreserved = engine->getRenderTarget() == output.get();
+				for (const Point point : { Point{0, size.y / 2}, Point{size.x - 1, size.y / 2},
+					Point{size.x / 2, 0}, Point{size.x / 2, size.y - 1} })
+				{
+					edgesPreserved = hasCoverage(point, true) && edgesPreserved;
+				}
+				for (const Point point : { Point{4, size.y / 2}, Point{size.x - 5, size.y / 2},
+					Point{size.x / 2, 4}, Point{size.x / 2, size.y - 5} })
+				{
+					edgesPreserved = hasCoverage(point, false) && edgesPreserved;
+				}
+				ok = check(edgesPreserved,
+					"water covers all four edges without stretching a one-pixel border across neighboring pixels") && ok;
+				if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"); directory && time == 4712)
+				{
+					std::filesystem::create_directories(directory);
+					const auto path = std::filesystem::path(directory) / (std::string(preset ? "preset-" : "edge-")
+						+ std::to_string(size.x) + "x" + std::to_string(size.y) + ".png");
+					ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()),
+						"capture the rendered water edge regression") && ok;
+				}
+			}
+		}
+		SDL_SetRenderTarget(renderer, nullptr);
+	}
+	CoreLifecycleTestAccess::setLogicalSize(previousWidth, previousHeight);
+	CoreLifecycleTestAccess::exchangeRenderer(previousRenderer);
+	SDL_DestroyRenderer(renderer);
+	return ok;
+}
+
+bool runScreenColorRenderingTests()
+{
+	class ColoredWorld : public GameManager
+	{
+		void onDraw() override
+		{
+			engine->fillRect(0, 0, 800, 600, 200, 160, 96, 255);
+		}
+	};
+	class ColoredWeather : public Weather
+	{
+	public:
+		bool failDrawing = false;
+		void onDraw() override
+		{
+			if (failDrawing) throw std::runtime_error("screen color render fixture");
+			engine->fillRect(20, 20, 20, 20, 80, 200, 120, 255);
+		}
+	};
+	class ColoredInterface : public Element
+	{
+		void onDraw() override
+		{
+			engine->fillRect(50, 50, 20, 20, 120, 80, 220, 255);
+		}
+	};
+	if (!check(SDL_Init(0), "initialize screen color pixel test")) return false;
+	auto surface = make_shared_surface(SDL_CreateSurface(800, 600, SDL_PIXELFORMAT_ARGB8888));
+	SDL_Renderer* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+	if (!check(renderer != nullptr, "create screen color software renderer")) return false;
+	Engine* engine = Engine::getInstance();
+	auto previousRenderer = CoreLifecycleTestAccess::exchangeRenderer(renderer);
+	int previousWidth = 0, previousHeight = 0;
+	CoreLifecycleTestAccess::getLogicalSize(previousWidth, previousHeight);
+	bool ok = true;
+	{
+		ColoredWorld world;
+		world.removeAllChild();
+		auto weather = std::make_shared<ColoredWeather>();
+		world.weather = weather;
+		world.addChild(weather);
+		world.addChild(std::make_shared<ColoredInterface>());
+		const auto matches = [&](const _shared_surface& pixels, int x, int y, int red, int green, int blue)
+		{
+			Uint8 r = 0, g = 0, b = 0, a = 0;
+			return pixels && SDL_ReadSurfacePixel(pixels.get(), x, y, &r, &g, &b, &a)
+				&& std::abs(r - red) <= 1 && std::abs(g - green) <= 1 && std::abs(b - blue) <= 1 && a == 255;
+		};
+		for (const Point size : { Point{640, 480}, Point{400, 360}, Point{800, 600} })
+		{
+			CoreLifecycleTestAccess::setLogicalSize(size.x, size.y);
+			world.scriptAPI.changeMapColorPlus("#804020");
+			CoreLifecycleTestAccess::drawGameComposition(world);
+			auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+			ok = check(engine->getRenderTarget() == nullptr && matches(pixels, 100, 100, 100, 40, 12)
+				&& matches(pixels, 25, 25, 40, 50, 15) && matches(pixels, 55, 55, 120, 80, 220),
+				"screen color multiplies world and weather pixels once while preserving UI and restoring the target after resize") && ok;
+			world.scriptAPI.changeMapColorPlus("#000000");
+			CoreLifecycleTestAccess::drawGameComposition(world);
+			pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+			ok = check(matches(pixels, 100, 100, 200, 160, 96),
+				"MG black reset restores full color without the legacy grayscale path") && ok;
+		}
+		world.scriptAPI.changeMapColorPlus("#804020");
+		weather->failDrawing = true;
+		bool threw = false;
+		try
+		{
+			CoreLifecycleTestAccess::drawGameComposition(world);
+		}
+		catch (const std::runtime_error&)
+		{
+			threw = true;
+		}
+		ok = check(threw && engine->getRenderTarget() == nullptr,
+			"an interrupted world composition restores its previous render target") && ok;
+	}
+	CoreLifecycleTestAccess::setLogicalSize(previousWidth, previousHeight);
+	CoreLifecycleTestAccess::exchangeRenderer(previousRenderer);
+	SDL_DestroyRenderer(renderer);
 	return ok;
 }
 
@@ -8582,6 +9434,246 @@ bool runProductionNewSwordFeedbackTests()
 		}
 	}
 	Config::loadAsync = previousLoadAsync;
+	return ok;
+}
+
+bool runProductionNewSwordPartnerDepartureTests()
+{
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	auto& resources = ResourceManager::instance();
+	if (!check(resources.initialize(assetsRoot.u8string()) && resources.setActiveResourcePackById("XJXQY"),
+		"select the real New Sword profile used again by ordinary save reload")) return false;
+	const bool previousLoadAsync = Config::loadAsync;
+	const std::string selectedSaveNamespace = File::getActiveSaveNamespace();
+	File::setActiveSaveNamespace("");
+	bool ok = true;
+	for (bool asynchronous : { false, true })
+	{
+		for (int failure = 0; failure < 4; ++failure)
+		{
+#if !defined(_WIN32)
+			if (failure == 3) continue; // Windows sharing denial exercises a real write-open failure.
+#endif
+			Config::loadAsync = asynchronous;
+			ScopedActiveResourceRoot resourceRoot;
+			if (!check(resourceRoot.valid(), "New Sword departure isolates all writes"))
+			{
+				ok = false;
+				continue;
+			}
+			File::setResourceFallbackRoots({ (assetsRoot / "xjxqy").u8string(), (assetsRoot / "yycs").u8string() });
+			GameManager game;
+			ResourceManifest manifest;
+			ok = check(manifest.loadFromFile("game_profile.ini"), "load New Sword departure profile") && ok;
+			game.global.applyResourceManifestFeatures(manifest);
+			game.global.loadUiSettings();
+			game.goodsManager.configureLayout();
+			game.magicManager.configureLayout();
+			game.global.data.characterIndex = 0;
+			game.varList.ensureInitialized();
+			game.menu->dialog = std::make_shared<RecordingDialog>();
+			game.menu->messageBox = std::make_shared<MsgBox>();
+			game.menu->systemNotice = std::make_shared<SystemNotice>();
+			// Keep real dialogue dispatch, Kind changes, map loads and saves; omit presentation waits.
+			for (const char* command : { "fadeout", "fadein", "sleep", "playmusic", "stopmusic", "playsound",
+				"npcgoto", "npcgotoex", "playergoto", "playergotoex", "npcspecialaction" })
+			{
+				CoreLifecycleTestAccess::registerScriptProbe(game.script, command, [](lua_State*) { return 0; });
+			}
+			bool seeded = game.player->loadInitialTemplate(0) && game.goodsManager.load(0)
+				&& game.magicManager.load(0) && game.traps.loadInitialTemplate();
+			for (const char* file : { "player1.ini", "goods1.ini", "player2.ini", "goods2.ini" })
+			{
+				const std::string contents = readVirtualFile(std::string(INI_SAVE_FOLDER) + file);
+				seeded = !contents.empty() && writeVirtualFile(SaveFileManager::CurrentPath() + file, contents) && seeded;
+			}
+			if (!check(seeded && game.scriptAPI.loadMap(u8"map097_湖口村茶馆.map", false)
+				&& game.scriptAPI.loadNPC("map097.npc") && game.scriptAPI.loadObject("map097.obj"),
+				"seed actual character records and tea-house checkpoint"))
+			{
+				ok = false;
+				continue;
+			}
+			game.scriptAPI.addNPC(u8"npc004_张琳心.ini", 6, 12, 4);
+			// The medicine-return script makes this initially neutral template a friendly companion.
+			game.scriptAPI.setNPCRelation(u8"张琳心", nrFriendly);
+			game.scriptAPI.setNPCKind(u8"张琳心", nkPartner);
+			game.varList.setInteger("Event", 540);
+			game.runTrapScript(1);
+			game.runTrapScript(1);
+			auto reunion = game.npcManager->findNPC(u8"张如梦");
+			auto arrivingHeroine = game.npcManager->findNPC(u8"张琳心");
+			if (!check(game.mapFolderName == u8"map097_湖口村茶馆" && reunion.size() == 1
+				&& arrivingHeroine.size() == 1 && arrivingHeroine.front()->kind == nkPartner,
+				"the normal Event540 village entrance retains Linxin before the reunion"))
+			{
+				ok = false;
+				continue;
+			}
+			game.runNPCScript(reunion.front(), "", false);
+			ok = check(game.varList.getInteger("Event") == 550, "the actual brother reunion reaches Event550") && ok;
+			game.runTrapScript(1);
+			game.runTrapScript(1);
+			const auto sisters = game.npcManager->findNPC(u8"张琳心");
+			const auto brothers = game.npcManager->findNPC(u8"张如梦");
+			const auto owners = game.npcManager->findNPC(u8"龚楷");
+			if (!check(sisters.size() == 1 && brothers.size() == 1 && owners.size() == 1
+				&& sisters.front()->kind == nkPartner && brothers.front()->kind == nkPartner,
+				"the departure starts with exactly the two real companions"))
+			{
+				ok = false;
+				continue;
+			}
+			const auto heroine = sisters.front();
+			ok = check(game.global.feature.restorePartnerAttributes,
+				"the actual New Sword profile enables partner character writeback") && ok;
+			ok = check(heroine->getPartnerCharacterIndex() == 1 && heroine->relation == nrFriendly,
+				"the actual New Sword role index identifies the friendly Linxin companion") && ok;
+			ok = check(!heroine->handEquip.empty(),
+				"the actual New Sword UI layout loads Linxin's initial equipped weapon") && ok;
+			heroine->exp += 37;
+			heroine->attack += 5;
+			const int expectedExperience = heroine->exp;
+			const int expectedAttack = heroine->attack;
+			const int expectedLife = heroine->life;
+			std::vector<std::string> equipment;
+			for (int part = 0; part < GOODS_BODY_COUNT; ++part) equipment.push_back(heroine->getEquipmentFileByPartIndex(part));
+			const std::string playerFile = SaveFileManager::CurrentPath() + "player1.ini";
+			const std::string goodsFile = SaveFileManager::CurrentPath() + "goods1.ini";
+			const std::string validPlayer = readVirtualFile(playerFile);
+			const std::string validGoods = readVirtualFile(goodsFile);
+			game.varList.setInteger("Event", 550);
+			const std::string invalidRecord = failure == 1
+				? u8"[Init]\nName=张琳心\nLevel=invalid\n" : "[Head]\nCount=-1\n";
+			if (failure == 1 || failure == 2)
+			{
+				ok = check(writeVirtualFile(failure == 1 ? playerFile : goodsFile, invalidRecord),
+					"inject an invalid companion record only in the isolated current save") && ok;
+			}
+#if defined(_WIN32)
+			HANDLE blockedWrite = INVALID_HANDLE_VALUE;
+			if (failure == 3)
+			{
+				const auto path = std::filesystem::u8path(File::getAssetsName(goodsFile));
+				blockedWrite = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING,
+					FILE_ATTRIBUTE_NORMAL, nullptr);
+				ok = check(blockedWrite != INVALID_HANDLE_VALUE, "hold the equipment record readable but unwritable") && ok;
+			}
+#endif
+			game.runNPCScript(owners.front(), "", false);
+#if defined(_WIN32)
+			if (blockedWrite != INVALID_HANDLE_VALUE) CloseHandle(blockedWrite);
+#endif
+			if (failure != 0)
+			{
+				ok = check(game.varList.getInteger("Event") == 550 && !game.inEvent
+					&& game.mapFolderName == u8"map097_湖口村茶馆" && heroine->kind == nkPartner
+					&& heroine->exp == expectedExperience && heroine->attack == expectedAttack && heroine->life == expectedLife,
+					"failed departure stops the actual dialogue before Event560 without discarding the companion") && ok;
+				ok = check(game.menu->messageBox->currentMessage.find(u8"张琳心") != std::string::npos
+					|| game.menu->systemNotice->currentMessage.find(u8"张琳心") != std::string::npos,
+					"departure failure names the affected companion to the player") && ok;
+				ok = check(readVirtualFile(failure == 1 ? playerFile : goodsFile)
+					== (failure == 3 ? validGoods : invalidRecord), "failed departure preserves the blocked record") && ok;
+				for (int part = 0; part < GOODS_BODY_COUNT; ++part)
+				{
+					ok = check(heroine->getEquipmentFileByPartIndex(part) == equipment[part],
+						"failed departure leaves every equipped item on the companion") && ok;
+				}
+				if (failure == 1 || failure == 2)
+				{
+					ok = check(writeVirtualFile(failure == 1 ? playerFile : goodsFile, failure == 1 ? validPlayer : validGoods),
+						"restore the test record before retrying the same real dialogue") && ok;
+				}
+				game.runNPCScript(owners.front(), "", false);
+			}
+			ok = check(game.varList.getInteger("Event") == 560 && heroine->kind == nkBattle
+				&& brothers.front()->kind == nkBattle && !game.inEvent,
+				"the original tea-house dialogue leaves both siblings behind after a successful save or retry") && ok;
+			const auto recordsPreserved = [&]()
+			{
+				INIReader player(playerFile);
+				INIReader goods(goodsFile);
+				bool matches = player.GetInteger("Init", "Exp", -1) == expectedExperience
+					&& player.GetInteger("Init", "Attack", -1) == expectedAttack;
+				for (int part = 0; part < GOODS_BODY_COUNT; ++part)
+				{
+					const std::string section = std::to_string(game.goodsManager.equipIndex(part) + 1);
+					matches = goods.Get(section, "IniFile", "") == equipment[part]
+						&& goods.GetInteger(section, "Number", 0) == (equipment[part].empty() ? 0 : 1) && matches;
+				}
+				return matches;
+			};
+			ok = check(recordsPreserved(), "departure preserves earned attributes and all seven equipment slots") && ok;
+			const auto reload = [&]()
+			{
+				return game.saveGame(1) && (asynchronous ? game.scriptAPI.loadGameAsync(1) : game.loadGame(1))
+					&& game.global.feature.restorePartnerAttributes;
+			};
+			ok = check(reload(), "ordinary tea-house save reload succeeds after departure") && ok;
+			if (failure == 0)
+			{
+				for (int revisit = 0; revisit < 2; ++revisit)
+				{
+					game.runTrapScript(1);
+					ok = check(game.mapFolderName == u8"map096_湖口村", "the normal front door permits leaving after the departure dialogue") && ok;
+					game.runTrapScript(1);
+					const auto waitingHeroine = game.npcManager->findNPC(u8"张琳心");
+					const auto waitingBrother = game.npcManager->findNPC(u8"张如梦");
+					ok = check(game.mapFolderName == u8"map097_湖口村茶馆" && waitingHeroine.size() == 1
+						&& waitingBrother.size() == 1 && waitingHeroine.front()->kind == nkBattle
+						&& waitingBrother.front()->kind == nkBattle && game.varList.getInteger("Event") == 560,
+						"returning from the village at Event560 does not recruit either waiting sibling") && ok;
+					const auto owner = game.npcManager->findNPC(u8"龚楷");
+					if (owner.size() == 1) game.runNPCScript(owner.front(), "", false);
+					ok = check(reload() && recordsPreserved(), "repeated tea-house visits and saves preserve departed character records") && ok;
+				}
+			}
+			for (const char* destination : { u8"map098_天王帮秘道", u8"map099_洞庭湖畔", u8"map121_洞庭湖底", u8"map100_天王岛" })
+			{
+				game.runTrapScript(2);
+				ok = check(game.mapFolderName == destination && game.npcManager->findNPC(u8"张琳心").empty()
+					&& game.npcManager->findNPC(u8"张如梦").empty(),
+					"real tunnel, lake and island transitions never carry the departed siblings") && ok;
+			}
+			ok = check(reload() && recordsPreserved() && game.npcManager->findNPC(u8"张琳心").empty()
+				&& game.npcManager->findNPC(u8"张如梦").empty(),
+				"ordinary island save reload retains departure and character records") && ok;
+			if (failure == 0)
+			{
+				// Checkpoint the later return with Yang Ying; the intervening island story is outside this regression.
+				game.scriptAPI.addNPC(u8"npc008_杨瑛.ini", 3, 70, 1);
+				game.scriptAPI.setNPCKind(u8"杨瑛", nkPartner);
+				game.varList.setInteger("Event", 610);
+				for (const char* destination : { u8"map121_洞庭湖底", u8"map099_洞庭湖畔", u8"map098_天王帮秘道", u8"map097_湖口村茶馆" })
+				{
+					game.runTrapScript(1);
+					ok = check(game.mapFolderName == destination, "the original Event610 return route remains reachable") && ok;
+				}
+				game.runTrapScript(1);
+				game.runTrapScript(1);
+				const auto returningCompanion = game.npcManager->findNPC(u8"杨瑛");
+				ok = check(game.mapFolderName == u8"map097_湖口村茶馆" && returningCompanion.size() == 1
+					&& returningCompanion.front()->kind == nkPartner && game.npcManager->findNPC(u8"张琳心").empty(),
+					"the Event610 village entrance preserves Yang Ying without restoring the departed siblings") && ok;
+				game.runScript(u8"桌上的书信.txt");
+				ok = check(game.varList.getInteger("Event") == 620 && game.mapFolderName == u8"map105_成都",
+					"the real letter continues the story after the original return") && ok;
+				ok = check(game.scriptAPI.loadMap(u8"map096_湖口村.map", false)
+					&& game.scriptAPI.loadNPC("map096.npc") && game.scriptAPI.loadObject("map096.obj"),
+					"checkpoint a later visit to the village after the letter") && ok;
+				game.runTrapScript(1);
+				const auto laterHeroine = game.npcManager->findNPC(u8"张琳心");
+				ok = check(std::none_of(laterHeroine.begin(), laterHeroine.end(), [](const auto& npc)
+					{ return npc->kind == nkPartner; }), "later tea-house visits cannot recruit Linxin from an earlier map snapshot") && ok;
+			}
+			// No heuristic rewrites an old save whose Event560 was already advanced by an earlier engine.
+			std::cout << "New Sword partner departure async=" << asynchronous << " failure=" << failure
+				<< " Event=" << game.varList.getInteger("Event") << " map=" << game.mapFolderName << std::endl;
+		}
+	}
+	Config::loadAsync = previousLoadAsync;
+	File::setActiveSaveNamespace(selectedSaveNamespace);
 	return ok;
 }
 
@@ -9812,6 +10904,16 @@ bool runProductionWudangGateTests()
 	return ok;
 }
 
+UTime getProductionArenaAttackReleaseTime(GameManager& gameManager, const NPC& boss)
+{
+	const auto& attack = boss.nowAction == acAttack1 ? boss.res.attack1 :
+		boss.nowAction == acAttack2 ? boss.res.attack2 : boss.res.attack;
+	const auto image = boss.preparedAttackMagic && boss.preparedAttackMagic->useActionImage
+		? boss.preparedAttackMagic->useActionImage : attack.imagePackage;
+	const auto frames = image ? ImageAnimationPlayback::calculateLayout(image->frame.size(), image->directions).framesPerDirection : 0;
+	return calculateActionReleaseTime(boss.actionLastTime, frames, gameManager.global.attackReleaseFrameRatio);
+}
+
 bool runProductionArenaSelfMagicAI(GameManager& gameManager, const std::shared_ptr<NPC>& boss)
 {
 	const auto originalOptions = boss->attackOptions;
@@ -9855,9 +10957,17 @@ bool runProductionArenaSelfMagicAI(GameManager& gameManager, const std::shared_p
 				ok = false;
 				continue;
 			}
-			CoreLifecycleTestAccess::advanceActorFrame(*boss, boss->actionLastTime - 1);
+			const UTime duration = boss->actionLastTime;
+			const UTime releaseTime = getProductionArenaAttackReleaseTime(gameManager, *boss);
+			if (!check(releaseTime > 0 && releaseTime <= duration,
+				"production self magic has a valid release gate within its admitted animation"))
+			{
+				ok = false;
+				continue;
+			}
+			CoreLifecycleTestAccess::advanceActorFrame(*boss, releaseTime - 1);
 			ok = check(gameManager.effectManager->effectList.size() == beforeCount,
-				"AI-selected self magic is not released before its attack animation ends") && ok;
+				"AI-selected self magic is not released before its configured attack frame") && ok;
 			CoreLifecycleTestAccess::advanceActorFrame(*boss, 1);
 			if (check(gameManager.effectManager->effectList.size() == beforeCount + 1,
 				"AI-selected production self magic releases once, including a second active cast"))
@@ -9874,6 +10984,11 @@ bool runProductionArenaSelfMagicAI(GameManager& gameManager, const std::shared_p
 					&& boss->res.stand.imagePackage && boss->getAttack() == originalAttack * 150 / 100,
 					"AI morph and recast use the real replacement without compounding its 50 percent attack bonus") && ok;
 			}
+			ok = check(releaseTime == duration || boss->isAttacking(),
+				"self magic keeps its admitted attack action during recovery") && ok;
+			CoreLifecycleTestAccess::advanceActorFrame(*boss, duration - releaseTime);
+			ok = check(boss->isStanding() && gameManager.effectManager->effectList.size() == beforeCount + 1,
+				"self magic finishes recovery without another effect before the next AI cast") && ok;
 		}
 		gameManager.effectManager->freeResource();
 		CoreLifecycleTestAccess::advanceActorFrame(*boss, 2500);
@@ -9897,14 +11012,26 @@ bool runProductionArenaSelfMagicAI(GameManager& gameManager, const std::shared_p
 			"normal NPC attack admits a full-life production BUFF regardless of player-only DisableUse") && ok;
 		if (boss->isAttacking() && boss->actionLastTime > 1)
 		{
+			const UTime duration = boss->actionLastTime;
+			const UTime releaseTime = getProductionArenaAttackReleaseTime(gameManager, *boss);
+			if (!check(releaseTime > 0 && releaseTime <= duration,
+				"the admitted production BUFF has a valid animation release gate"))
+			{
+				ok = false;
+				boss->life = originalLife;
+				continue;
+			}
 			boss->life -= 1;
-			CoreLifecycleTestAccess::advanceActorFrame(*boss, boss->actionLastTime - 1);
+			CoreLifecycleTestAccess::advanceActorFrame(*boss, releaseTime - 1);
 			ok = check(gameManager.effectManager->effectList.empty(), "NPC life loss does not release its prepared BUFF early") && ok;
 			CoreLifecycleTestAccess::advanceActorFrame(*boss, 1);
 			ok = check(gameManager.effectManager->effectList.size() == 1
 				&& gameManager.effectManager->effectList.back()->magic.iniName == admissionMagic->iniName
 				&& gameManager.effectManager->effectList.back()->user.lock() == boss,
-				"NPC attack releases its admitted BUFF at the actual final frame after life loss") && ok;
+				"NPC attack releases its admitted BUFF at the configured frame after life loss") && ok;
+			CoreLifecycleTestAccess::advanceActorFrame(*boss, duration - releaseTime);
+			ok = check(boss->isStanding() && gameManager.effectManager->effectList.size() == 1,
+				"the admitted BUFF finishes recovery before further attack-selection checks") && ok;
 		}
 		boss->life = originalLife;
 		gameManager.effectManager->freeResource();
@@ -10008,15 +11135,27 @@ bool runProductionArenaAttackAdmission(GameManager& gameManager, const std::shar
 			"an admitted mixed-list attack retains exactly the originally planned skill") && ok;
 		if (!boss->isAttacking() || boss->actionLastTime <= 1) continue;
 		const UTime duration = boss->actionLastTime;
+		const UTime releaseTime = getProductionArenaAttackReleaseTime(gameManager, *boss);
+		if (!check(releaseTime > 0 && releaseTime <= duration,
+			"an admitted mixed-list attack has a valid animation release gate"))
+		{
+			ok = false;
+			continue;
+		}
 		boss->life = boss->getLifeMax() - 1;
 		boss->beginAttack({ 40, 40 }, nullptr);
 		ok = check(boss->preparedAttackMagic == selected.magic,
 			"a busy request cannot replace the prepared attack after life changes") && ok;
-		CoreLifecycleTestAccess::advanceActorFrame(*boss, duration - 1);
+		CoreLifecycleTestAccess::advanceActorFrame(*boss, releaseTime - 1);
 		ok = check(gameManager.effectManager->effectList.empty(), "admitted mixed-list attack waits until its actual release frame") && ok;
 		CoreLifecycleTestAccess::advanceActorFrame(*boss, 1);
 		ok = check(gameManager.effectManager->effectList.size() == 1 && !boss->hasPreparedAttackMagic,
 			"admitted mixed-list attack releases once and clears preparation even after life loss") && ok;
+		ok = check(releaseTime == duration || boss->isAttacking(),
+			"admitted mixed-list attacks retain their recovery after releasing") && ok;
+		CoreLifecycleTestAccess::advanceActorFrame(*boss, duration - releaseTime);
+		ok = check(boss->isStanding() && gameManager.effectManager->effectList.size() == 1,
+			"mixed-list attack recovery completes without selecting or releasing another skill") && ok;
 	}
 	reset();
 	boss->attackOptions = originalOptions;
@@ -10053,19 +11192,29 @@ bool runProductionArenaMagicLifecycle(GameManager& gameManager, std::shared_ptr<
 			continue;
 		}
 		const UTime duration = boss->actionLastTime;
-		CoreLifecycleTestAccess::advanceActorFrame(*boss, duration - 1);
+		const UTime releaseTime = getProductionArenaAttackReleaseTime(gameManager, *boss);
+		if (!check(releaseTime > 0 && releaseTime <= duration,
+			"a real arena attack has a valid release gate within its animation"))
+		{
+			ok = false;
+			continue;
+		}
+		CoreLifecycleTestAccess::advanceActorFrame(*boss, releaseTime - 1);
 		ok = check(boss->isAttacking() && gameManager.effectManager->effectList.empty(),
-			"arena attack magic waits for the last animation tick") && ok;
+			"arena attack magic waits for its configured animation release gate") && ok;
 		CoreLifecycleTestAccess::advanceActorFrame(*boss, 1);
 		const auto effects = gameManager.effectManager->effectList;
-		ok = check(boss->isStanding() && !effects.empty()
+		ok = check((releaseTime == duration ? boss->isStanding() : boss->isAttacking()) && !effects.empty()
 			&& std::all_of(effects.begin(), effects.end(), [&](const auto& effect)
 			{
 				return effect->magic.iniName == option.magic->iniName && effect->level == 10 && effect->user.lock() == boss;
 			}), "arena animation releases its actual level-10 magic with the original caster") && ok;
-		CoreLifecycleTestAccess::advanceActorFrame(*boss, 1);
+		CoreLifecycleTestAccess::advanceActorFrame(*boss, 0);
 		ok = check(gameManager.effectManager->effectList.size() == effects.size(),
-			"an arena attack is not released twice") && ok;
+			"repeating an arena release tick does not duplicate its effects") && ok;
+		CoreLifecycleTestAccess::advanceActorFrame(*boss, duration - releaseTime);
+		ok = check(boss->isStanding() && gameManager.effectManager->effectList.size() == effects.size(),
+			"an arena attack completes recovery without another release") && ok;
 		if (option.moveKind == mmkSummon && !effects.empty())
 		{
 			const auto effect = effects.front();
@@ -10265,6 +11414,33 @@ bool runProductionYuchenArenaRoutes()
 			ResourceManifest manifest;
 			ok = check(manifest.loadFromFile("game_profile.ini"), "load actual Yuchen arena feature profile") && ok;
 			gameManager.global.applyResourceManifestFeatures(manifest);
+			const auto reportArenaState = [&](const char* stage)
+			{
+				const Point position = gameManager.player->getPosition();
+				std::cerr << "Arena actual stage=" << stage << " async=" << asynchronous
+					<< " entrance=" << entrance.npcs << " root=" << File::getActiveResourceRoot()
+					<< " saveNamespace=" << File::getActiveSaveNamespace()
+					<< " userRoot=" << File::getUserDataRoot()
+					<< " currentSave=" << SaveFileManager::CurrentPath()
+					<< " map=" << gameManager.global.data.mapName << " folder=" << gameManager.mapFolderName
+					<< " size=" << (gameManager.map->data ? gameManager.map->data->head.width : 0)
+					<< ',' << (gameManager.map->data ? gameManager.map->data->head.height : 0)
+					<< " npcFile=" << gameManager.global.data.npcName << " npcs=" << gameManager.npcManager->npcList.size()
+					<< " objectFile=" << gameManager.global.data.objName << " objects=" << gameManager.objectManager->objectList.size()
+					<< " player=" << position.x << ',' << position.y << " direction=" << gameManager.player->direction
+					<< " life=" << gameManager.player->life << " ai=" << gameManager.global.data.NPCAI
+					<< " follow=" << gameManager.camera->followPlayer << " inEvent=" << gameManager.inEvent
+					<< " SelValue=" << gameManager.varList.getInteger("SelValue")
+					<< " selvalue=" << gameManager.varList.getInteger("selvalue")
+					<< " trap1=" << gameManager.traps.get(arenaFolder, 1) << '\n';
+				for (const auto& npc : gameManager.npcManager->npcList)
+				{
+					if (!npc) continue;
+					std::cerr << "Arena actor name=" << npc->npcName << " life=" << npc->life
+						<< " kind=" << npc->kind << " action=" << static_cast<int>(npc->nowAction)
+						<< " drop=" << npc->dropIni << " deathImage=" << bool(npc->res.death.imagePackage) << '\n';
+				}
+			};
 			gameManager.varList.ensureInitialized();
 			gameManager.varList.setInteger("SelValue", -1);
 			gameManager.varList.setInteger("selvalue", 91);
@@ -10305,12 +11481,14 @@ bool runProductionYuchenArenaRoutes()
 				ok = false;
 				continue;
 			}
-			ok = check(gameManager.map->data->head.width == 32 && gameManager.map->data->head.height == 79
+			const bool arrivalMatches = gameManager.map->data->head.width == 32 && gameManager.map->data->head.height == 79
 				&& gameManager.npcManager->npcList.size() == 7 && gameManager.objectManager->objectList.empty()
 				&& gameManager.global.data.npcName == arenaNpcs && gameManager.global.data.objName.empty()
 				&& gameManager.player->getPosition().x == 8 && gameManager.player->getPosition().y == 60
 				&& gameManager.player->direction == 6 && gameManager.global.data.NPCAI
-				&& gameManager.camera->followPlayer && !gameManager.inEvent,
+				&& gameManager.camera->followPlayer && !gameManager.inEvent;
+			if (!arrivalMatches) reportArenaState("arrival");
+			ok = check(arrivalMatches,
 				"arena arrival replaces ordinary actors and objects and preserves the scripted spawn, AI and camera follow") && ok;
 			const std::string savedEntranceNpcs = readVirtualFile(std::string("save/game/") + entrance.npcs);
 			const std::string savedEntranceObjects = readVirtualFile(std::string("save/game/") + entrance.objects);
@@ -10342,13 +11520,15 @@ bool runProductionYuchenArenaRoutes()
 			gameManager.player->life = 1;
 			const bool loaded = asynchronous ? gameManager.scriptAPI.loadGameAsync(1) : gameManager.loadGame(1);
 			const auto restoredBosses = gameManager.npcManager->findNPC("boss001");
-			ok = check(loaded && gameManager.global.data.mapName == arenaMap && gameManager.mapFolderName == arenaFolder
+			const bool reloadMatches = loaded && gameManager.global.data.mapName == arenaMap && gameManager.mapFolderName == arenaFolder
 				&& gameManager.npcManager->npcList.size() == 7 && restoredBosses.size() == 1
 				&& restoredBosses.front() != bosses.front() && restoredBosses.front()->life == 1234
 				&& gameManager.player->life == 123 && gameManager.player->getPosition().x == 8 && gameManager.player->getPosition().y == 60
 				&& gameManager.objectManager->objectList.empty() && gameManager.global.data.objName.empty()
 				&& gameManager.varList.getInteger("SelValue") == 2 && gameManager.varList.getInteger("selvalue") == 91
-				&& gameManager.traps.get(arenaFolder, 1).empty(),
+				&& gameManager.traps.get(arenaFolder, 1).empty();
+			if (!reloadMatches) reportArenaState("reload");
+			ok = check(reloadMatches,
 				"complete sync and async slot reload restore arena map, fresh actors, player, case-sensitive variables and inactive traps") && ok;
 			ok = check(readVirtualFile(std::string("save/rpg1/") + entrance.npcs) == savedEntranceNpcs
 				&& readVirtualFile(std::string("save/rpg1/") + entrance.objects) == savedEntranceObjects,
@@ -10391,6 +11571,10 @@ bool runProductionYuchenArenaRoutes()
 				{
 					return npc->dropIni == u8"随机掉落-测试用.ini";
 				});
+				if (victim == victims.end() || (*victim)->res.death.imagePackage == nullptr)
+				{
+					reportArenaState("drop-owner");
+				}
 				if (check(victim != victims.end() && (*victim)->res.death.imagePackage != nullptr,
 					"actual arena drop owner has its real death animation"))
 				{
@@ -12078,6 +13262,72 @@ bool runTitleSaveLoadThemeTests()
 	return ok;
 }
 
+bool runExperienceMultiplierConfigTests()
+{
+	const float previousGameSpeed = Config::getGameSpeed();
+	const float previousMusicVolume = Config::getMusicVolume();
+	const float previousSoundVolume = Config::getSoundVolume();
+	Config::save();
+	std::unique_ptr<char[]> previousData;
+	int previousLength = 0;
+	if (!check(File::readSharedApplicationFile(CONFIG_INI, previousData, previousLength),
+		"experience setting uses the test process's isolated application config"))
+	{
+		return false;
+	}
+	INIReader fixture(previousData);
+	fixture.Remove("game", "experiencemultiplier");
+	fixture.Set("extension", "untouched", "keep");
+	const auto loadFixture = [&fixture]()
+	{
+		const std::string text = fixture.saveToString();
+		const bool written = File::writeSharedApplicationFile(CONFIG_INI, text.data(),
+			static_cast<int>(text.size()));
+		Config::experienceMultiplier = 3;
+		Config::load();
+		return written;
+	};
+	bool ok = check(loadFixture() && Config::experienceMultiplier == 2,
+		"missing experience setting resets to the two-times default");
+	for (int multiplier : {1, 2, 3})
+	{
+		Config::experienceMultiplier = multiplier;
+		Config::save();
+		Config::experienceMultiplier = 0;
+		Config::load();
+		ok = check(Config::experienceMultiplier == multiplier,
+			"each supported experience setting survives saving and reloading") && ok;
+	}
+	for (const char* invalid : {"0", "4", "1.5", "3oops"})
+	{
+		fixture.Set("game", "experiencemultiplier", invalid);
+		ok = check(loadFixture() && Config::experienceMultiplier == 2,
+			"invalid experience settings use two times without accepting integer prefixes") && ok;
+	}
+	for (int invalid : {0, 4})
+	{
+		Config::experienceMultiplier = invalid;
+		Config::save();
+		ok = check(Config::experienceMultiplier == 2,
+			"saving normalizes an out-of-range experience setting") && ok;
+	}
+	std::unique_ptr<char[]> savedData;
+	int savedLength = 0;
+	ok = check(File::readSharedApplicationFile(CONFIG_INI, savedData, savedLength),
+		"saved experience configuration can be read back") && ok;
+	INIReader saved(savedData);
+	ok = check(saved.GetInteger("game", "experiencemultiplier", 0) == 2
+		&& saved.Get("extension", "untouched", "") == "keep",
+		"saving writes the corrected multiplier and preserves unknown configuration") && ok;
+	ok = check(File::writeSharedApplicationFile(CONFIG_INI, previousData.get(), previousLength),
+		"restore application configuration after the experience setting test") && ok;
+	Config::load();
+	Config::setGameSpeed(previousGameSpeed);
+	Config::setMusicVolume(previousMusicVolume);
+	Config::setSoundVolume(previousSoundVolume);
+	return ok;
+}
+
 bool runAutomaticSaveTests()
 {
 	ScopedActiveResourceRoot resourceRoot;
@@ -12182,6 +13432,10 @@ bool runAutomaticSaveTests()
 	CoreLifecycleTestAccess::automaticSaveStep(*game, 1);
 	ok = check(SaveFileManager::HasSaveFile(10) && !CoreLifecycleTestAccess::automaticSavePending(*game),
 		"pending request writes automatic slot once after leaving combat") && ok;
+	INIReader automaticGlobal("save/rpg_auto/game.ini");
+	ok = check(automaticGlobal.Get("Save", "EngineVersion", "") == JxqyBuildVersion::EngineVersion &&
+		automaticGlobal.Get("Save", "MinimumReaderVersion", "") == JxqyBuildVersion::MinimumSaveReaderEngineVersion,
+		"automatic saves record the real writer and the independent minimum reader") && ok;
 	game->varList.setInteger("AutomaticSaveProbe", 11);
 	CoreLifecycleTestAccess::automaticSaveStep(*game, 1000);
 	ok = check(game->loadGame(10) && game->varList.getInteger("AutomaticSaveProbe") == 10,
@@ -12262,13 +13516,15 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 		const char* npcName;
 		const char* objectName;
 		const char* description;
+		int skillPoints;
+		bool skillPointsEnabled;
 	};
 	const EntityListCase cases[] =
 	{
-		{ "", "roundtrip.obj", "empty NPC list" },
-		{ "roundtrip.npc", "", "empty object list" },
-		{ "", "", "empty NPC and object lists" },
-		{ "roundtrip.npc", "roundtrip.obj", "empty named entity lists" },
+		{ "", "roundtrip.obj", "empty NPC list", 7, false },
+		{ "roundtrip.npc", "", "empty object list", 0, false },
+		{ "", "", "empty NPC and object lists", INT_MAX, false },
+		{ "roundtrip.npc", "roundtrip.obj", "empty named entity lists", 0, true },
 	};
 
 	Engine* engine = Engine::getInstance();
@@ -12294,6 +13550,11 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 		}
 
 		GameManager gameManager;
+		const auto& activeManifest = ResourceManager::instance().getActiveManifest();
+		gameManager.global.applyResourceManifestFeatures(activeManifest);
+		gameManager.global.loadUiSettings();
+		gameManager.goodsManager.configureLayout();
+		gameManager.magicManager.configureLayout();
 		gameManager.global.data.mapName = mapName;
 		gameManager.global.data.npcName = entityCase.npcName;
 		gameManager.global.data.objName = entityCase.objectName;
@@ -12305,6 +13566,9 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 		gameManager.global.data.mapTime = mtDawn;
 		gameManager.global.data.mpcStyle = ColorStyle::Grayscale;
 		gameManager.global.data.asfStyle = 0x008096C8;
+		gameManager.global.data.screenColor = 0x2E5C5C;
+		gameManager.player->skillPoints = entityCase.skillPoints;
+		gameManager.global.skillPointsEnabled = entityCase.skillPointsEnabled;
 		gameManager.global.data.mainLum = 17;
 		gameManager.global.data.fadeLum = 8;
 		const bool savedActionsDisabled = entityCase.npcName[0] == '\0';
@@ -12352,6 +13616,23 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 			"set real scripted speed and status durations before the complete save") && ok;
 		const bool saved = gameManager.saveGame(1);
 		INIReader savedGlobal("save/rpg1/game.ini");
+		const std::string expectedResourceVersion = activeManifest.releaseMetadata.displayVersion.empty()
+			? "1.0.0" : activeManifest.releaseMetadata.displayVersion;
+		const std::string savedResourceVersion = savedGlobal.Get("Save", "ResourceVersion", "");
+		if (savedResourceVersion != expectedResourceVersion)
+		{
+			std::cerr << entityCase.description << " resource version actual='" << savedResourceVersion
+				<< "' expected='" << expectedResourceVersion << "'\n";
+		}
+		ok = check(savedResourceVersion == expectedResourceVersion,
+			"empty entity-list save records the active resource version") && ok;
+		const std::string playerSuffix = gameManager.global.data.characterIndex < 0
+			? "" : std::to_string(gameManager.global.data.characterIndex);
+		INIReader savedPlayer("save/rpg1/player" + playerSuffix + ".ini");
+		ok = check(savedPlayer.Get("Init", "SkillPoint", "")
+			== (entityCase.skillPoints != 0 || entityCase.skillPointsEnabled
+				? std::to_string(entityCase.skillPoints) : ""),
+			"optional SkillPoint is saved for active rules or retained points and omitted from ordinary zero-point saves") && ok;
 		ok = check(savedGlobal.GetBoolean("Option", "ScriptShowMapPos", !savedActionsDisabled) == savedActionsDisabled,
 			"complete save writes the Lua map-position switch") && ok;
 		auto savedEntityListIsEmpty = [](const char* fileName)
@@ -12372,7 +13653,8 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 			saved && savedGlobal.ParseError() == 0 &&
 				savedGlobal.Get("Save", "EngineVersion", "") ==
 					JxqyBuildVersion::EngineVersion &&
-				savedGlobal.Get("Save", "ResourceVersion", "") == "1.0.0" &&
+				savedGlobal.Get("Save", "MinimumReaderVersion", "") ==
+					JxqyBuildVersion::MinimumSaveReaderEngineVersion &&
 				savedGlobal.Get("State", "Npc", "missing") ==
 					entityCase.npcName &&
 				savedGlobal.Get("State", "Obj", "missing") ==
@@ -12400,6 +13682,8 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 		gameManager.global.data.mapTime = mtDay;
 		gameManager.global.data.mpcStyle = ColorStyle::Normal;
 		gameManager.global.data.asfStyle = ColorStyle::Normal;
+		gameManager.global.data.screenColor = ColorStyle::Normal;
+		gameManager.player->skillPoints = 42;
 		gameManager.global.data.mainLum = 31;
 		gameManager.global.data.fadeLum = 0;
 		gameManager.player->setRunDisabled(!savedActionsDisabled);
@@ -12431,12 +13715,23 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 		const bool loaded = entityCase.objectName[0] == '\0'
 			? gameManager.scriptAPI.loadGameAsync(1)
 			: gameManager.loadGame(1);
-		ok = check(loaded && gameManager.player->life == 140 &&
+		const bool attributesRestored = loaded && gameManager.player->life == 140 &&
 			gameManager.player->thew == 130 && gameManager.player->mana == 120 &&
 			gameManager.player->getLifeMax() == 150 &&
 			gameManager.player->getThewMax() == 140 &&
 			gameManager.player->getManaMax() == 130 &&
-			gameManager.magicManager.findPrimaryMagic("stale_equipment_magic.ini") == nullptr,
+			gameManager.magicManager.findPrimaryMagic("stale_equipment_magic.ini") == nullptr;
+		if (!attributesRestored)
+		{
+			std::cerr << entityCase.description << " attribute load=" << loaded
+				<< " life=" << gameManager.player->life << '/' << gameManager.player->getLifeMax()
+				<< " thew=" << gameManager.player->thew << '/' << gameManager.player->getThewMax()
+				<< " mana=" << gameManager.player->mana << '/' << gameManager.player->getManaMax()
+				<< " equipmentIndex=" << gameManager.goodsManager.equipIndex(0)
+				<< " staleMagic=" << (gameManager.magicManager.findPrimaryMagic("stale_equipment_magic.ini") != nullptr)
+				<< '\n';
+		}
+		ok = check(attributesRestored,
 			"full sync/async load rebuilds attributes only after both saved lists are ready") && ok;
 		ok = check(loaded && gameManager.player->addMoveSpeedPercent == 37 &&
 			gameManager.player->poisoned && gameManager.player->poisonedLastTime == 1500 &&
@@ -12458,6 +13753,8 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 			&& gameManager.global.data.mapTime == mtDawn
 			&& gameManager.global.data.mpcStyle == ColorStyle::Grayscale
 			&& gameManager.global.data.asfStyle == 0x008096C8
+			&& gameManager.global.data.screenColor == 0x2E5C5C
+			&& gameManager.player->skillPoints == entityCase.skillPoints
 			&& gameManager.global.data.mainLum == 17
 			&& gameManager.global.data.fadeLum == 8
 			&& gameManager.weather->isRaining() == savedWeatherEnabled
@@ -12649,6 +13946,50 @@ bool runEmptyEntityListSaveLoadRoundTripTests()
 				futureVersionLoader.getLastLoadFailureMessage().find(
 					u8"更高版本引擎") != std::string::npos,
 			"a save from a future engine version is rejected") && ok;
+	}
+	struct ReaderVersionCase
+	{
+		const char* writer;
+		const char* reader;
+		bool accepted;
+	};
+	for (const auto& version : std::vector<ReaderVersionCase>
+	{
+		{ "1.1.9", nullptr, true },
+		{ "1.2.1", "1.2.0", true },
+		{ "999.0.0", "1.2.0", true },
+		{ "999.0.0", "999.0.0", false },
+		{ "1.2.0", "broken", false },
+		{ "1.2.0", "", false },
+		{ "1.2.0", "1.2.1", false },
+	})
+	{
+		const std::string savedState = minimalGlobalState + "[Save]\nEngineVersion=" + version.writer +
+			(version.reader == nullptr ? "\n" : std::string("\nMinimumReaderVersion=") + version.reader + "\n");
+		ok = check(writeVirtualFile(globalVirtualPath, savedState), "minimum reader fixture is ready") && ok;
+		for (bool asynchronous : { false, true })
+		{
+			const std::string previousCurrent = readVirtualFile("save/game/game.ini");
+			GameManager versionLoader;
+			const auto previousMap = versionLoader.map->data;
+			const bool loaded = asynchronous ? versionLoader.scriptAPI.loadGameAsync(1) : versionLoader.loadGame(1);
+			ok = check(loaded == version.accepted && readVirtualFile(globalVirtualPath) == savedState,
+				"sync and async loads use the minimum reader and preserve the source slot") && ok;
+			if (!version.accepted)
+			{
+				ok = check(versionLoader.map->data == previousMap && !versionLoader.getLastLoadFailureMessage().empty() &&
+					readVirtualFile("save/game/game.ini") == previousCurrent,
+					"reader version rejection precedes runtime directory and world mutation") && ok;
+			}
+			else if (loaded)
+			{
+				ok = check(versionLoader.saveGame(2), "a compatible save can be saved again") && ok;
+				INIReader rewrittenGlobal("save/rpg2/game.ini");
+				ok = check(rewrittenGlobal.Get("Save", "EngineVersion", "") == JxqyBuildVersion::EngineVersion &&
+					rewrittenGlobal.Get("Save", "MinimumReaderVersion", "") == JxqyBuildVersion::MinimumSaveReaderEngineVersion,
+					"resaving records this writer and keeps the explicit minimum reader baseline") && ok;
+			}
+		}
 	}
 	const std::string initialTemplatePath = "ini/save/game.ini";
 	for (const char* resourceVersion : { "invalid", "999.0.0" })
@@ -13487,6 +14828,9 @@ bool runScriptSleepLifecycleTests()
 	gameManager.effectManager->effectList.push_back(timeStop);
 	ok = check(gameManager.effectManager->hasActiveTimeStopper(),
 		"sleep fixture has an active time stopper while weather updates are gated") && ok;
+	// A newly attached wait must not consume its parent's unprocessed loading time.
+	gameManager.initTime();
+	SDL_Delay(MAX_FRAME_TIME + 20);
 	for (int mode = 0; mode < 4; ++mode)
 	{
 		Element::resetApplicationQuitState();
@@ -15349,7 +16693,17 @@ bool runProductionAttackFileRuntimeTests()
 	ok = runProductionExplicitAttackLists() && ok;
 	ok = runProductionAttackFileContracts() && ok;
 	ok = runProductionScriptAttackContracts() && ok;
+	ok = runProductionPracticeActionContracts() && ok;
 	return runProductionScriptMagicContracts() && ok;
+}
+
+bool runReleaseTimingProductionTests()
+{
+	bool ok = runNativeNpcAttackProtocolContracts();
+	ok = runProductionScriptAttackContracts() && ok;
+	ok = runProductionPracticeActionContracts() && ok;
+	ok = runProductionScriptMagicContracts() && ok;
+	return runAttackSaveBoundaryContracts() && ok;
 }
 
 bool runFullAttackSaveRuntimeTests()
@@ -15442,7 +16796,8 @@ bool runFullAttackSaveRuntimeTests()
 			actor->beginAttack(destination, target);
 			if (!check(actor->isAttacking() && actor->hasPreparedAttackMagic, "the real attack begins before a full save")) return false;
 			const UTime duration = actor->actionLastTime;
-			CoreLifecycleTestAccess::advanceActorFrame(*actor, afterRelease ? duration : duration / 2);
+			CoreLifecycleTestAccess::advanceActorFrame(*actor, afterRelease ? duration - 1 : 0);
+			ok = check(actor->isAttacking(), "full saves cover both preparation and the new recovery window") && ok;
 			if (afterRelease)
 			{
 				for (const auto& effect : gameManager.effectManager->effectList) CoreLifecycleTestAccess::advanceActorFrame(*effect, 1);
@@ -17048,6 +18403,15 @@ bool runFullExperienceSaveRuntimeTests()
 			if (originKind == 3)
 			{
 				// Extend the real-profile/full-load scene with actual death settlement.
+				struct ExperienceMultiplierRestore
+				{
+					int previous = Config::experienceMultiplier;
+					~ExperienceMultiplierRestore()
+					{
+						Config::experienceMultiplier = previous;
+					}
+				} restoreMultiplier;
+				Config::experienceMultiplier = 3;
 				if (!check(writeVirtualFile("ini/magic/ownership-practice.ini",
 					"[Init]\nName=OwnershipPractice\nMoveKind=2\nSpeed=8\nEffect=20\nLifeFrame=100\n"
 					"[Level1]\nLevelupExp=1000\n[Level2]\nLevelupExp=2000\n"),
@@ -17396,6 +18760,246 @@ bool runCharacterCasterSaveRuntimeTests()
 bool runMergedEntitySaveTests()
 {
 	return runMergedEntityListSaveLoadRoundTripTests();
+}
+
+bool runUiTextLayoutTests()
+{
+	const auto assetsRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path() / "assets";
+	ScopedActiveResourceRoot resourceRoot;
+	if (!check(resourceRoot.valid(), "UI text layout isolates writable resources")) return false;
+	File::setSharedApplicationRootForTests(File::getActiveResourceRoot());
+	const bool initializeTtf = TTF_WasInit() == 0;
+	if (!SDL_Init(0) || (initializeTtf && !TTF_Init())) return false;
+	const bool previousTheme = Config::useQingyuUi;
+	int previousWidth = 0, previousHeight = 0;
+	CoreLifecycleTestAccess::getLogicalSize(previousWidth, previousHeight);
+	Engine* engine = Engine::getInstance();
+	bool ok = true;
+	for (const std::string profile : { "jxqy2", "yycs", "xjxqy" })
+	{
+		File::setResourceFallbackRoots({ (assetsRoot / profile).u8string() });
+		File::setUiResourceFallbackRoots({ (assetsRoot / profile).u8string() }, true,
+			(assetsRoot / "common").u8string());
+		for (const bool qingyu : { false, true })
+		{
+			for (const Point viewport : { Point{ 640, 480 }, Point{ 1280, 720 } })
+			{
+				const std::string context = profile + (qingyu ? "-qingyu-" : "-original-")
+					+ std::to_string(viewport.x) + "x" + std::to_string(viewport.y);
+				auto surface = make_shared_surface(SDL_CreateSurface(viewport.x, viewport.y, SDL_PIXELFORMAT_ARGB8888));
+				SDL_Renderer* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+				if (!check(renderer != nullptr, "create UI text layout software renderer")) return false;
+				auto previousRenderer = CoreLifecycleTestAccess::exchangeRenderer(renderer);
+				CoreLifecycleTestAccess::setLogicalSize(viewport.x, viewport.y);
+				engine->setFontName((assetsRoot / "engine/font/font.ttf").string());
+				Config::useQingyuUi = qingyu;
+				{
+					GameManager game;
+					ResourceManifest manifest;
+					ok = check(manifest.loadFromFile("game_profile.ini"), (context + " reads its production profile").c_str()) && ok;
+					game.global.applyResourceManifestFeatures(manifest);
+					game.global.loadUiSettings();
+					game.goodsManager.configureLayout();
+					game.magicManager.configureLayout();
+					game.menu->init();
+					ok = check(game.global.feature.qingyuUi == qingyu,
+						(context + " selects the requested UI").c_str()) && ok;
+					const auto fits = [&](const std::shared_ptr<Label>& label, const std::string& description,
+						bool singleLine = false)
+					{
+						bool valid = label != nullptr;
+						if (label && !label->getStr().empty())
+						{
+							const auto& images = CoreLifecycleTestAccess::labelTextImages(*label);
+							const int height = label->getRenderedTextHeight();
+							valid = !images.empty() && height <= label->rect.h
+								&& (!singleLine || images.size() == 1) && !label->elideOverflow;
+							const int lineHeight = images.empty() ? 0 : height / static_cast<int>(images.size());
+							bool hasImage = false;
+							for (const auto& image : images)
+							{
+								if (!image) continue;
+								hasImage = true;
+								int width = 0, imageHeight = 0;
+								valid = engine->getImageSize(image, width, imageHeight)
+									&& width <= label->rect.w && imageHeight <= lineHeight && valid;
+							}
+							valid = valid && hasImage;
+							if (!valid)
+							{
+								std::cerr << context << " " << description << " rect=" << label->rect.w << "x"
+									<< label->rect.h << " renderedHeight=" << height << " text=" << label->getStr() << '\n';
+							}
+						}
+						ok = check(valid, (context + " " + description + " fits every real text texture and line height").c_str()) && ok;
+					};
+					const auto capture = [&](const std::string& name, const std::vector<PElement>& panels)
+					{
+						SDL_SetRenderDrawColor(renderer, 45, 61, 54, 255);
+						SDL_RenderClear(renderer);
+						for (const auto& panel : panels)
+						{
+							const bool wasVisible = panel->visible;
+							panel->visible = true;
+							CoreLifecycleTestAccess::drawSubtree(*panel);
+							panel->visible = wasVisible;
+						}
+						if (const char* directory = std::getenv("JXQY_TEST_ARTIFACT_DIRECTORY"))
+						{
+							std::filesystem::create_directories(std::filesystem::u8path(directory));
+							auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+							const auto path = std::filesystem::u8path(directory) / (context + "-" + name + ".png");
+							ok = check(pixels && IMG_SavePNG(pixels.get(), path.u8string().c_str()),
+								(context + " writes " + name + " screenshot").c_str()) && ok;
+						}
+					};
+					const auto tooltip = game.menu->toolTip;
+					const auto checkTooltip = [&]()
+					{
+						fits(tooltip->name, "tooltip name", true);
+						fits(tooltip->cost, "tooltip price or level", true);
+						if (auto body = tooltip->getComponentByName<MemoText>("body"))
+						{
+							for (const auto& row : body->mstr) fits(row, "tooltip paginated description", true);
+						}
+						else
+						{
+							fits(tooltip->intro1, "tooltip attributes");
+							fits(tooltip->intro2, "tooltip description");
+							if (tooltip->magicIntro) fits(tooltip->magicIntro, "tooltip magic description");
+						}
+					};
+					auto goods = std::make_shared<Goods>();
+					goods->name = u8"价格测试";
+					goods->intro = u8"使用后可以恢复生命和内力。";
+					const auto shop = game.menu->buySellMenu;
+					shop->buyPercent = shop->recyclePercent = 100;
+					shop->canSellSelfGoods = true;
+					for (const int price : { 140, 10000, INT_MAX })
+					{
+						goods->cost = price;
+						shop->visible = true;
+						tooltip->setGoods(goods);
+						ok = check(tooltip->cost->getStr() == u8"买入价： " + std::to_string(price),
+							(context + " preserves every purchase price digit").c_str()) && ok;
+						checkTooltip();
+						if (price == INT_MAX) capture("tooltip-price", { tooltip });
+					}
+					goods->cost = 140;
+					tooltip->setGoods(goods, true);
+					ok = check(tooltip->cost->getStr() == u8"卖出价： 70",
+						(context + " preserves every selling price digit").c_str()) && ok;
+					checkTooltip();
+					shop->visible = false;
+					goods->cost = 10000;
+					tooltip->setGoods(goods);
+					ok = check(tooltip->cost->getStr() == u8"价格： 10000",
+						(context + " preserves the inventory price digits").c_str()) && ok;
+					checkTooltip();
+					if (profile == "yycs")
+					{
+						int count = 0;
+						for (const auto& entry : std::filesystem::directory_iterator(assetsRoot / profile / "ini/goods"))
+						{
+							if (entry.path().extension() != ".ini") continue;
+							auto actualGoods = std::make_shared<Goods>();
+							actualGoods->initFromIni(entry.path().filename().u8string());
+							ok = check(actualGoods->loadSucceeded, (context + " loads " + entry.path().filename().u8string()).c_str()) && ok;
+							tooltip->setGoods(actualGoods);
+							checkTooltip();
+							++count;
+						}
+						ok = check(count >= 133, "Moonlight checks all production goods descriptions") && ok;
+						goods->initFromIni(u8"goods-p04-牧野披风.ini");
+						tooltip->setGoods(goods);
+						checkTooltip();
+						capture("tooltip-attributes", { tooltip });
+					}
+					const std::string magicFile = profile == "jxqy2" ? u8"player-magic-天意剑诀.ini"
+						: profile == "yycs" ? u8"player-magic-镇狱破天劲.ini" : u8"magic001_衡山有雪.ini";
+					auto magic = std::make_shared<Magic>();
+					magic->initFromIni(magicFile, false);
+					ok = check(magic->loadSucceeded, (context + " loads a production skill").c_str()) && ok;
+					tooltip->setMagic(magic, 10);
+					ok = check(tooltip->cost->getStr() == u8"等级： 10", (context + " keeps both level digits").c_str()) && ok;
+					checkTooltip();
+					capture("tooltip-magic", { tooltip });
+					game.menu->messageBox->showMessage(u8"自动存档失败，请检查可用空间并手动存档");
+					fits(game.menu->messageBox->label, "complete multiline save failure message");
+					capture("message", { game.menu->messageBox });
+					const int practiceIndex = game.magicManager.practiceIndex();
+					auto& practice = game.magicManager.magicList[practiceIndex];
+					practice.magic = magic;
+					practice.iniFile = magicFile;
+					practice.level = 9;
+					practice.exp = 99999;
+					magic->level[9].levelupExp = 240000;
+					game.menu->practiceMenu->updateMagic();
+					fits(game.menu->practiceMenu->level, "practice level", true);
+					fits(game.menu->practiceMenu->exp, "practice experience", true);
+					fits(game.menu->practiceMenu->intro, "complete practice description");
+					ok = check(game.menu->practiceMenu->exp->getStr() == "99999/240000",
+						(context + " keeps both practice experience values").c_str()) && ok;
+					int skillDescriptionCount = 0;
+					for (const auto& entry : std::filesystem::directory_iterator(assetsRoot / profile / "ini" / "magic"))
+					{
+						if (!entry.is_regular_file() || entry.path().extension() != ".ini") continue;
+						auto actualMagic = std::make_shared<Magic>();
+						actualMagic->initFromIni(entry.path().filename().u8string(), false);
+						if (actualMagic->intro.empty()) continue;
+						practice.magic = actualMagic;
+						game.menu->practiceMenu->updateMagic();
+						fits(game.menu->practiceMenu->intro, "practice description " + entry.path().filename().u8string());
+						++skillDescriptionCount;
+					}
+					ok = check(skillDescriptionCount >= (profile == "yycs" ? 20 : profile == "jxqy2" ? 27 : 31),
+						(context + " checks every production skill description").c_str()) && ok;
+					practice.magic = magic;
+					game.menu->practiceMenu->updateMagic();
+					capture("practice", { game.menu->practiceMenu });
+					game.player->npcName = u8"江湖客";
+					game.player->exp = 1000000;
+					game.player->levelUpExp = 1012130;
+					if (qingyu)
+					{
+						game.menu->equipMenu->visible = true;
+						CoreLifecycleTestAccess::advanceActorFrame(*game.menu->equipMenu, 0);
+						auto experience = game.menu->equipMenu->getComponentByName<Label>("labExp");
+						fits(experience, "character experience", true);
+						ok = check(experience->getStr() == u8"经验  1000000 / 1012130",
+							(context + " keeps both character experience values").c_str()) && ok;
+						capture("state", { game.menu->equipMenu });
+					}
+					else
+					{
+						game.menu->stateMenu->updateLabel();
+						capture("state", { game.menu->stateMenu });
+					}
+					auto label = std::make_shared<Label>();
+					label->rect = { 10, 10, 190, 60 };
+					label->fontSize = 18;
+					label->minimumFontSize = 12;
+					label->autoNextLine = label->autoShrink = true;
+					label->setStr(u8"<color=red>经验 1234567<color=default>，升级需要 7654321。");
+					fits(label, "colored wrapped numeric label");
+					const auto wideImage = CoreLifecycleTestAccess::labelTextImages(*label).front();
+					label->rect.w = 130;
+					fits(label, "resized colored numeric label");
+					ok = check(CoreLifecycleTestAccess::labelTextImages(*label).front() != wideImage,
+						"resizing invalidates the real text texture layout cache") && ok;
+				}
+				BaseComponent().tryCleanRes();
+				CoreLifecycleTestAccess::exchangeRenderer(previousRenderer);
+				SDL_DestroyRenderer(renderer);
+			}
+		}
+	}
+	Config::useQingyuUi = previousTheme;
+	File::setSharedApplicationRootForTests("");
+	CoreLifecycleTestAccess::setLogicalSize(previousWidth, previousHeight);
+	engine->setFontName("");
+	if (initializeTtf) TTF_Quit();
+	return ok;
 }
 
 bool runQingyuUiTests(bool interactionOnly)
@@ -18415,7 +20019,9 @@ bool runXiaoxiangLegacyEntranceTests()
 
 bool runMoonlightTrapRouteTests()
 {
-	return runProductionMoonlightTrapRouteTests();
+	bool ok = runProductionMoonlightTrapRouteTests();
+	ok = runProductionMoonlightQueuedTrapTests() && ok;
+	return runProductionMoonlightTrapStageTests() && ok;
 }
 
 bool runMoonlightDepartureTests()
@@ -18458,6 +20064,7 @@ bool runSwordTwoHistoricalScriptTests()
 bool runScriptMovementRuntimeTests()
 {
 	bool ok = runScriptMovementContractTests();
+	ok = runScriptMovementTrapQueueTests() && ok;
 	ok = runScriptBlockedMovementRetryTests() && ok;
 	ok = runScriptArenaGateDetourTests() && ok;
 	ok = runScriptPrisonDetourTests() && ok;
@@ -18488,10 +20095,13 @@ bool runCoreLifecycleTests()
 	};
 	bool ok = true;
 	ok = timed("runCompositionLayeringTests", runCompositionLayeringTests) && ok;
+	ok = timed("runScreenColorRenderingTests", runScreenColorRenderingTests) && ok;
+	ok = timed("runWaterEffectEdgeRenderingTests", runWaterEffectEdgeRenderingTests) && ok;
 	ok = timed("runMainThreadOwnershipTests", runMainThreadOwnershipTests) && ok;
 	ok = timed("runEditorRunWindowClosePolicyTests", runEditorRunWindowClosePolicyTests) && ok;
 	ok = timed("runLoadingInputNeutralityTests", runLoadingInputNeutralityTests) && ok;
 	ok = timed("runSaveFeedbackRenderingTests", runSaveFeedbackRenderingTests) && ok;
+	ok = timed("runExperienceMultiplierConfigTests", runExperienceMultiplierConfigTests) && ok;
 	ok = timed("runAutomaticSaveTests", runAutomaticSaveTests) && ok;
 	ok = timed("runTitleSaveLoadThemeTests", runTitleSaveLoadThemeTests) && ok;
 	ok = timed("runQingyuMessagePlacementTests", runQingyuMessagePlacementTests) && ok;
@@ -18506,6 +20116,7 @@ bool runCoreLifecycleTests()
 	ok = timed("runSceneResultTests", runSceneResultTests) && ok;
 	ok = timed("runScriptDispatchCharacterizationTests", runScriptDispatchCharacterizationTests) && ok;
 	ok = timed("runScriptMovementContractTests", runScriptMovementContractTests) && ok;
+	ok = timed("runScriptMovementTrapQueueTests", runScriptMovementTrapQueueTests) && ok;
 	ok = timed("runScriptInterfaceVisibilityTests", runScriptInterfaceVisibilityTests) && ok;
 	ok = timed("runScriptArenaGateDetourTests", runScriptArenaGateDetourTests) && ok;
 	ok = timed("runScriptPrisonDetourTests", runScriptPrisonDetourTests) && ok;
@@ -18519,10 +20130,13 @@ bool runCoreLifecycleTests()
 	ok = timed("runRandRunAndMapPositionContracts", runRandRunAndMapPositionContracts) && ok;
 	ok = timed("runScriptSpeedAndStatusTests", runScriptSpeedAndStatusTests) && ok;
 	ok = timed("runProductionMedicineChestTests", runProductionMedicineChestTests) && ok;
+	ok = timed("runProductionMoonlightQueuedTrapTests", runProductionMoonlightQueuedTrapTests) && ok;
 	ok = timed("runProductionXiaoxiangTrapIsolationTests", runProductionXiaoxiangTrapIsolationTests) && ok;
 	ok = timed("runProductionXiaoxiangMoneyPickupTests", runProductionXiaoxiangMoneyPickupTests) && ok;
 	ok = timed("runProductionXiaoxiangPrisonRouteTests", runProductionXiaoxiangPrisonRouteTests) && ok;
 	ok = timed("runProductionActionResourceTests", runProductionActionResourceTests) && ok;
+	ok = timed("runProductionPracticeActionContracts", runProductionPracticeActionContracts) && ok;
+	ok = timed("runProductionScriptMagicContracts", runProductionScriptMagicContracts) && ok;
 	ok = timed("runProductionRandomRewardContinuationTests", runProductionRandomRewardContinuationTests) && ok;
 	ok = timed("runProductionZhuangDialogueTests", runProductionZhuangDialogueTests) && ok;
 	ok = timed("runProductionHanboReturnBranchTests", runProductionHanboReturnBranchTests) && ok;
@@ -18548,6 +20162,7 @@ bool runCoreLifecycleTests()
 	ok = timed("runProductionMaskStoryTests", runProductionMaskStoryTests) && ok;
 	ok = timed("runProductionWudangGateTests", runProductionWudangGateTests) && ok;
 	ok = timed("runProductionHanboRouteTests", runProductionHanboRouteTests) && ok;
+	ok = timed("runProductionNewSwordPartnerDepartureTests", runProductionNewSwordPartnerDepartureTests) && ok;
 	ok = timed("runProductionHanboChoiceTests", runProductionHanboChoiceTests) && ok;
 	ok = timed("runChoiceVariableContracts", runChoiceVariableContracts) && ok;
 	ok = timed("runMemoGenerationCompatibilityTests", runMemoGenerationCompatibilityTests) && ok;

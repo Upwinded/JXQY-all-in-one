@@ -20,6 +20,9 @@ namespace MenuSurfaceCatalog
 		GlobalYesNo,
 		Dialog,
 		Choice,
+		Paper,
+		SkillTree,
+		AttributePoints,
 		BuySell,
 		GambleNormal,
 		GambleDice,
@@ -214,6 +217,27 @@ namespace MenuSurfaceCatalog
 			FocusRestorePolicy::PreviousValidOrDefault,
 			ControllerInteractionKind::FocusGraph,
 			"cxx:ChooseMenu; aggregate:ini/ui/choose/*.menu.ini; script:Choose*" },
+		{ SurfaceId::Paper, "paper",
+			SurfaceScope::InGame, ModalKind::Modal,
+			WorldPointerPolicy::BlockAll, WorldSemanticPolicy::Block,
+			FocusPolicy::None, DefaultFocusPolicy::None,
+			FocusRestorePolicy::PreviousValidOrDefault,
+			ControllerInteractionKind::ActionOnly,
+			"cxx:PaperMenu; script:OpenPaper; actions:page,close" },
+		{ SurfaceId::SkillTree, "skill-tree",
+			SurfaceScope::InGame, ModalKind::Modal,
+			WorldPointerPolicy::BlockAll, WorldSemanticPolicy::Block,
+			FocusPolicy::None, DefaultFocusPolicy::None,
+			FocusRestorePolicy::PreviousValidOrDefault,
+			ControllerInteractionKind::ActionOnly,
+			"cxx:SkillTreeMenu; source:Skill.ini,skilltree.json; actions:select,learn,scroll,details,group,close" },
+		{ SurfaceId::AttributePoints, "attribute-points",
+			SurfaceScope::InGame, ModalKind::Modal,
+			WorldPointerPolicy::BlockAll, WorldSemanticPolicy::Block,
+			FocusPolicy::None, DefaultFocusPolicy::None,
+			FocusRestorePolicy::PreviousValidOrDefault,
+			ControllerInteractionKind::ActionOnly,
+			"cxx:AttributePointMenu; source:Point.ini; actions:select,adjust,submit,reset,page,close" },
 		{ SurfaceId::BuySell, "buy-sell",
 			SurfaceScope::InGame, ModalKind::Modal,
 			WorldPointerPolicy::BlockAll, WorldSemanticPolicy::Block,
@@ -234,14 +258,14 @@ namespace MenuSurfaceCatalog
 			FocusPolicy::None, DefaultFocusPolicy::None,
 			FocusRestorePolicy::PreviousValidOrDefault,
 			ControllerInteractionKind::ActionOnly,
-			"cxx:GambleMenu; profile:ini/ui/dicegame/*; script:ShowDiceGame" },
+			"cxx:GambleMenu; profile:ini/ui/dicegame/*; script:ShowDiceGame,ShowMiniGame(gamble)" },
 		{ SurfaceId::GambleFish, "gamble.fish",
 			SurfaceScope::InGame, ModalKind::Modal,
 			WorldPointerPolicy::BlockAll, WorldSemanticPolicy::Block,
 			FocusPolicy::None, DefaultFocusPolicy::None,
 			FocusRestorePolicy::PreviousValidOrDefault,
 			ControllerInteractionKind::ActionOnly,
-			"cxx:GambleMenu; profile:ini/ui/fishgame/*; script:ShowFishGame" },
+			"cxx:GambleMenu; profile:ini/ui/fishgame/*; script:ShowFishGame,ShowMiniGame(fish)" },
 		{ SurfaceId::PartnerEquipment, "partner-equipment",
 			SurfaceScope::InGame, ModalKind::Modal,
 			WorldPointerPolicy::BlockAll, WorldSemanticPolicy::Block,
@@ -391,7 +415,7 @@ namespace MenuSurfaceCatalog
 		SurfaceId surfaceId;
 	};
 
-	inline constexpr std::array<TypeBinding, 38> kTypeBindings =
+	inline constexpr std::array<TypeBinding, 41> kTypeBindings =
 	{{
 		{ "ResourceSelectScene", SurfaceId::StartupResourceSelect },
 		{ "Title", SurfaceId::StartupTitle },
@@ -406,6 +430,9 @@ namespace MenuSurfaceCatalog
 		{ "YesNo", SurfaceId::GlobalYesNo },
 		{ "Dialog", SurfaceId::Dialog },
 		{ "ChooseMenu", SurfaceId::Choice },
+		{ "PaperMenu", SurfaceId::Paper },
+		{ "SkillTreeMenu", SurfaceId::SkillTree },
+		{ "AttributePointMenu", SurfaceId::AttributePoints },
 		{ "BuySellMenu", SurfaceId::BuySell },
 		{ "GambleMenu", SurfaceId::GambleNormal },
 		{ "GambleMenu", SurfaceId::GambleDice },
@@ -439,7 +466,7 @@ namespace MenuSurfaceCatalog
 		SurfaceId surfaceId;
 	};
 
-	inline constexpr std::array<ResourceBinding, 28> kResourceBindings =
+	inline constexpr std::array<ResourceBinding, 29> kResourceBindings =
 	{{
 		{ "title", SurfaceId::StartupTitle },
 		{ "system", SurfaceId::System },
@@ -455,6 +482,7 @@ namespace MenuSurfaceCatalog
 		{ "fishgame", SurfaceId::GambleFish },
 		{ "state", SurfaceId::RpgState },
 		{ "equip", SurfaceId::RpgEquipment },
+		{ "partner", SurfaceId::PartnerEquipment },
 		{ "xiulian", SurfaceId::RpgPractice },
 		{ "goods", SurfaceId::RpgGoods },
 		{ "magic", SurfaceId::RpgMagic },
@@ -477,9 +505,10 @@ namespace MenuSurfaceCatalog
 		std::string_view policyKeyOrExemption;
 	};
 
-	inline constexpr std::array<ScriptBinding, 52> kScriptBindings =
+	inline constexpr std::array<ScriptBinding, 54> kScriptBindings =
 	{{
 		{ "Talk", "dialog" },
+		{ "OpenPaper", "paper" },
 		{ "ShowTalk", "dialog" },
 		{ "Say", "dialog" },
 		{ "PlayMovie", "video.playback" },
@@ -492,6 +521,7 @@ namespace MenuSurfaceCatalog
 		{ "ShowGamble", "gamble.normal" },
 		{ "Gamble", "gamble.normal" },
 		{ "ShowDiceGame", "gamble.dice" },
+		{ "ShowMiniGame", "gamble.dice" },
 		{ "ShowFishGame", "gamble.fish" },
 		{ "ShowStealWin", "choice" },
 		{ "ShowGiveGoodsWin", "exempt:no-interface-created" },
@@ -540,7 +570,7 @@ namespace MenuSurfaceCatalog
 		std::string_view reason;
 	};
 
-	inline constexpr std::array<Exemption, 51> kExemptions =
+	inline constexpr std::array<Exemption, 52> kExemptions =
 	{{
 		{ "type", "MenuController", "surface container and input dispatcher" },
 		{ "type", "Panel", "upMenu container, not an independently displayed surface" },
@@ -580,6 +610,7 @@ namespace MenuSurfaceCatalog
 		{ "type", "MainScene", "gameplay scene container" },
 		{ "type", "GameManager", "gameplay container" },
 		{ "type", "GameController", "world input container" },
+		{ "type", "ScriptSleep", "script wait element without rendering or event handling" },
 		{ "type", "Camera", "world component" },
 		{ "type", "Effect", "world element" },
 		{ "type", "GameElement", "world-element base" },

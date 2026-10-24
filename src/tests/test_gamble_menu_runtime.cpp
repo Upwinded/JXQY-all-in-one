@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <iostream>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <vector>
@@ -86,6 +87,37 @@ public:
 class GambleMenuTestAccess
 {
 public:
+	static void prepareMiniGame(GambleMenu& menu, int opponentMoney, int gameType)
+	{
+		menu.resetForMiniGameGamble(opponentMoney, gameType, "Dealer");
+		menu.visible = true;
+		menu.setRunning(true);
+	}
+	static int miniGameOpponentMoney(const GambleMenu& menu) { return menu.diceState.npcMoney(); }
+	static int miniGameStake(const GambleMenu& menu) { return menu.diceState.stake(); }
+	static Rect miniGameBetButton(const GambleMenu& menu)
+	{
+		return menu.diceResourceLoaded ? menu.diceAddMoneyButton->rect : menu.increaseBetButton->rect;
+	}
+	static void dispatchEvents(GambleMenu& menu, std::initializer_list<AEvent> events)
+	{
+		AEvent queuedEvent;
+		while (Engine::getInstance()->getEvent(queuedEvent) > 0) {}
+		for (AEvent event : events) Engine::getInstance()->pushEvent(event);
+		menu.reArrangeChildren();
+		menu.allHandleEvents();
+		menu.onEvent();
+	}
+	static void resolveMiniGame(GambleMenu& menu, DiceGambleState::Result result)
+	{
+		menu.handleUIAction(UIAction::PageNext);
+		menu.handleUIAction(UIAction::Confirm);
+		const std::array<int, 3> high = { 6, 6, 6 }, low = { 1, 2, 4 };
+		menu.diceState.open(result == DiceGambleState::Result::NpcWin ? low : high,
+			result == DiceGambleState::Result::PlayerWin ? low : high);
+		menu.diceState.update(4000);
+		menu.resolveDiceRound();
+	}
 	static void prepareDicePrimary(
 		GambleMenu& menu,
 		const std::shared_ptr<TestTextButton>& primaryButton)
@@ -328,10 +360,8 @@ public:
 
 	static void prepareFishIdle(GambleMenu& menu)
 	{
-		menu.mode = GambleMenu::mmFishGame;
-		menu.settled = false;
+		menu.resetForFishGame();
 		menu.fishResourceLoaded = false;
-		menu.fishState.reset();
 		menu.visible = true;
 		menu.setRunning(true);
 	}
@@ -860,6 +890,22 @@ bool runGambleMenuPhysicalLinkTests()
 				&& gameManager.player->nextAction == nullptr,
 				"dice reveal-phase physical B did not exit or leak CastSkill3") && ok;
 
+			gameManager.player->money = 150;
+			GambleMenuTestAccess::prepareMiniGame(*menu, 5000, 1);
+			const auto mgBet = tapGamblePhysicalRightTrigger(gamepad, gameManager, frameDriver);
+			ok = check(observedPhysicalAlias(mgBet) && GambleMenuTestAccess::miniGameStake(*menu) == 100
+				&& gameManager.player->money == 150 && gameManager.player->nextAction == nullptr,
+				"MG physical RT bets one hundred without charging a bankroll entry fee or leaking a skill") && ok;
+			const auto mgCancel = tapGamblePhysicalButton(gamepad, SDL_GAMEPAD_BUTTON_EAST,
+				GameInput::InputAction::Cancel, GameInput::InputAction::CastSkill3, gameManager, frameDriver);
+			ok = check(observedPhysicalAlias(mgCancel) && menu->isLogicRunningForTest()
+				&& gameManager.player->nextAction == nullptr,
+				"MG physical B retains the forced bankroll game without casting a world skill") && ok;
+			const auto mgStart = tapGamblePhysicalButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH,
+				GameInput::InputAction::Confirm, GameInput::InputAction::InteractPrimary, gameManager, frameDriver);
+			ok = check(observedPhysicalAlias(mgStart) && GambleMenuTestAccess::isDiceRolling(*menu)
+				&& gameManager.player->nextAction == nullptr,
+				"MG physical A starts the bankroll hand without leaking world interaction") && ok;
 			GambleMenuTestAccess::prepareFishIdle(*menu);
 			gameManager.player->nextAction = nullptr;
 			const PhysicalActionObservation fishCast =
@@ -938,9 +984,123 @@ bool runGambleMenuPhysicalLinkTests()
 }
 }
 
+bool runMgMiniGameRulesTests()
+{
+	using Result = DiceGambleState::Result;
+	TestGameManager gameManager;
+	bool ok = true;
+	for (const Result outcome : { Result::PlayerWin, Result::NpcWin, Result::Tie })
+	{
+		gameManager.player->money = 150;
+		TestGambleMenu menu;
+		GambleMenuTestAccess::prepareMiniGame(menu, 100, 2);
+		ok = check(gameManager.player->money == 150
+			&& GambleMenuTestAccess::miniGameOpponentMoney(menu) == 100,
+			"MG bankroll parameter belongs to the opponent and does not charge entry money") && ok;
+		ok = check(hasPrompt(GambleMenuTestAccess::promptItems(menu), GameInput::InputAction::NextPage, "下注100"),
+			"MG controller prompt uses the one hundred silver betting step") && ok;
+		GambleMenuTestAccess::resolveMiniGame(menu, outcome);
+		const int result = outcome == Result::PlayerWin ? 1 : (outcome == Result::NpcWin ? 2 : 0);
+		const int money = outcome == Result::PlayerWin ? 250 : (outcome == Result::NpcWin ? 50 : 150);
+		ok = check(gameManager.player->miniGameResult == result && gameManager.player->money == money
+			&& !menu.isLogicRunningForTest(),
+			"MG type two returns after one resolved hand with distinct win, loss and tie codes") && ok;
+		GambleMenuTestAccess::poll(menu);
+		ok = check(gameManager.player->money == money,
+			"MG finished hand cannot apply its money delta a second time") && ok;
+	}
+	{
+		gameManager.player->money = 200;
+		TestGambleMenu menu;
+		GambleMenuTestAccess::prepareMiniGame(menu, 5000, 1);
+		menu.handleUIAction(UIAction::Cancel);
+		ok = check(menu.isLogicRunningForTest(),
+			"MG type one blocks voluntary exit while both sides can continue") && ok;
+		GambleMenuTestAccess::resolveMiniGame(menu, Result::NpcWin);
+		ok = check(menu.isLogicRunningForTest() && gameManager.player->money == 100
+			&& gameManager.player->miniGameResult == 2,
+			"MG type one continues at exactly one hundred silver after a loss") && ok;
+		menu.handleUIAction(UIAction::Cancel);
+		ok = check(!menu.isLogicRunningForTest() && gameManager.player->miniGameResult == 2,
+			"MG close guard permits leaving at exactly one hundred without converting loss to win") && ok;
+	}
+	for (bool playerWins : { true, false })
+	{
+		gameManager.player->money = 150;
+		TestGambleMenu menu;
+		GambleMenuTestAccess::prepareMiniGame(menu, playerWins ? 100 : 5000, 1);
+		GambleMenuTestAccess::resolveMiniGame(menu, playerWins ? Result::PlayerWin : Result::NpcWin);
+		ok = check(!menu.isLogicRunningForTest() && gameManager.player->miniGameResult == (playerWins ? 1 : 2),
+			"MG type one ends when the opponent is bankrupt or player money drops below one hundred") && ok;
+	}
+	{
+		gameManager.player->money = 150;
+		TestGambleMenu menu;
+		GambleMenuTestAccess::prepareMiniGame(menu, 50, 0);
+		GambleMenuTestAccess::resolveMiniGame(menu, Result::PlayerWin);
+		menu.handleUIAction(UIAction::Cancel);
+		ok = check(!menu.isLogicRunningForTest() && gameManager.player->miniGameResult == 0
+			&& gameManager.player->money == 250,
+			"MG free play resets its result on exit while retaining settled money") && ok;
+	}
+	{
+		gameManager.player->money = 450;
+		auto menu = std::make_shared<TestGambleMenu>();
+		GambleMenuTestAccess::prepareMiniGame(*menu, 5000, 1);
+		HeadlessPhysicalInputTest::ScopedRunningOwner owner(menu);
+		const Rect bet = GambleMenuTestAccess::miniGameBetButton(*menu);
+		const int x = bet.x + bet.w / 2, y = bet.y + bet.h / 2;
+		GambleMenuTestAccess::dispatchEvents(*menu,
+			{ AEvent(ET_MOUSEDOWN, MBC_MOUSE_LEFT, x, y, false),
+			  AEvent(ET_MOUSEUP, MBC_MOUSE_LEFT, x, y, false) });
+		ok = check(GambleMenuTestAccess::miniGameStake(*menu) == 100,
+			"MG mouse click places one wager through the element event tree") && ok;
+		constexpr EventTouchID finger = 1820;
+		GambleMenuTestAccess::dispatchEvents(*menu,
+			{ AEvent(ET_FINGERDOWN, finger, x, y, false),
+			  AEvent(ET_FINGERUP, finger, x, y, false) });
+		ok = check(GambleMenuTestAccess::miniGameStake(*menu) == 200,
+			"MG touch tap places exactly one wager through the element event tree") && ok;
+		GambleMenuTestAccess::dispatchEvents(*menu,
+			{ AEvent(ET_FINGERDOWN, finger, x, y, false),
+			  AEvent(ET_FINGERCANCEL, finger, x, y, false),
+			  AEvent(ET_FINGERUP, finger, x, y, false) });
+		ok = check(GambleMenuTestAccess::miniGameStake(*menu) == 200,
+			"MG cancelled touch does not submit a wager on stale release") && ok;
+		GambleMenuTestAccess::dispatchEvents(*menu,
+			{ AEvent(ET_KEYDOWN, KEY_RETURN, 0, 0, false) });
+		ok = check(GambleMenuTestAccess::isDiceRolling(*menu) && gameManager.player->money == 450,
+			"MG keyboard confirmation starts without withdrawing money before settlement") && ok;
+	}
+	{
+		gameManager.varList.ensureInitialized();
+		gameManager.player->money = 150;
+		gameManager.player->miniGameResult = 2;
+		auto menu = std::make_shared<TestGambleMenu>();
+		gameManager.menu->gambleMenu = menu;
+		gameManager.menu->addChild(menu);
+		bool observedPendingVariable = false;
+		bool resolved = false;
+		Element::setFrameGlobalInputHandler([&](Engine*)
+		{
+			if (resolved) return;
+			resolved = true;
+			observedPendingVariable = gameManager.varList.getInteger("MgResult") == 2
+				&& gameManager.player->miniGameResult == 0;
+			GambleMenuTestAccess::resolveMiniGame(*menu, Result::PlayerWin);
+		});
+		gameManager.scriptAPI.showMiniGame("gamble", 100, 2, "Missing NPC", "MgResult");
+		Element::setFrameGlobalInputHandler(nullptr);
+		ok = check(observedPendingVariable && gameManager.varList.getInteger("MgResult") == 1
+			&& gameManager.player->money == 250 && !menu->visible,
+			"MG API publishes prior result at entry and waits for modal settlement before final writeback") && ok;
+	}
+	return ok;
+}
+
 bool runGambleMenuRuntimeTests()
 {
-	bool ok = true;
+	bool ok = runMgMiniGameRulesTests();
 
 	{
 		auto sceneRoot = std::make_shared<Element>();
@@ -1067,34 +1227,36 @@ bool runGambleMenuRuntimeTests()
 			SDL_GAMEPAD_BUTTON_LABEL_Y,
 			SDL_GAMEPAD_BUTTON_LABEL_X,
 		};
-		const std::array<const char*, GameInput::InputActionCount> XboxLabels =
+		const std::array XboxLabels =
 		{
 			"X", "RT", "Y", "B", "RB+A", "RB+B", "RB+LB", "RB+X",
 			"RB+Y", "LB+左摇杆", "A", "RB", "LT", "L3", "R3", "Start",
 			"RB+十字键上", "RB+十字键下", "RB+十字键左", "RB+十字键右",
 			"十字键", "十字键", "十字键", "十字键", "A", "B", "X", "Y",
 			"LB", "RB", "LT", "RT", "Back+Start", "左摇杆",
-			"右摇杆", "右摇杆", "右摇杆", "右摇杆",
+			"右摇杆", "右摇杆", "右摇杆", "右摇杆", "RB+LT",
 		};
-		const std::array<const char*, GameInput::InputActionCount>
-			PlayStationLabels =
+		const std::array PlayStationLabels =
 		{
 			"□", "R2", "△", "○", "R1+×", "R1+○", "R1+L1", "R1+□",
 			"R1+△", "L1+左摇杆", "×", "R1", "L2", "L3", "R3", "Options",
 			"R1+十字键上", "R1+十字键下", "R1+十字键左", "R1+十字键右",
 			"方向键", "方向键", "方向键", "方向键", "×", "○", "□", "△",
 			"L1", "R1", "L2", "R2", "Create+Options", "左摇杆",
-			"右摇杆", "右摇杆", "右摇杆", "右摇杆",
+			"右摇杆", "右摇杆", "右摇杆", "右摇杆", "R1+L2",
 		};
-		const std::array<const char*, GameInput::InputActionCount> NintendoLabels =
+		const std::array NintendoLabels =
 		{
 			"Y", "ZR", "X", "A", "R+B", "R+A", "R+L", "R+Y",
 			"R+X", "L+左摇杆", "B", "R", "ZL", "LS", "RS", "+",
 			"R+十字键上", "R+十字键下", "R+十字键左", "R+十字键右",
 			"十字键", "十字键", "十字键", "十字键", "B", "A", "Y", "X",
 			"L", "R", "ZL", "ZR", "Minus+Plus", "左摇杆",
-			"右摇杆", "右摇杆", "右摇杆", "右摇杆",
+			"右摇杆", "右摇杆", "右摇杆", "右摇杆", "R+ZL",
 		};
+		static_assert(XboxLabels.size() == GameInput::InputActionCount);
+		static_assert(PlayStationLabels.size() == GameInput::InputActionCount);
+		static_assert(NintendoLabels.size() == GameInput::InputActionCount);
 		for (std::size_t index = 0; index < GameInput::InputActionCount; index++)
 		{
 			const GameInput::InputAction action =

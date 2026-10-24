@@ -50,6 +50,7 @@ enum class InputAction : std::uint8_t
 	ScrollDown,
 	ScrollLeft,
 	ScrollRight,
+	CycleFriendlyTarget,
 	Count
 };
 

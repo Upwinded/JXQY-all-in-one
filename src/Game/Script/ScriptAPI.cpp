@@ -121,8 +121,9 @@ bool validateSaveCompatibility(
 		return false;
 	}
 
-	if (!SaveVersionCompatibility::validateEngineVersion(
-		globalIni->Get("Save", "EngineVersion", "1.0.0"), initialTemplate, failureMessage))
+	const std::string engineVersion = globalIni->Get("Save", "EngineVersion", "1.0.0");
+	if (!SaveVersionCompatibility::validateEngineVersion(engineVersion,
+		globalIni->Get("Save", "MinimumReaderVersion", engineVersion), initialTemplate, failureMessage))
 	{
 		return false;
 	}
@@ -721,6 +722,22 @@ std::size_t getNamedNpcTargetCount(std::size_t availableTargetCount)
 	return std::min<std::size_t>(availableTargetCount, 1);
 }
 
+std::vector<std::shared_ptr<NPC>> findNamedScriptCharacters(
+	GameManager* gameManager,
+	const std::string& name)
+{
+	auto targets = gameManager->npcManager->findNPC(name);
+	if (usesTrilogyNpcRuntime(gameManager->global.npcRuntimeProfile))
+	{
+		// C# keeps variable-inactive NPCs outside GetPlayerAndAllNpcs in _hideList.
+		targets.erase(std::remove_if(targets.begin(), targets.end(), [gameManager](const auto& npc)
+		{
+			return npc == nullptr || (npc != gameManager->player && !npc->isVisibleByVariable);
+		}), targets.end());
+	}
+	return targets;
+}
+
 std::vector<std::shared_ptr<NPC>> findNamedNonPlayerNpcs(
 	GameManager* gameManager,
 	const std::string& name)
@@ -758,7 +775,7 @@ std::shared_ptr<NPC> getScriptPlayerKindCharacter(GameManager* gameManager)
 	return character;
 }
 
-void finishScriptCharacterPositionChange(GameManager* gameManager)
+void finishScriptCharacterPositionChange(GameManager* gameManager, NPC* positionedCharacter)
 {
 	if (gameManager == nullptr || gameManager->player == nullptr)
 	{
@@ -790,7 +807,10 @@ void finishScriptCharacterPositionChange(GameManager* gameManager)
 		gameManager->camera->differencePosition = { 0.0, 0.0 };
 	}
 
-	gameManager->player->suppressTrapAtScriptPosition();
+	if (positionedCharacter == gameManager->player.get())
+	{
+		gameManager->player->scheduleTrapCheckAtScriptPosition();
+	}
 }
 
 void setScriptPlayerKindCharacterNonFighting(GameManager* gameManager)
@@ -845,6 +865,13 @@ public:
 private:
 	void onUpdate() override
 	{
+		if (!started)
+		{
+			// Start after the parent's first frame has clamped any stale time.
+			initTime();
+			started = true;
+			return;
+		}
 		if (getTime() >= duration)
 		{
 			stop();
@@ -852,6 +879,7 @@ private:
 	}
 
 	UTime duration;
+	bool started = false;
 };
 
 void runNpcSpecialActionForTarget(const std::shared_ptr<NPC>& npc,
@@ -7744,7 +7772,7 @@ void ScriptAPI::setMapTrap(int idx, const std::string& trapFile)
 
 void ScriptAPI::saveMapTrap()
 {
-	gameManager->traps.saveDefinitions();
+	gameManager->traps.saveMap(gameManager->mapFolderName);
 }
 
 void ScriptAPI::setMapTime(int time)
@@ -7771,6 +7799,14 @@ void ScriptAPI::changeMapColor(uint8_t r, uint8_t g, uint8_t b)
 		return;
 	}
 	gameManager->global.data.mpcStyle = (r << 16) | (g << 8) | b;
+}
+
+void ScriptAPI::changeMapColorPlus(const std::string& color)
+{
+	if (gameManager != nullptr && !gameManager->global.setScreenColor(color))
+	{
+		GameLog::write("ChangeMapColorPlus: invalid RGB color.\n");
+	}
 }
 
 void ScriptAPI::loadObjectAsync(const std::string& fileName)
@@ -8257,6 +8293,23 @@ void ScriptAPI::goTo(const std::string& name, int x, int y)
 	}
 }
 
+void ScriptAPI::runTo(const std::string& name, int x, int y)
+{
+	if (name.empty())
+	{
+		return;
+	}
+	ScopedScriptInputBlock inputBlock(gameManager);
+	const auto targets = gameManager->npcManager->findNPC(name);
+	const std::size_t targetCount = getNamedNpcTargetCount(targets.size());
+	for (std::size_t index = 0; index < targetCount; ++index)
+	{
+		if (targets[index] == nullptr) continue;
+		const Point position = keepCurrentPositionWhenLegacyWildcard(x, y, targets[index]->getPosition());
+		targets[index]->runTo(position);
+	}
+}
+
 void ScriptAPI::goToEx(const std::string& name, int x, int y)
 {
 	if (name.empty())
@@ -8532,7 +8585,7 @@ void ScriptAPI::setNPCKind(const std::string& name, int kind)
 	}
 	else
 	{
-		auto npc = gameManager->npcManager->findNPC(name);
+		auto npc = findNamedScriptCharacters(gameManager, name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			if (npc[i] == nullptr) continue;
@@ -8563,6 +8616,49 @@ void ScriptAPI::setNPCLevel(const std::string& name, int level)
 			npc[i]->setLevel(level);
 		}
 	}
+}
+
+void ScriptAPI::setNPCLevelEqualPlayer(const std::string& name)
+{
+	if (gameManager == nullptr || gameManager->player == nullptr) return;
+	auto target = gameManager->scriptNPC;
+	if (!name.empty())
+	{
+		if (gameManager->npcManager == nullptr) return;
+		auto targets = gameManager->npcManager->findNPC(name);
+		target = targets.empty() ? nullptr : targets.front();
+	}
+	if (target == nullptr) return;
+	const int level = gameManager->player->level;
+	if (auto player = std::dynamic_pointer_cast<Player>(target))
+	{
+		if (level >= 1 && level <= static_cast<int>(player->levelList.size())) player->setLevel(level);
+		player->level = level;
+		return;
+	}
+	const bool enemy = target->kind == nkBattle && target->relation == nrHostile;
+	const bool friendlyFighter = target->relation == nrFriendly
+		&& (target->kind == nkBattle || target->kind == nkPartner || target->transientSummonedNPC);
+	if (target->npcLevelList.empty() && (enemy || friendlyFighter))
+	{
+		const std::string fileName = target->npcLevelIni.empty()
+			? (enemy ? "level-npc.ini" : "level-partner.ini") : target->npcLevelIni;
+		target->loadLevel(fileName);
+		if (!target->npcLevelList.empty()) target->npcLevelIni = fileName;
+	}
+	target->level = level;
+	if (level < 1 || level > static_cast<int>(target->npcLevelList.size())) return;
+	const auto& info = target->npcLevelList[level - 1];
+	target->setLevel(level);
+	// MG retains zero maxima and only copies kill experience for hostile fighters.
+	target->lifeMax = info.lifeMax > 0 ? info.lifeMax : info.life;
+	target->thewMax = info.thewMax;
+	target->manaMax = info.manaMax;
+	target->life = target->getLifeMax();
+	target->thew = target->getThewMax();
+	target->mana = target->getManaMax();
+	target->displayLifePercent = target->getLifeMax() > 0 ? 1.0f : 0.0f;
+	if (enemy) target->exp = info.exp;
 }
 
 void ScriptAPI::setNPCAction(const std::string& name, int action, int x, int y)
@@ -8683,7 +8779,7 @@ void ScriptAPI::setNPCRelation(const std::string& name, int relation)
 	}
 	else
 	{
-		auto npc = gameManager->npcManager->findNPC(name);
+		auto npc = findNamedScriptCharacters(gameManager, name);
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			setRelation(npc[i]);
@@ -9082,7 +9178,7 @@ void ScriptAPI::setPlayerPosition(int x, int y)
 	}
 	target->setOffset({ 0, 0 });
 	target->haveAsyncDest = false;
-	finishScriptCharacterPositionChange(gameManager);
+	finishScriptCharacterPositionChange(gameManager, target.get());
 }
 
 void ScriptAPI::setPlayerPosition(const std::string& name, int x, int y)
@@ -9110,7 +9206,7 @@ void ScriptAPI::setPlayerPosition(const std::string& name, int x, int y)
 	}
 	target->haveAsyncDest = false;
 	target->setOffset({ 0, 0 });
-	finishScriptCharacterPositionChange(gameManager);
+	finishScriptCharacterPositionChange(gameManager, target.get());
 }
 
 void ScriptAPI::setPlayerDir(int dir)
@@ -9503,6 +9599,19 @@ void ScriptAPI::playerGotoDir(int dir, int distance)
 	ScopedScriptInputBlock inputBlock(gameManager);
 	int direction = keepCurrentWhenLegacyWildcard(dir, target->direction);
 	target->goToDir(direction, distanceOrZeroWhenLegacyWildcard(distance));
+}
+
+void ScriptAPI::playerGotoDirEx(int dir, int distance)
+{
+	auto target = getScriptPlayerKindCharacter(gameManager);
+	if (target == nullptr || dir < 0 || dir > 7 || distance <= 0) return;
+	static constexpr int xSteps[] = { 0, -2, -2, -2, 0, 2, 2, 2 };
+	static constexpr int ySteps[] = { 1, 1, 0, -1, -1, -1, 0, 1 };
+	const PointEx start = target->getOffset();
+	const PointEx destination = { start.x + static_cast<float>(xSteps[dir]) * distance,
+		start.y + static_cast<float>(ySteps[dir]) * distance };
+	ScopedScriptInputBlock inputBlock(gameManager);
+	if (target->actionManager->beginOffsetWalk(destination, dir)) target->eventRun();
 }
 
 void ScriptAPI::setWalkIsRun(int value)
@@ -10222,6 +10331,34 @@ void ScriptAPI::showDiceGame(const std::string& npcName)
 	gameManager->menu->gambleMenu->openDiceGame(npcName);
 }
 
+void ScriptAPI::showMiniGame(const std::string& name, int opponentMoney, int gameType,
+	const std::string& npcName, const std::string& resultVariable)
+{
+	if (gameManager == nullptr || gameManager->player == nullptr) return;
+	if (!resultVariable.empty()) assign(resultVariable, gameManager->player->miniGameResult);
+	if (gameManager->menu != nullptr && gameManager->menu->gambleMenu != nullptr)
+	{
+		if (name == "fish") gameManager->menu->gambleMenu->openFishGame();
+		else if (name == "gamble")
+		{
+			std::string displayName;
+			if (gameManager->npcManager != nullptr && !npcName.empty())
+			{
+				const auto targets = gameManager->npcManager->findNPC(npcName);
+				if (!targets.empty() && targets.front() != nullptr) displayName = targets.front()->npcName;
+			}
+			gameManager->menu->gambleMenu->openMiniGameGamble(opponentMoney, gameType,
+				displayName);
+		}
+	}
+	else if (name == "gamble")
+	{
+		gameManager->player->miniGameResult = 0;
+		GameLog::write("ShowMiniGame requires GambleMenu.\n");
+	}
+	if (!resultVariable.empty()) assign(resultVariable, gameManager->player->miniGameResult);
+}
+
 void ScriptAPI::showFishGame()
 {
 	if (gameManager == nullptr || gameManager->menu == nullptr || gameManager->menu->gambleMenu == nullptr)
@@ -10343,6 +10480,11 @@ void ScriptAPI::showSystemMessage(const std::string& str, int stayTime)
 	{
 		gameManager->menu->scriptMessages->showMessage(gameManager->global.resolveScriptText(str), static_cast<UTime>(duration));
 	}
+}
+
+void ScriptAPI::openPaper(int type, const std::vector<std::string>& contents)
+{
+	if (gameManager->menu != nullptr) gameManager->menu->openPaper(type, contents);
 }
 
 void ScriptAPI::addToMemo(const std::string& str)
@@ -10531,7 +10673,8 @@ void ScriptAPI::getPlayerLevel(const std::string& varName)
 
 void ScriptAPI::getNpcCount(int kind, int relation)
 {
-	if (gameManager->player->kind == kind && gameManager->player->relation == relation)
+	if (!gameManager->player->isDying()
+		&& gameManager->player->kind == kind && gameManager->player->relation == relation)
 	{
 		gameManager->varList.setInteger("NpcCount", 1);
 		return;
@@ -10541,7 +10684,7 @@ void ScriptAPI::getNpcCount(int kind, int relation)
 	for (size_t i = 0; i < gameManager->npcManager->npcList.size(); i++)
 	{
 		auto& npc = gameManager->npcManager->npcList[i];
-		if (npc != nullptr && npc->kind == kind && npc->relation == relation)
+		if (npc != nullptr && !npc->isDying() && npc->kind == kind && npc->relation == relation)
 		{
 			count++;
 		}
@@ -10987,6 +11130,10 @@ void ScriptAPI::freeMap()
 	// effects, weather, script ownership, resource names, and trap state remain
 	// available until their own command or the next successful map load changes
 	// them.
+	if (gameManager->player != nullptr)
+	{
+		gameManager->player->cancelPendingScriptPositionTrap();
+	}
 	gameManager->map->freeResource();
 }
 
@@ -11325,6 +11472,7 @@ bool ScriptAPI::loadMapWithFailurePolicy(
 			}
 			mapFolderCommitted = true;
 			gameManager->global.data.mapName = fileName;
+			gameManager->player->cancelPendingScriptPositionTrap();
 
 			endRain();
 			gameManager->effectManager->clearEffect();
@@ -11495,6 +11643,7 @@ bool ScriptAPI::loadMapFromEditorRunBytes(
 			mapFolderCommitted = true;
 			gameManager->global.data.mapName =
 				convert::extractFullName(virtualPath);
+			gameManager->player->cancelPendingScriptPositionTrap();
 
 			endRain();
 			gameManager->effectManager->clearEffect();

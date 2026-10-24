@@ -89,6 +89,7 @@ public:
 	void setMapTime(int time);
 	void changeASFColor(uint8_t r, uint8_t g, uint8_t b);
 	void changeMapColor(uint8_t r, uint8_t g, uint8_t b);
+	void changeMapColorPlus(const std::string& color);
 
 	void loadObjectAsync(const std::string& fileName);
 	bool loadObject(const std::string& fileName);
@@ -134,6 +135,7 @@ public:
 	void setAllNPCDeathScript(const std::string& name, const std::string& scriptName);
 	bool interactNearestNPC(bool useRightScript = false, bool running = false, int radius = 2);
 	void goTo(const std::string& name, int x, int y);
+	void runTo(const std::string& name, int x, int y);
 	void goToEx(const std::string& name, int x, int y);
 	void goToDir(const std::string& name, int dir, int distance);
 	void setNpcDestination(const std::string& name, int x, int y);
@@ -150,6 +152,7 @@ public:
 	void setNPCDir(const std::string& name, int dir);
 	void setNPCKind(const std::string& name, int kind);
 	void setNPCLevel(const std::string& name, int level);
+	void setNPCLevelEqualPlayer(const std::string& name);
 	void setNPCAction(const std::string& name, int action, int x = 0, int y = 0);
 	void setNPCRelation(const std::string& name, int relation);
 	void setNPCActionType(const std::string& name, int strollIntent);
@@ -211,6 +214,7 @@ public:
 	void playerRunToEx(int x, int y);
 	void playerJumpTo(int x, int y);
 	void playerGotoDir(int dir, int distance);
+	void playerGotoDirEx(int dir, int distance);
 	void setWalkIsRun(int value);
 	void addMoveSpeedPercent(int percent);
 	void useMagic(const std::string& magicName, int x, int y, bool hasDestination);
@@ -267,12 +271,15 @@ public:
 	void gamble(int cost, int npcType, const std::string& varName);
 	void showDiceGame(const std::string& npcName);
 	void showFishGame();
+	void showMiniGame(const std::string& name, int opponentMoney = 50, int gameType = 0,
+		const std::string& npcName = "", const std::string& resultVariable = "");
 	void showStealWin(const std::string& npcName, const std::string& successScript = "", const std::string& failScript = "");
 	void showGiveGoodsWin(const std::string& targetGoodsName, const std::string& successScript, const std::string& failScript);
 
 	void showMessage(const std::string& str);
 	void showSystemMessage(const std::string& str, int stayTime);
 	void addToMemo(const std::string& str);
+	void openPaper(int type, const std::vector<std::string>& contents);
 	void deleteMemo(const std::string& str);
 	void clearMemo();
 	void buyGoods(const std::string& fileName);

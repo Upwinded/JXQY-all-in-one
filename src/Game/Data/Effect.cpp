@@ -30,19 +30,6 @@ bool isProjectilePathBlockedByWall(const Effect& effect)
 				})));
 }
 
-bool isCharacterTerrainBlocked(Point tile)
-{
-	if (!gm->map->isInMap(tile) || !tileObstacleAllowsWalk(gm->map->data->tile[tile.y][tile.x].obstacle))
-	{
-		return true;
-	}
-	const auto& objects = gm->map->dataMap.tile[tile.y][tile.x].objList;
-	return std::any_of(objects.begin(), objects.end(), [](const auto& object)
-	{
-		return isObjectObstacleKind(object->kind);
-	});
-}
-
 int clampDrawCoordinate(int base, double offset, int imageOffset, int heightOffset)
 {
 	if (!std::isfinite(offset))
@@ -670,6 +657,7 @@ void Effect::updateSound()
 
 void Effect::initParam()
 {
+	magic.applyRuntimeLevel(level);
 	fileName = magic.iniName;
 	const int effectLevel = clampMagicLevel(level);
 	speed = magic.level[effectLevel].speed;
@@ -1027,21 +1015,56 @@ void Effect::updateAttachedNPCs()
 			continue;
 		}
 
-		Point targetPosition = { position.x + item.tileOffset.x, position.y + item.tileOffset.y };
-		PointEx targetOffset = item.preserveOffset
-			? PointEx{ offset.x + item.offsetDelta.x, offset.y + item.offsetDelta.y }
-			: offset;
-		if (item.destroyOnObstacle && gm != nullptr && gm->map != nullptr
-			&& (!gm->map->isInMap(targetPosition) || !gm->map->canFly(targetPosition)))
+		Point targetPosition = position;
+		PointEx targetOffset = offset;
+		if (item.preserveOffset)
 		{
-			Point fallback = findBallFallbackPosition(npc->getPosition());
+			// Staggered rows must retain a pixel displacement, not a tile-index delta.
+			const Point originalEffectPosition = { item.initialPosition.x - item.tileOffset.x,
+				item.initialPosition.y - item.tileOffset.y };
+			const auto tileDelta = Map::getTilePositionEx(item.initialPosition, originalEffectPosition, { 0, 0 }, { 0, 0 });
+			getNewPosition(position, { offset.x + tileDelta.x + item.offsetDelta.x,
+				offset.y + tileDelta.y + item.offsetDelta.y }, &targetPosition, &targetOffset);
+		}
+		bool blocked = false;
+		if (item.destroyOnObstacle && gm != nullptr && gm->map != nullptr)
+		{
+			blocked = magic.carryUser == 4 ? gm->map->isCharacterTerrainBlocked(targetPosition)
+				: !gm->map->isInMap(targetPosition) || !gm->map->canFly(targetPosition);
+			if (!blocked && magic.carryUser == 4 && targetPosition != npc->getPosition())
+			{
+				const auto tileDelta = Map::getTilePositionEx(targetPosition, npc->getPosition(), { 0, 0 }, { 0, 0 });
+				const auto oldOffset = npc->getOffset();
+				const Point direction = { static_cast<int>(std::round(tileDelta.x + targetOffset.x - oldOffset.x)),
+					static_cast<int>(std::round((tileDelta.y + targetOffset.y - oldOffset.y) * MapXRatio)) };
+				const auto path = gm->map->getPassPathEx(npc->getPosition(), oldOffset, targetPosition, targetOffset, direction);
+				blocked = std::any_of(path.begin(), path.end(), [](Point tile)
+				{
+					return gm->map->isCharacterTerrainBlocked(tile);
+				});
+			}
+		}
+		if (blocked)
+		{
+			Point fallback = npc->getPosition();
+			if (magic.carryUser == 4)
+			{
+				if (gm->map->isCharacterTerrainBlocked(fallback))
+				{
+					fallback = gm->map->clampToWalkable(fallback);
+				}
+			}
+			else
+			{
+				fallback = findBallFallbackPosition(fallback);
+			}
 			npc->setPosition(fallback, false);
 			item.npc.reset();
 			destroyEffect = true;
 			continue;
 		}
-		npc->setPosition(targetPosition, false);
-		npc->setOffset(targetOffset);
+		npc->setPosition(targetPosition, false, true);
+		npc->setOffset(targetOffset, true);
 		npc->direction = direction;
 		if (Map::getTileDistance(item.initialPosition, item.initialOffset, targetPosition, targetOffset) > 0.5f)
 		{
@@ -1124,7 +1147,8 @@ void Effect::reflectBallFromPoint(Point hitPosition, PointEx normalPoint)
 		}
 	}
 	direction = getDirection(flyingDirection);
-	Point nextPosition = Map::getSubPoint(position, direction);
+	const int tileDirection = Magic::getDirection(getEffectProjectedMovementAngle(flyingDirection), 8);
+	Point nextPosition = Map::getSubPoint(position, tileDirection);
 	if (gm != nullptr && gm->map != nullptr && gm->map->isInMap(nextPosition) && gm->map->canFly(nextPosition))
 	{
 		position = nextPosition;
@@ -1501,8 +1525,11 @@ void Effect::updateCarryUserPosition()
 
 	// Ground carrying must also stop at terrain that only projectiles can cross.
 	if (!canPassThroughWall() && doing != ekThrowing
-		&& (isCharacterTerrainBlocked(position)
-			|| std::any_of(passPath.begin(), passPath.end(), isCharacterTerrainBlocked)))
+		&& (gm->map->isCharacterTerrainBlocked(position)
+			|| std::any_of(passPath.begin(), passPath.end(), [](Point tile)
+			{
+				return gm->map->isCharacterTerrainBlocked(tile);
+			})))
 	{
 		clearCarryUser();
 		if (magic.carryUser != 1)
@@ -1512,8 +1539,8 @@ void Effect::updateCarryUserPosition()
 		return;
 	}
 
-	npc->setPosition(position, false);
-	npc->setOffset(offset);
+	npc->setPosition(position, false, true);
+	npc->setOffset(offset, true);
 	npc->direction = direction;
 }
 
@@ -2184,9 +2211,9 @@ void Effect::updateRangeEffect(UTime frameTime)
 	}
 	auto selfEffect = std::dynamic_pointer_cast<Effect>(getMySharedPtr());
 
-	auto isLiveVisibleTarget = [&](std::shared_ptr<NPC> target)
+	auto isLivePresentTarget = [&](std::shared_ptr<NPC> target)
 	{
-		if (target == nullptr || !target->isVisibleForRuntime() || target->nowAction == acDeath || target->nowAction == acHide)
+		if (target == nullptr || !target->isPresentForRuntime() || target->nowAction == acDeath || target->nowAction == acHide)
 		{
 			return false;
 		}
@@ -2204,7 +2231,7 @@ void Effect::updateRangeEffect(UTime frameTime)
 
 	auto canReceiveRangeFriendEffect = [&](std::shared_ptr<NPC> target)
 	{
-		if (!isLiveVisibleTarget(target))
+		if (!isLivePresentTarget(target))
 		{
 			return false;
 		}
@@ -2217,7 +2244,7 @@ void Effect::updateRangeEffect(UTime frameTime)
 
 	auto canReceiveRangeAttackEffect = [&](std::shared_ptr<NPC> target)
 	{
-		if (!isLiveVisibleTarget(target))
+		if (!isLivePresentTarget(target))
 		{
 			return false;
 		}
@@ -2372,6 +2399,23 @@ void Effect::calDest()
 	}
 }
 
+std::array<PointEx, 3> Effect::getPathOffsets() const
+{
+	if (flyingDirection.is_zero() || magic.carryUser == 3 || magic.carryUser == 4)
+	{
+		return {};
+	}
+	float length = hypot(flyingDirection.x, flyingDirection.y);
+	const float radius = std::max(0.0f, width * 0.5f) * TILE_HEIGHT / std::sqrt(2.0f);
+	// Build the perpendicular in collision space, then restore the map projection.
+	const PointEx side =
+	{
+		flyingDirection.y / length * radius * MapXRatio,
+		-(float)flyingDirection.x / length * radius
+	};
+	return { PointEx{0, 0}, side, PointEx{-side.x, -side.y} };
+}
+
 std::deque<Point> Effect::getPassPath(Point from, PointEx fromOffset, Point to, PointEx toOffset)
 {
 	std::deque<Point> result, tempPath[3];
@@ -2380,21 +2424,21 @@ std::deque<Point> Effect::getPassPath(Point from, PointEx fromOffset, Point to, 
 		return result;
 	}
 	std::vector<float> resultDistance;
-	PointEx distanceOffset[3];
-	distanceOffset[0] = { 0, 0 };
+	const auto distanceOffset = getPathOffsets();
 	tempPath[0] = gm->map->getPassPathEx(from, fromOffset, to, toOffset, flyingDirection);
-	float l = hypot(flyingDirection.x, flyingDirection.y);
-	int tempX = convert_max((int)round(((float)flyingDirection.x) / l * width * TILE_WIDTH / 2) - 1, 1);
-	int tempY = convert_max((int)round((((float)flyingDirection.y) / l * width * TILE_WIDTH / 2) - 1), 1);
+	if (magic.carryUser == 3 || magic.carryUser == 4)
+	{
+		// These C# carry modes follow the character's point path. Projectile
+		// width must not stop the character against a wall beside that path.
+		return tempPath[0];
+	}
 	Point tempFrom, tempTo;
 	PointEx tempFromOffset, tempToOffset;
-	getNewPosition(from, { fromOffset.x + tempY , fromOffset.y - tempX }, &tempFrom, &tempFromOffset);
-	getNewPosition(to, { toOffset.x + tempY , toOffset.y - tempX }, &tempTo, &tempToOffset);
-	distanceOffset[1] = { (float)tempY, (float)- tempX};
+	getNewPosition(from, fromOffset + distanceOffset[1], &tempFrom, &tempFromOffset);
+	getNewPosition(to, toOffset + distanceOffset[1], &tempTo, &tempToOffset);
 	tempPath[1] = gm->map->getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
-	getNewPosition(from, { fromOffset.x - tempY , fromOffset.y + tempX }, &tempFrom, &tempFromOffset);
-	getNewPosition(to, { toOffset.x - tempY , toOffset.y + tempX }, &tempTo, &tempToOffset);
-	distanceOffset[2] = { (float)-tempY, (float)tempX };
+	getNewPosition(from, fromOffset + distanceOffset[2], &tempFrom, &tempFromOffset);
+	getNewPosition(to, toOffset + distanceOffset[2], &tempTo, &tempToOffset);
 	tempPath[2] = gm->map->getPassPathEx(tempFrom, tempFromOffset, tempTo, tempToOffset, flyingDirection);
 	auto maxStep = convert_max(convert_max(tempPath[0].size(), tempPath[1].size()), tempPath[2].size());
 	for (size_t i = 0; i < maxStep; i++)
@@ -3791,7 +3835,7 @@ void Effect::onUpdate()
 	}
 	else if (doing == ekFlying)
 	{		
-		if (lifeTime > 0)
+		if (lifeTime > 0 || meteorMoveActive)
 		{	
 			bool useTraceSpeed = false;
 			bool followByTraceEnemy = false;
@@ -3916,7 +3960,8 @@ void Effect::onUpdate()
 			//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
 			passPath = getPassPath(from, fromOffset, to, toOffset);
 			updateMagicWhenNewPosition();
-			if (getTime() - beginTime >= lifeTime)
+			// Meteor paths finish through their landing collision, independently of animation length.
+			if (!meteorMoveHandled && getTime() - beginTime >= lifeTime)
 			{
 				if (logicRunning)
 				{
@@ -3997,6 +4042,9 @@ void Effect::onUpdate()
 	{
 		if (getTime() - beginTime >= waitTime)
 		{
+			// Earlier character movement happened before this delayed effect existed
+			// for collisions. Keep its creation frame for projectile interactions.
+			characterCollisionActivationFrame = gm->effectManager->getProjectileCollisionFrame();
 			if (getMoveKind() == mmkThrow)
 			{
 				doing = ekThrowing;

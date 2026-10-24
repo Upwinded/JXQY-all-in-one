@@ -62,7 +62,7 @@ def main() -> int:
 
     empty_index = module.SourceIndex(pack_id="XJXQY", description="empty source", relative_paths=set())
     status, hits = module.classify_source_match(empty_index, candidates, "sound\\open.wav")
-    assert status == "runtime_alias_only"
+    assert status == "runtime_exact_only"
     assert hits == []
 
     status, hits = module.classify_source_match(None, candidates, "")

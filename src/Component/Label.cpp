@@ -4,6 +4,7 @@
 #include "TextLayout.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace
 {
@@ -201,114 +202,115 @@ void Label::refreshTextLayout()
 		return;
 	}
 
-	for (auto& image : strImage)
-	{
-		image = nullptr;
-	}
 	strImage.clear();
-	renderedFontSize = fontSize;
+	renderedFontSize = std::max(1, fontSize);
+	renderedLineHeight = renderedFontSize;
 
 	const bool hasColorTags = interpretColorTags
 		&& str.find("<color=") != std::string::npos;
-	if (hasColorTags)
+	const int smallestFontSize = autoShrink
+		? std::clamp(minimumFontSize, 1, renderedFontSize)
+		: renderedFontSize;
+	std::vector<TextLayout::ColorTaggedTextLine> lines;
+	for (;;)
 	{
-		const int charactersPerLine = autoNextLine
-			? TextLayout::charactersPerLineForWidth(rect.w, fontSize)
-			: std::max(1,
-				static_cast<int>(TextLayout::countUtf8Characters(str)));
-		const auto lines = TextLayout::wrapColorTaggedUtf8Text(
-			str, charactersPerLine, color);
+		int measuredWidth = 0;
+		int measuredHeight = 0;
+		bool measured = engine->measureText("", renderedFontSize, measuredWidth, measuredHeight);
+		renderedLineHeight = measured ? std::max(1, measuredHeight) : renderedFontSize;
+		const auto measureWidth = [&](const std::string& text)
+		{
+			int width = 0;
+			int height = 0;
+			measured = engine->measureText(text, renderedFontSize, width, height) && measured;
+			renderedLineHeight = std::max(renderedLineHeight, height);
+			return width;
+		};
+		const int maximumWidth = autoNextLine ? std::max(1, rect.w) : std::numeric_limits<int>::max();
+		lines.clear();
+		if (hasColorTags)
+		{
+			lines = TextLayout::wrapColorTaggedUtf8Text(str, maximumWidth, color, measureWidth);
+		}
+		else if (autoNextLine)
+		{
+			for (const auto& line : TextLayout::wrapUtf8Text(str, maximumWidth, measureWidth))
+			{
+				lines.push_back({ { line, color } });
+			}
+		}
+		else if (!str.empty())
+		{
+			lines.push_back({ { str, color } });
+		}
+		int widestLine = 0;
 		for (const auto& line : lines)
 		{
-			std::vector<_shared_image> runImages;
-			int lineWidth = 0;
-			int lineHeight = std::max(1, fontSize);
-			std::string plainLine;
+			int width = 0;
 			for (const auto& run : line)
 			{
-				plainLine += run.text;
-				_shared_image runImage = engine->createText(
-					run.text, fontSize, run.color);
-				int runWidth = 0;
-				int runHeight = 0;
-				if (runImage != nullptr
-					&& engine->getImageSize(runImage, runWidth, runHeight))
-				{
-					lineWidth += runWidth;
-					lineHeight = std::max(lineHeight, runHeight);
-				}
-				runImages.push_back(std::move(runImage));
+				width += measureWidth(run.text);
 			}
-			if (runImages.empty())
+			widestLine = std::max(widestLine, width);
+		}
+		const int totalHeight = static_cast<int>(lines.size()) * renderedLineHeight;
+		if (renderedFontSize <= smallestFontSize || !measured
+			|| ((rect.w <= 0 || widestLine <= rect.w) && (rect.h <= 0 || totalHeight <= rect.h)))
+		{
+			break;
+		}
+		--renderedFontSize;
+	}
+
+	for (const auto& line : lines)
+	{
+		std::vector<_shared_image> runImages;
+		int lineWidth = 0;
+		std::string plainLine;
+		for (const auto& run : line)
+		{
+			plainLine += run.text;
+			_shared_image runImage = run.text.empty()
+				? nullptr : engine->createText(run.text, renderedFontSize, run.color);
+			int runWidth = 0;
+			int runHeight = 0;
+			if (engine->getImageSize(runImage, runWidth, runHeight))
 			{
-				strImage.push_back(nullptr);
-				continue;
+				lineWidth += runWidth;
+				renderedLineHeight = std::max(renderedLineHeight, runHeight);
 			}
-			if (!engine->beginDrawTalk(std::max(1, lineWidth), lineHeight))
+			runImages.push_back(std::move(runImage));
+		}
+		if (runImages.empty())
+		{
+			strImage.push_back(nullptr);
+		}
+		else if (runImages.size() == 1 && !hasColorTags)
+		{
+			if (autoShrink && elideOverflow && !autoNextLine && rect.w > 0 && lineWidth > rect.w)
 			{
-				strImage.push_back(engine->createText(
-					plainLine, fontSize, color));
-				continue;
+				runImages.front() = createElidedTextImage(engine, plainLine, renderedFontSize, color, rect.w);
 			}
+			strImage.push_back(runImages.front());
+		}
+		else if (!engine->beginDrawTalk(std::max(1, lineWidth), renderedLineHeight))
+		{
+			strImage.push_back(engine->createText(plainLine, renderedFontSize, color));
+		}
+		else
+		{
 			int drawX = 0;
 			for (const auto& runImage : runImages)
 			{
 				int runWidth = 0;
 				int runHeight = 0;
-				if (runImage != nullptr
-					&& engine->getImageSize(runImage, runWidth, runHeight))
+				if (engine->getImageSize(runImage, runWidth, runHeight))
 				{
 					engine->drawImage(runImage, drawX, 0);
 					drawX += runWidth;
 				}
 			}
 			strImage.push_back(engine->endDrawTalk());
-		}
-	}
-	else if (autoNextLine)
-	{
-		int charactersPerLine = TextLayout::charactersPerLineForWidth(rect.w, fontSize);
-		auto lines = TextLayout::wrapUtf8Text(str, charactersPerLine);
-		for (const auto& line : lines)
-		{
-			strImage.push_back(line.empty() ? nullptr : engine->createText(line, fontSize, color));
-		}
-	}
-	else if (!str.empty())
-	{
-		if (autoShrink)
-		{
-			const int smallestFontSize = std::clamp(minimumFontSize, 1, std::max(1, fontSize));
-			int textFontSize = std::max(1, fontSize);
-			_shared_image img = nullptr;
-			for (; textFontSize >= smallestFontSize; textFontSize--)
-			{
-				img = engine->createText(str, textFontSize, color);
-				int textWidth = 0;
-				int textHeight = 0;
-				if (!engine->getImageSize(img, textWidth, textHeight)
-					|| rect.w <= 0 || rect.h <= 0
-					|| (textWidth <= rect.w && textHeight <= rect.h))
-				{
-					break;
-				}
-			}
-			textFontSize = std::max(textFontSize, smallestFontSize);
-			if (elideOverflow && img != nullptr && rect.w > 0)
-			{
-				int textWidth = 0;
-				int textHeight = 0;
-				if (engine->getImageSize(img, textWidth, textHeight) && textWidth > rect.w)
-				{
-					img = createElidedTextImage(engine, str, textFontSize, color, rect.w);
-				}
-			}
-			renderedFontSize = textFontSize;
-			strImage.push_back(img);
-		}
-		else
-		{
-			strImage.push_back(engine->createText(str, fontSize, color));
 		}
 	}
 
@@ -333,7 +335,7 @@ void Label::invalidateTextLayout()
 int Label::getRenderedTextHeight()
 {
 	refreshTextLayout();
-	return static_cast<int>(strImage.size()) * std::max(renderedFontSize, 1);
+	return static_cast<int>(strImage.size()) * std::max(renderedLineHeight, 1);
 }
 
 void Label::onMouseLeftDown(int x, int y)
@@ -364,7 +366,7 @@ void Label::freeResource()
 void Label::drawItemStr()
 {
 	refreshTextLayout();
-	const int lineHeight = renderedFontSize > 0 ? renderedFontSize : fontSize;
+	const int lineHeight = std::max(renderedLineHeight, 1);
 	const int contentHeight = static_cast<int>(strImage.size()) * std::max(lineHeight, 1);
 	int startY = rect.y;
 	if (verticalAlignment == TextVerticalAlignment::Center)
@@ -407,7 +409,7 @@ void Label::drawItemStr()
 			engine->drawImage(strImage[i], drawX, lineY);
 			continue;
 		}
-		if (rect.w <= 0 || rect.h <= 0 || lineY >= rect.y + rect.h)
+		if (rect.w <= 0 || rect.h <= 0 || lineY + imageHeight > rect.y + rect.h)
 		{
 			break;
 		}
@@ -415,7 +417,7 @@ void Label::drawItemStr()
 			0,
 			0,
 			std::min(imageWidth, rect.w),
-			std::min(imageHeight, rect.y + rect.h - lineY)
+			imageHeight
 		};
 		if (sourceRect.w > 0 && sourceRect.h > 0)
 		{

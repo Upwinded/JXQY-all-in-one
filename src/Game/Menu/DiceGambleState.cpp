@@ -1,6 +1,8 @@
 #include "DiceGambleState.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <limits>
 #include <map>
 
 namespace
@@ -66,10 +68,11 @@ namespace
 	}
 }
 
-void DiceGambleState::reset(int playerMoney, int npcMoney)
+void DiceGambleState::reset(int playerMoney, int npcMoney, int betStep)
 {
 	currentPhase = Phase::WaitingForBet;
 	currentStake = 0;
+	currentBetStep = betStep > 0 ? betStep : BetStep;
 	currentPlayerMoney = playerMoney;
 	currentNpcMoney = npcMoney;
 	moneyDelta = 0;
@@ -88,7 +91,8 @@ bool DiceGambleState::addBet()
 	{
 		return false;
 	}
-	currentStake += BetStep;
+	currentStake = static_cast<int>(std::min<std::int64_t>(std::numeric_limits<int>::max(),
+		static_cast<std::int64_t>(currentStake) + currentBetStep));
 	return true;
 }
 
@@ -256,6 +260,11 @@ int DiceGambleState::stake() const
 	return currentStake;
 }
 
+int DiceGambleState::betStep() const
+{
+	return currentBetStep;
+}
+
 int DiceGambleState::playerMoney() const
 {
 	return currentPlayerMoney;
@@ -331,15 +340,16 @@ void DiceGambleState::resolve()
 	if (currentOutcome.result == Result::PlayerWin)
 	{
 		moneyDelta = currentStake;
-		currentPlayerMoney += currentStake;
-		currentNpcMoney -= currentStake;
 	}
 	else if (currentOutcome.result == Result::NpcWin)
 	{
 		moneyDelta = -currentStake;
-		currentPlayerMoney -= currentStake;
-		currentNpcMoney += currentStake;
 	}
+	currentPlayerMoney = static_cast<int>(std::clamp<std::int64_t>(
+		static_cast<std::int64_t>(currentPlayerMoney) + moneyDelta, 0, std::numeric_limits<int>::max()));
+	currentNpcMoney = static_cast<int>(std::clamp<std::int64_t>(
+		static_cast<std::int64_t>(currentNpcMoney) - moneyDelta,
+		std::numeric_limits<int>::min(), std::numeric_limits<int>::max()));
 	currentStake = 0;
 	currentPhase = Phase::WaitingForBet;
 }

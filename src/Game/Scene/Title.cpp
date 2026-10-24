@@ -173,6 +173,10 @@ void Title::init()
 	// without carrying the newer aspect-fit fields. A title composition is
 	// always authored in its declared base size, so keep the background and
 	// controls on one uniform transform and soften the unused viewport bars.
+	align = alClient;
+	alignX = 0;
+	alignY = 0;
+	setAlign();
 	keepAspect = true;
 	fadeMirroredBars = true;
 
@@ -180,6 +184,13 @@ void Title::init()
 	exitBtn = getComponentByName<Button>("exitBtn");
 	loadBtn = getComponentByName<Button>("loadBtn");
 	teamBtn = getComponentByName<Button>("teamBtn");
+	for (const auto& button : { initBtn, exitBtn, loadBtn, teamBtn })
+	{
+		if (button != nullptr)
+		{
+			button->stretch = true;
+		}
+	}
 
 	weather = std::make_shared<Weather>();
 	weather->setPriority(epMax + 3);

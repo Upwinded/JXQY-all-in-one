@@ -309,6 +309,7 @@ void PhysicalInputManager::releaseAllInputs()
 	startConsumed = false;
 	endTouchControlsChord();
 	leftTriggerPressed = false;
+	leftTriggerChordConsumed = false;
 	rightTriggerPressed = false;
 	for (RegisteredGamepad& gamepad : registeredGamepads)
 	{
@@ -917,6 +918,7 @@ void PhysicalInputManager::handleButtonPressed(SDL_GamepadButton button, std::ui
 			shoulderPairChordActive = true;
 			setActionDown(ShoulderPairAction, true);
 		}
+		updateTriggerActions();
 		return;
 	}
 
@@ -983,6 +985,7 @@ void PhysicalInputManager::handleButtonReleased(SDL_GamepadButton button)
 			shoulderPairChordActive = false;
 		}
 		releaseRightShoulderChordBindings();
+		updateTriggerActions();
 		if (!rightShoulderConsumed)
 		{
 			pulseDefaultButtonReleaseActions(button);
@@ -1328,18 +1331,36 @@ void PhysicalInputManager::updateTriggerActions()
 		{
 			nextPressed = false;
 		}
-		if (nextPressed == pressed)
-		{
-			return;
-		}
 		pressed = nextPressed;
+		const bool isLeftTrigger = control == ControllerControl::LeftTrigger;
+		if (isLeftTrigger && !pressed)
+		{
+			leftTriggerChordConsumed = false;
+		}
+		const bool chordActive = isLeftTrigger && pressed
+			&& isButtonDown(SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER)
+			&& !shoulderPairChordActive;
+		if (chordActive)
+		{
+			leftTriggerChordConsumed = true;
+			rightShoulderConsumed = true;
+		}
 		for (const ControllerActionBinding& binding : DefaultControllerBindings)
 		{
 			if (binding.trigger == ControllerBindingTrigger::TriggerThreshold
-				&& binding.modifier == ControllerControl::None
 				&& binding.primary == control)
 			{
-				setActionDown(binding.action, pressed);
+				const bool bindingDown = binding.modifier == ControllerControl::RightShoulder
+					? chordActive : pressed && !(isLeftTrigger && leftTriggerChordConsumed);
+				if (isActionDown(binding.action) != bindingDown)
+				{
+					setActionDown(binding.action, bindingDown);
+				}
+				if (isLeftTrigger && leftTriggerChordConsumed
+					&& binding.modifier == ControllerControl::None)
+				{
+					actionStates[actionIndex(binding.action)].pressed = false;
+				}
 			}
 		}
 	};

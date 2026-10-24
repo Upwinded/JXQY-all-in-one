@@ -383,7 +383,7 @@ void EquipMenu::updatePlayerNameDisplay()
 	auto partners = gm->partnerManager.findPartnersFromNPCManager();
 	for (auto& partner : partners)
 	{
-		if (partner == nullptr || !partner->isLivingPartner())
+		if (partner == nullptr || !partner->canViewPartnerDetails())
 		{
 			continue;
 		}
@@ -423,7 +423,7 @@ std::shared_ptr<NPC> EquipMenu::getSelectedPartner() const
 {
 	const auto partner = selectedPartner.lock();
 	return gm && partner && gm->partnerManager.isActivePartner(partner)
-		&& partner->isLivingPartner() ? partner : nullptr;
+		&& partner->canViewPartnerDetails() ? partner : nullptr;
 }
 
 void EquipMenu::updateCharacterSelector(TextButton& button) const
@@ -431,7 +431,7 @@ void EquipMenu::updateCharacterSelector(TextButton& button) const
 	if (!gm || !gm->player) return;
 	const auto partners = gm->partnerManager.findPartnersFromNPCManager();
 	button.activated = std::any_of(partners.begin(), partners.end(),
-		[](const auto& partner) { return partner && partner->isLivingPartner(); });
+		[](const auto& partner) { return partner && partner->canViewPartnerDetails(); });
 	button.visible = button.activated || gm->global.feature.qingyuUi;
 	const auto partner = getSelectedPartner();
 	button.setStr((partner ? partner->npcName : gm->player->npcName) + (button.activated ? "  >" : ""));
@@ -444,7 +444,7 @@ bool EquipMenu::cycleCharacter()
 	bool found = !current;
 	for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
 	{
-		if (!partner || !partner->isLivingPartner()) continue;
+		if (!partner || !partner->canViewPartnerDetails()) continue;
 		if (found) return selectPartner(partner);
 		if (partner == current) found = true;
 	}
@@ -459,7 +459,7 @@ bool EquipMenu::openPartnerByCharacterIndex(int index)
 	{
 		for (const auto& candidate : gm->partnerManager.findPartnersFromNPCManager())
 		{
-			if (candidate && candidate->isLivingPartner() && getNewSwordPartnerIndex(candidate->npcName) == index)
+			if (candidate && candidate->canViewPartnerDetails() && getNewSwordPartnerIndex(candidate->npcName) == index)
 			{
 				partner = candidate;
 				break;
@@ -474,7 +474,7 @@ bool EquipMenu::openPartnerByCharacterIndex(int index)
 bool EquipMenu::selectPartner(const std::shared_ptr<NPC>& partner)
 {
 	if (!gm || !gm->menu || (partner && (!gm->partnerManager.isActivePartner(partner)
-		|| !partner->isLivingPartner()))) return false;
+		|| !partner->canViewPartnerDetails()))) return false;
 	gm->menu->cancelControllerInteraction();
 	cancelPointerInteraction();
 	if (gm->menu->goodsMenu) gm->menu->goodsMenu->cancelPointerInteraction();
@@ -572,6 +572,7 @@ void EquipMenu::updatePanelImage()
 void EquipMenu::onUpdate()
 {
 	if (!visible) return;
+	updateAttributePointEntry();
 	if (showingPartner && !getSelectedPartner()) selectPartner(nullptr);
 	updateCharacterBindings();
 	updatePlayerNameDisplay();
@@ -591,6 +592,11 @@ void EquipMenu::onEvent()
 	if (characterSelector && characterSelector->getResult(erClick))
 	{
 		cycleCharacter();
+		return;
+	}
+	if (attributePointEntry && attributePointEntry->visible && attributePointEntry->getResult(erClick))
+	{
+		gm->menu->openAttributePoints(shared_from_this(), attributePointEntry);
 		return;
 	}
 	for (int index = 0; index < static_cast<int>(playerNameButtons.size()); ++index)
@@ -878,6 +884,8 @@ void EquipMenu::onWindowResize(int width, int height)
 
 void EquipMenu::freeResource()
 {
+	attributePointEntryFocused = false;
+	attributePointEntry.reset();
 	selectedPartner.reset();
 	showingPartner = false;
 	characterSelectorFocused = false;
@@ -905,6 +913,30 @@ void EquipMenu::freeResource()
 	newSwordPartnerNames.clear();
 	loadedPanelIndex = -1;
 	ConfigDrivenPanel::freeResource();
+}
+
+void EquipMenu::updateAttributePointEntry()
+{
+	const bool available = gm && gm->menu && gm->global.attributePointRules.enabled
+		&& gm->global.feature.stateEquipIntegratedLayout && showingAttributes && !getSelectedPartner();
+	if (!attributePointEntry && available)
+	{
+		attributePointEntry = std::make_shared<FlatTextButton>();
+		attributePointEntry->setUTF8Str(u8"属性分配");
+		attributePointEntry->setFontSize(16);
+		addChild(attributePointEntry);
+	}
+	if (attributePointEntry)
+	{
+		attributePointEntry->visible = attributePointEntry->activated = available;
+		attributePointEntry->rect = { rect.x + std::max(0, rect.w - 100), rect.y + 8, 88, 44 };
+		if (!available) { attributePointEntryFocused = false; attributePointEntry->setFocused(false); }
+	}
+}
+
+void EquipMenu::onSetChildRect()
+{
+	updateAttributePointEntry();
 }
 
 void EquipMenu::configureControllerFocus()
@@ -1051,8 +1083,10 @@ bool EquipMenu::activateControllerFocus(ControllerFocusTarget target)
 
 bool EquipMenu::focusControllerEquipment()
 {
-	if (characterSelectorFocused || focusedPlayerName >= 0) deactivateControllerFocus();
-	if (showingAttributes) return focusControllerElement(attributesTab);
+	updateAttributePointEntry();
+	if (attributePointEntryFocused || characterSelectorFocused || focusedPlayerName >= 0) deactivateControllerFocus();
+	if (showingAttributes) return focusControllerElement(attributePointEntry && attributePointEntry->visible
+		? PElement(attributePointEntry) : PElement(attributesTab));
 	tabFocused = false;
 	return controllerPaneRouter.activatePane(EquipmentControllerPaneId);
 }
@@ -1064,11 +1098,13 @@ bool EquipMenu::focusControllerMagicList()
 
 bool EquipMenu::isControllerFocusActive() const
 {
-	return characterSelectorFocused || focusedPlayerName >= 0 || tabFocused || controllerPaneRouter.isActive();
+	return attributePointEntryFocused || characterSelectorFocused || focusedPlayerName >= 0 || tabFocused || controllerPaneRouter.isActive();
 }
 
 void EquipMenu::deactivateControllerFocus()
 {
+	attributePointEntryFocused = false;
+	if (attributePointEntry) attributePointEntry->setFocused(false);
 	characterSelectorFocused = false;
 	if (characterSelector) characterSelector->setFocused(false);
 	focusedPlayerName = -1;
@@ -1082,6 +1118,7 @@ void EquipMenu::deactivateControllerFocus()
 
 PElement EquipMenu::controllerFocusedElement() const
 {
+	if (attributePointEntryFocused) return attributePointEntry;
 	if (characterSelectorFocused) return characterSelector;
 	if (focusedPlayerName >= 0) return playerNameButtons[focusedPlayerName];
 	if (tabFocused) return showingAttributes ? attributesTab : equipmentTab;
@@ -1091,6 +1128,7 @@ PElement EquipMenu::controllerFocusedElement() const
 std::vector<PElement> EquipMenu::controllerFocusCandidates() const
 {
 	auto candidates = showingAttributes ? std::vector<PElement>{} : controllerPaneRouter.controllerFocusCandidates();
+	if (attributePointEntry && attributePointEntry->visible) candidates.push_back(attributePointEntry);
 	if (characterSelector && characterSelector->visible && characterSelector->activated) candidates.push_back(characterSelector);
 	for (const auto& button : playerNameButtons)
 	{
@@ -1106,6 +1144,13 @@ std::vector<PElement> EquipMenu::controllerFocusCandidates() const
 
 bool EquipMenu::focusControllerElement(const PElement& element)
 {
+	if (element && element == attributePointEntry && element->visible && element->activated)
+	{
+		deactivateControllerFocus();
+		attributePointEntryFocused = true;
+		element->setFocused(true);
+		return true;
+	}
 	if (element && element == characterSelector && element->visible && element->activated)
 	{
 		deactivateControllerFocus();
@@ -1149,6 +1194,7 @@ bool EquipMenu::controllerFocusElementMatchesTarget(
 		|| target == ControllerFocusTarget::PlayerEquipment)
 	{
 		if (element && element == characterSelector) return true;
+		if (element && element == attributePointEntry) return true;
 		for (const auto& button : playerNameButtons) if (element && element == button) return true;
 		if (element && (element == equipmentTab || element == attributesTab)) return true;
 		return contains(equipmentSlotController.controllerFocusCandidates());
@@ -1265,6 +1311,8 @@ void EquipMenu::refreshControllerTransferHighlight()
 
 bool EquipMenu::onHandleUIAction(UIAction action)
 {
+	if (attributePointEntryFocused && action == UIAction::Confirm && gm && gm->menu)
+		return gm->menu->openAttributePoints(shared_from_this(), attributePointEntry);
 	if (characterSelectorFocused)
 	{
 		if (action == UIAction::Confirm)
@@ -1352,7 +1400,8 @@ bool EquipMenu::onHandleUIAction(UIAction action)
 			}
 			if (action == UIAction::Confirm || action == UIAction::NavigateDown)
 			{
-				if (showingAttributes) return true;
+					if (showingAttributes) return attributePointEntry && attributePointEntry->visible
+						? focusControllerElement(attributePointEntry) : true;
 				deactivateControllerFocus();
 				return focusControllerEquipment();
 			}

@@ -54,6 +54,7 @@ StateMenu::~StateMenu()
 void StateMenu::updateLabel()
 {
 	if (!gm || !gm->player) return;
+	updateAttributePointEntry();
 	updatePanelImage();
 	const auto equipment = gm->menu ? gm->menu->equipMenu : nullptr;
 	const auto partner = equipment ? equipment->getSelectedPartner() : nullptr;
@@ -122,7 +123,7 @@ void StateMenu::init()
 	loadMenuDefinition("ini\\ui\\state\\state.menu.ini");
 	image = getComponentByName<ImageContainer>("image");
 	characterSelector = getComponentByName<TextButton>("characterSelector");
-	if (gm != nullptr &&
+	if (gm != nullptr && !gm->global.feature.qingyuUi &&
 		gm->global.feature.menuResourceProfile == mrpDefault)
 	{
 		compactStatusLabels(*this);
@@ -138,6 +139,8 @@ void StateMenu::onUpdate()
 
 void StateMenu::freeResource()
 {
+	attributePointEntryFocused = false;
+	attributePointEntry.reset();
 	characterSelectorFocused = false;
 	characterSelector.reset();
 	image = nullptr;
@@ -148,6 +151,11 @@ void StateMenu::freeResource()
 void StateMenu::onEvent()
 {
 	ConfigDrivenPanel::onEvent();
+	if (attributePointEntry && attributePointEntry->visible && attributePointEntry->getResult(erClick))
+	{
+		gm->menu->openAttributePoints(shared_from_this(), attributePointEntry);
+		return;
+	}
 	if (visible && characterSelector && characterSelector->getResult(erClick)
 		&& gm && gm->menu && gm->menu->equipMenu)
 	{
@@ -159,34 +167,49 @@ void StateMenu::onEvent()
 bool StateMenu::activateControllerFocus(ControllerFocusTarget target)
 {
 	updateLabel();
-	return target == ControllerFocusTarget::Default && focusControllerElement(characterSelector);
+	return target == ControllerFocusTarget::Default && focusControllerElement(
+		attributePointEntry && attributePointEntry->visible ? PElement(attributePointEntry) : PElement(characterSelector));
 }
 
 bool StateMenu::isControllerFocusActive() const
 {
-	return characterSelectorFocused && characterSelector && characterSelector->visible && characterSelector->activated;
+	return (attributePointEntryFocused && attributePointEntry && attributePointEntry->visible)
+		|| (characterSelectorFocused && characterSelector && characterSelector->visible && characterSelector->activated);
 }
 
 void StateMenu::deactivateControllerFocus()
 {
+	attributePointEntryFocused = false;
+	if (attributePointEntry) attributePointEntry->setFocused(false);
 	characterSelectorFocused = false;
 	if (characterSelector) characterSelector->setFocused(false);
 }
 
 PElement StateMenu::controllerFocusedElement() const
 {
+	if (attributePointEntryFocused) return attributePointEntry;
 	return isControllerFocusActive() ? characterSelector : nullptr;
 }
 
 std::vector<PElement> StateMenu::controllerFocusCandidates() const
 {
-	return characterSelector && characterSelector->visible && characterSelector->activated
+	auto candidates = characterSelector && characterSelector->visible && characterSelector->activated
 		? std::vector<PElement>{ characterSelector } : std::vector<PElement>{};
+	if (attributePointEntry && attributePointEntry->visible) candidates.push_back(attributePointEntry);
+	return candidates;
 }
 
 bool StateMenu::focusControllerElement(const PElement& element)
 {
+	if (element && element == attributePointEntry && element->visible && element->activated)
+	{
+		deactivateControllerFocus();
+		attributePointEntryFocused = true;
+		element->setFocused(true);
+		return true;
+	}
 	if (!element || element != characterSelector || !element->visible || !element->activated) return false;
+	deactivateControllerFocus();
 	characterSelectorFocused = true;
 	element->setFocused(true);
 	return true;
@@ -194,7 +217,33 @@ bool StateMenu::focusControllerElement(const PElement& element)
 
 bool StateMenu::onHandleUIAction(UIAction action)
 {
+	if (attributePointEntryFocused && action == UIAction::Confirm && gm && gm->menu)
+		return gm->menu->openAttributePoints(shared_from_this(), attributePointEntry);
 	if (action != UIAction::Confirm || !isControllerFocusActive()
 		|| !gm || !gm->menu || !gm->menu->equipMenu) return false;
 	return gm->menu->equipMenu->cycleCharacter();
+}
+
+void StateMenu::updateAttributePointEntry()
+{
+	const bool available = gm && gm->menu && gm->global.attributePointRules.enabled
+		&& (!gm->menu->equipMenu || !gm->menu->equipMenu->getSelectedPartner());
+	if (!attributePointEntry && available)
+	{
+		attributePointEntry = std::make_shared<FlatTextButton>();
+		attributePointEntry->setUTF8Str(u8"属性分配");
+		attributePointEntry->setFontSize(16);
+		addChild(attributePointEntry);
+	}
+	if (attributePointEntry)
+	{
+		attributePointEntry->visible = attributePointEntry->activated = available;
+		attributePointEntry->rect = { rect.x + std::max(0, rect.w - 100), rect.y + 8, 88, 44 };
+		if (!available) { attributePointEntryFocused = false; attributePointEntry->setFocused(false); }
+	}
+}
+
+void StateMenu::onSetChildRect()
+{
+	updateAttributePointEntry();
 }

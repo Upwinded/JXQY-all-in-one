@@ -44,6 +44,9 @@ public:
 	bool blocksWorldPointerInput() const;
 	bool hasActiveControllerPromptOwner();
 	void clearMenu();
+	void openPaper(int type, const std::vector<std::string>& contents);
+	bool openSkillTree();
+	bool openAttributePoints(const PElement& origin, const PElement& returnFocus);
 	void update();
 	void updateAfterGameLoad();
 	void showMessage(const std::string& str, UTime duration = 3500);
@@ -116,6 +119,9 @@ public:
 	std::shared_ptr<BuySellMenu> buySellMenu = nullptr;
 	std::shared_ptr<MapThumbnailMenu> mapThumbnailMenu = nullptr;
 	std::shared_ptr<GambleMenu> gambleMenu = nullptr;
+	std::shared_ptr<PaperMenu> paperMenu = nullptr;
+	std::shared_ptr<SkillTreeMenu> skillTreeMenu = nullptr;
+	std::shared_ptr<AttributePointMenu> attributePointMenu = nullptr;
 	std::shared_ptr<PartnerEquipMenu> partnerEquipMenu = nullptr;
 	std::shared_ptr<PartnerHeadMenu> partnerHeadMenu = nullptr;
 	std::shared_ptr<NpcInfoPanel> npcInfoPanel = nullptr;

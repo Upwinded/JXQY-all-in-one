@@ -1593,9 +1593,7 @@ bool pathIsRegularFile(const std::string& fullPath)
 struct ResourceDirectoryLookup
 {
 	bool valid = false;
-	bool aliasesValid = true;
 	std::unordered_map<std::string, std::filesystem::path> names;
-	std::unordered_map<std::string, std::vector<std::filesystem::path>> aliases;
 };
 
 thread_local unsigned int g_resourceLookupDepth = 0;
@@ -1687,32 +1685,6 @@ std::string resolveCaseInsensitiveExistingPath(const std::string& fullPath)
 	{
 		return "";
 	}
-}
-
-bool hasAsciiSuffix(const std::string& value, const std::string& suffix)
-{
-	if (value.size() < suffix.size())
-	{
-		return false;
-	}
-	return value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
-}
-
-bool isImagePackagePath(const std::string& fullPath)
-{
-	std::string normalized = toLowerAscii(fullPath);
-	convert::replaceAllString(normalized, "\\", "/");
-	if (normalized.compare(0, 4, "asf/") != 0 &&
-		normalized.compare(0, 4, "mpc/") != 0 &&
-		normalized.find("/asf/") == std::string::npos &&
-		normalized.find("/mpc/") == std::string::npos)
-	{
-		return false;
-	}
-	return hasAsciiSuffix(normalized, ".asf") ||
-		hasAsciiSuffix(normalized, ".mpc") ||
-		hasAsciiSuffix(normalized, ".shd") ||
-		hasAsciiSuffix(normalized, ".png");
 }
 
 std::string pathToUtf8String(const std::filesystem::path& path)
@@ -3649,89 +3621,6 @@ bool openEditorRunExactOutput(
 	return true;
 }
 
-std::string fileStemFromName(const std::string& fileName)
-{
-	if (!isValidUtf8(fileName))
-	{
-		return "";
-	}
-	try
-	{
-		std::filesystem::path path = std::filesystem::u8path(fileName);
-		return pathToUtf8String(path.stem());
-	}
-	catch (const std::exception&)
-	{
-		return "";
-	}
-}
-
-std::string fileExtensionFromName(const std::string& fileName)
-{
-	if (!isValidUtf8(fileName))
-	{
-		return "";
-	}
-	try
-	{
-		std::filesystem::path path = std::filesystem::u8path(fileName);
-		return toLowerAscii(pathToUtf8String(path.extension()));
-	}
-	catch (const std::exception&)
-	{
-		return "";
-	}
-}
-
-std::string extractStableResourceAliasPrefix(const std::string& fileStem)
-{
-	std::string prefix;
-	bool hasDigit = false;
-	for (unsigned char character : fileStem)
-	{
-		if (character >= 0x80)
-		{
-			break;
-		}
-		if (std::isalnum(character) || character == '-' || character == '_')
-		{
-			prefix.push_back(static_cast<char>(std::tolower(character)));
-			if (std::isdigit(character))
-			{
-				hasDigit = true;
-			}
-			continue;
-		}
-		break;
-	}
-	while (!prefix.empty() && (prefix.back() == '-' || prefix.back() == '_'))
-	{
-		prefix.pop_back();
-	}
-	if (!hasDigit || prefix.size() < 3)
-	{
-		return "";
-	}
-	return prefix;
-}
-
-bool asciiStemEndsWithIconSuffix(const std::string& fileStem)
-{
-	if (fileStem.empty())
-	{
-		return false;
-	}
-	unsigned char character = static_cast<unsigned char>(fileStem.back());
-	return character < 0x80 && std::tolower(character) == 's';
-}
-
-std::string resourceAliasKey(const std::string& name)
-{
-	return extractStableResourceAliasPrefix(fileStemFromName(name)) + "\n" +
-		fileExtensionFromName(name) +
-		(asciiStemEndsWithIconSuffix(fileStemFromName(name)) ? "\n1" : "\n0");
-}
-
 const ResourceDirectoryLookup& resourceDirectoryLookup(
 	const std::filesystem::path& directory)
 {
@@ -3753,18 +3642,6 @@ const ResourceDirectoryLookup& resourceDirectoryLookup(
 		if (!named.second)
 		{
 			named.first->second.clear();
-		}
-		std::error_code typeError;
-		if (iterator->is_regular_file(typeError))
-		{
-			if (!extractStableResourceAliasPrefix(name).empty())
-			{
-				lookup.aliases[resourceAliasKey(name)].push_back(path);
-			}
-		}
-		if (typeError)
-		{
-			lookup.aliasesValid = false;
 		}
 		iterator.increment(errorCode);
 	}
@@ -3797,110 +3674,8 @@ const ResourceDirectoryLookup& nativeResourceDirectoryLookup(
 		{
 			named.first->second.clear();
 		}
-		if (!extractStableResourceAliasPrefix(name).empty())
-		{
-			NativeFileHandle file;
-			if (openChildFileNoFollow(directory, name, false, false, false, false, file))
-			{
-				lookup.aliases[resourceAliasKey(name)].push_back(path);
-			}
-		}
 	}
 	return lookup;
-}
-
-std::string resolveUniqueImagePackageAlias(const std::string& fullPath)
-{
-	if (!isImagePackagePath(fullPath) || !isValidUtf8(fullPath))
-	{
-		return "";
-	}
-
-	try
-	{
-		std::filesystem::path requestedPath = std::filesystem::u8path(fullPath);
-		std::filesystem::path parentPath = requestedPath.parent_path();
-		std::error_code errorCode;
-		if (parentPath.empty() || !std::filesystem::is_directory(parentPath, errorCode))
-		{
-			return "";
-		}
-
-		std::string requestedFileName = pathToUtf8String(requestedPath.filename());
-		std::string requestedStem = fileStemFromName(requestedFileName);
-		std::string requestedExtension = fileExtensionFromName(requestedFileName);
-		std::string requestedPrefix = extractStableResourceAliasPrefix(requestedStem);
-		if (requestedFileName.empty() || requestedPrefix.empty() || requestedExtension.empty())
-		{
-			return "";
-		}
-
-		bool requestedIconSuffix = asciiStemEndsWithIconSuffix(requestedStem);
-		const std::string requestedKey = toLowerAscii(requestedFileName);
-		if (g_resourceLookupDepth != 0)
-		{
-			const auto& lookup = resourceDirectoryLookup(parentPath);
-			const auto found = lookup.aliases.find(resourceAliasKey(requestedFileName));
-			if (!lookup.valid || !lookup.aliasesValid || found == lookup.aliases.end())
-			{
-				return "";
-			}
-			std::filesystem::path match;
-			for (const auto& candidate : found->second)
-			{
-				if (toLowerAscii(candidate.filename().u8string()) != requestedKey)
-				{
-					if (!match.empty())
-					{
-						return "";
-					}
-					match = candidate;
-				}
-			}
-			return pathToUtf8String(match);
-		}
-		std::filesystem::path match;
-		std::filesystem::directory_iterator iterator(parentPath, errorCode);
-		std::filesystem::directory_iterator end;
-		while (!errorCode && iterator != end)
-		{
-			bool regularFile = iterator->is_regular_file(errorCode);
-			if (errorCode)
-			{
-				break;
-			}
-			if (regularFile)
-			{
-				std::string candidateName = pathToUtf8String(iterator->path().filename());
-				// A dot terminates this prefix, so the extension need not be parsed first.
-				if (!candidateName.empty() &&
-					extractStableResourceAliasPrefix(candidateName) == requestedPrefix &&
-					toLowerAscii(candidateName) != requestedKey &&
-					fileExtensionFromName(candidateName) == requestedExtension)
-				{
-					std::string candidateStem = fileStemFromName(candidateName);
-					if (asciiStemEndsWithIconSuffix(candidateStem) == requestedIconSuffix)
-					{
-						if (!match.empty())
-						{
-							return "";
-						}
-						match = iterator->path();
-					}
-				}
-			}
-			iterator.increment(errorCode);
-		}
-		if (errorCode || match.empty())
-		{
-			return "";
-		}
-		return pathToUtf8String(match);
-	}
-	catch (const std::exception&)
-	{
-		return "";
-	}
 }
 
 std::vector<std::string> listFilesInFullDirectory(
@@ -3908,130 +3683,14 @@ std::vector<std::string> listFilesInFullDirectory(
 	std::size_t maximumEntryCount = 0,
 	bool* entryCountLimitExceeded = nullptr);
 
-std::string resolveAnchoredImagePackageAlias(
-	const RoutedResourcePath& route,
-	const std::string& requestedRelativePath)
-{
-	if (!route.anchored ||
-		!isImagePackagePath(requestedRelativePath) ||
-		!isValidUtf8(requestedRelativePath))
-	{
-		return "";
-	}
-
-	const std::vector<std::string> components =
-		splitRelativePathComponents(requestedRelativePath);
-	if (components.empty())
-	{
-		return "";
-	}
-	const std::string& requestedFileName = components.back();
-	const std::string requestedStem =
-		fileStemFromName(requestedFileName);
-	const std::string requestedExtension =
-		fileExtensionFromName(requestedFileName);
-	const std::string requestedPrefix =
-		extractStableResourceAliasPrefix(requestedStem);
-	if (requestedFileName.empty() || requestedPrefix.empty() ||
-		requestedExtension.empty())
-	{
-		return "";
-	}
-
-	NativeDirectoryHandle root;
-	if (!openAnchoredRouteRoot(
-			route,
-			File::EditorRunFileOperationPhase::BeforeReadRootOpen,
-			root))
-	{
-		return "";
-	}
-	std::vector<std::string> resolvedParentComponents;
-	NativeDirectoryHandle parent;
-	if (!openRelativeDirectoryNoFollow(
-			std::move(root), components,
-			components.size() - 1,
-			false, true, parent,
-			&resolvedParentComponents))
-	{
-		return "";
-	}
-
-	const bool requestedIconSuffix =
-		asciiStemEndsWithIconSuffix(requestedStem);
-	const std::string requestedKey = toLowerAscii(requestedFileName);
-	if (g_resourceLookupDepth != 0)
-	{
-		const auto& lookup = nativeResourceDirectoryLookup(parent);
-		const auto found = lookup.aliases.find(resourceAliasKey(requestedFileName));
-		if (!lookup.valid || found == lookup.aliases.end())
-		{
-			return "";
-		}
-		std::string match;
-		for (const auto& candidate : found->second)
-		{
-			if (toLowerAscii(candidate.u8string()) != requestedKey)
-			{
-				if (!match.empty()) return "";
-				match = candidate.u8string();
-			}
-		}
-		if (match.empty() || !editorRunRouteIsCurrent(route)) return "";
-		resolvedParentComponents.push_back(match);
-		return joinRelativeComponents(resolvedParentComponents);
-	}
-	std::string match;
-	for (const std::string& candidateName :
-		listNativeDirectoryNames(parent))
-	{
-		if (extractStableResourceAliasPrefix(candidateName) != requestedPrefix ||
-			toLowerAscii(candidateName) == requestedKey ||
-			fileExtensionFromName(candidateName) !=
-				requestedExtension)
-		{
-			continue;
-		}
-		const std::string candidateStem =
-			fileStemFromName(candidateName);
-		if (asciiStemEndsWithIconSuffix(candidateStem) != requestedIconSuffix)
-		{
-			continue;
-		}
-		NativeFileHandle candidate;
-		if (openChildFileNoFollow(
-				parent, candidateName, false, false,
-				false, false, candidate))
-		{
-			if (!match.empty())
-			{
-				return "";
-			}
-			match = candidateName;
-		}
-	}
-	if (match.empty() ||
-		!editorRunRouteIsCurrent(route))
-	{
-		return "";
-	}
-	resolvedParentComponents.push_back(match);
-	return joinRelativeComponents(resolvedParentComponents);
-}
-
 bool readRoutedResource(
 	const RoutedResourcePath& route,
 	std::unique_ptr<char[]>& data,
 	int& length,
-	std::size_t maximumBytes,
-	std::string* resolvedRelativePath = nullptr)
+	std::size_t maximumBytes)
 {
 	data.reset();
 	length = 0;
-	if (resolvedRelativePath != nullptr)
-	{
-		resolvedRelativePath->clear();
-	}
 	if (!route.anchored)
 	{
 		const std::string fullPath =
@@ -4039,10 +3698,6 @@ bool readRoutedResource(
 		if (openFileForRead(
 				fullPath, data, length, maximumBytes))
 		{
-			if (resolvedRelativePath != nullptr)
-			{
-				*resolvedRelativePath = route.relativePath;
-			}
 			return true;
 		}
 		const std::string caseInsensitivePath =
@@ -4055,43 +3710,16 @@ bool readRoutedResource(
 				caseInsensitivePath, data, length,
 				maximumBytes))
 		{
-			if (resolvedRelativePath != nullptr)
-			{
-				*resolvedRelativePath = caseInsensitivePath;
-			}
-			return true;
-		}
-		const std::string aliasPath =
-			resolveUniqueImagePackageAlias(fullPath);
-		if (!aliasPath.empty() &&
-			routedReadPathIsContained(route, aliasPath) &&
-			openFileForRead(
-				aliasPath, data, length, maximumBytes))
-		{
-			if (resolvedRelativePath != nullptr)
-			{
-				*resolvedRelativePath = aliasPath;
-			}
 			return true;
 		}
 		return false;
 	}
 
 	NativeFileHandle file;
-	std::string resolvedPath;
 	if (!openAnchoredFileForRead(
-			route, route.relativePath, file, &resolvedPath))
+			route, route.relativePath, file))
 	{
-		const std::string aliasRelativePath =
-			resolveAnchoredImagePackageAlias(
-				route, route.relativePath);
-		if (aliasRelativePath.empty() ||
-			!openAnchoredFileForRead(
-				route, aliasRelativePath, file,
-				&resolvedPath))
-		{
-			return false;
-		}
+		return false;
 	}
 	if (!readNativeFileBounded(
 			file, data, length, maximumBytes) ||
@@ -4100,10 +3728,6 @@ bool readRoutedResource(
 		data.reset();
 		length = 0;
 		return false;
-	}
-	if (resolvedRelativePath != nullptr)
-	{
-		*resolvedRelativePath = resolvedPath;
 	}
 	return true;
 }
@@ -4127,11 +3751,7 @@ bool routedRegularFileExists(const RoutedResourcePath& route)
 		{
 			return true;
 		}
-		const std::string aliasPath =
-			resolveUniqueImagePackageAlias(fullPath);
-		return !aliasPath.empty() &&
-			routedReadPathIsContained(route, aliasPath) &&
-			pathIsRegularFile(aliasPath);
+		return false;
 	}
 
 	NativeFileHandle file;
@@ -4140,13 +3760,7 @@ bool routedRegularFileExists(const RoutedResourcePath& route)
 	{
 		return editorRunRouteIsCurrent(route);
 	}
-	const std::string aliasRelativePath =
-		resolveAnchoredImagePackageAlias(
-			route, route.relativePath);
-	return !aliasRelativePath.empty() &&
-		openAnchoredFileForRead(
-			route, aliasRelativePath, file) &&
-		editorRunRouteIsCurrent(route);
+	return false;
 }
 
 bool routedPathExists(const RoutedResourcePath& route)
@@ -4902,35 +4516,6 @@ bool anchoredResourcePathIsDefinitelyMissing(
 		}
 	}
 
-	if (isImagePackagePath(route.relativePath))
-	{
-		const std::string requestedStem =
-			fileStemFromName(requestedFileName);
-		const std::string requestedExtension =
-			fileExtensionFromName(requestedFileName);
-		const std::string requestedPrefix =
-			extractStableResourceAliasPrefix(requestedStem);
-		const bool requestedIconSuffix =
-			asciiStemEndsWithIconSuffix(requestedStem);
-		if (!requestedPrefix.empty() &&
-			!requestedExtension.empty())
-		{
-			for (const std::string& candidateName : names)
-			{
-				const std::string candidateStem =
-					fileStemFromName(candidateName);
-				if (fileExtensionFromName(candidateName) ==
-						requestedExtension &&
-					asciiStemEndsWithIconSuffix(candidateStem) ==
-						requestedIconSuffix &&
-					extractStableResourceAliasPrefix(
-						candidateStem) == requestedPrefix)
-				{
-					return false;
-				}
-			}
-		}
-	}
 	return editorRunRouteIsCurrent(route);
 }
 
@@ -7853,14 +7438,6 @@ bool File::fileExist(const std::string& fileName)
             {
                 return true;
             }
-            const std::string aliasPath =
-                resolveUniqueImagePackageAlias(fullPath);
-            if (!aliasPath.empty() &&
-                routedReadPathIsContained(route, aliasPath) &&
-                pathExists(aliasPath))
-            {
-                return true;
-            }
             continue;
         }
         if (routedPathExists(route))
@@ -8037,21 +7614,10 @@ bool File::readFile(const std::string& fileName, std::unique_ptr<char[]>& s, int
         {
             firstCandidate = fullPath;
         }
-        std::string resolvedRelativePath;
         if (readRoutedResource(
                 route, s, len,
-                static_cast<std::size_t>(maximumBytes),
-                &resolvedRelativePath))
+                static_cast<std::size_t>(maximumBytes)))
         {
-            if (!resolvedRelativePath.empty() &&
-                resolvedRelativePath != route.relativePath &&
-                isImagePackagePath(route.relativePath))
-            {
-                GameLog::write(
-                    "File: resolved image resource alias %s -> %s\n",
-                    fullPath.c_str(),
-                    resolvedRelativePath.c_str());
-            }
             return true;
         }
     }
@@ -9247,13 +8813,6 @@ std::string File::getAssetsName(const std::string& fileName)
             pathIsRegularFile(caseInsensitivePath))
         {
             return caseInsensitivePath;
-        }
-        std::string aliasPath = resolveUniqueImagePackageAlias(fullPath);
-        if (!aliasPath.empty() &&
-            routedReadPathIsContained(route, aliasPath) &&
-            pathIsRegularFile(aliasPath))
-        {
-            return aliasPath;
         }
     }
     return firstCandidate;

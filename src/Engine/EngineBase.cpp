@@ -3188,7 +3188,8 @@ _shared_image EngineBase::createRaindrop()
 	memset(s->pixels, 0, h * s->pitch);
 	for (int i = 0; i < h; i++)
 	{
-		col = 0xFFFFFF | (((unsigned int)(i * 1.3)) << 24);
+		const unsigned int alpha = static_cast<unsigned int>(i) * 255 / (h - 1);
+		col = 0xFFFFFF | (alpha << 24);
 		for (int j = 0; j < w; j++)
 		{
 			memcpy(((char *)s->pixels) + j * 4 + i * s->pitch, &col, 4);			
@@ -4186,6 +4187,27 @@ void EngineBase::clearFontCache()
 		TTF_CloseFont(cachedFont.second);
 	}
 	fontCache.clear();
+}
+
+bool EngineBase::measureText(const std::string& text, int size, int& width, int& height)
+{
+	width = 0;
+	height = 0;
+	if (!SDL_IsMainThread())
+	{
+		return false;
+	}
+	TTF_Font* textFont = getCachedFont(size);
+	if (textFont == nullptr)
+	{
+		return false;
+	}
+	if (text.empty())
+	{
+		height = TTF_GetFontHeight(textFont);
+		return true;
+	}
+	return TTF_GetStringSize(textFont, text.c_str(), text.size(), &width, &height);
 }
 
 _shared_image EngineBase::createText(const std::string& text, int size, unsigned int color, bool safe)

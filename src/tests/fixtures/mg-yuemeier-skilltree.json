@@ -1,0 +1,157 @@
+{
+  "Groups": [
+    {
+      "GroupId": 0,
+      "GroupName": "通用",
+      "GroupDescription": "全派系通用的辅助技能，无属性倾向，侧重基础能力强化",
+      "Nodes": [
+        {
+          "Id": "skill001",
+          "SkillFile": "player-magic-冰心仙子.ini",
+          "Icon": "C1.png",
+          "RequiredLevel": 5,
+          "RequiredPoints": 0,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 49.0,
+            "Y": 0.0
+          },
+          "ChildIds": [
+            "skill003"
+          ],
+          "RequiredSkillIds": []
+        },
+        {
+          "Id": "skill003",
+          "SkillFile": "player-magic-慧剑长空.ini",
+          "Icon": "C1.png",
+          "RequiredLevel": 5,
+          "RequiredPoints": 1,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 50.0,
+            "Y": 100.0
+          },
+          "ChildIds": [
+            "skill005"
+          ],
+          "RequiredSkillIds": [
+            "skill001"
+          ]
+        },
+        {
+          "Id": "skill005",
+          "SkillFile": "player-magic-招魂幡.ini",
+          "Icon": "C1.png",
+          "RequiredLevel": 10,
+          "RequiredPoints": 1,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 49.0,
+            "Y": 199.0
+          },
+          "ChildIds": [
+            "da0b59e2-c0d8-4284-9196-4538c323b190"
+          ],
+          "RequiredSkillIds": [
+            "skill003"
+          ]
+        },
+        {
+          "Id": "5a7720a5-f8c7-4424-b7dc-2452a384c01f",
+          "SkillFile": "player-magic-清心咒.ini",
+          "Icon": "C1.png",
+          "RequiredLevel": 4,
+          "RequiredPoints": 0,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 149.0,
+            "Y": 73.0
+          },
+          "ChildIds": [
+            "eda95636-59ee-4b32-8200-ba110549ee4e"
+          ],
+          "RequiredSkillIds": []
+        },
+        {
+          "Id": "eda95636-59ee-4b32-8200-ba110549ee4e",
+          "SkillFile": "player-magic-杀意.ini",
+          "Icon": "C1.png",
+          "RequiredLevel": 10,
+          "RequiredPoints": 1,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 149.0,
+            "Y": 173.0
+          },
+          "ChildIds": [
+            "b28a277c-27f0-4e49-a88c-2773da55a280"
+          ],
+          "RequiredSkillIds": [
+            "5a7720a5-f8c7-4424-b7dc-2452a384c01f"
+          ]
+        },
+        {
+          "Id": "b28a277c-27f0-4e49-a88c-2773da55a280",
+          "SkillFile": "player-magic-金蝉思雨.ini",
+          "Icon": "",
+          "RequiredLevel": 15,
+          "RequiredPoints": 1,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 149.0,
+            "Y": 273.0
+          },
+          "ChildIds": [],
+          "RequiredSkillIds": [
+            "eda95636-59ee-4b32-8200-ba110549ee4e"
+          ]
+        },
+        {
+          "Id": "da0b59e2-c0d8-4284-9196-4538c323b190",
+          "SkillFile": "player-magic-百剑诀.ini",
+          "Icon": "",
+          "RequiredLevel": 20,
+          "RequiredPoints": 1,
+          "RequiredTotalPoints": 0,
+          "MaxLevel": 10,
+          "CurrentLevel": 0,
+          "IsActive": false,
+          "IsUnlocked": false,
+          "Position": {
+            "X": 49.0,
+            "Y": 299.0
+          },
+          "ChildIds": [],
+          "RequiredSkillIds": [
+            "skill005"
+          ]
+        }
+      ]
+    }
+  ]
+}

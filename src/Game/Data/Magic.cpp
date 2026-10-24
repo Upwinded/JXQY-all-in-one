@@ -393,6 +393,64 @@ void applyBeginPositionRules(const Magic& magic, std::shared_ptr<GameElement> us
 }
 }
 
+bool Magic::supportsFriendlyTarget(int effectLevel) const
+{
+	return effectLevel >= 1 && effectLevel <= MAGIC_MAX_LEVEL
+		&& level[effectLevel].moveKind == mmkSelf
+		&& level[effectLevel].specialKind >= mskAddLife
+		&& level[effectLevel].specialKind <= mskChangeFlyIni;
+}
+
+bool Magic::isValidFriendlyTarget(const std::shared_ptr<NPC>& target)
+{
+	return target != nullptr && target->isFighterFriend()
+		&& target->life > 0 && target->isVisibleForRuntime()
+		&& !target->isDying() && !target->isHiding()
+		&& !target->isHiddenByCarryMagic()
+		&& NPCManager::isManagedEffectCaster(target);
+}
+
+unsigned int Magic::getKeepMillisecondsForLevel(int effectLevel) const
+{
+	const auto& runtime = level[clampMagicLevel(effectLevel)].runtime;
+	return runtime.configured ? runtime.keepMilliseconds : keepMilliseconds;
+}
+
+int Magic::getTargetLevelLimit(int effectLevel) const
+{
+	const auto& runtime = level[clampMagicLevel(effectLevel)].runtime;
+	return runtime.configured ? runtime.maxLevel : maxLevel;
+}
+
+void Magic::applyRuntimeLevel(int effectLevel)
+{
+	const auto& runtime = level[clampMagicLevel(effectLevel)].runtime;
+	if (!runtime.configured)
+	{
+		return;
+	}
+	keepMilliseconds = runtime.keepMilliseconds;
+	npcFile = runtime.npcFile;
+	npcIni = runtime.npcIni;
+	maxCount = runtime.maxCount;
+	maxLevel = runtime.maxLevel;
+	disableMoveMilliseconds = runtime.disableMoveMilliseconds;
+	disableSkillMilliseconds = runtime.disableSkillMilliseconds;
+	blindMilliseconds = runtime.blindMilliseconds;
+	weakMilliseconds = runtime.weakMilliseconds;
+	weakAttackPercent = runtime.weakAttackPercent;
+	weakDefendPercent = runtime.weakDefendPercent;
+	morphMilliseconds = runtime.morphMilliseconds;
+	changeToFriendMilliseconds = runtime.changeToFriendMilliseconds;
+	attackAddPercent = runtime.attackAddPercent;
+	defendAddPercent = runtime.defendAddPercent;
+	evadeAddPercent = runtime.evadeAddPercent;
+	speedAddPercent = runtime.speedAddPercent;
+	replaceMagic = runtime.replaceMagic;
+	specialKind9ReplaceFlyIni = runtime.specialKind9ReplaceFlyIni;
+	specialKind9ReplaceFlyIni2 = runtime.specialKind9ReplaceFlyIni2;
+}
+
 int Magic::calculatePrimaryEffectAmount(
 	const std::shared_ptr<Magic>& magic,
 	const std::shared_ptr<GameElement>& user,
@@ -414,6 +472,10 @@ int Magic::calculatePrimaryEffectAmount(
 			|| levelInfo.specialKind == mskAddDamageReduceShield);
 	if (selfSpecialUsesEffect)
 	{
+		if (levelInfo.effect == 0 && (levelInfo.specialKind == mskAddLife || levelInfo.specialKind == mskAddThew))
+		{
+			return caster->getAttack();
+		}
 		return levelInfo.effect;
 	}
 	if (!isPlayerCaster(caster) || levelInfo.effect == 0)
@@ -612,6 +674,7 @@ void Magic::reset()
 		explodeMagicFilesByLevel[i] = "";
 		explodeMagicsByLevel[i] = nullptr;
 		linkedLevel[i] = MagicLinkedLevel{};
+		level[i].runtime = MagicLevelRuntime{};
 		level[i].effect = 0;
 		level[i].effectExt = 0;
 		level[i].effect2 = 0;
@@ -1115,9 +1178,45 @@ void Magic::initFromIniWithContext(
 
 			level[i].attackRadius = ini.GetInteger(section, "AttackRadius", level[idx].attackRadius);
 			explodeMagicFilesByLevel[i] = ini.Get(section, "ExplodeMagicFile", explodeMagicFile);
+			auto& runtime = level[i].runtime;
+			for (const char* key : { "KeepMilliseconds", "NpcFile", "NpcIni", "MaxCount", "MaxLevel",
+				"DisableMoveMilliseconds", "DisableSkillMilliseconds", "BlindMilliseconds", "WeakMilliseconds",
+				"WeakAttackPercent", "WeakDefendPercent", "MorphMilliseconds", "ChangeToFriendMilliseconds",
+				"AttackAddPercent", "DefendAddPercent", "EvadeAddPercent", "SpeedAddPercent",
+				"ReplaceMagic", "SpecialKind9ReplaceFlyIni", "SpecialKind9ReplaceFlyIni2" })
+			{
+				runtime.configured = runtime.configured || (i > 0 && hasIniKey(ini, section, key));
+			}
+			runtime.keepMilliseconds = static_cast<unsigned int>(std::clamp<long>(
+				ini.GetInteger(section, "KeepMilliseconds", keepMilliseconds), 0, std::numeric_limits<int>::max()));
+			runtime.npcFile = ini.Get(section, "NpcFile", npcFile);
+			runtime.npcIni = ini.Get(section, "NpcIni", npcIni);
+			runtime.maxCount = std::max(0, static_cast<int>(ini.GetInteger(section, "MaxCount", maxCount)));
+			runtime.maxLevel = ini.GetInteger(section, "MaxLevel", maxLevel);
+			runtime.disableMoveMilliseconds = readNonNegativeTime(ini, section, "DisableMoveMilliseconds", disableMoveMilliseconds);
+			runtime.disableSkillMilliseconds = readNonNegativeTime(ini, section, "DisableSkillMilliseconds", disableSkillMilliseconds);
+			runtime.blindMilliseconds = readNonNegativeTime(ini, section, "BlindMilliseconds", blindMilliseconds);
+			runtime.weakMilliseconds = readNonNegativeTime(ini, section, "WeakMilliseconds", weakMilliseconds);
+			runtime.weakAttackPercent = std::clamp(static_cast<int>(ini.GetInteger(section, "WeakAttackPercent", weakAttackPercent)), 0, 100);
+			runtime.weakDefendPercent = std::clamp(static_cast<int>(ini.GetInteger(section, "WeakDefendPercent", weakDefendPercent)), 0, 100);
+			runtime.morphMilliseconds = readNonNegativeTime(ini, section, "MorphMilliseconds", morphMilliseconds);
+			runtime.changeToFriendMilliseconds = readNonNegativeTime(ini, section, "ChangeToFriendMilliseconds", changeToFriendMilliseconds);
+			runtime.attackAddPercent = ini.GetInteger(section, "AttackAddPercent", attackAddPercent);
+			runtime.defendAddPercent = ini.GetInteger(section, "DefendAddPercent", defendAddPercent);
+			runtime.evadeAddPercent = ini.GetInteger(section, "EvadeAddPercent", evadeAddPercent);
+			runtime.speedAddPercent = ini.GetInteger(section, "SpeedAddPercent", speedAddPercent);
+			runtime.replaceMagic = ini.Get(section, "ReplaceMagic", replaceMagic);
+			runtime.specialKind9ReplaceFlyIni = ini.Get(section, "SpecialKind9ReplaceFlyIni", specialKind9ReplaceFlyIni);
+			runtime.specialKind9ReplaceFlyIni2 = ini.Get(section, "SpecialKind9ReplaceFlyIni2", specialKind9ReplaceFlyIni2);
 
 		}
 
+		const bool hasRuntimeLevelOverrides = std::any_of(std::begin(level), std::end(level),
+			[](const MagicLevel& data) { return data.runtime.configured; });
+		for (auto& data : level)
+		{
+			data.runtime.configured = hasRuntimeLevelOverrides;
+		}
 		loadRes();
 		loadSucceeded = true;
 
@@ -1638,9 +1737,23 @@ std::vector<std::shared_ptr<Effect>> Magic::addEffect(
 	}	
 	case mmkSelf:
 	{
+		auto recipient = user;
+		auto friendlyTarget = std::dynamic_pointer_cast<NPC>(target);
+		if (srcMagic->supportsFriendlyTarget(lvl)
+			&& isPlayerCaster(std::dynamic_pointer_cast<NPC>(user))
+			&& isValidFriendlyTarget(friendlyTarget))
 		{
-			return finish(addSelfEffect(srcMagic, user, from, to, lvl, damage, evade, launcher, srcMagic->level[lvl].specialKind));
+			recipient = friendlyTarget;
 		}
+		int recipientAmount = damage;
+		const auto& levelInfo = srcMagic->level[lvl];
+		if (levelInfo.effect == 0 && (levelInfo.specialKind == mskAddLife || levelInfo.specialKind == mskAddThew))
+		{
+			recipientAmount = getPrimaryDamageForMagic(srcMagic, recipient, lvl, 0) + levelInfo.effectExt;
+			recipientAmount = applyCasterMagicEffectBonus(user, *srcMagic, recipientAmount);
+		}
+		return finish(addSelfEffect(srcMagic, recipient, from, to, lvl, recipientAmount, evade,
+			launcher, srcMagic->level[lvl].specialKind));
 		break;
 	}
 	case mmkTimeStop:
@@ -1768,7 +1881,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addFlyEffect(std::shared_ptr<Magic> 
 	}
 	int dir = getDirection(from, to);
 	Point src = from;
-	if (!zeroMoveDirection)
+	// A carried projectile starts at the caster, as in the C# world-position path.
+	// Advancing one tile first skips nearby targets before FlyMagic can emit.
+	if (!zeroMoveDirection && srcMagic->carryUser <= 0)
 	{
 		from = Map::getSubPoint(from, NPC::getDirection(from, to));
 	}
@@ -2297,7 +2412,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addLineEffect(std::shared_ptr<Magic>
 			tempTo = Map::getSubPoint(to, 0);
 		}
 		int dir = NPC::getDirection(from, tempTo);
-		int magicDir = dir * 2;
+		const int directionCount = srcMagic->flyImage != nullptr ? srcMagic->flyImage->directions : 16;
+		const int magicDir = getDirection((float)(dir * M_PI / 4), directionCount);
 		dir += 2;
 		if (dir > 7)
 		{
@@ -2371,7 +2487,6 @@ std::vector<std::shared_ptr<Effect>> Magic::addMoveLineEffect(std::shared_ptr<Ma
 		}
 		int srcDir = NPC::getDirection(from, tempTo);
 		int dir = srcDir;
-		int magicDir = dir * 2;
 		dir += 2;
 		if (dir > 7)
 		{
@@ -2394,9 +2509,9 @@ std::vector<std::shared_ptr<Effect>> Magic::addMoveLineEffect(std::shared_ptr<Ma
 			e->level = lvl;
 			e->user = user;
 			e->initFromMagic(srcMagic);
-			e->direction = magicDir;
 			e->flyingDirection = Map::getTilePosition(Map::getSubPoint({ 0, 0 }, srcDir), { 0, 0 });
 			e->flyingDirection.y = (int)round(MapXRatio * e->flyingDirection.y);
+			e->direction = e->getDirection();
 			e->position = pos;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -2439,15 +2554,6 @@ std::vector<std::shared_ptr<Effect>> Magic::addVMoveEffect(std::shared_ptr<Magic
 		tempTo = Map::getSubPoint(to, 0);
 	}
 	int srcDir = NPC::getDirection(from, tempTo);
-	int magicDir = srcDir * 2;
-	if (srcMagic->flyImage != nullptr)
-	{
-		magicDir = getDirection(from, tempTo, srcMagic->flyImage->directions);
-	}
-	else
-	{
-		magicDir = getDirection(from, tempTo);
-	}
 	Point flyingDirection = Map::getTilePosition(Map::getSubPoint({ 0, 0 }, srcDir), { 0, 0 });
 	flyingDirection.y = (int)round(MapXRatio * flyingDirection.y);
 
@@ -2457,8 +2563,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addVMoveEffect(std::shared_ptr<Magic
 		e->level = lvl;
 		e->user = user;
 		e->initFromMagic(srcMagic);
-		e->direction = magicDir;
 		e->flyingDirection = flyingDirection;
+		e->direction = e->getDirection();
 		e->launcherKind = launcher;
 		e->damage = damage;
 		e->evade = evade;
@@ -3166,7 +3272,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSelfEffect(std::shared_ptr<Magic>
 		auto npc = std::dynamic_pointer_cast<NPC>(user);
 		if (npc)
 		{
-			npc->applyTemporaryMorph(*srcMagic, getSelfMagicMorphDuration(*srcMagic, lvl));
+			npc->applyTemporaryMorph(e->magic, getSelfMagicMorphDuration(e->magic, lvl));
 		}
 		break;
 	}
@@ -3303,7 +3409,8 @@ std::vector<std::shared_ptr<Effect>> Magic::addFullScreenEffect(std::shared_ptr<
 std::vector<std::shared_ptr<Effect>> Magic::addFollowEffect(std::shared_ptr<Magic> srcMagic, std::shared_ptr<GameElement> user, Point from, Point to, int lvl, int damage, int evade, int launcher, std::shared_ptr<GameElement> target)
 {
 	auto targetNPC = std::dynamic_pointer_cast<NPC>(target);
-	if (targetNPC != nullptr && !NPCManager::canLauncherHitNPC(launcher, targetNPC, user))
+	if (targetNPC != nullptr && (!targetNPC->isVisibleForRuntime()
+		|| !NPCManager::canLauncherHitNPC(launcher, targetNPC, user)))
 	{
 		target.reset();
 	}
@@ -3395,7 +3502,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addControlEffect(std::shared_ptr<Mag
 	{
 		return ret;
 	}
-	if (!canControlMagicTarget(targetNPC->level, srcMagic->maxLevel, !targetNPC->isDying() && !targetNPC->isHiding()))
+	if (!canControlMagicTarget(targetNPC->level, srcMagic->getTargetLevelLimit(lvl), !targetNPC->isDying() && !targetNPC->isHiding()))
 	{
 		return ret;
 	}
@@ -3446,7 +3553,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSummonEffect(std::shared_ptr<Magi
 	e->launcherKind = launcher;
 	e->damage = damage;
 	e->evade = evade;
-	e->lifeTime = srcMagic->keepMilliseconds;
+	e->lifeTime = e->magic.keepMilliseconds;
 	e->doing = ekExploding;
 	if (!e->beginSummon(to))
 	{
@@ -3464,7 +3571,7 @@ float Magic::getAngle(Point from, Point to)
 {
 	Point pos = Map::getTilePosition(to, from, { 0, 0 }, { 0, 0 });
 	PointEx dir;
-	dir.x = ((float)pos.x) / TILE_WIDTH * MapXRatio;
+	dir.x = ((float)pos.x) / TILE_WIDTH;
 	dir.y = ((float)pos.y) / TILE_HEIGHT;
 	dir.x = -dir.x;
 	return atan2(dir.x, dir.y);
@@ -3487,21 +3594,17 @@ int Magic::getDirection(Point from, Point to, int maxDir)
 
 int Magic::getDirection(float angle, int maxDir)
 {
+	if (maxDir <= 1)
+	{
+		return 0;
+	}
+	angle = std::fmod(angle, 2 * M_PI);
 	if (angle < 0)
 	{
 		angle += 2 * M_PI;
 	}
 	angle += M_PI / maxDir;
-	int result = (int)(angle / (2 * M_PI / maxDir));
-	if (result > maxDir)
-	{
-		result -= maxDir;
-	}
-    else if (result < 0)
-    {
-        result += maxDir;
-    }
-	return result;
+	return (int)(angle / (2 * M_PI / maxDir)) % maxDir;
 }
 
 UTime Magic::getSpecialKindDurationMilliseconds(int lvl) const
@@ -3681,6 +3784,7 @@ void Magic::copy(Magic & magic)
 	for (size_t i = 0; i < MAGIC_MAX_LEVEL + 1; i++)
 	{
 		copyData(explodeMagicFilesByLevel[i]);
+		copyData(level[i].runtime);
 		copyData(level[i].effect);
 		copyData(level[i].effectExt);
 		copyData(level[i].effect2);

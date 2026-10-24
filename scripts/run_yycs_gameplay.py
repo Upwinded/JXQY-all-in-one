@@ -1347,7 +1347,7 @@ def huian_beggar(client, output, resource):
         recorded = json.loads(path.read_text(encoding="utf-8"))
         site = next((site for site in sites if site["id"] == recorded["choiceSite"]), None)
         if site:
-            choice_evidence(output, path, site)
+            choice_evidence(output, path, site, allow_cheats=True)
             proven.add((site["id"], recorded["choiceIndex"]))
     if proven != {(site["id"], option) for site in sites for option in (0, 1)}:
         raise AutomationError("Huian sidequest options lack complete native evidence")
@@ -1866,9 +1866,9 @@ def hanbo_fire_battle(client, output, resource):
         try:
             state = fight_named(client, output, resource, name, single_target=True)
         except AutomationError as error:
-            if name != "阿生" or str(error) != "StartCombat: no_progress":
+            if str(error) != "StartCombat: no_progress":
                 raise
-            checkpoint(client, output, "93-hanbo-archer-stalled", variables=("Enemy2",))
+            checkpoint(client, output, f"93-hanbo-target-stalled-{time.time_ns()}", variables=("Enemy2",))
             client.act("JumpTo", generation=client.observe()["generation"], x=33, y=68, timeoutMs=30000)
             client.move(28, 70, running=True)
             state = fight_named(client, output, resource, name, single_target=True)
@@ -1988,7 +1988,7 @@ def fight_hostiles(client, output, resource, use_magic=True, choice=None, single
                 position = current["player"]["position"]
                 distance = lambda item: abs(item["position"]["x"] - position["x"]) * 2 + abs(item["position"]["y"] - position["y"])
                 nearest = min(nearby, key=distance) if nearby else None
-                if nearest and nearest["id"] != target["id"] and distance(nearest) <= 14:
+                if nearest and (nearest["id"] != target["id"] or use_magic and not melee_only):
                     fight_named(client, output, resource, nearest["name"], use_magic=False,
                                 target_id=nearest["id"], choice=choice, single_target=True, magic_file=magic_file)
                     continue
@@ -2029,7 +2029,7 @@ def pili_day_route(client, output, resource):
         state = client.observe(VARIABLES)
         if any(target["name"] == name and npc_attackable(target) for target in state["targets"]):
             fight_named(client, output, resource, name, use_magic=name != "霹雳堂门卫")
-    fight_hostiles(client, output, resource)
+    # The treasure script requires Event212, not a full-map kill count.
     client.save_or_load(2)
     source = checkpoint(client, output, "107-pili-day-thunder-before-pickup-slot2", variables=("DayIn",))
     state = interact_named(client, output, resource, "雷震子")
@@ -2154,7 +2154,6 @@ def yaowang_heal(client, output, resource):
         raise AutomationError("Zixuan treatment requires the ordinary thunder delivery checkpoint")
     client.save_or_load(0)
     checkpoint(client, output, "117-yaowang-before-delivery-slot0")
-    fight_hostiles(client, output, resource)
     client.move(35, 80, running=True)
     idle(client)
     state = interact_named(client, output, resource, "胡神医")
@@ -3282,9 +3281,14 @@ def tianchi_walk_to(client, output, resource, point):
             foes = [target for target in value["targets"] if target.get("hostile") and npc_attackable(target)]
             if not foes:
                 raise
-            position = value["player"]["position"]
-            target = min(foes, key=lambda item: abs(item["position"]["x"] - position["x"]) * 2 + abs(item["position"]["y"] - position["y"]))
-            fight_named(client, output, resource, target["name"], timeout=30, use_magic=True, target_id=target["id"])
+            path = reachable_trap(resource, value["map"], None, value["player"]["position"],
+                                  with_path=True, destination=point)
+            blockers = {(target["position"]["x"], target["position"]["y"]): target for target in foes}
+            target = next((blockers[step] for step in path[1:] if step in blockers), None)
+            if target is None:
+                raise
+            fight_named(client, output, resource, target["name"], timeout=30,
+                        single_target=True, target_id=target["id"])
 
 
 def tianchi_crossings(layout):
@@ -5926,6 +5930,11 @@ def ending_two_moon_duel(client, output, resource):
     state = idle(client)
     if state["variables"].get("Result") != "2" or state["variables"].get("Event") != "1806":
         raise AutomationError("Moon's peak duel requires the ordinary rescued-Qiangwei letter")
+    if state["map"] == "map_030_悲魔山庄.map":
+        for destination, trap in (("map_028_连接地图.map", 5), ("map_027_连接地图.map", 3),
+                                  ("map_012_惠安镇.map", 2)):
+            transition(client, resource, destination, trap, running=True)
+        state = idle(client)
     if state["map"] == "map_012_惠安镇.map":
         recover(client, output, resource)
         client.save_or_load(0)

@@ -3,6 +3,7 @@
 #include "../Game/Data/Magic.h"
 #include "../Game/Data/Map.h"
 #include "../Game/GameManager/GameManager.h"
+#include "../Game/GameManager/WorldInteractionResolver.h"
 #include "../File/File.h"
 #include "../Image/IMP.h"
 #include "MapV3ContractFixture.h"
@@ -18,8 +19,16 @@
 #include <string>
 
 bool runGambleMenuRuntimeTests();
+bool runAttackAnimationRuntimeTests();
+bool runReleaseTimingRealResourceTests();
+bool runReleaseTimingProductionTests();
+bool runProjectileCollisionRuntimeTests();
 bool runMagicDerivedRuntimeTests();
 bool runMagicExperienceTests();
+bool runSkillTreeRuntimeTests();
+bool runAttributePointRuntimeTests();
+bool runAttributePointInputRuntimeTests();
+bool runSkillTreeInputRuntimeTests();
 bool runReplacementExperienceOwnershipTests();
 bool runEffectRuntimePersistenceTests();
 bool runNpcRuntimePersistenceTests();
@@ -29,6 +38,7 @@ bool runCoreLifecycleTests();
 bool runScriptMovementRuntimeTests();
 bool runCurrentModCompatibilityTests();
 bool runQingyuUiTests(bool interactionOnly = false);
+bool runUiTextLayoutTests();
 bool runSaveWriteSharingRuntimeTests();
 bool runSaveStabilityTests();
 bool runXiaoxiangMissingObjectRouteTests();
@@ -164,7 +174,7 @@ private:
 bool testModeUsesProductionResources(const std::string& mode)
 {
 	return mode == "--core-lifecycle" || mode == "--gameplay-automation" ||
-		mode == "--save-write-sharing" ||
+		mode == "--save-write-sharing" || mode == "--ui-text-layout" ||
 		mode == "--save-stability" ||
 		mode == "--xiaoxiang-missing-object-routes" ||
 		mode == "--xiaoxiang-tournament-routes" ||
@@ -183,7 +193,8 @@ bool testModeUsesProductionResources(const std::string& mode)
 		mode == "--bilibili-story-feedback" ||
 		mode == "--merged-entity-save" ||
 		mode == "--production-attack-files" ||
-		mode == "--full-attack-save" ||
+		mode == "--full-attack-save" || mode == "--release-timing" ||
+		mode == "--release-timing-production" ||
 		mode == "--equipment-replacement-save" ||
 		mode == "--dynamic-magic-list-save" ||
 		mode == "--full-experience-save" ||
@@ -288,6 +299,25 @@ bool runJumpBoundaryTest()
 		"a consumed trap does not shorten the boundary jump") && ok;
 	ok = check(map.getJumpPath({ -1, 8 }, origin) == Point{ -1, 8 },
 		"an invalid jump origin remains rejected") && ok;
+	for (auto& row : map.data->tile)
+		for (MapTile& tile : row)
+			tile.obstacle = toObstacle;
+	for (int column = 1; column <= 7; ++column)
+		map.data->tile[8][column].obstacle = 0;
+	ok = check(map.getJumpPath(origin, { 7, 8 }) == Point{ 7, 8 }
+		&& map.getJumpPath(origin, { 1, 8 }) == Point{ 1, 8 },
+		"horizontal jumps follow the center tiles between solid side walls") && ok;
+	for (auto& row : map.data->tile)
+		for (MapTile& tile : row)
+			tile.obstacle = toObstacle;
+	for (int row = 2; row <= 14; row += 2)
+		map.data->tile[row][4].obstacle = 0;
+	ok = check(map.getJumpPath(origin, { 4, 14 }) == Point{ 4, 14 }
+		&& map.getJumpPath(origin, { 4, 2 }) == Point{ 4, 2 },
+		"vertical jumps follow the center tiles between solid side walls") && ok;
+	map.data->tile[12][4].obstacle = toObstacle;
+	ok = check(map.getJumpPath(origin, { 4, 14 }) == Point{ 4, 10 },
+		"a solid tile on the jump ray still blocks the landing") && ok;
 	return ok;
 }
 
@@ -1025,6 +1055,65 @@ bool runNeutralProjectileCollisionTest()
 	return ok;
 }
 
+bool runInvisibleProjectileCollisionTest()
+{
+	GameManager gameManager;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = gameManager.map->data->head.height = 16;
+	gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
+	gameManager.player->setPosition({ 2, 2 }, false);
+	auto target = std::make_shared<NPC>();
+	target->kind = nkBattle;
+	target->relation = nrHostile;
+	target->invincible = 1;
+	target->life = target->lifeMax = 100;
+	target->setPosition({ 5, 5 }, false);
+	gameManager.npcManager->npcList = { target };
+	gameManager.map->createDataMap();
+	auto projectile = [&](std::shared_ptr<NPC> recipient, bool attackAll = false)
+	{
+		auto effect = std::make_shared<Effect>();
+		effect->doing = ekFlying;
+		effect->position = recipient->getPosition();
+		effect->user = recipient == gameManager.player ? target : gameManager.player;
+		effect->launcherKind = recipient == gameManager.player ? lkEnemy : lkSelf;
+		effect->magic.attackAll = attackAll ? 1 : 0;
+		effect->width = 0.5f;
+		effect->lifeTime = 1;
+		return CollisionDetector::detectCollision(recipient, effect);
+	};
+	target->invisibleMilliseconds = 10000;
+	bool ok = check(!WorldInteractionResolver::isNPCValidForIntent(
+		target, WorldInteractionIntent::Attack, gameManager.player),
+		"magic-invisible enemies remain unavailable for direct targeting");
+	ok = check(projectile(target), "a projectile can physically collide with a magic-invisible enemy") && ok;
+	ok = check(projectile(target, true), "AttackAll can physically collide with a magic-invisible enemy") && ok;
+	gameManager.player->invisibleMilliseconds = 10000;
+	ok = check(projectile(gameManager.player), "a hostile projectile can physically collide with the invisible player") && ok;
+	auto following = std::make_shared<Magic>();
+	following->level[1].moveKind = mmkFollow;
+	following->level[1].lifeFrame = 10;
+	const auto effects = Magic::addEffect(following, gameManager.player,
+		gameManager.player->getPosition(), target->getPosition(), 1, 0, 0, lkSelf, target);
+	ok = check(!effects.empty() && effects.front()->target.expired(),
+		"a new homing projectile cannot lock onto a magic-invisible enemy") && ok;
+	gameManager.effectManager->clearEffect();
+	for (int hiddenState = 0; hiddenState < 5; ++hiddenState)
+	{
+		target->scriptHidden = hiddenState == 0;
+		target->isVisibleByVariable = hiddenState != 1;
+		target->nowAction = hiddenState == 2 ? acHide : hiddenState == 3 ? acDeath : acStand;
+		auto transport = std::make_shared<Effect>();
+		transport->level = 1;
+		transport->magic.level[1].moveKind = mmkTransport;
+		if (hiddenState == 4) target->transportEffect = transport;
+		ok = check(!projectile(target) && !projectile(target, true),
+			"script/variable-hidden, hidden-action, dead and transporting enemies reject physical hits") && ok;
+		target->transportEffect.reset();
+	}
+	return ok;
+}
+
 bool runSweptProjectileCollisionTest()
 {
 	GameManager gameManager;
@@ -1236,6 +1325,9 @@ bool runSweptProjectileInteractionTest()
 		delayedDiscard->doing == ekFlying && newbornTarget->doing == ekFlying,
 		"projectiles created in the current frame do not collide") && ok;
 	ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+	// These synthetic stationary projectiles have a fresh zero-length update.
+	delayedDiscard->collisionSweepInitialized = true;
+	newbornTarget->collisionSweepInitialized = true;
 	CollisionDetector::detectCollision();
 	ok = check(
 		delayedDiscard->doing == ekHiding && newbornTarget->doing == ekHiding,
@@ -1316,6 +1408,8 @@ bool runProjectileCreationFrameTest()
 			currentFrameMessage) && scenarioOk;
 
 		ProjectileCollisionTestAccess::beginFrame(*gameManager.effectManager);
+		createdEffect->collisionSweepInitialized = true;
+		passiveEffect->collisionSweepInitialized = true;
 		CollisionDetector::detectCollision();
 		scenarioOk = check(
 			createdEffect->doing == ekHiding &&
@@ -1416,6 +1510,10 @@ bool runGameplayAutomationRuntimeTests();
 
 int main(int argc, char** argv)
 {
+	if (argc > 1 && std::string(argv[1]) == "--skill-tree-input") return runSkillTreeInputRuntimeTests() ? 0 : 1;
+	if (argc > 1 && std::string(argv[1]) == "--skill-tree") return runSkillTreeRuntimeTests() ? 0 : 1;
+	if (argc > 1 && std::string(argv[1]) == "--attribute-points") return runAttributePointRuntimeTests() ? 0 : 1;
+	if (argc > 1 && std::string(argv[1]) == "--attribute-points-input") return runAttributePointInputRuntimeTests() ? 0 : 1;
 	if (argc > 1 && std::string(argv[1]) == "--partner-mechanics") return runPartnerMechanicsTests() ? 0 : 1;
 #if defined(__MOBILE__)
 	if (argc > 1)
@@ -1503,6 +1601,10 @@ int main(int argc, char** argv)
 	{
 		return runQingyuUiTests() ? 0 : 1;
 	}
+	if (argc > 1 && std::string(argv[1]) == "--ui-text-layout")
+	{
+		return runUiTextLayoutTests() ? 0 : 1;
+	}
 	if (argc > 1 && std::string(argv[1]) == "--qingyu-ui-interaction")
 	{
 		return runQingyuUiTests(true) ? 0 : 1;
@@ -1583,6 +1685,18 @@ int main(int argc, char** argv)
 	{
 		return runProductionAttackFileRuntimeTests() ? 0 : 1;
 	}
+	if (argc > 1 && std::string(argv[1]) == "--release-timing")
+	{
+		return runReleaseTimingRealResourceTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--release-timing-production")
+	{
+		return runReleaseTimingProductionTests() ? 0 : 1;
+	}
+	if (argc > 1 && std::string(argv[1]) == "--attack-animation")
+	{
+		return runAttackAnimationRuntimeTests() ? 0 : 1;
+	}
 	if (argc > 1 && std::string(argv[1]) == "--full-attack-save")
 	{
 		return runFullAttackSaveRuntimeTests() ? 0 : 1;
@@ -1657,7 +1771,7 @@ int main(int argc, char** argv)
 		std::cerr << "Unknown test mode: " << argv[1] << '\n'
 			<< "Expected one of: --gamble-menu, --magic-derived, "
 				"--effect-persistence, --npc-persistence, --object-animation, --current-mod-compatibility, "
-				"--media-runtime, --core-lifecycle, --save-write-sharing, --xiaoxiang-missing-object-routes, --xiaoxiang-tournament-routes, --xiaoxiang-prison-ending, --xiaoxiang-companion-history, --xiaoxiang-companion-history-sync, --xiaoxiang-companion-history-async, --xiaoxiang-legacy-entrances, --production-attack-files, --full-attack-save, --script-engine-runtime, "
+				"--release-timing, --attack-animation, --media-runtime, --core-lifecycle, --save-write-sharing, --xiaoxiang-missing-object-routes, --xiaoxiang-tournament-routes, --xiaoxiang-prison-ending, --xiaoxiang-companion-history, --xiaoxiang-companion-history-sync, --xiaoxiang-companion-history-async, --xiaoxiang-legacy-entrances, --production-attack-files, --full-attack-save, --script-engine-runtime, "
 				"--merged-entity-save, "
 				"--equipment-replacement-save, "
 				"--dynamic-magic-list-save, "
@@ -1685,7 +1799,10 @@ int main(int argc, char** argv)
 	ok = runProjectileTilePathTest() && ok;
 	ok = runSharedMagicHitRateTest() && ok;
 	ok = runNeutralProjectileCollisionTest() && ok;
+	ok = runInvisibleProjectileCollisionTest() && ok;
 	ok = runSweptProjectileCollisionTest() && ok;
+	ok = runProjectileCollisionRuntimeTests() && ok;
+	ok = runAttackAnimationRuntimeTests() && ok;
 	ok = runSweptProjectileInteractionTest() && ok;
 	ok = runProjectileCreationFrameTest() && ok;
 
@@ -2052,22 +2169,20 @@ int main(int argc, char** argv)
 		"special attack direction gate prefers magic UseActionFile directions") && ok;
 	ok = check(NPC::selectAttackActionDirectionCount(4, -1) == 4,
 		"special attack direction gate ignores ActionFile and falls back to attack directions") && ok;
-	ok = check(NPC::selectMagicActionDirectionCount(8, 2, 4) == 2,
+	ok = check(NPC::selectMagicActionDirectionCount(8, 2) == 2,
 		"magic direction gate prefers UseActionFile directions") && ok;
-	ok = check(NPC::selectMagicActionDirectionCount(8, -1, 4) == 4,
-		"magic direction gate falls back to ActionFile directions when UseActionFile is absent") && ok;
-	ok = check(NPC::selectMagicActionDirectionCount(8, -1, -1) == 8,
+	ok = check(NPC::selectMagicActionDirectionCount(8, -1) == 8,
 		"magic direction gate falls back to NPC magic action directions when magic action images are absent") && ok;
-	int useActionGateDirectionCount = NPC::selectMagicActionDirectionCount(8, 2, 4);
+	int useActionGateDirectionCount = NPC::selectMagicActionDirectionCount(8, 2);
 	ok = check(NPC::canMoveInDirection(4, useActionGateDirectionCount),
 		"UseActionFile two-direction magic gate allows supported vertical direction") && ok;
 	ok = check(!NPC::canMoveInDirection(2, useActionGateDirectionCount),
 		"UseActionFile two-direction magic gate rejects unsupported side direction") && ok;
-	int actionGateDirectionCount = NPC::selectMagicActionDirectionCount(8, -1, 4);
+	int actionGateDirectionCount = NPC::selectMagicActionDirectionCount(4, -1);
 	ok = check(NPC::canMoveInDirection(2, actionGateDirectionCount),
-		"ActionFile four-direction magic gate allows supported side direction") && ok;
+		"NPC four-direction magic gate allows supported side direction") && ok;
 	ok = check(!NPC::canMoveInDirection(1, actionGateDirectionCount),
-		"ActionFile four-direction magic gate rejects unsupported diagonal direction") && ok;
+		"NPC four-direction magic gate rejects unsupported diagonal direction") && ok;
 
 	ok = check(NPC::isVisibleForRuntimeState(true, 0), "visible NPC is runtime-visible before magic invisibility") && ok;
 	ok = check(!NPC::isVisibleForRuntimeState(true, 250), "magic-invisible NPC is not runtime-visible") && ok;

@@ -1,7 +1,9 @@
 #include "TestSupport.h"
 
 #include "../core/AssetCliRunner.h"
+#include "../core/GameProfile.h"
 #include "../core/IMPImageFile.h"
+#include "../core/INIFileEditor.h"
 #include "../core/JxAssetMigrator.h"
 #include "../core/LuaScriptSyntaxValidator.h"
 #include "../core/MapConverter.h"
@@ -29,6 +31,7 @@
 #include <QSize>
 #include <QStringList>
 #include <QTemporaryDir>
+#include <QtEndian>
 
 #include <algorithm>
 #include <cstdio>
@@ -41,6 +44,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+extern "C"
+{
+#include "lua.h"
+#include "lauxlib.h"
+}
 
 #ifdef Q_OS_WIN
 #ifndef NOMINMAX
@@ -1156,6 +1165,77 @@ bool testScriptLegacyNumericCondition()
               "numeric If compatibility emits valid Lua");
 }
 
+bool testScriptCompoundConditions()
+{
+    const auto evaluate = [](const std::string& condition, const std::string& variables, bool expected)
+    {
+        ScriptConverter converter;
+        const std::string converted = converter.convertScript(
+            "Assign($Matched,0);\nIf(" + condition + ") @Matched;\nReturn;\n"
+            "@Matched:\nAssign($Matched,1);\nReturn;\n");
+        const std::string script = "vars={" + variables + "};\n"
+            "function getvar(name) return vars[name] or 0 end\n"
+            "function assign(name,value) vars[name]=value end\n" + converted;
+        lua_State* state = luaL_newstate();
+        if (!check(state != nullptr, "create Lua state for converted condition"))
+            return false;
+        const bool executed = luaL_dostring(state, script.c_str()) == LUA_OK;
+        bool matched = false;
+        if (executed)
+        {
+            lua_getglobal(state, "vars");
+            lua_getfield(state, -1, "Matched");
+            matched = lua_tointeger(state, -1) == 1;
+        }
+        lua_close(state);
+        return check(executed && matched == expected && converter.getDiagnostics().empty(),
+                     ("execute converted condition: " + condition + " with " + variables).c_str());
+    };
+
+    bool ok = true;
+    for (int bits = 0; bits < 32; ++bits)
+    {
+        const int room = (bits & 16) != 0 ? 15 : 3;
+        const int furong = bits & 1;
+        const int money = (bits >> 1) & 1;
+        const int medicineCompanion = (bits >> 2) & 1;
+        const int yinger = (bits >> 3) & 1;
+        const std::string variables = "Room=" + std::to_string(room)
+            + ",Duanfurong=" + std::to_string(furong) + ",Choosemoney=" + std::to_string(money)
+            + ",Danniang=" + std::to_string(medicineCompanion) + ",Yinger=" + std::to_string(yinger);
+        ok = evaluate("$Room<>15&&($Duanfurong==1||$Choosemoney==1||$Danniang==1||$Yinger==1)",
+                      variables, room != 15 && (bits & 15) != 0) && ok;
+    }
+    for (int bits = 0; bits < 8; ++bits)
+    {
+        const bool a = (bits & 1) != 0;
+        const bool b = (bits & 2) != 0;
+        const bool c = (bits & 4) != 0;
+        const std::string variables = "A=" + std::to_string(a) + ",B=" + std::to_string(b)
+            + ",C=" + std::to_string(c);
+        ok = evaluate("$A==1&&$B==1||$C==1", variables, a && (b || c)) && ok;
+        ok = evaluate("$A==1||$B==1&&$C==1", variables, a || (b && c)) && ok;
+        ok = evaluate("($A==1&&$B==1)||$C==1", variables, (a && b) || c) && ok;
+        ok = evaluate("(($A==1||$B==1)&&$C==1)", variables, (a || b) && c) && ok;
+    }
+    ok = evaluate("true&&($Missing==0||false)", "", true) && ok;
+    ok = evaluate("$A==$-1&&$B>=$Other", "A=-1,B=2,Other=1", true) && ok;
+    ok = evaluate("$Text==\"A && B || (C)\"", "Text=\"A && B || (C)\"", true) && ok;
+
+    for (const std::string& condition : {"$A==1&&", "||$A==1", "($A==1||)", "$A==1||($B==1"})
+    {
+        ScriptConverter converter;
+        const std::string converted = converter.convertScript("If(" + condition + ") @End;\n@End:\nReturn;\n");
+        ok = check(std::any_of(converter.getDiagnostics().begin(), converter.getDiagnostics().end(),
+                              [](const ScriptConversionDiagnostic& diagnostic)
+                              {
+                                  return diagnostic.category == "UnhandledIf";
+                              }),
+                   "incomplete compound conditions retain conversion diagnostics") && ok;
+    }
+    return ok;
+}
+
 bool testScriptDiagnostics()
 {
     ScriptConverter converter;
@@ -1189,7 +1269,8 @@ bool testScriptGambleOutputVariable()
 {
     ScriptConverter converter;
     std::string converted = converter.convertScript(
-        "Gamble(80, 0, $map027lwc);\n");
+        "Gamble(80, 0, $map027lwc);\n"
+        "ShowMiniGame(\"gamble\",5000,1,\"吕文才\",$map027lwc);\n");
 
     bool hasUnsupportedApi = false;
     for (const ScriptConversionDiagnostic& diagnostic : converter.getDiagnostics())
@@ -1200,6 +1281,8 @@ bool testScriptGambleOutputVariable()
 
     return check(converted.find("gamble(80,0,\"map027lwc\")") != std::string::npos,
                  "Gamble output variable") &&
+        check(converted.find("showminigame(\"gamble\",5000,1,\"吕文才\",\"map027lwc\")") != std::string::npos,
+              "MG ShowMiniGame preserves its fifth argument as an output variable name") &&
         check(!hasUnsupportedApi, "Gamble is a supported runtime API");
 }
 
@@ -1605,6 +1688,30 @@ bool testNewJxMultilineScriptCompatibility()
               "script editor encoding detection repairs accidentally-valid GBK text");
 }
 
+bool testMultilineCallArgumentsAndEmptyStatement()
+{
+    ScriptConverter converter;
+    const std::string converted = converter.convertScript(
+        "Say(\"唐墨清：南蛮子果然反复无常！\",143\n"
+        ");\n"
+        "; // empty statement\n"
+        "ChooseEx( // prompt\n\"选择\", // options\n\"甲\",\"乙\",\"Choice\"\n);\n"
+        "Say(\n\"line one\nline two\",1\n);\n");
+    bool ok = check(converted.find("say(\"唐墨清：南蛮子果然反复无常！\",143);") != std::string::npos &&
+            converted.find("chooseex(\"选择\",\"甲\",\"乙\",\"Choice\");") != std::string::npos &&
+            converted.find("-- options") != std::string::npos &&
+            converted.find("say(\"line one\\nline two\",1);") != std::string::npos &&
+            converter.getDiagnostics().empty() &&
+            LuaScriptSyntaxValidator::validateScriptContent("multiline-call.txt", converted).message.isEmpty(),
+        "multiline call arguments and standalone semicolons retain their arguments without diagnostics");
+    const std::string malformed = converter.convertScript(
+        "Say(\"unfinished\",1\n"
+        "Say(\"following\",2);\n");
+    return check(malformed.find("say(\"following\",2);") != std::string::npos &&
+            !converter.getDiagnostics().empty() && converter.getDiagnostics().front().lineNumber == 1,
+        "an unterminated call does not consume the next independent command") && ok;
+}
+
 bool testLuaScriptSyntaxValidator()
 {
     LuaScriptSyntaxIssue okIssue = LuaScriptSyntaxValidator::validateScriptContent(
@@ -1771,7 +1878,9 @@ bool testScriptOutputVariableMigration()
                 "GetPlayerState(\"Mana\",getvar(\"PlayerMana\"));\n"
                 "ClearAllVar($Exp,$exp,\"Kept\");\n"
                 "ClearAllVars(getvar(\"Other\"));\n"
-                "Add($Exp,$Delta);\nUnknownCall(1);\n"),
+                "Add($Exp,$Delta);\n"
+                "If($Exp==1&&($Delta==2||$Kept==3)) @AfterCondition;\n"
+                "@AfterCondition:\nUnknownCall(1);\n"),
             "write output-variable migration fixture"))
     {
         return false;
@@ -1804,8 +1913,9 @@ bool testScriptOutputVariableMigration()
             report.scriptSyntaxErrors.isEmpty(),
             "output-variable migration emits valid Lua and retains unknown API warning") &&
         check(report.unsupportedScriptApis.size() == 1 &&
-            report.unsupportedScriptApis.front().startsWith("unknowncall:"),
-            "migration shares the canonical and alias API catalog with the converter") && ok;
+            report.unsupportedScriptApis.front().startsWith("unknowncall:") &&
+            converted.contains(" and (") && converted.contains(" or "),
+            "migration ignores Lua logical operators and retains unknown API diagnostics") && ok;
 }
 
 bool testMigrationPreservesResourceScriptLocationsAndMovieNames()
@@ -1939,6 +2049,141 @@ bool testMigrationSkipsLegacySourceControlMetadata()
         check(report.processedFiles == 0, "ignored metadata is not counted as processed asset");
 }
 
+bool testMigrationConvertsLegacyContentAudio()
+{
+    QTemporaryDir sourceDirectory;
+    QTemporaryDir outputDirectory;
+    if (!check(sourceDirectory.isValid() && outputDirectory.isValid(), "create Content audio fixture"))
+        return false;
+    QDir source(sourceDirectory.path());
+    if (!check(source.mkpath("Content/Sound/角色") && source.mkpath("Content/Music") &&
+            source.mkpath("sound/角色") && source.mkpath("music"), "create Content and runtime audio roots"))
+        return false;
+    auto appendUInt32 = [](QByteArray& bytes, quint32 value)
+    {
+        const quint32 little = qToLittleEndian(value);
+        bytes.append(reinterpret_cast<const char*>(&little), sizeof(little));
+    };
+    const QByteArray reader("Microsoft.Xna.Framework.Content.SoundEffectReader");
+    QByteArray xnb("XNBw\x05\0", 6);
+    appendUInt32(xnb, 0);
+    xnb.append('\1');
+    xnb.append(static_cast<char>(reader.size()));
+    xnb.append(reader);
+    appendUInt32(xnb, 0);
+    xnb.append("\0\1", 2);
+    appendUInt32(xnb, 18);
+    const qsizetype formatPosition = xnb.size();
+    xnb.append(QByteArray::fromHex("01000100401f0000803e0000020010000000"));
+    appendUInt32(xnb, 4);
+    xnb.append(QByteArray::fromHex("0000ff7f"));
+    appendUInt32(xnb, 0);
+    appendUInt32(xnb, 2);
+    appendUInt32(xnb, 1);
+    qToLittleEndian<quint32>(static_cast<quint32>(xnb.size()), xnb.data() + 6);
+    const QByteArray expectedWav = QByteArray::fromHex(
+        "524946462800000057415645666d74201000000001000100401f0000803e00000200100064617461040000000000ff7f");
+    const QString soundSource = source.filePath("Content/Sound/角色/Voice.XNB");
+    if (!check(writeRawFile(soundSource, xnb) &&
+            writeRawFile(source.filePath("Content/Music/Theme.WMA"), "music bytes") &&
+            writeRawFile(source.filePath("Content/Music/Theme.xnb"), "external song reference"),
+            "write XNB PCM and external music fixtures"))
+        return false;
+
+    AssetMigrationOptions options;
+    options.resourceTypes = {AssetResourceType::Audio};
+    options.writeModProfile = false;
+    JxAssetMigrator migrator;
+    AssetMigrationReport report;
+    bool ok = check(migrator.migrate(source.path(), outputDirectory.path(), options, report) != MigrationResult::Failed &&
+            report.errorCount == 0 &&
+            readRawFile(QDir(outputDirectory.path()).filePath("sound/角色/voice.wav")) == expectedWav &&
+            readRawFile(QDir(outputDirectory.path()).filePath("music/theme.wma")) == "music bytes" &&
+            !QFileInfo::exists(QDir(outputDirectory.path()).filePath("Content")),
+        "audio-only migration maps Content, preserves PCM and copies external music");
+    QByteArray oddSound = xnb;
+    qToLittleEndian<quint32>(8000, oddSound.data() + formatPosition + 8);
+    qToLittleEndian<quint16>(1, oddSound.data() + formatPosition + 12);
+    qToLittleEndian<quint16>(8, oddSound.data() + formatPosition + 14);
+    const qsizetype pcmPosition = formatPosition + 22;
+    oddSound.remove(pcmPosition + 3, 1);
+    qToLittleEndian<quint32>(3, oddSound.data() + pcmPosition - 4);
+    qToLittleEndian<quint32>(3, oddSound.data() + pcmPosition + 7);
+    qToLittleEndian<quint32>(static_cast<quint32>(oddSound.size()), oddSound.data() + 6);
+    if (!check(writeRawFile(source.filePath("Content/Sound/Odd.xnb"), oddSound), "write odd-sized 8-bit PCM fixture"))
+        return false;
+    QTemporaryDir oddOutput;
+    AssetMigrationReport oddReport;
+    ok = check(migrator.migrate(source.path(), oddOutput.path(), options, oddReport) != MigrationResult::Failed &&
+            readRawFile(QDir(oddOutput.path()).filePath("sound/odd.wav")) == QByteArray::fromHex(
+                "524946462800000057415645666d74201000000001000100401f0000401f00000100080064617461030000000000ff00"),
+        "8-bit PCM retains its sample length and gets the required RIFF padding") && ok;
+    if (!check(writeRawFile(source.filePath("sound/角色/voice.wav"), expectedWav) &&
+            writeRawFile(source.filePath("music/theme.wma"), "music bytes"), "write identical runtime audio"))
+        return false;
+    QTemporaryDir duplicateOutput;
+    AssetMigrationReport duplicateReport;
+    ok = check(migrator.migrate(source.path(), duplicateOutput.path(), options, duplicateReport) != MigrationResult::Failed &&
+            duplicateReport.errorCount == 0 &&
+            std::count_if(duplicateReport.fileOutcomes.cbegin(), duplicateReport.fileOutcomes.cend(),
+                [](const AssetMigrationFileOutcome& outcome)
+                { return outcome.reason == "identical-to-runtime-audio"; }) == 2,
+        "identical converted Content audio shares its runtime output without a collision") && ok;
+    QByteArray metadataWav = expectedWav;
+    metadataWav.append("LIST", 4);
+    appendUInt32(metadataWav, 4);
+    metadataWav.append("INFO", 4);
+    qToLittleEndian<quint32>(static_cast<quint32>(metadataWav.size() - 8), metadataWav.data() + 4);
+    if (!check(writeRawFile(source.filePath("sound/角色/voice.wav"), metadataWav), "write WAV with ancillary metadata"))
+        return false;
+    QTemporaryDir metadataOutput;
+    AssetMigrationReport metadataReport;
+    ok = check(migrator.migrate(source.path(), metadataOutput.path(), options, metadataReport) != MigrationResult::Failed &&
+            readRawFile(QDir(metadataOutput.path()).filePath("sound/角色/voice.wav")) == metadataWav &&
+            std::any_of(metadataReport.fileOutcomes.cbegin(), metadataReport.fileOutcomes.cend(),
+                [](const AssetMigrationFileOutcome& outcome)
+                { return outcome.reason == "equivalent-pcm-runtime-audio"; }),
+        "equal PCM retains the original WAV and all ancillary metadata") && ok;
+    metadataWav[44] = 1;
+    if (!check(writeRawFile(source.filePath("sound/角色/voice.wav"), metadataWav), "write conflicting PCM sample"))
+        return false;
+    QTemporaryDir conflictOutput;
+    AssetMigrationReport conflictReport;
+    ok = check(migrator.migrate(source.path(), conflictOutput.path(), options, conflictReport) == MigrationResult::Failed &&
+            !QFileInfo::exists(QDir(conflictOutput.path()).filePath("music/theme.wma")),
+        "different Content and runtime audio fail before any publication") && ok;
+    source.remove("sound/角色/voice.wav");
+
+    QList<QByteArray> invalidSounds;
+    invalidSounds.append(xnb.first(15));
+    QByteArray invalid = xnb;
+    invalid[5] = static_cast<char>(0x80);
+    invalidSounds.append(invalid);
+    invalid = xnb;
+    invalid[formatPosition] = 2; // ADPCM requires a decoder.
+    invalidSounds.append(invalid);
+    invalid = xnb;
+    invalid.replace(10, 5, QByteArray(5, static_cast<char>(0xff)));
+    invalidSounds.append(invalid);
+    invalid = xnb;
+    qToLittleEndian<quint32>(1, invalid.data() + invalid.size() - 12);
+    qToLittleEndian<quint32>(1, invalid.data() + invalid.size() - 8);
+    invalidSounds.append(invalid);
+    for (const QByteArray& bytes : invalidSounds)
+    {
+        QTemporaryDir invalidOutput;
+        AssetMigrationReport invalidReport;
+        if (!check(writeRawFile(soundSource, bytes), "write unsupported or malformed XNB"))
+            return false;
+        ok = check(migrator.migrate(source.path(), invalidOutput.path(), options, invalidReport) == MigrationResult::Failed &&
+                invalidReport.errorCount > 0 &&
+                !QFileInfo::exists(QDir(invalidOutput.path()).filePath("sound/角色/voice.wav")) &&
+                invalidReport.logLines.join('\n').contains("XNB"),
+            "unsupported or malformed XNB is diagnosed and is never published as audio") && ok;
+    }
+    return ok;
+}
+
 bool testMigrationSkipsLegacyNonRuntimeFiles()
 {
     QTemporaryDir sourceDir;
@@ -1947,7 +2192,7 @@ bool testMigrationSkipsLegacyNonRuntimeFiles()
         return false;
 
     QDir source(sourceDir.path());
-    if (!check(source.mkpath("save/rpg0") && source.mkpath("Content/sound") &&
+    if (!check(source.mkpath("save/rpg0") && source.mkpath("Content/ui") &&
             source.mkpath("data") && source.mkpath("resource/editor") &&
             source.mkpath("Optional_Patch") && source.mkpath("font") &&
             source.mkpath("Mpc/UI") &&
@@ -1961,8 +2206,8 @@ bool testMigrationSkipsLegacyNonRuntimeFiles()
     bool ok = true;
     ok = check(writeUtf8TextFile(source.filePath("save/rpg0/game.ini"), "[State]\nMap=runtime\n"),
                "write root save fixture") && ok;
-    ok = check(writeUtf8TextFile(source.filePath("Content/sound/voice.xnb"), "xnb\n"),
-               "write XNB sound fixture") && ok;
+    ok = check(writeUtf8TextFile(source.filePath("Content/ui/voice.xnb"), "xnb\n"),
+               "write non-audio XNB fixture") && ok;
     ok = check(writeUtf8TextFile(source.filePath("Jxqy.exe"), "exe\n"),
                "write exe fixture") && ok;
     ok = check(writeUtf8TextFile(source.filePath("Engine.dll"), "dll\n"),
@@ -2017,10 +2262,10 @@ bool testMigrationSkipsLegacyNonRuntimeFiles()
                "migration reports skipped invalid map placeholders") && ok;
     ok = check(!QFileInfo::exists(output.filePath("save/rpg0/game.ini")),
                "migration skips root runtime save directory") && ok;
-    ok = check(!QFileInfo::exists(output.filePath("Content/sound/voice.xnb")),
+    ok = check(!QFileInfo::exists(output.filePath("Content/ui/voice.xnb")),
                "migration skips C# Content payload") && ok;
     ok = check(!QFileInfo::exists(output.filePath("sound/voice.wav")),
-               "migration skips XNA Content sound by default") && ok;
+               "migration does not treat a non-audio XNB as sound") && ok;
     ok = check(!QFileInfo::exists(output.filePath("Jxqy.exe")), "migration skips exe files") && ok;
     ok = check(!QFileInfo::exists(output.filePath("Engine.dll")), "migration skips dll files") && ok;
     ok = check(readRawFile(output.filePath("debug.txt")) ==
@@ -4373,6 +4618,13 @@ bool testMigrationResolvesCompositeAndProfileOutputOwnership()
             "Type=0\n"
             "UseWav=1\n"
             "\n"
+            "[Experience]\n"
+            "ExperienceMultiplier=2.5\n"
+            "\n"
+            "[Combat]\n"
+            "AttackReleaseFrameRatio=2/4\n"
+            "MagicReleaseFrameRatio=1/1\n"
+            "\n"
             "[Resource]\n"
             "DependencyId=OLD_BASE\n"
             "DependencyPath=../old-dependency\n"
@@ -4482,6 +4734,8 @@ bool testMigrationResolvesCompositeAndProfileOutputOwnership()
             publishedProfile.contains(
                 QStringLiteral(
                     "CustomGameKey=keep-game")) &&
+            !publishedProfile.contains(
+                QStringLiteral("ExperienceMultiplier=")) &&
             publishedProfile.contains(
                 QStringLiteral(
                     "Id=GENERATED_PROFILE")) &&
@@ -4568,6 +4822,9 @@ bool testMigrationResolvesCompositeAndProfileOutputOwnership()
                 "[Gameplay]\nPartnerFollowRadius=6\n"
                 "PartnerFollowRunRadius=11\n\n"
                 "[Combat]\nMinimumMagicDamage=4\n"
+                "AttackReleaseFrameRatio=2/3\n"
+                "SpecialAttackReleaseFrameRatio=1/3\n"
+                "MagicReleaseFrameRatio=4/5\n"
                 "MagicEffectCalculationMode=AddToAttack\n\n"
                 "[Script]\nNpcActionProfile=Legacy\n"
                 "NpcRuntimeProfile=Legacy\nSpecialActionMode=Replace\n"
@@ -4617,7 +4874,7 @@ bool testMigrationResolvesCompositeAndProfileOutputOwnership()
     ok = check(
         inheritedProfileText.contains(
             "DefeatedNpcExperienceMode=StoredExperience") &&
-            inheritedProfileText.contains("ExperienceMultiplier=2.5") &&
+            !inheritedProfileText.contains("ExperienceMultiplier=") &&
             inheritedProfileText.contains(
                 "LevelUpThresholdMode=GreaterThanOrEqual"),
         "asset conversion inherits experience defaults from the actual base profile") && ok;
@@ -4640,6 +4897,13 @@ bool testMigrationResolvesCompositeAndProfileOutputOwnership()
     ok = check(
         inheritedProfileText.contains("Music=custom-base.ogg"),
         "asset conversion inherits title music from the actual base profile") && ok;
+    ok = check(!inheritedProfileText.contains("ReleaseFrameRatio=") &&
+            !inheritedProfileText.contains("MagicTriggerAtAnimationEnd="),
+        "conversion leaves missing release ratios inherited and removes the obsolete timing switch") && ok;
+    ok = check(publishedProfile.contains("AttackReleaseFrameRatio=2/4") &&
+            publishedProfile.contains("MagicReleaseFrameRatio=1/1") &&
+            !publishedProfile.contains("SpecialAttackReleaseFrameRatio="),
+        "conversion preserves source release fractions without reducing or freezing inherited fields") && ok;
 
     AssetMigrationReport preservedMinimumDamageReport;
     const QString preservedMinimumDamageOutput =
@@ -4656,6 +4920,15 @@ bool testMigrationResolvesCompositeAndProfileOutputOwnership()
                 "game_profile.ini")).contains(
                     "MinimumMagicDamage=7"),
         "asset conversion preserves an explicit source minimum before applying the base default") && ok;
+    GameProfile convertedProfile;
+    ok = check(convertedProfile.loadFromFile(
+            QDir(preservedMinimumDamageOutput).filePath("game_profile.ini")) &&
+            convertedProfile.attackReleaseFrameRatioDefined &&
+            actionReleaseFrameRatioToString(convertedProfile.attackReleaseFrameRatio) == "2/4" &&
+            !convertedProfile.specialAttackReleaseFrameRatioDefined &&
+            convertedProfile.magicReleaseFrameRatioDefined &&
+            actionReleaseFrameRatioToString(convertedProfile.magicReleaseFrameRatio) == "1/1",
+        "reconverting a profile round-trips explicit fractions and keeps a missing field inherited") && ok;
 
     ok = check(
         root.mkpath(
@@ -6408,8 +6681,8 @@ bool testMigrationRejectsInheritedProfileWithoutDependency()
             standaloneProfile.contains(
                 QStringLiteral(
                     "DefeatedNpcExperienceMode=LevelProductWithBonus")) &&
-            standaloneProfile.contains(
-                QStringLiteral("ExperienceMultiplier=1")) &&
+            !standaloneProfile.contains(
+                QStringLiteral("ExperienceMultiplier=")) &&
             standaloneProfile.contains(
                 QStringLiteral("TextEncodingConverted=1")) &&
             !standaloneProfile.contains(
@@ -6712,6 +6985,232 @@ bool testMigrationBuildsChooseDefinitionFromSuppliedLayout()
             }
         }
     }
+    return ok;
+}
+
+std::vector<uint8_t> buildAsfFileFromImages(const std::vector<QImage>& frames,
+    int directions, int interval, int xMove, int yMove);
+
+bool testMigrationConvertsCSharpUiAnchors()
+{
+    QTemporaryDir sourceDir;
+    QTemporaryDir outputDir;
+    QDir source(sourceDir.path());
+    if (!sourceDir.isValid() || !outputDir.isValid() ||
+        !source.mkpath("Content/ui") || !source.mkpath("asf/ui") ||
+        !source.mkpath("ini/ui/xiulian") || !source.mkpath("ini/ui/dialog") ||
+        !source.mkpath("ini/ui/goods") || !source.mkpath("ini/ui/saveload") ||
+        !source.mkpath("ini/ui/memo") || !source.mkpath("ini/ui/system") ||
+        !source.mkpath("ini/ui/title"))
+        return false;
+    QDir collection(outputDir.path());
+    if (!collection.mkpath("base/ini/ui/system") ||
+        !writeUtf8TextFile(collection.filePath("resources.ini"),
+            "[Pack.UI_BASE]\nId=UI_BASE\nPath=base\nEnabled=1\n") ||
+        !writeUtf8TextFile(collection.filePath("base/game_profile.ini"),
+            "[Game]\nId=UI_BASE\nType=1\n[UI]\nProfile=YYCS\nPreferLocal=1\n") ||
+        !writeUtf8TextFile(collection.filePath("base/ini/ui/system/window.ini"),
+            "[Init]\nAlign=alCenter\nAlignX=17\nAlignY=-19\n"))
+        return false;
+    bool ok = writeUtf8TextFile(source.filePath("Content/ui/UI_Settings.ini"),
+        "[XiuLian]\nImage=asf\\ui\\practice.asf\nLeftAdjust=0\nTopAdjust=0\n"
+        "[Dialog]\nImage=asf\\ui\\dialog.asf\nLeftAdjust=0\nTopAdjust=-208\n"
+        "[Goods]\nLeftAdjust=0\nTopAdjust=0\n"
+        "[NpcInfoShow]\nWidth=300\nHeight=25\nLeftAdjust=-12\nTopAdjust=50\n"
+        "[Title_Btn_Begin]\nLeft=30\nTop=50\nWidth=199\nHeight=51\nImage=asf\\ui\\title-button.asf\n"
+        "[Title_Btn_Load]\nLeft=30\nTop=140\nWidth=199\nHeight=51\n");
+    ok = writeUtf8TextFile(source.filePath("ini/ui/title/initbtn.ini"),
+        "[Init]\nLeft=400\nTop=240\nWidth=199\nHeight=51\nImage=asf\\ui\\title-button.asf\n") && ok;
+    const QString customButton = "[Init]\nLeft=40\nTop=41\nWidth=42\nHeight=43\nStretch=false\n";
+    ok = writeUtf8TextFile(source.filePath("ini/ui/title/loadbtn.ini"), customButton) && ok;
+    QImage practice(319, 480, QImage::Format_ARGB32);
+    practice.fill(Qt::white);
+    QImage dialog(438, 123, QImage::Format_ARGB32);
+    dialog.fill(Qt::white);
+    const auto practiceBytes = buildAsfFileFromImages({practice}, 1, 60, 0, 0);
+    const auto dialogBytes = buildAsfFileFromImages({dialog}, 1, 60, 0, 0);
+    QImage titleButton(260, 72, QImage::Format_ARGB32);
+    titleButton.fill(Qt::blue);
+    QImage titleBackground(640, 480, QImage::Format_ARGB32);
+    titleBackground.fill(Qt::white);
+    ok = titleBackground.save(source.filePath("asf/ui/title-background.png")) &&
+        writeUtf8TextFile(source.filePath("ini/ui/title/window.ini"),
+            "[Init]\nLeft=0\nTop=0\nWidth=640\nHeight=480\nBitmap=asf/ui/title-background.png\n") && ok;
+    const auto titleButtonBytes = buildAsfFileFromImages({titleButton}, 1, 60, 0, 0);
+    ok = writeRawFile(source.filePath("asf/ui/title-button.asf"), QByteArray(
+        reinterpret_cast<const char*>(titleButtonBytes.data()), static_cast<int>(titleButtonBytes.size()))) && ok;
+    ok = writeRawFile(source.filePath("asf/ui/practice.asf"), QByteArray(
+        reinterpret_cast<const char*>(practiceBytes.data()), static_cast<int>(practiceBytes.size()))) && ok;
+    ok = writeRawFile(source.filePath("asf/ui/dialog.asf"), QByteArray(
+        reinterpret_cast<const char*>(dialogBytes.data()), static_cast<int>(dialogBytes.size()))) && ok;
+    for (const QString& directory : {QString("xiulian"), QString("dialog"),
+             QString("goods"), QString("saveload"), QString("memo"), QString("system")})
+    {
+        QString content = "[Init]\nWidth=320\nHeight=480\n";
+        if (directory == "xiulian") content = "[Init]\nWidth=280\nHeight=360\n";
+        if (directory == "dialog") content = "[Init]\nWidth=350\nHeight=85\n";
+        if (directory == "saveload") content = "[Init]\nWidth=640\nHeight=480\n";
+        if (directory == "memo") content += "Align=alRight\nAlignX=30\n";
+        ok = writeUtf8TextFile(source.filePath("ini/ui/" + directory + "/window.ini"), content) && ok;
+    }
+    if (!ok) return false;
+    AssetMigrationOptions options;
+    options.sourceEncoding = "utf8";
+    options.convertScript = false;
+    options.writeModProfile = false;
+    options.uiBaseId = "UI_BASE";
+    AssetMigrationReport report;
+    JxAssetMigrator migrator;
+    const QString destination = collection.filePath("converted");
+    const auto result = migrator.migrate(sourceDir.path(), destination, options, report);
+    ok = check(result != MigrationResult::Failed && report.errorCount == 0,
+        "C# UI layout conversion succeeds") && ok;
+    const auto window = [&](const char* name)
+    {
+        INIFileEditor ini;
+        ini.loadFromString(readUtf8TextFile(QDir(destination).filePath(
+            QString("ini/ui/%1/window.ini").arg(name))).toStdString());
+        return ini;
+    };
+    const auto left = window("xiulian");
+    const auto right = window("goods");
+    const auto talk = window("dialog");
+    const auto targetLife = window("npcinfo");
+    ok = check(targetLife.get("Init", "Align") == "alTopCenter" &&
+        targetLife.getInteger("Init", "Width") == 300 && targetLife.getInteger("Init", "Height") == 25 &&
+        targetLife.getInteger("Init", "AlignX") == -12 && targetLife.getInteger("Init", "AlignY") == 50,
+        "C# target life bar retains its dimensions and viewport offsets") && ok;
+    const QString nativeTargetLife = "[Init]\nAlignY=73\n";
+    ok = source.mkpath("ini/ui/npcinfo") &&
+        writeUtf8TextFile(source.filePath("ini/ui/npcinfo/window.ini"), nativeTargetLife) && ok;
+    AssetMigrationReport nativeTargetReport;
+    const QString nativeTargetDestination = collection.filePath("native-target-life");
+    const auto nativeTargetResult = migrator.migrate(sourceDir.path(), nativeTargetDestination, options, nativeTargetReport);
+    ok = check(nativeTargetResult != MigrationResult::Failed && nativeTargetReport.errorCount == 0 &&
+        readUtf8TextFile(QDir(nativeTargetDestination).filePath("ini/ui/npcinfo/window.ini")) == nativeTargetLife,
+        "explicit per-MOD target life offset survives even without an Align field") && ok;
+    ok = check(left.get("Init", "Align") == "alLTCorner" &&
+        left.getInteger("Init", "Width") == 319 && left.getInteger("Init", "Height") == 480 &&
+        left.getInteger("Init", "AlignX") == -30 && right.getInteger("Init", "AlignX") == 30 &&
+        left.getInteger("Init", "AlignY") == 0 &&
+        right.get("Init", "Align") == "alRTCorner",
+        "C# menus retain runtime corner anchors and practice uses its texture size") && ok;
+    ok = check(talk.get("Init", "Align") == "alBottomCenter" &&
+        talk.getInteger("Init", "Width") == 438 && talk.getInteger("Init", "Height") == 123 &&
+        talk.getInteger("Init", "AlignX") == 0 && talk.getInteger("Init", "AlignY") == -85,
+        "C# dialogue centers its actual background above the bottom HUD") && ok;
+    ok = check(window("saveload").get("Init", "Align") == "alCenter" &&
+        window("memo").get("Init", "Align") == "alRight" &&
+        window("memo").getInteger("Init", "AlignX") == 30,
+        "standalone windows center and explicitly authored runtime anchors survive") && ok;
+    ok = check(window("system").get("Init", "Align") == "alCenter" &&
+        window("system").getInteger("Init", "AlignX") == 17 &&
+        window("system").getInteger("Init", "AlignY") == -19,
+        "conversion inherits the selected UI base's modal anchor and offsets") && ok;
+    QFile outputWindow(QDir(destination).filePath("ini/ui/xiulian/window.ini"));
+    ok = check(outputWindow.open(QIODevice::ReadOnly) &&
+        !outputWindow.readAll().startsWith(QByteArray::fromHex("efbbbfefbbbf")),
+        "UI layout conversion does not duplicate the original UTF-8 BOM") && ok;
+    INIFileEditor convertedButton;
+    convertedButton.loadFromString(readUtf8TextFile(QDir(destination).filePath(
+        "ini/ui/title/initbtn.ini")).toStdString());
+    ok = check(convertedButton.getInteger("Init", "Left") == 30 &&
+        convertedButton.getInteger("Init", "Top") == 50 &&
+        convertedButton.getInteger("Init", "Width") == 260 &&
+        convertedButton.getInteger("Init", "Height") == 72 &&
+        convertedButton.getBoolean("Init", "Stretch"),
+        "title uses effective C# positions and scales its actual image and hit rectangle together") && ok;
+    ok = check(readUtf8TextFile(QDir(destination).filePath("ini/ui/title/loadbtn.ini")) == customButton,
+        "explicit custom title-button scaling remains unchanged") && ok;
+    if (!QFile::remove(source.filePath("Content/ui/UI_Settings.ini")) ||
+        !collection.mkpath("base/asf/ui") ||
+        !QFile::copy(source.filePath("asf/ui/title-button.asf"), collection.filePath("base/asf/ui/title-button.asf")) ||
+        !QFile::remove(source.filePath("asf/ui/title-button.asf")))
+        return false;
+    AssetMigrationReport nativeReport;
+    const QString nativeDestination = collection.filePath("native-title");
+    const auto nativeResult = migrator.migrate(sourceDir.path(), nativeDestination, options, nativeReport);
+    convertedButton.loadFromString(readUtf8TextFile(QDir(nativeDestination).filePath(
+        "ini/ui/title/initbtn.ini")).toStdString());
+    ok = check(nativeResult != MigrationResult::Failed && nativeReport.errorCount == 0 &&
+        convertedButton.getInteger("Init", "Left") == 400 &&
+        convertedButton.getInteger("Init", "Top") == 240 &&
+        convertedButton.getInteger("Init", "Width") == 260 &&
+        convertedButton.getInteger("Init", "Height") == 72 &&
+        convertedButton.getBoolean("Init", "Stretch") &&
+        readUtf8TextFile(QDir(nativeDestination).filePath("ini/ui/title/loadbtn.ini")) == customButton,
+        "title without C# settings resolves inherited images and preserves positions and explicit scaling") && ok;
+    INIFileEditor nativeTitle;
+    nativeTitle.loadFromString(readUtf8TextFile(QDir(nativeDestination).filePath(
+        "ini/ui/title/window.ini")).toStdString());
+    ok = check(nativeTitle.get("Init", "Align") == "alClient" &&
+        nativeTitle.getBoolean("Init", "Stretch") && nativeTitle.getBoolean("Init", "KeepAspect") &&
+        nativeTitle.getInteger("Init", "Width") == 640 && nativeTitle.getInteger("Init", "Height") == 480,
+        "fresh conversion gives native title background and buttons the same viewport transform") && ok;
+    AssetMigrationReport repeatReport;
+    const QString repeatedDestination = collection.filePath("repeated-title");
+    migrator.migrate(nativeDestination, repeatedDestination, options, repeatReport);
+    for (const char* name : {"window", "initbtn", "loadbtn"})
+    {
+        const QString path = QString("ini/ui/title/%1.ini").arg(name);
+        ok = check(repeatReport.errorCount == 0 &&
+            readUtf8TextFile(QDir(repeatedDestination).filePath(path)) ==
+                readUtf8TextFile(QDir(nativeDestination).filePath(path)),
+            "reconverting generated title files preserves their viewport and button layout") && ok;
+    }
+    const QString customTitle = "[Init]\nLeft=17\nTop=21\nWidth=800\nHeight=600\n"
+        "Bitmap=asf/ui/title-background.png\nStretch=false\n";
+    if (!writeUtf8TextFile(source.filePath("ini/ui/title/window.ini"), customTitle))
+        return false;
+    AssetMigrationReport customTitleReport;
+    const QString customDestination = collection.filePath("custom-title");
+    migrator.migrate(sourceDir.path(), customDestination, options, customTitleReport);
+    ok = check(customTitleReport.errorCount == 0 &&
+        readUtf8TextFile(QDir(customDestination).filePath("ini/ui/title/window.ini")) == customTitle,
+        "explicit native title background scaling stays unchanged even with a valid image") && ok;
+
+    if (!writeUtf8TextFile(source.filePath("Content/ui/UI_Settings.ini"),
+            "[Title_Btn_Begin]\nLeft=30\nTop=50\nWidth=120\nHeight=44\n"))
+        return false;
+    for (bool scaleChildren : {false, true})
+    {
+        const QString anchoredTitle = QString(
+            "[Init]\nAlign=alClient\nAlignX=17\nAlignY=21\nWidth=800\nHeight=600\n"
+            "Bitmap=asf/ui/title-background.png\nScaleChildren=%1\n").arg(scaleChildren ? 1 : 0);
+        if (!writeUtf8TextFile(source.filePath("ini/ui/title/window.ini"), anchoredTitle))
+            return false;
+        AssetMigrationReport anchoredReport;
+        const QString anchoredDestination = collection.filePath(
+            QString("anchored-title-%1").arg(scaleChildren ? 1 : 0));
+        const auto anchoredResult = migrator.migrate(sourceDir.path(), anchoredDestination, options, anchoredReport);
+        ok = check(anchoredResult != MigrationResult::Failed && anchoredReport.errorCount == 0,
+            "convert a title with an explicitly authored parent anchor") && ok;
+        for (const char* name : {"window", "initbtn", "loadbtn"})
+        {
+            const QString path = QString("ini/ui/title/%1.ini").arg(name);
+            ok = check(readUtf8TextFile(QDir(anchoredDestination).filePath(path)) ==
+                    readUtf8TextFile(source.filePath(path)),
+                "an authored title anchor preserves the parent and button configurations") && ok;
+        }
+    }
+
+    const QString anchoredButton = "[Init]\nAlign=alBottomCenter\nAlignX=17\nAlignY=-25\n"
+        "Left=123\nTop=124\nWidth=120\nHeight=44\nImage=asf/ui/title-button.asf\n";
+    if (!writeUtf8TextFile(source.filePath("ini/ui/title/window.ini"),
+            "[Init]\nWidth=640\nHeight=480\nBitmap=asf/ui/title-background.png\n") ||
+        !writeUtf8TextFile(source.filePath("ini/ui/title/initbtn.ini"), anchoredButton))
+        return false;
+    AssetMigrationReport anchoredButtonReport;
+    const QString anchoredButtonDestination = collection.filePath("anchored-title-button");
+    const auto anchoredButtonResult = migrator.migrate(sourceDir.path(), anchoredButtonDestination,
+        options, anchoredButtonReport);
+    INIFileEditor convertedTitle;
+    convertedTitle.loadFromString(readUtf8TextFile(QDir(anchoredButtonDestination).filePath(
+        "ini/ui/title/window.ini")).toStdString());
+    ok = check(anchoredButtonResult != MigrationResult::Failed && anchoredButtonReport.errorCount == 0 &&
+        convertedTitle.get("Init", "Align") == "alClient" &&
+        readUtf8TextFile(QDir(anchoredButtonDestination).filePath("ini/ui/title/initbtn.ini")) == anchoredButton,
+        "an authored button anchor survives conversion of its legacy title parent") && ok;
     return ok;
 }
 
@@ -7162,7 +7661,7 @@ bool testMigrationPreservesUiAndSupplementalFiles()
                mixedProfileText.contains("Profile=YYCS") &&
                mixedProfileText.contains("PreferLocal=1") &&
                mixedProfileText.contains("[Features]") &&
-               mixedProfileText.contains("MagicTriggerAtAnimationEnd=1") &&
+               !mixedProfileText.contains("MagicTriggerAtAnimationEnd=") &&
                !mixedProfileText.contains("Author=") &&
                !mixedProfileText.contains("[Team]") &&
                !mixedProfileText.contains("InfoFile="),
@@ -7645,6 +8144,8 @@ bool testMigrationSourceEncodingOptionPreservesChineseText()
     bool ok = true;
     ok = runCase("gbk", gbkMapName, expectedMapName, "GBK source") && ok;
     ok = runCase("utf8", utf8MapName, expectedMapName, "UTF-8 source") && ok;
+    ok = runCase("gbk", utf8MapName, expectedMapName,
+                 "UTF-8 BOM file in a GBK source pack", true) && ok;
     ok = runCase("gbk", accidentallyValidGbk, QString::fromUtf8("药品"),
                  "GBK accidentally-valid UTF-8 byte sequence") && ok;
     ok = runCase("gbk", accidentallyValidGbkMoney, QString::fromUtf8("钱"),
@@ -9864,6 +10365,7 @@ int main(int argc, char* argv[])
     ok = testScriptLegacySpellingAliases() && ok;
     ok = testScriptDiagnostics() && ok;
     ok = testScriptLegacyNumericCondition() && ok;
+    ok = testScriptCompoundConditions() && ok;
     ok = testScriptGambleOutputVariable() && ok;
     ok = testScriptLegacyWildcardArguments() && ok;
     ok = testScriptOriginalCompatibilityCommands() && ok;
@@ -9874,6 +10376,7 @@ int main(int argc, char* argv[])
     ok = testScriptTrailingColonFunctionCall() && ok;
     ok = testMoonlightScriptCompatibility() && ok;
     ok = testNewJxMultilineScriptCompatibility() && ok;
+    ok = testMultilineCallArgumentsAndEmptyStatement() && ok;
     ok = testLuaScriptSyntaxValidator() && ok;
     ok = testLuaScriptSyntaxValidatorSkipsLegacyDialogueAndDocs() && ok;
     ok = testMigrationPreservesLegacyScriptDocumentation() && ok;
@@ -9881,6 +10384,7 @@ int main(int argc, char* argv[])
     ok = testMigrationPreservesResourceScriptLocationsAndMovieNames() && ok;
     ok = testMigrationSkipsLegacySourceControlMetadata() && ok;
     ok = testMigrationSkipsLegacyNonRuntimeFiles() && ok;
+    ok = testMigrationConvertsLegacyContentAudio() && ok;
     ok = testMigrationMapsLegacyNewGameSaveTemplate() && ok;
     ok = testMigrationOverlaysLegacyNewGameSaveTemplate() && ok;
     ok = testMigrationRejectsUnsafeOutputPaths() && ok;
@@ -9896,6 +10400,7 @@ int main(int argc, char* argv[])
     ok = testMigrationRejectsInheritedProfileWithoutDependency() && ok;
     ok = testMigrationPreservesExplicitUiPresentation() && ok;
     ok = testMigrationBuildsChooseDefinitionFromSuppliedLayout() && ok;
+    ok = testMigrationConvertsCSharpUiAnchors() && ok;
     ok = testMigrationPreservesUiAndSupplementalFiles() && ok;
     ok = testMigrationNormalizesRuntimeEntryJpegs() && ok;
     ok = testMigrationNormalizesObjectAnimationResource() && ok;

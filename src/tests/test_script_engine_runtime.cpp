@@ -1,5 +1,6 @@
 #include "../Game/Script/Script.h"
 #include "../Game/Script/ScriptNpcAction.h"
+#include "../Game/Config/Config.h"
 #include "../Game/Data/ColorStyle.h"
 #include "../Game/Data/Goods.h"
 #include "../Game/Data/Magic.h"
@@ -8,14 +9,19 @@
 #include "../Game/Data/NPCManager.h"
 #include "../Game/Data/NPCAction/NPCActionManager.h"
 #include "../Game/GameManager/GameManager.h"
+#include "../Game/GameManager/GameController.h"
 #include "../Game/GameManager/ScriptRuntimeState.h"
 #include "../Element/Element.h"
 #include "../Engine/Engine.h"
+#include "../File/File.h"
 #include "../Image/IMP.h"
 #include "../Launch/EditorRunRuntimeTraceWriter.h"
 #include "../Resource/ResourceManifest.h"
 
 #include <cstring>
+#include <chrono>
+#include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -129,6 +135,17 @@ public:
 		script.registerLuaFunction("test_request_application_quit", requestApplicationQuit);
 	}
 
+	static void registerPlayerDeathTrigger(Script& script)
+	{
+		script.registerLuaFunction("test_queue_player_death", [](lua_State*)
+		{
+			gm->varList.setInteger("ActiveBatchBlocksInput",
+				gm->scriptTaskList.empty() && gm->hasPendingTrapScript());
+			gm->player->result |= erRunDeathScript;
+			return 0;
+		});
+	}
+
 	static void registerTraceNestedRunner(Script& script)
 	{
 		lua_pushlightuserdata(script.luaState, &script);
@@ -169,6 +186,22 @@ public:
 	static bool runPendingPlayerDeathScript(GameManager& gameManager)
 	{
 		return gameManager.runPendingPlayerDeathScript();
+	}
+
+	static void updateGameManager(GameManager& gameManager)
+	{
+		gameManager.onUpdate();
+	}
+
+	static void advanceGameManager(GameManager& gameManager, UTime milliseconds)
+	{
+		gameManager.frameTime = milliseconds;
+		gameManager.onUpdate();
+	}
+
+	static void registerScriptProbe(Script& script, const char* name, lua_CFunction callback)
+	{
+		script.registerLuaFunction(name, callback);
 	}
 
 private:
@@ -252,6 +285,7 @@ public:
 		specialActionStartCount = 0;
 		eventRunCount = 0;
 		goToCount = 0;
+		runToCount = 0;
 		goToExCount = 0;
 		goToDirCount = 0;
 		recordedDirection = -1;
@@ -336,6 +370,14 @@ public:
 		++goToExCount;
 	}
 
+	void runTo(Point destination) override
+	{
+		recordedAction = RecordedNpcAction::Run;
+		recordedDestination = destination;
+		inputEnabledDuringBlockingMove = gm == nullptr || gm->global.data.canInput;
+		++runToCount;
+	}
+
 	void goToDir(int direction, int distance) override
 	{
 		recordedDirection = direction;
@@ -387,6 +429,7 @@ public:
 	int specialActionStartCount = 0;
 	int eventRunCount = 0;
 	int goToCount = 0;
+	int runToCount = 0;
 	int goToExCount = 0;
 	int goToDirCount = 0;
 	int recordedDirection = -1;
@@ -1155,6 +1198,279 @@ bool runScriptPlayerNameTests(GameManager& gameManager)
 	return ok;
 }
 
+bool runPlayerOffsetWalkScriptTests()
+{
+	class FrameSteppedOffsetPlayer : public Player
+	{
+	public:
+		unsigned int eventRun() override
+		{
+			inputEnabledDuringMove = gm->global.data.canInput;
+			frames = 0;
+			while (isWalking() && frames < 2000)
+			{
+				setTime(getTime() + 16);
+				actionManager->update(16);
+				++frames;
+				if (interruptAfterFirstFrame && frames == 1) beginStand();
+			}
+			return 0;
+		}
+		bool inputEnabledDuringMove = true;
+		bool interruptAfterFirstFrame = false;
+		int frames = 0;
+	};
+	GameManager gameManager;
+	applyOriginalBehavior(gameManager.global, GAME_YYCS);
+	auto player = std::make_shared<FrameSteppedOffsetPlayer>();
+	gameManager.player = player;
+	player->res.walk.imagePackage = std::make_shared<IMPImage>();
+	player->res.walk.imagePackage->directions = 8;
+	player->res.walk.imagePackage->interval = 40;
+	player->res.walk.imagePackage->frame.resize(8);
+	player->res.stand.imagePackage = player->res.walk.imagePackage;
+	player->life = player->info.lifeMax = 100;
+	Script script;
+	bool ok = true;
+	const int xSteps[] = { 0, -2, -2, -2, 0, 2, 2, 2 };
+	const int ySteps[] = { 1, 1, 0, -1, -1, -1, 0, 1 };
+	for (int direction = 0; direction < 8; ++direction)
+	{
+		player->setPosition({ 5, 6 }, false);
+		player->setOffset({ 1.5f, -2.0f });
+		gameManager.global.data.canInput = true;
+		const int result = ScriptEngineRuntimeTestAccess::execute(script,
+			"playergotodirex(" + std::to_string(direction) + ",3)");
+		const PointEx offset = player->getOffset();
+		ok = check(result == LUA_OK && player->getPosition() == Point{ 5, 6 }
+			&& offset.x == 1.5f + xSteps[direction] * 3 && offset.y == -2.0f + ySteps[direction] * 3
+			&& player->isStanding() && player->frames > 0 && player->frames < 2000,
+			"PlayerGotoDirEx waits for offset walking in each legacy direction without changing map tiles") && ok;
+		ok = check(!player->inputEnabledDuringMove && gameManager.global.data.canInput,
+			"offset script walking blocks player input and restores it on completion") && ok;
+	}
+	const PointEx previousOffset = player->getOffset();
+	const int previousFrames = player->frames;
+	ScriptEngineRuntimeTestAccess::execute(script,
+		"playergotodirex(0,0); playergotodirex(0,-1); playergotodirex(8,3); playergotodirex(0)");
+	ok = check(player->getOffset().x == previousOffset.x && player->getOffset().y == previousOffset.y
+		&& player->frames == previousFrames && gameManager.global.data.canInput,
+		"invalid offset movement parameters do not start a wait or change the actor") && ok;
+	gameManager.global.data.canInput = false;
+	ScriptEngineRuntimeTestAccess::execute(script, "playergotodirex(0,3)");
+	ok = check(!gameManager.global.data.canInput,
+		"offset walking preserves an input block that was already active") && ok;
+	gameManager.global.data.canInput = true;
+	player->interruptAfterFirstFrame = true;
+	ScriptEngineRuntimeTestAccess::execute(script, "playergotodirex(0,128)");
+	ok = check(player->frames == 1 && player->isStanding() && gameManager.global.data.canInput,
+		"replacing the offset action terminates the synchronous wait without forcing the destination") && ok;
+	player->interruptAfterFirstFrame = false;
+	player->res.walk.imagePackage.reset();
+	const int framesBeforeMissingAnimation = player->frames;
+	ScriptEngineRuntimeTestAccess::execute(script, "playergotodirex(0,3)");
+	ok = check(player->frames == framesBeforeMissingAnimation && player->isStanding()
+		&& gameManager.global.data.canInput,
+		"a missing walk animation returns without entering a movement wait") && ok;
+	return ok;
+}
+
+bool runConfiguredPixelRunSpeedTests()
+{
+	GameManager gameManager;
+	gameManager.global.data.NPCAI = false;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = gameManager.map->data->head.height = 16;
+	gameManager.map->data->tile.assign(16, std::vector<MapTile>(16));
+	auto player = gameManager.player;
+	player->life = player->info.lifeMax = player->lifeMax = 1000;
+	player->thew = player->info.thewMax = player->thewMax = 1000;
+	NPCActionRes animation;
+	animation.imagePackage = std::make_shared<IMPImage>();
+	animation.imagePackage->directions = 8;
+	animation.imagePackage->interval = 40;
+	animation.imagePackage->frame.resize(16);
+	player->res.stand = player->res.walk = player->res.run = player->res.arun = animation;
+	const float savedGameSpeed = Config::getGameSpeed();
+	Config::setGameSpeed(SPEED_TIME_DEFAULT);
+	const auto reset = [&]()
+	{
+		player->forceBeginStand();
+		player->setPosition({ 6, 6 }, false);
+		gameManager.map->createDataMap();
+	};
+	reset();
+	player->beginRun({ 7, 6 });
+	const UTime legacyRunTime = player->stepLastTime;
+	reset();
+	player->beginWalk({ 7, 6 });
+	const UTime legacyWalkTime = player->stepLastTime;
+	player->forceBeginStand();
+	const std::string text = "[Game]\nId=PIXEL_RUN\n[Gameplay]\nRunSpeedPixelsPerSecond=400\n";
+	ResourceManifest manifest;
+	bool ok = check(manifest.loadFromBuffer(text.data(), static_cast<int>(text.size())),
+		"the real MOD pixel running speed profile parses");
+	gameManager.global.applyResourceManifestFeatures(manifest);
+	reset();
+	player->beginWalk({ 7, 6 });
+	ok = check(player->isWalking() && player->stepLastTime == legacyWalkTime,
+		"a configured pixel running speed does not alter walking") && ok;
+	for (bool fighting : { false, true })
+	{
+		for (int direction = 0; direction < 8; ++direction)
+		{
+			reset();
+			player->fightState.set(fighting);
+			const Point destination = Map::getSubPoint(player->getPosition(), direction);
+			const auto delta = Map::getTilePosition(destination, player->getPosition());
+			const double expectedHalfStep = std::hypot(static_cast<double>(delta.x), static_cast<double>(delta.y)) * 500.0 / 400.0;
+			player->beginRun(destination);
+			ok = check(player->isRunning() && std::abs(static_cast<double>(player->stepLastTime) - expectedHalfStep) <= 0.5,
+				"configured normal and combat running uses the same screen pixel speed in all directions") && ok;
+			int elapsed = 0;
+			while (player->isRunning() && elapsed < 1000)
+			{
+				player->setTime(player->getTime() + 1);
+				player->actionManager->update(1);
+				++elapsed;
+			}
+			ok = check(player->isStanding() && player->getPosition() == destination
+				&& std::abs(elapsed - expectedHalfStep * 2) <= 1.0,
+				"a complete running step reaches its target at the configured pixel duration") && ok;
+		}
+	}
+	reset();
+	player->equipmentChangeMoveSpeedPercent = 20;
+	player->addMoveSpeedPercent = 30;
+	Config::setGameSpeed(SPEED_TIME_DEFAULT * 1.5f);
+	player->beginRun({ 7, 6 });
+	ok = check(std::abs(static_cast<double>(player->stepLastTime) - 64.0 * 500 / 400 / 1.5 / 1.5) <= 0.5,
+		"configured running composes equipment, scripted speed and the existing game speed option") && ok;
+	player->equipmentChangeMoveSpeedPercent = player->addMoveSpeedPercent = 0;
+	Config::setGameSpeed(SPEED_TIME_DEFAULT);
+	for (const char* value : { "", "0", "-1", "nan", "inf", "2147483648", "400junk", "0.5" })
+	{
+		const std::string invalidText = std::string("[Game]\nId=DEFAULT_RUN\n[Gameplay]\nRunSpeedPixelsPerSecond=") + value + "\n";
+		manifest.loadFromBuffer(invalidText.data(), static_cast<int>(invalidText.size()));
+		gameManager.global.applyResourceManifestFeatures(manifest);
+		reset();
+		player->beginRun({ 7, 6 });
+		ok = check(player->stepLastTime == legacyRunTime,
+			"switching to absent or invalid pixel speed restores the existing running rule") && ok;
+	}
+	player->forceBeginStand();
+	Config::setGameSpeed(savedGameSpeed);
+	return ok;
+}
+
+bool runPaperScriptTests()
+{
+	GameManager gameManager;
+	gameManager.varList.ensureInitialized();
+	gameManager.memo.memo = { "Existing quest" };
+	Script script;
+	const int result = ScriptEngineRuntimeTestAccess::execute(script,
+		"openpaper(3,'First page','Second page');assign('paper_returned',1)");
+	return check(result == LUA_OK
+		&& gameManager.varList.getInteger("paper_returned") == 1
+		&& gameManager.menu->menuDisplayed()
+		&& gameManager.menu->blocksWorldInput()
+		&& gameManager.menu->blocksWorldKeyboardInput()
+		&& gameManager.menu->blocksWorldPointerInput()
+		&& gameManager.memo.memo == std::deque<std::string>{ "Existing quest" },
+		"MG OpenPaper returns immediately and retains a reader that owns world input");
+}
+
+bool runMiniGameScriptTests()
+{
+	GameManager gameManager;
+	gameManager.varList.ensureInitialized();
+	Script script;
+	return check(ScriptEngineRuntimeTestAccess::execute(script,
+		"showminigame('unknown');showminigame();assign('minigame_returned',1)") == LUA_OK
+		&& gameManager.varList.getInteger("minigame_returned") == 1
+		&& !gameManager.menu->blocksWorldInput(),
+		"MG ShowMiniGame accepts unsupported or missing names without opening a modal");
+}
+
+bool runMgEqualLevelScriptTests()
+{
+	GameManager gameManager;
+	auto player = gameManager.player;
+	player->npcName = "Hero";
+	player->level = 3;
+	auto partner = std::make_shared<NPC>();
+	partner->npcName = "Partner";
+	partner->kind = nkPartner;
+	partner->relation = nrFriendly;
+	partner->npcLevelIni = "level-hard.ini";
+	partner->npcLevelList.resize(3);
+	auto& info = partner->npcLevelList[2];
+	info.lifeMax = 130;
+	info.thewMax = 33;
+	info.manaMax = 44;
+	info.attack = 17;
+	info.levelUpExp = 900;
+	info.exp = 314;
+	partner->level = 1;
+	partner->life = 2;
+	partner->exp = 77;
+	partner->equipmentAttributes.lifeMax = 10;
+	auto duplicate = std::make_shared<NPC>();
+	duplicate->npcName = "Partner";
+	duplicate->level = 9;
+	gameManager.npcManager->npcList = { partner, duplicate };
+	Script script;
+	bool ok = check(ScriptEngineRuntimeTestAccess::execute(script, "setnpclevelequalplayer('Partner')") == LUA_OK
+		&& partner->level == 3 && duplicate->level == 9 && partner->life == 140
+		&& partner->thew == 33 && partner->mana == 44 && partner->attack == 17
+		&& partner->levelUpExp == 900 && partner->exp == 77,
+		"MG equal-level resets only the first named actor from its own level table and retains friendly experience");
+	partner->kind = nkBattle;
+	partner->relation = nrHostile;
+	ScriptEngineRuntimeTestAccess::execute(script, "setnpclevelequalplayer('Partner')");
+	ok = check(partner->exp == 314,
+		"MG equal-level takes hostile battle experience from the matching level row") && ok;
+	partner->kind = nkPartner;
+	partner->relation = nrNeutral;
+	partner->life = 5;
+	partner->exp = 88;
+	gameManager.scriptNPC = partner;
+	ScriptEngineRuntimeTestAccess::execute(script, "setnpclevelequalplayer('')");
+	ok = check(partner->level == 3 && partner->life == 140 && partner->exp == 88,
+		"an empty MG equal-level name resolves the current script actor, including a neutral partner") && ok;
+	player->level = 7;
+	partner->life = 19;
+	partner->attack = 76;
+	ScriptEngineRuntimeTestAccess::execute(script, "setnpclevelequalplayer('Partner')");
+	ok = check(partner->level == 7 && partner->life == 19 && partner->attack == 76 && partner->exp == 88,
+		"a missing MG level row changes the level without clamping or inventing attributes") && ok;
+	player->level = 3;
+	info.lifeMax = 0;
+	info.life = 125;
+	info.thewMax = info.manaMax = 0;
+	ScriptEngineRuntimeTestAccess::execute(script, "setnpclevelequalplayer('Partner')");
+	ok = check(partner->lifeMax == 125 && partner->life == 135 && partner->thew == 0 && partner->mana == 0,
+		"MG level rows use Life as a fallback and retain explicit zero stamina and mana") && ok;
+	player->levelList.resize(3);
+	player->levelList[2].lifeMax = 150;
+	player->levelList[2].thewMax = 50;
+	player->levelList[2].manaMax = 55;
+	player->exp = 222;
+	ScriptEngineRuntimeTestAccess::execute(script, "setnpclevelequalplayer('Hero')");
+	ok = check(player->level == 3 && player->life == 150 && player->thew == 50
+		&& player->mana == 55 && player->exp == 222,
+		"MG equal-level can address the player by name without changing accumulated experience") && ok;
+	gameManager.scriptNPC.reset();
+	player->life = 3;
+	partner->life = 4;
+	ScriptEngineRuntimeTestAccess::execute(script,
+		"setnpclevelequalplayer('missing'); setnpclevelequalplayer(''); setnpclevelequalplayer()");
+	ok = check(player->life == 3 && partner->life == 4,
+		"missing MG equal-level parameters, names or script actors leave other actors untouched") && ok;
+	return ok;
+}
+
 bool runPlayerForcedMovementUpdateTests()
 {
 	class FrameSteppedPlayer : public Player
@@ -1419,6 +1735,554 @@ bool runScriptActionResourceCostTests()
 		gameManager.scriptAPI.useMagic("story_cost.ini", 4, 4, true);
 		ok = check(!gameManager.effectManager->effectList.empty() && player->mana == 0 && player->thew == 0,
 			"immediate self-cure script casts also ignore mana and stamina costs") && ok;
+
+		ResourceManifest freeNormalRun;
+		freeNormalRun.type = originalType;
+		freeNormalRun.features["usethewwhennormalrun"] = false;
+		gameManager.global.applyResourceManifestFeatures(freeNormalRun);
+		for (bool fighting : { false, true })
+		{
+			for (int resources : { 0, 100 })
+			{
+				reset(resources);
+				player->fightState.set(fighting);
+				player->beginRun({ 8, 8 });
+				const bool canRun = !fighting || resources >= RUN_THEW_COST;
+				ok = check(player->isRunning() == canRun,
+					"normal-run exemption allows zero stamina only outside combat") && ok;
+				player->eventRun();
+				ok = check(player->isStanding()
+					&& (!canRun || player->getPosition() == Point{ 8, 8 })
+					&& (fighting && canRun ? player->thew < resources : player->thew == resources),
+					"normal-run exemption applies to the entire path while combat retains step costs") && ok;
+			}
+		}
+		reset(100);
+		player->fightState.set(true);
+		player->beginRun({ 8, 8 });
+		player->fightState.update(10000);
+		player->eventRun();
+		ok = check(player->getPosition() == Point{ 8, 8 } && player->thew == 100 - RUN_THEW_COST,
+			"leaving combat while running stops charging subsequent steps") && ok;
+		reset(0);
+		player->fightState.set(false);
+		player->beginRun({ 8, 8 });
+		player->fightState.set(true);
+		player->eventRun();
+		ok = check(player->isStanding() && player->getPosition() != Point{ 8, 8 } && player->thew == 0,
+			"entering combat rechecks stamina before committing the next running step") && ok;
+	}
+	return ok;
+}
+
+bool runPendingTrapWorldInputTests()
+{
+	GameManager gameManager;
+	gameManager.global.data.canInput = true;
+	gameManager.map->data = std::make_shared<MapData>();
+	gameManager.map->data->head.width = 8;
+	gameManager.map->data->head.height = 8;
+	gameManager.map->data->tile.assign(8, std::vector<MapTile>(8));
+	gameManager.map->createDataMap();
+	gameManager.player->life = 100;
+	gameManager.player->setPosition({ 3, 4 }, false);
+	auto npc = std::make_shared<NPC>();
+	npc->kind = nkNormal;
+	npc->relation = nrNeutral;
+	npc->life = 100;
+	npc->scriptFile = "pending-trap-input-npc.lua";
+	npc->setPosition({ 5, 4 });
+	gameManager.npcManager->npcList.push_back(npc);
+	AEvent talkKey(ET_KEYDOWN, KEY_E, 0, 0);
+	bool ok = check(gameManager.controller->onHandleEvent(talkKey)
+		&& gameManager.player->nextAction != nullptr,
+		"world keyboard interaction is available before a trap is queued");
+	gameManager.player->cancelQueuedInteraction();
+	ScriptTask trapTask;
+	trapTask.type = stTraps;
+	trapTask.scriptName = "pending-trap-input.lua";
+	trapTask.scriptMapName = "pending-trap-input-map";
+	trapTask.trapIndex = 1;
+	gameManager.addScriptTask(trapTask);
+	gameManager.controller->onHandleEvent(talkKey);
+	gameManager.controller->onUpdate();
+	ok = check(!gameManager.inEvent && gameManager.hasPendingTrapScript()
+		&& gameManager.player->nextAction == nullptr
+		&& !gameManager.controller->visible,
+		"a queued trap keeps world keyboard input and virtual controls blocked after the parent script ends") && ok;
+	gameManager.scriptTaskList.clear();
+	gameManager.controller->onUpdate();
+	ok = check(!gameManager.hasPendingTrapScript()
+		&& gameManager.controller->visible
+		&& gameManager.controller->onHandleEvent(talkKey)
+		&& gameManager.player->nextAction != nullptr,
+		"world input resumes after the queued trap is removed") && ok;
+	return ok;
+}
+
+bool runQueuedTrapPlayerDeathTests()
+{
+	const auto root = std::filesystem::temp_directory_path()
+		/ ("jxqy-trap-death-" + std::to_string(
+			std::chrono::steady_clock::now().time_since_epoch().count()));
+	std::error_code error;
+	std::filesystem::create_directories(root, error);
+	if (!check(!error, "queued trap death test creates an isolated script root"))
+	{
+		return false;
+	}
+	struct RestoreResourceRoot
+	{
+		std::string previousRoot;
+		std::filesystem::path temporaryRoot;
+		~RestoreResourceRoot()
+		{
+			File::setActiveResourceRoot(previousRoot);
+			std::error_code error;
+			std::filesystem::remove_all(temporaryRoot, error);
+		}
+	} restoreRoot{ File::getActiveResourceRoot(), root };
+	File::setActiveResourceRoot(root.u8string());
+	const auto writeScript = [](const std::string& name, const std::string& source)
+	{
+		return File::writeFileChecked("script/map/trap-death/" + name,
+			source.data(), static_cast<int>(source.size()));
+	};
+	if (!check(writeScript("first.lua", "assign('FirstTrapStarted',1); test_queue_player_death();")
+		&& writeScript("death.lua", "assign('PlayerDeathHandled',1);")
+		&& writeScript("second.lua", "assign('SecondTrapStarted',1);"),
+		"queued trap death test writes both captured traps and the player death script"))
+	{
+		return false;
+	}
+	GameManager gameManager;
+	gameManager.varList.ensureInitialized();
+	gameManager.mapFolderName = "trap-death";
+	gameManager.player->deathScript = "death.lua";
+	ScriptEngineRuntimeTestAccess::registerPlayerDeathTrigger(gameManager.script);
+	for (int index = 1; index <= 2; ++index)
+	{
+		ScriptTask task;
+		task.type = stTraps;
+		task.trapIndex = index;
+		task.scriptMapName = "trap-death";
+		task.scriptName = index == 1 ? "first.lua" : "second.lua";
+		gameManager.addScriptTask(task);
+	}
+	gameManager.runScriptTaskList();
+	const int first = gameManager.varList.getInteger("FirstTrapStarted");
+	const int death = gameManager.varList.getInteger("PlayerDeathHandled");
+	const int second = gameManager.varList.getInteger("SecondTrapStarted");
+	std::cout << "Queued trap death dispatch: first=" << first
+		<< " death=" << death << " second=" << second << '\n';
+	return check(first == 1 && death == 1 && second == 0
+		&& gameManager.varList.getInteger("ActiveBatchBlocksInput") == 1
+		&& !gameManager.hasPendingTrapScript(),
+		"player death handled inside the first trap cancels the remaining local trap batch and releases its input barrier");
+}
+
+bool runScriptPositionTrapTests()
+{
+	const auto root = std::filesystem::temp_directory_path()
+		/ ("jxqy-script-position-trap-" + std::to_string(
+			std::chrono::steady_clock::now().time_since_epoch().count()));
+	std::error_code error;
+	std::filesystem::create_directories(root, error);
+	if (!check(!error, "script-position traps create an isolated script root")) return false;
+	struct RestoreResourceRoot
+	{
+		std::string previousRoot;
+		std::filesystem::path temporaryRoot;
+		~RestoreResourceRoot()
+		{
+			File::setActiveResourceRoot(previousRoot);
+			std::error_code error;
+			std::filesystem::remove_all(temporaryRoot, error);
+		}
+	} restoreRoot{ File::getActiveResourceRoot(), root };
+	File::setActiveResourceRoot(root.u8string());
+	const auto writeScript = [](const std::string& name, const std::string& source)
+	{
+		return File::writeFileChecked("script/map/script-position-trap/" + name,
+			source.data(), static_cast<int>(source.size()));
+	};
+	if (!check(writeScript("first.lua",
+		"assign('FirstTrapCount',getvar('FirstTrapCount')+1); assign('ParentSeenByTrap',getvar('ParentFinished'));")
+		&& writeScript("second.lua", "assign('SecondTrapCount',getvar('SecondTrapCount')+1);")
+		&& writeScript("parallel.lua", "setplayerpos(3,4); sleep(1); assign('ParentFinished',1);"),
+		"script-position traps write their actual Lua callbacks")) return false;
+
+	bool ok = true;
+	for (const int originalType : { GAME_JXQY2, GAME_YYCS, GAME_XJXQY })
+	{
+		GameManager gameManager;
+		applyOriginalBehavior(gameManager.global, originalType);
+		gameManager.varList.ensureInitialized();
+		gameManager.mapFolderName = "script-position-trap";
+		gameManager.global.data.mapName = "script-position-trap.map";
+		gameManager.map->data = std::make_shared<MapData>();
+		gameManager.map->data->head.width = 8;
+		gameManager.map->data->head.height = 8;
+		gameManager.map->data->tile.assign(8, std::vector<MapTile>(8));
+		gameManager.map->data->tile[4][3].trap = 1;
+		gameManager.map->data->tile[4][5].trap = 2;
+		gameManager.map->createDataMap();
+		gameManager.player->npcName = "landing-player";
+		const auto update = [&]() { ScriptEngineRuntimeTestAccess::updateGameManager(gameManager); };
+		const auto reset = [&]()
+		{
+			gameManager.scriptTaskList.clear();
+			gameManager.inEvent = false;
+			gameManager.global.data.mapName = "script-position-trap.map";
+			gameManager.mapFolderName = "script-position-trap";
+			gameManager.player->life = 100;
+			gameManager.player->result = 0;
+			gameManager.player->actionManager->resetActionIgnoringTransitions(acStand);
+			gameManager.player->setPosition({ 1, 1 }, false);
+			gameManager.player->cancelPendingScriptPositionTrap();
+			gameManager.scriptAPI.setMapTrap(1, "first.lua");
+			gameManager.scriptAPI.setMapTrap(2, "second.lua");
+			for (const char* variable : { "FirstTrapCount", "SecondTrapCount", "ParentFinished",
+				"ParentSeenByTrap", "QueuedDuringParent", "TrapRanDuringParent", "ParallelWasRunning" })
+			{
+				gameManager.varList.setInteger(variable, 0);
+			}
+		};
+		const auto count = [&](const char* variable) { return gameManager.varList.getInteger(variable); };
+		ScriptEngineRuntimeTestAccess::registerScriptProbe(gameManager.script, "test_update_landing", [](lua_State*)
+		{
+			ScriptEngineRuntimeTestAccess::updateGameManager(*gm);
+			ScriptEngineRuntimeTestAccess::updateGameManager(*gm);
+			gm->varList.setInteger("QueuedDuringParent", static_cast<int>(gm->scriptTaskList.size()));
+			gm->varList.setInteger("TrapRanDuringParent", gm->varList.getInteger("FirstTrapCount"));
+			return 0;
+		});
+		for (const char* setter : { "setplayerpos(3,4)", "setplayerpos('landing-player',3,4)" })
+		{
+			reset();
+			gameManager.inEvent = true;
+			ok = check(ScriptEngineRuntimeTestAccess::execute(gameManager.script, setter) == LUA_OK
+				&& gameManager.player->getPosition() == Point{ 3, 4 }
+				&& gameManager.scriptTaskList.empty() && count("FirstTrapCount") == 0,
+				"both SetPlayerPos forms defer landing traps until the next manager update in all three profiles") && ok;
+			update();
+			update();
+			ok = check(gameManager.scriptTaskList.size() == 1
+				&& gameManager.scriptTaskList.front().type == stTraps
+				&& gameManager.scriptTaskList.front().trapIndex == 1
+				&& gameManager.scriptTaskList.front().scriptMapName == "script-position-trap"
+				&& gameManager.scriptTaskList.front().scriptName == "first.lua"
+				&& count("FirstTrapCount") == 0 && gameManager.traps.hasTriggered(1),
+				"real manager updates capture the landing trap exactly once while its parent event is active") && ok;
+			gameManager.varList.setInteger("ParentFinished", 1);
+			gameManager.inEvent = false;
+			update();
+			update();
+			gameManager.player->checkTrap();
+			ok = check(count("FirstTrapCount") == 1 && count("ParentSeenByTrap") == 1
+				&& gameManager.scriptTaskList.empty(),
+				"captured landing trap executes after its parent event and does not repeat on the same tile") && ok;
+			gameManager.scriptAPI.setMapTrap(1, "first.lua");
+			ok = check(ScriptEngineRuntimeTestAccess::execute(gameManager.script, setter) == LUA_OK,
+				"an explicit same-tile placement can be issued after rebinding") && ok;
+			update();
+			ok = check(count("FirstTrapCount") == 2 && gameManager.scriptTaskList.empty(),
+				"rearming and explicitly placing the player again on the same tile triggers once in a normal frame") && ok;
+		}
+
+		reset();
+		gameManager.inEvent = true;
+		ok = check(ScriptEngineRuntimeTestAccess::execute(gameManager.script,
+			"setplayerpos(3,4); test_update_landing(); assign('ParentFinished',1);") == LUA_OK
+			&& count("QueuedDuringParent") == 1 && count("TrapRanDuringParent") == 0,
+			"an active Lua parent can pump manager frames without executing its landing trap recursively") && ok;
+		gameManager.inEvent = false;
+		update();
+		ok = check(count("FirstTrapCount") == 1 && count("ParentSeenByTrap") == 1,
+			"the actual parent Lua continuation completes before the landing callback") && ok;
+
+		reset();
+		// Replace only wall-clock waiting with two real manager updates.
+		ScriptEngineRuntimeTestAccess::registerScriptProbe(gameManager.script, "sleep", [](lua_State*)
+		{
+			gm->varList.setInteger("ParallelWasRunning", !gm->inEvent && gm->script.running ? 1 : 0);
+			ScriptEngineRuntimeTestAccess::updateGameManager(*gm);
+			ScriptEngineRuntimeTestAccess::updateGameManager(*gm);
+			gm->varList.setInteger("QueuedDuringParent", static_cast<int>(gm->scriptTaskList.size()));
+			gm->varList.setInteger("TrapRanDuringParent", gm->varList.getInteger("FirstTrapCount"));
+			return 0;
+		});
+		ScriptTask parallel;
+		parallel.type = stScript;
+		parallel.scriptName = "parallel.lua";
+		parallel.scriptMapName = gameManager.mapFolderName;
+		gameManager.addScriptTask(parallel);
+		update();
+		ok = check(count("ParallelWasRunning") == 1 && count("QueuedDuringParent") == 1
+			&& count("TrapRanDuringParent") == 0 && count("ParentFinished") == 1,
+			"a parallel SetPlayerPos/sleep/assign parent defers landing dispatch even without inEvent") && ok;
+		update();
+		ok = check(count("FirstTrapCount") == 1 && count("ParentSeenByTrap") == 1,
+			"the parallel parent's continuation runs before its captured landing trap") && ok;
+
+		reset();
+		ScriptEngineRuntimeTestAccess::execute(gameManager.script, "setplayerpos(3,4); setplayerpos(5,4);");
+		update();
+		ok = check(count("FirstTrapCount") == 0 && count("SecondTrapCount") == 1
+			&& !gameManager.traps.hasTriggered(1),
+			"consecutive script placements inspect only the final landing") && ok;
+
+		for (int cancellation = 0; cancellation < 4; ++cancellation)
+		{
+			reset();
+			gameManager.scriptAPI.setPlayerPosition(3, 4);
+			if (cancellation == 0) gameManager.player->setPosition({ 1, 1 }, false);
+			if (cancellation == 1) gameManager.global.data.mapName = "another-map.map";
+			if (cancellation == 2) gameManager.player->life = 0;
+			if (cancellation == 3) gameManager.player->result |= erRunDeathScript;
+			update();
+			gameManager.global.data.mapName = "script-position-trap.map";
+			gameManager.player->life = 100;
+			gameManager.player->setPosition({ 3, 4 }, false);
+			update();
+			ok = check(count("FirstTrapCount") == 0 && gameManager.scriptTaskList.empty()
+				&& !gameManager.traps.hasTriggered(1),
+				"movement, map changes, zero life and death dispatch consume stale landings without replay after return") && ok;
+		}
+
+		reset();
+		gameManager.global.data.canInput = true;
+		auto interactionNpc = std::make_shared<NPC>();
+		interactionNpc->kind = nkNormal;
+		interactionNpc->relation = nrNeutral;
+		interactionNpc->life = 100;
+		interactionNpc->scriptFile = "input-must-wait.lua";
+		interactionNpc->setPosition({ 5, 4 }, false);
+		gameManager.npcManager->npcList.push_back(interactionNpc);
+		gameManager.player->setPosition({ 3, 4 }, false);
+		AEvent talkKey(ET_KEYDOWN, KEY_E, 0, 0);
+		ok = check(gameManager.controller->onHandleEvent(talkKey)
+			&& gameManager.player->nextAction != nullptr,
+			"world interaction is available before a script landing is pending") && ok;
+		gameManager.player->cancelQueuedInteraction();
+		gameManager.scriptAPI.setPlayerPosition(3, 4);
+		gameManager.controller->onHandleEvent(talkKey);
+		gameManager.controller->onUpdate();
+		ok = check(gameManager.hasPendingTrapScript() && gameManager.scriptTaskList.empty()
+			&& gameManager.player->nextAction == nullptr && !gameManager.controller->visible,
+			"pending script placement blocks world input before the manager can capture its trap") && ok;
+		gameManager.npcManager->npcList.clear();
+
+		reset();
+		gameManager.scriptAPI.setPlayerPosition(3, 4);
+		gameManager.player->suppressTrapAtScriptPosition();
+		update();
+		gameManager.player->checkTrap();
+		ok = check(count("FirstTrapCount") == 0 && !gameManager.traps.hasTriggered(1),
+			"explicit editor-run suppression cancels a pending landing and remains active on that tile") && ok;
+		gameManager.player->setPosition({ 5, 4 }, false);
+		gameManager.player->checkTrap();
+		ok = check(count("SecondTrapCount") == 1,
+			"leaving an explicitly suppressed editor tile restores ordinary trap contact") && ok;
+		reset();
+		gameManager.scriptAPI.setPlayerPosition(3, 4);
+		gameManager.scriptAPI.freeMap();
+		update();
+		ok = check(gameManager.map->data == nullptr && !gameManager.hasPendingTrapScript()
+			&& count("FirstTrapCount") == 0,
+			"FreeMap cancels a pending landing even though the logical map name is retained") && ok;
+	}
+	return ok;
+}
+
+bool runSwordTwoScriptLandingTrapTests()
+{
+	const auto packRoot = std::filesystem::path(__FILE__).parent_path().parent_path().parent_path()
+		/ "assets" / "jxqy2";
+	if (!std::filesystem::exists(packRoot / "game_profile.ini"))
+	{
+		std::cout << "SKIP: optional Sword2 script landing resources are absent\n";
+		return true;
+	}
+	struct RestoreSettings
+	{
+		std::string resourceRoot = File::getActiveResourceRoot();
+		std::string saveNamespace = File::getActiveSaveNamespace();
+		bool loadAsync = Config::loadAsync;
+		bool automaticSave = Config::automaticSaveEnabled;
+		~RestoreSettings()
+		{
+			File::setActiveResourceRoot(resourceRoot);
+			File::setActiveSaveNamespace(saveNamespace);
+			Config::loadAsync = loadAsync;
+			Config::automaticSaveEnabled = automaticSave;
+		}
+	} restoreSettings;
+	File::setActiveResourceRoot(packRoot.u8string());
+	File::setActiveSaveNamespace("script-landing-test-" + std::to_string(
+		std::chrono::steady_clock::now().time_since_epoch().count()));
+	Config::loadAsync = false;
+	Config::automaticSaveEnabled = false;
+
+	class LandingPlayer final : public Player
+	{
+	public:
+		using Element::onUpdate;
+		bool movementTimedOut = false;
+	private:
+		void onRun() override
+		{
+			// Run the real Player path and animation updates on a bounded clock.
+			for (int frame = 0; frame < 800 && logicRunning; ++frame)
+			{
+				gm->setTime(gm->getTime() + 50);
+				setTime(getTime() + 50);
+				frameTime = 50;
+				onUpdate();
+				ScriptEngineRuntimeTestAccess::updateGameManager(*gm);
+			}
+			if (logicRunning)
+			{
+				movementTimedOut = true;
+				result |= erInitError;
+				logicRunning = false;
+			}
+		}
+	};
+	class LandingDialog final : public Dialog
+	{
+	public:
+		int confirmations = 0;
+	private:
+		void onRun() override
+		{
+			++confirmations;
+			logicRunning = false;
+		}
+	};
+	GameManager gameManager;
+	ResourceManifest manifest;
+	if (!check(manifest.loadFromFile("game_profile.ini"), "Sword2 landing test reads the actual pack profile")) return false;
+	gameManager.global.applyResourceManifestFeatures(manifest);
+	gameManager.varList.ensureInitialized();
+	auto player = std::make_shared<LandingPlayer>();
+	gameManager.controller->removeChild(gameManager.player);
+	gameManager.player = player;
+	gameManager.npcManager->setPlayer(player);
+	gameManager.controller->addChild(player);
+	auto dialog = std::make_shared<LandingDialog>();
+	gameManager.menu->dialog = dialog;
+	if (!check(player->loadInitialTemplate(-1) && gameManager.traps.loadInitialTemplate()
+		&& gameManager.scriptAPI.loadMap(u8"狂沙镇.map", false),
+		"Sword2 landing test loads the actual player, trap bindings and departure map")) return false;
+	for (const char* command : { "fadeout", "fadein", "playmusic", "stopmusic", "showmessage", "savenpc", "saveobj" })
+	{
+		// Presentation and departure snapshots are outside this landing contract.
+		ScriptEngineRuntimeTestAccess::registerScriptProbe(gameManager.script, command, [](lua_State*) { return 0; });
+	}
+	ScriptEngineRuntimeTestAccess::registerScriptProbe(gameManager.script, "talk", [](lua_State* state)
+	{
+		const std::string part = lua_tostring(state, 1);
+		if (part == "NotOut")
+		{
+			gm->varList.setInteger("NotOutReached", gm->varList.getInteger("NotOutReached") + 1);
+			gm->varList.setInteger("NotOutSettled", gm->player->getPosition() == Point{ 8, 84 }
+				&& gm->player->isStanding() ? 1 : 0);
+		}
+		gm->scriptAPI.talk(part);
+		return 0;
+	});
+	gameManager.varList.setInteger("KsOQieHuan", 1);
+	gameManager.runTrapScript(3);
+	bool ok = check(gameManager.mapFolderName == u8"狂沙镇-铁门寨"
+		&& gameManager.global.data.mapName == u8"狂沙镇-铁门寨.map"
+		&& gameManager.global.data.npcName == "ks-tmz.npc"
+		&& gameManager.global.data.objName == "ks-tmz.obj"
+		&& player->getPosition() == Point{ 8, 90 }
+		&& gameManager.map->getTrapIndex({ 8, 90 }) == 1
+		&& gameManager.traps.get(gameManager.mapFolderName, 1) == u8"地图切换.txt"
+		&& gameManager.hasPendingTrapScript() && gameManager.varList.getInteger("NotOutReached") == 0,
+		"actual Kuangsha exit loads the wilderness and schedules its bound landing at (8,90)");
+	ScriptEngineRuntimeTestAccess::updateGameManager(gameManager);
+	ok = check(!player->movementTimedOut && player->getPosition() == Point{ 8, 84 }
+		&& gameManager.varList.getInteger("NotOutReached") == 1
+		&& gameManager.varList.getInteger("NotOutSettled") == 1 && dialog->confirmations == 1
+		&& !gameManager.hasPendingTrapScript(),
+		"actual landing script walks to (8,84) before presenting and confirming the NotOut dialogue") && ok;
+	ScriptEngineRuntimeTestAccess::updateGameManager(gameManager);
+	ok = check(gameManager.varList.getInteger("NotOutReached") == 1,
+		"rearmed wilderness exit does not replay without another contact or explicit placement") && ok;
+
+	gameManager.scriptAPI.setPlayerPosition(8, 90);
+	ok = check(gameManager.scriptAPI.loadMap(u8"狂沙镇-铁门寨.map", false),
+		"the same production map can be loaded again while a landing is pending") && ok;
+	ScriptEngineRuntimeTestAccess::updateGameManager(gameManager);
+	ok = check(!gameManager.hasPendingTrapScript() && gameManager.varList.getInteger("NotOutReached") == 1,
+		"successfully reloading the same map cancels the previous generation's pending landing") && ok;
+	return ok;
+}
+
+bool runStoryTimerTests()
+{
+	const auto root = std::filesystem::temp_directory_path()
+		/ ("jxqy-story-timer-" + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()));
+	std::error_code error;
+	std::filesystem::create_directories(root, error);
+	if (!check(!error, "story timer creates its isolated resource root")) return false;
+	struct RestoreResourceRoot
+	{
+		std::string previousRoot;
+		std::filesystem::path temporaryRoot;
+		~RestoreResourceRoot()
+		{
+			File::setActiveResourceRoot(previousRoot);
+			std::error_code error;
+			std::filesystem::remove_all(temporaryRoot, error);
+		}
+	} restoreRoot{ File::getActiveResourceRoot(), root };
+	File::setActiveResourceRoot(root.u8string());
+	const std::string callback = "assign('TimerCallbacks',getvar('TimerCallbacks')+1);";
+	if (!check(File::writeFileChecked("script/common/timer-expired.lua", callback.data(),
+		static_cast<int>(callback.size())), "story timer writes an isolated timeout callback")) return false;
+	bool ok = true;
+	for (const int originalType : { GAME_JXQY2, GAME_YYCS, GAME_XJXQY })
+	{
+		GameManager gameManager;
+		applyOriginalBehavior(gameManager.global, originalType);
+		gameManager.varList.ensureInitialized();
+		gameManager.scriptAPI.setTimeScript(0, "timer-expired.lua");
+		gameManager.scriptAPI.openTimeLimit(2);
+		ScriptEngineRuntimeTestAccess::advanceGameManager(gameManager, 250);
+		ScriptEngineRuntimeTestAccess::registerScriptProbe(gameManager.script, "test_story_frame", [](lua_State*)
+		{
+			ScriptEngineRuntimeTestAccess::advanceGameManager(*gm, 5000);
+			return 0;
+		});
+		const int scriptResult = ScriptEngineRuntimeTestAccess::execute(gameManager.script, "test_story_frame();");
+		ok = check(scriptResult == LUA_OK && gameManager.timerSeconds == 2
+			&& gameManager.timerAccumulated == 250 && gameManager.varList.getInteger("TimerCallbacks") == 0,
+			"a running Lua story cannot consume timer time or nest the timeout callback") && ok;
+		gameManager.inEvent = true;
+		ScriptEngineRuntimeTestAccess::advanceGameManager(gameManager, 5000);
+		gameManager.inEvent = false;
+		ok = check(gameManager.timerSeconds == 2 && gameManager.timerAccumulated == 250,
+			"story event waits preserve remaining seconds and the partial second") && ok;
+		ScriptTask trap;
+		trap.type = stTraps;
+		trap.remainingMilliseconds = 1000;
+		gameManager.addScriptTask(trap);
+		ScriptEngineRuntimeTestAccess::advanceGameManager(gameManager, 250);
+		ok = check(gameManager.timerSeconds == 2 && gameManager.timerAccumulated == 250,
+			"a pending story trap prevents the timer from overtaking its dispatch") && ok;
+		gameManager.scriptTaskList.clear();
+		ScriptEngineRuntimeTestAccess::advanceGameManager(gameManager, 750);
+		ok = check(gameManager.timerSeconds == 1 && gameManager.timerAccumulated == 0,
+			"idle gameplay resumes the timer without charging time spent in the story") && ok;
+		ScriptEngineRuntimeTestAccess::advanceGameManager(gameManager, 1000);
+		ScriptEngineRuntimeTestAccess::advanceGameManager(gameManager, 1000);
+		ok = check(!gameManager.timerStarted && !gameManager.timeScriptSet
+			&& gameManager.timerSeconds == 0 && gameManager.varList.getInteger("TimerCallbacks") == 1,
+			"unpaused gameplay reaches zero and executes its timeout callback exactly once") && ok;
 	}
 	return ok;
 }
@@ -1441,7 +2305,17 @@ bool runScriptEngineRuntimeTests()
 	ok = runRuntimeTraceInstrumentationTests() && ok;
 	ok = runGoodsUseWithoutMenusTests() && ok;
 	ok = runPlayerForcedMovementUpdateTests() && ok;
+	ok = runPlayerOffsetWalkScriptTests() && ok;
+	ok = runConfiguredPixelRunSpeedTests() && ok;
+	ok = runMgEqualLevelScriptTests() && ok;
+	ok = runPaperScriptTests() && ok;
+	ok = runMiniGameScriptTests() && ok;
 	ok = runScriptActionResourceCostTests() && ok;
+	ok = runPendingTrapWorldInputTests() && ok;
+	ok = runQueuedTrapPlayerDeathTests() && ok;
+	ok = runScriptPositionTrapTests() && ok;
+	ok = runSwordTwoScriptLandingTrapTests() && ok;
+	ok = runStoryTimerTests() && ok;
 	Script script;
 
 	for (int index = 0; index < 4096; index++)
@@ -1682,6 +2556,22 @@ bool runScriptEngineRuntimeTests()
 	ok = check(gameManager.global.data.asfStyle == 0x000C2238
 		&& gameManager.global.data.mpcStyle == 0x00412B15,
 		"ChangeASFColor and ChangeMapColor preserve nonzero RGB colors") && ok;
+	const int colorPlusResult = ScriptEngineRuntimeTestAccess::execute(script, "changemapcolorplus('#2E5C5C')");
+	ok = check(colorPlusResult == LUA_OK && gameManager.global.data.asfStyle == 0x000C2238
+		&& gameManager.global.data.mpcStyle == 0x00412B15 && gameManager.global.data.screenColor == 0x2E5C5C,
+		"MG ChangeMapColorPlus is registered independently of legacy map and sprite colors") && ok;
+	for (const auto& sample : std::vector<std::pair<std::string, uint32_t>>{
+		{ "#2e5c5c", 0x2E5C5C }, { "804020", 0x804020 }, { "#102030ignored", 0x102030 },
+		{ "000000", 0 }, { "#000000", 0xFFFFFF }, { "#FFFFFF", 0xFFFFFF }, { "", 0xFFFFFF } })
+	{
+		const int status = ScriptEngineRuntimeTestAccess::execute(script, "changemapcolorplus('" + sample.first + "')");
+		ok = check(status == LUA_OK && gameManager.global.data.screenColor == sample.second,
+			"MG screen color reads six hexadecimal digits and normalizes explicit reset colors") && ok;
+	}
+	ScriptEngineRuntimeTestAccess::execute(script, "changemapcolorplus('#804020');changemapcolorplus();changemapcolorplus('#12');changemapcolorplus('#GG2233')");
+	ok = check(gameManager.global.data.screenColor == 0x804020,
+		"missing and malformed screen colors preserve the last valid tint") && ok;
+	gameManager.global.data.screenColor = 0xFFFFFF;
 
 	const int savedAttack = gameManager.player->attack;
 	const int savedAttack2 = gameManager.player->attack2;
@@ -2200,6 +3090,38 @@ bool runScriptEngineRuntimeTests()
 	gameManager.scriptAPI.getNpcCount(9, 9);
 	ok = check(gameManager.varList.getInteger("NpcCount") == 2,
 		"GetNpcCount counts matching NPCs when the player does not match") && ok;
+	const auto savedFirstDeathImage = firstNamedNPC->res.death.imagePackage;
+	const auto savedSecondDeathImage = secondNamedNPC->res.death.imagePackage;
+	auto deathImage = std::make_shared<IMPImage>();
+	deathImage->directions = 1;
+	deathImage->interval = 100;
+	deathImage->frame.resize(2);
+	firstNamedNPC->res.death.imagePackage = deathImage;
+	secondNamedNPC->res.death.imagePackage = deathImage;
+	firstNamedNPC->NPC::beginDie();
+	gameManager.scriptAPI.getNpcCount(9, 9);
+	ok = check(firstNamedNPC->isDying() && gameManager.varList.getInteger("NpcCount") == 1,
+		"GetNpcCount excludes a dying NPC still retained in the manager") && ok;
+	secondNamedNPC->NPC::beginDie();
+	gameManager.scriptAPI.getNpcCount(9, 9);
+	ok = check(gameManager.varList.getInteger("NpcCount") == 0,
+		"GetNpcCount reaches zero before the last death animation is removed") && ok;
+	firstNamedNPC->actionManager->resetActionIgnoringTransitions(acStand);
+	secondNamedNPC->actionManager->resetActionIgnoringTransitions(acStand);
+	firstNamedNPC->res.death.imagePackage = savedFirstDeathImage;
+	secondNamedNPC->res.death.imagePackage = savedSecondDeathImage;
+	const int savedFirstNamedLife = firstNamedNPC->life;
+	firstNamedNPC->life = 0;
+	gameManager.scriptAPI.getNpcCount(9, 9);
+	ok = check(gameManager.varList.getInteger("NpcCount") == 2,
+		"GetNpcCount retains active zero-life actors until they enter the death action") && ok;
+	firstNamedNPC->life = savedFirstNamedLife;
+	gameManager.player->kind = 9;
+	gameManager.player->actionManager->changeAction(acDeath);
+	gameManager.scriptAPI.getNpcCount(9, 9);
+	ok = check(gameManager.varList.getInteger("NpcCount") == 2,
+		"a dying matching player does not mask the remaining matching NPCs") && ok;
+	gameManager.player->actionManager->resetActionIgnoringTransitions(acStand);
 	gameManager.player->kind = savedPlayerKind;
 	gameManager.player->relation = savedPlayerRelation;
 	firstNamedNPC->resetRecording();
@@ -2438,6 +3360,31 @@ bool runScriptEngineRuntimeTests()
 		&& firstNamedNPC->recordedDestination == Point{ 15, 104 }
 		&& secondNamedNPC->goToCount == 0,
 		"YYCS named NpcGoto waits for only the first matching NPC") && ok;
+	firstNamedNPC->resetRecording();
+	secondNamedNPC->resetRecording();
+	const bool inputBeforeLegacyRun = gameManager.global.data.canInput;
+	const int runResult = ScriptEngineRuntimeTestAccess::execute(script,
+		"npcrunto('duplicate-special-target',30,27)");
+	ok = check(runResult == LUA_OK && firstNamedNPC->runToCount == 1
+		&& firstNamedNPC->recordedAction == RecordedNpcAction::Run
+		&& firstNamedNPC->recordedDestination == Point{ 30, 27 }
+		&& firstNamedNPC->goToCount == 0 && firstNamedNPC->goToExCount == 0
+		&& secondNamedNPC->runToCount == 0 && !firstNamedNPC->inputEnabledDuringBlockingMove
+		&& gameManager.global.data.canInput == inputBeforeLegacyRun,
+		"legacy NpcRunTo delegates to blocking run for the first named NPC and restores input") && ok;
+	ScriptEngineRuntimeTestAccess::execute(script,
+		"npcrunto(); npcrunto('duplicate-special-target',1); npcrunto('missing-run-target',1,2)");
+	ok = check(firstNamedNPC->runToCount == 1 && secondNamedNPC->runToCount == 0,
+		"legacy NpcRunTo requires the verified named three-argument form") && ok;
+	const int changeResult = ScriptEngineRuntimeTestAccess::execute(script,
+		"changenpcres('duplicate-special-target','legacy-changed-res.ini')");
+	ok = check(changeResult == LUA_OK && firstNamedNPC->npcIni == "legacy-changed-res.ini"
+		&& firstNamedNPC->initResCount == 1 && secondNamedNPC->initResCount == 0,
+		"legacy ChangeNpcRes loads the replacement resource for the first named NPC") && ok;
+	ScriptEngineRuntimeTestAccess::execute(script,
+		"changenpcres('duplicate-special-target',''); changenpcres(''); changenpcres('','unused.ini')");
+	ok = check(firstNamedNPC->npcIni == "legacy-changed-res.ini" && firstNamedNPC->initResCount == 1,
+		"legacy ChangeNpcRes ignores empty resources and unverified implicit-target forms") && ok;
 
 	firstNamedNPC->resetRecording();
 	secondNamedNPC->resetRecording();
@@ -2496,6 +3443,69 @@ bool runScriptEngineRuntimeTests()
 		firstNamedNPC->actionManager->getCurrentActionType() == acRun &&
 		secondNamedNPC->actionManager->getCurrentActionType() == acRun,
 		"YYCS SetNpcRelation keeps the explicit all-match contract without cancelling the current action") && ok;
+
+
+	{
+		const auto previousProfile = gameManager.global.npcRuntimeProfile;
+		const auto previousScriptNpc = gameManager.scriptNPC;
+		const std::size_t previousNpcCount = gameManager.npcManager->npcList.size();
+		auto currentPhase = std::make_shared<RecordingNPC>();
+		auto nextPhase = std::make_shared<RecordingNPC>();
+		currentPhase->npcName = nextPhase->npcName = "staged-named-character";
+		currentPhase->kind = nextPhase->kind = nkBattle;
+		currentPhase->relation = nextPhase->relation = nrFriendly;
+		currentPhase->scriptHidden = nextPhase->scriptHidden = true;
+		nextPhase->visibleVariableName = "$named_character_stage";
+		nextPhase->visibleVariableValue = 1;
+		gameManager.varList.setInteger("$named_character_stage", 0);
+		nextPhase->updateVisibleByVariable();
+		gameManager.npcManager->npcList.push_back(currentPhase);
+		gameManager.npcManager->npcList.push_back(nextPhase);
+		gameManager.global.npcRuntimeProfile = ScriptNpcRuntimeProfile::Trilogy;
+		ScriptEngineRuntimeTestAccess::execute(script,
+			"setnpcrelation('staged-named-character',1); setnpckind('staged-named-character',0)");
+		ok = check(currentPhase->relation == nrHostile && currentPhase->kind == nkNormal
+			&& !nextPhase->isVisibleByVariable && nextPhase->relation == nrFriendly
+			&& nextPhase->kind == nkBattle,
+			"YYCS kind and relation changes exclude an inactive namesake, while script-hidden active NPCs remain eligible") && ok;
+
+		gameManager.varList.setInteger("$named_character_stage", 1);
+		nextPhase->updateVisibleByVariable();
+		ScriptEngineRuntimeTestAccess::execute(script,
+			"setnpcrelation('staged-named-character',1); setnpckind('staged-named-character',0)");
+		ok = check(nextPhase->isVisibleByVariable && nextPhase->relation == nrHostile
+			&& nextPhase->kind == nkNormal,
+			"an activated next phase becomes eligible for later named script changes") && ok;
+
+		gameManager.varList.setInteger("$named_character_stage", 0);
+		nextPhase->updateVisibleByVariable();
+		gameManager.global.npcRuntimeProfile = ScriptNpcRuntimeProfile::Legacy;
+		ScriptEngineRuntimeTestAccess::execute(script,
+			"setnpcrelation('staged-named-character',2); setnpckind('staged-named-character',1)");
+		ok = check(nextPhase->relation == nrNeutral && nextPhase->kind == nkBattle,
+			"legacy named changes retain their existing inactive-NPC behavior") && ok;
+
+		gameManager.global.npcRuntimeProfile = ScriptNpcRuntimeProfile::Trilogy;
+		gameManager.scriptNPC = nextPhase;
+		ScriptEngineRuntimeTestAccess::execute(script, "setnpcrelation('',0); setnpckind('',0)");
+		ok = check(!nextPhase->isVisibleByVariable && nextPhase->relation == nrFriendly
+			&& nextPhase->kind == nkNormal,
+			"an explicit empty-name script owner remains eligible even while inactive") && ok;
+		const auto playerNameBefore = gameManager.player->npcName;
+		const int playerRelationBefore = gameManager.player->relation;
+		const bool playerVariableVisibilityBefore = gameManager.player->isVisibleByVariable;
+		gameManager.player->npcName = "staged-named-character";
+		gameManager.player->isVisibleByVariable = false;
+		ScriptEngineRuntimeTestAccess::execute(script, "setnpcrelation('staged-named-character',2)");
+		ok = check(gameManager.player->relation == nrNeutral,
+			"the named player remains eligible independently of NPC variable visibility") && ok;
+		gameManager.player->npcName = playerNameBefore;
+		gameManager.player->relation = playerRelationBefore;
+		gameManager.player->isVisibleByVariable = playerVariableVisibilityBefore;
+		gameManager.scriptNPC = previousScriptNpc;
+		gameManager.global.npcRuntimeProfile = previousProfile;
+		gameManager.npcManager->npcList.resize(previousNpcCount);
+	}
 
 	firstNamedNPC->resetRecording();
 	secondNamedNPC->resetRecording();
@@ -3010,6 +4020,7 @@ bool runScriptEngineRuntimeTests()
 	gameManager.traps.set(gameManager.mapFolderName, 1, "script-position-trap-1.lua");
 	gameManager.traps.set(gameManager.mapFolderName, 2, "script-position-trap-2.lua");
 	gameManager.camera->followPlayer = false;
+	gameManager.player->life = 100;
 	gameManager.inEvent = true;
 	gameManager.scriptTaskList.clear();
 	const int setPlayerPositionResult = ScriptEngineRuntimeTestAccess::execute(
@@ -3018,9 +4029,12 @@ bool runScriptEngineRuntimeTests()
 		&& gameManager.player->getPosition() == Point{ 3, 4 }
 		&& gameManager.scriptTaskList.empty(),
 		"script SetPlayerPos places the player without queuing its landing trap") && ok;
-	gameManager.player->checkTrap();
-	ok = check(gameManager.scriptTaskList.empty(),
-		"frame trap checks keep the script placement tile suppressed") && ok;
+	ScriptEngineRuntimeTestAccess::updateGameManager(gameManager);
+	ok = check(gameManager.scriptTaskList.size() == 1
+		&& gameManager.scriptTaskList[0].type == stTraps
+		&& gameManager.scriptTaskList[0].trapIndex == 1,
+		"the next manager update queues the script placement trap behind its active parent") && ok;
+	gameManager.scriptTaskList.clear();
 	gameManager.player->setPosition({ 5, 4 }, false);
 	gameManager.player->checkTrap();
 	ok = check(gameManager.scriptTaskList.size() == 1

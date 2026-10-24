@@ -132,7 +132,7 @@ void PartnerHeadMenu::refreshPartnerButtons()
 		if (item != nullptr)
 		{
 			item->visible = true;
-			item->activated = partner->isLivingPartner();
+			item->activated = partner->canViewPartnerDetails();
 			item->impImage = headImage;
 			item->rect = { HeadStartX, y, width, height };
 		}
@@ -245,7 +245,7 @@ bool PartnerHeadMenu::openPartnerEquipMenu(
 	std::shared_ptr<NPC> partner,
 	bool returnToPartnerList)
 {
-	if (partner == nullptr || !partner->isLivingPartner() || gm->menu->equipMenu == nullptr)
+	if (partner == nullptr || !partner->canViewPartnerDetails() || gm->menu->equipMenu == nullptr)
 	{
 		return false;
 	}
@@ -262,7 +262,7 @@ bool PartnerHeadMenu::openFirstPartnerEquipMenu()
 
 	for (auto& partner : displayedPartners)
 	{
-		if (partner != nullptr && partner->isLivingPartner())
+		if (partner != nullptr && partner->canViewPartnerDetails())
 		{
 			return openPartnerEquipMenu(partner, false);
 		}
@@ -332,7 +332,7 @@ bool PartnerHeadMenu::hasControllerPartners()
 	refreshPartnerButtons();
 	for (const auto& partner : displayedPartners)
 	{
-		if (partner != nullptr && partner->isLivingPartner())
+		if (partner != nullptr && partner->canViewPartnerDetails())
 		{
 			return true;
 		}

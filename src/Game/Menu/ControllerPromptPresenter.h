@@ -277,6 +277,7 @@ public:
 			{ GameInput::InputAction::InteractPrimary, "交谈/互动" },
 			{ GameInput::InputAction::AttackPrimary, "攻击" },
 			{ GameInput::InputAction::CastSkill1, "武功一" },
+			{ GameInput::InputAction::CycleFriendlyTarget, "支援目标" },
 			{ GameInput::InputAction::OpenSystemMenu, "系统" }
 		};
 		return items;

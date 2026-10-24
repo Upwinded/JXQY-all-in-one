@@ -459,6 +459,7 @@ int Script::runScriptWithChunkName(
 	if (source != nullptr && len >= 0)
 	{
 		const bool outermostScript = !running;
+		if (outermostScript) commandFailureMessage.clear();
 		ScriptRunningHolder scriptRunningHolder(&running);
 		const int initialStackTop = lua_gettop(luaState);
 		int loadResult = luaL_loadbuffer(
@@ -489,6 +490,11 @@ int Script::runScriptWithChunkName(
 			*chunkLoaded = true;
 		}
 		int callResult = lua_pcall(luaState, 0, 0, 0);
+		if (callResult == LUA_OK && !commandFailureMessage.empty())
+		{
+			lua_pushlstring(luaState, commandFailureMessage.data(), commandFailureMessage.size());
+			callResult = LUA_ERRRUN;
+		}
 		if (callResult != LUA_OK)
 		{
 			const bool applicationQuitAbort = lua_islightuserdata(luaState, -1) &&
@@ -694,6 +700,11 @@ std::uint64_t Script::currentExecutionId() const noexcept
 	return executionStack.empty() ? 0 : executionStack.back();
 }
 
+void Script::reportCommandFailure(const std::string& message)
+{
+	if (running && commandFailureMessage.empty()) commandFailureMessage = message;
+}
+
 int Script::runScript(const std::string & fileName)
 {
 	std::unique_ptr<char[]> s;
@@ -757,6 +768,7 @@ void Script::registerFunc()
 	regFunc(SetMapTime);
 	regFunc(ChangeASFColor);
 	regFunc(ChangeMapColor);
+	regFunc(ChangeMapColorPlus);
 
 	regFunc(LoadObj);
 	regFunc(SaveObj);
@@ -782,6 +794,7 @@ void Script::registerFunc()
 	regFunc(DelNpc);
 	regFunc(GetNpcPos);
 	regFunc(SetNpcRes);
+	regFunc(ChangeNpcRes);
 	regFunc(SetNpcScript);
 	regFunc(SetNpcDeathScript);
 	regFunc(SetAllNpcScript);
@@ -789,6 +802,7 @@ void Script::registerFunc()
 	regFunc(InteractNearestNpc);
 	regAlias("InteractNearestNPC", InteractNearestNpc);
 	regFunc(NpcGoto);
+	regFunc(NpcRunTo);
 	regFunc(NpcGotoEx);
 	regFunc(NpcGotoDir);
 	regFunc(SetNpcDestination);
@@ -805,6 +819,7 @@ void Script::registerFunc()
 	regFunc(SetNpcDir);
 	regFunc(SetNpcKind);
 	regFunc(SetNpcLevel);
+	regFunc(SetNpcLevelEqualPlayer);
 	regFunc(SetNpcState);
 	regFunc(SetNpcAction);
 	regFunc(SetNpcRelation);
@@ -864,6 +879,7 @@ void Script::registerFunc()
 	regFunc(PlayerRunToEx);
 	regFunc(PlayerJumpTo);
 	regFunc(PlayerGotoDir);
+	regFunc(PlayerGotoDirEx);
 	regFunc(SetWalkIsRun);
 	regFunc(AddMoveSpeedPercent);
 	regFunc(UseMagic);
@@ -927,12 +943,14 @@ void Script::registerFunc()
 	regFunc(ShowGamble);
 	regFunc(ShowDiceGame);
 	regFunc(ShowFishGame);
+	regFunc(ShowMiniGame);
 	regFunc(ShowStealWin);
 	regFunc(ShowGiveGoodsWin);
 
 	regFunc(ShowMessage);
 	regFunc(ShowSystemMsg);
 	regFunc(Memo);
+	regFunc(OpenPaper);
 	regFunc(AddToMemo);
 	regFunc(DelMemo);
 	regFunc(ClearMemo);
@@ -1098,6 +1116,11 @@ int Script::callRegisteredLuaFunction(lua_State* luaState)
 	Script* script =
 		*static_cast<Script**>(
 			lua_getextraspace(luaState));
+	if (script != nullptr && !script->commandFailureMessage.empty())
+	{
+		lua_pushlstring(luaState, script->commandFailureMessage.data(), script->commandFailureMessage.size());
+		return lua_error(luaState);
+	}
 	std::size_t apiNameLength = 0;
 	const char* apiName = lua_tolstring(
 		luaState,
@@ -1116,6 +1139,12 @@ int Script::callRegisteredLuaFunction(lua_State* luaState)
 	if (Engine::getInstance()->isApplicationQuitRequested())
 	{
 		lua_pushlightuserdata(luaState, &ApplicationQuitScriptAbortToken);
+		return lua_error(luaState);
+	}
+	// Retain command failures across nested scripts until their outer scene stops.
+	if (script != nullptr && !script->commandFailureMessage.empty())
+	{
+		lua_pushlstring(luaState, script->commandFailureMessage.data(), script->commandFailureMessage.size());
 		return lua_error(luaState);
 	}
 	return resultCount;
@@ -1416,6 +1445,12 @@ int Script::lua_ChangeMapColor(lua_State* l)
 	{
 		gm->scriptAPI.changeMapColor((uint8_t)lua_tointeger(l, 1), (uint8_t)lua_tointeger(l, 2), (uint8_t)lua_tointeger(l, 3));
 	}
+	return 0;
+}
+
+int Script::lua_ChangeMapColorPlus(lua_State* l)
+{
+	if (lua_gettop(l) >= 1) gm->scriptAPI.changeMapColorPlus(getLuaString(l, 1));
 	return 0;
 }
 
@@ -1728,6 +1763,20 @@ int Script::lua_SetNpcRes(lua_State * l)
 	return 0;
 }
 
+int Script::lua_ChangeNpcRes(lua_State* l)
+{
+	if (lua_gettop(l) >= 2)
+	{
+		const std::string name = getLuaString(l, 1);
+		const std::string resource = getLuaString(l, 2);
+		if (!name.empty() && !resource.empty())
+		{
+			gm->scriptAPI.setNPCRes(name, resource);
+		}
+	}
+	return 0;
+}
+
 int Script::lua_SetNpcScript(lua_State * l)
 {
 	int argc = lua_gettop(l);
@@ -1797,6 +1846,16 @@ int Script::lua_NpcGoto(lua_State * l)
 	else if (argc >= 2)
 	{
 		gm->scriptAPI.goTo("", (int)lua_tointeger(l, 1), (int)lua_tointeger(l, 2));
+	}
+	return 0;
+}
+
+int Script::lua_NpcRunTo(lua_State* l)
+{
+	if (lua_gettop(l) >= 3)
+	{
+		gm->scriptAPI.runTo(getLuaString(l, 1),
+			static_cast<int>(lua_tointeger(l, 2)), static_cast<int>(lua_tointeger(l, 3)));
 	}
 	return 0;
 }
@@ -1999,6 +2058,12 @@ int Script::lua_SetNpcLevel(lua_State * l)
 	{
 		gm->scriptAPI.setNPCLevel(getLuaString(l, 1), (int)lua_tointeger(l, 2));
 	}
+	return 0;
+}
+
+int Script::lua_SetNpcLevelEqualPlayer(lua_State* l)
+{
+	if (lua_gettop(l) >= 1) gm->scriptAPI.setNPCLevelEqualPlayer(getLuaString(l, 1));
 	return 0;
 }
 
@@ -2607,6 +2672,16 @@ int Script::lua_PlayerGotoDir(lua_State * l)
 	return 0;
 }
 
+int Script::lua_PlayerGotoDirEx(lua_State* l)
+{
+	if (lua_gettop(l) >= 2)
+	{
+		gm->scriptAPI.playerGotoDirEx(static_cast<int>(lua_tointeger(l, 1)),
+			static_cast<int>(lua_tointeger(l, 2)));
+	}
+	return 0;
+}
+
 int Script::lua_SetWalkIsRun(lua_State * l)
 {
 	int argc = lua_gettop(l);
@@ -3207,6 +3282,18 @@ int Script::lua_ShowDiceGame(lua_State* l)
 	return 0;
 }
 
+int Script::lua_ShowMiniGame(lua_State* l)
+{
+	const int argc = lua_gettop(l);
+	if (argc == 5)
+	{
+		gm->scriptAPI.showMiniGame(getLuaString(l, 1), static_cast<int>(lua_tointeger(l, 2)),
+			static_cast<int>(lua_tointeger(l, 3)), getLuaString(l, 4), getLuaString(l, 5));
+	}
+	else if (argc > 0) gm->scriptAPI.showMiniGame(getLuaString(l, 1));
+	return 0;
+}
+
 int Script::lua_ShowFishGame(lua_State* l)
 {
 	gm->scriptAPI.showFishGame();
@@ -3265,6 +3352,18 @@ int Script::lua_ShowSystemMsg(lua_State * l)
 	{
 		int stayTime = argc >= 2 ? (int)lua_tointeger(l, 2) : 3000;
 		gm->scriptAPI.showSystemMessage(getLuaString(l, 1), stayTime);
+	}
+	return 0;
+}
+
+int Script::lua_OpenPaper(lua_State* l)
+{
+	const int argc = lua_gettop(l);
+	if (argc >= 2)
+	{
+		std::vector<std::string> contents;
+		for (int index = 2; index <= argc; ++index) contents.push_back(getLuaString(l, index));
+		gm->scriptAPI.openPaper(static_cast<int>(lua_tointeger(l, 1)), contents);
 	}
 	return 0;
 }

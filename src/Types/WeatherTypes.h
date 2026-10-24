@@ -69,12 +69,12 @@ inline WeatherLayerStyle getRainLayerStyle(WeatherDepthLayer layer)
 	switch (layer)
 	{
 	case WeatherDepthLayer::Far:
-		return { 0.15f, 0.70f, 0.32f, 2, 5, 1 };
+		return { 0.15f, 0.70f, 0.95f, 2, 5, 1 };
 	case WeatherDepthLayer::Near:
-		return { 0.70f, 1.25f, 0.82f, 20, 40, 2 };
+		return { 0.70f, 1.25f, 0.86f, 20, 40, 2 };
 	case WeatherDepthLayer::Middle:
 	default:
-		return { 0.38f, 1.00f, 0.68f, 8, 18, 1 };
+		return { 0.38f, 1.00f, 0.94f, 8, 18, 1 };
 	}
 }
 

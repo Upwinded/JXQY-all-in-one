@@ -33,6 +33,7 @@ public:
 
 	std::shared_ptr<FlatTextButton> touchControlsButton = nullptr;
 	std::shared_ptr<FlatTextButton> cheatSettingsButton = nullptr;
+	std::shared_ptr<FlatTextButton> experienceMultiplierButton = nullptr;
 	std::shared_ptr<FlatTextButton> themeButton = nullptr;
 	std::shared_ptr<FlatTextButton> automaticSaveButton = nullptr;
 
@@ -65,6 +66,7 @@ private:
 	void createFooterOptions();
 	void layoutFooterOptions();
 	void toggleThemeOption();
+	void toggleExperienceMultiplierOption();
 	void toggleAutomaticSaveOption();
 	void syncTouchControlsOption();
 	void toggleTouchControlsOption();
@@ -94,6 +96,7 @@ private:
 	std::vector<ElementPresentationState> mainOptionPresentation;
 	std::string mainOptionsFocusId;
 	bool cheatPanelVisible = false;
+	Rect resourceCheatSettingsButtonRect = {};
 
 	int musicPos = 0;
 	int soundPos = 0;

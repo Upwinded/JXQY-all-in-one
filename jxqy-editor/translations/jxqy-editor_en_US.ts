@@ -12186,8 +12186,8 @@ File path: %2</translation>
     </message>
     <message>
         <location line="+1"/>
-        <source>每行一项，例如 MagicTriggerAtAnimationEnd=1 或 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</source>
-        <translation>One per line, e.g. MagicTriggerAtAnimationEnd=1 or RageSystem=1; omitted gameplay keys use universal defaults, layout keys come from UI.Profile, and conversion writes defaults from the actual base profile</translation>
+        <source>每行一项，例如 RageSystem=1；缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；资源转换会写入实际基底默认值</source>
+        <translation>One per line, e.g. RageSystem=1; omitted gameplay keys use universal defaults, layout keys come from UI.Profile, and conversion writes defaults from the actual base profile</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -12752,6 +12752,18 @@ The original file in the current resource pack still has unsaved changes.</trans
         <translation>Default Manifest created:
 </translation>
     </message>
+    <message><source>普通攻击释放:</source><translation>Normal attack release:</translation></message>
+    <message><source>特殊攻击释放:</source><translation>Special attack release:</translation></message>
+    <message><source>施法释放:</source><translation>Spell release:</translation></message>
+    <message><source>继承</source><translation>Inherit</translation></message>
+    <message><source>自定义</source><translation>Custom</translation></message>
+    <message><source>分子/分母</source><translation>Numerator/denominator</translation></message>
+    <message><source>正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。</source><translation>Positive integer fraction with numerator no greater than denominator. Divide the per-direction frame count by the denominator, round down, then multiply by the numerator; do not reduce the fraction. 1/1 releases at the end of the action.</translation></message>
+    <message><source>释放帧比例必须是正整数分数，且分子不大于分母：%1</source><translation>Release frame ratios must be positive integer fractions with numerator no greater than denominator: %1</translation></message>
+    <message><source>分数无效</source><translation>Invalid fraction</translation></message>
+    <message><source>无法解析有效值</source><translation>Unable to resolve effective value</translation></message>
+    <message><source>有效值 %1；来源：%2</source><translation>Effective value %1; source: %2</translation></message>
+    <message><source>通用默认</source><translation>Universal default</translation></message>
 </context>
 <context>
     <name>SaveEditContext</name>

@@ -2,6 +2,7 @@
 
 #include "SaveSlots.h"
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -13,6 +14,8 @@ constexpr int AllSlots = 0;
 
 struct GameIdentity
 {
+	// An export without installed resources keeps only its known save namespace.
+	// A missing ID is matched by namespace when importing into an installed game.
 	std::string id;
 	std::string name;
 	std::string saveNamespace;
@@ -25,6 +28,7 @@ struct Slot
 	int index = 0;
 	std::string engineVersion;
 	std::string resourceVersion;
+	std::string minimumReaderVersion;
 };
 
 class Package
@@ -43,8 +47,10 @@ private:
 	struct Entry
 	{
 		std::string path;
-		std::vector<char> bytes;
+		unsigned int archiveIndex = 0;
 	};
+	struct Source;
+	std::shared_ptr<Source> source;
 	GameIdentity identity;
 	std::vector<Slot> savedSlots;
 	std::vector<Entry> entries;

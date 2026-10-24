@@ -427,6 +427,7 @@ void Weather::resetDrop(
 			? WeatherParticleMotion::getSnowLayerStyle(depthLayer)
 			: WeatherParticleMotion::getRainLayerStyle(depthLayer);
 		drop->cameraParallax = style.cameraParallax;
+		drop->windScale = isSnow ? 0.65f + style.cameraParallax : style.speedScale;
 		drop->visualWidth = style.visualWidth;
 		drop->visualLength = style.minimumVisualLength;
 		if (style.maximumVisualLength > style.minimumVisualLength)
@@ -457,25 +458,26 @@ void Weather::resetDrop(
 		}
 		else
 		{
-			const int alphaRange = 160;
-			const int baseAlpha = engine->getRand(alphaRange) + 90;
+			const int variationRange = 160;
+			const int variation = engine->getRand(variationRange);
+			const int baseAlpha = 200 + variation * 20 / variationRange;
 			drop->dropAlpha = std::clamp(
 				static_cast<int>(std::round(baseAlpha * style.alphaScale)),
 				0,
 				255);
 			float baseSpeed = 0.8f
-				+ 0.005f * static_cast<float>(baseAlpha - 90 - alphaRange / 2);
+				+ 0.005f * static_cast<float>(variation - variationRange / 2);
 			if (weatherType == wtCustomRain)
 			{
 				baseSpeed = convert_max(
 					0.04f * customRainSpeed
-						+ 0.005f * static_cast<float>(baseAlpha - 90 - alphaRange / 2),
+						+ 0.005f * static_cast<float>(variation - variationRange / 2),
 					0.3f);
 			}
 			drop->speed = baseSpeed * style.speedScale;
 			drop->horizontalSpeed =
 				(-0.080f + static_cast<float>(engine->getRand(30) - 15) / 1000.0f)
-				* (0.80f + drop->cameraParallax * 0.50f);
+				* style.speedScale;
 			drop->swayPhase = 0.0f;
 			drop->swayAngularSpeed = 0.0f;
 			drop->swayAmplitude = 0.0f;
@@ -817,7 +819,7 @@ void Weather::updateDrops(
 	for (WeatherDrop& drop : weatherDrops)
 	{
 		const float effectiveHorizontalSpeed = drop.horizontalSpeed
-			+ sharedWindPulse * (0.65f + drop.cameraParallax);
+			+ sharedWindPulse * drop.windScale;
 		if (weatherType == wtSnow)
 		{
 			const float phaseAdvance = drop.swayAngularSpeed * frameTime;

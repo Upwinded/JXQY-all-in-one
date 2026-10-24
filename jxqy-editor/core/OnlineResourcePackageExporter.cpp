@@ -74,7 +74,10 @@ bool containsExcludedComponent(const QString& relativePath)
                 Qt::CaseInsensitive) == 0 ||
             component.compare(
                 QStringLiteral(".jxqy_editor"),
-                Qt::CaseInsensitive) == 0)
+                Qt::CaseInsensitive) == 0 ||
+            component.endsWith(
+                QStringLiteral(".baiduyun.uploading.cfg"),
+                Qt::CaseInsensitive))
         {
             return true;
         }
@@ -555,6 +558,7 @@ exportDirectoryPackage(
     GameProfile profile;
     if (kind == PublishedDirectoryKind::Resource &&
         (!profile.loadFromFile(manifestPath) ||
+         !profile.invalidActionReleaseFrameRatios.isEmpty() ||
          profile.id.trimmed().isEmpty() ||
          profile.releaseMetadata.displayVersion.empty() ||
          profile.releaseMetadata.minimumEngineVersion.empty()))
@@ -598,8 +602,11 @@ exportDirectoryPackage(
                 "Release", "InstalledIncrementalArtifactCrc32") ||
             publishedManifest.hasKey(
                 "Release", "InstalledIncrementalChainCrc32s");
-        if (hasLocalReceipt)
+        const bool hasObsoleteReleaseTiming =
+            publishedManifest.hasKey("Features", "MagicTriggerAtAnimationEnd");
+        if (hasLocalReceipt || hasObsoleteReleaseTiming)
         {
+            publishedManifest.removeKey("Features", "MagicTriggerAtAnimationEnd");
             publishedManifest.removeKey(
                 "Release", "InstalledArtifactCrc32");
             publishedManifest.removeKey(
@@ -628,8 +635,9 @@ exportDirectoryPackage(
         {
             continue;
         }
+        const QByteArray archivePath = relativePath.toUtf8().toLower();
         if (kind == PublishedDirectoryKind::Common &&
-            relativePath == QStringLiteral("version.ini"))
+            archivePath == QByteArrayLiteral("version.ini"))
         {
             continue;
         }
@@ -655,18 +663,14 @@ exportDirectoryPackage(
             result.errorPath = absolutePath;
             return result;
         }
-        const QByteArray archivePath = relativePath.toUtf8();
         if (archivePath.isEmpty() || archivePath.contains('\0') ||
-            archivePath.startsWith('/') || archivePath.contains("../") ||
-            containsUppercaseAscii(archivePath))
+            archivePath.startsWith('/') || archivePath.contains("../"))
         {
-            result.status = containsUppercaseAscii(archivePath)
-                ? Status::NonLowercasePath
-                : Status::UnsafeSourceEntry;
+            result.status = Status::UnsafeSourceEntry;
             result.errorPath = relativePath;
             return result;
         }
-        const QString key = portablePathKey(relativePath);
+        const QString key = portablePathKey(QString::fromUtf8(archivePath));
         if (portableKeys.contains(key))
         {
             result.status = Status::DuplicatePortablePath;
@@ -682,7 +686,7 @@ exportDirectoryPackage(
         }
         const QByteArray inlineBytes =
             kind == PublishedDirectoryKind::Resource &&
-                relativePath == QStringLiteral("game_profile.ini") &&
+                archivePath == QByteArrayLiteral("game_profile.ini") &&
                 !publishedManifestBytes.isNull()
             ? publishedManifestBytes
             : QByteArray();

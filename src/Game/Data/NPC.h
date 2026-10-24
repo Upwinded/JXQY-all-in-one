@@ -284,7 +284,7 @@ private:
 	bool isFightState = false;
 	UTime fightStateLastTime = 0;
 public:
-	bool get() { return isFightState; }
+	bool get() const { return isFightState; }
 	void set(bool isFightState_) 
 	{
 		const UTime fightMaxLastTime = 10000;
@@ -440,6 +440,10 @@ class NPC :
 protected:
 	using GameElement::position;
 	using GameElement::offset;
+	Point projectileCollisionStartPosition = { 0, 0 };
+	PointEx projectileCollisionStartOffset = { 0, 0 };
+	std::uint64_t projectileCollisionFrame = 0;
+	bool projectileCollisionStartValid = false;
 public:
 	NPC();
 	virtual ~NPC();
@@ -548,11 +552,13 @@ public:
 		return invisibleMilliseconds > 0;
 	}
 	bool isTransporting() const;
+	bool isPresentForRuntime() const
+	{
+		return !scriptHidden && isVisibleByVariable && !isTransporting();
+	}
 	bool isVisibleForRuntime() const
 	{
-		return !scriptHidden
-			&& isVisibleForRuntimeState(isVisibleByVariable, invisibleMilliseconds)
-			&& !isTransporting();
+		return isPresentForRuntime() && !isInvisibleByMagic();
 	}
 	bool isObstacleForCharacter() const
 	{
@@ -724,6 +730,7 @@ public:
 	void triggerMagicWhenBeAttacked(const Effect& effect);
 	void triggerMagicWhenDeath();
 	int calculateEffectDamage(std::shared_ptr<Effect> effect);
+	int getShieldEffectAmount(const Effect& shield, int channel = 0);
 	int applyCriticalDamageFromEffect(const std::shared_ptr<Effect>& effect, int damage, bool* wasCritical = nullptr);
 	void applyEffectManaDamage(std::shared_ptr<Effect> effect);
 	void applyEffectRestore(std::shared_ptr<Effect> effect, int damageAmount);
@@ -1246,17 +1253,9 @@ public:
 	{
 		return useActionDirectionCount > 0 ? useActionDirectionCount : attackDirectionCount;
 	}
-	static int selectMagicActionDirectionCount(int magicDirectionCount, int useActionDirectionCount, int actionDirectionCount)
+	static int selectMagicActionDirectionCount(int magicDirectionCount, int useActionDirectionCount)
 	{
-		if (useActionDirectionCount > 0)
-		{
-			return useActionDirectionCount;
-		}
-		if (actionDirectionCount > 0)
-		{
-			return actionDirectionCount;
-		}
-		return magicDirectionCount;
+		return useActionDirectionCount > 0 ? useActionDirectionCount : magicDirectionCount;
 	}
 	int getAttackActionDirectionCount(std::shared_ptr<Magic> magic) const
 	{
@@ -1266,8 +1265,7 @@ public:
 	int getMagicActionDirectionCount(std::shared_ptr<Magic> magic) const
 	{
 		int useActionDirectionCount = magic != nullptr ? getImageDirectionCount(magic->useActionImage) : -1;
-		int actionDirectionCount = magic != nullptr ? getImageDirectionCount(magic->getActionImageForNPC(this)) : -1;
-		return selectMagicActionDirectionCount(getUseMagicDirectionCount(), useActionDirectionCount, actionDirectionCount);
+		return selectMagicActionDirectionCount(getUseMagicDirectionCount(), useActionDirectionCount);
 	}
 	bool canActToward(Point dest, int directionCount) const
 	{
@@ -1295,6 +1293,7 @@ public:
 	bool characterEquipmentSynchronized = true;
 	int getPartnerCharacterIndex();
 	bool isLivingPartner();
+	bool canViewPartnerDetails();
 	bool canChangePartnerEquipment();
 	bool setKindAndRelation(int newKind, int newRelation);
 	void finishPartnerJoin();
@@ -1311,6 +1310,7 @@ public:
 	bool hasDestinationMapPosition() const;
 	bool tryMoveToDestinationMapPosition();
 	bool isAIEnabled() const;
+	bool isFollowAIEnabled() const;
 	void setAIDisabled(bool disabled);
 	void clearActionPathTilePositions();
 	int getActionPathTilePositionCount() const { return static_cast<int>(actionPathTilePositions.size()); }
@@ -1392,10 +1392,12 @@ public:
 	unsigned int getSitState() const { return sitState; }
 	std::vector<Point> getStepPositions() const;
 	Point getPosition() const { return position; }
-	void setPosition(Point newPos, bool forceToStand = true);
+	void setPosition(Point newPos, bool forceToStand = true, bool continuousMovement = false);
 	PointEx getOffset() const { return offset; }
 	PointEx getDrawOffset() const;
-	void setOffset(PointEx newOffset);
+	void setOffset(PointEx newOffset, bool continuousMovement = false);
+	void beginProjectileCollisionFrame(std::uint64_t frame);
+	bool getProjectileCollisionStart(std::uint64_t frame, Point& startPosition, PointEx& startOffset) const;
 	void removeFromDataMap();
 
 	// ---- 音效 ----

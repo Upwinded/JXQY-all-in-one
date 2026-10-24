@@ -1387,6 +1387,7 @@ bool testPartnerActions(
 	auto partner = std::make_shared<NPC>();
 	partner->kind = nkPartner;
 	partner->npcName = resourcePack.partnerName.empty() ? "Test Partner" : resourcePack.partnerName;
+	partner->relation = nrNeutral;
 	partner->life = partner->lifeMax = 100;
 	partner->attack = 73;
 	partner->canEquip = 0;
@@ -2199,6 +2200,41 @@ bool testYycsBottomColumnSeam(
 	}
 	const auto& bottomMenu = gameManager.menu->bottomMenu;
 	const auto& columnMenu = gameManager.menu->columnMenu;
+	if (resourcePack.id == "JIAN_ZHI_YUAN_1_HD"
+		|| resourcePack.id == "JIAN_ZHI_YUAN_2_HD"
+		|| resourcePack.id == "JIAN_ZHI_YUAN_3_HD"
+		|| resourcePack.id == "JIAN_ZHI_YUAN_4_HD"
+		|| resourcePack.id == "JIAN_ZHI_YUAN_5_HD"
+		|| resourcePack.id == "JIAN_ZHI_YUAN_6_HD")
+	{
+		int windowWidth = 0;
+		int windowHeight = 0;
+		Engine::getInstance()->getWindowSize(windowWidth, windowHeight);
+		bool ok = checkPack(
+			bottomMenu != nullptr && columnMenu != nullptr
+				&& bottomMenu->rect.w == 422
+				&& bottomMenu->rect.x == (windowWidth - 422) / 2 + 102
+				&& columnMenu->rect.w == 218
+				&& columnMenu->rect.x == windowWidth / 2 - 320,
+			resourcePack,
+			"places the MOD Bottom and Column panels using its source UI settings");
+		const auto& menu = gameManager.menu;
+		for (const PElement& panel : { PElement(menu->equipMenu), PElement(menu->stateMenu),
+			PElement(menu->practiceMenu), PElement(menu->buySellMenu) })
+		{
+			ok = checkPack(panel != nullptr && panel->rect.y == 0
+				&& panel->rect.x == 0,
+				resourcePack, "left menu retains the original fixed top-left anchor") && ok;
+		}
+		for (const PElement& panel : { PElement(menu->goodsMenu), PElement(menu->magicMenu),
+			PElement(menu->memoMenu) })
+		{
+			ok = checkPack(panel != nullptr && panel->rect.y == 0
+				&& panel->rect.x + panel->rect.w == windowWidth,
+				resourcePack, "right menu follows the viewport's right edge with fixed top margin") && ok;
+		}
+		return ok;
+	}
 	return checkPack(
 		bottomMenu != nullptr
 			&& columnMenu != nullptr

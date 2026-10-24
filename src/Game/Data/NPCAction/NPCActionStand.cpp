@@ -14,7 +14,12 @@ NPCActionStand::NPCActionStand(NPC* npc)
 
 void NPCActionStand::enter()
 {
-    _npc->destGE.reset();
+    auto* player = dynamic_cast<Player*>(_npc);
+    if (player == nullptr || player->nextDest == ndNone
+        || (!player->nextDestStrictWorldInteraction && player->nextDest != ndTalk))
+    {
+        _npc->destGE.reset();
+    }
     _npc->clearStep();
     _npc->cancelMoveResumeState();
     _npc->stepList.resize(0);
@@ -84,7 +89,7 @@ void NPCActionStand::update(UTime frameTime)
     }
 
 	bool hasCombatWork = _npc->hasActiveCombatWork();
-	if (npcAIEnabled && _npc->isFollower() && !hasCombatWork)
+	if (_npc->isFollowAIEnabled() && _npc->isFollower() && !hasCombatWork)
 	{
 		UTime now = _npc->getTime();
 		if (_npc->nextFollowCheckTime == 0)

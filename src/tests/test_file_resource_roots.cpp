@@ -4,6 +4,7 @@
 #include "../Game/GameManager/SaveFileManager.h"
 #include "../Game/GameTypes.h"
 #include "../Game/Data/TalkTextList.h"
+#include "../Game/Data/ImageResourcePathResolver.h"
 #include "../Image/IMPFormatValidation.h"
 #include "../Launch/EditorRunDiagnosticsFile.h"
 #include "../Launch/EditorRunRuntimeTraceFile.h"
@@ -87,6 +88,15 @@ public:
 		manager.writableCommonResourceRoot.clear();
 		File::setAssetsCollectionRoot(collectionRoot);
 		manager.scanCollectionRoot(collectionRoot);
+	}
+
+	static void appendExternalCollection(
+		ResourceManager& manager, const std::string& collectionRoot)
+	{
+		auto retained = std::move(manager.discoveredPacks);
+		manager.scanCollectionRoot(collectionRoot);
+		retained.insert(retained.end(), manager.discoveredPacks.begin(), manager.discoveredPacks.end());
+		manager.discoveredPacks = std::move(retained);
 	}
 
 	static const std::string& activeResourceEntryKey(
@@ -1217,7 +1227,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 	writeRawFile(
 		formalDescendantLinkTargetA /
 			fs::u8path(u8"tm910-正确.asf"),
-		"formal-alias-a");
+		"formal-image-a");
 	writeRawFile(
 		formalDescendantLinkTargetA / "only-a.txt",
 		"only-a");
@@ -1230,7 +1240,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 	writeRawFile(
 		formalDescendantLinkTargetB /
 			fs::u8path(u8"tm910-正确.asf"),
-		"formal-alias-b");
+		"formal-image-b");
 	writeRawFile(
 		formalDescendantLinkTargetB / "only-b.txt",
 		"only-b");
@@ -1428,7 +1438,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 	ok = check(File::installEditorRunFileLayoutForTests(layout), "restore silent routing fixture") && ok;
 
 	// This phase checks unopened log handles later; read the shared routes silently.
-	const auto readAlias = [](const std::string& path)
+	const auto readImage = [](const std::string& path)
 	{
 		std::string text;
 		File::visitReadableResources({ path },
@@ -1439,27 +1449,18 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			});
 		return text;
 	};
-	const fs::path anchoredImages = overlayRoot / "asf" / "goods";
-	writeRawFile(anchoredImages / fs::u8path(u8"anchor001-正确.ASF"), "overlay-alias");
-	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"anchor001-丢失.asf"), "formal-exact");
-	ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
-		"an anchored overlay alias retains priority over a lower-root exact filename") && ok;
-	const fs::path competingAnchoredAlias = anchoredImages / fs::u8path(u8"anchor001-另一.asf");
-	writeRawFile(competingAnchoredAlias, "ambiguous-overlay");
-	ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "formal-exact",
-		"an ambiguous anchored alias still permits the existing lower-root fallback") && ok;
-	fs::remove(competingAnchoredAlias);
-	ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
-		"removing an anchored competing alias restores the overlay match") && ok;
-	const fs::path outsideAliasTarget = root / "outside-alias-target.txt";
-	const fs::path unsafeAnchoredAlias = anchoredImages / fs::u8path(u8"anchor001-外部.asf");
-	writeRawFile(outsideAliasTarget, "must-not-read-outside-alias");
-	std::error_code aliasLinkError;
-	fs::create_hard_link(outsideAliasTarget, unsafeAnchoredAlias, aliasLinkError);
-	ok = check(!aliasLinkError && readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias" &&
-		readRawFile(outsideAliasTarget) == "must-not-read-outside-alias",
-		"an unsafe hard-link alias is not counted as a second valid anchored candidate") && ok;
-	fs::remove(unsafeAnchoredAlias);
+	const fs::path anchoredImages = overlayRoot / "asf" / "character";
+	const std::string imageName = "asf/character/npc013_st.asf";
+	writeRawFile(anchoredImages / "npc013_st (2).asf", "monk");
+	writeRawFile(activeRoot / imageName, "white-woman");
+	ok = check(readImage(imageName) == "white-woman" && File::fileExist(imageName) &&
+		File::resolveFirstExistingResource({imageName}) == imageName &&
+		normalizePath(File::getAssetsName(imageName)).find("npc013_st.asf") != std::string::npos,
+		"a similar overlay filename cannot shadow an exact formal resource") && ok;
+	fs::remove(activeRoot / imageName);
+	ok = check(readImage(imageName).empty() && !File::fileExist(imageName) &&
+		File::resolveFirstExistingResource({imageName}).empty(),
+		"a sole similar overlay filename does not satisfy an absent image") && ok;
 	{
 		File::ResourceLookupScope lookup;
 		int enumerations = 0;
@@ -1467,57 +1468,30 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		{
 			if (phase == File::EditorRunFileOperationPhase::BeforeResourceDirectoryEnumeration) ++enumerations;
 		});
-		ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
-			"overlay aliases resolve inside a loading scope") && ok;
+		ok = check(readImage(imageName).empty(), "missing overlay image stays missing in a loading scope") && ok;
 		const int firstEnumerations = enumerations;
-		writeRawFile(anchoredImages / fs::u8path(u8"anchor900-新增.asf"), "next-scope");
 		{
 			File::ResourceLookupScope nestedLookup;
-			ok = check(readAlias(u8"asf/goods/anchor900-丢失.asf").empty() &&
-				readAlias(u8"asf/goods/anchor901-丢失.asf").empty() &&
-				readAlias(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias" &&
+			ok = check(readImage("asf/character/npc900_st.asf").empty() &&
+				readImage("asf/character/npc901_st.asf").empty() &&
 				enumerations == firstEnumerations && firstEnumerations > 0,
-				"different missing overlay names and nested loads reuse the same directory index") && ok;
+				"missing overlay filenames reuse the same directory index in nested loads") && ok;
 		}
-		const fs::path exact = anchoredImages / fs::u8path(u8"anchor001-丢失.asf");
-		writeRawFile(exact, "exact-during-scope");
-		ok = check(readAlias(u8"asf/goods/anchor001-丢失.asf") == "exact-during-scope",
-			"a new exact overlay file takes precedence over its cached alias") && ok;
-		fs::remove(exact);
+		writeRawFile(overlayRoot / imageName, "exact-during-scope");
+		ok = check(readImage(imageName) == "exact-during-scope" &&
+			File::getAssetsName(imageName).empty(),
+			"an exact overlay image is readable without exposing a host path") && ok;
+		fs::remove(overlayRoot / imageName);
 		File::setEditorRunFileOperationTestHook({});
 	}
-	const fs::path removedExact = anchoredImages / fs::u8path(u8"anchor903-丢失.asf");
-	writeRawFile(removedExact, "temporary-exact");
-	writeRawFile(anchoredImages / fs::u8path(u8"anchor903-正确.asf"), "remaining-alias");
+	for (const auto& extension : {"asf", "mpc", "shd", "png"})
 	{
-		File::ResourceLookupScope lookup;
-		ok = check(readAlias(u8"asf/goods/anchor900-丢失.asf") == "next-scope",
-			"the next overlay loading scope sees new aliases") && ok;
-		fs::remove(removedExact);
-		ok = check(readAlias(u8"asf/goods/anchor903-丢失.asf") == "remaining-alias",
-			"a removed exact name in the snapshot does not count as a competing alias") && ok;
+		const std::string name = std::string(u8"mpc/object/tm001-正确.") + extension;
+		const std::string missing = std::string(u8"mpc/object/tm001-丢失.") + extension;
+		writeRawFile(overlayRoot / fs::u8path(name), "exact-image");
+		ok = check(readImage(name) == "exact-image" && readImage(missing).empty(),
+			"all image package extensions require the complete filename in overlays") && ok;
 	}
-	writeRawFile(anchoredImages / fs::u8path(u8"anchor002.part-图标S.ASF"), "anchored-dotted-icon");
-	ok = check(readAlias(u8"asf/goods/anchor002.other-丢失s.asf") == "anchored-dotted-icon",
-		"anchored alias lookup preserves dotted stems, extension case and icon suffixes") && ok;
-	ok = check(File::fileExist(u8"asf/goods/anchor001-丢失.asf") &&
-		File::getAssetsName(u8"asf/goods/anchor001-丢失.asf").empty(),
-		"an anchored alias exists but never exposes a lower-root host path") && ok;
-	for (const auto& extension : { "mpc", "shd", "png" })
-	{
-		const std::string candidate = std::string(u8"mpc/objects/anchor003-正确.") + extension;
-		const std::string requested = std::string(u8"MPC\\objects\\anchor003-丢失.") + extension;
-		writeRawFile(overlayRoot / fs::u8path(candidate), "anchored-image");
-		ok = check(readAlias(requested) == "anchored-image",
-			"root-relative MPC, shadow and PNG aliases retain separator and directory case support") && ok;
-	}
-	writeRawFile(overlayRoot / fs::u8path(u8"nested/asf/goods/anchor004-正确.asf"), "nested-alias");
-	writeRawFile(overlayRoot / fs::u8path(u8"notasf/goods/anchor005-正确.asf"), "not-an-image-directory");
-	writeRawFile(anchoredImages / fs::u8path(u8"anchor006-正确.txt"), "not-an-image-extension");
-	ok = check(readAlias(u8"nested/asf/goods/anchor004-丢失.asf") == "nested-alias" &&
-		readAlias(u8"notasf/goods/anchor005-丢失.asf").empty() &&
-		readAlias(u8"asf/goods/anchor006-丢失.txt").empty(),
-		"alias classification preserves nested paths and rejects unrelated directories or extensions") && ok;
 
 	const fs::path fileExistDirectory =
 		overlayRoot / "file-exist" / "real-directory";
@@ -1649,9 +1623,9 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 					readViaFile(
 						"asf/formal-current/caseonly.txt") ==
 						"formal-case-a" &&
-					readAlias(
-						u8"asf/formal-current/tm910-丢失.asf") ==
-						"formal-alias-a" &&
+					readImage(
+						u8"asf/formal-current/tm910-正确.asf") ==
+						"formal-image-a" &&
 					std::find(
 						linkedFilesA.begin(),
 						linkedFilesA.end(),
@@ -1721,9 +1695,9 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 						readViaFile(
 							"asf/formal-current/caseonly.txt") ==
 							"formal-case-b" &&
-						readAlias(
-							u8"asf/formal-current/tm910-丢失.asf") ==
-							"formal-alias-b" &&
+						readImage(
+							u8"asf/formal-current/tm910-正确.asf") ==
+							"formal-image-b" &&
 						std::find(
 							linkedFilesB.begin(),
 							linkedFilesB.end(),
@@ -2070,7 +2044,7 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 				readViaFile("config/active-first.txt") == "active-first" &&
 				File::resolveFirstExistingResource({ "config/active-first.txt" }) ==
 					"config/active-first.txt" &&
-				readAlias("config/active-first.txt") == "active-first" &&
+				readImage("config/active-first.txt") == "active-first" &&
 				!File::listFiles("config").empty(),
 				"formal resource reads continue through their configured routes when the overlay is unavailable") &&
 				fixtureOk;
@@ -2249,8 +2223,8 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 			"ui-common" &&
 		File::getAssetsName("config/order.txt").empty(),
 		"editor-run ordinary reads use overlay then formal fallback order") && ok;
-	ok = check(readViaFile(u8"asf/goods/anchor001-丢失.asf") == "overlay-alias",
-		"ordinary File reads resolve anchored aliases after unopened-log security checks") && ok;
+	ok = check(readViaFile("asf/character/npc013_st.asf").empty(),
+		"ordinary File reads still reject similar overlay filenames after unopened-log security checks") && ok;
 	ok = check(File::resolveFirstExistingResource({
 			"config/active-first.txt",
 			"config/overlay-second.txt"
@@ -4072,10 +4046,24 @@ bool testEditorRunFileLayout(const std::filesystem::path& root)
 		"a fresh NotInstalled transaction can recover artifacts from the old generation") &&
 		ok;
 	const char resetData[] = "normal-reset";
-	ok = check(readViaFile("config/active-first.txt") == "active-first" &&
-		File::writeFileChecked("config/after-reset.txt", resetData, 12) &&
-		readRawFile(activeRoot / "config" / "after-reset.txt") == "normal-reset",
-		"layout reset restores the ordinary desktop read and write routes") && ok;
+#if defined(__ANDROID__) || defined(__APPLE__)
+	const fs::path resetWriteRoot = root / "UserState" / "editor-normal";
+#else
+	const fs::path resetWriteRoot = activeRoot;
+#endif
+	fs::create_directories(resetWriteRoot / "config");
+	ok = check(readViaFile("config/active-first.txt") == "active-first",
+		"layout reset restores the ordinary resource read route") && ok;
+	ok = check(File::writeFileChecked("config/after-reset.txt", resetData, 12),
+		"layout reset restores the ordinary checked write route") && ok;
+	ok = check(readRawFile(resetWriteRoot / "config" / "after-reset.txt") == "normal-reset",
+		"ordinary checked writes reach the platform output root: expected=" +
+			resetWriteRoot.u8string() + " resolved=" +
+			File::getAssetsName("config/after-reset.txt")) && ok;
+#if defined(__ANDROID__) || defined(__APPLE__)
+	ok = check(!fs::exists(activeRoot / "config" / "after-reset.txt"),
+		"ordinary writable-storage routing preserves the active resource tree") && ok;
+#endif
 	GameLog::use_log_file = true;
 	GameLog::write("legacy log restored");
 	ok = check(readRawFile(legacyLogPath).find("legacy log restored") !=
@@ -4159,6 +4147,97 @@ bool testIMPFormatValidation()
 	ok = check(!IMPFormatValidation::validate(truncatedSecondHeader.data(),
 		static_cast<int>(truncatedSecondHeader.size())),
 		"IMG validation rejects a missing later frame header") && ok;
+	return ok;
+}
+
+bool testActionReleaseFrameRatioInheritance(const std::filesystem::path& root)
+{
+	const auto collection = root / "ReleaseRatioInheritance";
+	const auto writePack = [&](const std::string& id, const std::string& declarations)
+	{
+		writeRawFile(collection / id / "game_profile.ini",
+			"[Game]\nId=" + id + "\nType=2\n" + declarations);
+	};
+	writePack("UI_ONLY", "[Combat]\nAttackReleaseFrameRatio=1/1\n"
+		"SpecialAttackReleaseFrameRatio=1/1\nMagicReleaseFrameRatio=1/1\n");
+	writePack("EMPTY", "[UI]\nBaseId=UI_ONLY\n");
+	writePack("BASE", "[Combat]\nAttackReleaseFrameRatio=2/3\n"
+		"SpecialAttackReleaseFrameRatio=1/3\nMagicReleaseFrameRatio=4/5\n");
+	writePack("GRAND", "[Resource]\nDependencyId=BASE\n[Combat]\nMagicReleaseFrameRatio=3/4\n");
+	writePack("FIRST", "[Resource]\nDependencyId=GRAND\n[Combat]\nAttackReleaseFrameRatio=2/4\n");
+	writePack("SECOND", "[Combat]\nAttackReleaseFrameRatio=1/1\n"
+		"SpecialAttackReleaseFrameRatio=2/7\nMagicReleaseFrameRatio=2/3\n");
+	writePack("ACTIVE", "[Resource]\nDependencyId=EMPTY,FIRST,SECOND\n"
+		"[UI]\nBaseId=UI_ONLY\n[Combat]\nSpecialAttackReleaseFrameRatio=1/1\n");
+	writePack("REORDERED", "[Resource]\nDependencyId=EMPTY,SECOND,FIRST\n");
+	writePack("CHAIN_DEFAULT", "[Resource]\nDependencyId=EMPTY\n");
+	writePack("INVALID", "[Resource]\nDependencyId=FIRST\n[Combat]\n"
+		"AttackReleaseFrameRatio=0/3\nSpecialAttackReleaseFrameRatio=3/2\nMagicReleaseFrameRatio=4/5/6\n");
+	writePack("BAD_PARTIAL", "[Combat]\nAttackReleaseFrameRatio=1/0\nMagicReleaseFrameRatio=1/2\n");
+	writePack("INVALID_PARENT", "[Resource]\nDependencyId=BAD_PARTIAL,SECOND\n");
+	writeRawFile(collection / "common" / "game_profile.ini",
+		"[Game]\nId=COMMON\nType=2\n[Combat]\nSpecialAttackReleaseFrameRatio=1/1\n");
+	bool ok = true;
+	const auto checkRatios = [&](const RuntimeResource::ExactSelectionResult& selection,
+		const char* attack, const char* special, const char* magic,
+		const char* attackSource, const char* specialSource, const char* magicSource,
+		const char* message)
+	{
+		const auto& manifest = selection.selection.activeManifest;
+		return check(selection.succeeded()
+			&& actionReleaseFrameRatioToString(manifest.attackReleaseFrameRatio) == attack
+			&& actionReleaseFrameRatioToString(manifest.specialAttackReleaseFrameRatio) == special
+			&& actionReleaseFrameRatioToString(manifest.magicReleaseFrameRatio) == magic
+			&& manifest.attackReleaseFrameRatioSourceId == attackSource
+			&& manifest.specialAttackReleaseFrameRatioSourceId == specialSource
+			&& manifest.magicReleaseFrameRatioSourceId == magicSource, message);
+	};
+	const auto active = RuntimeResource::resolveExactResourceSelection(collection, "ACTIVE");
+	ok = checkRatios(active, "2/4", "1/1", "3/4", "FIRST", "ACTIVE", "GRAND",
+		"release fields independently combine local overrides with multilevel content dependencies") && ok;
+	const auto reordered = RuntimeResource::resolveExactResourceSelection(collection, "REORDERED");
+	ok = checkRatios(reordered, "1/1", "2/7", "2/3", "SECOND", "SECOND", "SECOND",
+		"declared dependency order wins without unspecified earlier parents hiding later values") && ok;
+	for (const char* id : { "EMPTY", "CHAIN_DEFAULT" })
+	{
+		const auto defaults = RuntimeResource::resolveExactResourceSelection(collection, id);
+		ok = checkRatios(defaults, "2/3", "1/3", "4/5", "", "", "",
+			"UI-only and common roots do not supply combat ratios to a dependency-free or empty chain") && ok;
+		ok = check(!defaults.selection.activeManifest.attackReleaseFrameRatioDefined
+			&& !defaults.selection.activeManifest.specialAttackReleaseFrameRatioDefined
+			&& !defaults.selection.activeManifest.magicReleaseFrameRatioDefined,
+			"universal defaults remain distinguishable from explicit declarations") && ok;
+	}
+	const auto invalid = RuntimeResource::resolveExactResourceSelection(collection, "INVALID");
+	ok = checkRatios(invalid, "2/4", "1/3", "3/4", "FIRST", "BASE", "GRAND",
+		"invalid local release ratios independently fall through to valid content declarations") && ok;
+	ok = check(std::count_if(invalid.diagnostics.begin(), invalid.diagnostics.end(), [](const auto& diagnostic)
+		{
+			return diagnostic.code == "resource.catalog.action_release_frame_ratio_invalid"
+				&& diagnostic.resourcePackId == "INVALID";
+		}) == 3, "every invalid local ratio produces a diagnostic without rejecting the pack") && ok;
+	const auto invalidParent = RuntimeResource::resolveExactResourceSelection(collection, "INVALID_PARENT");
+	ok = checkRatios(invalidParent, "1/1", "2/7", "1/2", "SECOND", "SECOND", "BAD_PARTIAL",
+		"an invalid dependency field does not hide a later dependency while valid sibling fields remain usable") && ok;
+	ok = check(std::any_of(invalidParent.diagnostics.begin(), invalidParent.diagnostics.end(), [](const auto& diagnostic)
+		{
+			return diagnostic.code == "resource.catalog.action_release_frame_ratio_invalid"
+				&& diagnostic.resourcePackId == "BAD_PARTIAL";
+		}), "selected dependency ratio diagnostics reach the runtime selection") && ok;
+	const auto snapshot = RuntimeResource::loadResourceCatalogSnapshot(collection);
+	const auto raw = std::find_if(snapshot.snapshot.entries.begin(), snapshot.snapshot.entries.end(), [](const auto& entry)
+		{
+			return entry.manifest.id == "ACTIVE";
+		});
+	ok = check(snapshot.succeeded() && raw != snapshot.snapshot.entries.end()
+		&& !raw->manifest.attackReleaseFrameRatioDefined && !raw->manifest.magicReleaseFrameRatioDefined
+		&& raw->manifest.specialAttackReleaseFrameRatioDefined
+		&& raw->manifest.attackReleaseFrameRatioSourceId.empty()
+		&& raw->manifest.magicReleaseFrameRatioSourceId.empty(),
+		"catalog discovery preserves local inheritance declarations separately from effective values") && ok;
+	const auto defaultsAgain = RuntimeResource::resolveExactResourceSelection(collection, "EMPTY");
+	ok = checkRatios(defaultsAgain, "2/3", "1/3", "4/5", "", "", "",
+		"switching back to an unconfigured resource does not retain another selection's release ratios") && ok;
 	return ok;
 }
 
@@ -5561,6 +5640,140 @@ bool testWritableCommonIsNotResourceCandidate(
 	return ok;
 }
 
+bool testUnusedSharedResourceRemoval(const std::filesystem::path& root)
+{
+	namespace fs = std::filesystem;
+	struct Scenario
+	{
+		const char* name;
+		const char* retainedContentDependency;
+		const char* retainedUiDependency;
+		bool externalPeer;
+		bool externalShared;
+		bool sharedCycle;
+		bool selectedUiOnly;
+		std::vector<std::string> expected;
+	};
+	const std::vector<Scenario> scenarios = {
+		{ "last-mod", "", "", false, false, false, false, { "MOD", "PAIR", "CORE" } },
+		{ "same-pair", "pair", "", false, false, false, false, { "MOD" } },
+		{ "other-part", "core", "", false, false, false, false, { "MOD", "PAIR" } },
+		{ "ui-pair", "", " pair ", false, false, false, false, { "MOD" } },
+		{ "ui-core", "", "core", false, false, false, false, { "MOD", "PAIR" } },
+		{ "external-content", "PAIR", "", true, false, false, false, { "MOD" } },
+		{ "external-ui", "", "CORE", true, false, false, false, { "MOD", "PAIR" } },
+		{ "external-shared", "", "", false, true, false, false, { "MOD" } },
+		{ "unused-cycle", "", "", false, false, true, false, { "MOD", "PAIR", "CORE" } },
+		{ "retained-cycle", "", "CORE", false, false, true, false, { "MOD" } },
+		{ "selected-ui-only", "", "", false, false, false, true, { "MOD", "PAIR", "CORE" } },
+		{ "external-dependent-blocks", "", "MOD", true, false, false, false, {} },
+	};
+	bool ok = true;
+	ResourceManager& manager = ResourceManager::instance();
+	for (const Scenario& scenario : scenarios)
+	{
+		const fs::path fixture = root / "unused-shared" / scenario.name;
+		const fs::path assets = fixture / "assets";
+		const fs::path external = fixture / "external";
+		const fs::path saveRoot = fixture / "save";
+		const auto writePack = [](const fs::path& directory,
+			const std::string& id, const std::string& content,
+			const std::string& ui, bool resourceOnly)
+		{
+			writeRawFile(directory / "game_profile.ini",
+				"[Game]\nId=" + id + "\nName=" + id + "\nType=0\n"
+				"[Resource]\nDependencyId=" + content + "\nResourceOnly=" +
+				(resourceOnly ? "1" : "0") + "\n[UI]\nBaseId=" + ui +
+				"\n[Save]\nNamespace=" + id + "\n");
+			writeRawFile(directory / "payload.bin", id);
+		};
+		writePack(assets / "base", "BASE", "", "", false);
+		writePack(assets / "core", "CORE", scenario.sharedCycle ? "PAIR" : "BASE", "", true);
+		const fs::path pairRoot = (scenario.externalShared ? external : assets) / "pair";
+		writePack(pairRoot, "PAIR", "CORE", "", true);
+		writePack(assets / "mod", "MOD", scenario.selectedUiOnly ? "BASE" : "PAIR,BASE",
+			scenario.selectedUiOnly ? "PAIR" : "", false);
+		writePack(assets / "unrelated", "UNRELATED", "", "", true);
+		writeRawFile(assets / "common" / "payload.bin", "common");
+		if (*scenario.retainedContentDependency || *scenario.retainedUiDependency)
+		{
+			writePack((scenario.externalPeer ? external : assets) / "peer", "PEER",
+				scenario.retainedContentDependency, scenario.retainedUiDependency, false);
+		}
+		writeRawFile(saveRoot / "MOD" / "rpg1" / "game.ini", "mod-save");
+		writeRawFile(saveRoot / "BASE" / "rpg1" / "game.ini", "base-save");
+		// Resource-only packages never own gameplay saves, even if a namespace exists.
+		writeRawFile(saveRoot / "CORE" / "rpg1" / "game.ini", "retained-save");
+		ResourceManagerPolicyTestAccess::reset(manager);
+		File::setPlatformStateParentForTests(fixture.string());
+		ResourceManagerPolicyTestAccess::scanCollectionRoot(manager, assets.u8string());
+		if (fs::exists(external))
+		{
+			ResourceManagerPolicyTestAccess::appendExternalCollection(manager, external.u8string());
+		}
+		const auto& packs = manager.getDiscoveredPacks();
+		const auto selected = std::find_if(packs.begin(), packs.end(),
+			[](const ResourceManager::ResourcePack& pack) { return pack.manifest.id == "MOD"; });
+		if (!check(selected != packs.end(), std::string(scenario.name) + ": discover selected mod"))
+		{
+			ok = false;
+			continue;
+		}
+		const auto snapshot = snapshotDirectoryTree(fixture);
+		const auto plan = manager.buildResourceRemovalPlan(static_cast<int>(selected - packs.begin()));
+		ok = check(snapshotDirectoryTree(fixture) == snapshot,
+			std::string(scenario.name) + ": planning does not modify resources or saves") && ok;
+		if (scenario.expected.empty())
+		{
+			ok = check(plan.status == ResourceManager::ResourceRemovalStatus::DependencyBlocked &&
+				plan.entries.empty() && plan.blockingResourceNames == std::vector<std::string>{ "PEER" },
+				"external UI dependent blocks deleting its base") && ok;
+			continue;
+		}
+		std::vector<std::string> actual;
+		for (const auto& entry : plan.entries)
+		{
+			actual.push_back(entry.gameId);
+			if (entry.gameId == "CORE" || entry.gameId == "PAIR")
+			{
+				ok = check(entry.resourceOnly && entry.saveNamespace.empty() && !entry.saveExists,
+					std::string(scenario.name) + ": shared media has no save deletion target") && ok;
+			}
+		}
+		auto expected = scenario.expected;
+		if (scenario.sharedCycle)
+		{
+			std::sort(actual.begin(), actual.end());
+			std::sort(expected.begin(), expected.end());
+		}
+		ok = check(plan.status == ResourceManager::ResourceRemovalStatus::Success && actual == expected,
+			std::string(scenario.name) + ": exact deletion list, dependent before shared base") && ok;
+		const bool preserveSave = scenario.selectedUiOnly;
+		const auto removed = manager.removeResourceGroup(plan, preserveSave
+			? ResourceManager::ResourceRemovalSavePolicy::Preserve
+			: ResourceManager::ResourceRemovalSavePolicy::Delete);
+		ok = check(removed.status == ResourceManager::ResourceRemovalStatus::Success &&
+			removed.removedGameIds.size() == expected.size() && !fs::exists(assets / "mod") &&
+			fs::exists(saveRoot / "MOD") == preserveSave &&
+			readRawFile(saveRoot / "BASE" / "rpg1" / "game.ini") == "base-save" &&
+			readRawFile(saveRoot / "CORE" / "rpg1" / "game.ini") == "retained-save" &&
+			readRawFile(assets / "base" / "payload.bin") == "BASE" &&
+			readRawFile(assets / "unrelated" / "payload.bin") == "UNRELATED" &&
+			readRawFile(assets / "common" / "payload.bin") == "common",
+			std::string(scenario.name) + ": execute exact group, preserve originals, common and unrelated saves") && ok;
+		for (const auto& item : std::vector<std::pair<std::string, fs::path>>{
+			{ "CORE", assets / "core" }, { "PAIR", pairRoot } })
+		{
+			const bool shouldRemove = std::find(expected.begin(), expected.end(), item.first) != expected.end();
+			ok = check(fs::exists(item.second) != shouldRemove,
+				std::string(scenario.name) + ": expected shared directory survives or is removed") && ok;
+		}
+	}
+	ResourceManagerPolicyTestAccess::reset(manager);
+	File::setPlatformStateParentForTests(root.string());
+	return ok;
+}
+
 bool testResourceRemovalAndSaveCleanup(const std::filesystem::path& root)
 {
 	namespace fs = std::filesystem;
@@ -6449,8 +6662,65 @@ bool testCheckedWriteRecovery()
 #endif
 }
 
+// Read-only probe for comparing actual resource routes before a release.
+int auditImageResourceRoutes(const char* collection, const char* gameId,
+	const char* requestsPath, const char* outputPath)
+{
+	const auto resolved = RuntimeResource::resolveExactResourceSelection(
+		std::filesystem::u8path(collection), gameId);
+	if (!resolved.succeeded()) return 2;
+	const auto& selection = resolved.selection;
+	File::setAssetsCollectionRoot(collection);
+	File::setActiveResourceRoot(selection.activeResourceRoot.u8string());
+	File::setCommonResourceRoot(selection.commonResourceRoot.u8string());
+	std::vector<std::string> contentRoots, uiRoots;
+	for (const auto& root : selection.orderedContentRoots)
+	{
+		if (root.kind != RuntimeResource::ContentRootKind::Active &&
+			root.kind != RuntimeResource::ContentRootKind::Common)
+			contentRoots.push_back(root.root.u8string());
+	}
+	for (const auto& root : selection.orderedUiFallbackRoots)
+		uiRoots.push_back(root.u8string());
+	File::setResourceFallbackRoots(contentRoots);
+	File::setUiResourceFallbackRoots(uiRoots, selection.preferLocalUi,
+		selection.commonResourceRoot.u8string());
+	std::ifstream requests(std::filesystem::u8path(requestsPath));
+	std::ofstream output(std::filesystem::u8path(outputPath), std::ios::binary);
+	if (!requests || !output) return 3;
+	File::ResourceLookupScope scope;
+	std::string line;
+	while (std::getline(requests, line))
+	{
+		const auto separator = line.find('\t');
+		if (separator == std::string::npos) return 4;
+		const auto category = line.substr(0, separator);
+		const auto name = line.substr(separator + 1);
+		const auto candidates = category.empty() ? std::vector<std::string>{name} :
+			buildImageResourceCandidatesForCategory(name, category,
+				"asf/" + category + "/", "mpc/" + category + "/");
+		std::vector<std::string> expanded;
+		for (const auto& candidate : candidates)
+			for (const auto& path : ImagePackagePathCandidates::build(candidate))
+				appendUniqueImageResourceCandidate(expanded, path);
+		std::string selected;
+		int bytes = 0;
+		File::visitReadableResources(expanded,
+			[&](const std::string& candidate, std::unique_ptr<char[]>&, int length)
+			{
+				selected = File::getAssetsName(candidate);
+				bytes = length;
+				return true;
+			});
+		output << line << '\t' << selected << '\t' << bytes << '\n';
+	}
+	return output ? 0 : 5;
+}
+
 int main(int argc, char* argv[])
 {
+	if (argc == 6 && std::string(argv[1]) == "--image-route-audit")
+		return auditImageResourceRoutes(argv[2], argv[3], argv[4], argv[5]);
 	if (argc == 2 && std::string(argv[1]) == "--checked-write-recovery") return testCheckedWriteRecovery() ? 0 : 1;
 	if (argc == 2 && std::string(argv[1]) == "--ini-numeric-defaults") return testIniNumericDefaults() ? 0 : 1;
 	if (argc == 2 && std::string(argv[1]) == "--save-publication-repro") return runSavePublicationReproduction() ? 0 : 1;
@@ -6458,7 +6728,8 @@ int main(int argc, char* argv[])
 	namespace fs = std::filesystem;
 
 	bool ok = true;
-	fs::path root = makeUniqueTestDirectory("jxqy_file_resource_roots_test");
+	fs::path root = fs::weakly_canonical(
+		makeUniqueTestDirectory("jxqy_file_resource_roots_test"));
 	fs::remove_all(root);
 	std::filesystem::create_directories(root);
 	std::filesystem::create_directories(
@@ -6467,12 +6738,31 @@ int main(int argc, char* argv[])
 		(root / "UserState").string());
 	File::setPlatformStateParentForTests(root.string());
 
+	if (argc == 2 && std::string(argv[1]) == "--resource-removal-only")
+	{
+		ok = testResourceRemovalAndSaveCleanup(root) && ok;
+		ok = testUnusedSharedResourceRemoval(root) && ok;
+		File::setSharedApplicationRootForTests("");
+		File::setPlatformStateParentForTests("");
+		fs::remove_all(root);
+		return ok ? 0 : 1;
+	}
+	if (argc == 2 && std::string(argv[1]) == "--action-release-ratios")
+	{
+		ok = testActionReleaseFrameRatioInheritance(root);
+		File::setSharedApplicationRootForTests("");
+		File::setPlatformStateParentForTests("");
+		fs::remove_all(root);
+		return ok ? 0 : 1;
+	}
+
 	if (argc == 2 &&
 		std::string(argv[1]) ==
 			"--resource-manager-policy-only")
 	{
 		bool resourcePolicyOk =
 			testResourceManagerDependencySelection(root);
+		resourcePolicyOk = testActionReleaseFrameRatioInheritance(root) && resourcePolicyOk;
 		resourcePolicyOk =
 			testWritableCommonIsNotResourceCandidate(root) &&
 			resourcePolicyOk;
@@ -6491,9 +6781,11 @@ int main(int argc, char* argv[])
 	ok = testTalkIndexResourcePriority(root) && ok;
 	ok = testResourceReadPrefixPolicy() && ok;
 	ok = testIMPFormatValidation() && ok;
+	ok = testActionReleaseFrameRatioInheritance(root) && ok;
 	ok = testResourceManagerDependencySelection(root) && ok;
 	ok = testWritableCommonIsNotResourceCandidate(root) && ok;
 	ok = testResourceRemovalAndSaveCleanup(root) && ok;
+	ok = testUnusedSharedResourceRemoval(root) && ok;
 #if defined(__MOBILE__) && !defined(__ANDROID__)
 	ok = testPackagedEmptyPrimaryRootSelection(root) && ok;
 #endif
@@ -6662,91 +6954,59 @@ int main(int argc, char* argv[])
 		!File::readActiveResourceFile("../config/same.txt", limitedData, limitedLength),
 		"active-package access rejects parent traversal") && ok;
 
-	writeRawFile(activeRoot / "asf" / "goods" / std::filesystem::u8path("tm001-\xE6\xAD\xA3\xE7\xA1\xAE.asf"), "image-alias");
-	writeRawFile(activeRoot / "asf" / "goods" / std::filesystem::u8path("tm001-\xE5\x9B\xBE\xE6\xA0\x87s.asf"), "icon-alias");
-	writeRawFile(activeRoot / "asf" / "goods" / std::filesystem::u8path("tm002-\xE4\xB8\x80.asf"), "ambiguous-a");
-	writeRawFile(activeRoot / "asf" / "goods" / std::filesystem::u8path("tm002-\xE4\xBA\x8C.asf"), "ambiguous-b");
-	ok = check(readViaFile("asf/goods/tm001-\xE4\xB8\xA2\xE5\xA4\xB1.asf") == "image-alias",
-		"readFile resolves unique image resource alias by stable numeric prefix") && ok;
-	ok = check(readViaFile("asf/goods/tm001-\xE4\xB8\xA2\xE5\xA4\xB1s.asf") == "icon-alias",
-		"readFile keeps icon suffix while resolving image resource alias") && ok;
-	ok = check(File::fileExist("asf/goods/tm001-\xE4\xB8\xA2\xE5\xA4\xB1.asf"),
-		"fileExist resolves unique image resource alias") && ok;
-	ok = check(normalizePath(File::getAssetsName("asf/goods/tm001-\xE4\xB8\xA2\xE5\xA4\xB1.asf")).find("tm001-\xE6\xAD\xA3\xE7\xA1\xAE.asf") != std::string::npos,
-		"getAssetsName returns resolved image resource alias") && ok;
-	ok = check(readViaFile("asf/goods/tm002-\xE7\xBC\xBA.asf").empty(),
-		"readFile refuses ambiguous image resource aliases") && ok;
-
-	const fs::path secondAlias = activeRoot / "asf" / "goods" / fs::u8path(u8"tm001-新增.asf");
-	writeRawFile(secondAlias, "second-alias");
-	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf").empty(),
-		"adding a second alias invalidates a formerly unique match on the next read") && ok;
-	fs::remove(secondAlias);
-	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "image-alias",
-		"removing the competing alias restores the unique match on the next read") && ok;
-	const fs::path exactAlias = activeRoot / "asf" / "goods" / fs::u8path(u8"tm001-丢失.asf");
-	writeRawFile(exactAlias, "new-exact-resource");
-	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "new-exact-resource",
-		"a newly created exact filename takes priority over the previous alias") && ok;
-	fs::remove(exactAlias);
-	ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "image-alias",
-		"removing the exact filename re-enables the existing alias") && ok;
-	ok = check(readViaFile(u8"asf/goods/tm003-缺失.asf").empty(),
-		"the dynamic alias fixture begins with no matching resource") && ok;
-	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"tm003-新增.asf"), "new-alias");
-	ok = check(readViaFile(u8"asf/goods/tm003-缺失.asf") == "new-alias",
-		"a resource added after a missing read is visible without changing resource roots") && ok;
-
-	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"TM004-正确.ASF"), "uppercase-extension");
-	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"TM004-图标S.ASF"), "uppercase-icon");
-	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"tm004-说明.txt"), "different-extension");
-	fs::create_directory(activeRoot / "asf" / "goods" / fs::u8path(u8"tm004-目录.asf"));
-	ok = check(readViaFile(u8"asf/goods/tm004-丢失.asf") == "uppercase-extension" &&
-		readViaFile(u8"asf/goods/tm004-丢失s.asf") == "uppercase-icon",
-		"aliases preserve extension and icon-suffix case rules and ignore other extensions and directories") && ok;
-	writeRawFile(activeRoot / "asf" / "goods" / fs::u8path(u8"tm005.part-正确.asf"), "dotted-stem");
-	ok = check(readViaFile(u8"asf/goods/tm005.other-丢失.asf") == "dotted-stem",
-		"a dot inside the stem still terminates the stable alias prefix") && ok;
-
+	const std::string exactImage = "asf/character/npc013_st.asf";
+	writeRawFile(activeRoot / "asf/character/npc013_st (2).asf", "monk");
+	writeRawFile(dependencyRoot / exactImage, "white-woman");
+	const auto visitImage = [](const std::string& name)
 	{
-		File::ResourceLookupScope lookup;
-		const std::vector<std::pair<std::string, std::string>> cases = {
-			{u8"asf/goods/tm001-丢失.asf", "image-alias"},
-			{u8"asf/goods/tm001-丢失s.asf", "icon-alias"},
-			{u8"asf/goods/tm002-丢失.asf", ""},
-			{u8"asf/goods/tm004-丢失.asf", "uppercase-extension"},
-			{u8"asf/goods/tm004-丢失s.asf", "uppercase-icon"},
-			{u8"asf/goods/tm005.other-丢失.asf", "dotted-stem"}
-		};
-		for (int pass = 0; pass < 2; ++pass)
-		{
-			File::ResourceLookupScope nestedLookup;
-			for (const auto& entry : cases)
+		std::string bytes;
+		File::visitReadableResources({name},
+			[&](const std::string&, std::unique_ptr<char[]>& data, int length)
 			{
-				ok = check(readViaFile(entry.first) == entry.second,
-					"cached resource names retain aliases, ambiguity and icon suffixes") && ok;
-			}
-		}
-		ok = check(readViaFile(u8"asf/goods/tm900-缺失.asf").empty(),
-			"loading scope records an absent alias") && ok;
-		writeRawFile(activeRoot / "asf/goods" / fs::u8path(u8"tm900-新增.asf"), "next-load");
-		ok = check(readViaFile(u8"asf/goods/tm900-缺失.asf").empty(),
-			"nested loading scopes reuse the directory snapshot") && ok;
-		writeRawFile(exactAlias, "exact-during-load");
-		ok = check(readViaFile(u8"asf/goods/tm001-丢失.asf") == "exact-during-load",
-			"exact resource reads take precedence over cached aliases") && ok;
-		fs::remove(exactAlias);
-		File::setActiveResourceRoot(activeRoot.u8string());
-		ok = check(readViaFile(u8"asf/goods/tm900-缺失.asf") == "next-load",
-			"resource root changes refresh active directory snapshots") && ok;
-		ok = check(readViaFile(u8"asf/goods/tm901-缺失.asf").empty(),
-			"second absent alias is recorded") && ok;
-		writeRawFile(activeRoot / "asf/goods" / fs::u8path(u8"tm901-新增.asf"), "fresh-load");
-	}
+				bytes.assign(data.get(), static_cast<size_t>(length));
+				return true;
+			});
+		return bytes;
+	};
+	for (int pass = 0; pass < 2; ++pass)
 	{
-		File::ResourceLookupScope lookup;
-		ok = check(readViaFile(u8"asf/goods/tm901-缺失.asf") == "fresh-load",
-			"a new loading scope sees files added after the previous snapshot") && ok;
+		File::ResourceLookupScope scope;
+		ok = check(readViaFile(exactImage) == "white-woman" && visitImage(exactImage) == "white-woman" &&
+			File::fileExist(exactImage) && File::resolveFirstExistingResource({exactImage}) == exactImage &&
+			normalizePath(File::getAssetsName(exactImage)).find("BasePack/" + exactImage) != std::string::npos,
+			"all image lookup APIs ignore an earlier-root numeric duplicate and select the exact dependency image") && ok;
+		writeRawFile(activeRoot / exactImage, "local-exact");
+		ok = check(readViaFile(exactImage) == "local-exact" && visitImage(exactImage) == "local-exact",
+			"an exact local image retains priority even after a cached dependency lookup") && ok;
+		fs::remove(activeRoot / exactImage);
+	}
+	fs::remove(dependencyRoot / exactImage);
+	ok = check(readViaFile(exactImage).empty() && visitImage(exactImage).empty() &&
+		!File::fileExist(exactImage) && File::resolveFirstExistingResource({exactImage}).empty() &&
+		normalizePath(File::getAssetsName(exactImage)).find("(2)") == std::string::npos,
+		"no API substitutes a numeric duplicate when the exact image is absent") && ok;
+	for (const auto& extension : {"asf", "mpc", "shd", "png"})
+	{
+		const std::string name = std::string(u8"asf/goods/tm001-正确.") + extension;
+		const std::string missing = std::string(u8"asf/goods/tm001-丢失.") + extension;
+		writeRawFile(activeRoot / fs::u8path(name), "exact-image");
+		File::ResourceLookupScope scope;
+		ok = check(readViaFile(name) == "exact-image" && readViaFile(missing).empty() &&
+			!File::fileExist(missing) && File::resolveFirstExistingResource({missing}).empty(),
+			"Chinese suffixes must match completely for all image package extensions") && ok;
+	}
+	writeRawFile(activeRoot / "asf/goods/TM004-ICON.ASF", "uppercase-image");
+	ok = check(readViaFile("asf/goods/tm004-icon.asf") == "uppercase-image",
+		"ASCII filename case compatibility remains available") && ok;
+	writeRawFile(activeRoot / "asf/goods/tm005.part.asf", "dotted-image");
+	ok = check(readViaFile("asf/goods/tm005.other.asf").empty(),
+		"dots in image stems do not permit a partial match") && ok;
+	{
+		File::ResourceLookupScope scope;
+		ok = check(readViaFile("asf/goods/fresh.asf").empty(), "an absent exact image stays absent") && ok;
+		writeRawFile(activeRoot / "asf/goods/fresh.asf", "fresh-image");
+		ok = check(readViaFile("asf/goods/fresh.asf") == "fresh-image",
+			"new exact files are visible during the same loading scope") && ok;
 	}
 
 	std::string resolvedDependencyFile = normalizePath(File::getAssetsName("config/base-only.txt"));

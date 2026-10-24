@@ -1,6 +1,7 @@
 #pragma once
 #include "GameElement.h"
 #include "Magic.h"
+#include <array>
 #include <cstdint>
 #include <deque>
 #include <limits>
@@ -90,6 +91,7 @@ class Effect :
 	friend class EffectTestAccess;
 	friend class RageSystemTestAccess;
 	friend class ProjectileCollisionTestAccess;
+	friend class ProjectileCollisionRuntimeTestAccess;
 public:
 	Effect();
 	virtual ~Effect();
@@ -150,10 +152,13 @@ public:
 	std::shared_ptr<MagicDispatchContext> magicDispatchContext = nullptr;
 
 	std::deque<Point> passPath;
+	std::array<PointEx, 3> getPathOffsets() const;
 	Point collisionSweepStartPosition = { 0, 0 };
 	PointEx collisionSweepStartOffset = { 0, 0 };
 	bool collisionSweepInitialized = false;
 	std::uint64_t projectileCollisionCreationFrame =
+		std::numeric_limits<std::uint64_t>::max();
+	std::uint64_t characterCollisionActivationFrame =
 		std::numeric_limits<std::uint64_t>::max();
 
 	void beginExplode(
@@ -191,7 +196,7 @@ public:
 		EffectReferenceSaveContext* referenceContext = nullptr);
 	virtual void playSound(int act);
 	
-	// 按实际屏幕飞行方向和飞行图方向数选择动画方向
+	// 按去除地图投影的飞行向量和资源方向数选择动画方向
 	int getDirection(Point fDir);
 	int getDirection();
 

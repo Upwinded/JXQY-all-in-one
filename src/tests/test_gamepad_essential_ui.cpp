@@ -7,6 +7,7 @@
 #include "../Game/Config/Config.h"
 #include "../Game/Game.h"
 #include "../Game/GameManager/GameManager.h"
+#include "../Game/GameManager/SaveFileManager.h"
 #include "../Game/Menu/ColumnMenu.h"
 #include "../Game/Menu/ChooseMenu.h"
 #include "../Game/Menu/ControllerHelpOverlay.h"
@@ -58,6 +59,10 @@ public:
 		owner.setRunning(true);
 		const int x = control->rect.x + control->rect.w / 2;
 		const int y = control->rect.y + control->rect.h / 2;
+		if (!touch)
+		{
+			engine->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID, x, y, false));
+		}
 		engine->pushEvent(AEvent(touch ? ET_FINGERDOWN : ET_MOUSEDOWN,
 			touch ? 86 : MBC_MOUSE_LEFT, x, y, false));
 		owner.allHandleEvents();
@@ -93,6 +98,12 @@ public:
 	{
 		Engine::getInstance()->EngineBase::width = width;
 		Engine::getInstance()->EngineBase::height = height;
+	}
+
+	static std::array<int, 4> targetLifeBarSettings(const NpcInfoPanel& panel)
+	{
+		return {panel.lifeBarWidth, panel.lifeBarHeight,
+			panel.lifeBarLeftAdjust, panel.lifeBarTopAdjust};
 	}
 
 	static bool dispatchOptionReturnClick(Option& option, bool useTouch)
@@ -156,13 +167,37 @@ public:
 	{
 		using State = ResourceSelectScene::ResourceInstallDialogState;
 		using Operation = ResourceSelectScene::ResourceInstallOperation;
+		scene.resourceInstallDialogState = State::Hidden;
+		scene.beginSaveManagement();
+		const auto saved = std::find_if(scene.saveNamespaceEntries.begin(), scene.saveNamespaceEntries.end(),
+			[](const auto& entry) { return entry.saveNamespace == "jxqy2"; });
+		if (saved == scene.saveNamespaceEntries.end() || saved->saveSlotCount != 2) return false;
+		scene.selectedSaveNamespaceIndex = static_cast<int>(saved - scene.saveNamespaceEntries.begin());
+		scene.chooseSaveExport();
+		bool ok = scene.resourceInstallDialogState == State::ChoosingSaveExport &&
+			scene.saveTransferGame.id == "JXQY2" && scene.saveTransferGame.saveNamespace == "JXQY2" &&
+			scene.saveTransferRoot().filename() == "jxqy2" &&
+			scene.saveExportSlots == std::vector<int>{ SavePackage::AllSlots, 1, SavePackage::AutomaticSlot };
 		scene.resourceInstallOperation = Operation::SaveManagement;
 		scene.resourceInstallDialogState = State::BrowsingSaves;
 		scene.saveNamespaceEntries = { { "test_mod", u8"测试模组", 1024, 2 } };
 		scene.selectedSaveNamespaceIndex = 0;
 		scene.setMainControlsAvailable(false);
 		scene.refreshResourceInstallDialogControls();
-		bool ok = scene.saveExportButton->activated && scene.saveImportButton->activated;
+		ok = ok && scene.saveExportButton->activated && scene.saveImportButton->activated;
+		scene.saveTransferGame = { "TEST_MOD", u8"测试模组", "TEST_MOD", "1.0.0" };
+		scene.saveTransferAction = ResourceSelectScene::SaveTransferAction::Export;
+		ok = ok && scene.saveTransferRoot().filename() == "test_mod";
+		scene.saveNamespaceEntries.push_back({ "other_mod", u8"另一模组", 1024, 1 });
+		scene.selectedSaveNamespaceIndex = 1;
+		ok = ok && scene.saveTransferRoot().filename() == "other_mod" &&
+			scene.saveTransferGame.saveNamespace == "TEST_MOD";
+		scene.saveTransferAction = ResourceSelectScene::SaveTransferAction::Import;
+		ok = ok && scene.saveTransferRoot().filename() == "test_mod";
+		scene.saveTransferAction = ResourceSelectScene::SaveTransferAction::Inspect;
+		ok = ok && scene.saveTransferRoot().filename() == "test_mod";
+		scene.saveNamespaceEntries.pop_back();
+		scene.selectedSaveNamespaceIndex = 0;
 		const auto inside = [](const Rect& inner, const Rect& outer)
 		{
 			return inner.x >= outer.x && inner.y >= outer.y &&
@@ -178,7 +213,10 @@ public:
 		scene.onHandleUIAction(UIAction::NavigateLeft);
 		ok = ok && scene.focusManager.getFocusedElement() == scene.saveExportButton;
 		scene.onHandleUIAction(UIAction::Confirm);
-		ok = ok && scene.saveTransferAction == ResourceSelectScene::SaveTransferAction::Export;
+		ok = ok && scene.saveTransferAction == ResourceSelectScene::SaveTransferAction::Export &&
+			scene.resourceInstallDialogState == State::ChoosingSaveExport &&
+			scene.saveTransferGame.id.empty() && scene.saveTransferGame.saveNamespace == "test_mod" &&
+			scene.saveExportSlots.size() == SavePackage::AutomaticSlot + 1;
 		scene.onHandleUIAction(UIAction::Cancel);
 		ok = ok && scene.resourceInstallDialogState == State::BrowsingSaves &&
 			scene.focusManager.getFocusedElement() == scene.saveExportButton;
@@ -228,6 +266,40 @@ public:
 		return scene.resourceInstallPrimaryButton->activated &&
 			scene.resourceInstallPreviousPageButton->visible == (package.slots().size() == 1) &&
 			scene.getResourceInstallDialogRect().y + 170 < scene.getResourceInstallPreviousPageButtonRect().y;
+	}
+
+	static bool importedSaveIsReadableInGame(ResourceSelectScene& scene, const SavePackage::Package& package)
+	{
+		const auto previousNamespace = File::getActiveSaveNamespace();
+		scene.saveTransferGame = package.game();
+		scene.saveTransferGame.saveNamespace = "TEST_MOD";
+		scene.saveTransferAction = ResourceSelectScene::SaveTransferAction::Import;
+		File::setActiveSaveNamespace("TEST_MOD");
+		const auto root = scene.saveTransferRoot();
+		std::string error;
+		const bool imported = SavePackage::importTo(package, scene.saveTransferGame, root, 2, error);
+		std::unique_ptr<char[]> player;
+		int length = 0;
+		const bool hasSave = SaveFileManager::HasSaveFile(2);
+		const bool readPlayer = File::readFile("save/rpg2/player0.ini", player, length);
+		bool ok = imported && root.filename() == "test_mod" && hasSave && readPlayer &&
+			std::string(player.get(), length) == "[Player]\nLife=98765\n";
+		{
+			SaveLoad menu(false, true);
+			menu.selectSlot(1);
+			const bool screenshot = menu.snap && menu.snap->impImage;
+			ok = ok && screenshot;
+			menu.requestLoad();
+			const bool requested = menu.getResult(erLoad);
+			ok = ok && requested;
+			if (!ok) std::cerr << "Import runtime detail: imported=" << imported << " hasSave=" << hasSave
+				<< " readPlayer=" << readPlayer << " screenshot=" << screenshot << " requested=" << requested
+				<< " index=" << menu.index << " rows=" << (menu.listBox ? menu.listBox->itemButton.size() : 0)
+				<< " root=" << File::getActiveResourceRoot() << '\n';
+		}
+		if (!ok) std::cerr << "Imported save runtime routing failed: " << root.u8string() << ' ' << error << '\n';
+		File::setActiveSaveNamespace(previousNamespace);
+		return ok;
 	}
 
 	static bool auditResourceSurfaces(CapturedResourceScene& scene)
@@ -633,6 +705,23 @@ public:
 	static PElement focusedTitleControl(const Title& title)
 	{
 		return title.focusManager.getFocusedElement();
+	}
+
+	static bool clickTitleAt(Title& title, Point point, bool touch)
+	{
+		Engine* engine = Engine::getInstance();
+		title.result = erNone;
+		title.setRunning(true);
+		if (!touch)
+		{
+			engine->pushEvent(AEvent(ET_MOUSEMOTION, TOUCH_MOUSEID, point.x, point.y, false));
+		}
+		engine->pushEvent(AEvent(touch ? ET_FINGERDOWN : ET_MOUSEDOWN,
+			touch ? 86 : MBC_MOUSE_LEFT, point.x, point.y, false));
+		engine->pushEvent(AEvent(touch ? ET_FINGERUP : ET_MOUSEUP,
+			touch ? 86 : MBC_MOUSE_LEFT, point.x, point.y, false));
+		title.allHandleEvents();
+		return (title.result & erExit) != 0;
 	}
 
 	static void previewTitlePointerEvent(Title& title, AEvent event)
@@ -3365,6 +3454,7 @@ struct ResourcePackExpectation
 {
 	const char* id;
 	int gameType;
+	int layoutGameType;
 	int saveSlotCount;
 	int optionMusicWidth;
 	int optionSpeedMaximum;
@@ -3374,9 +3464,9 @@ struct ResourcePackExpectation
 
 const ResourcePackExpectation ResourcePacks[] =
 {
-	{ "JXQY2", GAME_JXQY2, 7, 180, 100, 3, { 284, 227, 274, 36 } },
-	{ "XJXQY", GAME_XJXQY, 9, 125, 2, 3, { 204, 164, 199, 51 } },
-	{ "YYCS", GAME_YYCS, 7, 194, 2, 3, { 327, 112, 81, 66 } }
+	{ "JXQY2", GAME_JXQY2, GAME_JXQY2, 7, 180, 100, 3, { 284, 227, 274, 36 } },
+	{ "XJXQY", GAME_XJXQY, GAME_XJXQY, 9, 125, 2, 3, { 204, 164, 199, 51 } },
+	{ "YYCS", GAME_YYCS, GAME_YYCS, 7, 194, 2, 3, { 327, 112, 81, 66 } }
 };
 
 bool check(bool condition, const std::string& message)
@@ -3482,9 +3572,10 @@ bool testControllerPromptContracts()
 			"[A] 交谈/互动",
 			"[X] 攻击",
 			"[RT] 武功一",
+			"[RB+LT] 支援目标",
 			"[Start] 系统"
 		}),
-		"world prompts expose the primary interaction, attack, skill, and"
+		"world prompts expose the primary interaction, attack, skill, support target, and"
 		" system actions through catalog-derived Xbox fallback labels") && ok;
 	engine->setWindowSize(800, 600);
 	return ok;
@@ -3582,6 +3673,11 @@ bool testResourceSelectionController(
 	const std::string previousAssetsCollectionRoot =
 		File::getAssetsCollectionRoot();
 	const auto& packs = resourceManager.getDiscoveredPacks();
+	const int playablePackCount = static_cast<int>(std::count_if(
+		packs.begin(), packs.end(), [](const auto& pack)
+		{
+			return !pack.manifest.resourceOnly;
+		}));
 	if (!check(packs.size() >= 3,
 		"resource selection discovers the production resource packs"))
 	{
@@ -4074,7 +4170,7 @@ bool testResourceSelectionController(
 	const int tallVisibleCount =
 		GamepadEssentialUITestAccess::visibleResourceCount(resizeScene);
 	const int resizeTargetIndex = std::min(
-		static_cast<int>(packs.size()) - 1,
+		playablePackCount - 1,
 		std::max(1, tallVisibleCount - 1));
 	for (int index = 0; index < resizeTargetIndex; index++)
 	{
@@ -4340,14 +4436,14 @@ bool testResourceSelectionController(
 				cheatHelpPointerScene),
 		"resource selection opens and closes cheat help through real pointer"
 		" click frames") && ok;
-	for (std::size_t index = 1; index < packs.size(); index++)
+	for (int index = 1; index < playablePackCount; index++)
 	{
 		controlsScene.handleUIAction(UIAction::NavigateDown);
 	}
 #if defined(__ANDROID__) || \
 	defined(JXQY_TEST_ANDROID_EXTERNAL_RESOURCE_UI)
 	ok = check(GamepadEssentialUITestAccess::selectedResourceIndex(controlsScene)
-			== static_cast<int>(packs.size()) - 1
+			== playablePackCount - 1
 		&& controlsScene.handleUIAction(UIAction::NavigateDown)
 		&& GamepadEssentialUITestAccess::focusedResourceControl(controlsScene)
 			== "enable-external"
@@ -4367,7 +4463,7 @@ bool testResourceSelectionController(
 		" external links before returning to exit") && ok;
 #else
 	ok = check(GamepadEssentialUITestAccess::selectedResourceIndex(controlsScene)
-			== static_cast<int>(packs.size()) - 1
+			== playablePackCount - 1
 		&& controlsScene.handleUIAction(UIAction::NavigateDown)
 		&& GamepadEssentialUITestAccess::focusedResourceControl(controlsScene)
 			== "external-link-0"
@@ -4397,7 +4493,7 @@ bool testResourceSelectionController(
 	ok = check(visibleCount > 0
 		&& pageScene.handleUIAction(UIAction::PanelNext)
 		&& GamepadEssentialUITestAccess::selectedResourceIndex(pageScene)
-			== visibleCount % static_cast<int>(packs.size()),
+			== visibleCount % playablePackCount,
 		"resource selection maps panel-next to a visible-page step") && ok;
 
 	ResourceSelectScene cancelScene;
@@ -4761,7 +4857,7 @@ bool testResourceSelectionController(
 	const bool onlineCatalogShapeReady =
 		onlineCatalogApplied
 		&& GamepadEssentialUITestAccess::resourceEntryCount(
-				onlineCatalogScene) == static_cast<int>(packs.size()) + 1
+				onlineCatalogScene) == playablePackCount + 1
 		&& localOnlineEntryIndex >= 0
 		&& onlineOnlyEntryIndex >= 0
 		&& resourceOnlyEntryIndex < 0;
@@ -4985,13 +5081,37 @@ bool testResourceSelectionController(
 	return ok;
 }
 
+bool testTargetLifeBarLayout()
+{
+	const auto root = makeUniqueTestDirectory("jxqy_target_life_bar");
+	std::filesystem::create_directories(root / "ini/ui/npcinfo");
+	File::setActiveResourceRoot(root.generic_string());
+	const auto settings = [](const NpcInfoPanel& panel)
+	{
+		return GamepadEssentialUITestAccess::targetLifeBarSettings(panel);
+	};
+	bool ok = check(settings(NpcInfoPanel()) == std::array<int, 4>{140, 18, 0, 50},
+		"target life bar defaults to fifty pixels below the viewport top");
+	const auto file = root / "ini/ui/npcinfo/window.ini";
+	std::ofstream(file, std::ios::binary) << "[Init]\nWidth=300\nHeight=25\nAlignX=-12\nAlignY=73\n";
+	ok = check(settings(NpcInfoPanel()) == std::array<int, 4>{300, 25, -12, 73},
+		"MOD target life bar overrides its size and offsets through the resource route") && ok;
+	std::ofstream(file, std::ios::binary) << "[Init]\nWidth=-1\nHeight=25\nAlignY=73\n";
+	ok = check(settings(NpcInfoPanel()) == std::array<int, 4>{140, 18, 0, 50},
+		"invalid target life bar dimensions retain the default layout") && ok;
+	File::setActiveResourceRoot("");
+	std::error_code error;
+	std::filesystem::remove_all(root, error);
+	return ok;
+}
+
 bool testResourceSelectionFooterRendering(const std::filesystem::path& assetsRoot)
 {
 	const auto fixture = makeUniqueTestDirectory("jxqy-save-import-ui");
 	const auto source = fixture / "save" / "test_mod";
 	const auto archive = fixture / "preview.zip";
 	const SavePackage::GameIdentity game{ "TEST_MOD", u8"测试模组较长名称的存档导入确认", "test_mod", "1.0.0" };
-	SavePackage::Package singleSlot, allSlots;
+	SavePackage::Package singleSlot, allSlots, onlySlotAll;
 	std::string error;
 	for (int slot = 1; slot <= SavePackage::AutomaticSlot; ++slot)
 	{
@@ -4999,12 +5119,29 @@ bool testResourceSelectionFooterRendering(const std::filesystem::path& assetsRoo
 		std::ofstream stream(source / SavePackage::slotDirectory(slot) / "game.ini", std::ios::binary);
 		stream << "[Save]\nEngineVersion=" << JxqyBuildVersion::EngineVersion << "\nResourceVersion=1.0.0\n";
 	}
-	const bool packagesReady = SavePackage::write(source, game, 1, archive.u8string(), error) &&
+	{
+		std::ofstream player(source / "rpg1/player0.ini", std::ios::binary);
+		player << "[Player]\nLife=98765\n";
+	}
+	std::filesystem::create_directories(source / "shot");
+	std::filesystem::copy_file(assetsRoot / "engine/config/logo.png", source / "shot/rpg1.png");
+	const auto onlySlotSource = fixture / "single-slot-source/save/test_mod";
+	std::filesystem::create_directories(onlySlotSource);
+	std::filesystem::copy(source / "rpg1", onlySlotSource / "rpg1", std::filesystem::copy_options::recursive);
+	std::filesystem::copy(source / "shot", onlySlotSource / "shot", std::filesystem::copy_options::recursive);
+	const bool packagesReady = SavePackage::write(onlySlotSource, game, SavePackage::AllSlots, archive.u8string(), error) &&
+		SavePackage::read(archive.u8string(), onlySlotAll, error) &&
+		SavePackage::write(source, game, 1, archive.u8string(), error) &&
 		SavePackage::read(archive.u8string(), singleSlot, error) &&
 		SavePackage::write(source, game, SavePackage::AllSlots, archive.u8string(), error) &&
 		SavePackage::read(archive.u8string(), allSlots, error);
-	std::filesystem::remove_all(fixture);
 	if (!check(packagesReady, "prepare actual single-slot and all-slot import previews: " + error)) return false;
+	for (int slot : { 1, SavePackage::AutomaticSlot })
+	{
+		const auto directory = fixture / "save/jxqy2" / SavePackage::slotDirectory(slot);
+		std::filesystem::create_directories(directory);
+		std::filesystem::copy_file(source / SavePackage::slotDirectory(slot) / "game.ini", directory / "game.ini");
+	}
 	VirtualGamepadTest::SDLSession sdlSession;
 	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Resource Footer Pad");
 	Engine* engine = Engine::getInstance();
@@ -5016,6 +5153,8 @@ bool testResourceSelectionFooterRendering(const std::filesystem::path& assetsRoo
 	int previousWidth = 0, previousHeight = 0;
 	engine->getWindowSize(previousWidth, previousHeight);
 	engine->setFontName((assetsRoot / "engine/font/font.ttf").string());
+	const auto previousStateParent = File::getUserDataRoot();
+	File::setPlatformStateParentForTests(fixture.u8string());
 	bool ok = true;
 	for (const Point size : { Point{1280, 720}, Point{800, 600}, Point{800, 480}, Point{640, 480}, Point{400, 480}, Point{800, 360}, Point{400, 360} })
 	{
@@ -5124,10 +5263,20 @@ bool testResourceSelectionFooterRendering(const std::filesystem::path& assetsRoo
 						"save import confirmation offscreen composition") && ok;
 				}
 			}
+			if (size.x == 800 && size.y == 480)
+			{
+				for (const auto* package : { &singleSlot, &onlySlotAll })
+				{
+					ok = check(GamepadEssentialUITestAccess::importedSaveIsReadableInGame(*scene, *package),
+						"single export and all export with one slot reach the runtime load menu and screenshot") && ok;
+				}
+			}
 		}
 		GamepadEssentialUITestAccess::exchangeRenderer(previousRenderer);
 		SDL_DestroyRenderer(renderer);
 	}
+	File::setPlatformStateParentForTests(previousStateParent);
+	std::filesystem::remove_all(fixture);
 	GamepadEssentialUITestAccess::setLogicalSize(previousWidth, previousHeight);
 	engine->setFontName("");
 	if (initializeTtf) TTF_Quit();
@@ -5233,6 +5382,113 @@ bool testResourceSelectionPhysicalFirstAction()
 	return ok;
 }
 
+bool testTitleAspectFitLayout()
+{
+	const auto root = makeUniqueTestDirectory("jxqy-title-layout");
+	const auto titleDirectory = root / "ini/ui/title";
+	std::filesystem::create_directories(titleDirectory);
+	const std::array<const char*, 4> names = { "initBtn", "loadBtn", "teamBtn", "exitBtn" };
+	const std::array<Rect, 4> sourceRects = {{ {35, 25, 60, 20}, {205, 50, 60, 20},
+		{65, 135, 60, 20}, {175, 180, 60, 20} }};
+	{
+		std::ofstream menu(titleDirectory / "title.menu.ini", std::ios::binary);
+		menu << "[menu]\nwindow=ini/ui/title/window.ini\n";
+		for (std::size_t index = 0; index < names.size(); ++index)
+		{
+			menu << "[component" << index + 1 << "]\ntype=Button\nname=" << names[index]
+				<< "\nfile=ini/ui/title/" << names[index] << ".ini\n";
+			std::ofstream button(titleDirectory / (std::string(names[index]) + ".ini"), std::ios::binary);
+			button << "[Init]\nLeft=" << sourceRects[index].x << "\nTop=" << sourceRects[index].y
+				<< "\nWidth=60\nHeight=20\nStretch=false\nImage=title-button.png\n";
+		}
+	}
+	const auto writeImage = [&](const char* name, int width, int height, Uint8 red, Uint8 green, Uint8 blue)
+	{
+		auto image = make_shared_surface(SDL_CreateSurface(width, height, SDL_PIXELFORMAT_ARGB8888));
+		return image && SDL_FillSurfaceRect(image.get(), nullptr, SDL_MapSurfaceRGB(image.get(), red, green, blue))
+			&& IMG_SavePNG(image.get(), (root / name).string().c_str());
+	};
+	bool ok = check(writeImage("title-background.png", 320, 240, 32, 64, 96)
+		&& writeImage("title-button.png", 60, 20, 220, 40, 20), "prepare title layout images");
+	auto surface = make_shared_surface(SDL_CreateSurface(1100, 900, SDL_PIXELFORMAT_ARGB8888));
+	SDL_Renderer* renderer = surface ? SDL_CreateSoftwareRenderer(surface.get()) : nullptr;
+	if (!check(renderer != nullptr, "create the title layout software renderer"))
+	{
+		std::filesystem::remove_all(root);
+		return false;
+	}
+	Engine* engine = Engine::getInstance();
+	int previousWidth = 0, previousHeight = 0;
+	engine->getWindowSize(previousWidth, previousHeight);
+	const auto previousRoot = File::getActiveResourceRoot();
+	auto previousRenderer = GamepadEssentialUITestAccess::exchangeRenderer(renderer);
+	File::setActiveResourceRoot(root.generic_string());
+	for (const char* alignment : { "alCenter", "alClient" })
+	{
+		std::ofstream(titleDirectory / "window.ini", std::ios::binary)
+			<< "[Init]\nWidth=320\nHeight=240\nAlign=" << alignment
+			<< "\nAlignX=17\nAlignY=-11\nStretch=false\nScaleChildren=false\nImage=title-background.png\n";
+		GamepadEssentialUITestAccess::setLogicalSize(320, 240);
+		Title title(true);
+		title.init();
+		for (const Point size : { Point{1100, 500}, Point{400, 900}, Point{240, 180}, Point{960, 720}, Point{320, 240} })
+		{
+			GamepadEssentialUITestAccess::setLogicalSize(size.x, size.y);
+			GamepadEssentialUITestAccess::resizeElementTree(title, size.x, size.y);
+			const float scale = std::min(size.x / 320.0f, size.y / 240.0f);
+			const int left = (size.x - static_cast<int>(std::round(320 * scale))) / 2;
+			const int top = (size.y - static_cast<int>(std::round(240 * scale))) / 2;
+			engine->renderClear(0, 0, 0, 255);
+			title.drawAll();
+			auto pixels = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+			const auto hasColor = [&](Point point, Uint8 red, Uint8 green, Uint8 blue)
+			{
+				Uint8 r = 0, g = 0, b = 0, a = 0;
+				return pixels && SDL_ReadSurfacePixel(pixels.get(), point.x, point.y, &r, &g, &b, &a)
+					&& std::abs(r - red) <= 2 && std::abs(g - green) <= 2 && std::abs(b - blue) <= 2;
+			};
+			for (const Point corner : { Point{4, 4}, Point{316, 236} })
+			{
+				ok = check(hasColor({left + static_cast<int>(corner.x * scale), top + static_cast<int>(corner.y * scale)}, 32, 64, 96),
+					"title background fits and centers its authored canvas after resize") && ok;
+			}
+			for (std::size_t index = 0; index < names.size(); ++index)
+			{
+				const Rect& source = sourceRects[index];
+				const Rect expected = { left + static_cast<int>(source.x * scale), top + static_cast<int>(source.y * scale),
+					static_cast<int>(source.w * scale), static_cast<int>(source.h * scale) };
+				const auto button = title.getComponentByName<Button>(names[index]);
+				ok = check(button && button->rect.x == expected.x && button->rect.y == expected.y
+					&& button->rect.w == expected.w && button->rect.h == expected.h,
+					"title buttons preserve their authored relative layout on wide, tall and small viewports") && ok;
+				ok = check(hasColor({expected.x + 3, expected.y + 3}, 220, 40, 20)
+					&& hasColor({expected.x + expected.w - 4, expected.y + expected.h - 4}, 220, 40, 20)
+					&& hasColor({expected.x + expected.w + 3, expected.y + expected.h / 2}, 32, 64, 96),
+					"title button images scale to the same bounds as their hit rectangles") && ok;
+				if (index == names.size() - 1)
+				{
+					for (bool touch : {false, true})
+					{
+						ok = check(!GamepadEssentialUITestAccess::clickTitleAt(title,
+							{expected.x + expected.w + 3, expected.y + expected.h / 2}, touch)
+							&& GamepadEssentialUITestAccess::clickTitleAt(title,
+								{expected.x + expected.w - 4, expected.y + expected.h - 4}, touch),
+							"mouse and touch activate the resized title button only inside its rendered bounds") && ok;
+					}
+				}
+			}
+		}
+		title.freeResource();
+		title.tryCleanRes();
+	}
+	File::setActiveResourceRoot(previousRoot);
+	GamepadEssentialUITestAccess::exchangeRenderer(previousRenderer);
+	SDL_DestroyRenderer(renderer);
+	GamepadEssentialUITestAccess::setLogicalSize(previousWidth, previousHeight);
+	std::filesystem::remove_all(root);
+	return ok;
+}
+
 bool testTitleController(const ResourcePackExpectation& resourcePack)
 {
 	bool ok = true;
@@ -5270,6 +5526,8 @@ bool testTitleController(const ResourcePackExpectation& resourcePack)
 		resourcePack,
 		"title background and buttons share the 640x480 aspect-fit transform"
 		" on a wide mobile viewport") && ok;
+	ok = checkPack(newGame->stretch && loadGame->stretch && team->stretch && exit->stretch,
+		resourcePack, "title images scale with their transformed hit rectangles") && ok;
 
 	title.setTime(1000);
 	GamepadEssentialUITestAccess::previewTitlePointerEvent(
@@ -5751,7 +6009,7 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 			"item and skill tooltip text keeps four compact lines above the lower border") && ok;
 	}
 	ok = checkPack(
-		menu.messageBox->parent == menu.upMenu.get()
+		menu.messageBox->parent == &menu
 			&& menu.dialog != nullptr
 			&& menu.dialog->parent == &menu
 			&& menu.systemNotice != nullptr
@@ -5761,13 +6019,14 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 			&& menu.upMenu != nullptr
 			&& menu.systemNotice->getPriority()
 				< menu.dialog->getPriority()
+			&& menu.messageBox->getPriority()
+				< menu.dialog->getPriority()
 			&& menu.dialog->getPriority()
 				< menu.upMenu->getPriority()
 			&& menu.systemNotice->rect.y
 				< menu.messageBox->rect.y,
 		resourcePack,
-		"system notices stay above story dialogs while gameplay messages keep"
-		" their ordinary lower-screen overlay layer")
+		"system and gameplay messages draw above story dialogs and the choice-menu parent")
 		&& ok;
 
 	menu.clearMenu();
@@ -5783,6 +6042,13 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	menu.scriptMessages->dismiss();
 	menu.messageBox->showed = false;
 	menu.messageBox->visible = false;
+	const Rect messagePanelBeforePickup = menu.messageBox->rect;
+	const Rect messageLabelBeforePickup = menu.messageBox->label
+		? menu.messageBox->label->rect : Rect{};
+	const int messageFontBeforePickup = menu.messageBox->label
+		? menu.messageBox->label->fontSize : 0;
+	const auto messageColorBeforePickup = menu.messageBox->label
+		? menu.messageBox->label->color : 0;
 	const int moneyBeforePickup = gameManager.player->money;
 	gameManager.scriptAPI.addMoney(37);
 	ok = checkPack(
@@ -5807,20 +6073,30 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 		resourcePack,
 		"script money loss formats the full minimum integer without signed overflow")
 		&& ok;
-	if (resourcePack.gameType == GAME_YYCS)
+	if (resourcePack.layoutGameType == GAME_YYCS)
 	{
 		const Rect& panelRect = menu.messageBox->rect;
 		const std::shared_ptr<Label>& messageLabel = menu.messageBox->label;
-		ok = checkPack(
-			(Config::useQingyuUi ? (messageLabel && messageLabel->fontSize > 0
-				&& panelRect.y + panelRect.h <= menu.bottomMenu->rect.y)
-				: (panelRect.x == 272 && panelRect.y == 435
+		const bool keepsConfiguredStyle = messageLabel != nullptr
+			&& messageFontBeforePickup > 0
+			&& messageLabel->fontSize == messageFontBeforePickup
+			&& messageLabel->color == messageColorBeforePickup
+			&& messageLabel->rect.w == messageLabelBeforePickup.w
+			&& messageLabel->rect.h == messageLabelBeforePickup.h
+			&& panelRect.w == messagePanelBeforePickup.w
+			&& panelRect.h == messagePanelBeforePickup.h
+			&& panelRect.y + panelRect.h <= menu.bottomMenu->rect.y;
+		const bool usesBaseYycsStyle =
+			std::string(resourcePack.id) != "YYCS" || Config::useQingyuUi
+			|| (panelRect.x == 272 && panelRect.y == 435
 				&& panelRect.w == 236 && panelRect.h == 94
 				&& messageLabel != nullptr
 				&& messageLabel->rect.x == 318 && messageLabel->rect.y == 467
 				&& messageLabel->rect.w == 148 && messageLabel->rect.h == 50
 				&& messageLabel->fontSize == 20
-				&& messageLabel->color == 0xCC9B2216)),
+				&& messageLabel->color == 0xCC9B2216);
+		ok = checkPack(
+			keepsConfiguredStyle && usesBaseYycsStyle,
 			resourcePack,
 			"money notification stays above the bottom menu and preserves its text style")
 			&& ok;
@@ -5857,13 +6133,18 @@ bool testDisplayOnlyAndPassiveSurfaceContracts(
 	menu.messageBox->visible = false;
 	menu.stateMenu->visible = true;
 	menu.stateMenu->updateLabel();
+	const auto stateFocusCandidates = menu.stateMenu->controllerFocusCandidates();
+	const bool expectedStateFocus = gameManager.global.attributePointRules.enabled
+		? stateFocusCandidates.size() == 1
+			&& std::dynamic_pointer_cast<FlatTextButton>(stateFocusCandidates.front()) != nullptr
+		: stateFocusCandidates.empty();
 	ok = checkPack(menu.stateMenu->needEvents
 			&& menu.blocksWorldInput()
 			&& !menu.blocksWorldPointerInput()
-			&& menu.stateMenu->controllerFocusCandidates().empty(),
+			&& expectedStateFocus,
 		resourcePack,
-		"state surface without companions blocks world semantics without pointer"
-		" capture or a character focus target") && ok;
+		"state surface without companions blocks world semantics, preserves uncovered"
+		" pointer input, and only offers the enabled attribute allocation action") && ok;
 	menu.stateMenu->visible = false;
 
 	menu.messageBox->showMessage("controller passive overlay", 1000);
@@ -6137,6 +6418,14 @@ bool testOptionController(
 		return false;
 	}
 	focusOrder.push_back("cheat-settings");
+	if (!checkPack(option.experienceMultiplierButton != nullptr
+		&& option.experienceMultiplierButton->visible
+		&& option.experienceMultiplierButton->activated,
+		resourcePack, "option exposes the player experience multiplier"))
+	{
+		return false;
+	}
+	focusOrder.push_back("experience-multiplier");
 	if (option.themeButton != nullptr)
 	{
 		focusOrder.push_back("ui-theme");
@@ -6177,6 +6466,23 @@ bool testOptionController(
 			resourcePack,
 			"option skips checkbox settings without a drawable control or label") && ok;
 	}
+	option.focusManager.focusDefault();
+
+	const int previousExperienceMultiplier = Config::experienceMultiplier;
+	int expectedExperienceMultiplier = previousExperienceMultiplier;
+	for (int step = 0; step < 3; ++step)
+	{
+		expectedExperienceMultiplier = expectedExperienceMultiplier % 3 + 1;
+		ok = checkPack(option.focusManager.focusNode("experience-multiplier")
+			&& option.handleUIAction(UIAction::Confirm)
+			&& Config::experienceMultiplier == expectedExperienceMultiplier,
+			resourcePack, "confirm cycles experience through one, two and three times") && ok;
+		Config::load();
+		ok = checkPack(Config::experienceMultiplier == expectedExperienceMultiplier,
+			resourcePack, "experience selection persists in application settings") && ok;
+	}
+	Config::experienceMultiplier = previousExperienceMultiplier;
+	Config::save();
 	option.focusManager.focusDefault();
 
 	if (gameManager.global.feature.automaticSave)
@@ -6587,8 +6893,12 @@ bool testSaveLoadController(
 bool testSaveOptionsRendering(const ResourcePackExpectation& pack, const std::filesystem::path& assetsRoot)
 {
 	Engine* engine = Engine::getInstance();
+	VirtualGamepadTest::SDLSession sdlSession;
+	VirtualGamepadTest::VirtualGamepad gamepad("JXQY Experience Option Pad");
+	auto& input = const_cast<GameInput::PhysicalInputManager&>(engine->inputActions());
+	HeadlessPhysicalInputTest::ScopedPhysicalInputManager inputScope(input);
 	const bool initializeTtf = TTF_WasInit() == 0;
-	if (!check(SDL_Init(0) && (!initializeTtf || TTF_Init()), "initialize save menu renderer")) return false;
+	if (!check(inputScope.isInitialized() && (!initializeTtf || TTF_Init()), "initialize save menu renderer and input")) return false;
 	int oldWidth = 0, oldHeight = 0;
 	engine->getWindowSize(oldWidth, oldHeight);
 	engine->setFontName((assetsRoot / "engine/font/font.ttf").string());
@@ -6621,7 +6931,7 @@ bool testSaveOptionsRendering(const ResourcePackExpectation& pack, const std::fi
 			};
 			auto option = std::make_shared<Option>();
 			std::vector<PElement> controls = { option->touchControlsButton, option->cheatSettingsButton,
-				option->themeButton, option->automaticSaveButton, option->rtnBtn };
+				option->experienceMultiplierButton, option->themeButton, option->automaticSaveButton, option->rtnBtn };
 			if (Config::useQingyuUi)
 			{
 				controls.insert(controls.end(), { option->music, option->sound, option->speed,
@@ -6651,6 +6961,63 @@ bool testSaveOptionsRendering(const ResourcePackExpectation& pack, const std::fi
 				}
 			}
 			capture(option, "options");
+			const int previousExperienceMultiplier = Config::experienceMultiplier;
+			for (bool touch : {false, true})
+			{
+				for (int step = 0; step < 3; ++step)
+				{
+					const int expected = Config::experienceMultiplier % 3 + 1;
+					ok = checkPack(GamepadEssentialUITestAccess::clickControl(
+						*option, option->experienceMultiplierButton, touch)
+						&& Config::experienceMultiplier == expected,
+						pack, "mouse and touch cycle every experience multiplier") && ok;
+				}
+			}
+			Config::experienceMultiplier = previousExperienceMultiplier;
+			Config::save();
+			{
+				HeadlessPhysicalInputTest::ScopedRunningOwner owner(option);
+				std::uint64_t now = SDL_GetTicks();
+				HeadlessPhysicalInputTest::FrameDriver driver(input, now,
+					[]() { return dispatchPhysicalUIActions(Engine::getInstance()); }, {});
+				driver.runFrame();
+				ok = checkPack(driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_DPAD_DOWN)
+					&& option->focusManager.focusNode("experience-multiplier")
+					&& option->focusManager.isFocusPresented(),
+					pack, "physical controller presents the experience option focus") && ok;
+				_shared_surface withoutPrompt;
+				{
+					HeadlessPhysicalInputTest::ScopedRunningOwner noOwner(nullptr);
+					engine->renderClear(24, 32, 38, 255);
+					option->drawAll();
+					withoutPrompt = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+				}
+				capture(option, "options-gamepad");
+				auto withPrompt = make_shared_surface(SDL_RenderReadPixels(renderer, nullptr));
+				bool experienceUncovered = withoutPrompt && withPrompt;
+				const Rect experienceRect = option->experienceMultiplierButton->rect;
+				for (int y = experienceRect.y; experienceUncovered && y < experienceRect.y + experienceRect.h; ++y)
+				{
+					for (int x = experienceRect.x; experienceUncovered && x < experienceRect.x + experienceRect.w; ++x)
+					{
+						Uint8 r, g, b, a, pr, pg, pb, pa;
+						experienceUncovered = SDL_ReadSurfacePixel(withoutPrompt.get(), x, y, &r, &g, &b, &a)
+							&& SDL_ReadSurfacePixel(withPrompt.get(), x, y, &pr, &pg, &pb, &pa)
+							&& r == pr && g == pg && b == pb && a == pa;
+					}
+				}
+				ok = checkPack(experienceUncovered, pack,
+					"the final controller prompt leaves every experience-button pixel intact") && ok;
+				for (int step = 0; step < 3; ++step)
+				{
+					const int expected = Config::experienceMultiplier % 3 + 1;
+					ok = checkPack(driver.tapButton(gamepad, SDL_GAMEPAD_BUTTON_SOUTH)
+						&& Config::experienceMultiplier == expected,
+						pack, "physical controller confirms each experience multiplier") && ok;
+				}
+				Config::experienceMultiplier = previousExperienceMultiplier;
+				Config::save();
+			}
 			auto saves = std::make_shared<SaveLoad>(true, true);
 			GamepadEssentialUITestAccess::selectSaveSlot(*saves, 0);
 			capture(saves, "save-first");
@@ -7215,6 +7582,8 @@ bool runGamepadEssentialUITests()
 	File::setResourceFallbackRoots({});
 	File::setUiResourceFallbackRoots({});
 	ResourceManager& resourceManager = ResourceManager::instance();
+	ok = testTargetLifeBarLayout() && ok;
+	ok = testTitleAspectFitLayout() && ok;
 	if (!check(resourceManager.initialize(assetsRoot.generic_string()),
 		"gamepad essential UI tests initialize the production resource collection"))
 	{
@@ -7263,6 +7632,27 @@ bool runGamepadEssentialUITests()
 			continue;
 		}
 		const ResourceManifest& manifest = resourceManager.getActiveManifest();
+		if (!qingyu && discoveredManifest.id != expectedBase->id)
+		{
+			// MODs may override individual components within their UI family.
+			// Keep the three base-game geometry expectations above fixed.
+			INIReader optionDefinition("ini\\ui\\option\\option.menu.ini");
+			for (const auto& section : optionDefinition.GetSectionNames())
+			{
+				const auto componentName = optionDefinition.Get(section, "Name", "");
+				if (componentName != "music" && componentName != "speed") continue;
+				INIReader source(optionDefinition.Get(section, "File", ""));
+				if (componentName == "music") resourcePack.optionMusicWidth = source.GetInteger("Init", "Width", resourcePack.optionMusicWidth);
+				else resourcePack.optionSpeedMaximum = source.GetInteger("Init", "Max", resourcePack.optionSpeedMaximum);
+			}
+			INIReader saveDefinition("ini\\ui\\saveload\\saveload.menu.ini");
+			for (const auto& section : saveDefinition.GetSectionNames())
+			{
+				if (saveDefinition.Get(section, "Name", "") != "listBox") continue;
+				INIReader source(saveDefinition.Get(section, "File", ""));
+				resourcePack.saveSlotCount = source.GetInteger("Init", "ItemCount", resourcePack.saveSlotCount);
+			}
+		}
 		INIReader titleMenu(manifest.titleMenu.empty() ? "ini\\ui\\title\\title.menu.ini" : manifest.titleMenu);
 		for (const auto& section : titleMenu.GetSectionNames())
 		{

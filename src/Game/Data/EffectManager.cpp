@@ -418,7 +418,7 @@ void EffectManager::addTrailMagic(
 	int launcher,
 	std::shared_ptr<MagicDispatchContext> dispatchContext)
 {
-	if (magic == nullptr || user == nullptr || magic->keepMilliseconds == 0)
+	if (magic == nullptr || user == nullptr || magic->getKeepMillisecondsForLevel(level) == 0)
 	{
 		return;
 	}
@@ -436,7 +436,7 @@ void EffectManager::addTrailMagic(
 	info.user = user;
 	info.magic = magic;
 	info.lastPosition = user->position;
-	info.remainingTime = magic->keepMilliseconds;
+	info.remainingTime = magic->getKeepMillisecondsForLevel(level);
 	info.level = level;
 	info.damage = damage;
 	info.evade = evade;
@@ -697,8 +697,8 @@ void EffectManager::loadFromIni(INIReader& ini)
 		info.magic = magic;
 		info.lastPosition.x = static_cast<int>(ini.GetInteger(section, "LastMapX", user->position.x));
 		info.lastPosition.y = static_cast<int>(ini.GetInteger(section, "LastMapY", user->position.y));
-		info.remainingTime = ini.GetTime(section, "RemainingTime", magic->keepMilliseconds);
 		info.level = clampMagicLevelForEffectManager(static_cast<int>(ini.GetInteger(section, "Level", 1)));
+		info.remainingTime = ini.GetTime(section, "RemainingTime", magic->getKeepMillisecondsForLevel(info.level));
 		info.damage = static_cast<int>(ini.GetInteger(section, "Damage", 0));
 		info.evade = static_cast<int>(ini.GetInteger(section, "Evade", 0));
 		info.launcher = static_cast<int>(ini.GetInteger(section, "Launcher", lkSelf));
@@ -951,6 +951,29 @@ bool EffectManager::shouldUpdateChild(PElement child)
 void EffectManager::onPreTreatment()
 {
 	projectileCollisionFrame++;
+	// All pre-treatment callbacks precede world updates, including during time stop.
+	if (gm != nullptr)
+	{
+		if (gm->player != nullptr)
+		{
+			gm->player->beginProjectileCollisionFrame(projectileCollisionFrame);
+		}
+		if (gm->npcManager != nullptr)
+		{
+			for (const auto& npc : gm->npcManager->npcList)
+			{
+				if (npc != nullptr) npc->beginProjectileCollisionFrame(projectileCollisionFrame);
+			}
+		}
+	}
+	for (const auto& effect : effectList)
+	{
+		if (effect != nullptr)
+		{
+			effect->collisionSweepInitialized = false;
+			effect->passPath.clear();
+		}
+	}
 }
 
 std::shared_ptr<NPC> EffectManager::captureCasterSnapshot(const std::shared_ptr<NPC>& caster) const

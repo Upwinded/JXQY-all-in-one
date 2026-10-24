@@ -43,6 +43,10 @@ public:
 	void cancelControllerInteraction();
 
 private:
+	std::shared_ptr<FlatTextButton> skillTreeEntry;
+	bool skillTreeEntryFocused = false;
+	void updateSkillTreeEntry();
+	void onSetChildRect() override;
 	bool showingDetails = false;
 	bool detailFocused = false;
 	std::string detailedMagicFile;

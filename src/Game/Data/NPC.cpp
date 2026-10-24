@@ -1159,7 +1159,16 @@ bool NPC::hasDestinationMapPosition() const
 
 bool NPC::isAIEnabled() const
 {
-	return gm != nullptr && gm->global.data.NPCAI && !isAIDisabled;
+	return gm != nullptr && gm->global.data.NPCAI && !isAIDisabled
+		&& (gm->player == nullptr || gm->player->getControlledCharacter().get() != this);
+}
+
+bool NPC::isFollowAIEnabled() const
+{
+	return gm != nullptr && !isAIDisabled
+		&& (kind == nkPartner || gm->global.data.NPCAI)
+		&& !scriptMoveDestination && !haveAsyncDest && !scriptSpecialActionOverlayActive
+		&& (gm->player == nullptr || gm->player->getControlledCharacter().get() != this);
 }
 
 void NPC::setAIDisabled(bool disabled)
@@ -1376,7 +1385,9 @@ bool NPC::isDestinationMapPositionBlockedByCharacter() const
 
 bool NPC::tryMoveToDestinationMapPosition()
 {
-	if (!hasDestinationMapPosition())
+	if (!hasDestinationMapPosition()
+		|| (gm != nullptr && gm->player != nullptr
+			&& gm->player->getControlledCharacter().get() == this))
 	{
 		return false;
 	}
@@ -1707,13 +1718,19 @@ int NPC::getPartnerCharacterIndex()
 
 bool NPC::isLivingPartner()
 {
-	return kind == nkPartner && relation == nrFriendly && life > 0
+	return relation == nrFriendly && canViewPartnerDetails();
+}
+
+bool NPC::canViewPartnerDetails()
+{
+	return kind == nkPartner && (relation == nrFriendly || relation == nrNeutral) && life > 0
 		&& !isDying() && !isHiding() && isVisibleForRuntime();
 }
 
 bool NPC::canChangePartnerEquipment()
 {
-	return isLivingPartner() && characterEquipmentSynchronized && (canEquip > 0 || getPartnerCharacterIndex() >= 0);
+	return canViewPartnerDetails() && characterEquipmentSynchronized
+		&& (canEquip > 0 || (relation == nrFriendly && getPartnerCharacterIndex() >= 0));
 }
 
 void NPC::resetPartnerRecovery()
@@ -1743,10 +1760,15 @@ bool NPC::setKindAndRelation(int newKind, int newRelation)
 {
 	const bool wasPartner = kind == nkPartner && relation == nrFriendly;
 	const bool becomesPartner = newKind == nkPartner && newRelation == nrFriendly;
-	if (wasPartner && !becomesPartner && gm != nullptr
+	const bool leavesEditableNeutral = kind == nkPartner && relation == nrNeutral && canEquip > 0
+		&& (newKind != nkPartner || newRelation != nrNeutral);
+	if (((wasPartner && !becomesPartner) || leavesEditableNeutral) && gm != nullptr
 		&& !gm->partnerManager.saveCharacterSnapshot(std::dynamic_pointer_cast<NPC>(getMySharedPtr())))
 	{
 		GameLog::write("NPC: cannot save departing partner %s\n", npcName.c_str());
+		const std::string message = u8"伙伴资料保存失败，无法离队或改变阵营：" + npcName;
+		gm->showMessage(message);
+		gm->script.reportCommandFailure(message);
 		return false;
 	}
 	kind = newKind;
@@ -1887,7 +1909,7 @@ void NPC::addPartnerExperience(int amount)
 
 bool NPC::tryRegroupWithPlayer()
 {
-	if (!isLivingPartner() || !isAIEnabled() || gm->inEvent || gm->player == nullptr
+	if (!isLivingPartner() || !isFollowAIEnabled() || gm->inEvent || gm->player == nullptr
 		|| gm->map == nullptr || gm->map->data == nullptr || isPartnerBlockingPlayer
 		|| !followNPC.empty() || scriptMoveDestination || scriptSpecialActionOverlayActive
 		|| haveAsyncDest || hasDestinationMapPosition() || hasFixedPath() || immobilized || petrified || frozen
@@ -2894,6 +2916,7 @@ void NPC::loadSpecialAction(const std::string & fileName)
 
 void NPC::initRes(const std::string & fileName)
 {
+	clearTemporaryNpcRes(false);
 	loadNpcResFromIni(fileName, res);
 	refreshLoopingActionAnimation();
 }
@@ -3064,6 +3087,19 @@ void NPC::addMana(int value)
 	mana += value;
 }
 
+int NPC::getShieldEffectAmount(const Effect& shield, int channel)
+{
+	const auto& level = shield.magic.level[std::clamp(shield.level, 1, MAGIC_MAX_LEVEL)];
+	const int configured = channel == 0 ? level.effect
+		: channel == 1 ? level.effect2 : level.effect3;
+	const int attackAmount = channel == 0 ? getAttack()
+		: channel == 1 ? getAttack2() : getAttack3();
+	const long long amount = static_cast<long long>(configured == 0 ? attackAmount : configured)
+		+ (channel == 0 ? level.effectExt : 0);
+	return applyMagicEffectBonus(shield.magic, static_cast<int>(std::clamp(amount,
+		static_cast<long long>(INT_MIN), static_cast<long long>(INT_MAX))));
+}
+
 void NPC::hurtLife(int damage, bool ignoreDefense)
 {
 	if (hasActiveSelfMagic(mskBlockDamage) || invincible > 0 || isProtectedByCheatInvincibility())
@@ -3084,10 +3120,7 @@ void NPC::hurtLife(int damage, bool ignoreDefense)
 				it = shieldEffects.erase(it);
 				continue;
 			}
-			int shieldLevel = shield->level;
-			if (shieldLevel < 1) shieldLevel = 1;
-			if (shieldLevel > MAGIC_MAX_LEVEL) shieldLevel = MAGIC_MAX_LEVEL;
-			damage -= shield->magic.level[shieldLevel].effect;
+			damage -= getShieldEffectAmount(*shield);
 		}
 		else
 		{
@@ -3156,12 +3189,9 @@ int NPC::calculateEffectDamage(std::shared_ptr<Effect> effect)
 				it = shieldEffects.erase(it);
 				continue;
 			}
-			int shieldLevel = shield->level;
-			if (shieldLevel < 1) shieldLevel = 1;
-			if (shieldLevel > MAGIC_MAX_LEVEL) shieldLevel = MAGIC_MAX_LEVEL;
-			damage -= shield->magic.level[shieldLevel].effect;
-			damage2 -= shield->magic.level[shieldLevel].effect2;
-			damage3 -= shield->magic.level[shieldLevel].effect3;
+			damage -= getShieldEffectAmount(*shield);
+			damage2 -= getShieldEffectAmount(*shield, 1);
+			damage3 -= getShieldEffectAmount(*shield, 2);
 		}
 		else
 		{
@@ -3884,6 +3914,16 @@ void NPC::clearCombatTargetMemory()
 
 bool NPC::hasActiveCombatWork()
 {
+	if (kind != nkPlayer && !isAIEnabled()
+		&& (gm == nullptr || gm->player == nullptr || gm->player->getControlledCharacter().get() != this))
+	{
+		clearCombatTargetMemory();
+		if (!scriptMoveDestination && !haveAsyncDest && !hasDestinationMapPosition())
+		{
+			destGE.reset();
+		}
+		return false;
+	}
 	bool hasActivePlanTarget = false;
 	if (actionPlan.isActive())
 	{
@@ -4235,7 +4275,7 @@ void NPC::updateBounceMovement(UTime frameTime)
 			offset = { 0, 0 };
 			return;
 		}
-		setPosition(nextPosition, false);
+		setPosition(nextPosition, false, true);
 	}
 	offset = normalizedOffset;
 
@@ -4402,7 +4442,7 @@ void NPC::updateMagicForcedMovement(UTime frameTime)
 			finishMagicForcedMove();
 			return;
 		}
-		setPosition(magicForcedMove.destination, false);
+		setPosition(magicForcedMove.destination, false, true);
 		offset = { 0.0f, 0.0f };
 		finishMagicForcedMove();
 		return;
@@ -4433,13 +4473,13 @@ void NPC::updateMagicForcedMovement(UTime frameTime)
 			}
 			if (lastOpenPosition != position)
 			{
-				setPosition(lastOpenPosition, false);
+				setPosition(lastOpenPosition, false, true);
 			}
 			offset = { 0.0f, 0.0f };
 			finishMagicForcedMove();
 			return;
 		}
-		setPosition(magicForcedMove.destination, false);
+		setPosition(magicForcedMove.destination, false, true);
 		offset = { 0.0f, 0.0f };
 		finishMagicForcedMove();
 		return;
@@ -4473,13 +4513,13 @@ void NPC::updateMagicForcedMovement(UTime frameTime)
 			}
 			if (lastOpenPosition != position)
 			{
-				setPosition(lastOpenPosition, false);
+				setPosition(lastOpenPosition, false, true);
 			}
 			offset = { 0.0f, 0.0f };
 			finishMagicForcedMove();
 			return;
 		}
-		setPosition(nextPosition, false);
+		setPosition(nextPosition, false, true);
 	}
 	offset = normalizedOffset;
 	if (magicForcedMove.totalProjectedDistance > 0.0f)
@@ -5861,8 +5901,12 @@ std::vector<Point> NPC::getStepPositions() const
 	return actionManager->getStepPositions();
 }
 
-void NPC::setPosition(Point newPos, bool forceToStand)
+void NPC::setPosition(Point newPos, bool forceToStand, bool continuousMovement)
 {
+	if (!continuousMovement)
+	{
+		projectileCollisionStartValid = false;
+	}
 	if (forceToStand)
 	{
 		beginStand();
@@ -5883,9 +5927,33 @@ void NPC::setPosition(Point newPos, bool forceToStand)
 	}
 }
 
-void NPC::setOffset(PointEx newOffset)
+void NPC::setOffset(PointEx newOffset, bool continuousMovement)
 {
+	if (!continuousMovement)
+	{
+		projectileCollisionStartValid = false;
+	}
 	offset = newOffset;
+}
+
+void NPC::beginProjectileCollisionFrame(std::uint64_t frame)
+{
+	projectileCollisionStartPosition = position;
+	projectileCollisionStartOffset = offset;
+	projectileCollisionFrame = frame;
+	projectileCollisionStartValid = isPresentForRuntime() && !isDying()
+		&& !isHiding() && getJumpState() != jsJumping;
+}
+
+bool NPC::getProjectileCollisionStart(std::uint64_t frame, Point& startPosition, PointEx& startOffset) const
+{
+	if (!projectileCollisionStartValid || projectileCollisionFrame != frame)
+	{
+		return false;
+	}
+	startPosition = projectileCollisionStartPosition;
+	startOffset = projectileCollisionStartOffset;
+	return true;
 }
 
 PointEx NPC::getDrawOffset() const
@@ -6492,8 +6560,7 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect, std::shared
 		expBonus,
 		kind == nkBattle && relation == nrHostile,
 		&usedLevelProductFallback);
-	const double scaledExperience = usedLevelProductFallback ? static_cast<double>(baseExperience)
-		: scaleAutomaticExperience(baseExperience, manifest.resolvedExperienceMultiplier());
+	const double scaledExperience = scaleAutomaticExperience(baseExperience, Config::experienceMultiplier);
 	const int playerExperience = roundAutomaticExperience(scaledExperience);
 	gm->player->addExp(playerExperience);
 	for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
@@ -6505,11 +6572,10 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect, std::shared
 		}
 		else if (partner == killer && partner->canLevelUp > 0)
 		{
-			bool fallback = false;
 			const int ownBase = calculateDefeatedNpcBaseExperience(manifest, partner->level,
-				level, exp, expBonus, kind == nkBattle && relation == nrHostile, &fallback);
-			partner->addPartnerExperience(fallback ? ownBase
-				: roundAutomaticExperience(scaleAutomaticExperience(ownBase, manifest.resolvedExperienceMultiplier())));
+				level, exp, expBonus, kind == nkBattle && relation == nrHostile);
+			partner->addPartnerExperience(
+				roundAutomaticExperience(scaleAutomaticExperience(ownBase, Config::experienceMultiplier)));
 		}
 	}
 	if (effect != nullptr && playerKill)
@@ -6518,7 +6584,7 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect, std::shared
 		{
 			gm->magicManager.addKillExp(
 				effect,
-				static_cast<double>(baseExperience),
+				scaledExperience,
 				FallbackPracticeKillFraction,
 				FallbackUseKillFraction);
 		}
@@ -8020,6 +8086,7 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 
 void NPC::freeResource()
 {
+	projectileCollisionStartValid = false;
 	clearTemporaryNpcRes(false);
 	freeNPCAction(&scriptSpecialActionOverlayResource);
 	scriptSpecialActionOverlayActive = false;

@@ -964,9 +964,9 @@ linan = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and
 prefix = []
 for statement in linan.body:
     prefix.append(statement)
-    if (isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call)
-            and isinstance(statement.value.func, ast.Name) and statement.value.func.id == "verify"
-            and any(keyword.arg == "FromFengChi" for keyword in statement.value.keywords)):
+    if isinstance(statement, ast.If) and any(
+            isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == "late_return_to_linan" for node in ast.walk(statement)):
         break
 client = SideClient("临安城.map", {})
 gate = dict(courtyard=False, manor=False)
@@ -1018,11 +1018,11 @@ practice_code = compile(ast.Module(body=linan.body[practice_start:practice_end],
                         "mengdie-practice", "exec")
 for previous_file, outcome in (
         ("player-magic-风雪狂刀.ini", "normal"), ("player-magic-弯刀冷光.ini", "normal"),
-        ("player-magic-风雪狂刀.ini", "wrong-main"), ("player-magic-寒霜掌.ini", "unexpected-practice"),
+        ("player-magic-风雪狂刀.ini", "reassign-main"), ("player-magic-寒霜掌.ini", "other-practice"),
         ("player-magic-弯刀冷光.ini", "lost-practice"), ("player-magic-风雪狂刀.ini", "duplicate-dream")):
     client = SideClient("临安城.map", {"FromFengChi": "2"})
     client.state.update(layout=dict(magicQuickBegin=36, practiceSlot=41), magic=[
-        dict(file="player-magic-天意剑诀.ini", slot=0 if outcome == "wrong-main" else 36, level=6, exp=25875),
+        dict(file="player-magic-天意剑诀.ini", slot=0 if outcome == "reassign-main" else 36, level=6, exp=25875),
         dict(file="player-magic-梦蝶神功.ini", slot=6, level=1, exp=0),
         dict(file=previous_file, slot=41, level=4, exp=5742)])
     def practice(slot):
@@ -1035,18 +1035,22 @@ for previous_file, outcome in (
         elif outcome == "duplicate-dream":
             client.state["magic"].append(dict(file="player-magic-梦蝶神功.ini", slot=7))
     client.assign_practice = practice
+    def equip_main(slot, quick_slot):
+        assert slot == 0 and quick_slot == 0
+        item(client.state, "player-magic-天意剑诀.ini", "magic")["slot"] = 36
+        client.calls.append(("equip-main", slot))
+    client.assign_magic = equip_main
     try:
         exec(practice_code, dict(client=client, output=None, item=item, idle=lambda c: c.observe(),
                                  magic_file_prefix="player-magic-",
                                  verify=verify, AutomationError=AutomationError,
                                  checkpoint=lambda c, out, name: c.calls.append(("checkpoint", name))))
     except (AutomationError, AssertionError):
-        assert outcome != "normal"
-        if outcome in ("wrong-main", "unexpected-practice"):
-            assert client.calls == []
+        assert outcome in ("lost-practice", "duplicate-dream")
     else:
-        assert outcome == "normal"
-        assert client.calls == [("practice", 6), ("checkpoint", "late-02-mengdie-practice")]
+        assert outcome in ("normal", "reassign-main", "other-practice")
+        assert client.calls == ([("equip-main", 0)] if outcome == "reassign-main" else []) + [
+            ("practice", 6), ("checkpoint", "late-02-mengdie-practice")]
         assert [(spell["slot"], spell["level"], spell["exp"]) for spell in client.state["magic"]] == [
             (36, 6, 25875), (41, 1, 0), (6, 4, 5742)]
     checks += 1
@@ -1165,8 +1169,8 @@ for returning, elder_present in [(False, True), (False, False), (True, False)]:
     bank = None
     def bridge_go(client, x, y, *, destination, combat=True):
         global bank
-        if returning and client.state["map"] == "金兵营寨.map":
-            assert combat is True, "Returning through the camp must clear nearby blocking soldiers"
+        if client.state["map"] == "金兵营寨.map":
+            assert combat is True, "Camp movement must handle nearby blocking soldiers"
         elif client.state["map"] in ("金兵营寨.map", "汉阳-金兵营寨.map") or destination == "金兵营寨.map":
             assert combat is False, "Camp transit does not require killing its soldiers"
         if client.state["map"] == "汉阳-中都1.map":
@@ -1350,9 +1354,7 @@ for branch, movie_lines, names in ((0, (57, 140), ("ordinary", "happy")),
 # The return to Zhongdu keeps the manor and temple scenes in their native order,
 # with bounded city walks before interacting across the buildings.
 tianren = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "tianren_dungeons")
-temple_verified = next(index for index, node in enumerate(tianren.body)
-                       if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call)
-                       and any(keyword.arg == "LongYinShiLiaoRan" for keyword in node.value.keywords))
+temple_runs = [dict(eventType="script.start", virtualPath="script/map/中都/龙音寺门口地图陷阱6.txt")]
 return_client = SideClient("中都.map", {"ZhongDuHouHuaYuan": "5", "FromFengChi": "20"})
 return_client.state["player"]["position"] = dict(x=25, y=317)
 
@@ -1374,9 +1376,11 @@ def return_city_go(client, x, y, **arguments):
             assert arguments["script"] == "中都/龙音寺门口地图陷阱5.txt"
             client.state["templeSceneCompleted"] = True
         if (x, y) == (48, 92):
-            assert arguments["script"] == "中都/龙音寺门口地图陷阱6.txt"
-            client.state.setdefault("templeGateBranches", []).append(
-                int(client.state["variables"].get("LongYinShiLiaoRan") or 0))
+            phase = int(client.state["variables"].get("LongYinShiLiaoRan") or 0)
+            assert arguments.get("script") == ("中都/龙音寺门口地图陷阱6.txt" if phase else None)
+            if phase:
+                temple_runs.append(dict(temple_runs[0]))
+            client.state.setdefault("templeGateBranches", []).append(phase)
         client.state["player"]["position"] = dict(x=x, y=y)
     client.calls.append((x, y))
 
@@ -1389,10 +1393,16 @@ def return_city_talk(client, name, position=None):
     client.state["variables"]["LongYinShiLiaoRan"] = "1"
 
 
-exec(compile(ast.Module(body=tianren.body[:temple_verified + 2], type_ignores=[]),
+temple_complete = next(index for index, statement in enumerate(tianren.body)
+                       if isinstance(statement, ast.Expr) and isinstance(statement.value, ast.Call)
+                       and isinstance(statement.value.func, ast.Name)
+                       and statement.value.func.id == "checkpoint")
+exec(compile(ast.Module(body=tianren.body[:temple_complete + 1], type_ignores=[]),
              "tianren-return-city", "exec"),
-     dict(client=return_client, idle=lambda client: client.observe(),
-          go=return_city_go, talk=return_city_talk, verify=verify))
+     dict(client=return_client, output=None, idle=lambda client: client.observe(),
+          go=return_city_go, talk=return_city_talk, verify=verify,
+          late_records=lambda *args: temple_runs, checkpoint=lambda *args: None))
+assert len(temple_runs) == 2
 assert return_client.calls == [(70, 334), (97, 223), (138, 263), (140, 264),
                                (138, 263), (97, 223), (84, 103), (47, 93), (48, 92), (60, 35), (48, 92)]
 assert return_client.state["templeGateBranches"] == [0, 1]
@@ -1476,8 +1486,8 @@ for error, position, expected_moves in (
     assert len(moves) == expected_moves
     assert failed == bool(error and expected_moves == 1)
     if expected_moves == 3:
-        assert moves[1:] == [(31, 75, dict(combat=False)),
-                             (31, 74, dict(script=gate_script, combat=False))]
+        assert moves[1:] == [(31, 75, {}),
+                             (31, 74, dict(script=gate_script))]
     checks += 1
 
 # Hanyang's normal entrance, rather than the orphan Daoxiang trap4, starts
@@ -1686,11 +1696,15 @@ assert not linan_map[tile + 6] & 0xc0 and linan_map[tile + 7] == 0
 # The hall boss may retreat behind its obstacles. Its route must target the
 # normal immobilization and allow weapon pursuit, including an interrupted cast.
 boss_end = next(index for index, statement in enumerate(pilitang.body)
-                if verifies_stage(statement, FromFengChi=8))
-for interrupted in (False, True):
+                if isinstance(statement, ast.If)
+                and any(verifies_stage(node, FromFengChi=8) for node in ast.walk(statement))) + 1
+for interrupted, completed in ((False, False), (True, False), (False, True)):
     class HallClient:
         def __init__(self):
             self.calls = []
+            self.phase = "8" if completed else "7"
+        def observe(self, variables=()):
+            return dict(state, variables=dict(FromFengChi=self.phase))
         def assign_magic(self, slot, quick_slot):
             assert slot == 4 and quick_slot == 1
         def act(self, command, **arguments):
@@ -1698,6 +1712,8 @@ for interrupted in (False, True):
             assert arguments["generation"] == 5 and arguments["targetId"] == 77
             if command == "CastSkill" and interrupted:
                 raise AutomationError("CastSkill: action_not_executed")
+            if command == "StartCombat":
+                self.phase = "8"
             return dict(kills=1)
     client = HallClient()
     state = dict(map="霹雳堂.map", generation=5,
@@ -1706,7 +1722,11 @@ for interrupted in (False, True):
          dict(client=client, magic_file_prefix="player-magic-", idle=lambda client: state, go=lambda *args, **kwargs: None,
               late_target=lambda *args: dict(id=77), item=item,
               continue_practice=lambda client: None, AutomationError=AutomationError,
-              select_medicine=lambda *args, **kwargs: dict(file="healing.ini"), LIFE_ITEM="life.ini"))
+              select_medicine=lambda *args, **kwargs: dict(file="healing.ini"), LIFE_ITEM="life.ini", verify=verify))
+    if completed:
+        assert not client.calls
+        checks += 1
+        continue
     cast, combat = client.calls
     assert cast[0] == "CastSkill" and cast[1]["slot"] == 1
     assert combat[0] == "StartCombat" and combat[1]["kills"] == 1

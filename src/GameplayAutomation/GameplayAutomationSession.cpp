@@ -82,13 +82,20 @@ bool skillPathIsClear(const Magic& magic, int level, Point from, const std::shar
 	if (magic.passThroughWall > 0 || (!sector && moveKind != mmkFly && moveKind != mmkFlyContinuous && moveKind != mmkFollow))
 		return true;
 	if (from == to) return map.canFly(to);
-	// Sector effects start on the caster's tile; fly effects start one tile ahead.
+	// Sector and carried single-fly effects start on the caster's tile.
 	// Check the aimed projectile's width sweep, not just character visibility.
 	Effect projectile;
-	projectile.position = projectile.src = sector ? from : Map::getSubPoint(from, NPC::getDirection(from, to));
+	const bool startsAtCaster = sector || (magic.carryUser > 0 && moveKind != mmkFlyContinuous);
+	projectile.position = projectile.src = startsAtCaster ? from : Map::getSubPoint(from, NPC::getDirection(from, to));
 	projectile.flyingDirection = Map::getTilePosition(to, projectile.src == to ? from : projectile.src);
 	projectile.flyingDirection.y = static_cast<int>(std::round(MapXRatio * projectile.flyingDirection.y));
 	const auto path = projectile.getPassPath(projectile.src, {0, 0}, to, {0, 0});
+	// Carry modes 2-4 stop at character terrain even when the projectile can
+	// cross it. Mode 1 detaches the caster and lets the projectile continue.
+	if (magic.carryUser > 1 && (map.isCharacterTerrainBlocked(projectile.src)
+		|| std::any_of(path.begin(), path.end(), [&](Point point)
+			{ return map.isCharacterTerrainBlocked(point); })))
+		return false;
 	// Native collision checks the NPC before the obstacle on that same tile.
 	// A target standing on a projectile-blocking tile can still receive the hit.
 	const bool targetReceivesCollision = magic.carryUser != 3 && magic.meteorMove <= 0
@@ -370,7 +377,7 @@ Value GameplayAutomationSession::actionState(const Action& action) const
 
 Value GameplayAutomationSession::observe(const Value& arguments)
 {
-	fields(arguments, {"variables"});
+	fields(arguments, {"variables", "includeEffects"});
 	auto value = object();
 	value.objectValues = {{"frame", number(frame)}, {"generation", number(generation)},
 		{"context", number(context)}, {"scene", string(owner() ? owner()->name : "initializing")},
@@ -474,6 +481,29 @@ Value GameplayAutomationSession::observe(const Value& arguments)
 	}
 	levelUp.objectValues["activeEffects"] = std::move(levelUpEffects);
 	value.objectValues["levelUp"] = std::move(levelUp);
+	if (has(arguments, "includeEffects") && boolMember(arguments, "includeEffects"))
+	{
+		auto effects = array();
+		if (manager->effectManager)
+			for (const auto& effect : manager->effectManager->effectList)
+			{
+				if (!effect) continue;
+				const auto& linked = effect->magic.getLinkedLevel(effect->level);
+				auto row = object();
+				row.objectValues = {{"file", string(effect->magic.iniName)}, {"position", position(effect->position)},
+					{"phase", number(effect->doing)}, {"damage", number(effect->damage)},
+					{"launcherKind", number(effect->launcherKind)},
+					{"lifeTimeMs", number(effect->lifeTime)}, {"waitTimeMs", number(effect->waitTime)},
+					{"flyElapsedMs", number(effect->flyMagicElapsedMilliseconds)},
+					{"flyIntervalMs", number(linked.flyInterval)},
+					{"flyMagicLoaded", boolean(linked.flyMagic && linked.flyMagic->loadSucceeded)}};
+				auto path = array();
+				for (const auto& tile : effect->passPath) path.arrayValues.push_back(position(tile));
+				row.objectValues["path"] = std::move(path);
+				effects.arrayValues.push_back(std::move(row));
+			}
+		value.objectValues["effects"] = std::move(effects);
+	}
 	auto targets = array();
 	if (manager->npcManager)
 		for (auto& npc : manager->npcManager->npcList)
@@ -483,6 +513,12 @@ Value GameplayAutomationSession::observe(const Value& arguments)
 			target.objectValues = {{"id", number(identify(npc))}, {"kind", string("npc")},
 				{"name", string(npc->npcName)}, {"position", position(npc->getPosition())},
 				{"hostile", boolean(npc->isEnemy())}, {"life", number(npc->life)},
+				{"lifeMax", number(npc->getLifeMax())}, {"mana", number(npc->mana)},
+				{"manaMax", number(npc->getManaMax())}, {"level", number(npc->level)},
+				{"exp", number(npc->exp)}, {"relation", number(npc->relation)},
+				{"attack", number(npc->getAttack())},
+				{"disableMoveMs", number(npc->disableMoveMilliseconds)},
+				{"blindMs", number(npc->blindMilliseconds)}, {"weakMs", number(npc->weakMilliseconds)},
 				{"attackable", boolean(WorldInteractionResolver::isNPCValidForIntent(npc, WorldInteractionIntent::Attack, actor))},
 				{"visibleFromPlayer", boolean(actor->canSee(npc->getPosition()))},
 				{"attackRadius", number(npc->attackRadius)},
@@ -752,7 +788,7 @@ void GameplayAutomationSession::beforePresent(EngineBase& renderedEngine)
 }
 
 bool GameplayAutomationSession::queueSkill(int slot, const std::shared_ptr<NPC>& target, bool requireReach,
-	std::string* unavailableReason)
+	std::string* unavailableReason, const Point* positionTarget)
 {
 	auto unavailable = [unavailableReason](const char* reason)
 	{
@@ -777,7 +813,7 @@ bool GameplayAutomationSession::queueSkill(int slot, const std::shared_ptr<NPC>&
 		|| (!prepared->goodsName.empty() && manager->goodsManager.getItemNum(prepared->goodsName) <= 0))
 		return unavailable("skill_resources_unavailable");
 	if (magic.remainColdMilliseconds > 0) return unavailable("skill_cooldown");
-	const auto goal = target ? target->getPosition() : player->getPosition();
+	const auto goal = target ? target->getPosition() : positionTarget ? *positionTarget : player->getPosition();
 	if (requireReach && target)
 	{
 		if (Map::calDistance(player->getPosition(), goal) > skillReach(*prepared, magic.level, *player)
@@ -794,7 +830,7 @@ bool GameplayAutomationSession::queueSkill(int slot, const std::shared_ptr<NPC>&
 	next.action = acMagic;
 	next.actionParam = slot;
 	next.destGE = target;
-	next.dest = target ? target->getPosition() : player->getPosition();
+	next.dest = goal;
 	return player->addNextAction(next) || unavailable("configured_skill_unavailable");
 }
 
@@ -933,12 +969,12 @@ void GameplayAutomationSession::execute(Action& action)
 	else if (command == "Attack")
 		fields(arguments, {"generation", "targetId", "timeoutMs"});
 	else if (command == "CastSkill")
-		fields(arguments, {"generation", "targetId", "slot", "timeoutMs"});
+		fields(arguments, {"generation", "targetId", "slot", "x", "y", "timeoutMs"});
 	else if (command == "ToggleSit")
 		fields(arguments, {"generation"});
 	else if (command == "StartCombat")
-		fields(arguments, {"generation", "targetId", "radius", "kills", "skills", "lifeItem", "manaItem",
-			"lifePercent", "manaPercent", "timeoutMs", "allowMeleeFallback"});
+		fields(arguments, {"generation", "targetId", "radius", "kills", "skills", "lifeItem", "manaItem", "thewItem",
+			"lifePercent", "manaPercent", "thewPercent", "timeoutMs", "allowMeleeFallback"});
 	else throw std::runtime_error("unknown_command");
 	requireWorld(arguments);
 	if (worldAction) throw std::runtime_error("world_action_busy");
@@ -980,20 +1016,44 @@ void GameplayAutomationSession::execute(Action& action)
 	else
 	{
 		if (!player->canFight) throw std::runtime_error("fight_disabled");
+		Point positionTarget{};
+		const bool hasPositionTarget = command == "CastSkill" && (has(arguments, "x") || has(arguments, "y"));
+		if (hasPositionTarget)
+		{
+			if (has(arguments, "targetId")) throw std::runtime_error("invalid_skill_destination");
+			positionTarget = destination(arguments);
+			if (!manager->map->isInMap(positionTarget)) throw std::runtime_error("outside_map");
+		}
 		std::shared_ptr<NPC> target;
 		if (has(arguments, "targetId"))
 		{
 			target = std::dynamic_pointer_cast<NPC>(resolve(integer(member(arguments, "targetId"))));
-			if (!target || !manager->npcManager->findNPC(target)
-				|| !WorldInteractionResolver::isNPCValidForIntent(target, WorldInteractionIntent::Attack, actor))
+			if (!target || !manager->npcManager->findNPC(target))
 				throw std::runtime_error("invalid_enemy");
+			bool validTarget = WorldInteractionResolver::isNPCValidForIntent(target, WorldInteractionIntent::Attack, actor);
+			if (!validTarget && command == "CastSkill")
+			{
+				const int slot = integerMember(arguments, "slot", 0, 63);
+				if (slot < manager->magicManager.bottomCount())
+				{
+					const int index = manager->magicManager.bottomIndex(slot);
+					if (manager->magicManager.magicListExists(index))
+					{
+						const auto& info = manager->magicManager.magicList[index];
+						const auto prepared = player->resolveMagicReplacement(info.magic);
+						validTarget = prepared && prepared->supportsFriendlyTarget(info.level)
+							&& WorldInteractionResolver::isNPCValidForIntent(target, WorldInteractionIntent::FriendlyMagic, actor);
+					}
+				}
+			}
+			if (!validTarget) throw std::runtime_error("invalid_enemy");
 		}
 		action.target = target;
 		if (command == "Attack") queued = target && manager->queueNPCAttackInteraction(target, false);
 		else if (command == "CastSkill")
 		{
 			const auto slot = integerMember(arguments, "slot", 0, 63);
-			queued = queueSkill(slot, target);
+			queued = queueSkill(slot, target, false, nullptr, hasPositionTarget ? &positionTarget : nullptr);
 			if (queued) action.magic = manager->magicManager.magicList[manager->magicManager.bottomIndex(slot)].magic;
 		}
 		else
@@ -1003,7 +1063,8 @@ void GameplayAutomationSession::execute(Action& action)
 			optionalInteger(arguments, "kills", 1, 1, 100);
 			optionalInteger(arguments, "lifePercent", 40, 1, 99);
 			optionalInteger(arguments, "manaPercent", 25, 1, 99);
-			for (const auto* key : {"lifeItem", "manaItem"}) if (has(arguments, key)) textMember(arguments, key);
+			optionalInteger(arguments, "thewPercent", 25, 1, 99);
+			for (const auto* key : {"lifeItem", "manaItem", "thewItem"}) if (has(arguments, key)) textMember(arguments, key);
 			if (has(arguments, "skills"))
 			{
 				const auto& skills = member(arguments, "skills");
@@ -1160,14 +1221,16 @@ void GameplayAutomationSession::updateWorldAction()
 			action.lastTargetLife = target->life;
 			action.lastProgress = now;
 		}
-		bool waitingForManaMedicine = false;
-		for (const bool life : {true, false})
+		bool waitingForResourceMedicine = false;
+		for (int resource = 0; resource < 3; ++resource)
 		{
+			const bool life = resource == 0;
+			const bool thew = resource == 2;
 			if (!life && manager->player->hasUnlimitedCheatResources()) continue;
-			const auto* itemKey = life ? "lifeItem" : "manaItem";
-			const int threshold = optionalInteger(arguments, life ? "lifePercent" : "manaPercent", life ? 40 : 25, 1, 99);
-			const int current = life ? actor->life : actor->mana;
-			const int maximum = life ? actor->getLifeMax() : actor->getManaMax();
+			const auto* itemKey = life ? "lifeItem" : thew ? "thewItem" : "manaItem";
+			const int threshold = optionalInteger(arguments, life ? "lifePercent" : thew ? "thewPercent" : "manaPercent", life ? 40 : 25, 1, 99);
+			const int current = life ? actor->life : thew ? actor->thew : actor->mana;
+			const int maximum = life ? actor->getLifeMax() : thew ? actor->getThewMax() : actor->getManaMax();
 			if (maximum <= 0 || static_cast<std::int64_t>(current) * 100 >= static_cast<std::int64_t>(maximum) * threshold) continue;
 			if (!has(arguments, itemKey)) continue;
 			const auto file = textMember(arguments, itemKey);
@@ -1181,7 +1244,7 @@ void GameplayAutomationSession::updateWorldAction()
 			}
 			if (manager->goodsManager.goodsList[slot].remainColdMilliseconds != 0)
 			{
-				waitingForManaMedicine = waitingForManaMedicine || !life;
+				waitingForResourceMedicine = waitingForResourceMedicine || !life;
 				continue;
 			}
 			const int countBefore = manager->goodsManager.goodsList[slot].number;
@@ -1190,12 +1253,13 @@ void GameplayAutomationSession::updateWorldAction()
 				auto detail = object();
 				detail.objectValues = {{"file", string(file)}, {"countBefore", number(countBefore)},
 					{"countAfter", number(manager->goodsManager.goodsList[slot].number)},
-					{"before", number(current)}, {"after", number(life ? actor->life : actor->mana)}};
+					{"before", number(current)}, {"after", number(life ? actor->life : thew ? actor->thew : actor->mana)}};
 				record("combat.item", std::move(detail));
 				return;
 			}
 		}
 		if (!manager->player->nextAction
+			&& !actor->isBouncing() && !actor->isMagicForcedMoving()
 			&& (actor->isStanding() || actor->isWalking() || actor->isRunning() || actor->isHurting()))
 		{
 			// Normal input can queue a skill during hurt; Player consumes it only
@@ -1273,7 +1337,7 @@ void GameplayAutomationSession::updateWorldAction()
 					next.dest = *firingPosition;
 					manager->player->addNextAction(next);
 				}
-				else if (approachSlot < 0 && !coolingDown && !(resourcesUnavailable && waitingForManaMedicine))
+				else if (approachSlot < 0 && !coolingDown && !(resourcesUnavailable && waitingForResourceMedicine))
 				{
 					finish(action, "failed", resourcesUnavailable ? "skill_resources_unavailable" : "configured_skill_unavailable");
 					return;

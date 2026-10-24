@@ -4,6 +4,8 @@
 #include "../Player.h"
 #include "../../GameManager/GameManager.h"
 #include "../../../Image/IMP.h"
+#include <algorithm>
+#include <cmath>
 
 // 构造函数，初始化关联的NPC对象
 NPCActionBase::NPCActionBase(NPC* npc)
@@ -130,6 +132,16 @@ void NPCActionBase::calStepLastTime(float speed)
     }
     float stepDistance = 1.0f;
     Point stepPosition = !_npc->stepList.empty() ? _npc->stepList.front() : Map::getSubPoint(_npc->position, _npc->direction);
+    if ((getActionType() == acRun || getActionType() == acARun) && gm->global.runSpeedPixelsPerSecond > 0)
+    {
+        const auto delta = Map::getTilePosition(stepPosition, _npc->position);
+        // Each tile step has an outgoing and an incoming half.
+        const double halfStepMilliseconds = std::hypot(static_cast<double>(delta.x), static_cast<double>(delta.y))
+            * 500.0 / gm->global.runSpeedPixelsPerSecond / _npc->getMoveSpeedFold()
+            * SPEED_TIME_DEFAULT / Config::getGameSpeed();
+        _npc->stepLastTime = static_cast<UTime>(std::max(1.0, std::round(halfStepMilliseconds)));
+        return;
+    }
     stepDistance = Map::getTileDistance(_npc->position, { 0.0f, 0.0f }, stepPosition, { 0.0f, 0.0f });
     if (stepDistance <= 0.0f)
     {

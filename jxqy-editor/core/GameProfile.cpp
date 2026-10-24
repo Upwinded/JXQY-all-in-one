@@ -70,9 +70,6 @@ GameProfile gameProfileFromManifest(
         manifest.defeatedNpcExperienceMode;
     profile.defeatedNpcExperienceModeDefined =
         manifest.defeatedNpcExperienceModeDefined;
-    profile.experienceMultiplier = manifest.experienceMultiplier;
-    profile.experienceMultiplierDefined =
-        manifest.experienceMultiplierDefined;
     profile.levelUpThresholdMode = manifest.levelUpThresholdMode;
     profile.levelUpThresholdModeDefined =
         manifest.levelUpThresholdModeDefined;
@@ -89,6 +86,15 @@ GameProfile gameProfileFromManifest(
         manifest.magicEffectCalculationMode;
     profile.magicEffectCalculationModeDefined =
         manifest.magicEffectCalculationModeDefined;
+    profile.attackReleaseFrameRatio = manifest.attackReleaseFrameRatio;
+    profile.attackReleaseFrameRatioDefined = manifest.attackReleaseFrameRatioDefined;
+    profile.attackReleaseFrameRatioSourceId = QString::fromStdString(manifest.attackReleaseFrameRatioSourceId);
+    profile.specialAttackReleaseFrameRatio = manifest.specialAttackReleaseFrameRatio;
+    profile.specialAttackReleaseFrameRatioDefined = manifest.specialAttackReleaseFrameRatioDefined;
+    profile.specialAttackReleaseFrameRatioSourceId = QString::fromStdString(manifest.specialAttackReleaseFrameRatioSourceId);
+    profile.magicReleaseFrameRatio = manifest.magicReleaseFrameRatio;
+    profile.magicReleaseFrameRatioDefined = manifest.magicReleaseFrameRatioDefined;
+    profile.magicReleaseFrameRatioSourceId = QString::fromStdString(manifest.magicReleaseFrameRatioSourceId);
     profile.scriptPlayerName = QString::fromStdString(manifest.scriptPlayerName);
     profile.npcActionProfile = manifest.npcActionProfile;
     profile.npcActionProfileDefined = manifest.npcActionProfileDefined;
@@ -121,6 +127,11 @@ GameProfile gameProfileFromManifest(
     profile.preferLocalUi = manifest.preferLocalUi;
     for (const auto& feature : manifest.features)
     {
+        if (QString::fromStdString(feature.first).compare(
+                QStringLiteral("MagicTriggerAtAnimationEnd"), Qt::CaseInsensitive) == 0)
+        {
+            continue;
+        }
         profile.features.insert(
             QString::fromStdString(feature.first),
             feature.second);
@@ -201,9 +212,25 @@ bool GameProfile::loadFromFile(const QString& filePath)
     loadedProfile.features.clear();
     for (const std::string& featureName : ini.getKeyNames("Features"))
     {
+        if (QString::fromStdString(featureName).compare(
+                QStringLiteral("MagicTriggerAtAnimationEnd"), Qt::CaseInsensitive) == 0)
+        {
+            continue;
+        }
         loadedProfile.features.insert(
             QString::fromStdString(featureName),
             ini.getBoolean("Features", featureName, false));
+    }
+
+    for (const char* key : {"AttackReleaseFrameRatio", "SpecialAttackReleaseFrameRatio", "MagicReleaseFrameRatio"})
+    {
+        ActionReleaseFrameRatio ratio;
+        if (ini.hasKey("Combat", key) &&
+            !tryParseActionReleaseFrameRatio(ini.get("Combat", key, ""), ratio))
+        {
+            loadedProfile.invalidActionReleaseFrameRatios.insert(
+                QString::fromLatin1(key), QString::fromStdString(ini.get("Combat", key, "")));
+        }
     }
 
     *this = std::move(loadedProfile);
@@ -232,6 +259,84 @@ bool GameProfile::saveToFile(const QString& filePath) const
     return output.write(bytes) == bytes.size() && output.commit();
 }
 
+bool ResourcePackScanner::resolveActionReleaseFrameRatios(
+    const QString& assetsPath,
+    const GameProfile& profile,
+    GameProfile& effectiveProfile)
+{
+    const QString manifestPath = profile.manifestPath.isEmpty()
+        ? QDir(profile.rootPath).absoluteFilePath(QString::fromLatin1(ManifestFileName))
+        : QFileInfo(profile.manifestPath).absoluteFilePath();
+    QByteArray manifestBytes;
+    if (!profile.prepareSaveBytes(manifestPath, manifestBytes))
+    {
+        return false;
+    }
+    RuntimeResource::ResourceCatalogFileAccess access;
+    access.readFileFromRoot = [manifestPath, manifestBytes](
+        const std::filesystem::path& root, std::string_view relativePath, std::size_t maximumBytes)
+    {
+        RuntimeResource::CatalogFileReadResult result;
+        const QString path = QDir(QString::fromStdString(root.u8string())).absoluteFilePath(
+            QString::fromUtf8(relativePath.data(), static_cast<qsizetype>(relativePath.size())));
+        QByteArray bytes;
+        if (QDir::cleanPath(path) == QDir::cleanPath(manifestPath))
+        {
+            bytes = manifestBytes;
+        }
+        else
+        {
+            QFile file(path);
+            if (!file.exists())
+            {
+                result.status = RuntimeResource::CatalogFileReadStatus::NotFound;
+                return result;
+            }
+            if (!file.open(QIODevice::ReadOnly)) return result;
+            if (file.size() > static_cast<qint64>(maximumBytes))
+            {
+                result.status = RuntimeResource::CatalogFileReadStatus::TooLarge;
+                return result;
+            }
+            bytes = file.readAll();
+            if (file.error() != QFileDevice::NoError) return result;
+        }
+        if (static_cast<std::size_t>(bytes.size()) > maximumBytes)
+        {
+            result.status = RuntimeResource::CatalogFileReadStatus::TooLarge;
+            return result;
+        }
+        result.status = RuntimeResource::CatalogFileReadStatus::Success;
+        result.bytes.assign(bytes.begin(), bytes.end());
+        return result;
+    };
+    access.getDirectoryStatus = [](const std::filesystem::path& path)
+    {
+        return QFileInfo(QString::fromStdString(path.u8string())).isDir()
+            ? RuntimeResource::CatalogDirectoryStatus::Exists
+            : RuntimeResource::CatalogDirectoryStatus::Missing;
+    };
+    access.listChildDirectories = [](const std::filesystem::path& path)
+    {
+        RuntimeResource::CatalogDirectoryListResult result;
+        const QDir directory(QString::fromStdString(path.u8string()));
+        if (!directory.exists()) return result;
+        result.status = RuntimeResource::CatalogDirectoryListStatus::Success;
+        for (const QString& child : directory.entryList(QDir::Dirs | QDir::NoDotAndDotDot, QDir::Name))
+        {
+            result.childDirectoryNames.push_back(child.toUtf8().toStdString());
+        }
+        return result;
+    };
+    const auto resolved = RuntimeResource::resolveExactResourceSelection(
+        std::filesystem::u8path(assetsPath.toUtf8().constData()),
+        profile.id.toUtf8().toStdString(), access);
+    if (!resolved.succeeded()) return false;
+    effectiveProfile = gameProfileFromManifest(
+        resolved.selection.activeManifest, profile.rootPath, manifestPath);
+    return true;
+}
+
 bool GameProfile::prepareSaveBytes(
     const QString& filePath,
     QByteArray& bytes,
@@ -239,6 +344,10 @@ bool GameProfile::prepareSaveBytes(
     bool* sourceExists) const
 {
     bytes.clear();
+    if (!invalidActionReleaseFrameRatios.isEmpty())
+    {
+        return false;
+    }
     if (sourceBytes)
     {
         sourceBytes->clear();
@@ -317,18 +426,7 @@ bool GameProfile::prepareSaveBytes(
     {
         ini.removeKey("Experience", "DefeatedNpcExperienceMode");
     }
-    if (experienceMultiplierDefined)
-    {
-        ini.set(
-            "Experience",
-            "ExperienceMultiplier",
-            QString::number(experienceMultiplier, 'g', 15).
-                toStdString());
-    }
-    else
-    {
-        ini.removeKey("Experience", "ExperienceMultiplier");
-    }
+    ini.removeKey("Experience", "ExperienceMultiplier");
     if (levelUpThresholdModeDefined)
     {
         ini.set(
@@ -382,6 +480,28 @@ bool GameProfile::prepareSaveBytes(
     else
     {
         ini.removeKey("Combat", "MagicEffectCalculationMode");
+    }
+    const auto writeReleaseRatio = [&ini](const char* key, const ActionReleaseFrameRatio& ratio, bool defined)
+    {
+        if (!defined)
+        {
+            ini.removeKey("Combat", key);
+            return true;
+        }
+        ActionReleaseFrameRatio validated;
+        const std::string text = actionReleaseFrameRatioToString(ratio);
+        if (!tryParseActionReleaseFrameRatio(text, validated))
+        {
+            return false;
+        }
+        ini.set("Combat", key, text);
+        return true;
+    };
+    if (!writeReleaseRatio("AttackReleaseFrameRatio", attackReleaseFrameRatio, attackReleaseFrameRatioDefined) ||
+        !writeReleaseRatio("SpecialAttackReleaseFrameRatio", specialAttackReleaseFrameRatio, specialAttackReleaseFrameRatioDefined) ||
+        !writeReleaseRatio("MagicReleaseFrameRatio", magicReleaseFrameRatio, magicReleaseFrameRatioDefined))
+    {
+        return false;
     }
     setOrRemove(ini, "Script", "PlayerName", scriptPlayerName.trimmed());
     if (npcActionProfileDefined)
@@ -480,7 +600,10 @@ bool GameProfile::prepareSaveBytes(
     QSet<QString> currentFeatureNames;
     for (auto feature = features.cbegin(); feature != features.cend(); ++feature)
     {
-        currentFeatureNames.insert(feature.key().toLower());
+        if (feature.key().compare(QStringLiteral("MagicTriggerAtAnimationEnd"), Qt::CaseInsensitive) != 0)
+        {
+            currentFeatureNames.insert(feature.key().toLower());
+        }
     }
     for (const std::string& existingFeature : ini.getKeyNames("Features"))
     {
@@ -491,7 +614,10 @@ bool GameProfile::prepareSaveBytes(
     }
     for (auto feature = features.cbegin(); feature != features.cend(); ++feature)
     {
-        ini.setBoolean("Features", feature.key().toUtf8().toStdString(), feature.value());
+        if (currentFeatureNames.contains(feature.key().toLower()))
+        {
+            ini.setBoolean("Features", feature.key().toUtf8().toStdString(), feature.value());
+        }
     }
 
     setOrRemove(ini, "Save", "Namespace", saveNamespace);
@@ -561,12 +687,10 @@ GameProfile GameProfile::createDefault()
     profile.type = 0;
     profile.typeDefined = true;
     profile.useWav = false;
-    // 经验三键默认不写入配置：未显式设置时由运行时沿 DependencyId 继承基底包。
+    // 经验模式默认不写入配置：未显式设置时由运行时沿 DependencyId 继承基底包。
     profile.defeatedNpcExperienceMode =
         DefeatedNpcExperienceMode::StoredExperience;
     profile.defeatedNpcExperienceModeDefined = false;
-    profile.experienceMultiplier = 3.0;
-    profile.experienceMultiplierDefined = false;
     profile.levelUpThresholdMode =
         LevelUpThresholdMode::GreaterThanOrEqual;
     profile.levelUpThresholdModeDefined = false;
@@ -599,7 +723,6 @@ GameProfile GameProfile::createDefault()
     profile.uiProfile = "JXQY2";
     profile.preferLocalUi = true;
     profile.features.clear();
-    profile.features.insert("MagicTriggerAtAnimationEnd", false);
     profile.features.insert("LumAsBrightness", true);
     profile.features.insert("AmbientLumOverlay", true);
     profile.features.insert("RainSceneTint", false);

@@ -1416,8 +1416,18 @@ void GameManager::saveSlotScreenshot(int slot)
 	const auto started = std::chrono::steady_clock::now();
 	const auto imageName = "save/" + SaveSlots::screenshot(slot);
 	if (!engine->beginSaveScreen()) return;
-	map->drawMap();
-	weather->draw();
+	const bool compositionStarted = onBeginDrawComposition();
+	try
+	{
+		map->drawMap();
+		weather->draw();
+	}
+	catch (...)
+	{
+		if (compositionStarted) onEndDrawComposition(false);
+		throw;
+	}
+	if (compositionStarted) onEndDrawComposition(true);
 	const auto snapshot = engine->endSaveScreen();
 	if (snapshot == nullptr) return;
 	std::unique_ptr<char[]> data;
@@ -1548,6 +1558,7 @@ bool GameManager::blocksWorldPointerInput() const
 	}
 void GameManager::freeResource()
 {
+	worldColorCanvas = nullptr;
 	touchControlsToggleRequested = false;
 	resetTouchControlsRecoveryGesture();
 	weather->reset();
@@ -2227,6 +2238,17 @@ void GameManager::clearParallelScriptTasks()
 		scriptTaskList.end());
 }
 
+bool GameManager::hasPendingTrapScript() const
+{
+	std::lock_guard<std::mutex> lock(scriptTaskMutex);
+	return dispatchingTrapScriptCount.load() != 0
+		|| (player != nullptr && player->hasPendingScriptPositionTrap())
+		|| std::any_of(scriptTaskList.begin(), scriptTaskList.end(), [](const ScriptTask& task)
+		{
+			return task.type == stTraps;
+		});
+}
+
 void GameManager::runScriptTaskList()
 {
 	if (runPendingPlayerDeathScript())
@@ -2235,6 +2257,7 @@ void GameManager::runScriptTaskList()
 	}
 	std::vector<ScriptTask> tasks;
 	std::vector<ScriptTask> pendingTasks;
+	const auto deathScriptGeneration = playerDeathScriptGeneration;
 	UTime frameTime = getFrameTime();
 	{
 		std::lock_guard<std::mutex> lock(scriptTaskMutex);
@@ -2245,6 +2268,29 @@ void GameManager::runScriptTaskList()
 		tasks = std::move(scriptTaskList);
 		scriptTaskList.clear();
 	}
+
+	// A parallel script can pump frames while later traps are held in this
+	// local batch. Keep those traps visible to the world-input barrier too.
+	struct TrapDispatchScope
+	{
+		std::atomic<std::size_t>& count;
+		std::size_t remaining;
+		void complete()
+		{
+			--count;
+			--remaining;
+		}
+		~TrapDispatchScope()
+		{
+			count -= remaining;
+		}
+	};
+	TrapDispatchScope trapDispatch{dispatchingTrapScriptCount,
+		static_cast<std::size_t>(std::count_if(tasks.begin(), tasks.end(), [](const ScriptTask& task)
+		{
+			return task.type == stTraps;
+		}))};
+	dispatchingTrapScriptCount += trapDispatch.remaining;
 
 	for (auto& task : tasks)
 	{
@@ -2279,7 +2325,20 @@ void GameManager::runScriptTaskList()
 			runObjScript(task.obj, task.scriptName, task.clearPlayerAction);
 			break;
 		case stTraps:
-			runTrapScript(task.trapIndex);
+			if (inEvent || script.running)
+			{
+				pendingTasks.push_back(task);
+				break;
+			}
+			if (task.scriptName.empty())
+			{
+				runTrapScript(task.trapIndex);
+			}
+			else
+			{
+				runCapturedTrapScript(task);
+			}
+			trapDispatch.complete();
 			break;
 		case stGoods:
 			runGoodsScript(task.goods);
@@ -2287,7 +2346,8 @@ void GameManager::runScriptTaskList()
 		default:
 			break;
 		}
-		if (runPendingPlayerDeathScript())
+		// A dispatched script may already have handled death through runEventList.
+		if (playerDeathScriptGeneration != deathScriptGeneration || runPendingPlayerDeathScript())
 		{
 			return;
 		}
@@ -2360,6 +2420,19 @@ void GameManager::runTrapScript(int idx)
 		return;
 	}
 
+	ScriptTask task;
+	task.type = stTraps;
+	task.trapIndex = idx;
+	task.scriptMapName = mapFolderName;
+	task.scriptName = traps.get(task.scriptMapName, idx);
+	if (task.scriptName.empty() || traps.hasTriggered(idx))
+	{
+		return;
+	}
+	// Consume on contact, before the parent can SaveMapTrap, rebind or change
+	// maps. The queued script retains the binding that was actually touched.
+	traps.markTriggered(idx);
+
 	player->nextAction = nullptr;
 	player->nextDest = ndNone;
 	player->nextDestUseRightScript = false;
@@ -2370,28 +2443,24 @@ void GameManager::runTrapScript(int idx)
 	{
 		player->beginStand();
 	}
-	if (inEvent)
+	if (inEvent || script.running)
 	{
-		ScriptTask task;
-		task.type = stTraps;
-		task.trapIndex = idx;
 		addScriptTask(task);
 		return;
 	}
-	scriptMapName = mapFolderName;
-	scriptTrapIndex = idx;
-	std::string sname = traps.get(mapFolderName, idx);
-	if (sname != "" && !traps.hasTriggered(idx))
-	{
-		inEvent = true;
-		effectManager->disableAllEffect();
-		traps.markTriggered(idx);
-		std::string tempMapName = mapFolderName;
-		scriptType = stTraps;
-		runScript(sname);
-		scriptType = stNone;
-		inEvent = false;
-	}
+	runCapturedTrapScript(task);
+}
+
+void GameManager::runCapturedTrapScript(const ScriptTask& task)
+{
+	scriptMapName = task.scriptMapName;
+	scriptTrapIndex = task.trapIndex;
+	inEvent = true;
+	effectManager->disableAllEffect();
+	scriptType = stTraps;
+	runScript(task.scriptName, task.scriptMapName);
+	scriptType = stNone;
+	inEvent = false;
 	scriptMapName = "";
 	scriptTrapIndex = 0;
 	camera->followPlayer = true;
@@ -2434,13 +2503,15 @@ void GameManager::onUpdate()
 	{
 		return;
 	}
+	// Check placements after actor updates, outside an action's update stack.
+	player->checkPendingScriptPositionTrap();
 	runScriptTaskList();
 	if (runPendingPlayerDeathScript())
 	{
 		return;
 	}
 
-	if (timerStarted)
+	if (timerStarted && !inEvent && !script.running && !hasPendingTrapScript())
 	{
 		int previousSeconds = timerSeconds;
 		timerAccumulated += getFrameTime();
@@ -2489,7 +2560,9 @@ bool GameManager::runPendingPlayerDeathScript()
 	}
 
 	player->result &= ~erRunDeathScript;
+	++playerDeathScriptGeneration;
 	player->cancelQueuedInteraction();
+	player->cancelPendingScriptPositionTrap();
 	// A game-over script supersedes NPC deaths, traps and interactions that
 	// became ready in the same frame; keeping them would advance the story first.
 	eventList.clear();
@@ -2609,6 +2682,46 @@ bool GameManager::processTouchControlsRecoveryContacts(
 
 	touchControlsRecoveryAwaitingRelease = true;
 	return true;
+}
+
+bool GameManager::onBeginDrawComposition()
+{
+	if (global.data.screenColor == 0xFFFFFF) return false;
+	int width = 0, height = 0, canvasWidth = 0, canvasHeight = 0;
+	engine->getWindowSize(width, height);
+	if (width <= 0 || height <= 0) return false;
+	if (worldColorCanvas == nullptr || !engine->getImageSize(worldColorCanvas, canvasWidth, canvasHeight)
+		|| canvasWidth != width || canvasHeight != height)
+	{
+		worldColorCanvas = engine->createCanvasImage(width, height);
+	}
+	if (worldColorCanvas == nullptr) return false;
+	worldColorOriginalTarget = engine->getRenderTarget();
+	if (!engine->setSharedImageAsRenderTarget(worldColorCanvas))
+	{
+		worldColorOriginalTarget = nullptr;
+		return false;
+	}
+	engine->renderClear(0, 0, 0, 255);
+	drawingWorldColor = true;
+	return true;
+}
+
+bool GameManager::shouldDrawChildAfterComposition(const PElement& child) const
+{
+	return child != weather;
+}
+
+void GameManager::onEndDrawComposition(bool completed)
+{
+	if (!drawingWorldColor) return;
+	drawingWorldColor = false;
+	const _image originalTarget = worldColorOriginalTarget;
+	worldColorOriginalTarget = nullptr;
+	if (!engine->restoreImageRenderTargetAfterAcceptedOperation(originalTarget, worldColorCanvas) || !completed) return;
+	const auto color = global.data.screenColor;
+	engine->drawImageWithColor(worldColorCanvas, 0, 0,
+		(color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF);
 }
 
 void GameManager::onDraw()

@@ -1,6 +1,7 @@
 #pragma once
 #include "../../Component/ConfigDrivenPanel.h"
 #include "../../Component/TextButton.h"
+#include "../../Component/FlatTextButton.h"
 #include "ControllerFocusParticipant.h"
 
 class StateMenu :
@@ -27,6 +28,10 @@ private:
 	std::shared_ptr<ImageContainer> image = nullptr;
 	int loadedPanelIndex = -1;
 	bool characterSelectorFocused = false;
+	bool attributePointEntryFocused = false;
+	std::shared_ptr<FlatTextButton> attributePointEntry;
+	void updateAttributePointEntry();
+	void onSetChildRect() override;
 	virtual void onUpdate() override;
 	void onEvent() override;
 	bool onHandleUIAction(UIAction action) override;
