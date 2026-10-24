@@ -15,10 +15,28 @@ concurrency:
 
 jobs:
   apple:
-    runs-on: xcode-27
+    name: ${{ matrix.toolchain }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - toolchain: xcode-26.5
+            runner: macos-26
+            developer-directory: /Applications/Xcode_26.5.app/Contents/Developer
+            macos-minimum: '10.15'
+            ios-minimum: '13.0'
+          - toolchain: xcode-27.1
+            runner: xcode-27
+            developer-directory: /Applications/Xcode_27.1.app/Contents/Developer
+            macos-minimum: '12.0'
+            ios-minimum: '15.0'
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
-      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+      DEVELOPER_DIR: ${{ matrix.developer-directory }}
+      JXQY_TOOLCHAIN: ${{ matrix.toolchain }}
+      JXQY_MACOS_MINIMUM: ${{ matrix.macos-minimum }}
+      JXQY_IOS_MINIMUM: ${{ matrix.ios-minimum }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -78,6 +96,7 @@ jobs:
             build 'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            "MACOSX_DEPLOYMENT_TARGET=$JXQY_MACOS_MINIMUM" \
             "CURRENT_PROJECT_VERSION=$JXQY_VERSION" \
             "MARKETING_VERSION=$JXQY_VERSION" \
             2>&1 | tee "$RUNNER_TEMP/apple-logs/macos.log"
@@ -96,6 +115,7 @@ jobs:
             build ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            "IPHONEOS_DEPLOYMENT_TARGET=$JXQY_IOS_MINIMUM" \
             "CURRENT_PROJECT_VERSION=$JXQY_VERSION" \
             "MARKETING_VERSION=$JXQY_VERSION" \
             2>&1 | tee "$RUNNER_TEMP/apple-logs/ios.log"
@@ -125,6 +145,7 @@ jobs:
           expected_assets = {p.relative_to(source_assets): hashlib.sha256(p.read_bytes()).hexdigest()
                              for p in source_assets.rglob("*") if p.is_file()}
           report = {"version": version, "source_commit": os.environ["GITHUB_SHA"],
+                    "toolchain": os.environ["JXQY_TOOLCHAIN"],
                     "xcode": subprocess.check_output(["xcodebuild", "-version"], text=True).strip(),
                     "platforms": {}}
           for platform, directory, architectures, resource_path in (
@@ -193,7 +214,7 @@ jobs:
       - name: Upload verified builds
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: apple-build-${{ env.JXQY_VERSION }}-${{ github.run_id }}
+          name: apple-build-${{ env.JXQY_VERSION }}-${{ matrix.toolchain }}-${{ github.run_id }}
           path: ${{ runner.temp }}/apple-output/
           retention-days: 3
           compression-level: 0
@@ -203,7 +224,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: apple-logs-${{ github.run_id }}
+          name: apple-logs-${{ matrix.toolchain }}-${{ github.run_id }}
           path: ${{ runner.temp }}/apple-logs/
           retention-days: 3
           if-no-files-found: ignore
