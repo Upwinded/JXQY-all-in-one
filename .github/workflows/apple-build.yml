@@ -1,0 +1,209 @@
+name: Apple build verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths: [.github/workflows/apple-build.yml]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Inspect build environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          sw_vers
+          uname -m
+          xcodebuild -version
+          df -h "$RUNNER_TEMP"
+          version=$(tr -d '"[:space:]' < cmake/JxqyEngineVersion.inc)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "JXQY_VERSION=$version" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/apple-output" "$RUNNER_TEMP/apple-logs"
+
+      - name: Restore verified Apple dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import configparser
+          import hashlib
+          import os
+          from pathlib import Path
+          import subprocess
+
+          manifest = configparser.ConfigParser()
+          manifest.read("ThirdParty/dependencies.ini")
+          artifact = manifest["Apple"]["Artifact"]
+          assert Path(artifact).name == artifact
+          tag = manifest["DependencySet"]["ReleaseTag"]
+          archive = Path(os.environ["RUNNER_TEMP"]) / artifact
+          url = f"https://github.com/Upwinded/JXQY-all-in-one/releases/download/{tag}/{artifact}"
+          subprocess.run(["curl", "--fail", "--location", "--retry", "3",
+                          "--output", str(archive), url], check=True)
+          digest = hashlib.file_digest(archive.open("rb"), "sha256").hexdigest()
+          assert digest == manifest["Apple"]["Sha256"], "Dependency SHA-256 mismatch"
+          print(f"Apple dependencies: {digest}", flush=True)
+          subprocess.run(["ditto", "-x", "-k", str(archive), "."], check=True)
+          PY
+
+      - name: Build macOS Universal2
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -quiet \
+            -project macos_ios/jxqy/jxqy.xcodeproj \
+            -scheme "jxqy macOS" -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/apple-derived" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/apple-packages" \
+            -onlyUsePackageVersionsFromResolvedFile -jobs 2 \
+            build 'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            "CURRENT_PROJECT_VERSION=$JXQY_VERSION" \
+            "MARKETING_VERSION=$JXQY_VERSION" \
+            2>&1 | tee "$RUNNER_TEMP/apple-logs/macos.log"
+
+      - name: Build iOS arm64
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -quiet \
+            -project macos_ios/jxqy/jxqy.xcodeproj \
+            -scheme "jxqy iOS" -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/apple-derived" \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/apple-packages" \
+            -onlyUsePackageVersionsFromResolvedFile -jobs 2 \
+            build ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY= DEVELOPMENT_TEAM= \
+            "CURRENT_PROJECT_VERSION=$JXQY_VERSION" \
+            "MARKETING_VERSION=$JXQY_VERSION" \
+            2>&1 | tee "$RUNNER_TEMP/apple-logs/ios.log"
+
+      - name: Verify and archive build outputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import plistlib
+          import shutil
+          import subprocess
+          import zipfile
+
+          temporary = Path(os.environ["RUNNER_TEMP"])
+          output = temporary / "apple-output"
+          products = temporary / "apple-derived/Build/Products"
+          version = os.environ["JXQY_VERSION"]
+          magic = {bytes.fromhex(value) for value in
+                   ("feedface", "cefaedfe", "feedfacf", "cffaedfe",
+                    "cafebabe", "bebafeca", "cafebabf", "bfbafeca")}
+          source_assets = Path("assets")
+          expected_assets = {p.relative_to(source_assets): hashlib.sha256(p.read_bytes()).hexdigest()
+                             for p in source_assets.rglob("*") if p.is_file()}
+          report = {"version": version, "source_commit": os.environ["GITHUB_SHA"],
+                    "xcode": subprocess.check_output(["xcodebuild", "-version"], text=True).strip(),
+                    "platforms": {}}
+          for platform, directory, architectures, resource_path in (
+              ("macos", "Release", {"arm64", "x86_64"}, "Contents/Resources/assets"),
+              ("ios", "Release-iphoneos", {"arm64"}, "assets"),
+          ):
+              app = products / directory / "jxqy-all-in-one.app"
+              info_path = app / ("Contents/Info.plist" if platform == "macos" else "Info.plist")
+              with info_path.open("rb") as stream:
+                  info = plistlib.load(stream)
+              assert info["CFBundleShortVersionString"] == version
+              assert info["CFBundleVersion"] == version
+              assets = app / resource_path
+              assert {p.name for p in assets.iterdir()} == {"engine", "resources.ini"}
+              actual_assets = {p.relative_to(assets): hashlib.sha256(p.read_bytes()).hexdigest()
+                               for p in assets.rglob("*") if p.is_file()}
+              assert actual_assets == expected_assets, f"{platform}: bootstrap assets mismatch"
+              binaries = []
+              for path in app.rglob("*"):
+                  if path.is_symlink() or not path.is_file():
+                      continue
+                  with path.open("rb") as stream:
+                      is_binary = stream.read(4) in magic
+                  if not is_binary:
+                      continue
+                  actual = set(subprocess.check_output(["lipo", "-archs", str(path)], text=True).split())
+                  assert actual == architectures, f"{path}: {actual}"
+                  binaries.append(str(path.relative_to(app)))
+                  if platform == "ios":
+                      signed = subprocess.run(["codesign", "-d", str(path)],
+                                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                      if signed.returncode == 0:
+                          subprocess.run(["codesign", "--remove-signature", str(path)], check=True)
+                      commands = subprocess.check_output(["otool", "-l", str(path)], text=True)
+                      assert "LC_CODE_SIGNATURE" not in commands, f"{path}: signature remains"
+              assert binaries, f"{platform}: no Mach-O binaries"
+              if platform == "ios":
+                  for path in list(app.rglob("_CodeSignature")):
+                      shutil.rmtree(path)
+                  assert not list(app.rglob("embedded.mobileprovision"))
+                  assert not list(app.rglob("Sparkle.framework"))
+                  payload = temporary / "apple-payload/Payload"
+                  payload.mkdir(parents=True)
+                  shutil.copytree(app, payload / app.name, symlinks=True)
+                  archive = output / f"jxqy-ios-arm64-{version}-unsigned.ipa"
+                  subprocess.run(["ditto", "-c", "-k", "--norsrc", "--noextattr",
+                                  "--noqtn", "--noacl", "--keepParent", str(payload), str(archive)], check=True)
+              else:
+                  archive = output / f"jxqy-macos-universal-{version}-build.zip"
+                  subprocess.run(["ditto", "-c", "-k", "--norsrc", "--noextattr",
+                                  "--noqtn", "--noacl", "--keepParent", str(app), str(archive)], check=True)
+              with zipfile.ZipFile(archive) as package:
+                  assert package.testzip() is None
+              report["platforms"][platform] = {
+                  "artifact": archive.name, "size": archive.stat().st_size,
+                  "sha256": hashlib.file_digest(archive.open("rb"), "sha256").hexdigest(),
+                  "architectures": sorted(architectures), "binaries": binaries,
+                  "bootstrap_files": len(actual_assets), "sdk": info.get("DTSDKName"),
+                  "minimum_os": info.get("MinimumOSVersion", info.get("LSMinimumSystemVersion")),
+              }
+          (output / "build-info.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n")
+          print(json.dumps(report, ensure_ascii=False, indent=2))
+          PY
+          df -h "$RUNNER_TEMP"
+
+      - name: Upload verified builds
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: apple-build-${{ env.JXQY_VERSION }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/apple-output/
+          retention-days: 3
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: apple-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}/apple-logs/
+          retention-days: 3
+          if-no-files-found: ignore
