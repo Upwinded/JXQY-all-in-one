@@ -136,6 +136,7 @@ QString GoodsDocument::text(GoodsTextField field) const
 
 void GoodsDocument::setText(GoodsTextField field, const QString& value)
 {
+    if (text(field) == value) return;
     ini.set("Init", textKey(field), value.toUtf8().toStdString());
 }
 

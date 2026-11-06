@@ -214,6 +214,15 @@ ScriptCallBuildResult ScriptCallTemplate::build(
             "ScriptCallTemplate", "不支持的参数化 API：%1")).arg(apiName);
         return result;
     }
+    return build(definition, argumentValues);
+}
+
+ScriptCallBuildResult ScriptCallTemplate::build(const ScriptCallDefinition& definition,
+    const QMap<QString, QString>& argumentValues)
+{
+    ScriptCallBuildResult result;
+    static const QRegularExpression identifier("^[A-Za-z_][A-Za-z0-9_]*$");
+    if (!identifier.match(definition.runtimeName).hasMatch()) return result;
     if (argumentValues.size() != definition.arguments.size())
     {
         result.error = translated(QT_TRANSLATE_NOOP(

@@ -25,6 +25,7 @@ class Engine final : private EngineBase
 #endif
 	friend class CoreLifecycleTestAccess;
 	friend class GamepadEssentialUITestAccess;
+	friend class FontSelectionTestAccess;
 	friend class GamepadWorldRuntimeTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
 	friend bool runMediaRuntimeTests();
@@ -175,7 +176,8 @@ public:
 	
 	//绘制文字
 	void setFontName(const std::string& fontName);
-	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
+	void setFontFromMem(std::unique_ptr<char[]>& data, int size,
+		std::unique_ptr<char[]> fallback = nullptr, int fallbackSize = 0);
 	bool measureText(const std::string& text, int size, int& width, int& height);
 	_shared_image createText(const std::string& text, int size, unsigned int color);
 	_shared_image createTextWithFontData(
@@ -184,7 +186,8 @@ public:
 		const std::string& text,
 		int size,
 		unsigned int color,
-		int wrapWidth);
+		int wrapWidth,
+		const void* fallbackData = nullptr, std::size_t fallbackSize = 0);
 	void drawText(const std::string& text, int x, int y, int size, unsigned int color);
 
 	//保存字符串到图片子程序
@@ -272,6 +275,8 @@ private:
 	_music talk = nullptr;
 	_channel channelTalk = nullptr;
 	_music getOrLoadCachedSoundFile(const std::string& fileName, bool& cached);
+	_channel playCachedSoundFile(const std::string& fileName,
+		float x, float y, float volume, const std::string& magicSoundKey);
 #if defined(JXQY_ENABLE_TEST_HOOKS)
 	std::size_t cachedSoundDecodeCountForTests = 0;
 #endif
@@ -307,6 +312,7 @@ public:
 	bool preloadCachedSoundFile(const std::string& fileName);
 	_channel playCachedSoundFile(const std::string& fileName,
 		float x = 0.0f, float y = 0.0f, float volume = -1.0f);
+	_channel playMagicSoundFile(const std::string& fileName, float x, float y);
 	void stopAllSounds();
 
 	//播放结束自动释放

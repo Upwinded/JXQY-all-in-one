@@ -372,7 +372,7 @@
        <item>
         <widget class="QGroupBox" name="commonGroup">
          <property name="title">
-          <string>通用属性</string>
+          <string>位置与尺寸</string>
          </property>
          <layout class="QFormLayout" name="commonFormLayout">
           <item row="0" column="0">
@@ -571,7 +571,7 @@
           <item row="0" column="0">
            <widget class="QLabel" name="itemFontLabel">
             <property name="text">
-             <string>字体</string>
+             <string>字体大小（像素）</string>
             </property>
            </widget>
           </item>
@@ -602,13 +602,13 @@
        <item>
         <widget class="QGroupBox" name="labelGroup">
          <property name="title">
-          <string>标签属性</string>
+          <string>文字</string>
          </property>
          <layout class="QFormLayout" name="labelFormLayout">
           <item row="0" column="0">
            <widget class="QLabel" name="labelFontLabel">
             <property name="text">
-             <string>字体</string>
+             <string>字体大小（像素）</string>
             </property>
            </widget>
           </item>
@@ -645,15 +645,14 @@
           <item row="0" column="0">
            <widget class="QLabel" name="scrollbarStyleLabel">
             <property name="text">
-             <string>样式</string>
+             <string>滚动方向</string>
             </property>
            </widget>
           </item>
           <item row="0" column="1">
-           <widget class="QSpinBox" name="scrollbarStyleSpin">
-            <property name="maximum">
-             <number>1</number>
-            </property>
+           <widget class="QComboBox" name="scrollbarDirectionCombo">
+            <item><property name="text"><string>水平</string></property></item>
+            <item><property name="text"><string>垂直</string></property></item>
            </widget>
           </item>
           <item row="1" column="0">

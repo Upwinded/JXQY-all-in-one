@@ -1,6 +1,7 @@
-#include "ToolTip.h"
+﻿#include "ToolTip.h"
 #include "../../Engine/Engine.h"
 #include "BuySellMenu.h"
+#include "MenuMouseWheel.h"
 #include "../GameManager/GameManager.h"
 #include "../../Component/TextLayout.h"
 
@@ -274,10 +275,31 @@ void ToolTip::setMagic(std::shared_ptr<Magic> magic, int level)
 	finishContentLayout();
 }
 
-void ToolTip::showForOwner(PElement ownerElement)
+void ToolTip::showForOwner(PElement ownerElement, const PElement& anchorElement)
 {
 	owner = ownerElement;
+	sourceElement = anchorElement;
 	visible = true;
+}
+
+PElement ToolTip::getSourceOwner() const
+{
+	return owner.lock();
+}
+
+PElement ToolTip::getSourceElement() const
+{
+	return sourceElement.lock();
+}
+
+bool ToolTip::supportsFullDetails() const
+{
+	return body != nullptr && !body->mstr.empty();
+}
+
+bool ToolTip::isExpanded() const
+{
+	return expanded;
 }
 
 void ToolTip::placeNearElement(const PElement& anchorElement)
@@ -313,6 +335,7 @@ void ToolTip::hide()
 	if (expanded) return;
 	visible = false;
 	owner.reset();
+	sourceElement.reset();
 }
 
 void ToolTip::init()
@@ -346,23 +369,23 @@ void ToolTip::init()
 	body = getComponentByName<MemoText>("body");
 
 	if (image) image->stretch = true;
-	if (name) name->autoShrink = true;
+	if (name && !name->autoShrinkConfigured) name->autoShrink = true;
 	if (cost)
 	{
-		cost->autoNextLine = layoutProfile == LayoutProfile::Xjxqy;
-		cost->autoShrink = layoutProfile != LayoutProfile::Xjxqy;
+		if (!cost->autoNextLineConfigured) cost->autoNextLine = layoutProfile == LayoutProfile::Xjxqy;
+		if (!cost->autoShrinkConfigured) cost->autoShrink = layoutProfile != LayoutProfile::Xjxqy;
 	}
 	if (intro1)
 	{
-		intro1->autoNextLine = layoutProfile != LayoutProfile::Jxqy2;
-		intro1->autoShrink = layoutProfile != LayoutProfile::Xjxqy;
+		if (!intro1->autoNextLineConfigured) intro1->autoNextLine = layoutProfile != LayoutProfile::Jxqy2;
+		if (!intro1->autoShrinkConfigured) intro1->autoShrink = layoutProfile != LayoutProfile::Xjxqy;
 	}
-	if (intro2) intro2->autoNextLine = true;
-	if (magicIntro) magicIntro->autoNextLine = true;
+	if (intro2 && !intro2->autoNextLineConfigured) intro2->autoNextLine = true;
+	if (magicIntro && !magicIntro->autoNextLineConfigured) magicIntro->autoNextLine = true;
 	if (layoutProfile == LayoutProfile::Jxqy2 || layoutProfile == LayoutProfile::Yycs)
 	{
-		if (intro2) intro2->autoShrink = true;
-		if (magicIntro) magicIntro->autoShrink = true;
+		if (intro2 && !intro2->autoShrinkConfigured) intro2->autoShrink = true;
+		if (magicIntro && !magicIntro->autoShrinkConfigured) magicIntro->autoShrink = true;
 	}
 	if (layoutProfile == LayoutProfile::Jxqy2)
 	{
@@ -374,12 +397,12 @@ void ToolTip::init()
 				return;
 			}
 			label->fontSize = std::min(label->fontSize, maximumFontSize);
-			label->minimumFontSize = std::min(label->fontSize, 12);
+			if (!label->minimumFontConfigured) label->minimumFontSize = std::min(label->fontSize, 12);
 			label->invalidateTextLayout();
 		};
 		setCompactFont(name, 18);
 		setCompactFont(cost, 18);
-		if (cost) cost->minimumFontSize = std::min(cost->fontSize, 9);
+		if (cost && !cost->minimumFontConfigured) cost->minimumFontSize = std::min(cost->fontSize, 9);
 		setCompactFont(intro1, 16);
 		setCompactFont(intro2, 16);
 		setCompactFont(magicIntro, 16);
@@ -498,7 +521,7 @@ void ToolTip::updatePage()
 #ifdef __MOBILE__
 		hint->setStr(u8"松手关闭提示");
 #else
-		hint->setStr(pages > 1 ? "滚轮 / 翻页键：翻阅说明" : "点击物品查看完整说明");
+		hint->setStr("左键查看完整说明");
 #endif
 	}
 }
@@ -515,7 +538,7 @@ bool ToolTip::turnPage(UIAction action)
 
 void ToolTip::runDetails()
 {
-	if (!body) return;
+	if (!body || body->mstr.empty()) return;
 	expanded = true;
 	updatePage();
 	int width = 0, height = 0;
@@ -551,9 +574,30 @@ void ToolTip::onRun()
 
 bool ToolTip::onHandleEvent(AEvent& event)
 {
-	if (event.eventType == ET_MOUSEWHEEL && event.eventData != 0
-		&& turnPage(event.eventData > 0 ? UIAction::PageNext : UIAction::PagePrevious)) return true;
 	return expanded && dispatchKeyboardUIAction(event, *this);
+}
+
+bool ToolTip::onHandleMouseWheel(AEvent& event)
+{
+	if (!visible || !expanded)
+	{
+		return false;
+	}
+	if (dragging != TOUCH_UNTOUCHEDID || currentDragItem != nullptr)
+	{
+		return true;
+	}
+	if (menuMouseWheelContains(getMySharedPtr(), event.eventX, event.eventY)
+		&& body != nullptr && !body->mstr.empty())
+	{
+		const int pageCount = std::max(1,
+			(static_cast<int>(lines.size()) + static_cast<int>(body->mstr.size()) - 1)
+			/ static_cast<int>(body->mstr.size()));
+		page = static_cast<int>(std::clamp<int64_t>(
+			static_cast<int64_t>(page) + menuMouseWheelSteps(event), 0, pageCount - 1));
+		updatePage();
+	}
+	return true;
 }
 
 bool ToolTip::onHandleUIAction(UIAction action)
@@ -564,6 +608,7 @@ bool ToolTip::onHandleUIAction(UIAction action)
 void ToolTip::onWindowResize(int width, int height)
 {
 	const auto previousOwner = owner;
+	const auto previousSource = sourceElement;
 	const std::string title = name ? name->getStr() : "";
 	const std::string price = cost ? cost->getStr() : "";
 	const std::string attributes = intro1 ? intro1->getStr() : "";
@@ -571,6 +616,7 @@ void ToolTip::onWindowResize(int width, int height)
 	const int previousPage = page;
 	ConfigDrivenPanel::onWindowResize(width, height);
 	owner = previousOwner;
+	sourceElement = previousSource;
 	if (name) name->setStr(title);
 	if (cost) cost->setStr(price);
 	if (intro1) intro1->setStr(attributes);
@@ -659,19 +705,20 @@ void ToolTip::placeNearMouse()
 
 void ToolTip::onDraw()
 {
+	if (drawImagetoRect(rect, stretch))
+	{
+		return;
+	}
 	if (layoutProfile == LayoutProfile::Xjxqy)
 	{
 		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 0, 0, 0, 160);
 		return;
 	}
-	if (!drawImagetoRect(rect, stretch))
-	{
-		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 28, 20, 12, 220);
-		engine->fillRect(rect.x, rect.y, rect.w, 2, 132, 102, 62, 255);
-		engine->fillRect(rect.x, rect.y + rect.h - 2, rect.w, 2, 60, 42, 24, 255);
-		engine->fillRect(rect.x, rect.y, 2, rect.h, 132, 102, 62, 255);
-		engine->fillRect(rect.x + rect.w - 2, rect.y, 2, rect.h, 60, 42, 24, 255);
-	}
+	engine->fillRect(rect.x, rect.y, rect.w, rect.h, 28, 20, 12, 220);
+	engine->fillRect(rect.x, rect.y, rect.w, 2, 132, 102, 62, 255);
+	engine->fillRect(rect.x, rect.y + rect.h - 2, rect.w, 2, 60, 42, 24, 255);
+	engine->fillRect(rect.x, rect.y, 2, rect.h, 132, 102, 62, 255);
+	engine->fillRect(rect.x + rect.w - 2, rect.y, 2, rect.h, 60, 42, 24, 255);
 }
 
 void ToolTip::onUpdate()
@@ -698,5 +745,6 @@ void ToolTip::freeResource()
 	body = nullptr;
 	detailFocus.clear();
 	owner.reset();
+	sourceElement.reset();
 	ConfigDrivenPanel::freeResource();
 }

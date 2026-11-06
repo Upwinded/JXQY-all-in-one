@@ -1,18 +1,24 @@
 #include "MagicEditorWindow.h"
+#include "EditorSaveConfirmation.h"
 
 #include "FilePickerHelper.h"
 #include "MagicRangePreview.h"
 #include "MpcPreviewLabel.h"
 #include "../core/AssetPreviewLoader.h"
 #include "../core/EditorAssetPath.h"
+#include "../core/DurableFileTransaction.h"
+#include "../core/GameProfile.h"
+#include "../core/TranslationManager.h"
 
 #include <QAction>
 #include <QAudioOutput>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
+#include <QDateTime>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
@@ -28,6 +34,7 @@
 #include <QPushButton>
 #include <QScrollArea>
 #include <QSignalBlocker>
+#include <QSlider>
 #include <QSpinBox>
 #include <QSplitter>
 #include <QTableWidget>
@@ -159,9 +166,22 @@ bool MagicEditorWindow::openFile(const QString& requestedPath)
         return false;
     }
 
+    QString logicalPath = normalized;
+    const QString name = ContentAuthoring::referenceName(ContentKind::Magic, assetsBasePath, normalized);
+    if (!name.isEmpty())
+        logicalPath = QDir(assetsBasePath).filePath("ini/magic/" + name);
+    if (documentPathValidator && !documentPathValidator(filePath, logicalPath))
+        return false;
+    QString sourcePath = name.isEmpty() ? normalized
+        : ContentAuthoring::resolve(assetsBasePath, "ini/magic/" + name);
+    if (sourcePath.isEmpty()) sourcePath = normalized;
     MagicDocument candidate;
     QString error;
-    if (!candidate.openFile(normalized, &error))
+    QFile source(sourcePath);
+    const bool readable = source.open(QIODevice::ReadOnly);
+    const QByteArray sourceBytes = readable ? source.readAll() : QByteArray();
+    if (!readable) error = source.errorString();
+    if (!readable || !candidate.load(sourceBytes, &error))
     {
         QMessageBox::warning(
             this, tr("无法打开武功"),
@@ -170,7 +190,9 @@ bool MagicEditorWindow::openFile(const QString& requestedPath)
     }
 
     document = std::move(candidate);
-    filePath = normalized;
+    filePath = logicalPath;
+    loadedSourcePath = sourcePath;
+    loadedBytes = sourceBytes;
     undoStack->clear();
     undoStack->setClean();
     refreshDocumentList();
@@ -181,18 +203,32 @@ bool MagicEditorWindow::openFile(const QString& requestedPath)
 
 bool MagicEditorWindow::saveFile()
 {
-    if (filePath.isEmpty())
+    if (filePath.isEmpty() || !linkedInputsValid())
         return false;
     commitPendingTextEditors();
     QString error;
-    if (!document.saveFile(filePath, &error))
+    bool saved = false;
+    if (!assetsBasePath.isEmpty())
     {
-        QMessageBox::warning(
-            this, tr("保存失败"),
-            tr("无法保存武功文件：\n%1\n\n%2").arg(filePath, error));
+        if (authoringTarget(filePath, error))
+        {
+            DurableFileTransaction transaction(assetsBasePath);
+            saved = EditorSaveConfirmation::prepareBytesWrite(this, transaction, filePath, document.serializedBytes(),
+                loadedSourcePath == filePath, loadedBytes, error) && transaction.commit(error);
+        }
+    }
+    else saved = document.saveFile(filePath, &error);
+    if (!saved)
+    {
+        if (!error.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"),
+                tr("无法保存武功文件：\n%1\n\n%2").arg(filePath, error));
         return false;
     }
     undoStack->setClean();
+    loadedSourcePath = filePath;
+    loadedBytes = document.serializedBytes();
+    refreshDocumentList();
     updateWindowTitle();
     emit documentStatesChanged();
     return true;
@@ -222,7 +258,9 @@ bool MagicEditorWindow::saveAsFile(const QString& requestedPath)
 
 bool MagicEditorWindow::hasUnsavedChanges() const
 {
-    return !undoStack->isClean();
+    return !undoStack->isClean() ||
+        !linkedInputsValid() ||
+        (!filePath.isEmpty() && currentEditorBytes() != document.serializedBytes());
 }
 
 QString MagicEditorWindow::currentFilePath() const
@@ -243,6 +281,7 @@ void MagicEditorWindow::setAssetsBasePath(const QString& path)
         : EditorAssetPath::normalizedAbsolutePath(path);
     refreshDocumentList();
     refreshResourcePreviews();
+    updateActionStates();
 }
 
 void MagicEditorWindow::setDocumentPathValidator(
@@ -266,11 +305,11 @@ MagicEditorWindow::desktopRunDocumentSnapshot() const
     snapshot.filePath = filePath;
     snapshot.type = ProjectDocumentType::Magic;
     snapshot.dirty = hasUnsavedChanges();
-    snapshot.includeInOverlay = snapshot.dirty;
-    snapshot.serializationSupported = !filePath.isEmpty();
-    snapshot.bytes = document.serializedBytes();
+    snapshot.includeInOverlay = snapshot.dirty || (!filePath.isEmpty() && loadedSourcePath != filePath);
+    snapshot.serializationSupported = !filePath.isEmpty() && linkedInputsValid();
+    snapshot.bytes = currentEditorBytes();
     if (!snapshot.serializationSupported)
-        snapshot.diagnosticCode = QStringLiteral("magic.document.unsaved");
+        snapshot.diagnosticCode = filePath.isEmpty() ? QStringLiteral("magic.document.unsaved") : QStringLiteral("magic.linked.invalid_input");
     return snapshot;
 }
 
@@ -401,7 +440,7 @@ void MagicEditorWindow::setupUi()
     documentList->setObjectName(QStringLiteral("magicDocumentList"));
     listLayout->addWidget(documentList, 1);
     auto listHint = new QLabel(
-        tr("双击或按 Enter 打开；已打开的武功会切回原标签。"), listPanel);
+        tr("试玩时按 F6 打开武功栏，右键放入快捷栏，再按 A 施放第一格武功。"), listPanel);
     listHint->setObjectName(QStringLiteral("magicListHint"));
     listHint->setWordWrap(true);
     listLayout->addWidget(listHint);
@@ -415,12 +454,16 @@ void MagicEditorWindow::setupUi()
     fileSummaryLabel = new QLabel(editorPanel);
     fileSummaryLabel->setObjectName(QStringLiteral("magicFileSummaryLabel"));
     fileSummaryLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    fileSummaryLabel->setWordWrap(true);
+    fileSummaryLabel->setMinimumWidth(0);
+    fileSummaryLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     editorLayout->addWidget(fileSummaryLabel);
 
     auto tabs = new QTabWidget(editorPanel);
     tabs->setObjectName(QStringLiteral("magicEditorTabs"));
     tabs->addTab(createOverviewPage(), tr("概览与效果"));
     tabs->addTab(createLevelsPage(), tr("等级参数"));
+    tabs->addTab(createLinkedEffectsPage(), tr("关联触发"));
     editorLayout->addWidget(tabs, 1);
 
     preservationLabel = new QLabel(editorPanel);
@@ -438,14 +481,15 @@ void MagicEditorWindow::setupUi()
 
 void MagicEditorWindow::setupActions()
 {
+    setupAuthoringActions();
     saveAction = toolBar->addAction(tr("保存"));
     saveAction->setObjectName(QStringLiteral("magicSaveAction"));
     saveAction->setShortcut(QKeySequence::Save);
     toolBar->addSeparator();
-    undoAction = undoStack->createUndoAction(this, tr("撤销"));
+    undoAction = new QAction(tr("撤销"), this);
     undoAction->setObjectName(QStringLiteral("magicUndoAction"));
     undoAction->setShortcut(QKeySequence::Undo);
-    redoAction = undoStack->createRedoAction(this, tr("重做"));
+    redoAction = new QAction(tr("重做"), this);
     redoAction->setObjectName(QStringLiteral("magicRedoAction"));
     redoAction->setShortcuts(QKeySequence::keyBindings(QKeySequence::Redo));
     toolBar->addAction(undoAction);
@@ -454,11 +498,30 @@ void MagicEditorWindow::setupActions()
     playtestAction = toolBar->addAction(tr("试玩当前武功"));
     playtestAction->setObjectName(QStringLiteral("magicPlaytestAction"));
     playtestAction->setToolTip(
-        tr("只带入当前武功和所选等级，并以战斗状态进入试玩场景"));
+        tr("带入当前武功和所选等级；F6 打开武功栏，右键放入快捷栏，按 A 施放第一格。"));
+    setupAuthoringMenu();
 }
 
 void MagicEditorWindow::setupConnections()
 {
+    connect(undoAction, &QAction::triggered, this, [this]() { commitPendingTextEditors(); undoStack->undo(); });
+    connect(redoAction, &QAction::triggered, this, [this]() { commitPendingTextEditors(); undoStack->redo(); });
+    connect(undoStack, &QUndoStack::canUndoChanged, this, [this]() { updateActionStates(); });
+    connect(undoStack, &QUndoStack::canRedoChanged, this, [this]() { updateActionStates(); });
+    auto pendingChanged = [this]()
+    {
+        if (refreshing) return;
+        updateWindowTitle();
+        updateActionStates();
+        emit documentStatesChanged();
+    };
+    for (auto* edit : {nameEdit, imageEdit, iconEdit, flyingImageEdit,
+             vanishImageEdit, flyingSoundEdit, vanishSoundEdit, superModeImageEdit,
+             superModeSoundEdit, actionFileEdit, useActionFileEdit, attackFileEdit})
+        connect(edit, &QLineEdit::textChanged, this, pendingChanged);
+    connect(introductionEdit, &QPlainTextEdit::textChanged, this, pendingChanged);
+    for (auto* spin : {speedSpin, waitFrameSpin, lifeFrameSpin, flyingLumSpin, vanishLumSpin})
+        connect(spin->findChild<QLineEdit*>(), &QLineEdit::textChanged, this, pendingChanged);
     connect(saveAction, &QAction::triggered,
         this,
         [this]()
@@ -475,6 +538,12 @@ void MagicEditorWindow::setupConnections()
         });
     connect(searchEdit, &QLineEdit::textChanged,
             this, &MagicEditorWindow::filterDocumentList);
+    connect(documentList, &QListWidget::itemClicked, this,
+        [this](QListWidgetItem* item)
+        {
+            const QString path = item->data(Qt::UserRole).toString();
+            if (path != filePath && !openFile(path)) refreshDocumentList();
+        });
     connect(documentList, &QListWidget::itemActivated, this,
         [this](QListWidgetItem* item)
         {
@@ -524,7 +593,7 @@ QWidget* MagicEditorWindow::createOverviewPage()
 
     auto effectGroup = new QGroupBox(tr("作用方式与范围"), page);
     effectGroup->setObjectName(QStringLiteral("magicEffectGroup"));
-    auto effectLayout = new QHBoxLayout(effectGroup);
+    auto effectLayout = new QVBoxLayout(effectGroup);
     auto effectForm = new QFormLayout();
     moveKindCombo = new QComboBox(effectGroup);
     moveKindCombo->setObjectName(QStringLiteral("magicMoveKindCombo"));
@@ -533,6 +602,7 @@ QWidget* MagicEditorWindow::createOverviewPage()
     previewLevelSpin = new QSpinBox(effectGroup);
     previewLevelSpin->setObjectName(QStringLiteral("magicPreviewLevelSpin"));
     previewLevelSpin->setRange(1, MagicDocument::MaximumLevel);
+    previewLevelSpin->setKeyboardTracking(false);
     previewLevelSpin->setValue(1);
     effectForm->addRow(tr("当前等级"), previewLevelSpin);
     if (QWidget* label = effectForm->labelForField(previewLevelSpin))
@@ -570,6 +640,7 @@ QWidget* MagicEditorWindow::createOverviewPage()
         auto spin = new QSpinBox(appearanceGroup);
         spin->setObjectName(objectName);
         spin->setRange(0, 1000000);
+        spin->setKeyboardTracking(false);
         return spin;
     };
     specialKindCombo = new QComboBox(appearanceGroup);
@@ -618,10 +689,10 @@ QWidget* MagicEditorWindow::createOverviewPage()
     resourcesGroup->setObjectName(QStringLiteral("magicResourcesGroup"));
     auto resourcesLayout = new QGridLayout(resourcesGroup);
     resourcesLayout->addWidget(createResourceCard(
-        tr("技能展示"), MagicTextField::Image, QStringLiteral("magic"),
+        tr("武功列表图片"), MagicTextField::Image, QStringLiteral("magic"),
         imagePreview, imageEdit), 0, 0);
     resourcesLayout->addWidget(createResourceCard(
-        tr("武功图标"), MagicTextField::Icon, QStringLiteral("magic"),
+        tr("快捷栏图标"), MagicTextField::Icon, QStringLiteral("magic"),
         iconPreview, iconEdit), 0, 1);
     resourcesLayout->addWidget(createResourceCard(
         tr("飞行特效"), MagicTextField::FlyingImage, QStringLiteral("effect"),
@@ -639,6 +710,8 @@ QWidget* MagicEditorWindow::createOverviewPage()
     resourcesLayout->addWidget(createSoundRow(
         MagicTextField::SuperModeSound, tr("全屏声音"), superModeSoundEdit), 2, 1);
     layout->addWidget(resourcesGroup);
+    imageEdit->setToolTip(tr("武功列表中显示的图片。留空时游戏中可能没有可见图片。"));
+    iconEdit->setToolTip(tr("放入快捷栏后显示的图标，不影响飞行特效。"));
 
     auto actionGroup = new QGroupBox(tr("施展动作与修炼攻击"), page);
     actionGroup->setObjectName(QStringLiteral("magicActionGroup"));
@@ -766,11 +839,8 @@ QWidget* MagicEditorWindow::createOverviewPage()
             {
                 reference.remove(0, 10);
             }
-            QString targetPath;
-            if (reference.isEmpty() ||
-                !EditorAssetPath::resolveLogicalResourcePath(
-                    assetsBasePath, QStringLiteral("ini/magic/") + reference,
-                    targetPath) || !QFileInfo(targetPath).isFile())
+            const QString targetPath = ContentAuthoring::resolve(assetsBasePath, "ini/magic/" + reference);
+            if (reference.isEmpty() || targetPath.isEmpty())
             {
                 QMessageBox::information(
                     this, tr("无法打开"), tr("关联武功文件不存在或尚未选择。"));
@@ -862,6 +932,69 @@ QWidget* MagicEditorWindow::createResourceCard(
     preview->setMaximumHeight(180);
     preview->setFrameShape(QFrame::StyledPanel);
     layout->addWidget(preview, 1);
+    if (field == MagicTextField::FlyingImage || field == MagicTextField::VanishImage)
+    {
+        auto* playback = preview;
+        auto* play = new QPushButton(card);
+        auto* previous = new QPushButton(tr("上一帧"), card);
+        auto* next = new QPushButton(tr("下一帧"), card);
+        auto* direction = new QComboBox(card);
+        auto* frame = new QSlider(Qt::Horizontal, card);
+        auto* counter = new QLabel(card);
+        play->setObjectName(preview->objectName() + "PlayButton");
+        previous->setObjectName(preview->objectName() + "PreviousButton");
+        next->setObjectName(preview->objectName() + "NextButton");
+        direction->setObjectName(preview->objectName() + "DirectionCombo");
+        frame->setObjectName(preview->objectName() + "FrameSlider");
+        frame->setToolTip(tr("拖动到指定帧，动画会暂停；只影响查看，不修改武功。"));
+        direction->setToolTip(tr("按素材保存顺序选择方向；不修改武功或素材。"));
+        auto* buttons = new QHBoxLayout();
+        buttons->addWidget(play); buttons->addWidget(previous); buttons->addWidget(next);
+        layout->addLayout(buttons);
+        auto* timeline = new QHBoxLayout();
+        timeline->addWidget(direction); timeline->addWidget(frame, 1); timeline->addWidget(counter);
+        layout->addLayout(timeline);
+        auto synchronize = [this, playback, play, previous, next, direction, frame, counter]()
+        {
+            const int count = playback->animationFramesPerDirection();
+            const int directions = playback->animationDirectionCount();
+            const QSignalBlocker blockDirection(direction), blockFrame(frame);
+            if (direction->count() != directions)
+            {
+                direction->clear();
+                for (int index = 0; index < directions; ++index) direction->addItem(tr("方向%1").arg(index + 1));
+            }
+            for (int index = 0; index < directions; ++index) direction->setItemText(index, tr("方向%1").arg(index + 1));
+            previous->setText(tr("上一帧")); next->setText(tr("下一帧"));
+            direction->setCurrentIndex(playback->currentAnimationDirection());
+            direction->setEnabled(directions > 1);
+            play->setText(playback->isAnimationPlaying() ? tr("暂停") : tr("播放"));
+            play->setEnabled(count > 1);
+            previous->setEnabled(count > 1); next->setEnabled(count > 1);
+            frame->setEnabled(count > 1);
+            frame->setRange(0, qMax(0, count - 1));
+            const int local = qMax(0, playback->currentAnimationFrameIndex() - playback->currentAnimationDirection() * count);
+            frame->setValue(local);
+            counter->setText(tr("%1/%2帧").arg(count ? local + 1 : 0).arg(count));
+            counter->setToolTip(tr("当前文件帧编号：%1（从0开始）").arg(playback->currentAnimationFrameIndex()));
+        };
+        connect(playback, &MpcPreviewLabel::animationStateChanged, card, synchronize);
+        connect(&TranslationManager::instance(), &TranslationManager::languageChanged, card, synchronize);
+        connect(play, &QPushButton::clicked, playback, [playback]() { playback->setAnimationPlaying(!playback->isAnimationPlaying()); });
+        connect(previous, &QPushButton::clicked, playback, [playback]()
+        {
+            const int count = playback->animationFramesPerDirection();
+            if (count) playback->seekAnimationFrame((playback->currentAnimationFrameIndex() % count + count - 1) % count);
+        });
+        connect(next, &QPushButton::clicked, playback, [playback]()
+        {
+            const int count = playback->animationFramesPerDirection();
+            if (count) playback->seekAnimationFrame((playback->currentAnimationFrameIndex() + 1) % count);
+        });
+        connect(direction, &QComboBox::currentIndexChanged, playback, &MpcPreviewLabel::setAnimationDirection);
+        connect(frame, &QSlider::valueChanged, playback, &MpcPreviewLabel::seekAnimationFrame);
+        synchronize();
+    }
     auto row = new QHBoxLayout();
     lineEdit = new QLineEdit(card);
     lineEdit->setObjectName(
@@ -935,7 +1068,7 @@ bool MagicEditorWindow::loadDocumentBytes(const QByteArray& bytes)
 void MagicEditorWindow::pushTextChange(
     MagicTextField field, const QString& value, const QString& description)
 {
-    if (refreshing || filePath.isEmpty() || document.text(field) == value)
+    if (refreshing || filePath.isEmpty() || !linkedInputsValid() || document.text(field) == value)
         return;
     const QByteArray before = document.serializedBytes();
     document.setText(field, value);
@@ -947,7 +1080,7 @@ void MagicEditorWindow::pushTextChange(
 void MagicEditorWindow::pushIntegerChange(
     MagicIntegerField field, int level, int value, const QString& description)
 {
-    if (refreshing || filePath.isEmpty() ||
+    if (refreshing || filePath.isEmpty() || !linkedInputsValid() ||
         (document.hasIntegerOverride(field, level) &&
          document.effectiveInteger(field, level) == value))
     {
@@ -972,14 +1105,14 @@ void MagicEditorWindow::pushSnapshotChange(
         description));
 }
 
-void MagicEditorWindow::commitPendingTextEditors()
+QByteArray MagicEditorWindow::currentEditorBytes() const
 {
     if (refreshing || filePath.isEmpty())
-        return;
+        return document.serializedBytes();
 
-    const QByteArray before = document.serializedBytes();
-    document.setText(MagicTextField::Name, nameEdit->text());
-    document.setText(MagicTextField::Introduction,
+    MagicDocument pending = document;
+    pending.setText(MagicTextField::Name, nameEdit->text());
+    pending.setText(MagicTextField::Introduction,
                      introductionEdit->toPlainText());
     for (MagicTextField field : {
              MagicTextField::Image, MagicTextField::Icon,
@@ -990,13 +1123,43 @@ void MagicEditorWindow::commitPendingTextEditors()
              MagicTextField::AttackFile})
     {
         if (QLineEdit* edit = lineEditForField(field))
-            document.setText(field, edit->text());
+            pending.setText(field, edit->text());
     }
-    const QByteArray after = document.serializedBytes();
+    for (const auto& entry : {
+             std::make_pair(speedSpin, MagicIntegerField::Speed),
+             std::make_pair(waitFrameSpin, MagicIntegerField::WaitFrame),
+             std::make_pair(lifeFrameSpin, MagicIntegerField::LifeFrame),
+             std::make_pair(flyingLumSpin, MagicIntegerField::FlyingLum),
+             std::make_pair(vanishLumSpin, MagicIntegerField::VanishLum)})
+    {
+        bool valid = false;
+        const int value = entry.first->cleanText().toInt(&valid);
+        if (valid && entry.first->hasAcceptableInput() &&
+            pending.effectiveInteger(entry.second, selectedLevel()) != value)
+            pending.setInteger(entry.second, selectedLevel(), value);
+    }
+    for (const auto& entry : {
+             std::make_pair(moveKindCombo, MagicIntegerField::MoveKind),
+             std::make_pair(regionCombo, MagicIntegerField::Region),
+             std::make_pair(specialKindCombo, MagicIntegerField::SpecialKind),
+             std::make_pair(alphaBlendCombo, MagicIntegerField::AlphaBlend)})
+    {
+        if (entry.first->currentIndex() >= 0 && pending.effectiveInteger(entry.second, selectedLevel()) != entry.first->currentData().toInt())
+            pending.setInteger(entry.second, selectedLevel(), entry.first->currentData().toInt());
+    }
+    appendLinkedEdits(pending);
+    return pending.serializedBytes();
+}
+
+void MagicEditorWindow::commitPendingTextEditors()
+{
+    if (refreshing || filePath.isEmpty() || !linkedInputsValid())
+        return;
+    const QByteArray before = document.serializedBytes();
+    const QByteArray after = currentEditorBytes();
     if (before == after)
         return;
 
-    loadDocumentBytes(before);
     pushSnapshotChange(before, after, tr("修改武功内容"));
 }
 
@@ -1022,6 +1185,7 @@ void MagicEditorWindow::refreshFromDocument()
             edit->setText(document.text(field));
     }
     refreshing = false;
+    refreshLinkedEffects();
     refreshLevelTable();
     refreshLevelEffectControls();
     refreshRangePreview();
@@ -1030,8 +1194,8 @@ void MagicEditorWindow::refreshFromDocument()
     updateActionStates();
     fileSummaryLabel->setText(
         filePath.isEmpty()
-        ? tr("从左侧列表或项目树打开一个武功文件。")
-        : tr("正在编辑：%1").arg(QDir::toNativeSeparators(filePath)));
+        ? tr("点击“新建”开始创作，或从左侧选择已有武功。")
+        : tr("当前武功：%1（%2）").arg(displayName(), ContentAuthoring::referenceName(ContentKind::Magic, assetsBasePath, filePath)));
     preservationLabel->setText(
         filePath.isEmpty()
         ? QString()
@@ -1215,6 +1379,7 @@ void MagicEditorWindow::refreshResourcePreviews()
         const QString reference = document.text(entry.field).trimmed();
         if (reference.isEmpty())
         {
+            label->setProperty("animationSourceSignature", QVariant());
             label->clearImage(tr("未设置"));
             continue;
         }
@@ -1224,20 +1389,28 @@ void MagicEditorWindow::refreshResourcePreviews()
         {
             AssetAnimationPreviewData animation;
             AssetPreviewData preview;
+            const QString resolved = ContentAuthoring::resolve(assetsBasePath, candidate);
+            if (resolved.isEmpty()) continue;
+            const QFileInfo source(resolved);
             const bool previewLoaded = entry.animated
                 ? AssetPreviewLoader::loadAnimation(
-                      assetsBasePath, candidate, &animation)
+                      source.path(), source.fileName(), &animation)
                 : AssetPreviewLoader::load(
-                      assetsBasePath, candidate, &preview);
+                      source.path(), source.fileName(), &preview);
             if (entry.animated)
                 preview = animation.preview;
             if (previewLoaded && preview.kind == AssetPreviewKind::Image)
             {
                 if (entry.animated)
                 {
-                    label->setSourceAnimation(
-                        animation.frames, preview.directions,
-                        preview.intervalMilliseconds);
+                    const QString signature = QString("%1:%2:%3").arg(resolved)
+                        .arg(source.size()).arg(source.lastModified().toMSecsSinceEpoch());
+                    if (label->property("animationSourceSignature").toString() != signature ||
+                        label->animationFramesPerDirection() == 0)
+                    {
+                        label->setSourceAnimation(animation.frames, preview.directions, preview.intervalMilliseconds);
+                        label->setProperty("animationSourceSignature", signature);
+                    }
                 }
                 else
                 {
@@ -1255,6 +1428,7 @@ void MagicEditorWindow::refreshResourcePreviews()
         }
         if (!loaded)
         {
+            label->setProperty("animationSourceSignature", QVariant());
             label->clearImage(tr("未找到预览\n可继续保存引用"));
             label->setToolTip(reference);
         }
@@ -1269,11 +1443,8 @@ void MagicEditorWindow::refreshAttackFileChoices()
     const QSignalBlocker blocker(attackFileCombo);
     attackFileCombo->clear();
     attackFileCombo->addItem(QString());
-    const QDir directory(QDir(assetsBasePath).filePath(QStringLiteral("ini/magic")));
-    const QFileInfoList files = directory.entryInfoList(
-        {QStringLiteral("*.ini")}, QDir::Files | QDir::Readable, QDir::Name);
-    for (const QFileInfo& info : files)
-        attackFileCombo->addItem(info.fileName());
+    for (const auto& entry : ContentAuthoring::resources(ContentKind::Magic, assetsBasePath))
+        attackFileCombo->addItem(entry.fileName);
     attackFileCombo->setCurrentText(currentText);
 }
 
@@ -1281,24 +1452,14 @@ void MagicEditorWindow::refreshDocumentList()
 {
     const QString selectedPath = filePath;
     documentList->clear();
-    const QDir directory(QDir(assetsBasePath).filePath(QStringLiteral("ini/magic")));
-    const QFileInfoList files = directory.entryInfoList(
-        {QStringLiteral("*.ini")}, QDir::Files | QDir::Readable, QDir::Name);
-    for (const QFileInfo& info : files)
+    for (const auto& entry : ContentAuthoring::resources(ContentKind::Magic, assetsBasePath))
     {
-        MagicDocument candidate;
-        QString name;
-        if (candidate.openFile(info.absoluteFilePath()))
-            name = candidate.text(MagicTextField::Name).trimmed();
+        const QString path = QDir(assetsBasePath).filePath("ini/magic/" + entry.fileName);
         auto item = new QListWidgetItem(
-            name.isEmpty()
-            ? info.completeBaseName()
-            : tr("%1\n%2").arg(name, info.fileName()),
+            entry.name.isEmpty() ? entry.fileName : tr("%1\n%2").arg(entry.name, entry.fileName),
             documentList);
-        item->setData(Qt::UserRole,
-                      EditorAssetPath::normalizedAbsolutePath(info.absoluteFilePath()));
-        item->setToolTip(info.absoluteFilePath());
-        if (ProjectDocumentRegistry::documentPathKey(info.absoluteFilePath()) ==
+        item->setData(Qt::UserRole, EditorAssetPath::normalizedAbsolutePath(path));
+        if (ProjectDocumentRegistry::documentPathKey(path) ==
             ProjectDocumentRegistry::documentPathKey(selectedPath))
         {
             documentList->setCurrentItem(item);
@@ -1332,8 +1493,20 @@ void MagicEditorWindow::updateWindowTitle()
 void MagicEditorWindow::updateActionStates()
 {
     const bool opened = !filePath.isEmpty();
+    if (auto* tabs = findChild<QTabWidget*>(QStringLiteral("magicEditorTabs")))
+        tabs->setEnabled(opened);
     saveAction->setEnabled(opened && hasUnsavedChanges());
+    const bool pending = currentEditorBytes() != document.serializedBytes();
+    undoAction->setEnabled(undoStack->canUndo() || pending);
+    redoAction->setEnabled(undoStack->canRedo() && !pending);
     playtestAction->setEnabled(opened);
+    newAction->setEnabled(QFileInfo(assetsBasePath).isDir());
+    duplicateAction->setEnabled(opened);
+    referencesAction->setEnabled(opened);
+    learningScriptAction->setEnabled(opened);
+    const bool localFile = opened && loadedSourcePath == filePath && QFileInfo(filePath).isFile();
+    renameAction->setEnabled(localFile);
+    deleteAction->setEnabled(localFile);
 }
 
 bool MagicEditorWindow::confirmSaveIfModified()
@@ -1366,13 +1539,14 @@ void MagicEditorWindow::browseResource(
                    QStringLiteral("mpc/%1").arg(category)};
     }
     QString initialDirectory;
-    for (const QString& folder : folders)
+    const auto roots = ResourcePackScanner::resolveContentRoots(assetsBasePath).roots;
+    for (const auto& root : roots)
     {
-        const QString candidate = QDir(assetsBasePath).filePath(folder);
-        if (QDir(candidate).exists())
+        for (const QString& folder : folders)
         {
-            initialDirectory = candidate;
-            break;
+            const QString candidate = QDir(root.rootPath).filePath(folder);
+            if (initialDirectory.isEmpty() && QDir(candidate).exists())
+                initialDirectory = candidate;
         }
     }
     const QString selected = QFileDialog::getOpenFileName(
@@ -1381,13 +1555,22 @@ void MagicEditorWindow::browseResource(
         return;
     QString reference;
     QStringList absoluteFolders;
-    for (const QString& folder : folders)
-        absoluteFolders.append(QDir(assetsBasePath).filePath(folder));
-    if (!FilePickerHelper::makeResourceReference(
-            assetsBasePath, absoluteFolders, selected, reference))
+    bool valid = false;
+    for (const auto& root : roots)
+    {
+        absoluteFolders.clear();
+        for (const QString& folder : folders)
+            absoluteFolders.append(QDir(root.rootPath).filePath(folder));
+        if (FilePickerHelper::makeResourceReference(root.rootPath, absoluteFolders, selected, reference))
+        {
+            valid = true;
+            break;
+        }
+    }
+    if (!valid)
     {
         QMessageBox::warning(this, tr("无法选择资源"),
-                             tr("请选择当前项目对应资源目录中的文件。"));
+                             tr("请选择当前项目可用的资源文件。"));
         return;
     }
     pushTextChange(field, reference, tr("修改资源引用"));
@@ -1456,20 +1639,10 @@ QString MagicEditorWindow::resolveSoundPath(const QString& reference) const
         return {};
     if (normalized.startsWith(QStringLiteral("sound/"), Qt::CaseInsensitive))
         normalized.remove(0, 6);
-    QString absolutePath;
-    if (!EditorAssetPath::resolveLogicalResourcePath(
-            assetsBasePath, QStringLiteral("sound/") + normalized,
-            absolutePath))
-    {
-        return {};
-    }
-    if (!QFileInfo(absolutePath).isFile() && QFileInfo(normalized).suffix().isEmpty())
-    {
-        EditorAssetPath::resolveLogicalResourcePath(
-            assetsBasePath, QStringLiteral("sound/") + normalized +
-                QStringLiteral(".wav"), absolutePath);
-    }
-    return QFileInfo(absolutePath).isFile() ? absolutePath : QString();
+    QString absolutePath = ContentAuthoring::resolve(assetsBasePath, "sound/" + normalized);
+    if (absolutePath.isEmpty() && QFileInfo(normalized).suffix().isEmpty())
+        absolutePath = ContentAuthoring::resolve(assetsBasePath, "sound/" + normalized + ".wav");
+    return absolutePath;
 }
 
 MpcPreviewLabel* MagicEditorWindow::previewForField(MagicTextField field) const
@@ -1513,6 +1686,7 @@ int MagicEditorWindow::selectedLevel() const
 
 void MagicEditorWindow::retranslateDynamicUi()
 {
+    retranslateAuthoringActions();
     const bool previouslyRefreshing = refreshing;
     refreshing = true;
     const int currentMoveKind = moveKindCombo ? moveKindCombo->currentData().toInt() : 1;
@@ -1562,20 +1736,22 @@ void MagicEditorWindow::retranslateDynamicUi()
     {
         playtestAction->setText(tr("试玩当前武功"));
         playtestAction->setToolTip(
-            tr("只带入当前武功和所选等级，并以战斗状态进入试玩场景"));
+            tr("带入当前武功和所选等级；F6 打开武功栏，右键放入快捷栏，按 A 施放第一格。"));
     }
     if (QLabel* label = findChild<QLabel*>(QStringLiteral("magicListTitle")))
         label->setText(tr("武功列表"));
     if (QLabel* label = findChild<QLabel*>(QStringLiteral("magicListHint")))
     {
-        label->setText(tr("双击或按 Enter 打开；已打开的武功会切回原标签。"));
+        label->setText(tr("试玩时按 F6 打开武功栏，右键放入快捷栏，再按 A 施放第一格武功。"));
     }
     if (QTabWidget* tabs =
             findChild<QTabWidget*>(QStringLiteral("magicEditorTabs")))
     {
         tabs->setTabText(0, tr("概览与效果"));
         tabs->setTabText(1, tr("等级参数"));
+        tabs->setTabText(2, tr("关联触发"));
     }
+    retranslateLinkedEffects();
     if (QGroupBox* group =
             findChild<QGroupBox*>(QStringLiteral("magicIdentityGroup")))
     {
@@ -1653,8 +1829,8 @@ void MagicEditorWindow::retranslateDynamicUi()
     {
         switch (field)
         {
-        case MagicTextField::Image: return tr("技能展示");
-        case MagicTextField::Icon: return tr("武功图标");
+        case MagicTextField::Image: return tr("武功列表图片");
+        case MagicTextField::Icon: return tr("快捷栏图标");
         case MagicTextField::FlyingImage: return tr("飞行特效");
         case MagicTextField::VanishImage: return tr("命中特效");
         case MagicTextField::FlyingSound: return tr("施放声音");
@@ -1726,8 +1902,8 @@ void MagicEditorWindow::retranslateDynamicUi()
     {
         fileSummaryLabel->setText(
             filePath.isEmpty()
-            ? tr("从左侧列表或项目树打开一个武功文件。")
-            : tr("正在编辑：%1").arg(QDir::toNativeSeparators(filePath)));
+            ? tr("点击“新建”开始创作，或从左侧选择已有武功。")
+            : tr("当前武功：%1（%2）").arg(displayName(), ContentAuthoring::referenceName(ContentKind::Magic, assetsBasePath, filePath)));
     }
     if (preservationLabel)
     {

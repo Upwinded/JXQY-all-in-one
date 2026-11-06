@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <iostream>
 #include <vector>
 
 namespace
@@ -358,6 +359,20 @@ bool GambleMenu::loadDiceResourceLayout()
 		return false;
 	}
 
+	diceLayout.values.clear();
+	for (const auto& role : DiceGameLayout::roles())
+	{
+		for (const auto& field : DiceGameLayout::fields(role))
+		{
+			const auto key = DiceGameLayout::key(role, field);
+			const auto slash = key.find('/');
+			const auto value = ini.Get(key.substr(0, slash), key.substr(slash + 1), "");
+			diceLayout.values[key] = value;
+			if (!DiceGameLayout::valid(field, value))
+				std::cerr << "[DiceGame] invalid display field " << key << "; using default\n";
+		}
+	}
+
 	auto loadImage = [&ini, this](const std::string& section, const std::string& key)
 	{
 		std::string path = ini.Get(section, key, "");
@@ -674,12 +689,13 @@ void GambleMenu::updateResourceLayout()
 
 Rect GambleMenu::scaleDiceRect(const Rect& sourceRect) const
 {
-	return {
-		diceWindowRect.x + static_cast<int>(std::round(sourceRect.x * diceScale)),
-		diceWindowRect.y + static_cast<int>(std::round(sourceRect.y * diceScale)),
-		std::max(1, static_cast<int>(std::round(sourceRect.w * diceScale))),
-		std::max(1, static_cast<int>(std::round(sourceRect.h * diceScale))),
+	const auto scaled = [this](int value, int offset)
+	{
+		return static_cast<int>(std::clamp(static_cast<double>(std::round(value * diceScale)) + offset,
+			static_cast<double>(INT_MIN), static_cast<double>(INT_MAX)));
 	};
+	return {scaled(sourceRect.x, diceWindowRect.x), scaled(sourceRect.y, diceWindowRect.y),
+		std::max(1, scaled(sourceRect.w, 0)), std::max(1, scaled(sourceRect.h, 0))};
 }
 
 void GambleMenu::updateDiceLayout()
@@ -700,20 +716,16 @@ void GambleMenu::updateDiceLayout()
 	diceWindowRect.x = (windowWidth - diceWindowRect.w) / 2;
 	diceWindowRect.y = (windowHeight - diceWindowRect.h) / 2;
 
-	diceStartButton->rect = scaleDiceRect({ 443, 263, 82, 28 });
-	diceAddMoneyButton->rect = scaleDiceRect({ 351, 263, 82, 28 });
-	diceOpenButton->rect = scaleDiceRect({ 260, 262, 82, 29 });
-	diceCloseButton->rect = scaleDiceRect({ 521, 4, 24, 24 });
+	diceStartButton->rect = scaleDiceRect(diceLayout.rectangle("Start", miniGameRules));
+	diceAddMoneyButton->rect = scaleDiceRect(diceLayout.rectangle("Bet", miniGameRules));
+	diceOpenButton->rect = scaleDiceRect(diceLayout.rectangle("Open", miniGameRules));
+	diceCloseButton->rect = scaleDiceRect(diceLayout.rectangle("Close", miniGameRules));
 	if (miniGameRules)
 	{
-		diceStartButton->rect = scaleDiceRect({ 443, 247, 82, 44 });
-		diceAddMoneyButton->rect = scaleDiceRect({ 351, 247, 82, 44 });
-		diceOpenButton->rect = scaleDiceRect({ 260, 247, 82, 44 });
-		diceCloseButton->rect = scaleDiceRect({ 505, 0, 44, 44 });
 		for (const auto& button : { diceStartButton, diceAddMoneyButton, diceOpenButton, diceCloseButton })
 		{
-			button->rect.w = std::max(44, button->rect.w);
-			button->rect.h = std::max(44, button->rect.h);
+			button->rect.w = std::min(diceWindowRect.w, std::max(44, button->rect.w));
+			button->rect.h = std::min(diceWindowRect.h, std::max(44, button->rect.h));
 			button->rect.x = std::clamp(button->rect.x, diceWindowRect.x,
 				diceWindowRect.x + diceWindowRect.w - button->rect.w);
 			button->rect.y = std::clamp(button->rect.y, diceWindowRect.y,
@@ -1996,23 +2008,21 @@ void GambleMenu::drawDiceImage(const _shared_image& image, const Rect& sourceLay
 void GambleMenu::drawDiceGame()
 {
 	updateDiceLayout();
-	drawDiceImage(diceFrameImage, { 0, 0, 549, 300 });
-	drawDiceImage(dicePlayerTalkImage, { 84, 51, 180, 61 });
-	drawDiceImage(diceNpcTalkImage, { 295, 51, 180, 61 });
-	drawDiceImage(diceNameplateImage, { 15, 167, 167, 37 });
-	drawDiceImage(diceNameplateImage, { 369, 170, 167, 37 });
-	drawDiceImage(dicePlayerPortraitImage, { 16, 48, 70, 70 });
-	drawDiceImage(diceNpcPortraitImage, { 460, 46, 70, 70 });
-	drawDiceImage(diceSilverImage, { 15, 273, 18, 11 });
+	drawDiceImage(diceFrameImage, diceLayout.rectangle("Frame"));
+	drawDiceImage(dicePlayerTalkImage, diceLayout.rectangle("PlayerTalk"));
+	drawDiceImage(diceNpcTalkImage, diceLayout.rectangle("NpcTalk"));
+	drawDiceImage(diceNameplateImage, diceLayout.rectangle("PlayerTray"));
+	drawDiceImage(diceNameplateImage, diceLayout.rectangle("NpcTray"));
+	drawDiceImage(dicePlayerPortraitImage, diceLayout.rectangle("PlayerPortrait"));
+	drawDiceImage(diceNpcPortraitImage, diceLayout.rectangle("NpcPortrait"));
+	drawDiceImage(diceSilverImage, diceLayout.rectangle("Silver"));
 
-	const std::array<int, DiceGambleState::DiceCount> playerX = { 35, 81, 127 };
-	const std::array<int, DiceGambleState::DiceCount> npcX = { 388, 434, 480 };
 	for (int index = 0; index < DiceGambleState::DiceCount; index++)
 	{
 		int playerFace = diceState.displayedFace(true, index);
 		int npcFace = diceState.displayedFace(false, index);
-		drawDiceImage(diceFaceImages[playerFace - 1], { playerX[index], 167, 37, 37 });
-		drawDiceImage(diceFaceImages[npcFace - 1], { npcX[index], 169, 37, 37 });
+		drawDiceImage(diceFaceImages[playerFace - 1], diceLayout.rectangle("PlayerDice" + std::to_string(index + 1)));
+		drawDiceImage(diceFaceImages[npcFace - 1], diceLayout.rectangle("NpcDice" + std::to_string(index + 1)));
 	}
 
 	if (diceState.phase() == DiceGambleState::Phase::WaitingForBet
@@ -2027,44 +2037,46 @@ void GambleMenu::drawDiceGame()
 		{
 			resultIndex = 1;
 		}
-		drawDiceImage(diceResultImages[resultIndex], { 222, 133, 106, 106 });
+		drawDiceImage(diceResultImages[resultIndex], diceLayout.rectangle(
+			resultIndex == 0 ? "ResultWin" : resultIndex == 1 ? "ResultLose" : "ResultTie"));
 	}
 	else
 	{
-		drawDiceImage(diceVersusImage, { 218, 151, 120, 74 });
+		drawDiceImage(diceVersusImage, diceLayout.rectangle("Versus"));
 	}
 
 	int fontSize = std::max(10, static_cast<int>(std::round(12 * diceScale)));
-	int titleSize = std::max(13, static_cast<int>(std::round(18 * diceScale)));
-	Rect titleRect = scaleDiceRect({ 0, 2, 549, 29 });
+	int titleSize = diceLayout.font("Title", diceScale);
+	Rect titleRect = scaleDiceRect(diceLayout.rectangle("Title"));
 	diceTitleTextTexture.draw(engine, "骰子",
-		titleRect.x + titleRect.w / 2 - titleSize,
-		titleRect.y + std::max(1, static_cast<int>(3 * diceScale)), titleSize, 0xFFFFFFFF);
-	diceCloseTextTexture.draw(engine, "×", scaleDiceRect({ 525, 5, 18, 20 }).x,
-		scaleDiceRect({ 525, 5, 18, 20 }).y, titleSize, 0xFFFFFFFF);
+		titleRect.x + diceWindowRect.w / 2 - titleSize,
+		titleRect.y + std::max(1, static_cast<int>(3 * diceScale)), titleSize, diceLayout.tint("Title"));
+	diceCloseTextTexture.draw(engine, "×", scaleDiceRect(diceLayout.rectangle("CloseSymbol")).x,
+		scaleDiceRect(diceLayout.rectangle("CloseSymbol")).y, diceLayout.font("CloseSymbol", diceScale), diceLayout.tint("CloseSymbol"));
 	std::string playerName = gm != nullptr && gm->player != nullptr && !gm->player->npcName.empty()
 		? gm->player->npcName : "玩家";
 	std::string npcName = displayName.empty() ? "庄家" : displayName;
-	Rect playerNameRect = scaleDiceRect({ 17, 100, 75, 19 });
-	Rect npcNameRect = scaleDiceRect({ 471, 100, 60, 19 });
+	Rect playerNameRect = scaleDiceRect(diceLayout.rectangle("PlayerName"));
+	Rect npcNameRect = scaleDiceRect(diceLayout.rectangle("NpcName"));
 	dicePlayerNameTextTexture.draw(
 		engine, playerName, playerNameRect.x, playerNameRect.y,
-		fontSize, 0xFF333333);
+		diceLayout.font("PlayerName", diceScale), diceLayout.tint("PlayerName"));
 	diceNpcNameTextTexture.draw(
 		engine, npcName, npcNameRect.x, npcNameRect.y,
-		fontSize, 0xFF333333);
+		diceLayout.font("NpcName", diceScale), diceLayout.tint("NpcName"));
 
-	auto drawWrappedTalk = [this, fontSize](
+	auto drawWrappedTalk = [this](
 		const std::string& talk,
-		const Rect& layoutRect,
+		const std::string& role,
 		std::vector<CachedTextTexture>& textTextures)
 	{
-		Rect talkRect = scaleDiceRect(layoutRect);
+		Rect talkRect = scaleDiceRect(diceLayout.rectangle(role));
+		const int fontSize = diceLayout.font(role, diceScale);
 		int charactersPerLine = TextLayout::charactersPerLineForWidth(talkRect.w, fontSize);
 		auto lines = TextLayout::wrapUtf8Text(talk, charactersPerLine);
-		int lineGap = std::max(1, static_cast<int>(3 * diceScale));
-		int lineHeight = fontSize + lineGap;
-		int maximumLines = std::max(1, (talkRect.h + lineGap) / lineHeight);
+		int lineGap = std::max(1, static_cast<int>(diceLayout.number(role, "LineGap", 3) * static_cast<double>(diceScale)));
+		const long long lineHeight = static_cast<long long>(fontSize) + lineGap;
+		int maximumLines = static_cast<int>(std::max(1LL, (static_cast<long long>(talkRect.h) + lineGap) / lineHeight));
 		const int visibleLineCount = std::min(
 			maximumLines, static_cast<int>(lines.size()));
 		textTextures.resize(static_cast<std::size_t>(visibleLineCount));
@@ -2072,22 +2084,22 @@ void GambleMenu::drawDiceGame()
 		{
 			textTextures[static_cast<std::size_t>(index)].draw(
 				engine, lines[static_cast<std::size_t>(index)],
-				talkRect.x, talkRect.y + index * lineHeight,
-				fontSize, 0xFF666666);
+				talkRect.x, talkRect.y + static_cast<int>(index * lineHeight),
+				fontSize, diceLayout.tint(role));
 		}
 	};
 	drawWrappedTalk(
-		dicePlayerTalk, { 100, 60, 153, 42 }, diceTalkTextTextures[0]);
+		dicePlayerTalk, "PlayerText", diceTalkTextTextures[0]);
 	drawWrappedTalk(
-		diceNpcTalk, { 308, 60, 153, 42 }, diceTalkTextTextures[1]);
-	Rect betRect = scaleDiceRect({ 36, 267, 85, 19 });
+		diceNpcTalk, "NpcText", diceTalkTextTextures[1]);
+	Rect betRect = scaleDiceRect(diceLayout.rectangle("Stake"));
 	const std::string moneyText = miniGameRules && gm != nullptr && gm->player != nullptr
 		? "银两 " + std::to_string(gm->player->money) + "  庄家 " + std::to_string(diceState.npcMoney())
 			+ "  注 " + std::to_string(diceState.stake())
 		: std::to_string(diceState.stake());
 	diceStakeTextTexture.draw(
 		engine, moneyText, betRect.x, betRect.y,
-		fontSize, 0xFFFFFFFF);
+		diceLayout.font("Stake", diceScale), diceLayout.tint("Stake"));
 
 	auto drawButton = [this, fontSize](
 		const std::shared_ptr<Button>& button,

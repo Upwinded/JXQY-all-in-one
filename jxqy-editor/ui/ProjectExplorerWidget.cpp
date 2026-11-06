@@ -34,6 +34,7 @@ ProjectExplorerWidget::ProjectExplorerWidget(QWidget* parent)
     filesLayout->addWidget(m_emptyProjectLabel, 1);
     m_assetBrowser = new AssetBrowser(filesPage);
     m_assetBrowser->setObjectName(QStringLiteral("projectFileBrowser"));
+    m_assetBrowser->enableProjectResourceSearch();
     filesLayout->addWidget(m_assetBrowser, 1);
 
     m_documentTree = new QTreeWidget(m_tabs);
@@ -50,6 +51,8 @@ ProjectExplorerWidget::ProjectExplorerWidget(QWidget* parent)
 
     connect(m_assetBrowser, &AssetBrowser::fileDoubleClicked,
         this, &ProjectExplorerWidget::onRelativeFileDoubleClicked);
+    connect(m_assetBrowser, &AssetBrowser::resolvedFileOpenRequested,
+        this, &ProjectExplorerWidget::fileOpenRequested);
     connect(m_documentTree, &QTreeWidget::itemDoubleClicked,
         this, &ProjectExplorerWidget::onDocumentItemDoubleClicked);
 
@@ -81,6 +84,12 @@ void ProjectExplorerWidget::setDocuments(
     rebuildDocumentItems();
 }
 
+void ProjectExplorerWidget::revealFile(const QString& path)
+{
+    if (!m_contentRoot.isEmpty() && EditorAssetPath::isLexicallyInside(m_contentRoot, path))
+        m_assetBrowser->revealRelativePath(QDir(m_contentRoot).relativeFilePath(path));
+}
+
 void ProjectExplorerWidget::changeEvent(QEvent* event)
 {
     if (event->type() == QEvent::LanguageChange)
@@ -93,7 +102,7 @@ void ProjectExplorerWidget::retranslateUi()
     m_tabs->setTabText(0, tr("项目文件"));
     m_tabs->setTabText(1, tr("已打开文档"));
     m_emptyProjectLabel->setText(
-        tr("请先打开项目并配置可编辑资源目录。"));
+        tr("打开项目后自动载入项目资源。新项目请先选择要编辑的资源包。"));
     m_documentTree->setHeaderLabels(
         {tr("文档"), tr("类型"), tr("状态")});
     rebuildDocumentItems();

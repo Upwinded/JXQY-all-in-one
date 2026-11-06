@@ -1,12 +1,14 @@
 #include "EditorSettings.h"
 
 #include <QCoreApplication>
+#include <QDebug>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QLockFile>
 #include <QSaveFile>
 #include <QStandardPaths>
+#include <QThread>
 
 namespace
 {
@@ -412,6 +414,48 @@ QSettings EditorSettings::create()
     return QSettings(path, QSettings::IniFormat);
 }
 
+bool EditorSettings::setValueIfChanged(
+    QSettings& settings, const QString& key, const QVariant& value)
+{
+    if (settings.contains(key) && settings.value(key) == value)
+        return false;
+    settings.setValue(key, value);
+    return true;
+}
+
+EditorSettings::SynchronizationResult EditorSettings::synchronize(QSettings& settings)
+{
+    const QSettings::Status previousStatus = settings.status();
+    settings.setAtomicSyncRequired(true);
+    settings.sync();
+    SynchronizationResult result;
+    result.status = settings.status();
+    result.firstError = result.status;
+    if (result.succeeded())
+        return result;
+
+    qWarning().noquote() << "Editor settings sync failed:" << settings.fileName()
+        << "status" << result.status << "previous status" << previousStatus;
+    if (result.status == QSettings::AccessError && settings.format() == QSettings::IniFormat)
+    {
+        for (unsigned long delay : {20UL, 50UL, 100UL})
+        {
+            QThread::msleep(delay);
+            // The INI constructor retries shared pending changes with a fresh status;
+            // the original object's status retains its first error even after recovery.
+            QSettings retry(settings.fileName(), QSettings::IniFormat);
+            ++result.attempts;
+            result.status = retry.status();
+            if (result.status != QSettings::AccessError)
+                break;
+        }
+    }
+    qWarning().noquote() << "Editor settings sync result:" << settings.fileName()
+        << "status" << result.status << "first error" << result.firstError
+        << "attempts" << result.attempts;
+    return result;
+}
+
 EditorSettings::DesktopExecutableValidation
 EditorSettings::validateDesktopGameExecutable(
     const QString& selectedPath)
@@ -540,9 +584,8 @@ bool EditorSettings::writeDesktopGameExecutable(
         QString::fromLatin1(DesktopGameExecutableKey);
     const bool hadPreviousValue = settings.contains(key);
     const QVariant previousValue = settings.value(key);
-    settings.setValue(key, validation.executablePath);
-    settings.sync();
-    if (settings.status() == QSettings::NoError &&
+    setValueIfChanged(settings, key, validation.executablePath);
+    if (synchronize(settings).succeeded() &&
         settings.value(key).toString() ==
             validation.executablePath)
     {
@@ -550,10 +593,10 @@ bool EditorSettings::writeDesktopGameExecutable(
     }
 
     if (hadPreviousValue)
-        settings.setValue(key, previousValue);
+        setValueIfChanged(settings, key, previousValue);
     else
         settings.remove(key);
-    settings.sync();
+    synchronize(settings);
     if (errorMessage)
     {
         *errorMessage =

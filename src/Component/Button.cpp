@@ -105,10 +105,19 @@ void Button::onDraw()
 {
 	if (flat)
 	{
-		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 171, 146, 93, 255);
+		const auto fill = [this](int x, int y, int width, int height, unsigned int color)
+		{
+			engine->fillRect(x, y, width, height,
+				(color >> 16) & 255, (color >> 8) & 255, color & 255, (color >> 24) & 255);
+		};
+		fill(rect.x, rect.y, rect.w, rect.h, flatBorderColor);
 		if (rect.w > 2 && rect.h > 2)
 		{
-			engine->fillRect(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, 44, 84, 70, 255);
+			const bool pressed = touchingDownID != TOUCH_UNTOUCHEDID
+				|| (dragging != TOUCH_UNTOUCHEDID && currentDragItem == getMySharedPtr());
+			const unsigned int color = pressed ? flatPressedBackgroundColor
+				: (touchingID != TOUCH_UNTOUCHEDID || isFocused()) ? flatHoverBackgroundColor : flatBackgroundColor;
+			fill(rect.x + 1, rect.y + 1, rect.w - 2, rect.h - 2, color);
 		}
 		drawFocusBorder();
 		return;
@@ -199,6 +208,10 @@ void Button::initFromIni(INIReader & ini)
 	animateFrames = false;
 	hoverSoundEnabled = ini.GetBoolean("Init", "HoverSound", true);
 	flat = ini.GetBoolean("Init", "Flat", false);
+	flatBackgroundColor = ini.GetColor("Init", "BackgroundColor", 0xFF2C5446);
+	flatHoverBackgroundColor = ini.GetColor("Init", "HoverBackgroundColor", flatBackgroundColor);
+	flatPressedBackgroundColor = ini.GetColor("Init", "PressedBackgroundColor", flatBackgroundColor);
+	flatBorderColor = ini.GetColor("Init", "BorderColor", 0xFFAB925D);
 	kind = ini.Get("Init", "Kind", kind);
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);

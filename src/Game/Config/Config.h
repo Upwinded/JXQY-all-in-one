@@ -25,6 +25,7 @@ public:
 	static bool useQingyuUi;
 	static bool automaticSaveEnabled;
 	static int experienceMultiplier;
+	static std::string fontId;
 
 	static void load();
 	static void save();

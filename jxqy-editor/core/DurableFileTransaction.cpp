@@ -916,6 +916,20 @@ bool DurableFileTransaction::addPreparedWrite(const QString& targetPath,
     return true;
 }
 
+bool DurableFileTransaction::addPreparedWriteChecked(
+    const QString& targetPath, const QString& preparedPath,
+    bool expectedTargetExists, const QByteArray& expectedTargetSha256,
+    QString& errorMessage)
+{
+    if (!addPreparedWrite(targetPath, preparedPath, errorMessage))
+        return false;
+    auto& entry = state->entries.last();
+    entry.checksExpectedOriginal = true;
+    entry.expectedOriginalExists = expectedTargetExists;
+    entry.expectedOldDigest = expectedTargetSha256;
+    return true;
+}
+
 bool DurableFileTransaction::addBytesWrite(const QString& targetPath,
                                            const QByteArray& bytes,
                                            QString& errorMessage)
@@ -975,6 +989,21 @@ bool DurableFileTransaction::addRemoval(const QString& targetPath,
     TransactionEntry entry;
     if (!state->prepareEntry(targetPath, true, entry, errorMessage))
         return false;
+    state->entries.append(entry);
+    return true;
+}
+
+bool DurableFileTransaction::addRemovalChecked(
+    const QString& targetPath, const QByteArray& expectedTargetBytes,
+    QString& errorMessage)
+{
+    TransactionEntry entry;
+    if (!state->prepareEntry(targetPath, true, entry, errorMessage))
+        return false;
+    entry.checksExpectedOriginal = true;
+    entry.expectedOriginalExists = true;
+    entry.expectedOldDigest = QCryptographicHash::hash(
+        expectedTargetBytes, QCryptographicHash::Sha256).toHex();
     state->entries.append(entry);
     return true;
 }

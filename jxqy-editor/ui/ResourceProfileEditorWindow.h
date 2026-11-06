@@ -209,6 +209,8 @@ private:
     // [Combat]
     QSpinBox* m_minimumMagicDamageSpin = nullptr;
     QComboBox* m_magicEffectCalculationModeCombo = nullptr;
+    QComboBox* m_magicTimingModeCombo = nullptr;
+    QComboBox* m_moveScreenProfileCombo = nullptr;
     struct ActionReleaseTimingControls
     {
         QComboBox* mode = nullptr;
@@ -255,6 +257,7 @@ private:
     QLineEdit* m_uiBaseIdEdit = nullptr;
     QLineEdit* m_uiProfileEdit = nullptr;
     QCheckBox* m_preferLocalUiCheck = nullptr;
+    QCheckBox* m_ignoreRunDisabledCheck = nullptr;
     QPlainTextEdit* m_featuresEdit = nullptr;
 
     // [Startup]

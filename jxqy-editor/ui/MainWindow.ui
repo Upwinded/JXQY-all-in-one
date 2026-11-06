@@ -70,25 +70,31 @@
     <addaction name="projectSettingsAction"/>
     <addaction name="runtimeConfigurationAction"/>
     <addaction name="separator"/>
-    <addaction name="openImageEditorAction"/>
-    <addaction name="openMapEditorAction"/>
-    <addaction name="openMenuEditorAction"/>
-    <addaction name="openScriptEditorAction"/>
     <addaction name="separator"/>
     <addaction name="recentFilesMenu"/>
     <addaction name="separator"/>
     <addaction name="closeCurrentAction"/>
     <addaction name="exitAction"/>
    </widget>
+   <widget class="QMenu" name="contentMenu">
+    <property name="title"><string>内容编辑(&amp;E)</string></property>
+    <addaction name="openMapEditorAction"/>
+    <addaction name="openMenuEditorAction"/>
+    <addaction name="openScriptEditorAction"/>
+    <addaction name="openMagicEditorAction"/>
+    <addaction name="openGoodsShopEditorAction"/>
+    <addaction name="openDialogueEditorAction"/>
+    <addaction name="openNpcDataEditorAction"/>
+    <addaction name="openImageEditorAction"/>
+   </widget>
    <widget class="QMenu" name="toolMenu">
     <property name="title">
-     <string>更多工具(&amp;T)</string>
+     <string>工具(&amp;T)</string>
     </property>
     <widget class="QMenu" name="advancedToolsMenu">
      <property name="title">
-      <string>高级工具</string>
+      <string>查找</string>
      </property>
-     <addaction name="openNpcDataEditorAction"/>
      <addaction name="assetReferenceSearchAction"/>
      <addaction name="scriptProjectSearchAction"/>
     </widget>
@@ -124,6 +130,7 @@
     <addaction name="aboutAction"/>
    </widget>
    <addaction name="fileMenu"/>
+   <addaction name="contentMenu"/>
    <addaction name="toolMenu"/>
    <addaction name="publishMenu"/>
    <addaction name="windowMenu"/>
@@ -175,7 +182,7 @@
   </action>
   <action name="saveProjectAction">
    <property name="text">
-    <string>保存项目</string>
+    <string>保存项目设置</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+S</string>
@@ -222,7 +229,7 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>运行配置</string>
+    <string>试玩设置…</string>
    </property>
    <property name="statusTip">
     <string>管理项目场景和默认运行场景</string>
@@ -271,7 +278,7 @@
   </action>
   <action name="openMenuEditorAction">
    <property name="text">
-    <string>菜单编辑器</string>
+    <string>游戏界面编辑器</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+M</string>
@@ -290,6 +297,18 @@
    <property name="statusTip">
     <string>编辑游戏脚本，支持搜索、补全和函数导航</string>
    </property>
+  </action>
+  <action name="openMagicEditorAction">
+   <property name="text"><string>武功编辑器</string></property>
+   <property name="statusTip"><string>新建、复制和编辑武功，查看引用并试玩</string></property>
+  </action>
+  <action name="openGoodsShopEditorAction">
+   <property name="text"><string>物品与商店</string></property>
+   <property name="statusTip"><string>新建物品和商店，编辑货单并试玩</string></property>
+  </action>
+  <action name="openDialogueEditorAction">
+   <property name="text"><string>地图对话</string></property>
+   <property name="statusTip"><string>选择地图，新建段落、编排台词并试玩</string></property>
   </action>
   <action name="openNpcDataEditorAction">
    <property name="text">
@@ -334,7 +353,7 @@
   </action>
   <action name="setAssetsPathAction">
    <property name="text">
-    <string>设置资源目录</string>
+    <string>临时打开资源目录…</string>
    </property>
    <property name="statusTip">
     <string>设置游戏资源文件夹路径，编辑器将从此目录加载图片和INI等资源</string>

@@ -8,6 +8,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <filesystem>
 #include <limits>
 #include <string>
 #include <utility>
@@ -1358,8 +1359,21 @@ ensureDefaultDesktopRunSessionBase()
                 "Cannot create the application-local data directory for persistent desktop-run sessions"));
         return result;
     }
+    // Qt's AppData path can retain a Windows package redirect that the game resolves.
+    std::error_code pathError;
+    const auto physicalParent = std::filesystem::canonical(
+        std::filesystem::u8path(location.parentDirectory.toUtf8().constData()),
+        pathError);
+    if (pathError)
+    {
+        DesktopRunSessionBaseResult result;
+        fail(result, DesktopRunSessionBaseError::ParentUnavailable,
+            location.parentDirectory,
+            QStringLiteral("Cannot resolve the application-local data directory for the game"));
+        return result;
+    }
     return ensureDesktopRunSessionBase(
-        location.parentDirectory,
+        QString::fromStdString(physicalParent.generic_u8string()),
         location.baseDirectoryName);
 }
 

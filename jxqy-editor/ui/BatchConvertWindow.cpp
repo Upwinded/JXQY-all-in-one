@@ -253,6 +253,10 @@ bool BatchConvertWindow::configureProjectMigration(
         context.migrationOptions.dependencyId);
     minimumMagicDamageUserEdited = false;
     magicEffectCalculationModeUserEdited = false;
+    ui->magicTimingModeComboBox->setCurrentIndex(context.migrationOptions.magicTimingModeDefined
+        ? static_cast<int>(context.migrationOptions.magicTimingMode) + 1 : 0);
+    ui->moveScreenProfileComboBox->setCurrentIndex(context.migrationOptions.moveScreenProfileDefined
+        ? static_cast<int>(context.migrationOptions.moveScreenProfile) + 1 : 0);
     refreshMinimumMagicDamageDefault();
     const QString sourceEncoding =
         context.migrationOptions.sourceEncoding;
@@ -591,6 +595,14 @@ void BatchConvertWindow::onStartConvert()
     migrationOptions.dependencyId = migrationDependencyIds;
     migrationOptions.minimumMagicDamage =
         ui->minimumMagicDamageSpinBox->value();
+    migrationOptions.magicTimingModeDefined = ui->magicTimingModeComboBox->currentIndex() > 0;
+    migrationOptions.magicTimingMode = migrationOptions.magicTimingModeDefined
+        ? static_cast<MagicTimingMode>(ui->magicTimingModeComboBox->currentIndex() - 1)
+        : MagicTimingMode::FixedMilliseconds;
+    migrationOptions.moveScreenProfileDefined = ui->moveScreenProfileComboBox->currentIndex() > 0;
+    migrationOptions.moveScreenProfile = migrationOptions.moveScreenProfileDefined
+        ? static_cast<ScriptMoveScreenProfile>(ui->moveScreenProfileComboBox->currentIndex() - 1)
+        : ScriptMoveScreenProfile::CSharp;
     if (minimumMagicDamageUserEdited)
     {
         migrationOptions.minimumMagicDamageDefined = true;
@@ -1159,6 +1171,8 @@ void BatchConvertWindow::updateConversionOptions()
         !isConverting);
     ui->magicEffectCalculationModeComboBox->setEnabled(
         !isConverting);
+    ui->magicTimingModeComboBox->setEnabled(!isConverting);
+    ui->moveScreenProfileComboBox->setEnabled(!isConverting);
 
     if (projectMigrationMode && projectMigrationPolicyChangedCallback)
         projectMigrationPolicyChangedCallback(policy);

@@ -2,6 +2,7 @@
 #include "GameElement.h"
 #include "../GameTypes.h"
 #include "Magic.h"
+#include "MagicManager.h"
 #include "Effect.h"
 #include "NPCAction/NPCActionType.h"
 #include "NPCAction/NPCActionManager.h"
@@ -125,6 +126,7 @@ struct NPCAttackOption
 	int sourceIndex = 0;
 	bool isTargetAttack = true;
 	bool useAdditionalEffect = false;
+	int learnedLevel = 0;
 
 	NPCAttackOption() {}
 	bool operator<(const NPCAttackOption& other) const
@@ -1131,7 +1133,7 @@ public:
 	bool tryKeepDistanceWhenFriendDeath();
 	bool tryUseMagicWhenLifeLow();
 	void parseMagicList(const std::string& listString, int sourceIndexStart = 2);
-	void addAttackOption(const std::string& magicFileName, int distance, int sourceIndex, bool useAdditionalEffect = false);
+	void addAttackOption(const std::string& magicFileName, int distance, int sourceIndex, bool useAdditionalEffect = false, int learnedLevel = 0);
 	void rebuildAttackOptions();
 	bool canMagicHitTarget(const NPCAttackOption& option, Point casterPosition, Point targetPosition, int level) const;
 	bool isTargetValid(std::shared_ptr<GameElement> target) const;
@@ -1143,7 +1145,7 @@ public:
 	std::shared_ptr<Magic> selectAttackMagicForAction(Point dest, std::shared_ptr<GameElement> target, AttackReleaseMode releaseMode);
 	bool usesNativeAttackProtocol() const;
 	std::shared_ptr<Magic> selectNativeAttackMagicAtRelease();
-	bool releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, std::shared_ptr<GameElement> target, bool applyAdditionalEffect);
+	bool releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, std::shared_ptr<GameElement> target, bool applyAdditionalEffect, int learnedLevel = 0);
 	bool isCrossHit(Point casterPosition, Point targetPosition, int crossRange) const;
 	bool isTooCloseForAttackOption(const NPCAttackOption& option, Point casterPosition, Point targetPosition) const;
 	int getMinEngageDistance() const;
@@ -1292,10 +1294,12 @@ public:
 	bool restorePartnerAttributes(bool joining = false);
 	bool characterEquipmentSynchronized = true;
 	int getPartnerCharacterIndex();
+	const std::vector<MagicInfo>& getPartnerMagicList();
+	void reloadPartnerMagic();
 	bool isLivingPartner();
 	bool canViewPartnerDetails();
 	bool canChangePartnerEquipment();
-	bool setKindAndRelation(int newKind, int newRelation);
+	bool setKindAndRelation(int newKind, int newRelation, bool changeRelation = true);
 	void finishPartnerJoin();
 	void refillPartnerResources();
 	void resetPartnerRecovery();
@@ -1423,8 +1427,13 @@ public:
 	void freeResource();
 
 protected:
+	_channel standingSoundChannel = nullptr;
 	std::string registeredPartnerName;
 	int registeredPartnerIndex = -1;
+	int partnerMagicCharacterIndex = -1;
+	std::vector<MagicInfo> partnerMagicList;
+	bool partnerMagicUsedForCombat = false;
+	int preparedAttackMagicLevel = 0;
 	UTime partnerRecoveryQuietTime = 0;
 	double partnerRecoveryFractions[3] = { 0.0, 0.0, 0.0 };
 	bool deathTransitionInProgress = false;

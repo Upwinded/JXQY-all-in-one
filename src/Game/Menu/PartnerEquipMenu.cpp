@@ -1,6 +1,7 @@
 #include "PartnerEquipMenu.h"
 #include "../../Engine/Engine.h"
 #include "GoodsMenu.h"
+#include "MenuMouseWheel.h"
 #include "../Data/Goods.h"
 #include "../Data/NPC.h"
 #include "../GameManager/GameManager.h"
@@ -547,7 +548,9 @@ void PartnerEquipMenu::onEvent()
 
 		unsigned int ret = item[i]->getResult();
 #ifndef __MOBILE__
-		if (gm->global.feature.qingyuUi && (ret & erClick) && itemGoods[i])
+		if (gm->menu != nullptr && gm->menu->toolTip != nullptr
+			&& gm->menu->toolTip->supportsFullDetails()
+			&& (ret & erClick) && !(ret & (erDropped | erDragEnd)) && itemGoods[i])
 		{
 			gm->menu->showGoodsToolTip(getMySharedPtr(), itemGoods[i], item[i], true);
 			item[i]->resetHint();
@@ -608,6 +611,60 @@ void PartnerEquipMenu::onUpdate()
 		deactivateControllerFocus();
 		visible = false;
 	}
+}
+
+bool PartnerEquipMenu::scrollMouseWheel(int steps)
+{
+	if (!visible || dragging != TOUCH_UNTOUCHEDID || currentDragItem != nullptr
+		|| gm == nullptr || gm->menu == nullptr || gm->menu->goodsMenu == nullptr
+		|| !gm->menu->goodsMenu->visible || !gm->menu->goodsMenu->canDraw
+		|| !gm->menu->goodsMenu->activated || !gm->menu->goodsMenu->needEvents)
+	{
+		return false;
+	}
+	return playerBagSlotController.scrollRows(steps);
+}
+
+bool PartnerEquipMenu::onHandleMouseWheel(AEvent& event)
+{
+	if (!visible)
+	{
+		return false;
+	}
+	if (dragging != TOUCH_UNTOUCHEDID || currentDragItem != nullptr)
+	{
+		return true;
+	}
+	const auto playerBag = gm != nullptr && gm->menu != nullptr
+		? gm->menu->goodsMenu : nullptr;
+	const auto tooltip = gm != nullptr && gm->menu != nullptr
+		? gm->menu->toolTip : nullptr;
+	const int steps = menuMouseWheelSteps(event);
+	if (tooltip != nullptr
+		&& menuMouseWheelContains(tooltip, event.eventX, event.eventY))
+	{
+		if (tooltip->isExpanded())
+		{
+			tooltip->dispatchMouseWheel(event);
+		}
+		else
+		{
+			const auto sourceOwner = tooltip->getSourceOwner();
+			const auto sourceElement = tooltip->getSourceElement();
+			if (menuMouseWheelSourceBelongsTo(sourceElement, sourceOwner)
+				&& (sourceOwner.get() == this || sourceOwner == playerBag))
+			{
+				scrollMouseWheel(steps);
+			}
+		}
+		return true;
+	}
+	if (menuMouseWheelContains(getMySharedPtr(), event.eventX, event.eventY, tooltip.get())
+		|| menuMouseWheelContains(playerBag, event.eventX, event.eventY, tooltip.get()))
+	{
+		scrollMouseWheel(steps);
+	}
+	return true;
 }
 
 bool PartnerEquipMenu::onHandleEvent(AEvent& e)

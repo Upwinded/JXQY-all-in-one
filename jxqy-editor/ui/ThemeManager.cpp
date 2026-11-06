@@ -65,8 +65,8 @@ void ThemeManager::setTheme(Theme theme)
     }
 
     QSettings settings = EditorSettings::create();
-    settings.setValue("theme", (theme == Theme::Dark) ? "dark" : "light");
-    settings.sync();
+    EditorSettings::setValueIfChanged(settings, "theme", (theme == Theme::Dark) ? "dark" : "light");
+    EditorSettings::synchronize(settings);
 
     emit themeChanged(theme);
 }
@@ -91,6 +91,7 @@ QPalette ThemeManager::createDarkPalette() const
     palette.setColor(QPalette::Base, QColor(30, 30, 30));
     palette.setColor(QPalette::AlternateBase, QColor(37, 37, 37));
     palette.setColor(QPalette::Text, QColor(212, 212, 212));
+    palette.setColor(QPalette::PlaceholderText, QColor(160, 160, 160));
 
     // 按钮和高亮
     palette.setColor(QPalette::Button, QColor(60, 60, 60));
@@ -127,6 +128,7 @@ QPalette ThemeManager::createDarkPalette() const
 
     // 禁用状态
     palette.setColor(QPalette::Disabled, QPalette::Text, QColor(102, 102, 102));
+    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QColor(128, 128, 128));
     palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(102, 102, 102));
     palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(102, 102, 102));
     palette.setColor(QPalette::Disabled, QPalette::Base, QColor(45, 45, 45));
@@ -147,6 +149,7 @@ QPalette ThemeManager::createLightPalette() const
     palette.setColor(QPalette::Base, QColor(255, 255, 255));
     palette.setColor(QPalette::AlternateBase, QColor(245, 245, 245));
     palette.setColor(QPalette::Text, QColor(30, 30, 30));
+    palette.setColor(QPalette::PlaceholderText, QColor(105, 105, 105));
 
     // 按钮和高亮
     palette.setColor(QPalette::Button, QColor(243, 243, 243));
@@ -181,6 +184,7 @@ QPalette ThemeManager::createLightPalette() const
 
     // 禁用状态
     palette.setColor(QPalette::Disabled, QPalette::Text, QColor(128, 128, 128));
+    palette.setColor(QPalette::Disabled, QPalette::PlaceholderText, QColor(128, 128, 128));
     palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(128, 128, 128));
     palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(128, 128, 128));
     palette.setColor(QPalette::Disabled, QPalette::Base, QColor(240, 240, 240));

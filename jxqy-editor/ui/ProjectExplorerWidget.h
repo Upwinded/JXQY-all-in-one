@@ -20,6 +20,7 @@ public:
     void setContentRoot(const QString& path);
     QString contentRoot() const;
     void setDocuments(const QList<ProjectDocumentState>& documents);
+    void revealFile(const QString& path);
 
 signals:
     void fileOpenRequested(const QString& filePath);

@@ -36,6 +36,8 @@ struct AssetMigrationOptions
     QString dependencyId = "JXQY2";
     QString saveNamespace;
     int minimumMagicDamage = 10;
+    MagicTimingMode magicTimingMode = MagicTimingMode::FixedMilliseconds;
+    bool magicTimingModeDefined = false;
     bool minimumMagicDamageDefined = false;
     MagicEffectCalculationMode magicEffectCalculationMode =
         MagicEffectCalculationMode::ReplaceAttack;
@@ -58,6 +60,8 @@ struct AssetMigrationOptions
     bool partnerFollowRunRadiusDefined = false;
     ScriptNpcActionProfile npcActionProfile =
         ScriptNpcActionProfile::Legacy;
+    ScriptMoveScreenProfile moveScreenProfile = ScriptMoveScreenProfile::CSharp;
+    bool moveScreenProfileDefined = false;
     bool npcActionProfileDefined = false;
     ScriptNpcRuntimeProfile npcRuntimeProfile =
         ScriptNpcRuntimeProfile::Legacy;
@@ -210,6 +214,12 @@ public:
     static MagicEffectCalculationMode resolveMagicEffectCalculationModeDefault(
         const QString& outputDir,
         const AssetMigrationOptions& options);
+    static MagicTimingMode resolveMagicTimingModeDefault(
+        const QString& sourceDir, const QString& outputDir,
+        const AssetMigrationOptions& options);
+    static ScriptMoveScreenProfile resolveMoveScreenProfileDefault(
+        const QString& sourceDir, const QString& outputDir,
+        const AssetMigrationOptions& options);
 
     MigrationResult migrate(const QString& sourceDir,
         const QString& outputDir,
@@ -252,7 +262,7 @@ private:
         AssetMigrationReport& report);
     void ensureChooseMenuDefinition(const QString& outputDir, const QString& uiBaseRoot,
         AssetMigrationReport& report);
-    void migrateLegacyUiLayout(const QString& sourceDir, const QString& outputDir, const QString& uiBaseRoot,
+    void migrateLegacyUiLayout(const QString& sourceDir, const QString& outputDir, const QString& uiBaseRoot, const QString& resolvedUiBaseId,
         const AssetMigrationOptions& options, AssetMigrationReport& report);
     void convertTalkDatToTalkIndex(const QString& inputDir, const QString& outputDir,
         const AssetMigrationOptions& options, AssetMigrationReport& report, const LogCallback& logCallback);

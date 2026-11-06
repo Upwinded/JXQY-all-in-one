@@ -5,6 +5,7 @@
 
 #include "../core/DesktopRunDocumentSnapshot.h"
 #include "../core/GoodsShopDocument.h"
+#include "../core/ContentAuthoring.h"
 #include "../core/ProjectDocumentRegistry.h"
 
 #include <QWidget>
@@ -54,6 +55,13 @@ public:
     bool saveAsFile(const QString& filePath);
     bool duplicateCurrentGoodsTo(const QString& targetPath,
                                  QString* errorMessage = nullptr);
+    QString createContentFile(ContentKind contentKind, const QString& name,
+        bool copyCurrent = false, QString* errorMessage = nullptr);
+    ContentReferenceReport currentReferences() const;
+    bool renameContentFile(const QString& name, QString* errorMessage = nullptr);
+    bool deleteContentFile(QString* errorMessage = nullptr);
+    void setDocumentSnapshotsProvider(std::function<QList<DesktopRunDocumentSnapshot>()> provider);
+    void setFileMutationPreflight(std::function<bool(const QStringList&, QString&)> preflight);
     bool hasUnsavedChanges() const;
     QString currentFilePath() const;
     QString displayName() const;
@@ -80,6 +88,9 @@ signals:
     void documentClosed();
     void openGoodsShopFileRequested(const QString& filePath);
     void playtestRequested();
+    void filesChanged(const QStringList& paths);
+    void openReferenceRequested(const QString& path, int line);
+    void usageScriptRequested(const QString& source);
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -125,6 +136,13 @@ private:
     bool confirmSaveIfModified();
     void browseGoodsResource(GoodsTextField field);
     void duplicateCurrentGoods();
+    void setupAuthoringActions();
+    void setupAuthoringMenu();
+    void retranslateAuthoringActions();
+    void showReferences();
+    bool authoringTarget(const QString& path, QString& error) const;
+    QByteArray pendingDocumentBytes() const;
+    ContentKind contentKind() const;
     void addSelectedGoodsToShop();
     QString goodsPathForReference(const QString& iniFile) const;
     QStringList imageCandidates(const QString& reference) const;
@@ -138,6 +156,10 @@ private:
     GoodsShopDocumentKind kind = GoodsShopDocumentKind::None;
     QString filePath;
     QString assetsBasePath;
+    QString loadedSourcePath;
+    QByteArray loadedBytes;
+    std::function<QList<DesktopRunDocumentSnapshot>()> snapshotsProvider;
+    std::function<bool(const QStringList&, QString&)> mutationPreflight;
     std::function<bool(const QString&, const QString&)>
         documentPathValidator;
     bool refreshing = false;
@@ -148,6 +170,12 @@ private:
     QAction* redoAction = nullptr;
     QAction* duplicateAction = nullptr;
     QAction* playtestAction = nullptr;
+    QAction* newGoodsAction = nullptr;
+    QAction* newShopAction = nullptr;
+    QAction* renameAction = nullptr;
+    QAction* deleteAction = nullptr;
+    QAction* referencesAction = nullptr;
+    QAction* usageScriptAction = nullptr;
     QUndoStack* undoStack = nullptr;
 
     QLineEdit* goodsSearchEdit = nullptr;

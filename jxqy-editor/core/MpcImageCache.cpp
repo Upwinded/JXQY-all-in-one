@@ -1,5 +1,6 @@
 #include "MpcImageCache.h"
 #include "EditorAssetPath.h"
+#include "GameProfile.h"
 #include "Util.h"
 
 #include <QByteArray>
@@ -150,6 +151,11 @@ void MpcImageCache::setAssetsBasePath(const std::string& path)
         clearCache();
         assetsBasePath = normalizedPath;
     }
+    // Resolve the catalog once when the context is set, not for every tile.
+    contentRoots.clear();
+    if (!assetsBasePath.empty())
+        for (const auto& root : ResourcePackScanner::resolveContentRoots(fromUtf8Path(assetsBasePath)).roots)
+            if (root.available) contentRoots.push_back(root.rootPath.toUtf8().toStdString());
 }
 
 const std::string& MpcImageCache::getAssetsBasePath() const
@@ -353,19 +359,17 @@ std::string MpcImageCache::resolveFilePath(const std::string& relativePath) cons
     const std::filesystem::path requestedPath = std::filesystem::u8path(normalizedRelativePath);
     if (!assetsBasePath.empty())
     {
-        QString absolutePath;
-        if (!EditorAssetPath::resolveLogicalResourcePath(
-                fromUtf8Path(assetsBasePath),
-                fromUtf8Path(relativePath),
-                absolutePath))
+        for (const auto& root : contentRoots)
         {
-            return "";
+            QString absolutePath;
+            if (!EditorAssetPath::resolveLogicalResourcePath(
+                    fromUtf8Path(root), fromUtf8Path(relativePath), absolutePath))
+                return "";
+            const QFileInfo fileInfo(absolutePath);
+            if (fileInfo.exists() && fileInfo.isFile())
+                return absolutePath.toUtf8().toStdString();
         }
-
-        const QFileInfo fileInfo(absolutePath);
-        if (!fileInfo.exists() || !fileInfo.isFile())
-            return "";
-        return absolutePath.toUtf8().toStdString();
+        return "";
     }
 
     // A cache without an assets root retains the historical relative-path

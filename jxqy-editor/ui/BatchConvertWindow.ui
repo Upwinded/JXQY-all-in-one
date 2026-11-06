@@ -363,6 +363,38 @@
         </item>
        </layout>
       </item>
+      <item>
+       <layout class="QHBoxLayout" name="magicTimingLayout">
+        <item>
+         <widget class="QLabel" name="magicTimingModeLabel">
+          <property name="text"><string>武功计时规则:</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="magicTimingModeComboBox">
+          <property name="toolTip"><string>自动按来源配置、C# 输入特征及内容依赖选择；不使用 UI 布局推断。</string></property>
+          <item><property name="text"><string>自动（按来源和内容依赖）</string></property></item>
+          <item><property name="text"><string>固定毫秒（兼容）</string></property></item>
+          <item><property name="text"><string>剑二：逻辑步</string></property></item>
+          <item><property name="text"><string>新剑／月影原版：动画帧</string></property></item>
+          <item><property name="text"><string>C#：动画帧，保留时间余数</string></property></item>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="moveScreenProfileLayout">
+        <item><widget class="QLabel" name="moveScreenProfileLabel">
+         <property name="text"><string>剧情镜头协议:</string></property>
+        </widget></item>
+        <item><widget class="QComboBox" name="moveScreenProfileComboBox">
+         <property name="toolTip"><string>自动按脚本来源及内容依赖选择；独立于武功计时与 UI 布局。</string></property>
+         <item><property name="text"><string>自动（按来源和内容依赖）</string></property></item>
+         <item><property name="text"><string>原版三部曲</string></property></item>
+         <item><property name="text"><string>C# 来源</string></property></item>
+        </widget></item>
+       </layout>
+      </item>
      </layout>
     </widget>
    </item>

@@ -1,9 +1,12 @@
 #include "GoodsShopEditorWindow.h"
+#include "EditorSaveConfirmation.h"
 
 #include "FilePickerHelper.h"
 #include "MpcPreviewLabel.h"
 #include "../core/AssetPreviewLoader.h"
 #include "../core/EditorAssetPath.h"
+#include "../core/DurableFileTransaction.h"
+#include "../core/GameProfile.h"
 
 #include <QAbstractItemView>
 #include <QAction>
@@ -13,15 +16,18 @@
 #include <QDir>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
 #include <QHeaderView>
+#include <QInputDialog>
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QLocale>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPlainTextEdit>
@@ -94,6 +100,7 @@ QSpinBox* createIntegerSpinBox(QWidget* parent, const QString& objectName)
     spin->setObjectName(objectName);
     spin->setRange(0, 999999999);
     spin->setGroupSeparatorShown(true);
+    spin->setKeyboardTracking(false);
     return spin;
 }
 }
@@ -147,9 +154,16 @@ bool GoodsShopEditorWindow::openFile(const QString& requestedPath)
         return false;
     const QString normalized =
         EditorAssetPath::normalizedAbsolutePath(requestedPath);
+    const ContentKind requestedKind = isShopFilePath(normalized) ? ContentKind::Shop : ContentKind::Goods;
+    const QString name = ContentAuthoring::referenceName(requestedKind, assetsBasePath, normalized);
+    const QString logicalPath = name.isEmpty() ? normalized
+        : QDir(assetsBasePath).filePath(ContentAuthoring::directory(requestedKind) + '/' + name);
+    QString sourcePath = name.isEmpty() ? normalized
+        : ContentAuthoring::resolve(assetsBasePath, ContentAuthoring::directory(requestedKind) + '/' + name);
+    if (sourcePath.isEmpty()) sourcePath = normalized;
     if (!isSupportedFilePath(normalized) ||
         (documentPathValidator &&
-         !documentPathValidator(filePath, normalized)) ||
+         !documentPathValidator(filePath, logicalPath)) ||
         !confirmSaveIfModified())
     {
         return false;
@@ -159,7 +173,7 @@ bool GoodsShopEditorWindow::openFile(const QString& requestedPath)
     if (isGoodsFilePath(normalized))
     {
         GoodsDocument candidate;
-        if (!candidate.openFile(normalized, &error))
+        if (!candidate.openFile(sourcePath, &error))
         {
             QMessageBox::warning(
                 this, tr("无法打开物品"),
@@ -172,7 +186,7 @@ bool GoodsShopEditorWindow::openFile(const QString& requestedPath)
     else
     {
         ShopDocument candidate;
-        if (!candidate.openFile(normalized, &error))
+        if (!candidate.openFile(sourcePath, &error))
         {
             QMessageBox::warning(
                 this, tr("无法打开商店"),
@@ -183,7 +197,10 @@ bool GoodsShopEditorWindow::openFile(const QString& requestedPath)
         kind = GoodsShopDocumentKind::Shop;
     }
 
-    filePath = normalized;
+    filePath = logicalPath;
+    loadedSourcePath = sourcePath;
+    QFile input(sourcePath);
+    loadedBytes = input.open(QIODevice::ReadOnly) ? input.readAll() : QByteArray();
     undoStack->clear();
     undoStack->setClean();
     refreshCatalogLists();
@@ -198,20 +215,32 @@ bool GoodsShopEditorWindow::saveFile()
         return false;
     commitPendingGoodsEditors();
     QString error;
-    const bool saved = kind == GoodsShopDocumentKind::Goods
-        ? goodsDocument.saveFile(filePath, &error)
-        : shopDocument.saveFile(filePath, &error);
+    bool saved = false;
+    if (!assetsBasePath.isEmpty())
+    {
+        if (authoringTarget(filePath, error))
+        {
+            DurableFileTransaction transaction(assetsBasePath);
+            saved = EditorSaveConfirmation::prepareBytesWrite(this, transaction, filePath, currentDocumentBytes(),
+                loadedSourcePath == filePath, loadedBytes, error) && transaction.commit(error);
+        }
+    }
+    else saved = kind == GoodsShopDocumentKind::Goods
+        ? goodsDocument.saveFile(filePath, &error) : shopDocument.saveFile(filePath, &error);
     if (!saved)
     {
-        QMessageBox::warning(
-            this, tr("保存失败"),
-            tr("无法保存当前内容：\n%1\n\n%2").arg(filePath, error));
+        if (!error.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"),
+                tr("无法保存当前内容：\n%1\n\n%2").arg(filePath, error));
         return false;
     }
     undoStack->setClean();
+    loadedSourcePath = filePath;
+    loadedBytes = currentDocumentBytes();
     refreshCatalogLists();
     updateWindowTitle();
     emit documentStatesChanged();
+    emit filesChanged({filePath});
     return true;
 }
 
@@ -255,10 +284,9 @@ bool GoodsShopEditorWindow::duplicateCurrentGoodsTo(
 
     const QString normalized =
         EditorAssetPath::normalizedAbsolutePath(requestedPath);
-    const QString goodsRoot = QDir(assetsBasePath).filePath(
-        QStringLiteral("ini/goods"));
+    QString targetError;
     if (!isGoodsFilePath(normalized) ||
-        !EditorAssetPath::isInside(goodsRoot, normalized))
+        !authoringTarget(normalized, targetError))
     {
         if (errorMessage)
             *errorMessage = tr("新物品必须保存到当前项目的物品目录。");
@@ -272,20 +300,27 @@ bool GoodsShopEditorWindow::duplicateCurrentGoodsTo(
     }
 
     QString error;
-    if (!goodsDocument.saveFile(normalized, &error))
+    bool saved = QDir().mkpath(QFileInfo(normalized).path());
+    if (saved)
+    {
+        DurableFileTransaction transaction(assetsBasePath);
+        saved = transaction.addBytesWriteChecked(normalized, pendingDocumentBytes(), false, {}, error) && transaction.commit(error);
+    }
+    if (!saved)
     {
         if (errorMessage)
             *errorMessage = error;
         return false;
     }
     refreshCatalogLists();
+    emit filesChanged({normalized});
     emit openGoodsShopFileRequested(normalized);
     return true;
 }
 
 bool GoodsShopEditorWindow::hasUnsavedChanges() const
 {
-    return !undoStack->isClean();
+    return !undoStack->isClean() || pendingDocumentBytes() != currentDocumentBytes();
 }
 
 QString GoodsShopEditorWindow::currentFilePath() const
@@ -346,7 +381,7 @@ GoodsShopEditorWindow::desktopRunDocumentSnapshot() const
     snapshot.includeInOverlay = snapshot.dirty;
     snapshot.serializationSupported = !filePath.isEmpty() &&
         kind != GoodsShopDocumentKind::None;
-    snapshot.bytes = currentDocumentBytes();
+    snapshot.bytes = pendingDocumentBytes();
     if (!snapshot.serializationSupported)
         snapshot.diagnosticCode = QStringLiteral("goods-shop.document.unsaved");
     return snapshot;
@@ -472,6 +507,8 @@ void GoodsShopEditorWindow::setupUi()
     fileSummaryLabel = new QLabel(editorPanel);
     fileSummaryLabel->setObjectName(QStringLiteral("goodsShopFileSummaryLabel"));
     fileSummaryLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    fileSummaryLabel->setWordWrap(true);
+    fileSummaryLabel->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
     editorLayout->addWidget(fileSummaryLabel);
 
     editorStack = new QStackedWidget(editorPanel);
@@ -811,27 +848,43 @@ QWidget* GoodsShopEditorWindow::createShopPage()
 
 void GoodsShopEditorWindow::setupActions()
 {
+    setupAuthoringActions();
     saveAction = toolBar->addAction(tr("保存"));
     saveAction->setObjectName(QStringLiteral("goodsShopSaveAction"));
     saveAction->setShortcut(QKeySequence::Save);
     toolBar->addSeparator();
-    undoAction = undoStack->createUndoAction(this, tr("撤销"));
+    undoAction = new QAction(tr("撤销"), this);
     undoAction->setObjectName(QStringLiteral("goodsShopUndoAction"));
     undoAction->setShortcut(QKeySequence::Undo);
-    redoAction = undoStack->createRedoAction(this, tr("重做"));
+    redoAction = new QAction(tr("重做"), this);
     redoAction->setObjectName(QStringLiteral("goodsShopRedoAction"));
     redoAction->setShortcuts(QKeySequence::keyBindings(QKeySequence::Redo));
     toolBar->addAction(undoAction);
     toolBar->addAction(redoAction);
     toolBar->addSeparator();
-    duplicateAction = toolBar->addAction(tr("复制物品…"));
-    duplicateAction->setObjectName(QStringLiteral("goodsDuplicateAction"));
     playtestAction = toolBar->addAction(tr("试玩当前内容"));
     playtestAction->setObjectName(QStringLiteral("goodsShopPlaytestAction"));
+    setupAuthoringMenu();
 }
 
 void GoodsShopEditorWindow::setupConnections()
 {
+    connect(undoAction, &QAction::triggered, this, [this]() { commitPendingGoodsEditors(); undoStack->undo(); });
+    connect(redoAction, &QAction::triggered, this, [this]() { commitPendingGoodsEditors(); undoStack->redo(); });
+    connect(undoStack, &QUndoStack::canUndoChanged, this, [this]() { updateActionStates(); });
+    connect(undoStack, &QUndoStack::canRedoChanged, this, [this]() { updateActionStates(); });
+    auto pendingChanged = [this]()
+    {
+        if (refreshing) return;
+        updateWindowTitle();
+        updateActionStates();
+        emit documentStatesChanged();
+    };
+    for (auto* edit : {goodsNameEdit, goodsEffectEdit, goodsImageEdit, goodsIconEdit})
+        connect(edit, &QLineEdit::textChanged, this, pendingChanged);
+    connect(goodsIntroductionEdit, &QPlainTextEdit::textChanged, this, pendingChanged);
+    for (auto* spin : findChildren<QSpinBox*>())
+        if (auto* edit = spin->findChild<QLineEdit*>()) connect(edit, &QLineEdit::textChanged, this, pendingChanged);
     connect(saveAction, &QAction::triggered, this,
         [this]() { commitPendingGoodsEditors(); saveFile(); });
     connect(duplicateAction, &QAction::triggered,
@@ -1124,20 +1177,14 @@ void GoodsShopEditorWindow::pushShopMutation(
 
 void GoodsShopEditorWindow::commitPendingGoodsEditors()
 {
-    if (refreshing || kind != GoodsShopDocumentKind::Goods || filePath.isEmpty())
+    if (refreshing || kind == GoodsShopDocumentKind::None || filePath.isEmpty())
         return;
-    const QByteArray before = goodsDocument.serializedBytes();
-    goodsDocument.setText(GoodsTextField::Name, goodsNameEdit->text());
-    goodsDocument.setText(GoodsTextField::Introduction,
-                          goodsIntroductionEdit->toPlainText());
-    goodsDocument.setText(GoodsTextField::Effect, goodsEffectEdit->text());
-    goodsDocument.setText(GoodsTextField::Image, goodsImageEdit->text());
-    goodsDocument.setText(GoodsTextField::Icon, goodsIconEdit->text());
-    const QByteArray after = goodsDocument.serializedBytes();
+    const QByteArray before = currentDocumentBytes();
+    const QByteArray after = pendingDocumentBytes();
     if (before == after)
         return;
     loadDocumentBytes(before);
-    pushSnapshotChange(before, after, tr("修改物品内容"));
+    pushSnapshotChange(before, after, tr("修改当前内容"));
 }
 
 void GoodsShopEditorWindow::refreshFromDocument()
@@ -1158,12 +1205,12 @@ void GoodsShopEditorWindow::refreshFromDocument()
     updateActionStates();
     fileSummaryLabel->setText(
         filePath.isEmpty()
-            ? tr("从左侧列表或项目树打开一个物品或商店货单。")
+            ? tr("点击“新建”创建物品或商店，或从左侧选择已有内容。")
             : kind == GoodsShopDocumentKind::Goods
                 ? tr("正在编辑物品：%1").arg(
-                      QDir::toNativeSeparators(filePath))
+                      QFileInfo(filePath).fileName())
                 : tr("正在编辑商店：%1").arg(
-                      QDir::toNativeSeparators(filePath)));
+                      QFileInfo(filePath).fileName()));
     const int hidden = kind == GoodsShopDocumentKind::Goods
         ? goodsDocument.hiddenFieldCount()
         : kind == GoodsShopDocumentKind::Shop
@@ -1309,22 +1356,12 @@ void GoodsShopEditorWindow::refreshCatalogLists()
     goodsList->clear();
     shopList->clear();
 
-    const QDir goodsDirectory(
-        QDir(assetsBasePath).filePath(QStringLiteral("ini/goods")));
-    const QFileInfoList goodsFiles = goodsDirectory.entryInfoList(
-        {QStringLiteral("*.ini")}, QDir::Files | QDir::Readable, QDir::Name);
-    for (const QFileInfo& info : goodsFiles)
+    for (const auto& entry : ContentAuthoring::resources(ContentKind::Goods, assetsBasePath))
     {
-        GoodsDocument candidate;
-        QString name;
-        if (candidate.openFile(info.absoluteFilePath()))
-            name = candidate.text(GoodsTextField::Name).trimmed();
         auto item = new QListWidgetItem(
-            name.isEmpty() ? info.completeBaseName()
-                           : tr("%1\n%2").arg(name, info.fileName()),
+            entry.name.isEmpty() ? entry.fileName : tr("%1\n%2").arg(entry.name, entry.fileName),
             goodsList);
-        const QString path = EditorAssetPath::normalizedAbsolutePath(
-            info.absoluteFilePath());
+        const QString path = QDir(assetsBasePath).filePath("ini/goods/" + entry.fileName);
         item->setData(Qt::UserRole, path);
         item->setToolTip(path);
         const QString wanted = selectedGoods.isEmpty() &&
@@ -1336,15 +1373,10 @@ void GoodsShopEditorWindow::refreshCatalogLists()
         }
     }
 
-    const QDir shopDirectory(
-        QDir(assetsBasePath).filePath(QStringLiteral("ini/buy")));
-    const QFileInfoList shopFiles = shopDirectory.entryInfoList(
-        {QStringLiteral("*.ini")}, QDir::Files | QDir::Readable, QDir::Name);
-    for (const QFileInfo& info : shopFiles)
+    for (const auto& entry : ContentAuthoring::resources(ContentKind::Shop, assetsBasePath))
     {
-        auto item = new QListWidgetItem(info.completeBaseName(), shopList);
-        const QString path = EditorAssetPath::normalizedAbsolutePath(
-            info.absoluteFilePath());
+        auto item = new QListWidgetItem(QFileInfo(entry.fileName).completeBaseName(), shopList);
+        const QString path = QDir(assetsBasePath).filePath("ini/buy/" + entry.fileName);
         item->setData(Qt::UserRole, path);
         item->setToolTip(path);
         const QString wanted = selectedShop.isEmpty() &&
@@ -1456,8 +1488,21 @@ void GoodsShopEditorWindow::updateActionStates()
     const bool opened = !filePath.isEmpty() &&
         kind != GoodsShopDocumentKind::None;
     saveAction->setEnabled(opened && hasUnsavedChanges());
-    duplicateAction->setEnabled(kind == GoodsShopDocumentKind::Goods);
+    const bool pending = pendingDocumentBytes() != currentDocumentBytes();
+    undoAction->setEnabled(undoStack->canUndo() || pending);
+    redoAction->setEnabled(undoStack->canRedo() && !pending);
+    duplicateAction->setEnabled(opened);
     playtestAction->setEnabled(opened);
+    editorStack->setEnabled(opened);
+    if (referencesAction)
+    {
+        referencesAction->setEnabled(opened);
+        usageScriptAction->setEnabled(opened);
+        const bool local = opened && loadedSourcePath == filePath;
+        renameAction->setEnabled(local);
+        deleteAction->setEnabled(local);
+        retranslateAuthoringActions();
+    }
     addSelectedGoodsButton->setVisible(kind == GoodsShopDocumentKind::Shop);
     updateShopButtons();
 }
@@ -1502,14 +1547,16 @@ void GoodsShopEditorWindow::browseGoodsResource(GoodsTextField field)
     const QStringList folders = {
         QStringLiteral("asf/goods"), QStringLiteral("mpc/goods")};
     QString initialDirectory;
-    for (const QString& folder : folders)
+    const auto providers = ResourcePackScanner::resolveContentRoots(assetsBasePath).roots;
+    for (const auto& provider : providers)
     {
-        const QString candidate = QDir(assetsBasePath).filePath(folder);
-        if (QDir(candidate).exists())
+        if (!provider.available) continue;
+        for (const QString& folder : folders)
         {
-            initialDirectory = candidate;
-            break;
+            const QString candidate = QDir(provider.rootPath).filePath(folder);
+            if (QDir(candidate).exists()) { initialDirectory = candidate; break; }
         }
+        if (!initialDirectory.isEmpty()) break;
     }
     const QString selected = QFileDialog::getOpenFileName(
         this, tr("选择物品图片"), initialDirectory,
@@ -1518,14 +1565,20 @@ void GoodsShopEditorWindow::browseGoodsResource(GoodsTextField field)
         return;
     QString reference;
     QStringList absoluteFolders;
-    for (const QString& folder : folders)
-        absoluteFolders.append(QDir(assetsBasePath).filePath(folder));
-    if (!FilePickerHelper::makeResourceReference(
-            assetsBasePath, absoluteFolders, selected, reference))
+    bool valid = false;
+    for (const auto& provider : providers)
+    {
+        if (!provider.available) continue;
+        absoluteFolders.clear();
+        for (const QString& folder : folders) absoluteFolders.append(QDir(provider.rootPath).filePath(folder));
+        if (FilePickerHelper::makeResourceReference(provider.rootPath, absoluteFolders, selected, reference))
+        { valid = true; break; }
+    }
+    if (!valid)
     {
         QMessageBox::warning(
             this, tr("无法选择资源"),
-            tr("请选择当前项目物品图片目录中的文件。"));
+            tr("请选择当前项目可用的物品图片。"));
         return;
     }
     pushGoodsTextChange(field, reference, tr("修改物品图片"));
@@ -1534,20 +1587,16 @@ void GoodsShopEditorWindow::browseGoodsResource(GoodsTextField field)
 void GoodsShopEditorWindow::duplicateCurrentGoods()
 {
     commitPendingGoodsEditors();
-    if (kind != GoodsShopDocumentKind::Goods)
+    if (kind == GoodsShopDocumentKind::None)
         return;
-    const QString goodsRoot = QDir(assetsBasePath).filePath(
-        QStringLiteral("ini/goods"));
-    const QFileInfo source(filePath);
-    const QString suggested = QDir(goodsRoot).filePath(
-        source.completeBaseName() + tr("-副本.ini"));
-    const QString target = QFileDialog::getSaveFileName(
-        this, tr("复制为新物品"), suggested, tr("物品文件 (*.ini)"));
-    if (target.isEmpty())
-        return;
+    bool accepted = false;
+    const QString name = QInputDialog::getText(this, tr("复制为新内容"), tr("新名称"),
+        QLineEdit::Normal, displayName() + tr("副本"), &accepted);
+    if (!accepted) return;
     QString error;
-    if (!duplicateCurrentGoodsTo(target, &error))
-        QMessageBox::warning(this, tr("无法复制物品"), error);
+    const QString target = createContentFile(contentKind(), name, true, &error);
+    if (target.isEmpty()) QMessageBox::warning(this, tr("无法复制"), error);
+    else emit openGoodsShopFileRequested(target);
 }
 
 void GoodsShopEditorWindow::addSelectedGoodsToShop()
@@ -1556,7 +1605,7 @@ void GoodsShopEditorWindow::addSelectedGoodsToShop()
         return;
     const QString selectedPath =
         goodsList->currentItem()->data(Qt::UserRole).toString();
-    const QString iniFile = QFileInfo(selectedPath).fileName();
+    const QString iniFile = ContentAuthoring::referenceName(ContentKind::Goods, assetsBasePath, selectedPath);
     pushShopMutation(
         tr("加入商店"),
         [this, iniFile]() { return shopDocument.addItem(iniFile, 1); });
@@ -1576,7 +1625,7 @@ QString GoodsShopEditorWindow::goodsPathForReference(
     {
         return {};
     }
-    return QFileInfo(absolutePath).isFile() ? absolutePath : QString();
+    return ContentAuthoring::resolve(assetsBasePath, "ini/goods/" + QDir::fromNativeSeparators(iniFile.trimmed()));
 }
 
 QStringList GoodsShopEditorWindow::imageCandidates(
@@ -1641,8 +1690,9 @@ void GoodsShopEditorWindow::showPreview(
     }
     for (const QString& candidate : imageCandidates(reference))
     {
+        const QString source = ContentAuthoring::resolve(assetsBasePath, candidate);
         AssetPreviewData preview;
-        if (AssetPreviewLoader::load(assetsBasePath, candidate, &preview) &&
+        if (!source.isEmpty() && AssetPreviewLoader::load(QFileInfo(source).path(), QFileInfo(source).fileName(), &preview) &&
             preview.kind == AssetPreviewKind::Image)
         {
             label->setSourceImage(preview.image);
@@ -1702,8 +1752,7 @@ void GoodsShopEditorWindow::retranslateDynamicUi()
         undoAction->setText(tr("撤销"));
     if (redoAction)
         redoAction->setText(tr("重做"));
-    if (duplicateAction)
-        duplicateAction->setText(tr("复制物品…"));
+    retranslateAuthoringActions();
     if (playtestAction)
     {
         playtestAction->setText(tr("试玩当前内容"));

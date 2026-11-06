@@ -46,6 +46,8 @@ struct GameProfile
     bool partnerFollowRunRadiusDefined = false;
 
     // [Combat]
+    MagicTimingMode magicTimingMode = MagicTimingMode::FixedMilliseconds;
+    bool magicTimingModeDefined = false;
     int minimumMagicDamage = 10;
     bool minimumMagicDamageDefined = false;
     MagicEffectCalculationMode magicEffectCalculationMode =
@@ -64,6 +66,8 @@ struct GameProfile
     QMap<QString, QString> invalidActionReleaseFrameRatios;
 
     // [Script]
+    ScriptMoveScreenProfile moveScreenProfile = ScriptMoveScreenProfile::CSharp;
+    bool moveScreenProfileDefined = false;
     QString scriptPlayerName;
     ScriptNpcActionProfile npcActionProfile =
         ScriptNpcActionProfile::Legacy;

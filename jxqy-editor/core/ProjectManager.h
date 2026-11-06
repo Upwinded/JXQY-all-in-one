@@ -169,6 +169,7 @@ public:
     QStringList recentFiles() const;
     void addRecentFile(const QString& fileName);
     void clearRecentFiles();
+    void setRecentFiles(const QStringList& fileNames);
 
     QString theme() const;
     void setTheme(const QString& theme);
@@ -178,6 +179,8 @@ public:
     WindowDisplayMode windowMode() const;
     void setWindowMode(WindowDisplayMode mode);
     void setWindowPlacement(const QRect& normalGeometry, WindowDisplayMode mode);
+    void setWindowPlacement(const QRect& normalGeometry, WindowDisplayMode mode,
+                            const QByteArray& windowState);
     bool hasWindowPlacement() const;
 
     QByteArray windowState() const;

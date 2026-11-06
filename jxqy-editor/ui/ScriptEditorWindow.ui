@@ -13,7 +13,7 @@
   <property name="windowTitle">
    <string>脚本编辑器</string>
   </property>
-  <layout class="QVBoxLayout" name="mainLayout">
+  <layout class="QVBoxLayout" name="mainLayout" stretch="0,1,0">
    <item>
     <layout class="QHBoxLayout" name="toolbarLayout">
      <item>
@@ -54,12 +54,25 @@
      <item>
       <widget class="QPushButton" name="insertApiCallButton">
        <property name="text">
-        <string>插入 API 调用...</string>
+        <string>指令列表…</string>
        </property>
        <property name="toolTip">
-        <string>填写参数并插入当前运行时支持的标准 Lua 调用</string>
+        <string>直接浏览当前游戏指令，查看说明与示例并插入；可按名称或中文用途搜索</string>
        </property>
       </widget>
+     </item>
+     <item>
+      <spacer name="toolbarSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
      </item>
     </layout>
    </item>

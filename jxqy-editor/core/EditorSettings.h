@@ -57,6 +57,20 @@ ConfigurationMigrationResult migrateLegacyConfiguration(
     const QString& legacyPath,
     const QString& targetPath);
 QSettings create();
+struct SynchronizationResult
+{
+    QSettings::Status status = QSettings::NoError;
+    QSettings::Status firstError = QSettings::NoError;
+    int attempts = 1;
+
+    bool succeeded() const
+    {
+        return status == QSettings::NoError;
+    }
+};
+
+bool setValueIfChanged(QSettings& settings, const QString& key, const QVariant& value);
+SynchronizationResult synchronize(QSettings& settings);
 DesktopExecutableValidation validateDesktopGameExecutable(
     const QString& selectedPath);
 DesktopExecutableValidation discoverDesktopGameExecutable(

@@ -5,6 +5,9 @@
 #include "../GameManager/GameManager.h"
 
 #include <utility>
+#include <algorithm>
+#include <cstdlib>
+#include "../../File/File.h"
 
 PartnerHeadMenu::PartnerHeadMenu()
 {
@@ -28,7 +31,38 @@ void PartnerHeadMenu::init()
 	alignX = 0;
 	alignY = 0;
 	coverMouse = false;
-
+	layout = PartnerHeadLayout();
+	const std::string themed = "ini/ui/qingyu/partnerhead/partnerhead.menu.ini";
+	if (File::fileExist(PartnerHeadLayout::MenuFile)
+		|| (gm != nullptr && gm->global.feature.qingyuUi && File::fileExist(themed)))
+	{
+		loadMenuDefinition(PartnerHeadLayout::MenuFile);
+		if (auto head = getComponentByName<Item>("head"))
+		{
+			layout.head = head->rect;
+			layout.stretch = head->stretch && head->rect.w > 0 && head->rect.h > 0;
+		}
+		if (auto level = getComponentByName<Label>("level"))
+		{
+			layout.level = level->rect;
+			layout.font = level->fontSize;
+			layout.color = level->color;
+		}
+		for (const auto& definition : componentDefinitions)
+		{
+			if (definition.name != "head" || definition.spacingY.empty()) continue;
+			char* end = nullptr;
+			const long value = std::strtol(definition.spacingY.c_str(), &end, 10);
+			if (end != definition.spacingY.c_str() && *end == 0 && value >= 0 && value <= 100000)
+				layout.spacingY = static_cast<int>(value);
+		}
+		// Configured controls are templates, never extra interactive partners.
+		for (auto& component : componentMap)
+		{
+			component.second->visible = false;
+			component.second->activated = false;
+		}
+	}
 	refreshPartnerButtons();
 }
 
@@ -64,7 +98,7 @@ void PartnerHeadMenu::ensurePartnerControls(size_t count)
 		partnerHeadItems.push_back(item);
 
 		std::shared_ptr<Label> label;
-		makeLabel(label, { HeadStartX, HeadStartY, LevelTextWidth, LevelTextHeight }, LevelFontSize, 0xFFFFFFFF);
+		makeLabel(label, layout.level, layout.font, layout.color);
 		levelLabels.push_back(label);
 	}
 }
@@ -97,11 +131,12 @@ void PartnerHeadMenu::refreshPartnerButtons()
 
 	auto partners = gm->partnerManager.findPartnersFromNPCManager();
 	size_t controlIndex = 0;
-	int y = HeadStartY;
+	rect.w = 160;
+	int y = layout.head.y;
 	if (gm->global.feature.qingyuUi && gm->menu != nullptr && gm->menu->columnMenu != nullptr)
 	{
 		const auto& statusRect = gm->menu->columnMenu->rect;
-		y = statusRect.y + statusRect.h + HeadStartY;
+		y = statusRect.y + statusRect.h + layout.head.y;
 	}
 
 	for (auto& partner : partners)
@@ -121,8 +156,8 @@ void PartnerHeadMenu::refreshPartnerButtons()
 		auto& item = partnerHeadItems[controlIndex];
 		auto& label = levelLabels[controlIndex];
 
-		int width = 32;
-		int height = 32;
+		int width = PartnerHeadLayout().head.w;
+		int height = PartnerHeadLayout().head.h;
 		auto firstFrame = IMP::loadImage(headImage, 0);
 		if (firstFrame != nullptr)
 		{
@@ -134,28 +169,23 @@ void PartnerHeadMenu::refreshPartnerButtons()
 			item->visible = true;
 			item->activated = partner->canViewPartnerDetails();
 			item->impImage = headImage;
-			item->rect = { HeadStartX, y, width, height };
+			item->stretch = layout.stretch;
+			item->rect = layout.headRectangle(width, height, y);
 		}
 		if (label != nullptr)
 		{
-			label->rect =
-			{
-				HeadStartX + width + 3,
-				y + height - LevelTextHeight,
-				LevelTextWidth,
-				LevelTextHeight
-			};
+			label->rect = layout.levelRectangle(item->rect);
 			label->visible = partner->canLevelUp > 0;
+			rect.w = std::max(rect.w, label->rect.x + label->rect.w);
 			label->setStr(label->visible ? "LV" + std::to_string(partner->level) : "");
 		}
 
 		displayedPartners.push_back(partner);
-		y += height + HeadGapY;
+		y += item->rect.h + layout.spacingY;
 		controlIndex++;
 	}
 
-	rect.w = 160;
-	rect.h = y + HeadGapY;
+	rect.h = y + layout.spacingY;
 	synchronizeControllerFocus();
 }
 
@@ -273,7 +303,7 @@ bool PartnerHeadMenu::openFirstPartnerEquipMenu()
 void PartnerHeadMenu::makeHeadItem(std::shared_ptr<Item>& item)
 {
 	item = std::make_shared<Item>();
-	item->rect = { HeadStartX, HeadStartY, 32, 32 };
+	item->rect = layout.head;
 	item->canDrag = false;
 	item->canDrop = false;
 	item->canShowHint = false;
@@ -445,6 +475,6 @@ void PartnerHeadMenu::freeResource()
 	displayedPartners.clear();
 	controllerPartnerIdentities.clear();
 	headImageCache.clear();
-	Panel::freeResource();
+	ConfigDrivenPanel::freeResource();
 	removeAllChild();
 }

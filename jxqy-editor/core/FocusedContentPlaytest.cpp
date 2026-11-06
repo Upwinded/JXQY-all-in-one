@@ -73,8 +73,11 @@ FocusedContentPlaytestBootstrap buildFocusedContentPlaytestBootstrap(
 
     const QString mapName =
         QFileInfo(normalizedMapPath).completeBaseName();
-    const QString targetName =
-        targetFileName(normalizedTargetPath);
+    const QString prefix = kind == FocusedContentPlaytestKind::Magic ? QStringLiteral("ini/magic/")
+        : kind == FocusedContentPlaytestKind::Goods ? QStringLiteral("ini/goods/")
+        : kind == FocusedContentPlaytestKind::Shop ? QStringLiteral("ini/buy/") : QString();
+    const QString targetName = !prefix.isEmpty() && normalizedTargetPath.startsWith(prefix, Qt::CaseInsensitive)
+        ? normalizedTargetPath.mid(prefix.size()) : targetFileName(normalizedTargetPath);
     if (mapName.isEmpty() || targetName.isEmpty())
     {
         result.diagnosticCode = QStringLiteral(

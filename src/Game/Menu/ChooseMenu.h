@@ -19,6 +19,7 @@ class ChooseMenu :
 	friend class GamepadEssentialUITestAccess;
 	friend class GamepadSurfaceContractTestAccess;
 	friend class CoreLifecycleTestAccess;
+	friend class MenuMouseWheelTestAccess;
 public:
 	ChooseMenu();
 	virtual ~ChooseMenu();
@@ -65,6 +66,7 @@ private:
 	std::shared_ptr<ImageContainer> portraitImage = nullptr;
 	std::shared_ptr<ChooseTextButton> selectA = nullptr;
 	std::shared_ptr<ChooseTextButton> selectB = nullptr;
+	std::shared_ptr<INIReader> choiceButtonTemplate;
 	std::shared_ptr<ChooseTextButton> previousPageButton = nullptr;
 	std::shared_ptr<ChooseTextButton> nextPageButton = nullptr;
 	std::shared_ptr<ChooseTextButton> multipleConfirmButton = nullptr;
@@ -104,6 +106,7 @@ private:
 	void changePage(int offset);
 	void applyChoiceState();
 	std::shared_ptr<ChooseTextButton> getOrCreateChoiceButton(size_t displayIndex);
+	void initializeChoiceButton(const std::shared_ptr<ChooseTextButton>& button);
 	std::shared_ptr<ChooseTextButton> getOrCreateMultipleControlButton(std::shared_ptr<ChooseTextButton>& button, const std::string& text);
 	std::shared_ptr<ChooseTextButton> getOrCreatePageButton(std::shared_ptr<ChooseTextButton>& button);
 	void updateChoiceButtons();

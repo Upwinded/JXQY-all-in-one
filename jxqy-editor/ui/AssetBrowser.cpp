@@ -1,6 +1,7 @@
 #include "AssetBrowser.h"
 #include "ui_AssetBrowser.h"
 #include "AssetDragDrop.h"
+#include "FilePickerHelper.h"
 #include "../core/EditorAssetPath.h"
 
 #include <QAbstractItemView>
@@ -411,7 +412,8 @@ void AssetBrowser::updatePathLabel()
 {
     ui->pathLabel->setText(assetsBasePath.isEmpty() || !QDir(assetsBasePath).exists()
         ? tr("资源目录: 未设置")
-        : tr("资源目录: %1").arg(assetsBasePath));
+        : tr("资源包：%1").arg(QFileInfo(assetsBasePath).fileName()));
+    ui->pathLabel->setToolTip(assetsBasePath);
 }
 
 void AssetBrowser::setAssetsBasePath(const QString& path)
@@ -438,6 +440,20 @@ void AssetBrowser::setAssetsBasePath(const QString& path)
 QString AssetBrowser::getAssetsBasePath() const
 {
     return assetsBasePath;
+}
+
+void AssetBrowser::enableProjectResourceSearch()
+{
+    ui->searchEdit->hide();
+    auto* search = new QPushButton(tr("查找资源…"), this);
+    search->setObjectName("projectFindResourceButton");
+    search->setToolTip(tr("搜索项目和基础内容，同名文件只显示当前生效版本。"));
+    ui->filterLayout->addWidget(search);
+    connect(search, &QPushButton::clicked, this, [this]()
+    {
+        const QString path = FilePickerHelper::chooseResourceFile(this, assetsBasePath, {}, currentSuffixes);
+        if (!path.isEmpty()) emit resolvedFileOpenRequested(path);
+    });
 }
 
 void AssetBrowser::setFilterSuffix(const QString& suffix)
@@ -519,6 +535,28 @@ void AssetBrowser::applyFilter()
 {
     fileSystemModel->setNameFilters(currentSuffixes);
     fileSystemModel->setNameFilterDisables(false);
+}
+
+void AssetBrowser::revealRelativePath(const QString& relativePath)
+{
+    const QString path = QDir(assetsBasePath).filePath(QDir::fromNativeSeparators(relativePath));
+    if (!EditorAssetPath::isLexicallyInside(assetsBasePath, path))
+        return;
+    const QModelIndex source = fileSystemModel->index(path);
+    QModelIndex index = proxyModel->mapFromSource(source);
+    if (!index.isValid() && !ui->searchEdit->text().isEmpty())
+    {
+        ui->searchEdit->clear();
+        index = proxyModel->mapFromSource(source);
+    }
+    if (index.isValid())
+    {
+        for (QModelIndex parent = index.parent(); parent.isValid() && parent != ui->treeView->rootIndex(); parent = parent.parent())
+            ui->treeView->expand(parent);
+        ui->treeView->setCurrentIndex(index);
+        ui->treeView->scrollTo(index);
+    }
+    previewRelativePath(relativePath);
 }
 
 bool AssetBrowser::previewRelativePath(const QString& relativePath)

@@ -154,6 +154,9 @@ Label::~Label()
 void Label::initFromIni(INIReader & ini)
 {
 	Item::initFromIni(ini);
+	autoNextLineConfigured = !ini.Get("Init", "AutoNextLine", "").empty();
+	autoShrinkConfigured = !ini.Get("Init", "AutoShrink", "").empty();
+	minimumFontConfigured = !ini.Get("Init", "MinimumFont", "").empty();
 	autoShrink = ini.GetBoolean("Init", "AutoShrink", autoShrink);
 	elideOverflow = ini.GetBoolean("Init", "ElideOverflow", elideOverflow);
 	minimumFontSize = ini.GetInteger("Init", "MinimumFont", minimumFontSize);

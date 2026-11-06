@@ -81,6 +81,7 @@ public:
 	int focusedVisibleIndex() const;
 	int focusedLogicalIndex() const;
 	bool focusLogicalIndex(int logicalIndex);
+	bool scrollRows(int rowDelta);
 	void setNeighbour(
 		int fromVisibleIndex,
 		UIFocusDirection direction,
@@ -104,7 +105,6 @@ private:
 	void restoreBindingState();
 	bool focusVisibleIndex(int visibleIndex);
 	bool navigate(int visibleIndex, UIFocusDirection direction);
-	bool scrollRows(int rowDelta);
 	void invoke(
 		const SlotGridBinding::SlotAction& action,
 		int visibleIndex);
@@ -204,6 +204,7 @@ public:
 	int focusedVisibleIndex() const;
 	int focusedLogicalIndex() const;
 	bool focusLogicalIndex(int logicalIndex);
+	bool scrollRows(int rowDelta);
 	void setNeighbour(
 		int fromVisibleIndex,
 		UIFocusDirection direction,

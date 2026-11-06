@@ -117,6 +117,8 @@ QString MagicDocument::text(MagicTextField field) const
 
 void MagicDocument::setText(MagicTextField field, const QString& value)
 {
+    if (text(field) == value)
+        return;
     ini.set("Init", textKey(field), value.toUtf8().toStdString());
 }
 
@@ -187,11 +189,53 @@ int MagicDocument::hiddenFieldCount() const
         }
         for (const auto& keyPair : sectionPair.second.keys)
         {
-            if (visible->find(keyPair.first) == visible->end())
+            const QString key = QString::fromStdString(keyPair.first);
+            if (visible->find(keyPair.first) == visible->end() &&
+                !linkedFileKeys().contains(key, Qt::CaseInsensitive) &&
+                !linkedParameterKeys().contains(key, Qt::CaseInsensitive))
                 ++count;
         }
     }
     return count;
+}
+
+QStringList MagicDocument::linkedFileKeys()
+{
+    return {"FlyMagic", "ExplodeMagicFile", "ParasiticMagic", "RandMagicFile", "SecondMagicFile",
+        "MagicWhenNewPos", "MagicToUseWhenKillEnemy", "BounceFlyEndMagic", "ChangeMagic", "JumpEndMagic"};
+}
+
+QStringList MagicDocument::linkedParameterKeys()
+{
+    return {"FlyInterval", "RandMagicProbability", "SecondMagicDelay", "Parasitic", "ParasiticInterval",
+        "ParasiticMaxEffect", "HitCountToChangeMagic", "BounceFly", "JumpToTarget", "ExplodeWhenLifeFrameEnd"};
+}
+
+QString MagicDocument::linkedValue(const QString& key, int level) const
+{
+    const std::string name = key.toStdString();
+    const auto base = ini.get("Init", name, "");
+    // Runtime linked effects use the exact level with Init fallback, not the previous level.
+    return QString::fromStdString(level > 0 && key != "ExplodeWhenLifeFrameEnd"
+        ? ini.get(sectionName(std::clamp(level, 1, MaximumLevel)), name, base) : base);
+}
+
+bool MagicDocument::hasLinkedOverride(const QString& key, int level) const
+{
+    return level > 0 && key != "ExplodeWhenLifeFrameEnd" && ini.hasKey(sectionName(std::clamp(level, 1, MaximumLevel)), key.toStdString());
+}
+
+void MagicDocument::setLinkedValue(const QString& key, const QString& value, int level)
+{
+    if (!linkedFileKeys().contains(key, Qt::CaseInsensitive) && !linkedParameterKeys().contains(key, Qt::CaseInsensitive)) return;
+    if (key == "ExplodeWhenLifeFrameEnd") level = 0;
+    if (level == 0 && linkedValue(key).isEmpty() && value.isEmpty()) return;
+    ini.set(sectionName(std::clamp(level, 0, MaximumLevel)), key.toStdString(), value.toStdString());
+}
+
+void MagicDocument::removeLinkedOverride(const QString& key, int level)
+{
+    if (level > 0 && key != "ExplodeWhenLifeFrameEnd") ini.removeKey(sectionName(std::clamp(level, 1, MaximumLevel)), key.toStdString());
 }
 
 const char* MagicDocument::textKey(MagicTextField field)

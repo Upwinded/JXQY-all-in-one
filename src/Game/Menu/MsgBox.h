@@ -13,7 +13,7 @@ public:
 	UTime beginTime = 0;
 	UTime showinUTime = 3500;
 	std::string currentMessage;
-	void showMessage(const std::string & str, UTime duration = 3500);
+	void showMessage(const std::string & str, UTime duration = 0);
 	virtual void onUpdate() override;
 	virtual void init() override;
 	void freeResource();

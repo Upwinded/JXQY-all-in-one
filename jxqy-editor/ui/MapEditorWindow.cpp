@@ -1,4 +1,5 @@
 #include "MapEditorWindow.h"
+#include "EditorSaveConfirmation.h"
 #include "MapRenderCanvas.h"
 #include "MpcPreviewLabel.h"
 #include "EntityPropertyDialog.h"
@@ -9,6 +10,12 @@
 #include "../core/AuthoringMutationGate.h"
 #include "../core/ImageResourceCandidates.h"
 #include "../core/DurableFileTransaction.h"
+#include "../core/ContentAuthoring.h"
+#include "../core/GameProfile.h"
+#include "../core/EditorAssetPath.h"
+#include <QFile>
+#include <QRegularExpression>
+#include <QSet>
 
 #include <algorithm>
 #include <climits>
@@ -17,6 +24,7 @@
 #include <QScrollArea>
 #include <QFileInfo>
 #include <QDir>
+#include <QDirIterator>
 #include <QSaveFile>
 #include <QSignalBlocker>
 #include <QMessageBox>
@@ -850,6 +858,21 @@ void MapEditorWindow::setupMenuBar()
     mapFileMenu = menuBar->addMenu(tr("文件"));
     mapFileMenu->setObjectName(QStringLiteral("mapFileMenu"));
     mapFileMenu->addAction(ui->actionNewMap);
+    auto* copyMap = mapFileMenu->addAction(tr("复制地图及已加载列表…"));
+    copyMap->setObjectName("copyMapDocumentAction");
+    connect(copyMap, &QAction::triggered, this, [this]()
+    {
+        bool accepted = false;
+        const QString name = QInputDialog::getText(this, tr("复制地图"),
+            tr("新地图名（复制已加载的NPC／物体列表及地图脚本；图片资源沿用）"), QLineEdit::Normal,
+            QFileInfo(currentMapFileName).completeBaseName() + tr("副本"), &accepted).trimmed();
+        if (!accepted) return;
+        if (name.isEmpty() || name.startsWith('.') || name.contains(QRegularExpression("[\\\\/:*?\"<>|\\r\\n]")))
+        { QMessageBox::warning(this, tr("无法复制"), tr("请输入有效地图名，不包含目录或特殊字符。")); return; }
+        QString error;
+        if (!copyMapFile(QDir(assetsBasePath).filePath("map/" + name + ".map"), &error))
+            QMessageBox::warning(this, tr("无法复制"), error);
+    });
     mapFileMenu->addAction(ui->actionOpenMap);
     mapFileMenu->addAction(ui->actionSaveMap);
     mapFileMenu->addAction(ui->actionSaveMapAs);
@@ -1561,13 +1584,16 @@ bool MapEditorWindow::hasDocumentTargetConflict(
 
 bool MapEditorWindow::openMapFile(const QString& fileName)
 {
+    const QString target = ContentAuthoring::projectPath(assetsBasePath, fileName);
+    const QString source = QFileInfo(target).isFile() ? target : fileName;
     if (fileName.trimmed().isEmpty() ||
-        !canAdoptDocumentPath(currentMapFileName, fileName))
+        !canAdoptDocumentPath(currentMapFileName, target))
     {
         return false;
     }
 
-    if (!mapEditor.loadFromFile(fileName.toUtf8().toStdString()))
+    const EditorFileState openedState = EditorFileState::read(source, target);
+    if (!openedState.isReadable() || !mapEditor.loadFromFile(source.toUtf8().toStdString()))
     {
         QMessageBox::warning(this, tr("错误"),
             tr("无法加载地图文件: %1\n%2")
@@ -1580,10 +1606,11 @@ bool MapEditorWindow::openMapFile(const QString& fileName)
     // redo-only resource payload can now be retired safely.
     discardPendingMpcResources();
 
-    currentMapFileName = fileName;
+    currentMapFileName = target;
+    mapFileState = openedState;
     isModified = false;
 
-    mapEditor.setMapFileName(fileName.toUtf8().toStdString());
+    mapEditor.setMapFileName(target.toUtf8().toStdString());
 
     mpcCache.setAssetsBasePath(assetsBasePath.toUtf8().toStdString());
     mpcCache.clearCache();
@@ -1609,7 +1636,9 @@ bool MapEditorWindow::openMapFile(const QString& fileName)
     canvas->clearSelection();
     canvas->clearTransientEditState();
     currentNpcFileName.clear();
+    npcFileState = {};
     currentObjectFileName.clear();
+    objectFileState = {};
     isNpcListOpen = false;
     isObjectListOpen = false;
     npcListLoadedFromRuntimeSave = false;
@@ -1633,7 +1662,7 @@ bool MapEditorWindow::openMapFile(const QString& fileName)
     minimapWidget->setMapFileEditor(&mapEditor);
     minimapWidget->refreshMinimap();
 
-    QFileInfo mapInfo(fileName);
+    QFileInfo mapInfo(target);
     QString baseDir = mapInfo.absolutePath();
     QString baseName = mapInfo.completeBaseName();
 
@@ -1657,7 +1686,7 @@ bool MapEditorWindow::openMapFile(const QString& fileName)
         npcListLoaded = tryLoadNpcList(saveNpcFile);
         if (!npcListLoaded && !npcListBlockedByOwner)
         {
-            QString templateNpcFile = assetsBasePath + "/ini/save/" + baseName + ".npc";
+            QString templateNpcFile = ContentAuthoring::resolve(assetsBasePath, "ini/save/" + baseName + ".npc");
             npcListLoaded = tryLoadNpcList(templateNpcFile);
         }
     }
@@ -1688,7 +1717,7 @@ bool MapEditorWindow::openMapFile(const QString& fileName)
         objectListLoaded = tryLoadObjectList(saveObjFile);
         if (!objectListLoaded && !objectListBlockedByOwner)
         {
-            QString templateObjFile = assetsBasePath + "/ini/save/" + baseName + ".obj";
+            QString templateObjFile = ContentAuthoring::resolve(assetsBasePath, "ini/save/" + baseName + ".obj");
             objectListLoaded = tryLoadObjectList(templateObjFile);
         }
     }
@@ -1731,6 +1760,8 @@ bool MapEditorWindow::createNewMap(int width, int height)
     discardPendingMpcResources();
 
     currentMapFileName.clear();
+
+    mapFileState = {};
     isModified = true;
     mapEditor.setMapFileName("");
 
@@ -1747,7 +1778,9 @@ bool MapEditorWindow::createNewMap(int width, int height)
     canvas->clearSelection();
     canvas->clearTransientEditState();
     currentNpcFileName.clear();
+    npcFileState = {};
     currentObjectFileName.clear();
+    objectFileState = {};
     isNpcListOpen = false;
     isObjectListOpen = false;
     npcListLoadedFromRuntimeSave = false;
@@ -1941,7 +1974,16 @@ bool MapEditorWindow::saveMapFile(const QString& fileName)
         }
     }
 
+    const EditorFileState expectedMap = mapFileState.forSave(fileName);
+    const EditorFileState expectedNpc = npcFileState.forSave(npcFileName);
+    const EditorFileState expectedObject = objectFileState.forSave(objFileName);
+    EditorFileState savedMap, savedNpc, savedObject;
     const QString transactionId = QUuid::createUuid().toString(QUuid::Id128);
+    if (!QDir().mkpath(baseDir))
+    {
+        QMessageBox::warning(this, tr("保存失败"), tr("无法创建地图目录：%1").arg(baseDir));
+        return false;
+    }
     QString mapTempPath = fileName + ".tmp." + transactionId;
     QString npcTempPath = npcFileName + ".tmp." + transactionId;
     QString objTempPath = objFileName + ".tmp." + transactionId;
@@ -2097,34 +2139,45 @@ bool MapEditorWindow::saveMapFile(const QString& fileName)
     }
 
     QString transactionError;
-    auto addPreparedWrite = [&](const QString& target, const QString& temporary)
+    auto addPreparedWrite = [&](const QString& target, const QString& temporary,
+                                const EditorFileState& expected, EditorFileState& saved)
     {
-        if (fileTransaction.addPreparedWrite(target, temporary, transactionError))
+        if (expected.prepareWrite(fileTransaction, target, temporary, saved, transactionError, EditorSaveConfirmation::forWindow(this)))
             return true;
         QFile::remove(mapTempPath);
         QFile::remove(npcTempPath);
         QFile::remove(objTempPath);
-        QMessageBox::warning(this, tr("保存失败"),
-            tr("无法准备多文件事务：\n%1").arg(transactionError));
+        if (!transactionError.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"), transactionError);
         return false;
     };
-    if (!addPreparedWrite(fileName, mapTempPath) ||
-        (shouldSaveNpc && !addPreparedWrite(npcFileName, npcTempPath)) ||
-        (shouldSaveObj && !addPreparedWrite(objFileName, objTempPath)))
+    if (!addPreparedWrite(fileName, mapTempPath, expectedMap, savedMap) ||
+        (shouldSaveNpc && !addPreparedWrite(npcFileName, npcTempPath, expectedNpc, savedNpc)) ||
+        (shouldSaveObj && !addPreparedWrite(objFileName, objTempPath, expectedObject, savedObject)))
     {
         return false;
     }
 
+    for (auto file = mapCopyScripts.cbegin(); file != mapCopyScripts.cend(); ++file)
+    {
+        if (!QDir().mkpath(QFileInfo(file.key()).path()) ||
+            !fileTransaction.addBytesWriteChecked(file.key(), file.value(), false, {}, transactionError))
+        {
+            QMessageBox::warning(this, tr("无法复制地图脚本"), transactionError);
+            return false;
+        }
+    }
     if (!fileTransaction.commit(transactionError))
     {
         QMessageBox::warning(this, tr("保存失败"),
-            tr("地图同代事务提交失败：\n%1").arg(transactionError));
+            transactionError);
         return false;
     }
     if (!transactionError.isEmpty())
         QMessageBox::warning(this, tr("事务清理警告"), transactionError);
 
     currentMapFileName = fileName;
+    mapFileState = savedMap;
     mapEditor.setMapFileName(fileName.toUtf8().toStdString());
     rollbackMpcPath = false;
     rollbackMapFileName = false;
@@ -2132,12 +2185,14 @@ bool MapEditorWindow::saveMapFile(const QString& fileName)
     if (shouldSaveNpc)
     {
         currentNpcFileName = npcFileName;
+        npcFileState = savedNpc;
         npcListLoadedFromRuntimeSave = false;
         undoRedoManager.markSaved(UndoDomain::NpcList);
     }
     if (shouldSaveObj)
     {
         currentObjectFileName = objFileName;
+        objectFileState = savedObject;
         objectListLoadedFromRuntimeSave = false;
         undoRedoManager.markSaved(UndoDomain::ObjectList);
     }
@@ -2155,10 +2210,82 @@ bool MapEditorWindow::saveMapFile()
     return saveMapFile(currentMapFileName);
 }
 
+bool MapEditorWindow::copyMapFile(const QString& fileName, QString* errorMessage)
+{
+    auto fail = [&](const QString& message) { if (errorMessage) *errorMessage = message; return false; };
+    if (errorMessage) errorMessage->clear();
+    if (!mapEditor.isLoaded() || assetsBasePath.isEmpty() || !EditorAssetPath::isInside(assetsBasePath, fileName))
+        return fail(tr("请先打开地图，并将副本保存在当前项目中。"));
+    const QString name = QFileInfo(fileName).completeBaseName();
+    if (QFileInfo::exists(fileName) || ContentAuthoring::mapNames(assetsBasePath).contains(name, Qt::CaseInsensitive) ||
+        !ContentAuthoring::resolve(assetsBasePath, "ini/save/" + name + ".npc").isEmpty() ||
+        !ContentAuthoring::resolve(assetsBasePath, "ini/save/" + name + ".obj").isEmpty())
+        return fail(tr("新地图或同名列表已经存在，请换一个名称。"));
+    const QString sourceDirectory = "script/map/" + QFileInfo(currentMapFileName).completeBaseName();
+    QHash<QString, QByteArray> scripts;
+    QSet<QString> found;
+    QStringList sources;
+    const auto scriptRoots = currentMapFileName.isEmpty() ? QList<ResourceContentRoot>()
+        : ResourcePackScanner::resolveContentRoots(assetsBasePath).roots;
+    for (const auto& root : scriptRoots)
+    {
+        if (!root.available) continue;
+        const QString directory = QDir(root.rootPath).filePath(sourceDirectory);
+        QDirIterator iterator(directory, QDir::Files, QDirIterator::Subdirectories);
+        while (iterator.hasNext())
+        {
+            const QString source = iterator.next();
+            const QString relative = QDir(directory).relativeFilePath(source);
+            if (found.contains(relative.toCaseFolded())) continue;
+            found.insert(relative.toCaseFolded());
+            const QString target = QDir(assetsBasePath).filePath("script/map/" + name + '/' + relative);
+            if (QFileInfo::exists(target)) return fail(tr("目标地图脚本目录已有同名文件，请换一个地图名称。"));
+            QFile input(source);
+            if (!input.open(QIODevice::ReadOnly)) return fail(tr("无法读取地图脚本：%1").arg(source));
+            scripts.insert(target, input.readAll());
+            sources.append(source);
+        }
+    }
+    QString error;
+    if (copyPreflight && !copyPreflight(sources, error)) return fail(error);
+    if (!QDir().mkpath(QFileInfo(fileName).path())) return fail(tr("无法创建地图目录。"));
+    const QString oldNpc = currentNpcFileName;
+    const QString oldObject = currentObjectFileName;
+    const EditorFileState oldMapState = mapFileState;
+    const EditorFileState oldNpcState = npcFileState;
+    const EditorFileState oldObjectState = objectFileState;
+    const bool oldNpcFlag = saveNpcWithMapCheck->isChecked();
+    const bool oldObjectFlag = saveObjWithMapCheck->isChecked();
+    if (isNpcListOpen) currentNpcFileName = QDir(assetsBasePath).filePath("ini/save/" + name + ".npc");
+    if (isObjectListOpen) currentObjectFileName = QDir(assetsBasePath).filePath("ini/save/" + name + ".obj");
+    mapFileState = EditorFileState::newFile(fileName);
+    npcFileState = EditorFileState::newFile(currentNpcFileName);
+    objectFileState = EditorFileState::newFile(currentObjectFileName);
+    saveNpcWithMapCheck->setChecked(isNpcListOpen);
+    saveObjWithMapCheck->setChecked(isObjectListOpen);
+    mapCopyScripts = std::move(scripts);
+    const bool saved = saveMapFile(fileName);
+    mapCopyScripts.clear();
+    if (!saved)
+    {
+        currentNpcFileName = oldNpc;
+        currentObjectFileName = oldObject;
+        mapFileState = oldMapState;
+        npcFileState = oldNpcState;
+        objectFileState = oldObjectState;
+        saveNpcWithMapCheck->setChecked(oldNpcFlag);
+        saveObjWithMapCheck->setChecked(oldObjectFlag);
+        return fail(tr("地图副本未保存，原地图及列表仍保留。"));
+    }
+    return true;
+}
+
 bool MapEditorWindow::loadNpcListFromFile(const QString& fileName, bool confirmReplacement)
 {
+    const QString target = ContentAuthoring::projectPath(assetsBasePath, fileName);
+    const QString source = QFileInfo(target).isFile() ? target : fileName;
     if (fileName.isEmpty() ||
-        !canAdoptDocumentPath(currentNpcFileName, fileName))
+        !canAdoptDocumentPath(currentNpcFileName, target))
         return false;
 
     if (confirmReplacement && isNpcListOpen && isNpcListModified)
@@ -2177,7 +2304,8 @@ bool MapEditorWindow::loadNpcListFromFile(const QString& fileName, bool confirmR
         }
     }
 
-    if (!canvas->loadNpcList(fileName.toUtf8().toStdString()))
+    const EditorFileState openedState = EditorFileState::read(source, target);
+    if (!openedState.isReadable() || !canvas->loadNpcList(source.toUtf8().toStdString()))
     {
         QMessageBox::warning(
             this, tr("加载失败"),
@@ -2185,7 +2313,8 @@ bool MapEditorWindow::loadNpcListFromFile(const QString& fileName, bool confirmR
         return false;
     }
 
-    currentNpcFileName = fileName;
+    currentNpcFileName = target;
+    npcFileState = openedState;
     npcListLoadedFromRuntimeSave =
         isRuntimeSaveListPath(assetsBasePath, fileName);
     isNpcListOpen = true;
@@ -2202,8 +2331,10 @@ bool MapEditorWindow::loadNpcListFromFile(const QString& fileName, bool confirmR
 
 bool MapEditorWindow::loadObjectListFromFile(const QString& fileName, bool confirmReplacement)
 {
+    const QString target = ContentAuthoring::projectPath(assetsBasePath, fileName);
+    const QString source = QFileInfo(target).isFile() ? target : fileName;
     if (fileName.isEmpty() ||
-        !canAdoptDocumentPath(currentObjectFileName, fileName))
+        !canAdoptDocumentPath(currentObjectFileName, target))
         return false;
 
     if (confirmReplacement && isObjectListOpen && isObjectListModified)
@@ -2222,7 +2353,8 @@ bool MapEditorWindow::loadObjectListFromFile(const QString& fileName, bool confi
         }
     }
 
-    if (!canvas->loadObjectList(fileName.toUtf8().toStdString()))
+    const EditorFileState openedState = EditorFileState::read(source, target);
+    if (!openedState.isReadable() || !canvas->loadObjectList(source.toUtf8().toStdString()))
     {
         QMessageBox::warning(
             this, tr("加载失败"),
@@ -2230,7 +2362,8 @@ bool MapEditorWindow::loadObjectListFromFile(const QString& fileName, bool confi
         return false;
     }
 
-    currentObjectFileName = fileName;
+    currentObjectFileName = target;
+    objectFileState = openedState;
     objectListLoadedFromRuntimeSave =
         isRuntimeSaveListPath(assetsBasePath, fileName);
     isObjectListOpen = true;
@@ -2245,7 +2378,7 @@ bool MapEditorWindow::loadObjectListFromFile(const QString& fileName, bool confi
     return true;
 }
 
-bool MapEditorWindow::saveNpcListToFile(const QString& fileName) const
+bool MapEditorWindow::saveEntityListToFile(const QString& fileName, bool npc, EditorFileState* savedState)
 {
     auto mutationLease =
         AuthoringMutationGate::instance().
@@ -2254,33 +2387,85 @@ bool MapEditorWindow::saveNpcListToFile(const QString& fileName) const
         return false;
     if (isRuntimeSaveListPath(assetsBasePath, fileName))
         return false;
-    return canvas->saveNpcList(fileName.toUtf8().toStdString());
+    if (!QDir().mkpath(QFileInfo(fileName).absolutePath())) return false;
+    EditorFileState& state = npc ? npcFileState : objectFileState;
+    const EditorFileState expected = state.forSave(fileName);
+    const QString temporaryPath = fileName + ".tmp." + QUuid::createUuid().toString(QUuid::Id128);
+    const bool serialized = npc ? canvas->saveNpcList(temporaryPath.toUtf8().toStdString())
+                                : canvas->saveObjectList(temporaryPath.toUtf8().toStdString());
+    DurableFileTransaction transaction(QFileInfo(fileName).absolutePath());
+    EditorFileState saved;
+    QString error = tr("无法保存列表：%1").arg(fileName);
+    if (!serialized || !expected.prepareWrite(transaction, fileName, temporaryPath, saved, error, EditorSaveConfirmation::forWindow(this)) ||
+        !transaction.commit(error))
+    {
+        QFile::remove(temporaryPath);
+        if (!error.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"), error);
+        return false;
+    }
+    if (savedState)
+        *savedState = saved;
+    const QString currentPath = npc ? currentNpcFileName : currentObjectFileName;
+    if (EditorAssetPath::logicalComparisonKey(fileName) == EditorAssetPath::logicalComparisonKey(currentPath))
+        state = saved;
+    return true;
 }
 
-bool MapEditorWindow::saveObjectListToFile(const QString& fileName) const
+bool MapEditorWindow::saveContentDocument(const QString& path)
 {
-    auto mutationLease =
-        AuthoringMutationGate::instance().
-            acquireMutationLeaseForPath(fileName);
-    if (!mutationLease)
+    const auto key = EditorAssetPath::logicalComparisonKey(path);
+    if (key == EditorAssetPath::logicalComparisonKey(currentNpcFileName))
+        return saveNpcListAsFile(currentNpcFileName);
+    if (key == EditorAssetPath::logicalComparisonKey(currentObjectFileName))
+        return saveObjectListAsFile(currentObjectFileName);
+    return key == EditorAssetPath::logicalComparisonKey(currentMapFileName) && saveMapFile();
+}
+
+bool MapEditorWindow::reloadContentDocument(const QString& path)
+{
+    const auto key = EditorAssetPath::logicalComparisonKey(path);
+    const bool npc = key == EditorAssetPath::logicalComparisonKey(currentNpcFileName);
+    const bool object = key == EditorAssetPath::logicalComparisonKey(currentObjectFileName);
+    if ((!npc && !object) || (npc && isNpcListModified) || (object && isObjectListModified))
         return false;
-    if (isRuntimeSaveListPath(assetsBasePath, fileName))
+    const int selected = canvas->getSelectedEntityIndex();
+    const auto* entity = canvas->getSelectedEntity();
+    const bool selectedNpc = entity ? entity->isNpc : npc;
+    const auto view = editingViewState();
+    const bool loaded = npc ? loadNpcListFromFile(path, false) : loadObjectListFromFile(path, false);
+    if (!loaded)
         return false;
-    return canvas->saveObjectList(fileName.toUtf8().toStdString());
+    restoreEditingViewState(view);
+    if (selected >= 0)
+        canvas->selectEntity(selected, selectedNpc);
+    return true;
+}
+
+bool MapEditorWindow::saveNpcListToFile(const QString& fileName)
+{
+    return saveEntityListToFile(fileName, true);
+}
+
+bool MapEditorWindow::saveObjectListToFile(const QString& fileName)
+{
+    return saveEntityListToFile(fileName, false);
 }
 
 bool MapEditorWindow::saveNpcListAsFile(const QString& fileName)
 {
+    EditorFileState saved;
     if (!isNpcListOpen || fileName.trimmed().isEmpty() ||
         isRuntimeSaveListPath(assetsBasePath, fileName) ||
         hasDocumentTargetConflict(ProjectDocumentType::NpcList, fileName) ||
         !canAdoptDocumentPath(currentNpcFileName, fileName) ||
-        !saveNpcListToFile(fileName))
+        !saveEntityListToFile(fileName, true, &saved))
     {
         return false;
     }
 
     currentNpcFileName = fileName;
+    npcFileState = saved;
     npcListLoadedFromRuntimeSave = false;
     undoRedoManager.markSaved(UndoDomain::NpcList);
     syncDirtyStateFromUndoHistory();
@@ -2289,16 +2474,18 @@ bool MapEditorWindow::saveNpcListAsFile(const QString& fileName)
 
 bool MapEditorWindow::saveObjectListAsFile(const QString& fileName)
 {
+    EditorFileState saved;
     if (!isObjectListOpen || fileName.trimmed().isEmpty() ||
         isRuntimeSaveListPath(assetsBasePath, fileName) ||
         hasDocumentTargetConflict(ProjectDocumentType::ObjectList, fileName) ||
         !canAdoptDocumentPath(currentObjectFileName, fileName) ||
-        !saveObjectListToFile(fileName))
+        !saveEntityListToFile(fileName, false, &saved))
     {
         return false;
     }
 
     currentObjectFileName = fileName;
+    objectFileState = saved;
     objectListLoadedFromRuntimeSave = false;
     undoRedoManager.markSaved(UndoDomain::ObjectList);
     syncDirtyStateFromUndoHistory();
@@ -2807,6 +2994,7 @@ void MapEditorWindow::onEntityPlaced(int index, bool isNpc)
         {
             isNpcListOpen = true;
             currentNpcFileName.clear();
+            npcFileState = {};
         }
     }
     else
@@ -2815,6 +3003,7 @@ void MapEditorWindow::onEntityPlaced(int index, bool isNpc)
         {
             isObjectListOpen = true;
             currentObjectFileName.clear();
+            objectFileState = {};
         }
     }
     syncDirtyStateFromUndoHistory();
@@ -3117,24 +3306,30 @@ void MapEditorWindow::onEditEntityProperties(int index, bool isNpc)
     EntityPropertyDialog dialog(this);
     dialog.setEntity(entity);
     dialog.setAssetsBasePath(assetsBasePath);
+    dialog.setMapName(currentMapFileName);
+    connect(&dialog, &EntityPropertyDialog::editScriptRequested, this, [this, &dialog](const QString& path)
+    {
+        emit editBoundScriptRequested(path, &dialog);
+    });
 
     if (dialog.exec() == QDialog::Accepted)
     {
         MapEntityData newEntityData = entity;
         if (!dialog.applyToEntity(newEntityData))
             return;
-        if (newEntityData == oldEntityData)
-            return;
-        entity = newEntityData;
-        canvas->clearEntityResImageCache();
-        undoRedoManager.pushCommand(new EntityPropertyEditCommand(
-            index, isNpc, oldEntityData, entity,
-            &canvas->getNpcListRef(), &canvas->getObjectListRef()));
-        syncDirtyStateFromUndoHistory();
-        updateEntityInfoPanel(index, isNpc);
-        if (isNpc) updateNpcListWidget();
-        else updateObjectListWidget();
-        canvas->update();
+        if (!(newEntityData == oldEntityData))
+        {
+            entity = newEntityData;
+            canvas->clearEntityResImageCache();
+            undoRedoManager.pushCommand(new EntityPropertyEditCommand(
+                index, isNpc, oldEntityData, entity,
+                &canvas->getNpcListRef(), &canvas->getObjectListRef()));
+            syncDirtyStateFromUndoHistory();
+            updateEntityInfoPanel(index, isNpc);
+            if (isNpc) updateNpcListWidget();
+            else updateObjectListWidget();
+            canvas->update();
+        }
     }
 }
 
@@ -6450,6 +6645,7 @@ void MapEditorWindow::closeNpcListDocument()
 
     canvas->getNpcListRef().clear();
     currentNpcFileName.clear();
+    npcFileState = {};
     npcListLoadedFromRuntimeSave = false;
     isNpcListOpen = false;
     isNpcListModified = false;
@@ -6544,6 +6740,7 @@ void MapEditorWindow::closeObjectListDocument()
 
     canvas->getObjectListRef().clear();
     currentObjectFileName.clear();
+    objectFileState = {};
     objectListLoadedFromRuntimeSave = false;
     isObjectListOpen = false;
     isObjectListModified = false;

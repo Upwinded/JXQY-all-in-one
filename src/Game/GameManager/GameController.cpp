@@ -334,7 +334,7 @@ void GameController::handlePhysicalMovement(
 	gm->player->cancelQueuedInteraction();
 
 	NextAction action;
-	action.action = running && gm->player->canRun ? acARun : acAWalk;
+	action.action = running && !gm->player->isRunDisabled() ? acARun : acAWalk;
 	const Point actorPosition = actionActor->getPosition();
 	for (int direction : directionList)
 	{
@@ -1321,7 +1321,7 @@ void GameController::onChildCallBack(PElement child)
 						}
 						if (tempNPC != nullptr)
 						{
-							const bool canRunToTarget = gm->player->canRun
+							const bool canRunToTarget = !gm->player->isRunDisabled()
 								&& gm->player->canPayRunThewCost();
 							act.action = canRunToTarget ? acRun : acWalk;
 							act.destKind = ndAttack;
@@ -1393,7 +1393,7 @@ void GameController::onChildCallBack(PElement child)
 						break;
 					}
 					NextAction act;
-					if (gm->player->canRun
+					if (!gm->player->isRunDisabled()
 						&& gm->player->canPayRunThewCost())
 					{
 						act.action = acRun;
@@ -1534,7 +1534,7 @@ void GameController::onEvent()
 	bool joystickAction = true;
 	if (joystickPanel->joystick->isRunning())
 	{
-		if (gm->player->canRun)
+		if (!gm->player->isRunDisabled())
 		{
 			act.action = acARun;
 		}
@@ -2200,7 +2200,7 @@ bool GameController::onHandleEvent(AEvent & e)
 		if (actionActor != nullptr && actionActor->nowAction != acDeath && actionActor->nowAction != acHide)
 		{
 			NextAction act;
-			if (!player->isControllingCharacter() && player->canRun
+			if (!player->isControllingCharacter() && !player->isRunDisabled()
 				&& player->canPayRunThewCost())
 			{
 				act.action = acRun;

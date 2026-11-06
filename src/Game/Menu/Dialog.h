@@ -8,6 +8,7 @@ class Dialog :
 	friend class GameplayAutomationSession;
 #endif
 	friend class CoreLifecycleTestAccess;
+	friend class FontSelectionTestAccess;
 public:
 	Dialog();
 	virtual ~Dialog();

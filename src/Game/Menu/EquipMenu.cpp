@@ -195,6 +195,14 @@ void EquipMenu::updateGoods(int index)
 void EquipMenu::updateMagicDisplay()
 {
 	updatePanelImage();
+	if (magicScrollbar)
+	{
+		auto partner = getSelectedPartner();
+		const int count = partner ? static_cast<int>(partner->getPartnerMagicList().size()) : gm->global.magicLayout.storeCount();
+		const int columns = std::max(1, magicScrollbar->lineSize);
+		magicScrollbar->max = (std::max(0, count - static_cast<int>(magicDisplayItem.size())) + columns - 1) / columns;
+		magicScrollbar->setPosition(std::min(magicScrollbar->position, magicScrollbar->max));
+	}
 
 	for (int i = 0; i < static_cast<int>(magicDisplayItem.size()); i++)
 	{
@@ -215,19 +223,14 @@ void EquipMenu::updateMagicDisplay(int index)
 		return;
 	}
 
-	if (getSelectedPartner())
-	{
-		magicDisplayItem[index]->canDrag = magicDisplayItem[index]->canDrop = false;
-		magicDisplayIniFile[index].clear();
-		magicDisplayItem[index]->impImage = nullptr;
-		return;
-	}
-	magicDisplayItem[index]->canDrop = true;
+	const bool partner = getSelectedPartner() != nullptr;
+	magicDisplayItem[index]->canDrop = !partner;
 	std::string iniFile;
 	int listIndex = getMagicDisplayStartIndex() + index;
-	if (gm->magicManager.magicListExists(listIndex))
+	const auto* info = displayedMagicInfo(listIndex);
+	if (info)
 	{
-		iniFile = gm->magicManager.magicList[listIndex].iniFile;
+		iniFile = info->iniFile;
 	}
 
 	magicDisplayItem[index]->canDrag = false;
@@ -242,23 +245,34 @@ void EquipMenu::updateMagicDisplay(int index)
 		return;
 	}
 
-	magicDisplayItem[index]->canDrag = true;
+	magicDisplayItem[index]->canDrag = !partner;
 	if (magicDisplayIniFile[index] == iniFile)
 	{
 		return;
 	}
 
 	magicDisplayIniFile[index] = iniFile;
-	magicDisplayItem[index]->impImage = MenuResource::createMagicMenuImage(gm->magicManager.magicList[listIndex].magic);
+	magicDisplayItem[index]->impImage = MenuResource::createMagicMenuImage(info->magic);
+}
+
+const MagicInfo* EquipMenu::displayedMagicInfo(int index) const
+{
+	if (auto partner = getSelectedPartner())
+	{
+		const auto& list = partner->getPartnerMagicList();
+		return index >= 0 && index < static_cast<int>(list.size()) ? &list[index] : nullptr;
+	}
+	return gm->magicManager.magicListExists(index) ? &gm->magicManager.magicList[index] : nullptr;
 }
 
 int EquipMenu::getMagicDisplayStartIndex() const
 {
+	const int begin = getSelectedPartner() ? 0 : gm->magicManager.storeBegin();
 	if (magicScrollbar == nullptr)
 	{
-		return gm->magicManager.storeBegin();
+		return begin;
 	}
-	return gm->magicManager.storeBegin() + magicScrollbar->position * magicScrollbar->lineSize;
+	return begin + magicScrollbar->position * magicScrollbar->lineSize;
 }
 
 void EquipMenu::quickEquipMagic(int sourceIndex)
@@ -481,6 +495,8 @@ bool EquipMenu::selectPartner(const std::shared_ptr<NPC>& partner)
 	deactivateControllerFocus();
 	selectedPartner = partner;
 	showingPartner = partner != nullptr;
+	configureControllerFocus();
+	if (gm->menu->magicMenu) gm->menu->magicMenu->showPartnerMagic(partner);
 	if (magicScrollbar) magicScrollbar->position = 0;
 	for (auto& file : magicDisplayIniFile) file.clear();
 	for (auto& item : magicDisplayItem) if (item) item->impImage = nullptr;
@@ -649,7 +665,9 @@ void EquipMenu::onEvent()
 			continue;
 		}
 #ifndef __MOBILE__
-		if (gm->global.feature.qingyuUi && (ret & erClick)
+		if (gm->menu != nullptr && gm->menu->toolTip != nullptr
+			&& gm->menu->toolTip->supportsFullDetails() && (ret & erClick)
+			&& !(ret & (erDropped | erDragEnd))
 			&& gm->goodsManager.goodsListExists(listIndex))
 		{
 			gm->menu->showGoodsToolTip(getMySharedPtr(),
@@ -737,16 +755,15 @@ void EquipMenu::onEvent()
 		}
 
 		unsigned int ret = magicDisplayItem[i]->getResult();
-		if (getSelectedPartner()) continue;
 		if (ret & erShowHint)
 		{
 			int listIndex = magicDisplayItem[i]->dragIndex;
-			if (gm->magicManager.magicListExists(listIndex))
+			if (const auto* info = displayedMagicInfo(listIndex))
 			{
 				gm->menu->showMagicToolTip(
 					getMySharedPtr(),
-					gm->magicManager.magicList[listIndex].magic,
-					gm->magicManager.magicList[listIndex].level,
+					info->magic,
+					info->level,
 					magicDisplayItem[i]);
 			}
 			else
@@ -757,6 +774,11 @@ void EquipMenu::onEvent()
 		if (ret & erHideHint)
 		{
 			gm->menu->toolTip->visible = false;
+		}
+		if (getSelectedPartner())
+		{
+			if (ret & (erClick | erMouseRDown)) showControllerMagicDetails(magicDisplayItem[i]->dragIndex, i);
+			continue;
 		}
 #ifdef __MOBILE__
 		if ((ret & erClick) || (ret & erMouseRDown))
@@ -988,6 +1010,7 @@ void EquipMenu::configureControllerFocus()
 			ControllerSlotKind::Magic,
 			ControllerSlotDomain::MagicList);
 	magicBinding.grid.focusIdPrefix = "integrated-magic-item-";
+	if (getSelectedPartner()) magicBinding.transfers = nullptr;
 	magicBinding.grid.items = magicDisplayItem;
 	magicBinding.grid.scrollbar = magicScrollbar;
 	magicBinding.grid.resolveLogicalIndex = [this](int visibleIndex)
@@ -1065,6 +1088,20 @@ void EquipMenu::configureEquipmentControllerNeighbours()
 	connect(5, UIFocusDirection::Down, 6);
 	connect(6, UIFocusDirection::Up, 5);
 	connect(6, UIFocusDirection::Right, 3);
+}
+
+bool EquipMenu::scrollMouseWheel(int steps)
+{
+	if (showingAttributes || !std::any_of(
+		magicDisplayItem.begin(), magicDisplayItem.end(),
+		[](const std::shared_ptr<Item>& item)
+		{
+			return item != nullptr && item->visible;
+		}))
+	{
+		return false;
+	}
+	return magicSlotController.scrollRows(steps);
 }
 
 bool EquipMenu::activateControllerFocus(ControllerFocusTarget target)
@@ -1262,13 +1299,18 @@ int EquipMenu::getControllerMagicIndex(int visibleIndex) const
 		return -1;
 	}
 	const int logicalIndex = getMagicDisplayStartIndex() + visibleIndex;
-	return !getSelectedPartner() && gm->magicManager.isStoreIndex(logicalIndex)
-		&& logicalIndex < gm->magicManager.listLength()
+	if (getSelectedPartner()) return displayedMagicInfo(logicalIndex) ? logicalIndex : -1;
+	return gm->magicManager.isStoreIndex(logicalIndex) && logicalIndex < gm->magicManager.listLength()
 		? logicalIndex : -1;
 }
 
-void EquipMenu::activateControllerMagic(int logicalIndex, int)
+void EquipMenu::activateControllerMagic(int logicalIndex, int visibleIndex)
 {
+	if (getSelectedPartner())
+	{
+		showControllerMagicDetails(logicalIndex, visibleIndex);
+		return;
+	}
 	if (gm == nullptr || gm->menu == nullptr
 		|| !gm->magicManager.isStoreIndex(logicalIndex))
 	{
@@ -1279,19 +1321,19 @@ void EquipMenu::activateControllerMagic(int logicalIndex, int)
 }
 void EquipMenu::showControllerMagicDetails(int logicalIndex, int visibleIndex)
 {
-	if (getSelectedPartner() || gm == nullptr || gm->menu == nullptr || gm->menu->toolTip == nullptr
+	if (gm == nullptr || gm->menu == nullptr || gm->menu->toolTip == nullptr
 		|| gm->menu->upMenu == nullptr || visibleIndex < 0
 		|| visibleIndex >= static_cast<int>(magicDisplayItem.size())
 		|| magicDisplayItem[visibleIndex] == nullptr
-		|| !gm->magicManager.magicListExists(logicalIndex))
+		|| !displayedMagicInfo(logicalIndex))
 	{
 		hideControllerDetails();
 		return;
 	}
 	gm->menu->showMagicToolTip(
 		getMySharedPtr(),
-		gm->magicManager.magicList[logicalIndex].magic,
-		gm->magicManager.magicList[logicalIndex].level,
+		displayedMagicInfo(logicalIndex)->magic,
+		displayedMagicInfo(logicalIndex)->level,
 		magicDisplayItem[visibleIndex]);
 }
 

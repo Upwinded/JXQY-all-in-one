@@ -4,23 +4,15 @@
 #include "../../File/File.h"
 #include "../../File/log.h"
 #include "../../Component/TextLayout.h"
+#include "../../Component/Panel.h"
+#include "../../Resource/FontCatalog.h"
+#include "../Config/Config.h"
 
 #include <algorithm>
 
 namespace
 {
-constexpr char ResourceFont[] = "font/font.ttf";
-constexpr char EngineFont[] = "engine/font/font.ttf";
-constexpr int MaximumBundledFontBytes = 32 * 1024 * 1024;
-constexpr int HorizontalMargin = 16;
-constexpr int MaximumNoticeWidth = 720;
-constexpr int NoticeHeight = 72;
-constexpr int NoticeTop = 20;
-constexpr int NoticePadding = 14;
-constexpr int NoticeFontSize = 18;
-constexpr unsigned int NoticeTextColor = 0xFFF4F4F4;
 constexpr std::size_t MaximumScriptMessages = 15;
-constexpr int ScriptLineHeight = NoticeFontSize + 3;
 }
 
 SystemNotice::SystemNotice(Mode mode) : mode(mode)
@@ -30,20 +22,17 @@ SystemNotice::SystemNotice(Mode mode) : mode(mode)
 	coverMouse = false;
 	needEvents = false;
 	setPriority(epMax);
-	if (!File::readActiveResourceFile(
-			ResourceFont,
-			fontData,
-			fontLength,
-			MaximumBundledFontBytes) &&
-		!File::readBundledApplicationFile(
-			EngineFont,
-			fontData,
-			fontLength,
-			MaximumBundledFontBytes))
+	auto selectedFont = ResourceFonts::loadGameFont(Config::fontId);
+	fontData = std::move(selectedFont.data);
+	fontLength = selectedFont.length;
+	fallbackFontData = std::move(selectedFont.fallback);
+	fallbackFontLength = selectedFont.fallbackLength;
+	if (!fontData || fontLength <= 0)
 	{
 		GameLog::write(
 			"SystemNotice: resource and engine fonts are unavailable\n");
 	}
+	loadDisplayLayout();
 	int width = 0;
 	int height = 0;
 	if (engine != nullptr)
@@ -120,13 +109,13 @@ void SystemNotice::onDraw()
 	{
 		engine->fillRect(
 			rect.x, rect.y, rect.w, rect.h,
-			24, 27, 32, 232);
+			(displayLayout.background >> 16) & 255, (displayLayout.background >> 8) & 255, displayLayout.background & 255, displayLayout.background >> 24);
 		engine->fillRect(
 			rect.x, rect.y, rect.w, 1,
-			154, 162, 174, 255);
+			(displayLayout.topBorder >> 16) & 255, (displayLayout.topBorder >> 8) & 255, displayLayout.topBorder & 255, displayLayout.topBorder >> 24);
 		engine->fillRect(
 			rect.x, rect.y + rect.h - 1, rect.w, 1,
-			82, 88, 98, 255);
+			(displayLayout.bottomBorder >> 16) & 255, (displayLayout.bottomBorder >> 8) & 255, displayLayout.bottomBorder & 255, displayLayout.bottomBorder >> 24);
 	}
 	if (textImage == nullptr)
 	{
@@ -181,28 +170,42 @@ void SystemNotice::onWindowResize(int width, int height)
 	updateLayout(width, height);
 }
 
+void SystemNotice::loadDisplayLayout()
+{
+    const auto file=SystemNoticeLayout::menuFile(mode==Mode::ScriptMessages);
+    if(!File::fileExist(file)) return;
+    INIReader menu(file);
+    const auto window=menu.Get("menu","window","");
+    if(!window.empty()) windowConfiguration=INIReader(window);
+    bool found=false;
+    for(int index=1;;++index)
+    {
+        const auto section="component"+std::to_string(index),type=menu.Get(section,"type","");
+        if(type.empty()) break;
+        if(menu.Get(section,"name","")!="text") continue;
+        if(found||type!="Label") {GameLog::write("SystemNotice: invalid fixed text role in %s\n",file);continue;}
+        found=true;const auto reference=menu.Get(section,"file","");
+        if(!reference.empty()) textConfiguration=INIReader(reference);
+    }
+}
+
 void SystemNotice::updateLayout(int width, int height)
 {
-	const int availableWidth = std::max(1, width - HorizontalMargin * 2);
-	const int noticeWidth = std::min(MaximumNoticeWidth, availableWidth);
-	if (mode == Mode::ScriptMessages)
-	{
-		const int bottom = std::max(1, height - 110);
-		const int top = std::min(bottom - 1, NoticeTop + NoticeHeight + 12);
-		const int stackHeight = std::min(static_cast<int>(MaximumScriptMessages) * ScriptLineHeight, bottom - top);
-		rect = { std::min(HorizontalMargin, std::max(0, width - 1)), bottom - stackHeight,
-			availableWidth, stackHeight };
-		refreshTextImage();
-		return;
-	}
-	rect =
-	{
-		std::max(0, (width - noticeWidth) / 2),
-		NoticeTop,
-		noticeWidth,
-		NoticeHeight
-	};
-	refreshTextImage();
+    const bool script=mode==Mode::ScriptMessages;
+    const int font=SystemNoticeLayout::integer(textConfiguration.Get("Init","Font",""),18,1,256);
+    const int gap=script?SystemNoticeLayout::integer(textConfiguration.Get("Init","LineGap",""),3,0,1024):3;
+    displayLayout=SystemNoticeLayout::defaults(width,height,script,font,gap);
+    displayLayout.padding=SystemNoticeLayout::integer(textConfiguration.Get("Init","HorizontalPadding",""),14,0);
+    displayLayout.color=textConfiguration.GetColor("Init","Color",displayLayout.color);
+    displayLayout.background=windowConfiguration.GetColor("Init","BackgroundColor",displayLayout.background);
+    displayLayout.topBorder=windowConfiguration.GetColor("Init","TopBorderColor",displayLayout.topBorder);
+    displayLayout.bottomBorder=windowConfiguration.GetColor("Init","BottomBorderColor",displayLayout.bottomBorder);
+    Panel panel;INIReader geometry;
+    for(const auto& field:std::vector<std::pair<const char*,int>>{{"Left",displayLayout.panel.x},{"Top",displayLayout.panel.y},{"Width",displayLayout.panel.w},{"Height",displayLayout.panel.h},{"AlignX",0},{"AlignY",0}})
+        geometry.SetInteger("Init",field.first,SystemNoticeLayout::integer(windowConfiguration.Get("Init",field.first,""),field.second,field.first==std::string("Width")||field.first==std::string("Height")?1:-100000));
+    geometry.Set("Init","Align",windowConfiguration.Get("Init","Align","alNone"));
+    panel.initFromIni(geometry);rect=panel.rect;displayLayout.panel=rect;
+    refreshTextImage();
 }
 
 void SystemNotice::refreshTextImage()
@@ -212,40 +215,24 @@ void SystemNotice::refreshTextImage()
 	{
 		return;
 	}
-	const int contentWidth = std::max(1, rect.w - NoticePadding * 2);
+	const int contentWidth = displayLayout.contentWidth();
 	if (mode == Mode::SingleNotice && currentMessage.find("<color=") == std::string::npos)
 	{
 		textImage = engine->createTextWithFontData(
 			fontData.get(),
 			static_cast<std::size_t>(fontLength),
 			currentMessage,
-			NoticeFontSize,
-			NoticeTextColor,
-			contentWidth);
+			displayLayout.font,
+			displayLayout.color,
+			contentWidth, fallbackFontData.get(), static_cast<std::size_t>(fallbackFontLength));
 		return;
 	}
 
-	std::vector<TextLayout::ColorTaggedTextLine> lines;
-	const int capacity = TextLayout::charactersPerLineForWidth(contentWidth, NoticeFontSize);
-	if (mode == Mode::ScriptMessages)
-	{
-		for (const auto& message : messages)
-		{
-			// Each message starts with the default color, including after an unclosed range tag.
-			auto messageLines = TextLayout::wrapColorTaggedUtf8Text(message.text, capacity, NoticeTextColor);
-			lines.insert(lines.end(), messageLines.begin(), messageLines.end());
-		}
-		const auto visibleLines = static_cast<std::size_t>(std::max(0, rect.h / ScriptLineHeight));
-		if (lines.size() > visibleLines)
-		{
-			lines.erase(lines.begin(), lines.end() - visibleLines);
-		}
-	}
-	else
-	{
-		lines = TextLayout::wrapColorTaggedUtf8Text(currentMessage, capacity, NoticeTextColor);
-	}
-	const int lineHeight = mode == Mode::ScriptMessages ? ScriptLineHeight : NoticeFontSize;
+    std::vector<std::string> texts;
+    if(mode==Mode::ScriptMessages) for(const auto& message:messages) texts.push_back(message.text);
+    else texts.push_back(currentMessage);
+    const auto lines=displayLayout.lines(texts,mode==Mode::ScriptMessages);
+    const int lineHeight=displayLayout.lineHeight(mode==Mode::ScriptMessages);
 	std::vector<std::vector<_shared_image>> lineImages;
 	std::vector<int> lineWidths;
 	int imageWidth = 0;
@@ -259,9 +246,9 @@ void SystemNotice::refreshTextImage()
 				fontData.get(),
 				static_cast<std::size_t>(fontLength),
 				run.text,
-				NoticeFontSize,
+				displayLayout.font,
 				run.color,
-				0);
+				0, fallbackFontData.get(), static_cast<std::size_t>(fallbackFontLength));
 			int runWidth = 0;
 			int runHeight = 0;
 			if (runImage != nullptr

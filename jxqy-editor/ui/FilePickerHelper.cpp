@@ -1,17 +1,25 @@
 #include "FilePickerHelper.h"
 #include "../core/AuthoringMutationGate.h"
 #include "../core/EditorAssetPath.h"
+#include "../core/ContentAuthoring.h"
+#include "../core/AssetPreviewLoader.h"
 
 #include <QCoreApplication>
+#include <QApplication>
 #include <QComboBox>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QFile>
 #include <QFileInfo>
 #include <QLineEdit>
+#include <QInputDialog>
 #include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QPixmap>
+#include <QRegularExpression>
+#include <QListWidget>
+#include <QSplitter>
 #include <QPushButton>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -22,6 +30,139 @@
 
 namespace FilePickerHelper
 {
+
+QString chooseResourceFile(QWidget* parent, const QString& assetsBasePath,
+    const QStringList& folders, const QStringList& nameFilters, const QString& query, QString* resourcePath)
+{
+    if (resourcePath) resourcePath->clear();
+    auto tr = [](const char* text) { return QCoreApplication::translate("FilePickerHelper", text); };
+    QString error;
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    const auto entries = ContentAuthoring::files(assetsBasePath, folders, nameFilters, &error);
+    QApplication::restoreOverrideCursor();
+    if (!error.isEmpty())
+    {
+        QMessageBox::warning(parent, tr("无法查找资源"), error);
+        return {};
+    }
+    QDialog dialog(parent);
+    dialog.setObjectName("resourceFileDialog");
+    dialog.setWindowTitle(tr("查找资源"));
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* hint = new QLabel(tr("输入文件名或路径。项目和基础内容一起查找，同名文件只显示当前生效版本。"), &dialog);
+    hint->setWordWrap(true);
+    layout->addWidget(hint);
+    auto* search = new QLineEdit(&dialog);
+    search->setObjectName("resourceFileSearch");
+    search->setPlaceholderText(tr("搜索文件名或路径…"));
+    layout->addWidget(search);
+    auto* splitter = new QSplitter(&dialog);
+    auto* list = new QListWidget(splitter);
+    list->setObjectName("resourceFileList");
+    list->setUniformItemSizes(true);
+    auto* preview = new QLabel(splitter);
+    preview->setObjectName("resourceFilePreview");
+    preview->setAlignment(Qt::AlignCenter);
+    preview->setTextFormat(Qt::PlainText);
+    preview->setWordWrap(true);
+    preview->setMinimumSize(220, 180);
+    splitter->setSizes({480, 260});
+    layout->addWidget(splitter, 1);
+    auto* status = new QLabel(&dialog);
+    status->setWordWrap(true);
+    layout->addWidget(status);
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel, &dialog);
+    layout->addWidget(buttons);
+    for (int index = 0; index < entries.size(); ++index)
+    {
+        auto* item = new QListWidgetItem(entries[index].resourcePath, list);
+        item->setData(Qt::UserRole, index);
+        item->setToolTip(entries[index].resourcePath);
+    }
+    QObject::connect(list, &QListWidget::currentItemChanged, &dialog, [&](QListWidgetItem* item)
+    {
+        preview->clear();
+        buttons->button(QDialogButtonBox::Open)->setEnabled(item);
+        if (!item) return;
+        const auto& entry = entries[item->data(Qt::UserRole).toInt()];
+        AssetPreviewData data;
+        const bool loaded = AssetPreviewLoader::load(entry.rootPath, entry.resourcePath, &data);
+        preview->setAlignment(data.kind == AssetPreviewKind::Text ? Qt::AlignLeft | Qt::AlignTop : Qt::AlignCenter);
+        if (loaded && !data.image.isNull())
+        {
+            preview->setPixmap(QPixmap::fromImage(data.image).scaled(300, 260, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+            status->setText(tr("%1\n%2×%3，%4帧").arg(entry.resourcePath).arg(data.imageWidth).arg(data.imageHeight).arg(data.frameCount));
+        }
+        else
+        {
+            if (loaded && data.kind == AssetPreviewKind::Text) preview->setText(data.text.left(1200));
+            status->setText(entry.resourcePath);
+        }
+    });
+    auto filter = [&](const QString& text)
+    {
+        QListWidgetItem* first = nullptr;
+        for (int row = 0; row < list->count(); ++row)
+        {
+            auto* item = list->item(row);
+            item->setHidden(!item->text().contains(text.trimmed(), Qt::CaseInsensitive));
+            if (!first && !item->isHidden()) first = item;
+        }
+        list->setCurrentItem(first);
+        buttons->button(QDialogButtonBox::Open)->setEnabled(first);
+        if (!first) status->setText(tr("没有匹配的资源，请换一个文件名或路径。"));
+    };
+    QObject::connect(search, &QLineEdit::textChanged, &dialog, filter);
+    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    QObject::connect(list, &QListWidget::itemDoubleClicked, &dialog, [&]() { dialog.accept(); });
+    search->setText(query);
+    filter(query);
+    search->setFocus();
+    dialog.resize(820, 560);
+    if (dialog.exec() != QDialog::Accepted || !list->currentItem()) return {};
+    const auto& selected = entries[list->currentItem()->data(Qt::UserRole).toInt()];
+    if (resourcePath) *resourcePath = selected.resourcePath;
+    return selected.sourcePath;
+}
+
+void addScriptAuthoringButtons(QLineEdit* fileEdit,
+    std::function<QString()> assetsBasePathGetter,
+    std::function<QString()> mapNameGetter, QWidget* parent,
+    std::function<void(const QString&)> openScript)
+{
+    auto* wrapper = fileEdit ? fileEdit->parentWidget() : nullptr;
+    auto* layout = wrapper ? qobject_cast<QHBoxLayout*>(wrapper->layout()) : nullptr;
+    if (!layout) return;
+    auto tr = [](const char* text) { return QCoreApplication::translate("FilePickerHelper", text); };
+    auto* edit = new QPushButton(tr("编辑"), wrapper);
+    edit->setObjectName(fileEdit->objectName() + "OpenScriptButton");
+    edit->setToolTip(tr("打开已绑定的脚本"));
+    auto* create = new QPushButton(tr("新建脚本"), wrapper);
+    create->setObjectName(fileEdit->objectName() + "NewScriptButton");
+    layout->addWidget(edit);
+    layout->addWidget(create);
+    QObject::connect(edit, &QPushButton::clicked, parent, [=]()
+    {
+        const QString path = ContentAuthoring::bindingScript(assetsBasePathGetter(), mapNameGetter(), fileEdit->text());
+        if (path.isEmpty()) QMessageBox::information(parent, tr("脚本未找到"), tr("请先选择已有脚本，或点击“新建脚本”。"));
+        else openScript(path);
+    });
+    QObject::connect(create, &QPushButton::clicked, parent, [=]()
+    {
+        bool accepted = false;
+        const QString name = QInputDialog::getText(parent, tr("新建并绑定脚本"), tr("脚本名称"), QLineEdit::Normal, {}, &accepted);
+        if (!accepted) return;
+        QString error;
+        const QString path = ContentAuthoring::createBindingScript(assetsBasePathGetter(), mapNameGetter(), name, error);
+        if (path.isEmpty()) QMessageBox::warning(parent, tr("无法创建脚本"), error);
+        else
+        {
+            fileEdit->setText(QFileInfo(path).fileName());
+            openScript(path);
+        }
+    });
+}
 
 namespace
 {
@@ -68,131 +209,6 @@ QStringList entityResourceBasePaths(const QString& assetsBasePath,
     for (const QString& folder : entityResourceRule(field).allowedFolders)
         paths.append(QDir(assetsBasePath).filePath(folder));
     return paths;
-}
-
-QString entityResourceDefaultPath(const QString& assetsBasePath,
-                                  EntityResourceField field)
-{
-    const QStringList paths = entityResourceBasePaths(assetsBasePath, field);
-    for (const QString& path : paths)
-    {
-        if (QDir(path).exists())
-            return path;
-    }
-    return paths.isEmpty() ? QString() : paths.front();
-}
-
-QString resourceRootLabel(const ResourceContentRoot& root, int readOnlyIndex)
-{
-    const QString identity = !root.name.trimmed().isEmpty()
-        ? root.name.trimmed()
-        : (!root.id.trimmed().isEmpty() ? root.id.trimmed()
-                                        : QFileInfo(root.rootPath).fileName());
-    switch (root.kind)
-    {
-    case ResourceContentRoot::Kind::Local:
-        return QCoreApplication::translate("FilePickerHelper", "本地资源 — %1")
-            .arg(identity);
-    case ResourceContentRoot::Kind::Common:
-        return QCoreApplication::translate("FilePickerHelper", "只读共享资源 — %1")
-            .arg(identity);
-    case ResourceContentRoot::Kind::DependencyId:
-        return QCoreApplication::translate("FilePickerHelper", "只读依赖 %1 — %2")
-            .arg(readOnlyIndex).arg(identity);
-    }
-    return identity;
-}
-
-int chooseEntityResourceRoot(QWidget* parent,
-                             const ResourceContentRootResolution& resolution)
-{
-    QList<int> availableIndices;
-    for (int i = 0; i < resolution.roots.size(); ++i)
-    {
-        if (resolution.roots[i].available)
-            availableIndices.append(i);
-    }
-    if (availableIndices.isEmpty())
-        return -1;
-    if (availableIndices.size() == 1 && resolution.missingDependencyIds.isEmpty() &&
-        resolution.missingPaths.isEmpty())
-    {
-        return availableIndices.front();
-    }
-
-    QDialog dialog(parent);
-    dialog.setObjectName(QStringLiteral("entityResourceRootDialog"));
-    dialog.setWindowTitle(QCoreApplication::translate(
-        "FilePickerHelper", "选择资源来源"));
-    auto layout = new QVBoxLayout(&dialog);
-    auto explanation = new QLabel(QCoreApplication::translate(
-        "FilePickerHelper",
-        "本地资源可直接引用；依赖和共享资源为只读来源，选中文件后可仅保存引用或复制为本地覆盖。"),
-        &dialog);
-    explanation->setWordWrap(true);
-    layout->addWidget(explanation);
-
-    auto rootCombo = new QComboBox(&dialog);
-    rootCombo->setObjectName(QStringLiteral("entityResourceRootCombo"));
-    int readOnlyIndex = 0;
-    for (int index : availableIndices)
-    {
-        const ResourceContentRoot& root = resolution.roots[index];
-        if (root.kind != ResourceContentRoot::Kind::Local)
-            ++readOnlyIndex;
-        rootCombo->addItem(resourceRootLabel(root, readOnlyIndex), index);
-    }
-    layout->addWidget(rootCombo);
-
-    auto pathLabel = new QLabel(&dialog);
-    pathLabel->setObjectName(QStringLiteral("entityResourceRootPathLabel"));
-    pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    pathLabel->setWordWrap(true);
-    layout->addWidget(pathLabel);
-    auto updatePath = [rootCombo, pathLabel, &resolution]()
-    {
-        const int index = rootCombo->currentData().toInt();
-        if (index >= 0 && index < resolution.roots.size())
-            pathLabel->setText(resolution.roots[index].rootPath);
-    };
-    QObject::connect(rootCombo, &QComboBox::currentIndexChanged, &dialog,
-        [updatePath](int) { updatePath(); });
-    updatePath();
-
-    QStringList warnings;
-    if (!resolution.missingDependencyIds.isEmpty())
-    {
-        warnings.append(QCoreApplication::translate(
-            "FilePickerHelper", "缺失依赖 ID：%1")
-            .arg(resolution.missingDependencyIds.join(QStringLiteral(", "))));
-    }
-    if (!resolution.missingPaths.isEmpty())
-    {
-        warnings.append(QCoreApplication::translate(
-            "FilePickerHelper", "不可用依赖路径：%1")
-            .arg(resolution.missingPaths.join(QStringLiteral("; "))));
-    }
-    if (!warnings.isEmpty())
-    {
-        auto warningLabel = new QLabel(warnings.join(QLatin1Char('\n')), &dialog);
-        warningLabel->setObjectName(QStringLiteral("entityResourceRootWarningLabel"));
-        warningLabel->setWordWrap(true);
-        layout->addWidget(warningLabel);
-    }
-
-    auto buttons = new QDialogButtonBox(QDialogButtonBox::Open |
-                                         QDialogButtonBox::Cancel, &dialog);
-    buttons->setObjectName(QStringLiteral("entityResourceRootButtons"));
-    buttons->button(QDialogButtonBox::Open)->setText(QCoreApplication::translate(
-        "FilePickerHelper", "继续选择文件"));
-    QObject::connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    QObject::connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    layout->addWidget(buttons);
-
-    dialog.resize(560, dialog.sizeHint().height());
-    if (dialog.exec() != QDialog::Accepted)
-        return -1;
-    return rootCombo->currentData().toInt();
 }
 
 bool normalizeSingleEntityResourceReference(const QString& input,
@@ -404,50 +420,23 @@ bool pickEntityResourceReference(QWidget* parent, const QString& filter,
                 .arg(resolution.recoveryErrors.join('\n')));
         return false;
     }
-    const int rootIndex = chooseEntityResourceRoot(parent, resolution);
-    if (rootIndex < 0 || rootIndex >= resolution.roots.size())
-        return false;
-    const ResourceContentRoot& selectedRoot = resolution.roots[rootIndex];
-
-    QString startDir;
-    if (selectedRoot.kind == ResourceContentRoot::Kind::Local && localDefaultDirGetter)
+    QStringList folders = entityResourceFolders(field);
+    if (field == EntityResourceField::ScriptFile && localDefaultDirGetter)
     {
-        const QString candidate = localDefaultDirGetter();
-        if (!candidate.isEmpty() && QDir(candidate).exists() &&
-            EditorAssetPath::isLexicallyInside(
-                selectedRoot.rootPath, candidate))
-        {
-            startDir = candidate;
-        }
+        QString relative;
+        if (EditorAssetPath::makeLogicalResourceRelativePath(activeAssetsPath, localDefaultDirGetter(), relative)
+            && relative.startsWith("script/map/"))
+            folders = {relative, "script/goods", "script/common"};
     }
-    if (startDir.isEmpty())
-        startDir = entityResourceDefaultPath(selectedRoot.rootPath, field);
-    if (!QDir(startDir).exists())
-        startDir = selectedRoot.rootPath;
-
-    const QString filePath = QFileDialog::getOpenFileName(
-        parent, title, startDir, filter, nullptr,
-        QFileDialog::DontResolveSymlinks);
-    if (filePath.isEmpty())
-        return false;
-    QString selectedRootRelativePath;
-    if (!EditorAssetPath::makeLogicalResourceRelativePath(
-            selectedRoot.rootPath, filePath, selectedRootRelativePath))
-    {
-        QMessageBox::warning(parent,
-            QCoreApplication::translate("FilePickerHelper", "文件范围限制"),
-            QCoreApplication::translate("FilePickerHelper",
-                "所选文件不在当前选择的资源根的逻辑路径范围内，或无法生成安全的相对资源路径。\n\n"
-                "资源根：%1\n文件路径：%2")
-                .arg(selectedRoot.rootPath, filePath));
-        return false;
-    }
+    const auto patterns = QRegularExpression("\\(([^)]+)\\)").match(filter);
+    const QStringList filters = patterns.hasMatch()
+        ? patterns.captured(1).split(' ', Qt::SkipEmptyParts) : QStringList();
+    const QString filePath = chooseResourceFile(parent, activeAssetsPath, folders, filters);
+    if (filePath.isEmpty()) return false;
 
     EntityResourceSelection selection;
     if (!inspectEntityResourceSelection(activeAssetsPath, resolution.roots,
-            field, filePath, selection) ||
-        EditorAssetPath::logicalComparisonKey(selection.sourceRootPath) !=
-            EditorAssetPath::logicalComparisonKey(selectedRoot.rootPath))
+            field, filePath, selection))
     {
         QMessageBox::warning(parent,
             QCoreApplication::translate("FilePickerHelper", "文件范围限制"),
@@ -456,8 +445,7 @@ bool pickEntityResourceReference(QWidget* parent, const QString& filter,
         return false;
     }
 
-    if ((!selection.inherited && selection.referenceResolvesToSource) ||
-        resolveInheritedSelectionAction(parent, selection))
+    if (selection.referenceResolvesToSource || resolveInheritedSelectionAction(parent, selection))
     {
         resourceReference = selection.resourceReference;
         return true;

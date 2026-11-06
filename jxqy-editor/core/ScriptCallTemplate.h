@@ -3,6 +3,7 @@
 #include <QList>
 #include <QMap>
 #include <QString>
+#include <QStringList>
 
 enum class ScriptCallArgumentType
 {
@@ -17,6 +18,8 @@ struct ScriptCallArgumentDefinition
     QString description;
     ScriptCallArgumentType type = ScriptCallArgumentType::String;
     QString defaultValue;
+    QString resourceDirectory;
+    QStringList resourceFilters;
 };
 
 struct ScriptCallDefinition
@@ -44,5 +47,7 @@ public:
                                ScriptCallDefinition& definition);
     static ScriptCallBuildResult build(
         const QString& apiName,
+        const QMap<QString, QString>& argumentValues);
+    static ScriptCallBuildResult build(const ScriptCallDefinition& definition,
         const QMap<QString, QString>& argumentValues);
 };

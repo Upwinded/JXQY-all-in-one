@@ -6,6 +6,8 @@
 
 namespace
 {
+constexpr std::size_t MaximumSimultaneousMagicSounds = 3;
+
 std::string normalizeSoundCachePart(std::string value)
 {
 	convert::replaceAllString(value, "\\", "/");
@@ -907,7 +909,8 @@ void Engine::setFontName(const std::string & fontName)
 	EngineBase::setFontName(fontName);
 }
 
-void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size)
+void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size,
+	std::unique_ptr<char[]> fallback, int fallbackSize)
 {
 	if (!SDL_IsMainThread())
 	{
@@ -916,7 +919,7 @@ void Engine::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 		return;
 	}
 	ConditionalLock locker(_mutex, multiThreadedMode);
-	EngineBase::setFontFromMem(data, size);
+	EngineBase::setFontFromMem(data, size, std::move(fallback), fallbackSize);
 }
 
 bool Engine::measureText(const std::string& text, int size, int& width, int& height)
@@ -951,11 +954,12 @@ _shared_image Engine::createTextWithFontData(
 	const std::string& text,
 	int size,
 	unsigned int color,
-	int wrapWidth)
+	int wrapWidth,
+	const void* fallbackData, std::size_t fallbackSize)
 {
 	ConditionalLock locker(_mutex, multiThreadedMode);
 	return EngineBase::createTextWithFontData(
-		data, dataSize, text, size, color, wrapWidth, true);
+		data, dataSize, text, size, color, wrapWidth, true, fallbackData, fallbackSize);
 }
 
 void Engine::drawText(const std::string & text, int x, int y, int size, unsigned int color)
@@ -1198,7 +1202,9 @@ _music Engine::loadCircleSound(const std::string & fileName)
 
 void Engine::setSoundVolume(float volume)
 {
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
 	soundVolume = volume;
+	setMagicSoundVolume(volume);
 }
 
 float Engine::getSoundVolume()
@@ -1284,6 +1290,38 @@ bool Engine::preloadCachedSoundFile(const std::string& fileName)
 _channel Engine::playCachedSoundFile(const std::string& fileName,
 	float x, float y, float volume)
 {
+	return playCachedSoundFile(fileName, x, y, volume, {});
+}
+
+_channel Engine::playMagicSoundFile(const std::string& fileName, float x, float y)
+{
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	std::string soundPath = buildSoundAssetPath(fileName);
+	if (soundPath.empty())
+	{
+		return nullptr;
+	}
+	soundPath = normalizeSoundCachePart(soundPath);
+	for (char& character : soundPath)
+	{
+		if (character >= 'A' && character <= 'Z')
+		{
+			character += 'a' - 'A';
+		}
+	}
+	const std::string scope = getSoundCacheScope();
+	setSoundCacheScope(scope);
+	const std::string key = scope + "\n" + soundPath;
+	if (countPlayingMagicSounds(key) >= MaximumSimultaneousMagicSounds)
+	{
+		return nullptr;
+	}
+	return playCachedSoundFile(fileName, x, y, soundVolume, key);
+}
+
+_channel Engine::playCachedSoundFile(const std::string& fileName,
+	float x, float y, float volume, const std::string& magicSoundKey)
+{
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
 	bool cached = false;
 	_music music = getOrLoadCachedSoundFile(fileName, cached);
@@ -1296,7 +1334,7 @@ _channel Engine::playCachedSoundFile(const std::string& fileName,
 	{
 		volume = soundVolume;
 	}
-	_channel channel = EngineBase::playMusic(music, x, y, volume);
+	_channel channel = EngineBase::playMusic(music, x, y, volume, magicSoundKey);
 	if (channel == nullptr)
 	{
 		if (!cached)

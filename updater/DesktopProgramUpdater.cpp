@@ -4,6 +4,7 @@
 #include <system_error>
 
 #if defined(_WIN32)
+#include <iostream>
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -149,6 +150,25 @@ DesktopProgramUpdateResult applyDesktopProgramUpdate(
 	{
 		std::error_code renameError;
 		std::filesystem::rename(source, destination, renameError);
+#if defined(_WIN32)
+		// Scanners can briefly hold files inside a directory being switched.
+		for (int retry = 0; retry < 20 &&
+			renameError.category() == std::system_category() &&
+			(renameError.value() == ERROR_ACCESS_DENIED ||
+				renameError.value() == ERROR_SHARING_VIOLATION ||
+				renameError.value() == ERROR_LOCK_VIOLATION); ++retry)
+		{
+			Sleep(50);
+			std::filesystem::rename(source, destination, renameError);
+		}
+		if (renameError)
+		{
+			std::cerr << "Program update rename failed: " << source.u8string()
+				<< " -> " << destination.u8string() << "; Windows error "
+				<< renameError.value() << " (" << renameError.message() << ")"
+				<< std::endl;
+		}
+#endif
 		return !renameError;
 	};
 	auto cleanupPreviousRoot = [&previousRoot]()

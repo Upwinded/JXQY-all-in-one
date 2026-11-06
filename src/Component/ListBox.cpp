@@ -38,6 +38,7 @@ void ListBox::initFromIni(INIReader & ini)
 	itemHeight = ini.GetInteger("Init", "ItemHeight", itemHeight);
 	itemCount = ini.GetInteger("Init", "ItemCount", itemCount);
 	fitItems = ini.GetBoolean("Init", "FitItems", false);
+	itemSize = ini.GetInteger("Init", "Font", 20);
 	
 	std::string soundName = ini.Get("Init", "Sound", "");
 

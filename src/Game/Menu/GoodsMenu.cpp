@@ -38,11 +38,16 @@ void GoodsMenu::updateGoods()
 		return;
 	}
 	position = scrollbar->position;
+	const bool controllerWasActive = isControllerFocusActive();
 	for (size_t i = 0; i < item.size(); i++)
 	{
 		if (item[i] == nullptr) continue;
-		item[i]->dragIndex = gm->goodsManager.storeBegin() + static_cast<int>(i) + scrollbar->position * scrollbar->lineSize;
 		updateGoods(static_cast<int>(i));
+	}
+	if (controllerWasActive)
+	{
+		const auto focused = controllerFocusedElement();
+		if (!focused || focused->dragIndex < 0) focusControllerDefault();
 	}
 	refreshControllerTransferHighlight();
 }
@@ -54,8 +59,21 @@ void GoodsMenu::updateGoods(int index)
 		return;
 	}
 
-	int listIndex = gm->goodsManager.storeBegin() + index + scrollbar->position * scrollbar->lineSize;
-	if (!gm->goodsManager.isStoreIndex(listIndex) || listIndex >= gm->goodsManager.listLength())
+	const int listIndex = getControllerItemIndex(index);
+	const bool valid = listIndex >= 0;
+	if (item[index]->dragIndex != listIndex || !valid)
+	{
+		item[index]->cancelPointerInteraction();
+		item[index]->resetHint();
+		if (visible) hideControllerItemDetails();
+		if (!valid) item[index]->setFocused(false);
+	}
+	item[index]->dragIndex = listIndex;
+	item[index]->activated = valid;
+	item[index]->canDrag = valid;
+	item[index]->canDrop = valid;
+	item[index]->canShowHint = valid;
+	if (!valid)
 	{
 		item[index]->impImage = nullptr;
 		item[index]->setStr("");
@@ -119,10 +137,18 @@ void GoodsMenu::onEvent()
 		{
 			continue;
 		}
-		int listIndex = gm->goodsManager.storeBegin() + static_cast<int>(i) + scrollbar->position * scrollbar->lineSize;
+		const int listIndex = getControllerItemIndex(static_cast<int>(i));
 		unsigned int ret = item[i]->getResult();
+		if (listIndex < 0 || item[i]->dragIndex != listIndex)
+		{
+			item[i]->cancelPointerInteraction();
+			item[i]->resetHint();
+			continue;
+		}
 #ifndef __MOBILE__
-		if (gm->global.feature.qingyuUi && (ret & erClick)
+		if (gm->menu != nullptr && gm->menu->toolTip != nullptr
+			&& gm->menu->toolTip->supportsFullDetails() && (ret & erClick)
+			&& !(ret & (erDropped | erDragEnd))
 			&& gm->goodsManager.goodsListExists(listIndex))
 		{
 			gm->menu->showGoodsToolTip(getMySharedPtr(),
@@ -250,7 +276,7 @@ void GoodsMenu::onEvent()
 					}
 				}
 			}
-			else if (item[i]->dropType == dtBuy)
+			else if (item[i]->dropType == dtBuy && item[i]->dropIndex >= 0 && item[i]->dropIndex < BUYSELL_GOODS_COUNT)
 			{
 				auto buySellMenu = BuySellMenu::getInstance();
 				if (buySellMenu != nullptr && buySellMenu->visible && buySellMenu->goodsList[item[i]->dropIndex].iniFile != "")
@@ -311,7 +337,7 @@ void GoodsMenu::onEvent()
 					}
 				}			
 			}
-			else if (item[i]->dropType == dtSell)
+			else if (item[i]->dropType == dtSell && item[i]->dropIndex >= 0 && item[i]->dropIndex < BUYSELL_GOODS_COUNT)
 			{
 				if (BuySellMenu::getInstance() != nullptr && BuySellMenu::getInstance()->visible && BuySellMenu::getInstance()->goodsList[item[i]->dropIndex].iniFile != "")
 				{
@@ -443,6 +469,11 @@ void GoodsMenu::configureControllerFocus()
 	slotController.bind(std::move(binding));
 }
 
+bool GoodsMenu::scrollMouseWheel(int steps)
+{
+	return slotController.scrollRows(steps);
+}
+
 bool GoodsMenu::activateControllerFocus(ControllerFocusTarget target)
 {
 	return (target == ControllerFocusTarget::Default
@@ -559,6 +590,7 @@ void GoodsMenu::activateControllerItem(int visibleIndex)
 
 void GoodsMenu::useDisplayedItem(int listIndex)
 {
+	if (!gm->goodsManager.isStoreIndex(listIndex) || !gm->goodsManager.goodsListExists(listIndex)) return;
 	const auto& equip = gm->menu->equipMenu;
 	if (equip && equip->visible && equip->getSelectedPartner()
 		&& gm->goodsManager.goodsListExists(listIndex)

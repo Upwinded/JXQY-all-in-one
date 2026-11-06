@@ -2,6 +2,9 @@
 #include "../../Element/Element.h"
 #include "../../Component/Label.h"
 #include "VideoPage.h"
+#include "TitleTeamLayout.h"
+#include "../../File/INIReader.h"
+#include <array>
 #include "../Data/GameElement.h"
 #include <string>
 #include <vector>
@@ -32,6 +35,7 @@ private:
 		unsigned char maximumAlpha,
 		unsigned long elapsedMilliseconds);
 	void updateTextLayout();
+	void loadDisplayLayout();
 	void scrollByLines(int delta);
 	void closePage();
 	bool beginTextPointer(EventTouchID pointerId, int x, int y);
@@ -53,6 +57,8 @@ private:
 	int visibleLineCount = 0;
 	int layoutWindowWidth = -1;
 	int layoutWindowHeight = -1;
+	std::array<INIReader, 4> displayConfiguration;
+	TitleTeamLayout displayLayout;
 	EventTouchID activePointer = TOUCH_UNTOUCHEDID;
 	int pointerStartY = 0;
 	int pointerStartLine = 0;

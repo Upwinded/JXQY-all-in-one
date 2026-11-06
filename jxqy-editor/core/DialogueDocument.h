@@ -60,6 +60,14 @@ public:
     bool setPortrait(const QString& section, int row,
                      DialoguePortraitMode mode,
                      const QString& reference = QString());
+    bool addSection(const QString& name, const QString& firstText);
+    bool copySection(const QString& section, const QString& name);
+    bool renameSection(const QString& section, const QString& name);
+    bool removeSection(const QString& section);
+    bool insertLine(const QString& section, int row, const QString& text);
+    bool removeLine(const QString& section, int row);
+    bool moveLine(const QString& section, int from, int to);
+    bool canReorderLines(const QString& section) const;
     int hiddenFieldCount() const;
 
     static QVector<DialogueReference> findLiteralTalkReferences(
@@ -69,6 +77,7 @@ public:
     static QString talkFileForScript(const QString& scriptPath);
 
 private:
+    bool rewriteLines(const QString& section, const QVector<int>& order, const QString& insertedText = QString());
     static QString decodeDialogueText(const QString& value);
     static QString encodeDialogueText(const QString& value);
     static QString unescapeLuaString(const QString& value);

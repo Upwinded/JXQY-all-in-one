@@ -231,6 +231,8 @@ public:
 	bool hasPositionCastLimit(int level) const;
 	void initFromIni(const std::string& fileName);
 	void initFromIni(const std::string & fileName, bool loadLinkedMagic);
+	static void playCastSound(const std::shared_ptr<Magic>& magic,
+		const std::shared_ptr<GameElement>& user);
 	static std::vector<std::shared_ptr<Effect>> addEffect(
 		std::shared_ptr<Magic> srcMagic,
 		std::shared_ptr<GameElement> user,

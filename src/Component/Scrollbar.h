@@ -11,6 +11,7 @@ public:
 
 	ScrollbarStyle style = ssVertical;
 	bool flat = false;
+	unsigned int backgroundColor = 0xFFB7B697;
 	bool fitTrack = false;
 	int position = 0;
 	int min = 0;

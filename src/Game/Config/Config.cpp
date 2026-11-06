@@ -1,4 +1,5 @@
 #include "Config.h"
+#include "GameSpeedMapping.h"
 #include "../../Engine/Engine.h"
 #include "../../File/log.h"
 #include "../../File/File.h"
@@ -16,6 +17,7 @@ bool Config::externalResourcesEnabled = false;
 bool Config::useQingyuUi = false;
 bool Config::automaticSaveEnabled = false;
 int Config::experienceMultiplier = 2;
+std::string Config::fontId = "default";
 int Config::windowWidth = DEFAULT_WINDOW_WIDTH;
 int Config::windowHeight = DEFAULT_WINDOW_HEIGHT;
 float Config::gameSpeed = SPEED_TIME_DEFAULT;
@@ -67,8 +69,9 @@ void Config::load()
 	automaticSaveEnabled = ini.GetBoolean("game", "automaticsave", false);
 	const std::string multiplier = ini.Get("game", "experiencemultiplier", "2");
 	experienceMultiplier = multiplier == "1" ? 1 : multiplier == "3" ? 3 : 2;
+	fontId = ini.Get("game", "font", "default");
 
-	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(gameSpeed));
+	auto speed = ini.GetInteger("game", "speed", convSpeedToInt(SPEED_TIME_DEFAULT));
 	gameSpeed = convSpeedTofloat(speed);
 
 	float musicVolume = ((float)ini.GetInteger("game", "musicvolume", 100)) / 100.0f;
@@ -112,6 +115,7 @@ void Config::save()
 		experienceMultiplier = 2;
 	}
 	ini.SetInteger("game", "experiencemultiplier", experienceMultiplier);
+	ini.Set("game", "font", fontId);
 	float musicVolume = Engine::getInstance()->getBGMVolume();
 	float soundVolume = Engine::getInstance()->getSoundVolume();
 	//ini.SetReal("game", "speed", gameSpeed);
@@ -214,48 +218,10 @@ float Config::setGameSpeed(float speed)
 
 float Config::convSpeedTofloat(int speed)
 {
-	const int speed_min_int = 0;
-	const int speed_max_int = 100;
-	if (speed <= speed_min_int)
-	{
-		return SPEED_TIME_MIN;
-	}
-	if (speed >= speed_max_int)
-	{
-		return SPEED_TIME_MAX;
-	}
-	auto ret = ((float)(speed - speed_min_int)) / (speed_max_int - speed_min_int) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
-	if (ret <= SPEED_TIME_MIN)
-	{
-		return SPEED_TIME_MIN;
-	}
-	else if (ret >= SPEED_TIME_MAX)
-	{
-		return SPEED_TIME_MAX;
-	}
-	return ret;
+	return GameSpeedMapping::fromPosition(speed, 0, 100);
 }
 
 int Config::convSpeedToInt(float speed)
 {
-	const int speed_min_int = 0;
-	const int speed_max_int = 100;
-	if (speed <= SPEED_TIME_MIN)
-	{
-		return speed_min_int;
-	}
-	else if (speed >= SPEED_TIME_MAX)
-	{
-		return speed_max_int;
-	}
-	auto ret = (int)round((speed - SPEED_TIME_MIN) / (SPEED_TIME_MAX - SPEED_TIME_MIN) * (speed_max_int - speed_min_int)) + speed_min_int;
-	if (ret <= speed_min_int)
-	{
-		return speed_min_int;
-	}
-	if (ret >= speed_max_int)
-	{
-		return speed_max_int;
-	}
-	return ret;
+	return GameSpeedMapping::toPosition(speed, 0, 100);
 }

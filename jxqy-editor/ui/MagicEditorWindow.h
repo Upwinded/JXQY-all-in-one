@@ -5,6 +5,7 @@
 
 #include "../core/DesktopRunDocumentSnapshot.h"
 #include "../core/MagicDocument.h"
+#include "../core/ContentAuthoring.h"
 #include "../core/ProjectDocumentRegistry.h"
 
 #include <QHash>
@@ -20,9 +21,11 @@ class QLineEdit;
 class QListWidget;
 class QMediaPlayer;
 class QPlainTextEdit;
+class QPushButton;
 class QSpinBox;
 class QTableWidget;
 class QToolBar;
+class QToolButton;
 class QUndoStack;
 class MagicRangePreview;
 class MpcPreviewLabel;
@@ -46,6 +49,15 @@ public:
     QString currentFilePath() const;
     QString displayName() const;
     int selectedLevel() const;
+    QString createMagicFile(const QString& name, bool copyCurrent,
+                            QString* errorMessage = nullptr);
+    bool renameMagicFile(const QString& newFileName, QString* errorMessage = nullptr);
+    bool deleteMagicFile(QString* errorMessage = nullptr);
+    ContentReferenceReport currentReferences() const;
+    void setDocumentSnapshotsProvider(
+        std::function<QList<DesktopRunDocumentSnapshot>()> provider);
+    void setFileMutationPreflight(
+        std::function<bool(const QStringList&, QString&)> preflight);
 
     void setAssetsBasePath(const QString& path);
     void setDocumentPathValidator(
@@ -68,6 +80,9 @@ signals:
     void documentClosed();
     void openMagicFileRequested(const QString& filePath);
     void playtestRequested();
+    void filesChanged(const QStringList& paths);
+    void openReferenceRequested(const QString& path, int line);
+    void learningScriptRequested(const QString& source);
 
 protected:
     void closeEvent(QCloseEvent* event) override;
@@ -80,6 +95,12 @@ private:
     void setupConnections();
     QWidget* createOverviewPage();
     QWidget* createLevelsPage();
+    QWidget* createLinkedEffectsPage();
+    void refreshLinkedEffects();
+    void retranslateLinkedEffects();
+    void appendLinkedEdits(MagicDocument& pending) const;
+    bool linkedInputsValid() const;
+    QString linkedEditorValue(const QString& key) const;
     QWidget* createResourceCard(
         const QString& title,
         MagicTextField field,
@@ -100,6 +121,7 @@ private:
                             const QByteArray& after,
                             const QString& description);
     void commitPendingTextEditors();
+    QByteArray currentEditorBytes() const;
     void refreshFromDocument();
     void refreshLevelTable();
     void refreshLevelEffectControls();
@@ -120,10 +142,20 @@ private:
     MpcPreviewLabel* previewForField(MagicTextField field) const;
     QLineEdit* lineEditForField(MagicTextField field) const;
     void retranslateDynamicUi();
+    void setupAuthoringActions();
+    void setupAuthoringMenu();
+    void retranslateAuthoringActions();
+    void showReferences();
+    bool authoringTarget(const QString& target, QString& error) const;
+    bool mutationReady(const QStringList& paths, QString& error) const;
 
     MagicDocument document;
     QString filePath;
     QString assetsBasePath;
+    QString loadedSourcePath;
+    QByteArray loadedBytes;
+    std::function<QList<DesktopRunDocumentSnapshot>()> documentSnapshotsProvider;
+    std::function<bool(const QStringList&, QString&)> fileMutationPreflight;
     std::function<bool(const QString&, const QString&)>
         documentPathValidator;
     bool refreshing = false;
@@ -133,6 +165,13 @@ private:
     QAction* undoAction = nullptr;
     QAction* redoAction = nullptr;
     QAction* playtestAction = nullptr;
+    QAction* newAction = nullptr;
+    QAction* duplicateAction = nullptr;
+    QAction* renameAction = nullptr;
+    QAction* deleteAction = nullptr;
+    QAction* referencesAction = nullptr;
+    QAction* learningScriptAction = nullptr;
+    QToolButton* moreButton = nullptr;
     QUndoStack* undoStack = nullptr;
 
     QLineEdit* searchEdit = nullptr;
@@ -154,6 +193,12 @@ private:
     QLabel* selectedLevelEffectLabel = nullptr;
     MagicRangePreview* rangePreview = nullptr;
     QTableWidget* levelTable = nullptr;
+    QComboBox* linkedLevelCombo = nullptr;
+    int linkedEditLevel = 0;
+    QMap<QString, QWidget*> linkedEditors;
+    QMap<QString, QString> loadedLinkedValues;
+    QMap<QString, QPushButton*> linkedResetButtons;
+    QLabel* linkedErrorLabel = nullptr;
 
     QLineEdit* imageEdit = nullptr;
     QLineEdit* iconEdit = nullptr;

@@ -16,18 +16,18 @@ Camera::~Camera()
 
 void Camera::flyTo(int dir, int distance, int speed)
 {
-	if (distance > 0)
+	if (distance >= 0)
 	{
-		setFlyTo(dir, distance, speed);
+		setFlyTo(dir, distance, std::clamp(speed, 0, 1000));
 		run();
 	}
 }
 
 void Camera::flyToEx(int dir, int distance, int speed)
 {
-	if (distance > 0)
+	if (distance >= 0)
 	{
-		setFlyTo(dir, distance, speed);
+		setFlyTo(dir, distance, std::clamp(speed, 0, 1000));
 	}
 }
 
@@ -54,27 +54,21 @@ void Camera::flyToPosition(int x, int y, int speed)
 
 void Camera::setFlyTo(int dir, int distance, int speed)
 {
+	// All three native interpreters move before testing the pre-decrement count.
+	setDirectionalFrameMove(dir, distance >= 0 ? static_cast<double>(distance) + 1.0 : 0.0, speed, false);
+}
+
+void Camera::setDirectionalFrameMove(int dir, double frames, int speed, bool csharpProtocol)
+{
 	followPlayer = false;
 	clearDirectionalFrameMove();
 	distanceToFly = { 0.0, 0.0 };
 	distanceFlied = { 0.0, 0.0 };
-	flyStartPosition = position;
-	flyStartOffset = offset;
-	flyDirection = normalizeDir(dir);
-	flySpeed = normalizeFlySpeed(speed);
-	static const PointEx dirOffset[8] = {
-		{ 0.0,  1.0},
-		{-0.5,  0.5},
-		{-0.5,  0.0},
-		{-0.5, -0.5},
-		{ 0.0, -1.0},
-		{ 0.5, -0.5},
-		{ 0.5,  0.0},
-		{ 0.5,  0.5}
-	};
-	distanceToFly.x = dirOffset[flyDirection].x * flyRatio * distance * TILE_WIDTH;
-	distanceToFly.y = dirOffset[flyDirection].y * flyRatio * distance * TILE_HEIGHT;
-	flying = true;
+	flying = false;
+	directionalMoveDirection = dir >= 0 && dir <= 7 ? dir : 0;
+	directionalMoveFramesRemaining = std::max(0.0, frames);
+	directionalMoveSpeed = speed;
+	csharpDirectionalMove = csharpProtocol;
 }
 
 void Camera::moveForFrameCount(int dir, int frameCount, int speed)
@@ -84,14 +78,7 @@ void Camera::moveForFrameCount(int dir, int frameCount, int speed)
 		return;
 	}
 
-	followPlayer = false;
-	flying = false;
-	distanceToFly = { 0.0, 0.0 };
-	distanceFlied = { 0.0, 0.0 };
-	directionalMoveDirection = dir >= 0 && dir <= 7 ? dir : 0;
-	directionalMoveFramesRemaining = frameCount;
-	directionalMoveSpeed = speed;
-	directionalMoveRemainder = { 0.0, 0.0 };
+	setDirectionalFrameMove(dir, frameCount, speed, true);
 	run();
 }
 
@@ -239,24 +226,37 @@ void Camera::clearDirectionalFrameMove()
 	directionalMoveFramesRemaining = 0;
 	directionalMoveSpeed = 0;
 	directionalMoveRemainder = { 0.0, 0.0 };
+	csharpDirectionalMove = false;
 }
 
-void Camera::updateDirectionalFrameMove()
+void Camera::updateDirectionalFrameMove(UTime frameTime)
 {
+	const double frames = std::min(directionalMoveFramesRemaining,
+		static_cast<double>(getLegacyMovementFrameCount(static_cast<float>(frameTime), Config::getGameSpeed())));
 	const DirectionalFrameMoveStep step =
 		calculateDirectionalFrameMoveStep(
 			directionalMoveRemainder,
 			directionalMoveDirection,
-			directionalMoveSpeed);
+			directionalMoveSpeed,
+			frames,
+			csharpDirectionalMove);
 	directionalMoveRemainder = step.remainder;
 	offset.x += static_cast<float>(step.distance.x);
 	offset.y += static_cast<float>(step.distance.y);
 	updatePosition();
 	clampToMapBounds();
 
-	--directionalMoveFramesRemaining;
+	directionalMoveFramesRemaining -= frames;
 	if (directionalMoveFramesRemaining <= 0)
 	{
+		// JxqyHD carries integer pixels between updates and drops the final fraction.
+		if (!csharpDirectionalMove)
+		{
+			offset.x += static_cast<float>(directionalMoveRemainder.x);
+			offset.y += static_cast<float>(directionalMoveRemainder.y);
+		}
+		updatePosition();
+		clampToMapBounds();
 		clearDirectionalFrameMove();
 		logicRunning = false;
 		if (gm != nullptr && gm->player != nullptr &&
@@ -284,7 +284,7 @@ void Camera::onUpdate()
 	}
 	else if (directionalMoveFramesRemaining > 0)
 	{
-		updateDirectionalFrameMove();
+		updateDirectionalFrameMove(frameTime);
 	}
 	else if (flying)
 	{
@@ -293,7 +293,9 @@ void Camera::onUpdate()
 		{
 			l = 1.0f;
 		}
-		PointEx frameFlyDistance = { distanceToFly.x / l * cameraSpeed * frameTime * flySpeed * Config::getGameSpeed(), distanceToFly.y / l * cameraSpeed * frameTime * flySpeed * Config::getGameSpeed()};
+		const float distance = getProjectedMagicFrameDistance(
+			static_cast<float>(flySpeed), static_cast<float>(frameTime), Config::getGameSpeed());
+		PointEx frameFlyDistance = { distanceToFly.x / l * distance, distanceToFly.y / l * distance };
 		distanceFlied = distanceFlied + frameFlyDistance;
 		offset = flyStartOffset + distanceFlied;
 		position = flyStartPosition;

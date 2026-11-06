@@ -10,6 +10,10 @@ public:
 
 	bool stretch = false;
 	bool flat = false;
+	unsigned int flatBackgroundColor = 0xFF2C5446;
+	unsigned int flatHoverBackgroundColor = 0xFF2C5446;
+	unsigned int flatPressedBackgroundColor = 0xFF2C5446;
+	unsigned int flatBorderColor = 0xFFAB925D;
 	bool animateFrames = false;
 	bool hoverSoundEnabled = true;
 

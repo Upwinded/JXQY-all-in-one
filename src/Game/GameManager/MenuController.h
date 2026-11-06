@@ -33,6 +33,7 @@ public:
 	virtual ~MenuController();
 
 	virtual bool onHandleEvent(AEvent & e);
+	bool onHandleMouseWheel(AEvent& event) override;
 
 	void init();
 	void freeResource();
@@ -49,7 +50,7 @@ public:
 	bool openAttributePoints(const PElement& origin, const PElement& returnFocus);
 	void update();
 	void updateAfterGameLoad();
-	void showMessage(const std::string& str, UTime duration = 3500);
+	void showMessage(const std::string& str, UTime duration = 0);
 	void showSystemNotice(
 		const std::string& str, UTime duration = 7000);
 	bool showGoodsToolTip(

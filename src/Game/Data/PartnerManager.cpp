@@ -203,9 +203,9 @@ bool PartnerManager::restoreCharacterEquipment(NPC& partner, int characterIndex)
 
 bool PartnerManager::saveCharacterSnapshot(const std::shared_ptr<NPC>& partner)
 {
-	const bool equipmentOnly = partner != nullptr && partner->relation == nrNeutral && partner->canEquip > 0;
+	const bool neutralPartner = partner != nullptr && partner->relation == nrNeutral;
 	if (gm == nullptr || !gm->global.feature.restorePartnerAttributes || partner == nullptr
-		|| !isActivePartner(partner) || (partner->relation != nrFriendly && !equipmentOnly)) return true;
+		|| !isActivePartner(partner) || (partner->relation != nrFriendly && !neutralPartner)) return true;
 	const int index = partner->getPartnerCharacterIndex();
 	if (index < 0) return true;
 	if (!partner->characterEquipmentSynchronized)
@@ -227,7 +227,8 @@ bool PartnerManager::saveCharacterSnapshot(const std::shared_ptr<NPC>& partner)
 		GameLog::write("PartnerManager: cannot update character record %s\n", playerFile.c_str());
 		return false;
 	}
-	if (savedLevel > partner->level && !equipmentOnly) return true;
+	if (savedLevel > partner->level && !neutralPartner) return true;
+	const bool equipmentOnly = neutralPartner && savedLevel > partner->level;
 	const auto goodsStatus = readCharacterRecord(goodsFile, goodsIni);
 	if (goodsStatus == SaveIniPersistence::ReadStatus::Missing) goodsIni = std::make_shared<INIReader>();
 	else if (goodsStatus != SaveIniPersistence::ReadStatus::Loaded || !goodsIni->HasSection("Head")
@@ -881,7 +882,8 @@ bool PartnerManager::load(int index, std::string* failureReason)
 		partner->initFromIni(&ini, section);
 		const int characterIndex = partner->getPartnerCharacterIndex();
 		// Before 1.1.5 these partners could not equip items: goodsN.ini owns their equipment.
-		if (legacyEquipment && characterIndex >= 0 && partner->relation == nrFriendly && partner->canEquip <= 0)
+		if (legacyEquipment && characterIndex >= 0 && partner->canEquip <= 0
+			&& (partner->relation == nrFriendly || partner->relation == nrNeutral))
 		{
 			partner->characterEquipmentSynchronized = false;
 			std::shared_ptr<INIReader> character;

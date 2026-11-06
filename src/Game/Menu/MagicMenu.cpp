@@ -20,23 +20,52 @@ MagicMenu::~MagicMenu()
 	freeResource();
 }
 
+std::shared_ptr<NPC> MagicMenu::getDisplayedPartner() const
+{
+	auto partner = selectedPartner.lock();
+	return partner && gm->partnerManager.isActivePartner(partner) && partner->canViewPartnerDetails() ? partner : nullptr;
+}
+
+const MagicInfo* MagicMenu::displayedMagicInfo(int index) const
+{
+	if (showingPartnerMagic)
+	{
+		auto partner = getDisplayedPartner();
+		if (!partner) return nullptr;
+		const auto& list = partner->getPartnerMagicList();
+		return index >= 0 && index < static_cast<int>(list.size()) ? &list[index] : nullptr;
+	}
+	return gm->magicManager.magicListExists(index) ? &gm->magicManager.magicList[index] : nullptr;
+}
+
+void MagicMenu::showPartnerMagic(const std::shared_ptr<NPC>& partner)
+{
+	closeDetails();
+	selectedPartner = partner;
+	showingPartnerMagic = partner != nullptr;
+	showTalents(false);
+	setDetailVisibility();
+}
+
 int MagicMenu::detailedMagicIndex() const
 {
-	return !detailedMagicFile.empty() && gm->magicManager.magicListExists(detailedSlotIndex)
-		&& gm->magicManager.magicList[detailedSlotIndex].iniFile == detailedMagicFile
+	const auto* info = displayedMagicInfo(detailedSlotIndex);
+	return !detailedMagicFile.empty() && info && info->iniFile == detailedMagicFile
 		? detailedSlotIndex : -1;
 }
 
-bool MagicMenu::showDetails(int listIndex)
+bool MagicMenu::showDetails(int listIndex, bool playerMagic)
 {
-	if (!detailText || !gm->magicManager.magicListExists(listIndex)
+	if (playerMagic && showingPartnerMagic) showPartnerMagic(nullptr);
+	const auto* info = displayedMagicInfo(listIndex);
+	if (!detailText || !info
 		|| !(isDisplayIndex(listIndex) || gm->magicManager.isStoreIndex(listIndex)
 			|| gm->magicManager.isBottomIndex(listIndex) || gm->magicManager.isPracticeIndex(listIndex))) return false;
 	if (showingTalents && !isDisplayIndex(listIndex)) showTalents(false);
 	if (!visible) gm->menu->toggleMagicView();
 	gm->menu->cancelControllerInteraction();
 	deactivateControllerFocus();
-	detailedMagicFile = gm->magicManager.magicList[listIndex].iniFile;
+	detailedMagicFile = info->iniFile;
 	detailedSlotIndex = listIndex;
 	detailContent.clear();
 	showingDetails = true;
@@ -51,7 +80,7 @@ bool MagicMenu::showDetails(int listIndex)
 void MagicMenu::setDetailVisibility()
 {
 	if (!detailText) return;
-	const bool hasTalents = gm->global.magicLayout.talentBegin >= 0;
+	const bool hasTalents = !showingPartnerMagic && gm->global.magicLayout.talentBegin >= 0;
 	for (const auto& entry : componentMap)
 	{
 		if (entry.first.rfind("heading", 0) == 0) continue;
@@ -63,11 +92,15 @@ void MagicMenu::setDetailVisibility()
 	if (auto caption = getComponentByName("listCaption"))
 		caption->visible = caption->activated = !showingDetails && !hasTalents;
 	if (auto heading = getComponentByName<Label>("heading"))
-		heading->setStr(showingDetails ? (showingTalents ? u8"天赋详情" : u8"武功详情") : (hasTalents ? u8"武学" : u8"武功"));
+	{
+		auto partner = getDisplayedPartner();
+		heading->setStr(partner ? partner->npcName + u8" · 武功" :
+			(showingDetails ? (showingTalents ? u8"天赋详情" : u8"武功详情") : (hasTalents ? u8"武学" : u8"武功")));
+	}
 	for (const char* name : { "detailPractice", "detailQuick" })
 	{
 		if (auto button = getComponentByName<FlatTextButton>(name))
-			button->visible = button->activated = showingDetails && !showingTalents
+			button->visible = button->activated = showingDetails && !showingTalents && !showingPartnerMagic
 				&& (std::string(name) != "detailPractice" || !gm->global.feature.practiceMenuDisabled);
 	}
 }
@@ -87,7 +120,7 @@ void MagicMenu::closeDetails()
 bool MagicMenu::assignDetailedMagic(bool practice)
 {
 	const int source = detailedMagicIndex();
-	if (!showingDetails || showingTalents || source < 0) return false;
+	if (!showingDetails || showingTalents || showingPartnerMagic || source < 0) return false;
 	int target = practice ? gm->magicManager.practiceIndex() : -1;
 	if (practice && gm->global.feature.practiceMenuDisabled) return false;
 	const bool returnToList = practice ? gm->magicManager.isPracticeIndex(source) : gm->magicManager.isBottomIndex(source);
@@ -142,7 +175,7 @@ void MagicMenu::updateDetails()
 		closeDetails();
 		return;
 	}
-	const auto& info = gm->magicManager.magicList[index];
+	const auto& info = *displayedMagicInfo(index);
 	const auto& magic = info.magic;
 	if (auto button = getComponentByName<FlatTextButton>("detailPractice"))
 		button->setStr(gm->magicManager.isPracticeIndex(index) ? u8"取消修炼" : u8"设为修炼");
@@ -222,11 +255,17 @@ void MagicMenu::configureDetailFocus()
 
 int MagicMenu::displayBegin() const
 {
+	if (showingPartnerMagic) return 0;
 	return showingTalents ? gm->global.magicLayout.talentBegin : gm->magicManager.storeBegin();
 }
 
 int MagicMenu::displayCount() const
 {
+	if (showingPartnerMagic)
+	{
+		auto partner = getDisplayedPartner();
+		return partner ? static_cast<int>(partner->getPartnerMagicList().size()) : 0;
+	}
 	return showingTalents ? gm->global.magicLayout.talentEnd - displayBegin() + 1 : gm->global.magicLayout.storeCount();
 }
 
@@ -241,7 +280,7 @@ void MagicMenu::showTalents(bool value)
 	const bool keepFocus = isControllerFocusActive();
 	const bool previousCategory = showingTalents;
 	cancelControllerInteraction();
-	showingTalents = value && talentTab != nullptr && talentTab->visible;
+	showingTalents = !showingPartnerMagic && value && talentTab != nullptr && talentTab->visible;
 	if (magicTab) magicTab->checked = !showingTalents;
 	if (talentTab) talentTab->checked = showingTalents;
 	if (scrollbar)
@@ -252,13 +291,14 @@ void MagicMenu::showTalents(bool value)
 	}
 	for (auto& slot : item)
 	{
-		slot->canDrag = slot->canDrop = !showingTalents;
+		slot->canDrag = slot->canDrop = !showingTalents && !showingPartnerMagic;
 	}
 	configureControllerFocus();
 	updateMagic();
 	if (auto hint = getComponentByName<Label>("hint"))
 	{
-		hint->setStr(showingTalents ? u8"已习得天赋 · 点击查看" : u8"点击查看详情 · 拖动整理");
+		hint->setStr(showingPartnerMagic ? u8"已学武功由伙伴自动使用 · 点击查看" :
+			(showingTalents ? u8"已习得天赋 · 点击查看" : u8"点击查看详情 · 拖动整理"));
 	}
 	if (previousCategory != showingTalents && !item.empty())
 	{
@@ -272,6 +312,9 @@ void MagicMenu::updateMagic()
 {
 	if (scrollbar != nullptr)
 	{
+		const int columns = std::max(1, scrollbar->lineSize);
+		scrollbar->max = (std::max(0, displayCount() - static_cast<int>(item.size())) + columns - 1) / columns;
+		scrollbar->setPosition(std::min(scrollbar->position, scrollbar->max));
 		position = scrollbar->position;
 	}
 	for (size_t i = 0; i < item.size(); i++)
@@ -299,14 +342,14 @@ void MagicMenu::updateMagic(int index)
 	item[index]->impImage = nullptr;
 
 	int listIndex = displayBegin() + scrollbar->position * scrollbar->lineSize + index;
-	MenuResource::updateMagicCooldown(item[index], gm->magicManager, listIndex);
-	if (!isDisplayIndex(listIndex) || listIndex >= gm->magicManager.listLength())
+	MenuResource::updateMagicCooldown(item[index], gm->magicManager, showingPartnerMagic ? -1 : listIndex);
+	if (!isDisplayIndex(listIndex))
 	{
 		return;
 	}
-	if (gm->magicManager.magicList[listIndex].magic != nullptr)
+	if (const auto* info = displayedMagicInfo(listIndex))
 	{
-		item[index]->impImage = MenuResource::createMagicMenuImage(gm->magicManager.magicList[listIndex].magic);
+		item[index]->impImage = MenuResource::createMagicMenuImage(info->magic);
 	}
 }
 
@@ -314,11 +357,12 @@ void MagicMenu::onUpdate()
 {
 	if (visible && gm != nullptr)
 	{
+		if (showingPartnerMagic && !getDisplayedPartner()) showPartnerMagic(nullptr);
 		updateSkillTreeEntry();
 		updateDetails();
 		for (size_t i = 0; i < item.size(); ++i)
 		{
-			MenuResource::updateMagicCooldown(item[i], gm->magicManager, getControllerItemIndex(static_cast<int>(i)));
+			MenuResource::updateMagicCooldown(item[i], gm->magicManager, showingPartnerMagic ? -1 : getControllerItemIndex(static_cast<int>(i)));
 		}
 	}
 }
@@ -378,12 +422,12 @@ void MagicMenu::onEvent()
 		}
 		if (ret & erShowHint)
 		{
-			if (scrollbar && gm->magicManager.magicListExists(listIndex))
+			if (const auto* info = displayedMagicInfo(listIndex))
 			{
 				gm->menu->showMagicToolTip(
 					getMySharedPtr(),
-					gm->magicManager.magicList[listIndex].magic,
-					gm->magicManager.magicList[listIndex].level,
+					info->magic,
+					info->level,
 					item[i]);
 			}
 			else
@@ -396,7 +440,7 @@ void MagicMenu::onEvent()
 		{
 			gm->menu->toolTip->visible = false;
 		}
-		if (showingTalents)
+		if (showingTalents || showingPartnerMagic)
 		{
 			if (ret & (erClick | erMouseRDown)) showControllerItemDetails(static_cast<int>(i));
 			continue;
@@ -517,6 +561,8 @@ void MagicMenu::init()
 
 void MagicMenu::freeResource()
 {
+	selectedPartner.reset();
+	showingPartnerMagic = false;
 	skillTreeEntry = nullptr;
 	skillTreeEntryFocused = false;
 	showingDetails = false;
@@ -544,7 +590,7 @@ void MagicMenu::configureControllerFocus()
 			ControllerSlotKind::Magic,
 			ControllerSlotDomain::MagicList);
 	binding.grid.focusIdPrefix = "magic-item-";
-	if (showingTalents) binding.transfers = nullptr;
+	if (showingTalents || showingPartnerMagic) binding.transfers = nullptr;
 	binding.grid.items = item;
 	binding.grid.scrollbar = scrollbar;
 	binding.grid.resolveLogicalIndex = [this](int visibleIndex)
@@ -566,6 +612,20 @@ void MagicMenu::configureControllerFocus()
 		updateMagic();
 	};
 	slotController.bind(std::move(binding));
+}
+
+bool MagicMenu::scrollMouseWheel(int steps)
+{
+	if (steps == 0)
+	{
+		return false;
+	}
+	if (showingDetails)
+	{
+		changeDetailPage(steps);
+		return true;
+	}
+	return slotController.scrollRows(steps);
 }
 
 bool MagicMenu::activateControllerFocus(ControllerFocusTarget target)
@@ -656,7 +716,6 @@ int MagicMenu::getControllerItemIndex(int visibleIndex) const
 	const int listIndex = displayBegin()
 		+ visibleIndex + scrollbar->position * scrollbar->lineSize;
 	return isDisplayIndex(listIndex)
-		&& listIndex < gm->magicManager.listLength()
 		? listIndex
 		: -1;
 }
@@ -668,7 +727,7 @@ void MagicMenu::activateControllerItem(int visibleIndex)
 		showDetails(getControllerItemIndex(visibleIndex));
 		return;
 	}
-	if (showingTalents)
+	if (showingTalents || showingPartnerMagic)
 	{
 		showControllerItemDetails(visibleIndex);
 		return;
@@ -708,15 +767,15 @@ void MagicMenu::showControllerItemDetails(int visibleIndex)
 	}
 	if (gm->menu == nullptr || gm->menu->toolTip == nullptr
 		|| gm->menu->upMenu == nullptr || listIndex < 0
-		|| !gm->magicManager.magicListExists(listIndex))
+		|| !displayedMagicInfo(listIndex))
 	{
 		hideControllerItemDetails();
 		return;
 	}
 	gm->menu->showMagicToolTip(
 		getMySharedPtr(),
-		gm->magicManager.magicList[listIndex].magic,
-		gm->magicManager.magicList[listIndex].level,
+		displayedMagicInfo(listIndex)->magic,
+		displayedMagicInfo(listIndex)->level,
 		item[visibleIndex]);
 }
 
@@ -797,7 +856,7 @@ bool MagicMenu::onHandleUIAction(UIAction action)
 
 void MagicMenu::updateSkillTreeEntry()
 {
-	const bool available = gm != nullptr && gm->global.skillTreeEnabled && !gm->magicManager.skillTree().nodes.empty();
+	const bool available = !showingPartnerMagic && gm != nullptr && gm->global.skillTreeEnabled && !gm->magicManager.skillTree().nodes.empty();
 	if (!skillTreeEntry && available)
 	{
 		skillTreeEntry = std::make_shared<FlatTextButton>();

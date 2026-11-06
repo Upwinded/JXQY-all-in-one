@@ -11,6 +11,7 @@ class PartnerEquipMenu :
 	public ConfigDrivenPanel,
 	public ControllerTransferParticipant
 {
+	friend class MenuMouseWheelTestAccess;
 public:
 	PartnerEquipMenu();
 	virtual ~PartnerEquipMenu();
@@ -20,6 +21,7 @@ public:
 	std::shared_ptr<NPC> getPartner() const;
 	void updateGoods();
 	void updateGoods(int index);
+	bool scrollMouseWheel(int steps);
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;
 	bool focusControllerDefault();
@@ -66,6 +68,7 @@ private:
 	virtual void onEvent() override;
 	virtual void onUpdate() override;
 	virtual bool onHandleEvent(AEvent& e) override;
+	bool onHandleMouseWheel(AEvent& event) override;
 	virtual bool onHandleUIAction(UIAction action) override;
 	virtual void onDraw() override;
 	virtual void onWindowResize(int width, int height) override;

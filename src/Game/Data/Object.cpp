@@ -770,7 +770,7 @@ void Object::onMouseLeftDown(int x, int y)
 
 	auto player = gm->player;
 	NextAction act;
-    if (player->canRun && player->canPayRunThewCost())
+    if (!player->isRunDisabled() && player->canPayRunThewCost())
     {
 		act.action = acRun;
 	}

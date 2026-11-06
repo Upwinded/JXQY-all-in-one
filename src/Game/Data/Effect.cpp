@@ -11,8 +11,10 @@
 #include "../GameManager/GameManager.h"
 #include "../../File/File.h"
 #include "../../File/INIReader.h"
+#include "../../Image/ImageAnimationPlayback.h"
 #include <algorithm>
 #include <cmath>
+#include <climits>
 #include <limits>
 
 namespace
@@ -569,6 +571,7 @@ void Effect::beginExplode(
 
 void Effect::beginFly()
 {
+	resetFlightClock();
 	magicWhenNewPositionLastTile = position;
 	magicWhenNewPositionInitialized = true;
 	if (getMoveKind() == mmkThrow)
@@ -576,14 +579,12 @@ void Effect::beginFly()
 		doing = ekThrowing;
 		beginTime = getTime();
 		lifeTime = getFlyinUTime();
-		playSound(ekFlying);
 	}
 	else
 	{
 		doing = ekFlying;
 		beginTime = getTime();
 		lifeTime = getFlyinUTime();
-		playSound(doing);
 		beginMeteorMove();
 	}
 }
@@ -623,6 +624,22 @@ UTime Effect::getFlyinUTime()
 	}
 	else
 	{
+		const int kind = getMoveKind();
+		const auto mode = gm != nullptr && !isSelfAnchoredMoveKind(kind)
+			&& kind != mmkFullScreen && kind != mmkSummon && kind != mmkTimeStop && magic.meteorMove <= 0
+			? gm->global.magicTimingMode : MagicTimingMode::FixedMilliseconds;
+		if (mode == MagicTimingMode::LogicFrames)
+		{
+			const double rate = getLegacyMovementFrameCount(1.0f, Config::getGameSpeed());
+			return rate > 0.0 ? static_cast<UTime>(std::ceil(magic.level[level].lifeFrame / rate)) : 0;
+		}
+		if (mode == MagicTimingMode::NativeAnimationFrames || mode == MagicTimingMode::CSharpAnimationFrames)
+		{
+			const int interval = magic.flyImage != nullptr
+				? ImageAnimationPlayback::effectiveFrameInterval(magic.flyImage->interval)
+				: ImageAnimationPlayback::LegacyZeroIntervalMilliseconds;
+			return static_cast<UTime>(magic.level[level].lifeFrame) * interval;
+		}
 		return (unsigned int)((float)magic.level[level].lifeFrame * EFFECT_FRAME_TIME);
 	}
 }
@@ -648,15 +665,14 @@ void Effect::updateSound()
 	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
 	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
 	engine->setMusicPosition(channel, x, y);
-	if (engine->getSoundVolume() != soundVolume)
-	{
-		soundVolume = engine->getSoundVolume();
-		engine->setMusicVolume(channel, soundVolume);
-	}
 }
 
 void Effect::initParam()
 {
+	flightClock = {};
+	waitTimingMode = MagicTimingMode::FixedMilliseconds;
+	flightClockExpired = false;
+	waitFramesRemaining = -1.0;
 	magic.applyRuntimeLevel(level);
 	fileName = magic.iniName;
 	const int effectLevel = clampMagicLevel(level);
@@ -1971,6 +1987,8 @@ bool Effect::handleLeapAfterHit(std::shared_ptr<NPC> hitTarget)
 	srcOffset = offset;
 	changeFollowTarget(nextTarget);
 	leapFlying = true;
+	flightClock = {};
+	flightClockExpired = false;
 	doing = ekFlying;
 	beginTime = getTime();
 	lifeTime = (UTime)((float)magic.level[level].leapFrame * EFFECT_FRAME_TIME);
@@ -1979,7 +1997,6 @@ bool Effect::handleLeapAfterHit(std::shared_ptr<NPC> hitTarget)
 		lifeTime = getFlyinUTime();
 	}
 	passPath.clear();
-	playSound(ekFlying);
 	return true;
 }
 
@@ -2372,10 +2389,96 @@ void Effect::updateRangeEffect(UTime frameTime)
 	}
 }
 
+void Effect::updateEffectPosition(UTime frameTime, float flySpeed)
+{
+	updateEffectPositionForFrames(
+		getLegacyMovementFrameCount(static_cast<float>(frameTime), Config::getGameSpeed()), flySpeed);
+}
+
+void Effect::updateEffectPositionForFrames(double movementFrames, float flySpeed)
+{
+	if (flySpeed <= 0.0f || movementFrames <= 0.0)
+	{
+		return;
+	}
+	const PointEx movementVector = getEffectProjectedMovementVector(flyingDirection);
+	const int moveKind = magic.level[level].moveKind;
+	// Original straight projectiles normalize screen pixels; radial effects and moving walls use projection.
+	const float length = moveKind == mmkFly || moveKind == mmkFlyContinuous
+		? std::hypot(movementVector.x, movementVector.y)
+		: getProjectedMovementLength(movementVector);
+	if (length <= 0.0f)
+	{
+		return;
+	}
+	const float distance = static_cast<float>(flySpeed * movementFrames);
+	offset.x += movementVector.x / length * distance;
+	offset.y += movementVector.y / length * distance;
+	updatePosition();
+}
+
 void Effect::calTime()
 {
-	lifeTime = (unsigned int)(((float)magic.level[level].lifeFrame) * EFFECT_FRAME_TIME);
+	lifeTime = getFlyinUTime();
 	waitTime = (unsigned int)(((float)magic.level[level].waitFrame) * EFFECT_FRAME_TIME);
+	waitTimingMode = gm != nullptr ? gm->global.magicTimingMode : MagicTimingMode::FixedMilliseconds;
+	resetFlightClock();
+}
+
+void Effect::resetFlightClock()
+{
+	flightClock = {};
+	flightClockExpired = false;
+	const int kind = getMoveKind();
+	if (gm == nullptr || kind == mmkThrow || kind == mmkFullScreen || kind == mmkSummon
+		|| kind == mmkTimeStop || magic.meteorMove > 0 || isSelfAnchoredMoveKind(kind))
+	{
+		return;
+	}
+	flightClock.mode = gm->global.magicTimingMode;
+	flightClock.framesRemaining = std::max(0, magic.level[level].lifeFrame);
+	if (magic.level[level].lifeFrame <= 0 && magic.flyImage != nullptr)
+	{
+		flightClock.framesRemaining = static_cast<double>(ImageAnimationPlayback::calculateLayout(
+			magic.flyImage->frame.size(), magic.flyImage->directions).framesPerDirection);
+		// Sword2's zero-LifeFrame fallback remains one timed animation cycle.
+		if (flightClock.mode == MagicTimingMode::LogicFrames)
+		{
+			flightClock.mode = MagicTimingMode::FixedMilliseconds;
+		}
+	}
+}
+
+bool Effect::flightLifetimeExpired() const
+{
+	if (moveBackActive)
+	{
+		return false;
+	}
+	return flightClock.mode == MagicTimingMode::FixedMilliseconds
+		? getTime() - beginTime >= lifeTime : flightClockExpired;
+}
+
+double Effect::consumeWaitTime(UTime frameTime)
+{
+	if (waitTimingMode != MagicTimingMode::LogicFrames
+		&& waitTimingMode != MagicTimingMode::NativeAnimationFrames)
+	{
+		return getTime() - beginTime >= waitTime
+			? static_cast<double>(getTime() - beginTime - waitTime) : -1.0;
+	}
+	if (waitFramesRemaining < 0.0)
+	{
+		waitFramesRemaining = static_cast<double>(waitTime) / EFFECT_FRAME_TIME;
+	}
+	const double rate = getLegacyMovementFrameCount(1.0f, Config::getGameSpeed());
+	if (frameTime == 0 || rate <= 0.0)
+	{
+		return -1.0;
+	}
+	const double consumedMilliseconds = std::min(static_cast<double>(frameTime), waitFramesRemaining / rate);
+	waitFramesRemaining = std::max(0.0, waitFramesRemaining - consumedMilliseconds * rate);
+	return waitFramesRemaining <= 0.000001 ? frameTime - consumedMilliseconds : -1.0;
 }
 
 //计算一个较远处的目标，新版轨迹计算已不需要
@@ -2386,7 +2489,7 @@ void Effect::calDest()
 	{
 		return;
 	}
-	int distance = (int)((speed + 5) * MAGIC_FLYING_SPEED_SCALE * Config::getGameSpeed() * ((float)lifeTime + 5000));
+	int distance = (int)((speed + 5) * Config::getGameSpeed() * ((float)lifeTime + 5000));
 	if (flyingDirection.x < 10 || flyingDirection.y < 10)
 	{
 		dest.x = flyingDirection.x * 100 * distance + src.x;
@@ -3118,6 +3221,30 @@ void Effect::initFromIni(
 			"MagicLevelSpeed",
 			magic.level[clampMagicLevel(level)].speed));
 	}
+	// Old saves retain their stored millisecond lifetime. Only new records
+	// carry a frame budget, so a resource update cannot restart an in-flight spell.
+	MagicTimingMode savedTimingMode;
+	if (tryParseMagicTimingMode(ini->Get(section, "MagicTimingMode", ""), savedTimingMode))
+	{
+		const double frames = ini->GetReal(section, "MagicLifeFramesRemaining", 0.0);
+		const double animationElapsed = ini->GetReal(section, "MagicAnimationElapsedMilliseconds", 0.0);
+		const double logicalRemainder = ini->GetReal(section, "MagicLogicalFrameRemainder", 0.0);
+		const double waitFrames = ini->GetReal(section, "MagicWaitFramesRemaining", -1.0);
+		if (std::isfinite(frames) && frames >= 0.0 && frames <= INT_MAX
+			&& std::isfinite(animationElapsed) && animationElapsed >= 0.0
+			&& std::isfinite(logicalRemainder) && logicalRemainder >= 0.0 && logicalRemainder < 1.0
+			&& std::isfinite(waitFrames) && waitFrames >= -1.0)
+		{
+			flightClock.mode = savedTimingMode;
+			flightClock.framesRemaining = frames;
+			flightClock.animationElapsedMilliseconds = animationElapsed;
+			flightClock.logicalFrameRemainder = logicalRemainder;
+			flightClock.animationFrame = ini->GetTime(section, "MagicAnimationFrame", 0);
+			waitFramesRemaining = waitFrames;
+			waitTimingMode = savedTimingMode;
+			tryParseMagicTimingMode(ini->Get(section, "MagicWaitTimingMode", ""), waitTimingMode);
+		}
+	}
 	additionalEffect = savedAdditionalEffectText.empty()
 		? magic.additionalEffect
 		: static_cast<int>(ini->GetInteger(section, "AdditionalEffect", magic.additionalEffect));
@@ -3321,6 +3448,13 @@ void Effect::saveToIni(
 	ini->SetTime(section, "BeginTime", tempBeginTime);
 	ini->SetTime(section, "LifeTime", lifeTime);
 	ini->SetTime(section, "WaitTime", waitTime);
+	ini->Set(section, "MagicTimingMode", magicTimingModeToString(flightClock.mode));
+	ini->Set(section, "MagicWaitTimingMode", magicTimingModeToString(waitTimingMode));
+	ini->SetReal(section, "MagicLifeFramesRemaining", flightClock.framesRemaining);
+	ini->SetReal(section, "MagicAnimationElapsedMilliseconds", flightClock.animationElapsedMilliseconds);
+	ini->SetReal(section, "MagicLogicalFrameRemainder", flightClock.logicalFrameRemainder);
+	ini->SetTime(section, "MagicAnimationFrame", flightClock.animationFrame);
+	ini->SetReal(section, "MagicWaitFramesRemaining", waitFramesRemaining);
 	ini->SetInteger(section, "Damage", damage);
 	ini->SetInteger(section, "Damage2", damage2);
 	ini->SetInteger(section, "Damage3", damage3);
@@ -3571,58 +3705,13 @@ void Effect::playSound(int act)
 	Point pos = Map::getTilePosition(position, gm->camera->position, { 0, 0 }, soundOffset);
 	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
 	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
-	float soundFactor = 1.0f;
 	switch (act)
 	{
-	case ekFlying:
-		// 多重飞行技能释放时，声音叠加过大，此处降低音量处理
-		if (magic.level[level].moveKind == mmkHeartCircle || magic.level[level].moveKind == mmkCircle 
-			|| magic.level[level].moveKind == mmkHelixCircle)
-		{
-			soundFactor = 0.05f;
-		}
-		else if (magic.level[level].moveKind == mmkSector || magic.level[level].moveKind == mmkRandSector ||
-			(magic.level[level].moveKind == mmkRegion && magic.level[level].region == mrWave))
-		{
-			if (level < 4)
-			{
-				soundFactor = 0.35f;
-			}
-			else if (level < 7)
-			{
-				soundFactor = 0.2f;
-			}
-			else
-			{
-				soundFactor = 0.1f;
-			}
-		}
-		else if (magic.level[level].moveKind == mmkRegion)
-		{
-			if (level < 4)
-			{
-				soundFactor = 0.15f;
-			}
-			else if (level < 7)
-			{
-				soundFactor = 0.1f;
-			}
-			else
-			{
-				soundFactor = 0.05f;
-			}
-		}
-		channel = playSoundFile(magic.flyingSound, x, y, engine->getSoundVolume() * soundFactor);
-		break;
 	case ekExploding:
-		if (magic.level[level].moveKind == mmkFullScreen)
-		{
-			soundFactor = 0.2f;
-		}
-		channel = playSoundFile(magic.vanishSound, x, y, engine->getSoundVolume() * soundFactor);
+		channel = engine->playMagicSoundFile(magic.vanishSound, x, y);
 		break;
 	case ekSuperMode:
-		channel = playSoundFile(magic.superModeSound, x, y, engine->getSoundVolume());
+		channel = engine->playMagicSoundFile(magic.superModeSound, x, y);
 		break;
 	case ekHiding:
 		break;
@@ -3757,7 +3846,12 @@ _shared_image Effect::loadImage(int * x, int * y)
 		}
 		else
 		{
-			return IMP::loadImageForDirection(magic.flyImage, direction, getTime() - beginTime, x, y);
+			const bool frameTimed = flightClock.mode == MagicTimingMode::NativeAnimationFrames
+				|| flightClock.mode == MagicTimingMode::CSharpAnimationFrames;
+			const UTime imageTime = frameTimed && magic.flyImage != nullptr
+				? flightClock.animationFrame * ImageAnimationPlayback::effectiveFrameInterval(magic.flyImage->interval)
+				: getTime() - beginTime;
+			return IMP::loadImageForDirection(magic.flyImage, direction, imageTime, x, y);
 		}		
 	}
 	else if (doing == ekSuperMode)
@@ -3842,6 +3936,16 @@ void Effect::onUpdate()
 			Point from = position;
 			PointEx fromOffset = offset;
 			bool meteorMoveHandled = updateMeteorMove(ft);
+			MagicFlightStep flightStep;
+			if (!meteorMoveHandled)
+			{
+				flightStep = moveBackActive ? MagicFlightStep{
+					getLegacyMovementFrameCount(static_cast<float>(ft), Config::getGameSpeed()), false }
+					: flightClock.advance(ft,
+					getLegacyMovementFrameCount(1.0f, Config::getGameSpeed()),
+					magic.flyImage != nullptr ? magic.flyImage->interval : 0);
+				flightClockExpired = flightStep.expired;
+			}
 			bool roundMoveHandled = false;
 			if (!meteorMoveHandled)
 			{
@@ -3946,14 +4050,16 @@ void Effect::onUpdate()
 				}
 
 				roundMoveHandled = roundMoveActive;
-				updateRoundMovePosition(ft);
+				const double rate = getLegacyMovementFrameCount(1.0f, Config::getGameSpeed());
+				updateRoundMovePosition(rate > 0.0
+					? static_cast<UTime>(std::lround(flightStep.movementFrames / rate)) : 0);
 			}
 			float flySpeed = (followByTraceEnemy && useTraceSpeed && magic.traceSpeed > 0)
 				? (float)magic.traceSpeed
 				: (float)speed;
 			if (!meteorMoveHandled && !roundMoveHandled)
 			{
-				updateEffectPosition(ft, flySpeed);
+				updateEffectPositionForFrames(flightStep.movementFrames, flySpeed);
 			}
 			Point to = position;
 			PointEx toOffset = offset;
@@ -3961,7 +4067,7 @@ void Effect::onUpdate()
 			passPath = getPassPath(from, fromOffset, to, toOffset);
 			updateMagicWhenNewPosition();
 			// Meteor paths finish through their landing collision, independently of animation length.
-			if (!meteorMoveHandled && getTime() - beginTime >= lifeTime)
+			if (!meteorMoveHandled && flightLifetimeExpired())
 			{
 				if (logicRunning)
 				{
@@ -4040,7 +4146,8 @@ void Effect::onUpdate()
 	}
 	else if (doing == ekHiding)
 	{
-		if (getTime() - beginTime >= waitTime)
+		const double flightElapsedMilliseconds = consumeWaitTime(ft);
+		if (flightElapsedMilliseconds >= 0.0)
 		{
 			// Earlier character movement happened before this delayed effect existed
 			// for collisions. Keep its creation frame for projectile interactions.
@@ -4048,33 +4155,35 @@ void Effect::onUpdate()
 			if (getMoveKind() == mmkThrow)
 			{
 				doing = ekThrowing;
-				beginTime += waitTime;
+				beginTime = getTime() - static_cast<UTime>(flightElapsedMilliseconds);
 				waitTime = 0;
 				magicWhenNewPositionLastTile = position;
 				magicWhenNewPositionInitialized = true;
-				playSound(ekFlying);
 			}
 			else
 			{
 				doing = ekFlying;
-				beginTime += waitTime;
+				beginTime = getTime() - static_cast<UTime>(flightElapsedMilliseconds);
 				waitTime = 0;
 				magicWhenNewPositionLastTile = position;
 				magicWhenNewPositionInitialized = true;
-				playSound(doing);
 				beginMeteorMove();
 			}
 			if (lifeTime > 0)
 			{
 				Point from = position;
 				PointEx fromOffset = offset;
-				updateEffectPosition(getTime() - beginTime, (float)speed);
+				const auto flightStep = flightClock.advance(flightElapsedMilliseconds,
+					getLegacyMovementFrameCount(1.0f, Config::getGameSpeed()),
+					magic.flyImage != nullptr ? magic.flyImage->interval : 0);
+				flightClockExpired = flightStep.expired;
+				updateEffectPositionForFrames(flightStep.movementFrames, static_cast<float>(speed));
 				Point to = position;
 				PointEx toOffset = offset;
 				//passPath = gm->map->getPassPath(from, to, flyingDirection, dest);
 				passPath = getPassPath(from, fromOffset, to, toOffset);
 				updateMagicWhenNewPosition();
-				if (getTime() - beginTime >= lifeTime)
+				if (flightLifetimeExpired())
 				{
 					if (shouldExplodeWhenLifeFrameEnds())
 					{

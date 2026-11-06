@@ -66,9 +66,8 @@ bool SaveEditContext::setCurrentIndex(int index)
 
     selectedIndex = index;
     QSettings settings = EditorSettings::create();
-    settings.setValue(SettingsKey, currentTarget().id);
-    settings.sync();
-    return settings.status() == QSettings::NoError;
+    EditorSettings::setValueIfChanged(settings, SettingsKey, currentTarget().id);
+    return EditorSettings::synchronize(settings).succeeded();
 }
 
 bool SaveEditContext::setCurrentId(const QString& id)

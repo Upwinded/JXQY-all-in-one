@@ -220,44 +220,7 @@ void Item::onDraw()
 		return;
 	}
 
-	_shared_image img = frameIndex >= 0
-		? IMP::loadImage(impImage, frameIndex)
-		: IMP::loadImageForTime(impImage, getTime());
-	if (img != nullptr)
-	{
-		if (stretch)
-		{
-			engine->drawImage(img, nullptr, &rect);
-		}
-		else
-		{
-			int imageWidth = 0;
-			int imageHeight = 0;
-			engine->getImageSize(img, imageWidth, imageHeight);
-			if (imageWidth > rect.w || imageHeight > rect.h)
-			{
-				double scale = std::min(
-					static_cast<double>(rect.w) / static_cast<double>(imageWidth),
-					static_cast<double>(rect.h) / static_cast<double>(imageHeight));
-				Rect drawRect =
-				{
-					rect.x + (rect.w - std::max(1, static_cast<int>(std::round(imageWidth * scale)))) / 2,
-					rect.y + (rect.h - std::max(1, static_cast<int>(std::round(imageHeight * scale)))) / 2,
-					std::max(1, static_cast<int>(std::round(imageWidth * scale))),
-					std::max(1, static_cast<int>(std::round(imageHeight * scale)))
-				};
-				engine->drawImage(img, nullptr, &drawRect);
-			}
-			else if (backImage[0] != nullptr || centerImage)
-			{
-				engine->drawImage(img, rect.x + (rect.w - imageWidth) / 2, rect.y + (rect.h - imageHeight) / 2);
-			}
-			else
-			{
-				engine->drawImage(img, rect.x, rect.y);
-			}
-		}
-	}
+	drawItemImage(rect.x, rect.y);
 	if (cooldownFraction > 0.0f)
 	{
 		drawCooldown(rect);
@@ -337,20 +300,52 @@ void Item::drawCooldown(const Rect& destination)
 	}
 }
 
+void Item::drawItemImage(int x, int y)
+{
+	Rect destination = { x, y, rect.w, rect.h };
+	_shared_image img = frameIndex >= 0
+		? IMP::loadImage(impImage, frameIndex)
+		: IMP::loadImageForTime(impImage, getTime());
+	if (img != nullptr)
+	{
+		if (stretch)
+		{
+			engine->drawImage(img, nullptr, &destination);
+		}
+		else
+		{
+			int imageWidth = 0;
+			int imageHeight = 0;
+			engine->getImageSize(img, imageWidth, imageHeight);
+			if (imageWidth > destination.w || imageHeight > destination.h)
+			{
+				double scale = std::min(
+					static_cast<double>(destination.w) / static_cast<double>(imageWidth),
+					static_cast<double>(destination.h) / static_cast<double>(imageHeight));
+				Rect drawRect =
+				{
+					destination.x + (destination.w - std::max(1, static_cast<int>(std::round(imageWidth * scale)))) / 2,
+					destination.y + (destination.h - std::max(1, static_cast<int>(std::round(imageHeight * scale)))) / 2,
+					std::max(1, static_cast<int>(std::round(imageWidth * scale))),
+					std::max(1, static_cast<int>(std::round(imageHeight * scale)))
+				};
+				engine->drawImage(img, nullptr, &drawRect);
+			}
+			else if (backImage[0] != nullptr || centerImage)
+			{
+				engine->drawImage(img, destination.x + (destination.w - imageWidth) / 2, destination.y + (destination.h - imageHeight) / 2);
+			}
+			else
+			{
+				engine->drawImage(img, destination.x, destination.y);
+			}
+		}
+	}
+}
+
 void Item::onDrawDrag(int x, int y)
 {
-	_shared_image img = IMP::loadImageForTime(impImage, getTime());
-	if (stretch)
-	{
-		Rect r = rect;
-		r.x = x;
-		r.y = y;
-		engine->drawImage(img, nullptr, &r);
-	}
-	else
-	{
-		engine->drawImage(img, x, y);
-	}
+	drawItemImage(x, y);
 }
 
 bool Item::onHandleEvent(AEvent & e)

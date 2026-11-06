@@ -24,6 +24,7 @@ public:
 	void reFresh();
 	void reset();
 	void reRange(int max);
+	bool scrollMouseWheel(int steps);
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;
 	virtual bool isControllerFocusActive() const override;

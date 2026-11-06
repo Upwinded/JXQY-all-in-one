@@ -58,6 +58,9 @@ public:
 	virtual ~Label();
 
 	bool autoNextLine = false;
+	bool autoNextLineConfigured = false;
+	bool autoShrinkConfigured = false;
+	bool minimumFontConfigured = false;
 	bool autoShrink = false;
 	bool elideOverflow = false;
 	int minimumFontSize = 7;

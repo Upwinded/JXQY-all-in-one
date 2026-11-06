@@ -1,5 +1,7 @@
 #pragma once
 #include "../../Component/Component.h"
+#include "../../Component/ConfigDrivenPanel.h"
+#include "PartnerHeadLayout.h"
 #include "ControllerFocusParticipant.h"
 #include "UIFocusManager.h"
 #include <map>
@@ -9,7 +11,7 @@
 class NPC;
 
 class PartnerHeadMenu :
-	public Panel,
+	public ConfigDrivenPanel,
 	public ControllerFocusParticipant
 {
 public:
@@ -31,12 +33,7 @@ public:
 		const PElement& element) override;
 
 private:
-	static constexpr int HeadStartX = 5;
-	static constexpr int HeadStartY = 5;
-	static constexpr int HeadGapY = 2;
-	static constexpr int LevelFontSize = 10;
-	static constexpr int LevelTextWidth = 64;
-	static constexpr int LevelTextHeight = 12;
+	PartnerHeadLayout layout;
 
 	std::vector<std::shared_ptr<Item>> partnerHeadItems;
 	std::vector<std::shared_ptr<Label>> levelLabels;

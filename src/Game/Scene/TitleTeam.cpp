@@ -3,12 +3,50 @@
 #include "../Menu/UIFocusManager.h"
 
 #include "../../Component/TextLayout.h"
+#include "../../Component/Panel.h"
 
 #include <algorithm>
+#include <sstream>
+#include <limits>
 
 namespace
 {
-constexpr int TextPanelWidth = 440;
+int displayInteger(const INIReader& ini, const char* key, int fallback, int minimum = -100000, int maximum = 100000)
+{
+	const std::string text = ini.Get("Init", key, "");
+	if (text.empty()) return fallback;
+	try
+	{
+		std::size_t end = 0;
+		const long value = std::stol(text, &end, 0);
+		return text.find_first_not_of(" \t\r\n", end) == std::string::npos && value >= minimum && value <= maximum
+			? static_cast<int>(value) : fallback;
+	}
+	catch (const std::exception&) { return fallback; }
+}
+unsigned int displayColor(INIReader& ini, const char* key, unsigned int fallback)
+{
+	const std::string text = ini.Get("Init", key, "");
+	if (text.empty()) return fallback;
+	try
+	{
+		std::istringstream stream(text); std::string part; int count = 0;
+		const bool tuple = text.find(',') != std::string::npos;
+		if (text.back() == ',') return fallback;
+		while (std::getline(stream, part, ','))
+		{
+			const auto first = part.find_first_not_of(" \t\r\n");
+			if (first == std::string::npos || part[first] == '-') return fallback;
+			std::size_t end = 0; const auto value = std::stoul(part, &end, tuple ? 10 : 0);
+			if (part.find_first_not_of(" \t\r\n", end) != std::string::npos || (tuple && value > 255)
+				|| (!tuple && value > std::numeric_limits<unsigned int>::max())) return fallback;
+			++count;
+		}
+		if (tuple ? count != 3 && count != 4 : count != 1) return fallback;
+		return ini.GetColor("Init", key, fallback);
+	}
+	catch (const std::exception&) { return fallback; }
+}
 }
 
 unsigned char TitleTeam::fadeInTextureAlpha(
@@ -61,6 +99,7 @@ bool TitleTeam::onInitial()
 	firstVisibleLine = 0;
 	layoutWindowWidth = -1;
 	layoutWindowHeight = -1;
+	loadDisplayLayout();
 
 	if (!videoFileName.empty())
 	{
@@ -70,6 +109,26 @@ bool TitleTeam::onInitial()
 	updateTextLayout();
 	initTime();
 	return true;
+}
+
+void TitleTeam::loadDisplayLayout()
+{
+	for (auto& configuration : displayConfiguration) configuration = INIReader();
+	if (teamInfoText.empty() || !File::fileExist(TitleTeamLayout::MenuFile)) return;
+	INIReader menu(TitleTeamLayout::MenuFile);
+	const std::string window = menu.Get("menu", "window", "");
+	if (!window.empty()) displayConfiguration[0] = INIReader(window);
+	for (int index = 1; ; ++index)
+	{
+		const std::string section = "component" + std::to_string(index);
+		const std::string type = menu.Get(section, "type", "");
+		if (type.empty()) break;
+		const std::string name = menu.Get(section, "name", "");
+		const int role = name == "body" && type == "Label" ? 1 : name == "scrollHint" && type == "Label" ? 2
+			: name == "closeBtn" && type == "FlatTextButton" ? 3 : -1;
+		const std::string file = menu.Get(section, "file", "");
+		if (role > 0 && !file.empty()) displayConfiguration[role] = INIReader(file);
+	}
 }
 
 void TitleTeam::updateTextLayout()
@@ -89,26 +148,42 @@ void TitleTeam::updateTextLayout()
 	layoutWindowWidth = width;
 	layoutWindowHeight = height;
 
-	textFontSize = height < 540 ? 22 : 26;
-	textLineGap = std::max(4, textFontSize / 4);
-	const int leftMargin = videoFileName.empty()
-		? std::max(24, width / 14)
-		: std::max(20, width - TextPanelWidth + 30);
-	const int rightMargin = std::max(20, width / 30);
-	const int topMargin = std::max(28, height / 14);
-	const int bottomControlsHeight = std::max(66, height / 7);
-	textRect = {
-		leftMargin,
-		topMargin,
-		std::max(1, width - leftMargin - rightMargin),
-		std::max(1, height - topMargin - bottomControlsHeight)
+	displayLayout = TitleTeamLayout::defaults(width, height, !videoFileName.empty());
+	Panel panel;
+	panel.rect = displayLayout.panel;
+	INIReader geometry;
+	auto& window = displayConfiguration[0];
+	geometry.SetInteger("Init", "Left", displayInteger(window, "Left", panel.rect.x));
+	geometry.SetInteger("Init", "Top", displayInteger(window, "Top", panel.rect.y));
+	geometry.SetInteger("Init", "Width", displayInteger(window, "Width", panel.rect.w, 1));
+	geometry.SetInteger("Init", "Height", displayInteger(window, "Height", panel.rect.h, 1));
+	geometry.Set("Init", "Align", window.Get("Init", "Align", "alNone"));
+	geometry.SetInteger("Init", "AlignX", displayInteger(window, "AlignX", 0));
+	geometry.SetInteger("Init", "AlignY", displayInteger(window, "AlignY", 0));
+	panel.initFromIni(geometry);
+	displayLayout = TitleTeamLayout::defaults(width, height, !videoFileName.empty(), &panel.rect);
+	displayLayout.panelColor = displayColor(window, "BackgroundColor", displayLayout.panelColor);
+	const auto rectangle = [](const INIReader& ini, Rect value)
+	{
+		return Rect{displayInteger(ini, "Left", value.x), displayInteger(ini, "Top", value.y),
+			displayInteger(ini, "Width", value.w, 1), displayInteger(ini, "Height", value.h, 1)};
 	};
-	closeRect = {
-		std::max(10, width - rightMargin - 116),
-		std::max(10, height - 48),
-		116,
-		34
-	};
+	displayLayout.body = rectangle(displayConfiguration[1], displayLayout.body);
+	displayLayout.close = rectangle(displayConfiguration[3], displayLayout.close);
+	displayLayout.hint.x = displayInteger(displayConfiguration[2], "Left", displayLayout.body.x);
+	displayLayout.hint.y = displayInteger(displayConfiguration[2], "Top", displayLayout.close.y + 7);
+	textFontSize = displayInteger(displayConfiguration[1], "Font", displayLayout.font, 1, 256);
+	textLineGap = displayInteger(displayConfiguration[1], "LineGap", std::max(4, textFontSize / 4), 0, 1024);
+	displayLayout.color = displayColor(displayConfiguration[1], "Color", displayLayout.color);
+	displayLayout.hintFont = displayInteger(displayConfiguration[2], "Font", displayLayout.hintFont, 1, 256);
+	displayLayout.hintColor = displayColor(displayConfiguration[2], "Color", displayLayout.hintColor);
+	displayLayout.closeFont = displayInteger(displayConfiguration[3], "Font", displayLayout.closeFont, 1, 256);
+	displayLayout.closeColor = displayColor(displayConfiguration[3], "Color", displayLayout.closeColor);
+	displayLayout.closeBackground = displayColor(displayConfiguration[3], "BackgroundColor", displayLayout.closeBackground);
+	textRect = displayLayout.body;
+	closeRect = displayLayout.close;
+	textRect.x += panel.rect.x; textRect.y += panel.rect.y;
+	closeRect.x += panel.rect.x; closeRect.y += panel.rect.y;
 	wrappedTeamInfoLines = TextLayout::wrapUtf8Text(teamInfoText,
 		TextLayout::charactersPerLineForWidth(textRect.w, textFontSize));
 	teamInfoTextTextures.clear();
@@ -123,22 +198,21 @@ void TitleTeam::updateTextLayout()
 
 void TitleTeam::onDrawEnd()
 {
-	int width = 0;
-	int height = 0;
-	engine->getWindowSize(width, height);
 	if (teamInfoText.empty())
 	{
 		return;
 	}
-	const int panelLeft =
-		videoFileName.empty() ? 0 : std::max(0, width - TextPanelWidth);
-	engine->fillRect(
-		panelLeft, 0, width - panelLeft, height, 8, 10, 14, 245);
+	updateTextLayout();
+	const auto fill = [this](const Rect& rectangle, unsigned int color)
+	{
+		engine->fillRect(rectangle.x, rectangle.y, rectangle.w, rectangle.h,
+			(color >> 16) & 255, (color >> 8) & 255, color & 255, (color >> 24) & 255);
+	};
+	fill(displayLayout.panel, displayLayout.panelColor);
 
 	const unsigned long elapsedMilliseconds = getTime();
 	const unsigned char textAlpha = fadeInTextureAlpha(
 		0xD0, elapsedMilliseconds);
-	updateTextLayout();
 	const int endLine = std::min(static_cast<int>(wrappedTeamInfoLines.size()),
 		firstVisibleLine + visibleLineCount);
 	int y = textRect.y;
@@ -150,7 +224,7 @@ void TitleTeam::onDrawEnd()
 			textRect.x,
 			y,
 			textFontSize,
-			0xFFFFFFFF,
+			displayLayout.color,
 			textAlpha);
 		y += textFontSize + textLineGap;
 	}
@@ -160,21 +234,20 @@ void TitleTeam::onDrawEnd()
 		scrollHintTextTexture.drawWithAlpha(
 			engine,
 			"↑/↓ 或滚轮滚动",
-			textRect.x,
-			closeRect.y + 7,
-			18,
-			0xFFFFFFFF,
+			displayLayout.panel.x + displayLayout.hint.x,
+			displayLayout.panel.y + displayLayout.hint.y,
+			displayLayout.hintFont,
+			displayLayout.hintColor,
 			fadeInTextureAlpha(0xA0, elapsedMilliseconds));
 	}
-	engine->fillRect(closeRect.x, closeRect.y, closeRect.w, closeRect.h,
-		35, 43, 55, 220);
+	fill(closeRect, displayLayout.closeBackground);
 	closeTextTexture.drawWithAlpha(
 		engine,
 		"返回",
-		closeRect.x + 35,
-		closeRect.y + 6,
-		20,
-		0xFFFFFFFF,
+		closeRect.x + (closeRect.w - 2 * displayLayout.closeFont) / 2 - 3,
+		closeRect.y + (closeRect.h - displayLayout.closeFont) / 2 - 1,
+		displayLayout.closeFont,
+		displayLayout.closeColor,
 		textAlpha);
 }
 

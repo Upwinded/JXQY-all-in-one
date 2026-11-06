@@ -5,6 +5,7 @@
 #include "../../Component/Component.h"
 #include "ControllerPromptPresenter.h"
 #include "DiceGambleState.h"
+#include "DiceGameLayout.h"
 #include "FishGameState.h"
 #include "UIFocusManager.h"
 
@@ -14,6 +15,7 @@ class GambleMenu :
 	public Panel
 {
 	friend class GambleMenuTestAccess;
+	friend bool runAuthoredDiceLayoutTests();
 public:
 	GambleMenu();
 	virtual ~GambleMenu();
@@ -83,6 +85,7 @@ private:
 	bool resourceLayoutLoaded = false;
 
 	DiceGambleState diceState;
+	DiceGameLayout diceLayout;
 	_shared_image diceFrameImage = nullptr;
 	_shared_image dicePlayerPortraitImage = nullptr;
 	_shared_image diceNpcPortraitImage = nullptr;

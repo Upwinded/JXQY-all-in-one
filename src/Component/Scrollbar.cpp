@@ -69,6 +69,7 @@ void Scrollbar::initFromIniWithName(INIReader & ini, const std::string& fileName
 
 	style = (ScrollbarStyle)ini.GetInteger("Init", "Style", int(style));
 	flat = ini.GetBoolean("Init", "Flat", false);
+	backgroundColor = ini.GetColor("Init", "BackgroundColor", 0xFFB7B697);
 	fitTrack = ini.GetBoolean("Init", "FitTrack", false);
 	rect.x = ini.GetInteger("Init", "Left", rect.x);
 	rect.y = ini.GetInteger("Init", "Top", rect.y);
@@ -288,7 +289,9 @@ void Scrollbar::onDraw()
 {
 	if (flat)
 	{
-		engine->fillRect(rect.x, rect.y, rect.w, rect.h, 183, 182, 151, 255);
+		engine->fillRect(rect.x, rect.y, rect.w, rect.h,
+			(backgroundColor >> 16) & 255, (backgroundColor >> 8) & 255,
+			backgroundColor & 255, (backgroundColor >> 24) & 255);
 		return;
 	}
 	_shared_image image = IMP::loadImageForTime(impImage, getTime(), nullptr, nullptr);

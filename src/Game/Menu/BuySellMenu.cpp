@@ -3,6 +3,7 @@
 #include "ControllerPromptPresenter.h"
 #include "GoodsMenu.h"
 #include "MenuResource.h"
+#include "MenuMouseWheel.h"
 #include "../Data/BuySellInventory.h"
 #include "../Data/NPC.h"
 #include "../GameManager/GameManager.h"
@@ -728,7 +729,9 @@ void BuySellMenu::onEvent()
 		int listIndex = scrollbar ? scrollbar->position * scrollbar->lineSize + static_cast<int>(i) : -1;
 		unsigned int ret = item[i]->getResult();
 #ifndef __MOBILE__
-		if (gm->global.feature.qingyuUi && (ret & erClick) && listIndex >= 0
+		if (gm->menu != nullptr && gm->menu->toolTip != nullptr
+			&& gm->menu->toolTip->supportsFullDetails()
+			&& (ret & erClick) && !(ret & (erDropped | erDragEnd)) && listIndex >= 0
 			&& listIndex < BUYSELL_GOODS_COUNT && goodsList[listIndex].goods)
 		{
 			gm->menu->showGoodsToolTip(getMySharedPtr(), goodsList[listIndex].goods, item[i], true);
@@ -838,6 +841,77 @@ void BuySellMenu::onEvent()
 		}
 	}
 
+}
+
+bool BuySellMenu::scrollMouseWheel(int steps, const PElement& sourceElement)
+{
+	if (!visible || dragging != TOUCH_UNTOUCHEDID || currentDragItem != nullptr)
+	{
+		return false;
+	}
+	const auto playerBag = gm != nullptr && gm->menu != nullptr
+		? gm->menu->goodsMenu : nullptr;
+	if (sourceElement != nullptr && playerBag != nullptr
+		&& menuMouseWheelSourceBelongsTo(sourceElement, playerBag))
+	{
+		if (!playerBag->visible || !playerBag->canDraw
+			|| !playerBag->activated || !playerBag->needEvents)
+		{
+			return false;
+		}
+		return playerSlotGridController.scrollRows(steps);
+	}
+	if (sourceElement != nullptr
+		&& !menuMouseWheelSourceBelongsTo(sourceElement, getMySharedPtr()))
+	{
+		return false;
+	}
+	return shopSlotGridController.scrollRows(steps);
+}
+
+bool BuySellMenu::onHandleMouseWheel(AEvent& event)
+{
+	if (!visible)
+	{
+		return false;
+	}
+	if (dragging != TOUCH_UNTOUCHEDID || currentDragItem != nullptr)
+	{
+		return true;
+	}
+	const auto playerBag = gm != nullptr && gm->menu != nullptr
+		? gm->menu->goodsMenu : nullptr;
+	const auto tooltip = gm != nullptr && gm->menu != nullptr
+		? gm->menu->toolTip : nullptr;
+	const int steps = menuMouseWheelSteps(event);
+	if (tooltip != nullptr
+		&& menuMouseWheelContains(tooltip, event.eventX, event.eventY))
+	{
+		if (tooltip->isExpanded())
+		{
+			tooltip->dispatchMouseWheel(event);
+		}
+		else
+		{
+			const auto sourceOwner = tooltip->getSourceOwner();
+			const auto sourceElement = tooltip->getSourceElement();
+			if (menuMouseWheelSourceBelongsTo(sourceElement, sourceOwner)
+				&& (sourceOwner.get() == this || sourceOwner == playerBag))
+			{
+				scrollMouseWheel(steps, sourceElement);
+			}
+		}
+		return true;
+	}
+	if (menuMouseWheelContains(playerBag, event.eventX, event.eventY, tooltip.get()))
+	{
+		scrollMouseWheel(steps, playerBag);
+	}
+	else if (menuMouseWheelContains(getMySharedPtr(), event.eventX, event.eventY, tooltip.get()))
+	{
+		scrollMouseWheel(steps);
+	}
+	return true;
 }
 
 bool BuySellMenu::onHandleEvent(AEvent & e)

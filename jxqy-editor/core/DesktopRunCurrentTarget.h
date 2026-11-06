@@ -56,3 +56,8 @@ DesktopRunCurrentTargetResult selectCurrentScriptTarget(
     const QString& scriptVirtualPath,
     Qt::CaseSensitivity pathCaseSensitivity,
     const QString& preferredSceneId = QString());
+
+DesktopRunCurrentTargetResult selectCurrentEntityListTarget(
+    const ProjectRuntimeConfiguration& configuration, const QString& listVirtualPath,
+    bool npcList, const QString& mapVirtualPath, Qt::CaseSensitivity caseSensitivity,
+    const QString& preferredSceneId = QString());

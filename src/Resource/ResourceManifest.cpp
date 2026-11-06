@@ -208,6 +208,10 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 		&& configuredRunSpeed <= INT_MAX && std::floor(configuredRunSpeed) == configuredRunSpeed
 		? static_cast<int>(configuredRunSpeed) : 0;
 
+	magicTimingMode = MagicTimingMode::FixedMilliseconds;
+	magicTimingModeDefined = tryParseMagicTimingMode(
+		ini.get("Combat", "MagicTimingMode", ""), magicTimingMode);
+
 	minimumMagicDamage = 10;
 	minimumMagicDamageDefined =
 		hasIniKey(ini, "Combat", "MinimumMagicDamage");
@@ -275,6 +279,11 @@ bool ResourceManifest::loadFromBuffer(const char* data, int len)
 		magicReleaseFrameRatioDefined, magicReleaseFrameRatioSourceId);
 
 	scriptPlayerName = trimAscii(ini.get("Script", "PlayerName", ""));
+	moveScreenProfile = ScriptMoveScreenProfile::CSharp;
+	const std::string cameraProfile = toLowerAscii(trimAscii(ini.get("Script", "MoveScreenProfile", "")));
+	moveScreenProfileDefined = cameraProfile == "native" || cameraProfile == "csharp";
+	if (cameraProfile == "native") moveScreenProfile = ScriptMoveScreenProfile::Native;
+
 	npcActionProfileDefined =
 		hasIniKey(ini, "Script", "NpcActionProfile");
 	if (npcActionProfileDefined)

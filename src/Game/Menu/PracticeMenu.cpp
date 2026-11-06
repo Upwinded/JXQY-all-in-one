@@ -100,7 +100,7 @@ void PracticeMenu::onEvent()
 	unsigned int ret = magic->getResult();
 	int practiceIndex = gm->magicManager.practiceIndex();
 	if ((ret & erClick) && gm->global.feature.qingyuUi
-		&& gm->menu->magicMenu->showDetails(practiceIndex))
+		&& gm->menu->magicMenu->showDetails(practiceIndex, true))
 	{
 		magic->resetHint();
 		return;
@@ -217,7 +217,7 @@ void PracticeMenu::configureControllerFocus()
 	{
 		binding.grid.primary = [this](int logicalIndex, int)
 		{
-			gm->menu->magicMenu->showDetails(logicalIndex);
+			gm->menu->magicMenu->showDetails(logicalIndex, true);
 		};
 	}
 	binding.grid.details = [this](int logicalIndex, int)

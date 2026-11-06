@@ -22,6 +22,7 @@ class BuySellMenu :
 	friend class GameplayAutomationSession;
 #endif
 	friend class UIFocusTestAccess;
+	friend class MenuMouseWheelTestAccess;
 public:
 	BuySellMenu();
 	virtual ~BuySellMenu();
@@ -52,6 +53,7 @@ public:
 	void updateGoods();
 	bool sellOneFromPlayerSlot(int playerIndex);
 	void clearControllerFocus();
+	bool scrollMouseWheel(int steps, const PElement& sourceElement = nullptr);
 private:
 	static constexpr int ShopControllerPaneId = 0;
 	static constexpr int PlayerControllerPaneId = 1;
@@ -80,6 +82,7 @@ private:
 	int resolveShopSlotIndex(int visibleIndex) const;
 	virtual void onEvent() override;
 	virtual bool onHandleEvent(AEvent & e) override;
+	bool onHandleMouseWheel(AEvent& event) override;
 	virtual bool onHandleUIAction(UIAction action) override;
 	virtual void onDrawEnd() override;
 	virtual void onWindowResize(int width, int height) override;

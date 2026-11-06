@@ -35,9 +35,15 @@ inline float getProjectedFrameDistance(float speed, float frameTime, float gameS
 	return speed * gameSpeed * frameTime;
 }
 
+inline float getLegacyMovementFrameCount(float frameTime, float gameSpeed)
+{
+	// Keep the existing time conversion; one original movement step has no extra speed multiplier.
+	return getProjectedFrameDistance(1.0f, frameTime, gameSpeed) * (float)TILE_HEIGHT / 2.0f;
+}
+
 inline float getProjectedMagicFrameDistance(float speed, float frameTime, float gameSpeed)
 {
-	return getProjectedFrameDistance(speed, frameTime, gameSpeed) * MAGIC_FLYING_SPEED_SCALE * (float)TILE_HEIGHT / 2.0f;
+	return std::max(0.0f, speed) * getLegacyMovementFrameCount(frameTime, gameSpeed);
 }
 
 inline bool isWithinProjectedMovementDistance(PointEx value, float distance)

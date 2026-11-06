@@ -114,8 +114,8 @@ bool TranslationManager::applyLanguage(const QString& localeName, bool persistSe
         if (persistSelection)
         {
             QSettings settings = EditorSettings::create();
-            settings.setValue(LanguageSettingsKey, selectedLocaleName);
-            settings.sync();
+            EditorSettings::setValueIfChanged(settings, LanguageSettingsKey, selectedLocaleName);
+            EditorSettings::synchronize(settings);
         }
         emit languageChanged(selectedLocaleName);
         return false;
@@ -133,8 +133,8 @@ bool TranslationManager::applyLanguage(const QString& localeName, bool persistSe
     if (persistSelection)
     {
         QSettings settings = EditorSettings::create();
-        settings.setValue(LanguageSettingsKey, localeName);
-        settings.sync();
+        EditorSettings::setValueIfChanged(settings, LanguageSettingsKey, localeName);
+        EditorSettings::synchronize(settings);
     }
     emit languageChanged(localeName);
     return true;

@@ -26,6 +26,7 @@ class MainWindow;
 class QActionGroup;
 class QDockWidget;
 class QMenu;
+class QStackedWidget;
 class QUndoStack;
 class ProjectExplorerWidget;
 class DesktopRunPanel;
@@ -90,6 +91,9 @@ private slots:
     void onOpenMapEditor();
     void onOpenMenuEditor();
     void onOpenScriptEditor();
+    void onOpenMagicEditor();
+    void onOpenGoodsShopEditor();
+    void onOpenDialogueEditor();
     void onOpenNpcDataEditor();
     void onOpenResourceProfileEditor();
     void onFindAssetReferences();
@@ -132,6 +136,8 @@ private:
         const QString& title,
         bool authoringSurface = true);
     void setupProjectExplorer();
+    void setupWorkspaceHome();
+    void updateWorkspaceHome();
     void setupDesktopRun();
     void compactDesktopRunDock();
     void refreshDesktopRunProjectContext();
@@ -144,6 +150,7 @@ private:
     void playtestActiveTarget();
     bool runSavedScene(const QString& sceneId);
     bool runCurrentMap(MapEditorWindow* window);
+    bool runCurrentEntityList(NpcDataEditorWindow* window);
     bool runCurrentScript(ScriptEditorWindow* window);
     bool runCurrentMagic(MagicEditorWindow* window);
     bool runCurrentGoodsShop(GoodsShopEditorWindow* window);
@@ -190,6 +197,13 @@ private:
         MapEditorWindow* window, QMdiSubWindow* subWindow);
     void configureMagicDocumentWindow(
         MagicEditorWindow* window, QMdiSubWindow* subWindow);
+    void configureContentAuthoring(MagicEditorWindow* window);
+    void configureContentAuthoring(GoodsShopEditorWindow* window);
+    void configureContentAuthoring(DialogueEditorWindow* window);
+    bool prepareContentFileMutation(const QString& ownerPath, const QStringList& paths, QString& error);
+    void refreshContentFileDocuments(QWidget* owner, const QStringList& paths);
+    void openContentReference(const QString& path, int line);
+    void editBoundScript(const QString& path, QWidget* propertyDialog);
     void configureGoodsShopDocumentWindow(
         GoodsShopEditorWindow* window, QMdiSubWindow* subWindow);
     void configureDialogueDocumentWindow(
@@ -300,6 +314,8 @@ private:
     QAction* desktopRunAction = nullptr;
     QAction* desktopRunStopAction = nullptr;
     QPointer<QWidget> lastDocumentFocusWidget;
+    QWidget* workspaceHome = nullptr;
+    QStackedWidget* workspaceStack = nullptr;
     QPointer<QMdiSubWindow> playtestReturnSubWindow;
     QPointer<QWidget> playtestReturnFocusWidget;
     ProjectDocumentRegistry documentRegistry;

@@ -71,6 +71,16 @@ void TalkLabel::showAllImmediately()
 	}
 }
 
+void TalkLabel::restoreProgress(const TalkLabel& previous, int displayedCharacters)
+{
+	charInterval = previous.charInterval;
+	displayedCharCount = convert_max(0, convert_min(displayedCharacters,
+		static_cast<int>(currentTalkData.talkChar.size())));
+	lastCharTime = getTime();
+	pageComplete = displayedCharCount == static_cast<int>(currentTalkData.talkChar.size());
+	renderUpToIndex(displayedCharCount);
+}
+
 void TalkLabel::renderUpToIndex(int endIndex)
 {
 	int totalChars = static_cast<int>(currentTalkData.talkChar.size());

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 #include "ActionReleaseFrameRatio.h"
+#include "MagicTimingMode.h"
+#include "ScriptMoveScreenProfile.h"
 #include "ModReleaseMetadata.h"
 
 enum class DefeatedNpcExperienceMode
@@ -91,6 +93,8 @@ struct ResourceManifest
 	int runSpeedPixelsPerSecond = 0; // Zero retains the existing projected running speed.
 
 	// [Combat]
+	MagicTimingMode magicTimingMode = MagicTimingMode::FixedMilliseconds;
+	bool magicTimingModeDefined = false;
 	// Resource-wide lower bound for one magic damage application. This is
 	// deliberately independent from Game.Type.
 	int minimumMagicDamage = 10;
@@ -111,6 +115,8 @@ struct ResourceManifest
 	std::vector<std::string> invalidActionReleaseFrameRatioKeys;
 
 	// [Script]
+	ScriptMoveScreenProfile moveScreenProfile = ScriptMoveScreenProfile::CSharp;
+	bool moveScreenProfileDefined = false;
 	std::string scriptPlayerName; // Optional fixed story name for #name.
 	ScriptNpcActionProfile npcActionProfile =
 		ScriptNpcActionProfile::Legacy;

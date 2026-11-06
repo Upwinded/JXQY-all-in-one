@@ -378,6 +378,7 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClCompile Include="..\..\src\libconvert\libconvert.cpp" />
     <ClCompile Include="..\..\src\main.cpp" />
     <ClCompile Include="..\..\src\Resource\ResourceCatalog.cpp" />
+    <ClCompile Include="..\..\src\Resource\FontCatalog.cpp" />
     <ClCompile Include="..\..\src\Resource\ResourceManager.cpp" />
     <ClCompile Include="..\..\src\Resource\ResourceManifest.cpp" />
     <ClCompile Include="..\..\src\Resource\ModReleaseAssets.cpp" />
@@ -596,6 +597,7 @@ if exist "$(VCToolsRedistDir)$(SdlRuntimeArchDir)\Microsoft.VC145.CRT\vcruntime1
     <ClInclude Include="..\..\src\Image\PicDecoder.h" />
     <ClInclude Include="..\..\src\libconvert\libconvert.h" />
     <ClInclude Include="..\..\src\Resource\ResourceCatalog.h" />
+    <ClInclude Include="..\..\src\Resource\FontCatalog.h" />
     <ClInclude Include="..\..\src\Resource\ResourceManager.h" />
     <ClInclude Include="..\..\src\Resource\ResourceManifest.h" />
     <ClInclude Include="..\..\src\Resource\ResourcePackCard.h" />

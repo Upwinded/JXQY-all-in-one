@@ -14,6 +14,7 @@
 #include "../Engine/WindowTypes.h"
 #include "ResourceManager.h"
 #include "ResourcePackList.h"
+#include "FontCatalog.h"
 #include "../Game/Menu/ControllerPromptPresenter.h"
 #include "../Game/Menu/UIFocusManager.h"
 #include "../Game/Loading/ExclusiveLoadingRunner.h"
@@ -28,11 +29,13 @@ struct SaveFileSelection;
 
 class GamepadEssentialUITestAccess;
 class GamepadSurfaceContractTestAccess;
+class FontSelectionTestAccess;
 
 class ResourceSelectScene : public Element
 {
 	friend class GamepadEssentialUITestAccess;
 	friend class GamepadSurfaceContractTestAccess;
+	friend class FontSelectionTestAccess;
 public:
 	ResourceSelectScene();
 	virtual ~ResourceSelectScene();
@@ -240,6 +243,7 @@ private:
 	void resetPendingDisplaySettings();
 	void setDisplaySettingsControlsVisible(bool visible);
 	void updateDisplaySettingsControlLayout();
+	int firstDisplaySettingsRow() const;
 	void setMainControlsAvailable(bool available);
 	Rect getExitButtonRect() const;
 	Rect getCheatHelpButtonRect() const;
@@ -387,10 +391,12 @@ private:
 	std::shared_ptr<FlatTextButton> saveExportButton;
 	std::shared_ptr<FlatTextButton> saveImportButton;
 	std::shared_ptr<FlatTextButton> displaySettingsButton;
-	std::array<std::shared_ptr<FlatTextButton>, 4>
+	std::array<std::shared_ptr<FlatTextButton>, 5>
 		displaySettingsPreviousButtons;
-	std::array<std::shared_ptr<FlatTextButton>, 4>
+	std::array<std::shared_ptr<FlatTextButton>, 5>
 		displaySettingsNextButtons;
+	std::vector<ResourceFonts::FontChoice> fontChoices;
+	std::string pendingFontId;
 	std::shared_ptr<FlatTextButton> displaySettingsApplyButton;
 	std::shared_ptr<FlatTextButton> displaySettingsDefaultButton;
 	std::shared_ptr<FlatTextButton> displaySettingsBackButton;

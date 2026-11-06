@@ -1,12 +1,14 @@
 #pragma once
 
 #include "AssetDragDrop.h"
+#include "DisplayPropertyEditor.h"
 
 #include <QWidget>
 #include <QMap>
 #include <QRect>
 #include <QString>
 #include <QStringList>
+#include <QSet>
 
 class QLineEdit;
 class QPushButton;
@@ -14,6 +16,8 @@ class QCheckBox;
 class QGroupBox;
 class QSpinBox;
 class QToolButton;
+class QLabel;
+class QPixmap;
 
 namespace Ui
 {
@@ -43,7 +47,7 @@ struct ComponentIniProperties
     bool hoverSound = true;
     bool animate = false;
     unsigned int color = 0xFFFFFFFF;
-    unsigned int selColor = 0xFFE6C864;
+    unsigned int selColor = 0xFFFFFFFF;
     int font = 18;
     int style = 1;
     int min = 0;
@@ -105,6 +109,12 @@ public:
 
     void setComponentType(const QString& type);
     void setProperties(const ComponentIniProperties& props);
+    void setDisplayDefaults(const QMap<QString, QString>& defaults);
+    void setTitleTeamDisplayLimits(bool titleTeam);
+    void setNoticeDisplayMode(bool notice);
+    void setDiceDisplayProperties(const QString& role, const QMap<QString,QString>& values = {}, bool editable = false);
+    QMap<QString,QString> diceDisplayProperties() const;
+    void setControllerHelpDisplayMode(bool help);
     ComponentIniProperties getProperties() const;
 
     void setDefinitionProperties(const QString& name, const QString& file,
@@ -148,6 +158,9 @@ public:
     void setAssetDropRoots(const QStringList& roots);
 
     void clearAll();
+    void setMenuEditableFields(const QSet<QString>& fields, const QString& reason);
+    void setButtonStatePreviews(const QList<QPixmap>& images);
+    void setChoiceListSpacing(int gap, bool visible);
 
 protected:
     void changeEvent(QEvent* event) override;
@@ -156,6 +169,7 @@ signals:
     void propertiesChanged();
     void definitionPropertiesChanged();
     void resourceFileEditingFinished();
+    void choiceListSpacingChanged(int gap);
 
 private slots:
     void onAnyPropertyChanged();
@@ -172,6 +186,7 @@ private:
     void addColorPickerButton(QLineEdit* colorEdit);
     void updateColorButtonStyle(QPushButton* button, const QString& colorText);
     void retranslateDynamicUi();
+    QList<QPair<QString, QString>> runtimeLayoutLabels() const;
     void updateAdvancedPropertyVisibility();
     void setupAssetDropTargets();
     AssetDragDrop::DropResult evaluateAssetDrop(
@@ -180,7 +195,13 @@ private:
     Ui::ComponentPropertyEditor* ui;
 
     QString currentType;
+    QString menuWindowAlign;
     bool updatingFromCode = false;
+    bool noticeDisplayMode = false;
+    bool controllerHelpDisplayMode = false;
+    QGroupBox* statePreviewGroup = nullptr;
+    QList<QLabel*> statePreviewLabels;
+    QSpinBox* choiceSpacingSpin = nullptr;
     QStringList listBoxItems;
     QString assetsBasePath;
     QStringList assetDropRoots;
@@ -213,5 +234,11 @@ private:
     QGroupBox* labelAdvancedGroup = nullptr;
     QCheckBox* autoShrinkCheck = nullptr;
     QSpinBox* scrollbarPositionSpin = nullptr;
+    QSpinBox* listBoxFontSpin = nullptr;
     QLineEdit* menuWindowBitmapEdit = nullptr;
+    QGroupBox* diceLayoutGroup = nullptr;
+    QMap<QString, DisplayPropertyEditor*> diceLayoutEdits;
+    QGroupBox* runtimeLayoutGroup = nullptr;
+    QLabel* imageBorderScalingHelp = nullptr;
+    QMap<QString, DisplayPropertyEditor*> runtimeLayoutEdits;
 };

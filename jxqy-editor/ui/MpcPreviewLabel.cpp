@@ -59,7 +59,8 @@ void MpcPreviewLabel::setSourceAnimation(
     animationFrames = frames;
     animationDirections = qMax(1, directions);
     animationIntervalMilliseconds = intervalMilliseconds;
-    animationDirection = qMax(0, direction);
+    animationDirection = ImageAnimationPlayback::normalizeDirection(direction,
+        ImageAnimationPlayback::calculateLayout(static_cast<std::size_t>(animationFrames.size()), animationDirections));
     if (animationFrames.isEmpty())
     {
         clearImage(tr("没有可播放的帧"));
@@ -67,8 +68,63 @@ void MpcPreviewLabel::setSourceAnimation(
     }
     animationClock.start();
     updateAnimationFrame();
-    if (animationFrames.size() > 1)
+    if (animationFramesPerDirection() > 1)
         animationTimer->start();
+    emit animationStateChanged();
+}
+
+int MpcPreviewLabel::animationDirectionCount() const
+{
+    return animationFrames.isEmpty() ? 0 : ImageAnimationPlayback::calculateLayout(
+        static_cast<std::size_t>(animationFrames.size()), animationDirections).directions;
+}
+
+int MpcPreviewLabel::animationFramesPerDirection() const
+{
+    return static_cast<int>(ImageAnimationPlayback::calculateLayout(
+        static_cast<std::size_t>(animationFrames.size()), animationDirections).framesPerDirection);
+}
+
+void MpcPreviewLabel::setAnimationPlaying(bool playing)
+{
+    if (playing == isAnimationPlaying()) return;
+    if (playing)
+    {
+        if (animationFramesPerDirection() < 2) return;
+        animationClock.start();
+        animationTimer->start();
+    }
+    else
+    {
+        if (animationClock.isValid()) animationElapsedMilliseconds += animationClock.elapsed();
+        animationClock.invalidate();
+        animationTimer->stop();
+    }
+    updateAnimationFrame();
+    emit animationStateChanged();
+}
+
+void MpcPreviewLabel::setAnimationDirection(int direction)
+{
+    const int normalized = qBound(0, direction, qMax(0, animationDirectionCount() - 1));
+    if (normalized == animationDirection) return;
+    animationDirection = normalized;
+    animationElapsedMilliseconds = 0;
+    if (animationClock.isValid()) animationClock.restart();
+    updateAnimationFrame();
+    emit animationStateChanged();
+}
+
+void MpcPreviewLabel::seekAnimationFrame(int localFrame)
+{
+    if (animationFrames.isEmpty()) return;
+    setAnimationPlaying(false);
+    animationElapsedMilliseconds = static_cast<qint64>(qBound(0, localFrame,
+        qMax(0, animationFramesPerDirection() - 1))) *
+        ImageAnimationPlayback::effectiveFrameInterval(animationIntervalMilliseconds);
+    animationClock.invalidate();
+    updateAnimationFrame();
+    emit animationStateChanged();
 }
 
 void MpcPreviewLabel::clearImage(const QString& text)
@@ -91,6 +147,8 @@ void MpcPreviewLabel::stopAnimation()
     animationIntervalMilliseconds = 0;
     animationDirection = 0;
     animationFrameIndex = -1;
+    animationElapsedMilliseconds = 0;
+    emit animationStateChanged();
 }
 
 void MpcPreviewLabel::updateAnimationFrame()
@@ -102,7 +160,8 @@ void MpcPreviewLabel::updateAnimationFrame()
             static_cast<std::size_t>(animationFrames.size()),
             animationDirections,
             animationDirection,
-            static_cast<std::uint64_t>(qMax<qint64>(0, animationClock.elapsed())),
+            static_cast<std::uint64_t>(qMax<qint64>(0, animationElapsedMilliseconds +
+                (animationClock.isValid() ? animationClock.elapsed() : 0))),
             animationIntervalMilliseconds);
     if (!frameIndex.has_value())
         return;
@@ -115,6 +174,7 @@ void MpcPreviewLabel::updateAnimationFrame()
     lastTargetSize = QSize();
     setText(QString());
     recomputePixmap();
+    emit animationStateChanged();
 }
 
 void MpcPreviewLabel::recomputePixmap()

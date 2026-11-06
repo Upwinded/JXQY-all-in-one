@@ -74,6 +74,13 @@ bool INIFileEditor::loadFromString(const std::string& content)
     return loadFromString(content, UnrecognizedLinePolicy::Reject);
 }
 
+bool INIFileEditor::canRoundTripValue(const std::string& value)
+{
+    INIFileEditor parsed;
+    return parsed.loadFromString("[Value]\nText=" + value + "\n")
+        && parsed.hasKey("Value", "Text") && parsed.get("Value", "Text") == value;
+}
+
 bool INIFileEditor::loadFromString(
     const std::string& content,
     UnrecognizedLinePolicy unrecognizedLinePolicy)
@@ -664,6 +671,68 @@ bool INIFileEditor::addSection(const std::string& section)
     IniSection newSection;
     newSection.originalName = sectionName;
     iniMap.sections.emplace(lowerSection, std::move(newSection));
+    return true;
+}
+
+bool INIFileEditor::renameSection(const std::string& section, const std::string& newName)
+{
+    const std::string clean = trim(newName);
+    const std::string from = toLowerAscii(section);
+    const std::string to = toLowerAscii(clean);
+    auto existing = iniMap.sections.find(from);
+    if (existing == iniMap.sections.end() || clean.empty() || clean.find_first_of("[]\r\n") != std::string::npos ||
+        (from != to && iniMap.sections.count(to))) return false;
+    IniSection renamed = existing->second;
+    renamed.originalName = clean;
+    iniMap.sections.erase(existing);
+    iniMap.sections[to] = std::move(renamed);
+    for (auto& line : originalLines)
+    {
+        const std::string comparable = stripUtf8Bom(trim(line));
+        const size_t close = comparable.find(']');
+        if (comparable.empty() || comparable.front() != '[' || close == std::string::npos ||
+            toLowerAscii(trim(comparable.substr(1, close - 1))) != from) continue;
+        const size_t open = line.find('[');
+        line.replace(open + 1, line.find(']', open) - open - 1, clean);
+    }
+    return true;
+}
+
+bool INIFileEditor::copySection(const std::string& section, const std::string& newName)
+{
+    const std::string clean = trim(newName);
+    const std::string from = toLowerAscii(section);
+    const std::string to = toLowerAscii(clean);
+    const auto existing = iniMap.sections.find(from);
+    if (existing == iniMap.sections.end() || clean.empty() || clean.find_first_of("[]\r\n") != std::string::npos ||
+        iniMap.sections.count(to)) return false;
+    IniSection copy = existing->second;
+    copy.originalName = clean;
+    iniMap.sections[to] = std::move(copy);
+    std::vector<std::string> body;
+    bool copying = false;
+    for (const auto& line : originalLines)
+    {
+        const std::string comparable = stripUtf8Bom(trim(line));
+        const size_t close = comparable.find(']');
+        if (!comparable.empty() && comparable.front() == '[' && close != std::string::npos)
+        {
+            copying = toLowerAscii(trim(comparable.substr(1, close - 1))) == from;
+            if (copying)
+            {
+                std::string header = stripUtf8Bom(line);
+                const size_t open = header.find('[');
+                header.replace(open + 1, header.find(']', open) - open - 1, clean);
+                body.push_back(header);
+            }
+        }
+        else if (copying) body.push_back(line);
+    }
+    if (!body.empty())
+    {
+        originalLines.push_back("");
+        originalLines.insert(originalLines.end(), body.begin(), body.end());
+    }
     return true;
 }
 

@@ -393,7 +393,9 @@
 		F2000000000000000000000F /* EditorRunResourceRouting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000F /* EditorRunResourceRouting.cpp */; };
 		F20000000000000000000010 /* EditorRunResourceRouting.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F1000000000000000000000F /* EditorRunResourceRouting.cpp */; };
 		F20000000000000000000011 /* ResourceCatalog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000011 /* ResourceCatalog.cpp */; };
+		0F668535ABEAF508AA2E77A8 /* FontCatalog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1D2C942C5BBF1E51DC675CC2 /* FontCatalog.cpp */; };
 		F20000000000000000000012 /* ResourceCatalog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000011 /* ResourceCatalog.cpp */; };
+		8C5DD1C020239D1FD3368EA6 /* FontCatalog.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1D2C942C5BBF1E51DC675CC2 /* FontCatalog.cpp */; };
 		F20000000000000000000013 /* EditorRunDiagnostics.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000013 /* EditorRunDiagnostics.cpp */; };
 		F20000000000000000000014 /* EditorRunDiagnosticsFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000015 /* EditorRunDiagnosticsFile.cpp */; };
 		F20000000000000000000015 /* EditorRunRuntimeSession.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F10000000000000000000017 /* EditorRunRuntimeSession.cpp */; };
@@ -937,7 +939,9 @@
 		F1000000000000000000000F /* EditorRunResourceRouting.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EditorRunResourceRouting.cpp; sourceTree = "<group>"; };
 		F10000000000000000000010 /* EditorRunResourceRouting.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EditorRunResourceRouting.h; sourceTree = "<group>"; };
 		F10000000000000000000011 /* ResourceCatalog.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = ResourceCatalog.cpp; sourceTree = "<group>"; };
+		1D2C942C5BBF1E51DC675CC2 /* FontCatalog.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = FontCatalog.cpp; sourceTree = "<group>"; };
 		F10000000000000000000012 /* ResourceCatalog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ResourceCatalog.h; sourceTree = "<group>"; };
+		8D9CB6C706204BE46B704407 /* FontCatalog.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FontCatalog.h; sourceTree = "<group>"; };
 		F10000000000000000000013 /* EditorRunDiagnostics.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EditorRunDiagnostics.cpp; sourceTree = "<group>"; };
 		F10000000000000000000014 /* EditorRunDiagnostics.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = EditorRunDiagnostics.h; sourceTree = "<group>"; };
 		F10000000000000000000015 /* EditorRunDiagnosticsFile.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = EditorRunDiagnosticsFile.cpp; sourceTree = "<group>"; };
@@ -1802,7 +1806,9 @@
 			isa = PBXGroup;
 			children = (
 				F10000000000000000000011 /* ResourceCatalog.cpp */,
+				1D2C942C5BBF1E51DC675CC2 /* FontCatalog.cpp */,
 				F10000000000000000000012 /* ResourceCatalog.h */,
+				8D9CB6C706204BE46B704407 /* FontCatalog.h */,
 				DCA95CE82A7D94421BAC2C56 /* ResourceManager.cpp */,
 				DCB0E8D379609662B09625A9 /* ResourceManager.h */,
 				DC6B770B1629C1C8EEFCCB58 /* ResourceManifest.cpp */,
@@ -2216,6 +2222,7 @@
 				F2000000000000000000000D /* EditorRunDescriptor.cpp in Sources */,
 				F2000000000000000000000F /* EditorRunResourceRouting.cpp in Sources */,
 				F20000000000000000000011 /* ResourceCatalog.cpp in Sources */,
+				0F668535ABEAF508AA2E77A8 /* FontCatalog.cpp in Sources */,
 				F2000000000000000000001A /* EditorRunDiagnostics.cpp in Sources */,
 				F2000000000000000000001B /* EditorRunDiagnosticsFile.cpp in Sources */,
 				F2000000000000000000001C /* EditorRunRuntimeSession.cpp in Sources */,
@@ -2447,6 +2454,7 @@
 				F2000000000000000000000E /* EditorRunDescriptor.cpp in Sources */,
 				F20000000000000000000010 /* EditorRunResourceRouting.cpp in Sources */,
 				F20000000000000000000012 /* ResourceCatalog.cpp in Sources */,
+				8C5DD1C020239D1FD3368EA6 /* FontCatalog.cpp in Sources */,
 				F20000000000000000000013 /* EditorRunDiagnostics.cpp in Sources */,
 				F20000000000000000000014 /* EditorRunDiagnosticsFile.cpp in Sources */,
 				F20000000000000000000015 /* EditorRunRuntimeSession.cpp in Sources */,
@@ -2627,7 +2635,7 @@
 				CLANG_ENABLE_CPP_STATIC_DESTRUCTORS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.2.1;
+				CURRENT_PROJECT_VERSION = 1.2.2;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_APP_SANDBOX = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2660,7 +2668,7 @@
 					"@executable_path/Frameworks",
 				);
 				LINK_WITH_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 1.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2683,7 +2691,7 @@
 				CLANG_ENABLE_CPP_STATIC_DESTRUCTORS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1.2.1;
+				CURRENT_PROJECT_VERSION = 1.2.2;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_APP_SANDBOX = NO;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2716,7 +2724,7 @@
 					"@executable_path/Frameworks",
 				);
 				LINK_WITH_STANDARD_LIBRARIES = YES;
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 1.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -2742,7 +2750,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.2.1;
+				CURRENT_PROJECT_VERSION = 1.2.2;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				FRAMEWORK_SEARCH_PATHS = (
 					../../ThirdParty/devel/mac_ios/SDL,
@@ -2771,7 +2779,7 @@
 				);
 				MACH_O_TYPE = mh_execute;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 1.2.2;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";
@@ -2798,7 +2806,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1.2.1;
+				CURRENT_PROJECT_VERSION = 1.2.2;
 				DEVELOPMENT_TEAM = 8G5399D42G;
 				ENABLE_HARDENED_RUNTIME = YES;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -2827,7 +2835,7 @@
 				);
 				MACH_O_TYPE = mh_execute;
 				MACOSX_DEPLOYMENT_TARGET = 12.0;
-				MARKETING_VERSION = 1.2.1;
+				MARKETING_VERSION = 1.2.2;
 				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.upwinded.jxqy-all-in-one";
 				PRODUCT_NAME = "jxqy-all-in-one";

@@ -3,12 +3,15 @@
 #include "MpcPreviewLabel.h"
 #include "../core/AssetPreviewLoader.h"
 #include "../core/EditorAssetPath.h"
+#include "../core/DurableFileTransaction.h"
+#include "../core/GameProfile.h"
 
 #include <QAction>
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDir>
 #include <QEvent>
+#include <QFile>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
@@ -23,6 +26,7 @@
 #include <QSignalBlocker>
 #include <QSplitter>
 #include <QToolBar>
+#include <QToolButton>
 #include <QUndoCommand>
 #include <QUndoStack>
 #include <QVBoxLayout>
@@ -101,9 +105,13 @@ bool DialogueEditorWindow::openFile(const QString& requestedPath,
         return false;
     const QString normalized =
         EditorAssetPath::normalizedAbsolutePath(requestedPath);
+    const QString name = ContentAuthoring::referenceName(ContentKind::Dialogue, assetsBasePath, normalized);
+    const QString logicalPath = name.isEmpty() ? normalized : QDir(assetsBasePath).filePath("script/map/" + name);
+    QString sourcePath = name.isEmpty() ? normalized : ContentAuthoring::resolve(assetsBasePath, "script/map/" + name);
+    if (sourcePath.isEmpty()) sourcePath = normalized;
     if (!isDialogueFilePath(normalized) ||
         (documentPathValidator &&
-         !documentPathValidator(filePath, normalized)) ||
+         !documentPathValidator(filePath, logicalPath)) ||
         !confirmSaveIfModified())
     {
         return false;
@@ -111,7 +119,7 @@ bool DialogueEditorWindow::openFile(const QString& requestedPath,
 
     DialogueDocument candidate;
     QString error;
-    if (!candidate.openFile(normalized, &error))
+    if (!candidate.openFile(sourcePath, &error))
     {
         QMessageBox::warning(
             this, tr("无法打开对话"),
@@ -120,7 +128,10 @@ bool DialogueEditorWindow::openFile(const QString& requestedPath,
     }
 
     document = std::move(candidate);
-    filePath = normalized;
+    filePath = logicalPath;
+    loadedSourcePath = sourcePath;
+    QFile input(sourcePath);
+    loadedBytes = input.open(QIODevice::ReadOnly) ? input.readAll() : QByteArray();
     selectedSection.clear();
     selectedLineRow = -1;
     undoStack->clear();
@@ -169,22 +180,23 @@ bool DialogueEditorWindow::saveFile()
         return false;
     commitPendingLineEditors();
     QString error;
-    if (!document.saveFile(filePath, &error))
+    if (!writeDocument(document.serializedBytes(), error))
     {
-        QMessageBox::warning(
-            this, tr("保存失败"),
-            tr("无法保存当前对话：\n%1\n\n%2").arg(filePath, error));
+        if (!error.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"),
+                tr("无法保存当前对话：\n%1\n\n%2").arg(filePath, error));
         return false;
     }
     undoStack->setClean();
     updateWindowTitle();
     emit documentStatesChanged();
+    emit filesChanged({filePath});
     return true;
 }
 
 bool DialogueEditorWindow::hasUnsavedChanges() const
 {
-    return !undoStack->isClean();
+    return !undoStack->isClean() || pendingDocumentBytes() != document.serializedBytes();
 }
 
 QString DialogueEditorWindow::currentFilePath() const
@@ -254,14 +266,13 @@ DialogueEditorWindow::currentProjectDocuments() const
 DesktopRunDocumentSnapshot
 DialogueEditorWindow::desktopRunDocumentSnapshot() const
 {
-    const_cast<DialogueEditorWindow*>(this)->commitPendingLineEditors();
     DesktopRunDocumentSnapshot snapshot;
     snapshot.filePath = filePath;
     snapshot.type = ProjectDocumentType::Dialogue;
     snapshot.dirty = hasUnsavedChanges();
     snapshot.includeInOverlay = snapshot.dirty;
     snapshot.serializationSupported = !filePath.isEmpty();
-    snapshot.bytes = document.serializedBytes();
+    snapshot.bytes = pendingDocumentBytes();
     if (!snapshot.serializationSupported)
         snapshot.diagnosticCode = QStringLiteral("dialogue.document.unsaved");
     return snapshot;
@@ -400,6 +411,9 @@ void DialogueEditorWindow::setupUi()
     lineList = new QListWidget(linePanel);
     lineList->setObjectName(QStringLiteral("dialogueLineList"));
     lineLayout->addWidget(sectionSummaryLabel);
+    auto* lineActions = new QToolBar(linePanel);
+    lineActions->setObjectName("dialogueLineToolBar");
+    lineLayout->addWidget(lineActions);
     lineLayout->addWidget(lineList, 1);
 
     auto* editorPanel = new QWidget(splitter);
@@ -462,14 +476,15 @@ void DialogueEditorWindow::setupUi()
 
 void DialogueEditorWindow::setupActions()
 {
+    setupAuthoringActions();
     saveAction = toolBar->addAction(QString());
     saveAction->setObjectName(QStringLiteral("dialogueSaveAction"));
     saveAction->setShortcut(QKeySequence::Save);
     toolBar->addSeparator();
-    undoAction = undoStack->createUndoAction(this);
+    undoAction = new QAction(this);
     undoAction->setObjectName(QStringLiteral("dialogueUndoAction"));
     undoAction->setShortcut(QKeySequence::Undo);
-    redoAction = undoStack->createRedoAction(this);
+    redoAction = new QAction(this);
     redoAction->setObjectName(QStringLiteral("dialogueRedoAction"));
     redoAction->setShortcut(QKeySequence::Redo);
     toolBar->addAction(undoAction);
@@ -479,10 +494,26 @@ void DialogueEditorWindow::setupActions()
     playtestAction->setObjectName(QStringLiteral("dialoguePlaytestAction"));
     returnAction = toolBar->addAction(QString());
     returnAction->setObjectName(QStringLiteral("dialogueReturnAction"));
+    toolBar->addSeparator();
+    toolBar->addWidget(findChild<QToolButton*>("dialogueMoreButton"));
 }
 
 void DialogueEditorWindow::setupConnections()
 {
+    connect(undoAction, &QAction::triggered, this, [this]() { commitPendingLineEditors(); undoStack->undo(); });
+    connect(redoAction, &QAction::triggered, this, [this]() { commitPendingLineEditors(); undoStack->redo(); });
+    connect(undoStack, &QUndoStack::canUndoChanged, this, [this]() { updateActionStates(); });
+    connect(undoStack, &QUndoStack::canRedoChanged, this, [this]() { updateActionStates(); });
+    auto pendingChanged = [this]()
+    {
+        if (refreshing) return;
+        updateWindowTitle();
+        updateActionStates();
+        emit documentStatesChanged();
+    };
+    connect(speakerEdit, &QLineEdit::textChanged, this, pendingChanged);
+    connect(textEdit, &QPlainTextEdit::textChanged, this, pendingChanged);
+    connect(portraitReferenceCombo->lineEdit(), &QLineEdit::textChanged, this, pendingChanged);
     connect(saveAction, &QAction::triggered,
             this, &DialogueEditorWindow::saveFile);
     connect(playtestAction, &QAction::triggered,
@@ -554,6 +585,7 @@ void DialogueEditorWindow::setupConnections()
 
 void DialogueEditorWindow::retranslateDynamicUi()
 {
+    retranslateAuthoringActions();
     saveAction->setText(tr("保存"));
     saveAction->setToolTip(tr("保存当前对话"));
     undoAction->setText(tr("撤销"));
@@ -652,18 +684,7 @@ void DialogueEditorWindow::commitPendingLineEditors()
         return;
     }
     const QByteArray before = document.serializedBytes();
-    document.setLine(selectedSection, selectedLineRow,
-                     speakerEdit->text(), textEdit->toPlainText());
-    const DialoguePortraitMode mode = static_cast<DialoguePortraitMode>(
-        portraitModeCombo->currentData().toInt());
-    if (mode != DialoguePortraitMode::Reference ||
-        !portraitReferenceCombo->currentText().trimmed().isEmpty())
-    {
-        document.setPortrait(
-            selectedSection, selectedLineRow, mode,
-            portraitReferenceCombo->currentText());
-    }
-    const QByteArray after = document.serializedBytes();
+    const QByteArray after = pendingDocumentBytes();
     if (before == after)
         return;
     loadDocumentBytes(before);
@@ -744,7 +765,7 @@ void DialogueEditorWindow::refreshLineList()
         item->setToolTip(value.text);
     }
     sectionSummaryLabel->setText(selectedSection.isEmpty()
-        ? tr("请选择对话段落")
+        ? document.sectionNames().isEmpty() ? tr("点击“新建段落”开始编写对话。") : tr("请选择对话段落")
         : tr("%1 · %2 句").arg(selectedSection).arg(count));
     refreshing = false;
     if (count > 0)
@@ -802,15 +823,16 @@ void DialogueEditorWindow::refreshPortraitChoices()
     const QStringList roots = {
         QStringLiteral("mpc/portrait"),
         QStringLiteral("asf/portrait")};
-    for (const QString& root : roots)
+    for (const auto& provider : ResourcePackScanner::resolveContentRoots(assetsBasePath).roots)
     {
-        QDir directory(QDir(assetsBasePath).filePath(root));
-        if (!directory.exists())
-            continue;
-        const QFileInfoList files = directory.entryInfoList(
-            QDir::Files | QDir::Readable, QDir::Name | QDir::IgnoreCase);
-        for (const QFileInfo& file : files)
-            choices.insert(file.fileName());
+        if (!provider.available) continue;
+        for (const QString& root : roots)
+        {
+            QDir directory(QDir(provider.rootPath).filePath(root));
+            if (!directory.exists()) continue;
+            for (const auto& file : directory.entryInfoList(QDir::Files | QDir::Readable, QDir::Name | QDir::IgnoreCase))
+                choices.insert(file.fileName());
+        }
     }
     QStringList sorted = choices.values();
     sorted.sort(Qt::CaseInsensitive);
@@ -862,8 +884,9 @@ void DialogueEditorWindow::refreshPortraitPreview()
     }
     for (const QString& candidate : portraitCandidates(reference))
     {
+        const QString source = ContentAuthoring::resolve(assetsBasePath, candidate);
         AssetPreviewData preview;
-        if (AssetPreviewLoader::load(assetsBasePath, candidate, &preview) &&
+        if (!source.isEmpty() && AssetPreviewLoader::load(QFileInfo(source).path(), QFileInfo(source).fileName(), &preview) &&
             preview.kind == AssetPreviewKind::Image)
         {
             portraitPreview->setSourceImage(preview.image);
@@ -893,11 +916,28 @@ void DialogueEditorWindow::updateActionStates()
 {
     const bool opened = !filePath.isEmpty();
     saveAction->setEnabled(opened && hasUnsavedChanges());
+    const bool pending = pendingDocumentBytes() != document.serializedBytes();
+    undoAction->setEnabled(undoStack->canUndo() || pending);
+    redoAction->setEnabled(undoStack->canRedo() && !pending);
     playtestAction->setEnabled(opened && !selectedSection.isEmpty());
     returnAction->setEnabled(hasCaller());
+    if (newSectionAction)
+    {
+        newSectionAction->setEnabled(opened);
+        const bool selected = opened && !selectedSection.isEmpty();
+        for (auto* action : {copySectionAction, renameSectionAction, deleteSectionAction, referencesAction, usageScriptAction})
+            action->setEnabled(selected);
+        const int count = document.lineCount(selectedSection);
+        const bool reorder = selected && document.canReorderLines(selectedSection);
+        insertLineAction->setEnabled(reorder && count < 10000);
+        removeLineAction->setEnabled(reorder && count > 1 && selectedLineRow >= 0);
+        moveLineUpAction->setEnabled(reorder && selectedLineRow > 0);
+        moveLineDownAction->setEnabled(reorder && selectedLineRow >= 0 && selectedLineRow + 1 < count);
+    }
     callerHintLabel->setText(hasCaller()
         ? tr("完成后可返回打开这段对话的脚本位置。")
-        : tr("从脚本或 NPC 进入时，可在这里返回调用位置。"));
+        : tr("地图：%1。可在“更多操作”中创建调用脚本；脚本须在这张地图运行。")
+            .arg(QFileInfo(filePath).dir().dirName()));
 }
 
 bool DialogueEditorWindow::confirmSaveIfModified()

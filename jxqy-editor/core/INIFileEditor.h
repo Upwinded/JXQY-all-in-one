@@ -39,6 +39,7 @@ public:
     bool loadFromString(const std::string& content);
     bool loadFromString(const std::string& content,
                         UnrecognizedLinePolicy unrecognizedLinePolicy);
+    static bool canRoundTripValue(const std::string& value);
     bool loadFromBuffer(const std::unique_ptr<char[]>& buffer);
     bool loadFromBuffer(const char* data, int length);
     bool loadFromBuffer(const char* data, int length,
@@ -71,6 +72,8 @@ public:
     bool hasSection(const std::string& section) const;
     bool hasKey(const std::string& section, const std::string& name) const;
     bool addSection(const std::string& section);
+    bool renameSection(const std::string& section, const std::string& newName);
+    bool copySection(const std::string& section, const std::string& newName);
 
     std::vector<std::string> getSectionNames() const;
     std::vector<std::string> getKeyNames(const std::string& section) const;

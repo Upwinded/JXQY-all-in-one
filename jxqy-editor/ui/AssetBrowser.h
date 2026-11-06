@@ -61,6 +61,8 @@ public:
     void setFilterSuffixes(const QStringList& suffixes);
 
     bool previewRelativePath(const QString& relativePath);
+    void revealRelativePath(const QString& relativePath);
+    void enableProjectResourceSearch();
 
 protected:
     void changeEvent(QEvent* event) override;
@@ -69,6 +71,7 @@ protected:
 signals:
     void fileSelected(const QString& relativePath);
     void fileDoubleClicked(const QString& relativePath);
+    void resolvedFileOpenRequested(const QString& filePath);
 
 private slots:
     void onSearchTextChanged(const QString& text);

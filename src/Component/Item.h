@@ -43,6 +43,7 @@ protected:
 	virtual void onMouseMoving(int x, int y) override;
 	virtual bool shouldKeepTouchWhenPointerLeaves(int x, int y) override;
 
+	void drawItemImage(int x, int y);
 	virtual void onDrawDrag(int x, int y);
 	virtual bool onHandleEvent(AEvent & e);
 	virtual void onClick();

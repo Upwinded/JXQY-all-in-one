@@ -540,6 +540,11 @@ void ResourceProfileEditorWindow::setupUi()
     combatLayout->addRow(
         magicEffectCalculationModeFieldLabel,
         m_magicEffectCalculationModeCombo);
+    m_magicTimingModeCombo = new QComboBox(this);
+    m_magicTimingModeCombo->setObjectName(QStringLiteral("magicTimingModeCombo"));
+    auto* magicTimingModeFieldLabel = new QLabel(this);
+    magicTimingModeFieldLabel->setObjectName(QStringLiteral("magicTimingModeFieldLabel"));
+    combatLayout->addRow(magicTimingModeFieldLabel, m_magicTimingModeCombo);
     for (std::size_t index = 0; index < m_actionReleaseTimingControls.size(); ++index)
     {
         auto& controls = m_actionReleaseTimingControls[index];
@@ -582,6 +587,11 @@ void ResourceProfileEditorWindow::setupUi()
     m_scriptPlayerNameEdit = new QLineEdit(this);
     m_scriptPlayerNameEdit->setObjectName(QStringLiteral("scriptPlayerNameEdit"));
     scriptLayout->addRow("PlayerName (#name):", m_scriptPlayerNameEdit);
+    m_moveScreenProfileCombo = new QComboBox(this);
+    m_moveScreenProfileCombo->setObjectName(QStringLiteral("moveScreenProfileCombo"));
+    auto* moveScreenProfileFieldLabel = new QLabel(this);
+    moveScreenProfileFieldLabel->setObjectName(QStringLiteral("moveScreenProfileFieldLabel"));
+    scriptLayout->addRow(moveScreenProfileFieldLabel, m_moveScreenProfileCombo);
     m_npcActionProfileCombo = new QComboBox(this);
     m_npcActionProfileCombo->setObjectName(
         QStringLiteral("npcActionProfileCombo"));
@@ -775,12 +785,15 @@ void ResourceProfileEditorWindow::setupUi()
     m_uiProfileEdit = new QLineEdit(this);
     m_uiProfileEdit->setObjectName("uiProfileEdit");
     m_preferLocalUiCheck = new QCheckBox(this);
+    m_ignoreRunDisabledCheck = new QCheckBox(this);
+    m_ignoreRunDisabledCheck->setObjectName("ignoreRunDisabledCheck");
     m_featuresEdit = new QPlainTextEdit(this);
     m_featuresEdit->setObjectName("featuresEdit");
     m_featuresEdit->setMinimumHeight(72);
     uiLayout->addRow("BaseId:", m_uiBaseIdEdit);
     uiLayout->addRow("Profile:", m_uiProfileEdit);
     uiLayout->addRow("", m_preferLocalUiCheck);
+    uiLayout->addRow("", m_ignoreRunDisabledCheck);
     auto* featuresFieldLabel = new QLabel(this);
     featuresFieldLabel->setObjectName(QStringLiteral("featuresFieldLabel"));
     uiLayout->addRow(featuresFieldLabel, m_featuresEdit);
@@ -921,6 +934,10 @@ void ResourceProfileEditorWindow::setupUi()
     connect(m_magicEffectCalculationModeCombo,
         QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &ResourceProfileEditorWindow::onFieldChanged);
+    connect(m_magicTimingModeCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+        this, &ResourceProfileEditorWindow::onFieldChanged);
+    connect(m_moveScreenProfileCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
+        this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_scriptPlayerNameEdit, &QLineEdit::textChanged,
         this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_npcActionProfileCombo,
@@ -994,6 +1011,7 @@ void ResourceProfileEditorWindow::setupUi()
     connect(m_uiBaseIdEdit, &QLineEdit::textChanged, this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_uiProfileEdit, &QLineEdit::textChanged, this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_preferLocalUiCheck, &QCheckBox::stateChanged, this, &ResourceProfileEditorWindow::onFieldChanged);
+    connect(m_ignoreRunDisabledCheck, &QCheckBox::toggled, this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_featuresEdit, &QPlainTextEdit::textChanged, this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_titleMenuEdit, &QLineEdit::textChanged, this, &ResourceProfileEditorWindow::onFieldChanged);
     connect(m_titleNewYearMenuEdit, &QLineEdit::textChanged, this, &ResourceProfileEditorWindow::onFieldChanged);
@@ -1095,6 +1113,10 @@ void ResourceProfileEditorWindow::retranslateUi()
         "每次武功伤害结算的最低值；该值只由当前资源包配置决定。"));
     m_magicEffectCalculationModeCombo->setToolTip(tr(
         "替代攻击力用于剑二和月影；叠加攻击力用于新剑。"));
+    findChild<QLabel*>(QStringLiteral("magicTimingModeFieldLabel"))->setText(tr("武功计时规则:"));
+    m_magicTimingModeCombo->setToolTip(tr("按资源来源选择。继承只查内容依赖；UI 布局不决定计时规则。"));
+    findChild<QLabel*>(QStringLiteral("moveScreenProfileFieldLabel"))->setText(tr("剧情镜头协议:"));
+    m_moveScreenProfileCombo->setToolTip(tr("原版新剑／月影也支持三参数。按脚本来源选择，独立于武功计时和 UI 布局。"));
     findChild<QLabel*>(QStringLiteral("levelUpMessageFieldLabel"))->setText(
         tr("提示模板:"));
     findChild<QLabel*>(QStringLiteral("levelUpEffectModeFieldLabel"))->setText(tr("效果模式:"));
@@ -1166,6 +1188,10 @@ void ResourceProfileEditorWindow::retranslateUi()
         m_magicEffectCalculationModeCombo,
         { tr("Effect 替代人物攻击力"),
           tr("人物攻击力与 Effect 相加") });
+    refillCombo(m_magicTimingModeCombo,
+        { tr("继承内容依赖"), tr("固定毫秒（兼容）"), tr("剑二：逻辑步"),
+          tr("新剑／月影原版：动画帧"), tr("C#：动画帧，保留时间余数") });
+    refillCombo(m_moveScreenProfileCombo, { tr("继承内容依赖"), tr("原版三部曲"), tr("C# 来源") });
     m_partnerFollowRadiusCheck->setText(tr("写入配置"));
     m_partnerFollowRunRadiusCheck->setText(tr("写入配置"));
     m_scriptPlayerNameEdit->setPlaceholderText(tr("固定剧情角色名，留空保持原有行为"));
@@ -1226,6 +1252,8 @@ void ResourceProfileEditorWindow::retranslateUi()
     m_uiBaseIdEdit->setPlaceholderText(tr("仅回退 UI 资源，例如 YYCS"));
     m_uiProfileEdit->setPlaceholderText(tr("布局族，例如 JXQY2 / YYCS / XJXQY"));
     m_preferLocalUiCheck->setText(tr("当前资源包 UI 优先（允许局部覆盖）"));
+    m_ignoreRunDisabledCheck->setText(tr("忽略禁止跑步"));
+    m_ignoreRunDisabledCheck->setToolTip(tr("开启后忽略存档和脚本的禁跑限制；仍检查体力和角色状态。"));
     m_featuresEdit->setPlaceholderText(tr(
         "每行一项，例如 RageSystem=1；"
         "缺省玩法键使用通用默认值，布局键由 UI.Profile 成套决定；"
@@ -1593,6 +1621,10 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
         profile.minimumMagicDamageDefined
             ? profile.minimumMagicDamage
             : 10);
+    m_magicTimingModeCombo->setCurrentIndex(profile.magicTimingModeDefined
+        ? static_cast<int>(profile.magicTimingMode) + 1 : 0);
+    m_moveScreenProfileCombo->setCurrentIndex(profile.moveScreenProfileDefined
+        ? static_cast<int>(profile.moveScreenProfile) + 1 : 0);
     m_magicEffectCalculationModeCombo->setCurrentIndex(
         profile.magicEffectCalculationModeDefined &&
                 profile.magicEffectCalculationMode ==
@@ -1680,9 +1712,15 @@ void ResourceProfileEditorWindow::loadProfileToUi(const GameProfile& profile)
     m_uiBaseIdEdit->setText(profile.uiBaseId);
     m_uiProfileEdit->setText(profile.uiProfile);
     m_preferLocalUiCheck->setChecked(profile.preferLocalUi);
+    m_ignoreRunDisabledCheck->setChecked(false);
     QStringList featureLines;
     for (auto feature = profile.features.cbegin(); feature != profile.features.cend(); ++feature)
     {
+        if (feature.key().compare("IgnoreRunDisabled", Qt::CaseInsensitive) == 0)
+        {
+            m_ignoreRunDisabledCheck->setChecked(feature.value());
+            continue;
+        }
         featureLines.append(feature.key() + "=" + (feature.value() ? "1" : "0"));
     }
     m_featuresEdit->setPlainText(featureLines.join('\n'));
@@ -1751,6 +1789,14 @@ GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
     profile.minimumMagicDamage =
         m_minimumMagicDamageSpin->value();
     profile.minimumMagicDamageDefined = true;
+    profile.magicTimingModeDefined = m_magicTimingModeCombo->currentIndex() > 0;
+    profile.magicTimingMode = profile.magicTimingModeDefined
+        ? static_cast<MagicTimingMode>(m_magicTimingModeCombo->currentIndex() - 1)
+        : MagicTimingMode::FixedMilliseconds;
+    profile.moveScreenProfileDefined = m_moveScreenProfileCombo->currentIndex() > 0;
+    profile.moveScreenProfile = profile.moveScreenProfileDefined
+        ? static_cast<ScriptMoveScreenProfile>(m_moveScreenProfileCombo->currentIndex() - 1)
+        : ScriptMoveScreenProfile::CSharp;
     profile.magicEffectCalculationMode =
         m_magicEffectCalculationModeCombo->currentIndex() == 1
             ? MagicEffectCalculationMode::AddToAttack
@@ -1850,12 +1896,15 @@ GameProfile ResourceProfileEditorWindow::collectProfileFromUi() const
         const qsizetype separator = line.indexOf('=');
         const QString featureName = (separator >= 0 ? line.left(separator) : line).trimmed();
         const QString value = separator >= 0 ? line.mid(separator + 1).trimmed().toLower() : "1";
-        if (!featureName.isEmpty())
+        if (!featureName.isEmpty() && featureName.compare("IgnoreRunDisabled", Qt::CaseInsensitive) != 0)
         {
             const bool enabled = value == "1" || value == "true" || value == "yes" || value == "on";
             profile.features.insert(featureName, enabled);
         }
     }
+
+    if (m_ignoreRunDisabledCheck->isChecked())
+        profile.features.insert(QStringLiteral("IgnoreRunDisabled"), true);
 
     profile.startupVideos.clear();
     for (int i = 0; i < m_videosList->count(); i++)

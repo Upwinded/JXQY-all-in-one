@@ -1054,6 +1054,11 @@ void Element::adjustPointerEventPreviewObserverCount(int delta)
 	}
 }
 
+bool Element::dispatchMouseWheel(AEvent& event)
+{
+	return event.eventType == ET_MOUSEWHEEL && handleEvent(event);
+}
+
 bool Element::handleEvent(AEvent & e)
 {
 	if (stopForApplicationQuit())
@@ -1063,6 +1068,10 @@ bool Element::handleEvent(AEvent & e)
 	bool handled = false;
 	if (activated && needEvents && visible)
 	{
+		if (e.eventType == ET_MOUSEWHEEL && onHandleMouseWheel(e))
+		{
+			return true;
+		}
 		for (auto& child : children)
 		{
 			if (child->handleEvent(e))

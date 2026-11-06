@@ -1280,7 +1280,7 @@ int Script::lua_MoveScreen(lua_State * l)
 
 	const int direction = (int)lua_tointeger(l, 1);
 	const int amount = (int)lua_tointeger(l, 2);
-	if (resolveMoveScreenArgumentMode(argc) ==
+	if (resolveMoveScreenArgumentMode(argc, gm->global.moveScreenProfile) ==
 		MoveScreenArgumentMode::FrameCountAndSpeed)
 	{
 		gm->scriptAPI.moveScreenForFrameCount(
@@ -1290,7 +1290,7 @@ int Script::lua_MoveScreen(lua_State * l)
 	}
 	else
 	{
-		gm->scriptAPI.moveScreen(direction, amount, 1);
+		gm->scriptAPI.moveScreen(direction, amount, argc >= 3 ? static_cast<int>(lua_tointeger(l, 3)) : 1);
 	}
 	return 0;
 }
@@ -3991,8 +3991,7 @@ int Script::lua_SetNpcMagicLevel(lua_State* l)
 	int argc = lua_gettop(l);
 	if (argc >= 3)
 	{
-		gm->scriptAPI.setNpcMagicFile(getLuaString(l, 1), getLuaString(l, 2));
-		gm->scriptAPI.setNpcMagicLevel(getLuaString(l, 1), (int)lua_tointeger(l, 3));
+		gm->scriptAPI.setNpcMagicLevel(getLuaString(l, 1), getLuaString(l, 2), (int)lua_tointeger(l, 3));
 	}
 	else if (argc >= 2)
 	{

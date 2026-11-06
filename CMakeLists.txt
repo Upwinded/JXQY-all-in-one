@@ -1126,6 +1126,7 @@ add_executable(jxqy-npc-targeting-tests
     ${SRC_DIR}/tests/test_attack_animation_runtime.cpp
     ${SRC_DIR}/tests/test_release_timing_real_resources.cpp
     ${SRC_DIR}/tests/test_projectile_collision_runtime.cpp
+    ${SRC_DIR}/tests/test_original_movement_runtime.cpp
     ${SRC_DIR}/tests/test_npc_runtime_persistence.cpp
     ${SRC_DIR}/tests/test_effect_runtime_persistence.cpp
     ${SRC_DIR}/tests/test_gamble_menu_runtime.cpp
@@ -1134,6 +1135,7 @@ add_executable(jxqy-npc-targeting-tests
     ${SRC_DIR}/tests/test_attribute_points_runtime.cpp
     ${SRC_DIR}/tests/test_object_animation_runtime.cpp
     ${SRC_DIR}/tests/test_media_runtime.cpp
+    ${SRC_DIR}/tests/test_font_selection.cpp
     ${SRC_DIR}/tests/test_core_lifecycle.cpp
 	${SRC_DIR}/tests/test_ui_focus.cpp
 	${SRC_DIR}/tests/test_map_thumbnail_controller.cpp
@@ -1143,6 +1145,7 @@ add_executable(jxqy-npc-targeting-tests
 	${SRC_DIR}/tests/test_gamepad_world_runtime.cpp
 	${SRC_DIR}/tests/test_gamepad_essential_ui.cpp
 	${SRC_DIR}/tests/test_gamepad_rpg_menu_actions.cpp
+	${SRC_DIR}/tests/test_menu_mouse_wheel.cpp
 	${SRC_DIR}/tests/test_gamepad_surface_contract.cpp
 	${SRC_DIR}/tests/test_mobile_external_input_runtime.cpp
 	${SRC_DIR}/tests/test_script_engine_runtime.cpp
@@ -1180,6 +1183,7 @@ elseif(UNIX AND NOT APPLE)
 endif()
 
 add_test(NAME jxqy-npc-targeting-tests COMMAND jxqy-npc-targeting-tests)
+add_test(NAME jxqy-original-movement-runtime-tests COMMAND jxqy-npc-targeting-tests --original-movement)
 if(WIN32)
     add_test(NAME jxqy-gameplay-automation-runtime-tests COMMAND jxqy-npc-targeting-tests --gameplay-automation)
     set_tests_properties(jxqy-gameplay-automation-runtime-tests PROPERTIES TIMEOUT 60)
@@ -1196,6 +1200,7 @@ add_test(NAME jxqy-skill-tree-input-tests COMMAND jxqy-npc-targeting-tests --ski
 add_test(NAME jxqy-replacement-experience-tests COMMAND jxqy-npc-targeting-tests --replacement-experience)
 add_test(NAME jxqy-object-animation-runtime-tests COMMAND jxqy-npc-targeting-tests --object-animation)
 add_test(NAME jxqy-media-runtime-tests COMMAND jxqy-npc-targeting-tests --media-runtime)
+add_test(NAME jxqy-font-selection-tests COMMAND jxqy-npc-targeting-tests --font-selection)
 add_test(NAME jxqy-core-lifecycle-tests COMMAND jxqy-npc-targeting-tests --core-lifecycle)
 add_test(NAME jxqy-script-movement-tests COMMAND jxqy-npc-targeting-tests --script-movement)
 set_tests_properties(jxqy-core-lifecycle-tests PROPERTIES TIMEOUT 600)
@@ -1205,7 +1210,8 @@ add_test(NAME jxqy-ui-text-layout-tests COMMAND jxqy-npc-targeting-tests --ui-te
 set_tests_properties(jxqy-ui-text-layout-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-qingyu-ui-interaction-tests COMMAND jxqy-npc-targeting-tests --qingyu-ui-interaction)
 set_tests_properties(jxqy-qingyu-ui-interaction-tests PROPERTIES TIMEOUT 180)
-set_tests_properties(jxqy-qingyu-ui-tests PROPERTIES TIMEOUT 180)
+# The full software-rendered matrix covers 11 resource profiles at 4 sizes.
+set_tests_properties(jxqy-qingyu-ui-tests PROPERTIES TIMEOUT 300)
 set_tests_properties(jxqy-current-mod-compatibility-tests PROPERTIES TIMEOUT 180)
 if(WIN32 AND BUILD_TESTING)
     add_test(NAME jxqy-save-write-sharing-tests COMMAND jxqy-npc-targeting-tests --save-write-sharing)
@@ -1245,6 +1251,12 @@ set_tests_properties(jxqy-merged-entity-save-tests PROPERTIES TIMEOUT 180)
 add_test(NAME jxqy-production-attack-file-tests COMMAND jxqy-npc-targeting-tests --production-attack-files)
 set_tests_properties(jxqy-production-attack-file-tests PROPERTIES TIMEOUT 300)
 add_test(NAME jxqy-full-attack-save-tests COMMAND jxqy-npc-targeting-tests --full-attack-save)
+add_test(NAME jxqy-magic-hit-save-comparison-tests COMMAND jxqy-npc-targeting-tests --magic-hit-save-comparison)
+set_tests_properties(jxqy-magic-hit-save-comparison-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-magic-hit-environment-tests COMMAND jxqy-npc-targeting-tests --magic-hit-environment)
+set_tests_properties(jxqy-magic-hit-environment-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-warning-lifecycle-diagnostic-tests COMMAND jxqy-npc-targeting-tests --warning-lifecycle-diagnostic)
+set_tests_properties(jxqy-warning-lifecycle-diagnostic-tests PROPERTIES TIMEOUT 60)
 add_test(NAME jxqy-release-timing-tests COMMAND jxqy-npc-targeting-tests --release-timing)
 add_test(NAME jxqy-release-timing-production-tests COMMAND jxqy-npc-targeting-tests --release-timing-production)
 set_tests_properties(jxqy-release-timing-production-tests PROPERTIES TIMEOUT 180)
@@ -1273,6 +1285,11 @@ add_test(NAME jxqy-gamepad-essential-ui-tests
 	COMMAND jxqy-npc-targeting-tests --gamepad-essential-ui)
 add_test(NAME jxqy-gamepad-rpg-menu-action-tests
 	COMMAND jxqy-npc-targeting-tests --gamepad-rpg-menu-actions)
+add_test(NAME jxqy-menu-mouse-wheel-tests
+	COMMAND jxqy-npc-targeting-tests --menu-mouse-wheel)
+set_tests_properties(jxqy-menu-mouse-wheel-tests PROPERTIES TIMEOUT 180)
+add_test(NAME jxqy-item-drag-rendering-tests
+	COMMAND jxqy-npc-targeting-tests --item-drag-rendering)
 add_test(NAME jxqy-gamepad-surface-contract-tests
 	COMMAND jxqy-npc-targeting-tests --gamepad-surface-contract)
 if(JXQY_FORCE_MOBILE_UI)

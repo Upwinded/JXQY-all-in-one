@@ -7,6 +7,7 @@
 class ToolTip :
 	public ConfigDrivenPanel
 {
+	friend class MenuMouseWheelTestAccess;
 public:
 	ToolTip();
 	virtual ~ToolTip();
@@ -20,7 +21,11 @@ public:
 
 	void setGoods(std::shared_ptr<Goods> goods, bool selling = false);
 	void setMagic(std::shared_ptr<Magic> magic, int level);
-	void showForOwner(PElement owner);
+	void showForOwner(PElement owner, const PElement& sourceElement = nullptr);
+	PElement getSourceOwner() const;
+	PElement getSourceElement() const;
+	bool supportsFullDetails() const;
+	bool isExpanded() const;
 	void placeNearElement(const PElement& anchorElement);
 	void hide();
 	void runDetails();
@@ -37,6 +42,7 @@ private:
 	};
 
 	std::weak_ptr<Element> owner;
+	std::weak_ptr<Element> sourceElement;
 	LayoutProfile layoutProfile = LayoutProfile::Jxqy2;
 	bool currentContentIsMagic = false;
 	bool expanded = false;
@@ -60,6 +66,7 @@ private:
 	void onEvent() override;
 	void onRun() override;
 	bool onHandleEvent(AEvent& event) override;
+	bool onHandleMouseWheel(AEvent& event) override;
 	bool onHandleUIAction(UIAction action) override;
 	void onWindowResize(int width, int height) override;
 };

@@ -458,10 +458,10 @@ void ProjectRuntimeConfigurationDialog::clearError()
 
 void ProjectRuntimeConfigurationDialog::retranslateUi()
 {
-    setWindowTitle(tr("运行配置"));
+    setWindowTitle(tr("试玩场景设置"));
     m_summaryLabel->setText(tr(
-        "场景按列表顺序保存。运行配置只记录桌面测试预设；"
-        "应用配置不会启动游戏，也不代表资源已经完整。"));
+        "首次试玩：新建场景，选择地图和玩家起点，并设为默认。场景可以供多个脚本共用。"
+        "应用后回到脚本，点击“试玩当前脚本”开始执行。"));
     m_createButton->setText(tr("新建..."));
     m_editButton->setText(tr("编辑..."));
     m_copyButton->setText(tr("复制..."));

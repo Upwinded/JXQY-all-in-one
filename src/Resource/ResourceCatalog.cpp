@@ -2159,7 +2159,7 @@ bool appendDependencyGraph(
 	return true;
 }
 
-void resolveActionReleaseFrameRatios(
+void resolveInheritedRuntimeOptions(
 	const Catalog& catalog, RuntimeResource::ExactSelectionResult& result)
 {
 	ResourceManifest& destination = result.selection.activeManifest;
@@ -2190,6 +2190,16 @@ void resolveActionReleaseFrameRatios(
 			continue;
 		}
 		const ResourceManifest& source = pack->manifest;
+		if (!destination.moveScreenProfileDefined && source.moveScreenProfileDefined)
+		{
+			destination.moveScreenProfile = source.moveScreenProfile;
+			destination.moveScreenProfileDefined = true;
+		}
+		if (!destination.magicTimingModeDefined && source.magicTimingModeDefined)
+		{
+			destination.magicTimingMode = source.magicTimingMode;
+			destination.magicTimingModeDefined = true;
+		}
 		inheritRatio(destination.attackReleaseFrameRatio, destination.attackReleaseFrameRatioDefined,
 			destination.attackReleaseFrameRatioSourceId, source.attackReleaseFrameRatio,
 			source.attackReleaseFrameRatioDefined, source.id);
@@ -2619,7 +2629,7 @@ ExactSelectionResult resolveCatalogSelection(
 		{
 			return result;
 		}
-		resolveActionReleaseFrameRatios(catalog, result);
+		resolveInheritedRuntimeOptions(catalog, result);
 
 		visiting.clear();
 		completed.clear();

@@ -634,6 +634,9 @@
     <ClCompile Include="..\..\src\Resource\ResourceCatalog.cpp">
       <Filter>Src\Resource</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\Resource\FontCatalog.cpp">
+      <Filter>Src\Resource</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\Resource\ResourceManifest.cpp">
       <Filter>Src\Resource</Filter>
     </ClCompile>
@@ -1313,6 +1316,9 @@
       <Filter>Src\Game\Menu</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Resource\ResourceCatalog.h">
+      <Filter>Src\Resource</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Resource\FontCatalog.h">
       <Filter>Src\Resource</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\Platform\AndroidExternalStorage.h">

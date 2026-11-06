@@ -470,6 +470,13 @@ EntityPropertyDialog::EntityPropertyDialog(QWidget* parent)
     });
     connect(buttonBox, &QDialogButtonBox::rejected, this, &QDialog::reject);
     mainLayout->addWidget(buttonBox);
+    for (auto* field : {scriptFileEdit, deathScriptEdit, scriptFileRightEdit, timerScriptFileEdit,
+        scriptFileRightObjEdit, timerScriptFileObjEdit})
+        FilePickerHelper::addScriptAuthoringButtons(field, getAssetsPath,
+            [this]() { return mapName; }, this, [this](const QString& path)
+            {
+                emit editScriptRequested(path);
+            });
 }
 
 EntityPropertyDialog::~EntityPropertyDialog()

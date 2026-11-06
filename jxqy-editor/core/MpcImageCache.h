@@ -28,6 +28,8 @@ public:
 
     void setAssetsBasePath(const std::string& path);
     const std::string& getAssetsBasePath() const;
+    // Resolve a logical content file using the selected pack's dependency order.
+    std::string resolveFilePath(const std::string& relativePath) const;
 
     QImage getFrameImage(const std::string& mpcFileName, int frameIndex);
     QImage getFrameImageByPath(const std::string& fullPath, int frameIndex);
@@ -61,11 +63,11 @@ private:
         const std::string& cachePath,
         const std::string& displayName,
         const std::string& resolvedPath);
-    std::string resolveFilePath(const std::string& relativePath) const;
     void evictIfNeeded();
 
     std::map<std::string, MpcCacheEntry> cache;
     std::vector<std::string> accessOrder;
     std::string assetsBasePath;
+    std::vector<std::string> contentRoots;
     int maxCacheCount = 64;
 };

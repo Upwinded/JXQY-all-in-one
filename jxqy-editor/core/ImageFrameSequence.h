@@ -34,6 +34,8 @@ struct ImageFrameSequenceEdit
 class ImageFrameSequence
 {
 public:
+    static bool removeSelectedFrames(const std::vector<ImageFrameData>& frames,
+        const std::vector<int>& selectedIndices, ImageFrameSequenceEdit* edit);
     static bool insertFramesAt(
         const std::vector<ImageFrameData>& frames,
         int insertionIndex,

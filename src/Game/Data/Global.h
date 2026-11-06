@@ -78,6 +78,7 @@ struct GameFeatureFlags
 	bool nativeNpcAttackAtAnimationEnd = false;
 	bool restorePartnerAttributes = false;
 	bool useThewWhenNormalRun = true;
+	bool ignoreRunDisabled = false;
 	bool lumAsBrightness = true;
 	bool ambientLumOverlay = true;
 	bool topButtonsLayout = false;
@@ -150,6 +151,7 @@ public:
 
 	bool useWav = false;
 	int minimumMagicDamage = 10;
+	MagicTimingMode magicTimingMode = MagicTimingMode::FixedMilliseconds;
 	ActionReleaseFrameRatio attackReleaseFrameRatio{2, 3};
 	ActionReleaseFrameRatio specialAttackReleaseFrameRatio{1, 3};
 	ActionReleaseFrameRatio magicReleaseFrameRatio{4, 5};
@@ -167,6 +169,7 @@ public:
 	std::map<int, std::string> skillTreeFiles;
 	LevelUpThresholdMode levelUpThresholdMode =
 		LevelUpThresholdMode::GreaterThanOrEqual;
+	ScriptMoveScreenProfile moveScreenProfile = ScriptMoveScreenProfile::CSharp;
 	ScriptNpcActionProfile npcActionProfile =
 		ScriptNpcActionProfile::Legacy;
 	ScriptNpcRuntimeProfile npcRuntimeProfile =

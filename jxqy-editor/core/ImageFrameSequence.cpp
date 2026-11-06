@@ -144,6 +144,22 @@ bool ImageFrameSequence::insertFramesAfter(
         frames, currentIndex + 1, insertedFrames, edit);
 }
 
+bool ImageFrameSequence::removeSelectedFrames(const std::vector<ImageFrameData>& frames,
+    const std::vector<int>& selectedIndices, ImageFrameSequenceEdit* edit)
+{
+    if (!edit) return false;
+    *edit = {};
+    std::vector<int> selection;
+    if (!validateFrames(frames) || !normalizeSelection(static_cast<int>(frames.size()), selectedIndices, &selection) ||
+        selection.size() == frames.size()) return false;
+    for (int index = 0; index < static_cast<int>(frames.size()); ++index)
+        if (!std::binary_search(selection.begin(), selection.end(), index)) edit->frames.push_back(frames[index]);
+    edit->currentIndex = std::min(selection.front(), static_cast<int>(edit->frames.size()) - 1);
+    edit->selectedIndices = {edit->currentIndex};
+    edit->changed = true;
+    return true;
+}
+
 bool ImageFrameSequence::duplicateSelectedFrames(
     const std::vector<ImageFrameData>& frames,
     const std::vector<int>& selectedIndices,

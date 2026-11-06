@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../../Element/Element.h"
+#include "../../File/INIReader.h"
+#include "SystemNoticeLayout.h"
 
 #include <memory>
 #include <string>
@@ -10,6 +12,7 @@ class SystemNotice :
 	public Element
 {
 	friend class CoreLifecycleTestAccess;
+	friend class GamepadEssentialUITestAccess;
 public:
 	enum class Mode
 	{
@@ -33,6 +36,9 @@ private:
 	virtual void onWindowResize(int width, int height) override;
 
 	void updateLayout(int width, int height);
+	void loadDisplayLayout();
+	INIReader windowConfiguration, textConfiguration;
+	SystemNoticeLayout displayLayout;
 	void refreshTextImage();
 	void refreshMessageText();
 	struct TimedMessage
@@ -46,6 +52,8 @@ private:
 
 	std::unique_ptr<char[]> fontData;
 	int fontLength = 0;
+	std::unique_ptr<char[]> fallbackFontData;
+	int fallbackFontLength = 0;
 	_shared_image textImage = nullptr;
 	UTime beginTime = 0;
 	UTime showDuration = 7000;

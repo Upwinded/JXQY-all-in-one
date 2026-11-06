@@ -1962,7 +1962,7 @@ bool setNpcRuntimeAttribute(GameManager* gameManager, const std::shared_ptr<NPC>
 	}
 	if (lowerKey == "kind" && readInteger())
 	{
-		if (!npc->setKindAndRelation(integerValue, npc->relation)) return false;
+		if (!npc->setKindAndRelation(integerValue, npc->relation, false)) return false;
 		npc->beginStand();
 		return true;
 	}
@@ -8580,7 +8580,7 @@ void ScriptAPI::setNPCKind(const std::string& name, int kind)
 		std::shared_ptr<NPC> npc = gameManager->scriptNPC;
 		if (npc != nullptr)
 		{
-			npc->setKindAndRelation(kind, npc->relation);
+			npc->setKindAndRelation(kind, npc->relation, false);
 		}
 	}
 	else
@@ -8589,7 +8589,7 @@ void ScriptAPI::setNPCKind(const std::string& name, int kind)
 		for (size_t i = 0; i < npc.size(); i++)
 		{
 			if (npc[i] == nullptr) continue;
-			npc[i]->setKindAndRelation(kind, npc[i]->relation);
+			npc[i]->setKindAndRelation(kind, npc[i]->relation, false);
 		}
 	}
 }
@@ -8996,8 +8996,7 @@ void ScriptAPI::setAllNpcIsEnemy()
 		{
 			continue;
 		}
-		npc->kind = nkBattle;
-		npc->relation = nrHostile;
+		if (!npc->setKindAndRelation(nkBattle, nrHostile)) return;
 		npc->beginStand();
 	}
 }
@@ -9503,7 +9502,7 @@ void ScriptAPI::enableRun()
 
 void ScriptAPI::disableRun()
 {
-	// 保留旧脚本入口；所有游戏的 DisableRun 均不再改变跑步权限。
+	gameManager->player->setRunDisabled(true);
 }
 
 void ScriptAPI::enableJump()
@@ -9839,11 +9838,17 @@ void ScriptAPI::addTalent(const std::string& name)
 
 void ScriptAPI::addOneMagic(const std::string& playerName, const std::string& magicName)
 {
+	updateCharacterMagic(playerName, magicName, 0);
+}
+
+bool ScriptAPI::updateCharacterMagic(const std::string& playerName, const std::string& magicName, int level)
+{
 	const std::string targetName = gameManager->global.resolveScriptCharacterName(playerName);
 	if (gameManager->player->npcName == targetName)
 	{
-		addMagic(magicName);
-		return;
+		if (level == 0) addMagic(magicName);
+		else gameManager->magicManager.setPrimaryMagicLevel(magicName, level);
+		return true;
 	}
 
 	for (size_t i = 0; i < 5; i++)
@@ -9871,17 +9876,35 @@ void ScriptAPI::addOneMagic(const std::string& playerName, const std::string& ma
 		MagicManager tempMagicManager;
 		if (!tempMagicManager.load(static_cast<int>(i)))
 		{
-			continue;
+			const std::string message = u8"角色武功读取失败：" + targetName;
+			gameManager->showMessage(message);
+			gameManager->script.reportCommandFailure(message);
+			return true;
 		}
-		tempMagicManager.addMagic(magicName);
+		if (level == 0) tempMagicManager.addPrimaryMagic(magicName, false, false);
+		else tempMagicManager.setPrimaryMagicLevel(magicName, level);
 		if (!tempMagicManager.save(static_cast<int>(i)))
 		{
 			GameLog::write(
 				"ScriptAPI: failed to save magic snapshot index=%d\n",
 				static_cast<int>(i));
+			const std::string message = u8"角色武功保存失败：" + targetName;
+			gameManager->showMessage(message);
+			gameManager->script.reportCommandFailure(message);
+			return true;
 		}
-		return;
+		for (const auto& npc : gameManager->npcManager->findNPC(targetName))
+		{
+			if (npc && npc->kind == nkPartner) npc->reloadPartnerMagic();
+		}
+		if (gameManager->menu)
+		{
+			if (gameManager->menu->equipMenu) gameManager->menu->equipMenu->updateMagicDisplay();
+			if (gameManager->menu->magicMenu) gameManager->menu->magicMenu->updateMagic();
+		}
+		return true;
 	}
+	return false;
 }
 
 void ScriptAPI::deleteMagic(const std::string& name)
@@ -10106,7 +10129,7 @@ void ScriptAPI::getPlayerState(const std::string& stateName, const std::string& 
 	}
 	else if (normalizedStateName == "canrun")
 	{
-		value = gameManager->player->canRun ? 1 : 0;
+		value = !gameManager->player->isRunDisabled() ? 1 : 0;
 	}
 	else if (normalizedStateName == "canjump")
 	{
@@ -10943,6 +10966,14 @@ void ScriptAPI::setNpcMagicFile(const std::string& name, const std::string& file
 	}
 }
 
+void ScriptAPI::setNpcMagicLevel(const std::string& name, const std::string& magicName, int level)
+{
+	if (gameManager->global.feature.restorePartnerAttributes
+		&& updateCharacterMagic(name, magicName, std::clamp(level, 1, MAGIC_MAX_LEVEL))) return;
+	setNpcMagicFile(name, magicName);
+	setNpcMagicLevel(name, level);
+}
+
 void ScriptAPI::setNpcMagicLevel(const std::string& name, int level)
 {
 	auto npcList = gameManager->npcManager->findNPC(name);
@@ -11335,6 +11366,10 @@ void ScriptAPI::playerChange(int index)
 	}
 
 	gameManager->global.data.characterIndex = index;
+	for (const auto& npc : gameManager->npcManager->npcList)
+	{
+		if (npc && npc->kind == nkPartner) npc->reloadPartnerMagic();
+	}
 	gameManager->effectManager->replaceCasterReferences(gameManager->player, outgoingCaster);
 
 	gameManager->player->reloadAction();

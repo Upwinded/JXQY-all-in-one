@@ -68,6 +68,11 @@ public:
     bool addPreparedWrite(const QString& targetPath,
                           const QString& preparedPath,
                           QString& errorMessage);
+    bool addPreparedWriteChecked(const QString& targetPath,
+                                 const QString& preparedPath,
+                                 bool expectedTargetExists,
+                                 const QByteArray& expectedTargetSha256,
+                                 QString& errorMessage);
     bool addBytesWrite(const QString& targetPath,
                        const QByteArray& bytes,
                        QString& errorMessage);
@@ -78,6 +83,9 @@ public:
         const QByteArray& expectedTargetBytes,
         QString& errorMessage);
     bool addRemoval(const QString& targetPath, QString& errorMessage);
+    bool addRemovalChecked(const QString& targetPath,
+                           const QByteArray& expectedTargetBytes,
+                           QString& errorMessage);
 
     // A successful commit may still return a non-empty warning when the new
     // generation is durable but obsolete backup files could not be removed.

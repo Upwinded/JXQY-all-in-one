@@ -1,2 +1,5 @@
 # Auto detect text files and perform LF normalization
 * text=auto eol=lf
+
+# Preserve the exact bytes of packaged bootstrap assets.
+assets/** -text

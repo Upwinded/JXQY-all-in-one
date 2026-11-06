@@ -323,6 +323,7 @@ public:
 	void setTrap(const std::string& mapName, int idx, const std::string& trapFile);
 	void setNpcMagicFile(const std::string& name, const std::string& fileName);
 	void setNpcMagicLevel(const std::string& name, int level);
+	void setNpcMagicLevel(const std::string& name, const std::string& magicName, int level);
 	void setPlayerMagicToUseWhenBeAttacked(const std::string& fileName, int direction);
 	void setNpcMagicToUseWhenBeAttacked(const std::string& name, const std::string& fileName, int direction);
 	void setNpcClickScript(const std::string& name, const std::string& scriptFile);
@@ -350,6 +351,7 @@ public:
 	void select(int messageIdx, int optionAIdx, int optionBIdx, const std::string& varName);
 
 private:
+	bool updateCharacterMagic(const std::string& name, const std::string& magicName, int level);
 	friend class GameManager;
 	friend class CoreLifecycleTestAccess;
 	struct PreparedSaveLoadCallbacks

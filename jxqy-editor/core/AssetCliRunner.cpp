@@ -141,6 +141,8 @@ bool applyMigrateOptions(const QStringList& arguments, int startIndex,
         << "--ui-base" << "--ui-profile" << "--feature"
         << "--save-namespace" << "--include-prefix" << "--source-encoding"
         << "--minimum-magic-damage"
+        << "--magic-timing-mode"
+        << "--move-screen-profile"
         << "--resource-type" << "--image-category" << "--image-mode"
         << "--crop-transparent";
 
@@ -219,6 +221,26 @@ bool applyMigrateOptions(const QStringList& arguments, int startIndex,
                 }
                 options.minimumMagicDamage = minimumDamage;
                 options.minimumMagicDamageDefined = true;
+            }
+            else if (arg == "--magic-timing-mode")
+            {
+                if (!tryParseMagicTimingMode(value.toStdString(), options.magicTimingMode))
+                {
+                    err << "Error: --magic-timing-mode requires FixedMilliseconds, LogicFrames, NativeAnimationFrames or CSharpAnimationFrames\n\n";
+                    return false;
+                }
+                options.magicTimingModeDefined = true;
+            }
+            else if (arg == "--move-screen-profile")
+            {
+                const QString profile = value.trimmed().toLower();
+                if (profile != "native" && profile != "csharp")
+                {
+                    err << "Error: --move-screen-profile requires Native or CSharp\n\n";
+                    return false;
+                }
+                options.moveScreenProfile = profile == "native" ? ScriptMoveScreenProfile::Native : ScriptMoveScreenProfile::CSharp;
+                options.moveScreenProfileDefined = true;
             }
             else if (arg == "--include-prefix")
                 options.includePrefix = value;
@@ -783,6 +805,8 @@ int AssetCliRunner::printUsage(const QString& appName, FILE* outputFile, int exi
     out << "  --mod-type <0..3>      Explicit Game.Type; omitted by default so the content base is inherited\n";
     out << "  --dependency-id <ids>  Ordered content bases; defaults to JXQY2 and accepts comma-separated IDs\n";
     out << "  --minimum-magic-damage <n>  Resource-wide magic damage floor; defaults to the content base\n";
+    out << "  --magic-timing-mode <mode>  Spell lifetime clock; defaults to source profile, C# source marker, then content dependencies\n";
+    out << "  --move-screen-profile <Native|CSharp>  Story camera protocol; defaults to source and content dependencies\n";
     out << "  --ui-base <id>         UI-only fallback pack id; independent from content base\n";
     out << "  --ui-profile <name>    Layout family: JXQY2, YYCS, or XJXQY\n";
     out << "  --feature <Name=0|1>   Override one Game.Type feature; may be repeated\n";

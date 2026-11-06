@@ -20,6 +20,7 @@
 
 #include "ScriptApiList.h"
 #include "ScriptVariableHints.h"
+#include "../core/ContentAuthoring.h"
 #include "../core/DialogueDocument.h"
 
 #include <optional>
@@ -54,6 +55,7 @@ protected:
 
 signals:
     void mouseHovered(const QPoint& position);
+    void manualCompletionRequested();
 
 private slots:
     void updateLineNumberAreaWidth(int newBlockCount);
@@ -228,6 +230,16 @@ public:
         const QByteArray& sourceBytes,
         QByteArray& normalizedEditorBytes);
     bool saveAsFile(const QString& fileName);
+    bool saveFile();
+    void setSingleFileEditing();
+    void setSuggestedSavePath(const QString& path);
+    void setAssetsBasePath(const QString& path);
+    QString createContentFile(const QString& name, bool copyCurrent, QString* errorMessage = nullptr);
+    bool renameContentFile(const QString& name, QString* errorMessage = nullptr);
+    bool deleteContentFile(QString* errorMessage = nullptr);
+    ContentReferenceReport currentReferences() const;
+    void setDocumentSnapshotsProvider(std::function<QList<DesktopRunDocumentSnapshot>()> provider);
+    void setFileMutationPreflight(std::function<bool(const QStringList&, QString&)> preflight);
     DesktopRunDocumentSnapshot desktopRunDocumentSnapshot() const;
     StoryGraphSourceSnapshot storyGraphSourceSnapshot(
         const QString& portableRootKey,
@@ -256,6 +268,9 @@ signals:
     void documentStateChanged(const QString& filePath, bool dirty);
     void storyGraphSourceChanged();
     void documentClosed();
+    void openScriptFileRequested(const QString& path);
+    void filesChanged(const QStringList& paths);
+    void openReferenceRequested(const QString& path, int line);
 
 protected:
     void changeEvent(QEvent* event) override;
@@ -284,7 +299,10 @@ private:
 
     void setupEditor();
     void setupCompleter();
+    void reloadApiDocumentation();
     void setupConnections();
+    void setupAuthoringActions();
+    void showReferences();
     void applyEditingModeUi();
     void updateWindowTitle();
     void invalidateSerializedDocumentCache();
@@ -315,6 +333,12 @@ private:
 
     const EditingMode currentEditingMode;
     QString currentFileName;
+    QString suggestedSavePath;
+    QString assetsBasePath;
+    QString loadedSourcePath;
+    QByteArray loadedSourceBytes;
+    std::function<QList<DesktopRunDocumentSnapshot>()> snapshotsProvider;
+    std::function<bool(const QStringList&, QString&)> mutationPreflight;
     std::function<bool(const QString&)> documentPathValidator;
     QTimer* tooltipTimer;
     QPoint lastHoverPosition;

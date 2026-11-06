@@ -1,4 +1,5 @@
 #include "ImageEditorWindow.h"
+#include "EditorSaveConfirmation.h"
 #include "../core/AuthoringMutationGate.h"
 #include "ui_ImageEditorWindow.h"
 #include "ImageBatchExportDialog.h"
@@ -6,6 +7,7 @@
 #include "ImageEditDialog.h"
 #include "../core/DurableFileTransaction.h"
 #include "../core/EditorAssetPath.h"
+#include "../core/ContentAuthoring.h"
 #include "../core/ImageFrameBatchExchange.h"
 #include "Image/ImageAnimationPlayback.h"
 
@@ -13,11 +15,13 @@
 #include <QMessageBox>
 #include <QBuffer>
 #include <QFileDialog>
+#include <QBuffer>
 #include <QFileInfo>
 #include <QDir>
 #include <QMouseEvent>
 #include <QScrollArea>
 #include <QSaveFile>
+#include <QUuid>
 #include <QSignalBlocker>
 #include <QStandardPaths>
 #include <QVBoxLayout>
@@ -457,6 +461,26 @@ ImageEditorWindow::ImageEditorWindow(QWidget* parent)
 {
     ui->setupUi(this);
 
+    auto* newFileButton = new QPushButton(tr("从图片新建"), this);
+    newFileButton->setObjectName("newImageFileButton");
+    ui->toolbarLayout->insertWidget(0, newFileButton);
+    connect(newFileButton, &QPushButton::clicked, this, &ImageEditorWindow::onNewFile);
+    frameNumberHint = new QLabel(tr("帧编号从0开始；按钮的普通／按下等状态按编号使用图片。插入、删除或排序后请检查对应状态。"), this);
+    frameNumberHint->setObjectName("imageFrameNumberHint");
+    frameNumberHint->setWordWrap(true);
+    ui->mainLayout->insertWidget(1, frameNumberHint);
+    ui->addFrameButton->setText(tr("导入帧"));
+    ui->deleteFrameButton->setText(tr("删除所选帧"));
+    ui->importFrameButton->setText(tr("替换当前帧"));
+    auto* frameActions = new QHBoxLayout();
+    for (auto* button : {ui->addFrameButton, ui->deleteFrameButton, ui->importFrameButton, ui->exportFrameButton})
+    {
+        ui->toolbarLayout->removeWidget(button);
+        frameActions->addWidget(button);
+    }
+    frameActions->addStretch();
+    ui->mainLayout->insertLayout(1, frameActions);
+
     advancedFrameToolsButton = new QToolButton(this);
     advancedFrameToolsButton->setObjectName(
         QStringLiteral("advancedFrameToolsButton"));
@@ -536,11 +560,11 @@ ImageEditorWindow::ImageEditorWindow(QWidget* parent)
 
     // 创建右键菜单
     contextMenu = new QMenu(this);
-    editAction = contextMenu->addAction(tr("编辑图片"));
+    editAction = contextMenu->addAction(tr("编辑当前帧"));
     editAction->setObjectName(QStringLiteral("imageEditFrameAction"));
-    exportAction = contextMenu->addAction(tr("导出图片"));
+    exportAction = contextMenu->addAction(tr("导出当前帧"));
     exportAction->setObjectName(QStringLiteral("imageExportFrameAction"));
-    importAction = contextMenu->addAction(tr("替换图片"));
+    importAction = contextMenu->addAction(tr("替换当前帧"));
     importAction->setObjectName(QStringLiteral("imageImportFrameAction"));
     batchExportAction = contextMenu->addAction(tr("批量导出"));
     batchExportAction->setObjectName(
@@ -565,12 +589,12 @@ ImageEditorWindow::ImageEditorWindow(QWidget* parent)
     moveFramesLaterAction->setObjectName(
         QStringLiteral("imageMoveFramesLaterAction"));
     contextMenu->addSeparator();
-    insertAction = contextMenu->addAction(tr("批量插入图片"));
+    insertAction = contextMenu->addAction(tr("批量插入帧"));
     insertAction->setObjectName(QStringLiteral("imageInsertFrameAction"));
     addAction = contextMenu->addAction(tr("批量导入到末尾"));
     addAction->setObjectName(QStringLiteral("imageAddFrameAction"));
     contextMenu->addSeparator();
-    deleteAction = contextMenu->addAction(tr("删除图片"));
+    deleteAction = contextMenu->addAction(tr("删除所选帧"));
     deleteAction->setObjectName(QStringLiteral("imageDeleteFrameAction"));
 
     connect(editAction, &QAction::triggered, this, &ImageEditorWindow::onEditFrame);
@@ -690,9 +714,9 @@ void ImageEditorWindow::changeEvent(QEvent* event)
 void ImageEditorWindow::retranslateDynamicUi()
 {
     advancedFrameToolsButton->setText(tr("高级帧工具"));
-    editAction->setText(tr("编辑图片"));
-    exportAction->setText(tr("导出图片"));
-    importAction->setText(tr("替换图片"));
+    editAction->setText(tr("编辑当前帧"));
+    exportAction->setText(tr("导出当前帧"));
+    importAction->setText(tr("替换当前帧"));
     batchExportAction->setText(tr("批量导出"));
     reimportBatchAction->setText(tr("按清单回导"));
     batchOffsetAction->setText(tr("批量设置所选帧偏移"));
@@ -701,9 +725,12 @@ void ImageEditorWindow::retranslateDynamicUi()
     duplicateFramesAction->setText(tr("重复所选帧"));
     moveFramesEarlierAction->setText(tr("所选帧前移"));
     moveFramesLaterAction->setText(tr("所选帧后移"));
-    insertAction->setText(tr("批量插入图片"));
+    insertAction->setText(tr("批量插入帧"));
     addAction->setText(tr("批量导入到末尾"));
-    deleteAction->setText(tr("删除图片"));
+    deleteAction->setText(tr("删除所选帧"));
+    ui->addFrameButton->setText(tr("导入帧"));
+    ui->deleteFrameButton->setText(tr("删除所选帧"));
+    ui->importFrameButton->setText(tr("替换当前帧"));
     undoShortcutAction->setText(tr("撤销图片编辑"));
     redoShortcutAction->setText(tr("重做图片编辑"));
     updateWindowTitle();
@@ -761,7 +788,7 @@ void ImageEditorWindow::updateCanvas()
 
 void ImageEditorWindow::updateWindowTitle()
 {
-    QString fileName = currentFileName.empty() ? tr("未命名") : QString::fromUtf8(currentFileName.c_str());
+    QString fileName = currentFileName.empty() ? tr("未命名") : QFileInfo(QString::fromUtf8(currentFileName.c_str())).fileName();
     QString dirtyMark = isModified ? QStringLiteral(" *") : QString();
     setWindowTitle(tr("图片编辑器 - %1%2").arg(fileName).arg(dirtyMark));
 }
@@ -1298,6 +1325,7 @@ void ImageEditorWindow::pushFrameSequenceEdit(
 {
     if (!edit.changed)
         return;
+    const int afterCount = static_cast<int>(edit.frames.size());
     imageUndoStack->push(new ImageFrameSequenceCommand(
         beforeFrames,
         beforeSelection,
@@ -1311,8 +1339,12 @@ void ImageEditorWindow::pushFrameSequenceEdit(
                 frames, selection, selectedCurrentIndex);
             Q_ASSERT(replaced);
             Q_UNUSED(replaced);
+            frameNumberHint->setText(tr("当前%1帧，编号0—%2。按钮状态或角色动作的引用编号不会自动修改，请对照检查。")
+                .arg(frames.size()).arg(qMax(0, static_cast<int>(frames.size()) - 1)));
         },
         commandText));
+    frameNumberHint->setText(tr("%1：%2帧→%3帧。按钮状态或角色动作的引用编号不会自动修改，可撤销后对照。")
+        .arg(commandText).arg(beforeFrames.size()).arg(afterCount));
 }
 
 void ImageEditorWindow::applySelectedFrameTransform(
@@ -1631,6 +1663,10 @@ bool ImageEditorWindow::openFile(const QString& fileName)
     if (confirmSaveIfModified() == SaveConfirmResult::Cancelled)
         return false;
 
+    const EditorFileState openedState = EditorFileState::read(normalizedFileName,
+        normalizedSavePath(ContentAuthoring::projectPath(assetsBasePath, normalizedFileName), true));
+    if (!openedState.isReadable())
+        return false;
     std::string fileNameStr = normalizedFileName.toUtf8().toStdString();
     PicType picType = Util::detectPicType(fileNameStr);
 
@@ -1648,6 +1684,7 @@ bool ImageEditorWindow::openFile(const QString& fileName)
         {
             impFile = std::move(loadedImpFile);
             currentFileName = fileNameStr;
+            fileState = openedState;
             currentPicType = PicType::Imp;
             currentFrameIndex = impFile.getImageCount() > 0 ? 0 : -1;
             resetDocumentEditState();
@@ -1675,6 +1712,7 @@ bool ImageEditorWindow::openFile(const QString& fileName)
     {
         picEditor = std::move(loadedPicEditor);
         currentFileName = fileNameStr;
+        fileState = openedState;
         currentPicType = picType;
         resetDocumentEditState();
         loadFromPicEditor();
@@ -1757,12 +1795,8 @@ void ImageEditorWindow::onSaveFile()
     }
 
     const QString targetPath = normalizedSavePath(
-        QString::fromUtf8(currentFileName), true);
-    if (saveToNormalizedPath(targetPath))
-    {
-        QMessageBox::information(this, tr("提示"),
-            tr("保存成功！"));
-    }
+        ContentAuthoring::projectPath(assetsBasePath, QString::fromUtf8(currentFileName)), true);
+    saveToNormalizedPath(targetPath);
 }
 
 void ImageEditorWindow::onSaveAs()
@@ -1774,18 +1808,17 @@ void ImageEditorWindow::onSaveAs()
         return;
     }
 
+    const QString initialPath = currentFileName.empty() ? QDir(assetsBasePath).filePath("asf/new-image.img")
+        : normalizedSavePath(ContentAuthoring::projectPath(assetsBasePath, QString::fromUtf8(currentFileName)), true);
+    if (!QDir().mkpath(QFileInfo(initialPath).path())) return;
     QString fileName = QFileDialog::getSaveFileName(this,
-        tr("保存文件"), "",
+        tr("保存图片文件"), initialPath,
         tr("IMG文件 (*.img);;所有文件 (*.*)"));
 
     if (fileName.isEmpty())
         return;
 
-    if (saveFileAs(fileName))
-    {
-        QMessageBox::information(this, tr("提示"),
-            tr("保存成功！"));
-    }
+    saveFileAs(fileName);
 }
 
 QString ImageEditorWindow::normalizedSavePath(
@@ -1825,7 +1858,10 @@ bool ImageEditorWindow::saveToNormalizedPath(const QString& targetPath)
     if (!canAdoptDocumentPath(targetPath))
         return false;
 
-    const QString tempPath = targetPath + QStringLiteral(".tmp");
+    const EditorFileState expectedState = fileState.forSave(targetPath);
+    if (!QDir().mkpath(QFileInfo(targetPath).absolutePath()))
+        return false;
+    const QString tempPath = targetPath + QStringLiteral(".tmp.") + QUuid::createUuid().toString(QUuid::Id128);
 
     // 步骤1：写入临时文件 — always save as IMP/IMG
     QFile::remove(tempPath);
@@ -1850,17 +1886,19 @@ bool ImageEditorWindow::saveToNormalizedPath(const QString& targetPath)
     DurableFileTransaction transaction(
         QFileInfo(targetPath).absolutePath());
     QString transactionMessage;
-    if (!transaction.addPreparedWrite(
-            targetPath, tempPath, transactionMessage) ||
+    EditorFileState savedState;
+    if (!expectedState.prepareWrite(transaction,
+            targetPath, tempPath, savedState, transactionMessage, EditorSaveConfirmation::forWindow(this)) ||
         !transaction.commit(transactionMessage))
     {
         QFile::remove(tempPath);
-        QMessageBox::warning(this, tr("保存失败"),
-            tr("无法完成保存: %1\n%2").arg(targetPath, transactionMessage));
+        if (!transactionMessage.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"), transactionMessage);
         return false;
     }
 
     currentFileName = targetPath.toUtf8().toStdString();
+    fileState = savedState;
     suppressUndoStateSynchronization = true;
     imageHistoryBaseModified = false;
     imageUndoStack->setClean();
@@ -1885,24 +1923,63 @@ void ImageEditorWindow::onInsertFrame()
 
 void ImageEditorWindow::onDeleteFrame()
 {
-    if (currentFrameIndex < 0)
+    std::vector<ImageFrameData> frames;
+    const auto selection = selectedFrameIndices();
+    if (!currentFrameSequence(&frames) || selection.empty()) return;
+    ImageFrameSequenceEdit edit;
+    if (!ImageFrameSequence::removeSelectedFrames(frames, selection, &edit))
+    {
+        QMessageBox::information(this, tr("删除帧"), tr("图片至少保留一帧；文件删除与帧编辑是不同操作。"));
         return;
-
-    if (currentPicType == PicType::Imp)
-    {
-        impFile.deleteFrame(currentFrameIndex);
     }
-    else if (currentPicType != PicType::None)
+    pushFrameSequenceEdit(frames, selection, currentFrameIndex, std::move(edit), tr("删除%1帧").arg(selection.size()));
+}
+
+bool ImageEditorWindow::createImageDocument(const QList<QImage>& images, QString* errorMessage)
+{
+    auto fail = [&](const QString& message) { if (errorMessage) *errorMessage = message; return false; };
+    if (errorMessage) errorMessage->clear();
+    if (images.isEmpty() || images.size() > MaximumImageFrameCount) return fail(tr("请选择1至10000张有效图片。"));
+    std::vector<ImageFrameData> frames;
+    for (const auto& image : images)
     {
-        picEditor.removeFrame(currentFrameIndex);
+        ImageFrameData frame;
+        QBuffer buffer(&frame.encodedImage);
+        if (image.isNull() || !buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG"))
+            return fail(tr("有图片无法读取，当前文档保持不变。"));
+        frame.decodedImage = image;
+        frames.push_back(std::move(frame));
     }
-
-    int count = (currentPicType == PicType::Imp) ? impFile.getImageCount() : picEditor.getFrameCount();
-    if (currentFrameIndex >= count)
-        currentFrameIndex = count - 1;
-
+    IMPImageFile prepared;
+    if (!prepared.setFrameSequence(frames)) return fail(tr("无法创建图片文档。"));
+    prepared.setDirection(1);
+    prepared.setInterval(80);
+    resetAnimationPlayback();
+    impFile = std::move(prepared);
+    picEditor.clear();
+    currentPicType = PicType::Imp;
+    currentFileName.clear();
+    fileState = {};
+    currentFrameIndex = 0;
+    resetDocumentEditState();
+    imageHistoryBaseModified = true;
     updateCanvas();
-    markModifiedOutsideImageHistory();
+    synchronizeModifiedStateFromUndoStack();
+    updateWindowTitle();
+    emit documentStatesChanged();
+    return true;
+}
+
+void ImageEditorWindow::onNewFile()
+{
+    const QStringList files = QFileDialog::getOpenFileNames(this, tr("选择图片创建动画（按选择顺序）"), assetsBasePath,
+        tr("图片 (*.png *.bmp *.jpg *.jpeg);;所有文件 (*)"));
+    if (files.isEmpty()) return;
+    QList<QImage> images;
+    for (const auto& file : files) images.append(QImage(file));
+    if (confirmSaveIfModified() == SaveConfirmResult::Cancelled) return;
+    QString error;
+    if (!createImageDocument(images, &error)) QMessageBox::warning(this, tr("无法新建图片"), error);
 }
 
 void ImageEditorWindow::onEditFrame()

@@ -324,16 +324,26 @@ bool SlotGridController::scrollRows(int rowDelta)
 	{
 		return false;
 	}
-	if (binding.hideDetails)
-	{
-		binding.hideDetails();
-	}
 	const int previousPosition = binding.scrollbar->position;
 	binding.scrollbar->setPosition(previousPosition + rowDelta);
-	if (binding.scrollbar->position != previousPosition
-		&& binding.refreshAfterScroll)
+	if (binding.scrollbar->position != previousPosition)
 	{
-		binding.refreshAfterScroll();
+		if (binding.hideDetails)
+		{
+			binding.hideDetails();
+		}
+		for (const auto& item : binding.items)
+		{
+			if (item != nullptr)
+			{
+				item->cancelPointerInteraction();
+				item->resetHint();
+			}
+		}
+		if (binding.refreshAfterScroll)
+		{
+			binding.refreshAfterScroll();
+		}
 	}
 	return true;
 }
@@ -819,6 +829,11 @@ int SlotInteractionController::focusedLogicalIndex() const
 bool SlotInteractionController::focusLogicalIndex(int logicalIndex)
 {
 	return gridController.focusLogicalIndex(logicalIndex);
+}
+
+bool SlotInteractionController::scrollRows(int rowDelta)
+{
+	return gridController.scrollRows(rowDelta);
 }
 
 void SlotInteractionController::setNeighbour(

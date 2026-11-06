@@ -47,7 +47,7 @@ UPEdit 系列作品，由 Upwinded 开发。</source>
 UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+14"/>
         <source>color: #666; font-size: 11px;</source>
         <translation>color: #666; font-size: 11px;</translation>
     </message>
@@ -63,6 +63,185 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
 </context>
 <context>
+    <name>AndroidExternalResourcePackageDialog</name>
+    <message>
+        <location filename="../ui/AndroidExternalResourcePackageDialog.cpp" line="+204"/>
+        <source>导出 Android 外部资源</source>
+        <translation>匯出 Android 外部資源</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>导出当前活动资源包</source>
+        <translation>匯出目前使用中的資源包</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>活动资源包：</source>
+        <translation>使用中的資源包：</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>源目录：</source>
+        <translation>來源目錄：</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>%1（%2）</source>
+        <translation>%1（%2）</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>设备目标：</source>
+        <translation>裝置目標：</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>外部资源根：%1
+当前包目录：%2
+清单文件：%3</source>
+        <translation>外部資源根：%1
+目前包目錄：%2
+清單檔案：%3</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>导出包目录：</source>
+        <translation>匯出包目錄：</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>选择父目录…</source>
+        <translation>選擇上層目錄…</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>只导出磁盘上已保存的文件。不会校验 Lua、地图、NPC、OBJ、封面、说明或 UI 资源；缺失资源不会阻止导出。资源集合的 common 目录会在可用时自动复制。</source>
+        <translation>只匯出磁碟上已儲存的檔案。不會檢查 Lua、地圖、NPC、OBJ、封面、說明或 UI 資源；缺少資源不會阻止匯出。資源集合的 common 目錄可用時會自動複製。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>打开导出目录</source>
+        <translation>開啟匯出目錄</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>开始导出</source>
+        <translation>開始匯出</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+144"/>
+        <source>取消</source>
+        <translation>取消</translation>
+    </message>
+    <message>
+        <location line="-143"/>
+        <location line="+143"/>
+        <source>关闭</source>
+        <translation>關閉</translation>
+    </message>
+    <message>
+        <location line="-132"/>
+        <source>选择 Android 外部资源导出包的父目录</source>
+        <translation>選擇 Android 外部資源匯出包的上層目錄</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <location line="+8"/>
+        <source>无法导出</source>
+        <translation>無法匯出</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>请选择有效的导出包目录。</source>
+        <translation>請選擇有效的匯出包目錄。</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>导出包的父目录不存在。</source>
+        <translation>匯出包的上層目錄不存在。</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>替换已有导出包</source>
+        <translation>取代現有匯出包</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>导出包目录已经存在。完整导出成功后将替换旧目录；失败或取消时保留旧目录。是否继续？</source>
+        <translation>匯出包目錄已經存在。完整匯出成功後將取代舊目錄；失敗或取消時保留舊目錄。是否繼續？</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>开始导出：%1</source>
+        <translation>開始匯出：%1</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>%1/%2  %3</source>
+        <translation>%1/%2  %3</translation>
+    </message>
+    <message>
+        <location line="+67"/>
+        <source>正在取消；旧导出包将保持不变…</source>
+        <translation>正在取消；舊匯出包將保持不變…</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>导出完成：复制 %1 项，跳过 %2 项，警告 %3 项。</source>
+        <translation>匯出完成：複製 %1 項，略過 %2 項，警告 %3 項。</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>警告：%1</source>
+        <translation>警告：%1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>导出完成</source>
+        <translation>匯出完成</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Android 外部资源目录已完整发布。请把导出包中的 Download 目录复制到 Android 共享存储根目录。</source>
+        <translation>Android 外部資源目錄已完整發佈。請把匯出包中的 Download 目錄複製到 Android 共用儲存空間根目錄。</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>导出已取消；旧导出包未被替换。</source>
+        <translation>匯出已取消；舊匯出包未被取代。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>导出已取消</source>
+        <translation>匯出已取消</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>导出已取消，已有导出包保持不变。</source>
+        <translation>匯出已取消，現有匯出包保持不變。</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>导出失败：%1</source>
+        <translation>匯出失敗：%1</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>导出失败</source>
+        <translation>匯出失敗</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Android 外部资源未发布，已有导出包保持不变。
+
+%1</source>
+        <translation>Android 外部資源未發佈，現有匯出包保持不變。
+
+%1</translation>
+    </message>
+</context>
+<context>
     <name>AssetBrowser</name>
     <message>
         <location filename="../ui/AssetBrowser.ui" line="+6"/>
@@ -71,17 +250,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+21"/>
-        <location filename="../ui/AssetBrowser.cpp" line="+409"/>
+        <location filename="../ui/AssetBrowser.cpp" line="+413"/>
         <source>资源目录: 未设置</source>
         <translation>資源目錄: 未設定</translation>
     </message>
     <message>
-        <location line="+6"/>
         <source>padding: 4px; color: #aaa; font-size: 11px;</source>
-        <translation>padding: 4px; color: #aaa; font-size: 11px;</translation>
+        <translation type="vanished">padding: 4px; color: #aaa; font-size: 11px;</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+25"/>
         <source>全部文件</source>
         <translation>所有檔案</translation>
     </message>
@@ -111,7 +289,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>INI 檔案</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="-29"/>
+        <source>padding: 4px; font-size: 11px;</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+39"/>
         <source>地图 (map)</source>
         <translation>地圖 (map)</translation>
     </message>
@@ -121,12 +304,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>搜尋檔名...</translation>
     </message>
     <message>
-        <location filename="../ui/AssetBrowser.cpp" line="+1"/>
         <source>资源目录: %1</source>
-        <translation>資源目錄: %1</translation>
+        <translation type="vanished">資源目錄: %1</translation>
     </message>
     <message>
-        <location line="-18"/>
+        <location filename="../ui/AssetBrowser.cpp" line="-17"/>
         <source>单文件预览</source>
         <translation>單一檔案預覽</translation>
     </message>
@@ -142,25 +324,30 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location line="+146"/>
+        <location line="+152"/>
         <source>尚未选择可预览文件。</source>
         <translation>尚未選擇可預覽的檔案。</translation>
     </message>
     <message>
-        <location line="-142"/>
-        <location line="+158"/>
+        <location line="-148"/>
+        <location line="+164"/>
         <location line="+7"/>
         <source>预览已就绪。</source>
         <translation>預覽已就緒。</translation>
     </message>
     <message>
-        <location line="-295"/>
-        <location line="+453"/>
+        <location line="-301"/>
+        <location line="+459"/>
         <source>音频加载失败：%1</source>
         <translation>音訊載入失敗：%1</translation>
     </message>
     <message>
-        <location line="-153"/>
+        <location line="-322"/>
+        <source>资源包：%1</source>
+        <translation type="unfinished">資源包：%1</translation>
+    </message>
+    <message>
+        <location line="+169"/>
         <location line="+169"/>
         <source>正在加载音频…</source>
         <translation>正在載入音訊…</translation>
@@ -295,6 +482,14 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="+4"/>
         <source>音频已就绪。</source>
         <translation>音訊已就緒。</translation>
+    </message>
+    <message>
+        <source>搜索项目和基础内容，同名文件只显示当前生效版本。</source>
+        <translation>搜索項目和基礎內容，同名文件只顯示當前生效版本。</translation>
+    </message>
+    <message>
+        <source>查找资源…</source>
+        <translation>查找資源…</translation>
     </message>
 </context>
 <context>
@@ -433,7 +628,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation type="vanished">Lua 一般字串未閉合或包含未跳脫的換行</translation>
     </message>
     <message>
-        <location filename="../core/AssetReferenceScanner.cpp" line="+513"/>
+        <location filename="../core/AssetReferenceScanner.cpp" line="+516"/>
         <source>Lua 动态拼接</source>
         <translation>Lua 動態串接</translation>
     </message>
@@ -448,7 +643,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>作用中內容根目錄無法使用</translation>
     </message>
     <message>
-        <location line="+56"/>
+        <location line="+60"/>
         <source>无法读取文件</source>
         <translation>無法讀取檔案</translation>
     </message>
@@ -462,15 +657,18 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     <name>BatchConvertWindow</name>
     <message>
         <location filename="../ui/BatchConvertWindow.ui" line="+6"/>
+        <location filename="../ui/BatchConvertWindow.cpp" line="+204"/>
+        <location line="+965"/>
         <source>资源格式转换</source>
         <translation>資源格式轉換</translation>
     </message>
     <message>
+        <location line="+151"/>
         <source>源文本编码:</source>
         <translation>來源文字編碼:</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="-131"/>
         <source>目录设置</source>
         <translation>目錄設定</translation>
     </message>
@@ -486,20 +684,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+28"/>
+        <location line="+25"/>
         <source>浏览...</source>
         <translation>瀏覽...</translation>
     </message>
     <message>
-        <location line="-25"/>
-        <location line="+28"/>
-        <location line="+270"/>
-        <location line="+13"/>
         <source>secondaryButton</source>
-        <translation>secondaryButton</translation>
+        <translation type="vanished">secondaryButton</translation>
     </message>
     <message>
-        <location line="-300"/>
+        <location line="-14"/>
         <source>输出目录:</source>
         <translation>輸出目錄:</translation>
     </message>
@@ -509,7 +703,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>留空則在來源目錄名_new 資料夾下輸出</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+22"/>
         <source>当前项目导入/转换</source>
         <translation>目前專案匯入/轉換</translation>
     </message>
@@ -534,17 +728,27 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>轉換腳本語法</translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+31"/>
+        <source>GBK / CP936</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>UTF-8</source>
+        <translation type="unfinished">UTF-8</translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>替换WAV为MP3</source>
         <translation>將 WAV 替換為 MP3</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+27"/>
         <source>旧图转为 IMP/IMG：</source>
         <translation>舊圖轉為 IMP/IMG：</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+7"/>
         <source>角色 character</source>
         <translation>角色 character</translation>
     </message>
@@ -614,34 +818,39 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>按順序填寫 Game.Id，例如 JXQY2,YYCS</translation>
     </message>
     <message>
+        <location line="+10"/>
         <source>武功最低伤害:</source>
         <translation>武功最低傷害:</translation>
     </message>
     <message>
+        <location line="+23"/>
         <source>武功效果计算:</source>
         <translation>武功效果計算:</translation>
     </message>
     <message>
+        <location line="+11"/>
         <source>Effect 替代人物攻击力</source>
         <translation>Effect 取代人物攻擊力</translation>
     </message>
     <message>
+        <location line="+5"/>
         <source>人物攻击力与 Effect 相加</source>
         <translation>人物攻擊力與 Effect 相加</translation>
     </message>
     <message>
+        <location line="-32"/>
+        <location line="+23"/>
         <source>默认从首个可用内容依赖的 game_profile.ini 读取</source>
         <translation>預設從第一個可用內容依賴的 game_profile.ini 讀取</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+27"/>
         <source>开始转换</source>
         <translation>開始轉換</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>startButton</source>
-        <translation>startButton</translation>
+        <translation type="vanished">startButton</translation>
     </message>
     <message>
         <location line="+7"/>
@@ -649,12 +858,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>取消</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+10"/>
         <source>检查转换后脚本</source>
         <translation>檢查轉換後腳本</translation>
     </message>
     <message>
-        <location filename="../ui/BatchConvertWindow.cpp" line="+483"/>
+        <location filename="../ui/BatchConvertWindow.cpp" line="-709"/>
         <source>%1（裁剪透明边缘）</source>
         <translation>%1（裁剪透明邊緣）</translation>
     </message>
@@ -679,29 +888,29 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>、</translation>
     </message>
     <message>
-        <location line="+36"/>
+        <location line="+7"/>
         <source>选择源目录</source>
         <translation>選擇來源目錄</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+14"/>
         <source>选择输出目录</source>
         <translation>選擇輸出目錄</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+20"/>
         <location line="+7"/>
-        <location line="+41"/>
+        <location line="+40"/>
         <location line="+9"/>
         <location line="+8"/>
-        <location line="+26"/>
-        <location line="+271"/>
+        <location line="+53"/>
+        <location line="+343"/>
         <location line="+7"/>
         <source>错误</source>
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="-368"/>
+        <location line="-466"/>
         <source>请选择源目录！</source>
         <translation>請選擇來源目錄！</translation>
     </message>
@@ -711,7 +920,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>來源目錄不存在！</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+31"/>
         <source>项目导入配置已失效</source>
         <translation>專案匯入設定已失效</translation>
     </message>
@@ -736,7 +945,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>輸出路徑必須是普通的非磁碟根目錄。</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+53"/>
         <source>资源格式转换必须填写内容依赖 Game.Id（可用逗号分隔多个依赖）。</source>
         <translation>資源格式轉換必須填寫內容依賴 Game.Id（可用逗號分隔多個依賴）。</translation>
     </message>
@@ -773,7 +982,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>目前專案狀態不允許開始資源匯入。</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+18"/>
         <source>无法开始资源转换</source>
         <translation>無法開始資源轉換</translation>
     </message>
@@ -788,7 +997,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>資源目錄目前無法寫入，且專案匯入狀態還原失敗：%1</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+19"/>
         <source>=== 开始资源格式转换 ===</source>
         <translation>=== 開始資源格式轉換 ===</translation>
     </message>
@@ -803,13 +1012,13 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>輸出目錄: %1</translation>
     </message>
     <message>
-        <location line="+22"/>
-        <location line="+217"/>
+        <location line="+56"/>
+        <location line="+275"/>
         <source>%1/%2 %3</source>
         <translation>%1/%2 %3</translation>
     </message>
     <message>
-        <location line="-134"/>
+        <location line="-149"/>
         <source>
 
 转换输出已经完整发布，但项目上下文未切换：%1</source>
@@ -834,16 +1043,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+16"/>
-        <location line="+28"/>
+        <location line="+11"/>
+        <location line="+23"/>
         <location line="+21"/>
-        <location line="+95"/>
+        <location line="+141"/>
         <location line="+8"/>
         <source>提示</source>
         <translation>提示</translation>
     </message>
     <message>
-        <location line="-167"/>
+        <location line="-203"/>
         <source>转换已被用户取消！</source>
         <translation>轉換已被使用者取消！</translation>
     </message>
@@ -853,46 +1062,44 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>=== 轉換失敗 ===</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+2"/>
         <source>转换失败，存在错误，详见报告。</source>
         <translation>轉換失敗，存在錯誤，詳見報告。</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>转换失败，%1 个文件处理出错。</source>
-        <translation>轉換失敗，%1 個檔案處理出錯。</translation>
+        <translation type="vanished">轉換失敗，%1 個檔案處理出錯。</translation>
     </message>
     <message>
-        <location line="+7"/>
-        <location line="+28"/>
-        <location line="+25"/>
+        <location line="+6"/>
+        <location line="+23"/>
+        <location line="+23"/>
         <source>打开输出目录</source>
         <translation>開啟輸出目錄</translation>
     </message>
     <message>
-        <location line="-50"/>
-        <location line="+28"/>
-        <location line="+25"/>
+        <location line="-43"/>
+        <location line="+23"/>
+        <location line="+23"/>
         <source>打开报告</source>
         <translation>開啟報告</translation>
     </message>
     <message>
-        <location line="-43"/>
+        <location line="-36"/>
         <source>=== 转换完成但存在警告 ===</source>
         <translation>=== 轉換完成但存在警告 ===</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+2"/>
         <source>转换完成，但存在警告，详见报告。</source>
         <translation>轉換完成，但存在警告，詳見報告。</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>转换完成，但存在 %1 个警告。</source>
-        <translation>轉換完成，但存在 %1 個警告。</translation>
+        <translation type="vanished">轉換完成，但存在 %1 個警告。</translation>
     </message>
     <message>
-        <location line="+22"/>
+        <location line="+21"/>
         <source>=== 转换完成 ===</source>
         <translation>=== 轉換完成 ===</translation>
     </message>
@@ -902,7 +1109,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>資源格式轉換完成！共處理 %1 個檔案。</translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+25"/>
         <source>请先选择输出目录，或设置源目录以推导默认输出目录。</source>
         <translation>請先選擇輸出目錄，或設定來源目錄以推導預設輸出目錄。</translation>
     </message>
@@ -912,7 +1119,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>輸出目錄不存在，無法檢查轉換後腳本：%1</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+14"/>
         <source>=== 开始检查转换后脚本 ===</source>
         <translation>=== 開始檢查轉換後腳本 ===</translation>
     </message>
@@ -922,7 +1129,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>資源目錄: %1</translation>
     </message>
     <message>
-        <location line="+47"/>
+        <location line="+92"/>
         <source>=== 脚本检查已取消 ===</source>
         <translation>=== 腳本檢查已取消 ===</translation>
     </message>
@@ -948,12 +1155,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+6"/>
-        <location line="+576"/>
         <source>错误: %1</source>
         <translation>錯誤: %1</translation>
     </message>
     <message>
-        <location line="-570"/>
+        <location line="+6"/>
         <source>脚本检查失败</source>
         <translation>腳本檢查失敗</translation>
     </message>
@@ -973,12 +1179,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>轉換後腳本語法檢查通過。共檢查 %1 個腳本，略過 %2 個資料/備註檔案。</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+21"/>
         <source>&gt;&gt;&gt; 用户取消转换 &lt;&lt;&lt;</source>
         <translation>&gt;&gt;&gt; 使用者取消轉換 &lt;&lt;&lt;</translation>
     </message>
     <message>
-        <location line="-737"/>
+        <location line="-819"/>
         <source>普通 loose 资源根（转换后重新解析 Game.Id）</source>
         <translation>一般 loose 資源根（轉換後重新解析 Game.Id）</translation>
     </message>
@@ -998,18 +1204,19 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 輸出必須是空目錄或既有轉換輸出；資源集合根不會被當作單一資源包輸出。</translation>
     </message>
     <message>
-        <location line="+735"/>
-        <location line="+5"/>
-        <location line="+3"/>
+        <location line="+843"/>
         <source>[资源格式转换] %1。</source>
         <translation>[資源格式轉換] %1。</translation>
     </message>
     <message>
+        <location line="+55"/>
+        <location line="+5"/>
+        <location line="+3"/>
         <source>[资源格式转换] %1</source>
         <translation>[資源格式轉換] %1</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+10"/>
         <source>[资源格式转换] 脚本转换中仍有未处理的 API 调用: %1 个，详见报告</source>
         <translation>[資源格式轉換] 腳本轉換中仍有未處理的 API 呼叫: %1 個，詳見報告</translation>
     </message>
@@ -1039,138 +1246,104 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>[資源格式轉換] JSON 報告: 寫入失敗</translation>
     </message>
     <message>
-        <location line="+28"/>
         <source>错误: 无法创建输出父目录 %1</source>
-        <translation>錯誤: 無法建立輸出父目錄 %1</translation>
+        <translation type="vanished">錯誤: 無法建立輸出父目錄 %1</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>错误: 无法创建转换暂存目录</source>
-        <translation>錯誤: 無法建立轉換暫存目錄</translation>
+        <translation type="vanished">錯誤: 無法建立轉換暫存目錄</translation>
     </message>
     <message>
-        <location line="+57"/>
         <source>[脚本/INI] %1</source>
-        <translation>[腳本/INI] %1</translation>
+        <translation type="vanished">[腳本/INI] %1</translation>
     </message>
     <message>
-        <location line="+17"/>
         <source>  错误: 无法打开文件</source>
-        <translation>  錯誤: 無法開啟檔案</translation>
+        <translation type="vanished">  錯誤: 無法開啟檔案</translation>
     </message>
     <message>
-        <location line="+7"/>
         <source>  错误: 文本编码转换失败，跳过输出</source>
-        <translation>  錯誤: 文字編碼轉換失敗，略過輸出</translation>
+        <translation type="vanished">  錯誤: 文字編碼轉換失敗，略過輸出</translation>
     </message>
     <message>
-        <location line="+17"/>
-        <location line="+29"/>
         <source>  INI文件，编码已转换</source>
-        <translation>  INI 檔案，編碼已轉換</translation>
+        <translation type="vanished">  INI 檔案，編碼已轉換</translation>
     </message>
     <message>
-        <location line="-26"/>
-        <location line="+29"/>
-        <location line="+83"/>
         <source>  错误: 无法写入文件</source>
-        <translation>  錯誤: 無法寫入檔案</translation>
+        <translation type="vanished">  錯誤: 無法寫入檔案</translation>
     </message>
     <message>
-        <location line="-103"/>
-        <location line="+29"/>
-        <location line="+185"/>
         <source>  错误: 无法复制文件</source>
-        <translation>  錯誤: 無法複製檔案</translation>
+        <translation type="vanished">  錯誤: 無法複製檔案</translation>
     </message>
     <message>
-        <location line="-129"/>
         <source>  WAV→MP3替换完成</source>
-        <translation>  WAV→MP3 替換完成</translation>
+        <translation type="vanished">  WAV→MP3 替換完成</translation>
     </message>
     <message>
-        <location line="+14"/>
         <source>  转换成功</source>
-        <translation>  轉換成功</translation>
+        <translation type="vanished">  轉換成功</translation>
     </message>
     <message>
-        <location line="+13"/>
-        <location line="+120"/>
-        <location line="+31"/>
-        <location line="+12"/>
-        <location line="+14"/>
         <source>  错误: 无法复制文件 %1</source>
-        <translation>  錯誤: 無法複製檔案 %1</translation>
+        <translation type="vanished">  錯誤: 無法複製檔案 %1</translation>
     </message>
     <message>
-        <location line="-169"/>
         <source>[图片] %1</source>
-        <translation>[圖片] %1</translation>
+        <translation type="vanished">[圖片] %1</translation>
     </message>
     <message>
-        <location line="+15"/>
         <source>  转换为IMP成功</source>
-        <translation>  轉換為 IMP 成功</translation>
+        <translation type="vanished">  轉換為 IMP 成功</translation>
     </message>
     <message>
-        <location line="+4"/>
         <source>  错误: 转换IMP失败</source>
-        <translation>  錯誤: IMP 轉換失敗</translation>
+        <translation type="vanished">  錯誤: IMP 轉換失敗</translation>
     </message>
     <message>
-        <location line="+6"/>
         <source>  错误: 无法加载文件</source>
-        <translation>  錯誤: 無法載入檔案</translation>
+        <translation type="vanished">  錯誤: 無法載入檔案</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>[裁剪] %1</source>
-        <translation>[裁剪] %1</translation>
+        <translation type="vanished">[裁剪] %1</translation>
     </message>
     <message>
-        <location line="+48"/>
         <source>  裁剪成功</source>
-        <translation>  裁剪成功</translation>
+        <translation type="vanished">  裁剪成功</translation>
     </message>
     <message>
-        <location line="+4"/>
         <source>  保存IMP文件失败</source>
-        <translation>  儲存 IMP 檔案失敗</translation>
+        <translation type="vanished">  儲存 IMP 檔案失敗</translation>
     </message>
     <message>
-        <location line="+13"/>
         <source>  无需裁剪，已复制到输出目录</source>
-        <translation>  無需裁剪，已複製到輸出目錄</translation>
+        <translation type="vanished">  無需裁剪，已複製到輸出目錄</translation>
     </message>
     <message>
-        <location line="+5"/>
         <source>  错误: 无法加载IMP文件</source>
-        <translation>  錯誤: 無法載入 IMP 檔案</translation>
+        <translation type="vanished">  錯誤: 無法載入 IMP 檔案</translation>
     </message>
     <message>
-        <location line="+18"/>
         <source>[地图] %1</source>
-        <translation>[地圖] %1</translation>
+        <translation type="vanished">[地圖] %1</translation>
     </message>
     <message>
-        <location line="+7"/>
         <source>  地图迁移或校验成功</source>
-        <translation>  地圖遷移或驗證成功</translation>
+        <translation type="vanished">  地圖遷移或驗證成功</translation>
     </message>
     <message>
-        <location line="+4"/>
         <source>  错误: 地图迁移或校验失败</source>
-        <translation>  錯誤: 地圖遷移或驗證失敗</translation>
+        <translation type="vanished">  錯誤: 地圖遷移或驗證失敗</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>  详情: %1</source>
-        <translation>  詳情: %1</translation>
+        <translation type="vanished">  詳情: %1</translation>
     </message>
     <message>
-        <location line="+26"/>
         <source>[Lua] %1 - 已复制</source>
-        <translation>[Lua] %1 - 已複製</translation>
+        <translation type="vanished">[Lua] %1 - 已複製</translation>
     </message>
 </context>
 <context>
@@ -1232,13 +1405,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>視窗屬性</translation>
     </message>
     <message>
-        <location line="+6"/>
-        <location line="+1011"/>
         <source>窗口INI</source>
-        <translation>視窗 INI</translation>
+        <translation type="vanished">視窗 INI</translation>
     </message>
     <message>
-        <location line="-949"/>
+        <location line="+68"/>
         <source>alNone</source>
         <translation>alNone</translation>
     </message>
@@ -1323,12 +1494,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>名稱</translation>
     </message>
     <message>
-        <location line="+10"/>
         <source>INI文件</source>
-        <translation>INI 檔案</translation>
+        <translation type="vanished">INI 檔案</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+20"/>
         <source>数据绑定</source>
         <translation>資料繫結</translation>
     </message>
@@ -1338,21 +1508,20 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>格式化</translation>
     </message>
     <message>
-        <location line="+93"/>
         <source>通用属性</source>
-        <translation>通用屬性</translation>
+        <translation type="vanished">通用屬性</translation>
     </message>
     <message>
-        <location line="+91"/>
+        <location line="+184"/>
         <location line="+129"/>
         <location line="+37"/>
-        <location line="+178"/>
+        <location line="+177"/>
         <location line="+63"/>
         <source>0xFFFFFFFF</source>
         <translation>0xFFFFFFFF</translation>
     </message>
     <message>
-        <location line="-387"/>
+        <location line="-386"/>
         <source>按钮属性</source>
         <translation>按鈕屬性</translation>
     </message>
@@ -1367,17 +1536,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>物品格屬性</translation>
     </message>
     <message>
-        <location line="+37"/>
         <source>标签属性</source>
-        <translation>標籤屬性</translation>
+        <translation type="vanished">標籤屬性</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+74"/>
         <source>滚动条属性</source>
         <translation>捲軸屬性</translation>
     </message>
     <message>
-        <location line="+123"/>
+        <location line="+122"/>
         <source>柱状图属性</source>
         <translation>柱狀圖屬性</translation>
     </message>
@@ -1447,145 +1615,143 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>背景圖片</translation>
     </message>
     <message>
-        <location filename="../ui/ComponentPropertyEditor.cpp" line="+67"/>
-        <location line="+411"/>
         <source>INI 名称</source>
-        <translation>INI 名稱</translation>
+        <translation type="vanished">INI 名稱</translation>
     </message>
     <message>
-        <location line="-407"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="+136"/>
         <location line="+27"/>
-        <location line="+381"/>
-        <location line="+5"/>
+        <location line="+499"/>
+        <location line="+6"/>
         <source>备用图片</source>
         <translation>備用圖片</translation>
     </message>
     <message>
-        <location line="-408"/>
-        <location line="+404"/>
+        <location line="-527"/>
+        <location line="+522"/>
         <source>当前位置</source>
         <translation>目前位置</translation>
     </message>
     <message>
-        <location line="-402"/>
-        <location line="+404"/>
+        <location line="-520"/>
+        <location line="+523"/>
         <source>图像高级属性</source>
         <translation>圖像高級屬性</translation>
     </message>
     <message>
-        <location line="-383"/>
-        <location line="+386"/>
+        <location line="-502"/>
+        <location line="+505"/>
         <source>帧</source>
         <translation>幀</translation>
     </message>
     <message>
-        <location line="-385"/>
-        <location line="+386"/>
+        <location line="-504"/>
+        <location line="+505"/>
         <source>保持宽高比</source>
         <translation>維持長寬比</translation>
     </message>
     <message>
-        <location line="-385"/>
-        <location line="+386"/>
+        <location line="-504"/>
+        <location line="+505"/>
         <source>图片居中</source>
         <translation>圖片置中</translation>
     </message>
     <message>
-        <location line="-385"/>
-        <location line="+386"/>
+        <location line="-504"/>
+        <location line="+505"/>
         <source>裁剪内容</source>
         <translation>裁剪內容</translation>
     </message>
     <message>
-        <location line="-385"/>
-        <location line="+386"/>
+        <location line="-504"/>
+        <location line="+505"/>
         <source>裁剪黑边</source>
         <translation>裁剪黑邊</translation>
     </message>
     <message>
-        <location line="-385"/>
-        <location line="+386"/>
+        <location line="-504"/>
+        <location line="+505"/>
         <source>背景图片 1</source>
         <translation>背景圖片 1</translation>
     </message>
     <message>
-        <location line="-385"/>
-        <location line="+386"/>
+        <location line="-504"/>
+        <location line="+505"/>
         <source>背景图片 2</source>
         <translation>背景圖片 2</translation>
     </message>
     <message>
-        <location line="-383"/>
-        <location line="+385"/>
+        <location line="-502"/>
+        <location line="+504"/>
         <source>按钮高级属性</source>
         <translation>按鈕高級屬性</translation>
     </message>
     <message>
-        <location line="-378"/>
-        <location line="+380"/>
+        <location line="-497"/>
+        <location line="+499"/>
         <source>悬停音效</source>
         <translation>懸停音效</translation>
     </message>
     <message>
-        <location line="-379"/>
-        <location line="+380"/>
+        <location line="-498"/>
+        <location line="+499"/>
         <source>动画帧</source>
         <translation>動畫幀</translation>
     </message>
     <message>
-        <location line="-377"/>
-        <location line="+379"/>
+        <location line="-496"/>
+        <location line="+506"/>
         <source>标签高级属性</source>
         <translation>標簽高級屬性</translation>
     </message>
     <message>
-        <location line="-374"/>
-        <location line="+376"/>
+        <location line="-501"/>
+        <location line="+503"/>
         <source>自动缩小</source>
         <translation>自動縮小</translation>
     </message>
     <message>
-        <location line="-373"/>
-        <location line="+375"/>
+        <location line="-440"/>
+        <location line="+442"/>
         <source>圆形按钮图标</source>
         <translation>圓形按鈕圖標</translation>
     </message>
     <message>
-        <location line="-368"/>
-        <location line="+370"/>
+        <location line="-435"/>
+        <location line="+437"/>
         <source>图标名称</source>
         <translation>圖標名稱</translation>
     </message>
     <message>
-        <location line="-369"/>
-        <location line="+370"/>
+        <location line="-436"/>
+        <location line="+437"/>
         <source>图标图片</source>
         <translation>圖標圖片</translation>
     </message>
     <message>
-        <location line="-113"/>
+        <location line="-172"/>
         <source>Image Files (*.mpc *.shd *.asf *.imp *.img *.pic *.png *.jpg *.jpeg *.bmp *.gif *.webp *.tga);;All Files (*)</source>
         <translation>圖片檔案 (*.mpc *.shd *.asf *.imp *.img *.pic *.png *.jpg *.jpeg *.bmp *.gif *.webp *.tga);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+18"/>
         <location line="+2"/>
         <source>Sound Files (*.wav *.mp3 *.ogg);;All Files (*)</source>
         <translation>音效檔案 (*.wav *.mp3 *.ogg);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+35"/>
         <source>INI Files (*.ini);;All Files (*)</source>
         <translation>INI 檔案 (*.ini);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="+757"/>
+        <location line="+1039"/>
         <source>添加列表项</source>
         <translation>新增清單項目</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+36"/>
+        <location line="+38"/>
         <source>项文本:</source>
         <translation>項目文字:</translation>
     </message>
@@ -1595,7 +1761,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>編輯清單項目</translation>
     </message>
     <message>
-        <location line="+125"/>
+        <location line="+133"/>
         <source>该文件不属于当前菜单可读取的资源目录。</source>
         <translation>該檔案不屬於目前選單可讀取的資源目錄。</translation>
     </message>
@@ -1615,27 +1781,30 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>該欄位僅接受選單圖片資源。</translation>
     </message>
     <message>
-        <location line="-854"/>
-        <location line="+895"/>
+        <location line="-1091"/>
+        <location line="+1133"/>
         <location line="+14"/>
         <source>选择颜色</source>
         <translation>選擇顏色</translation>
     </message>
     <message>
-        <location filename="../ui/ComponentPropertyEditor.ui" line="-1011"/>
+        <location filename="../ui/ComponentPropertyEditor.ui" line="-1010"/>
         <location line="+350"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="-1645"/>
         <source>宽度</source>
         <translation>寬度</translation>
     </message>
     <message>
         <location line="-333"/>
         <location line="+350"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="+0"/>
         <source>高度</source>
         <translation>高度</translation>
     </message>
     <message>
         <location line="-333"/>
         <location line="+350"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="-1"/>
         <source>图片</source>
         <translation>圖片</translation>
     </message>
@@ -1661,7 +1830,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>拉伸</translation>
     </message>
     <message>
-        <location line="-92"/>
+        <location line="-98"/>
+        <source>位置与尺寸</source>
+        <translation>位置與尺寸</translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>左</source>
         <translation>左</translation>
     </message>
@@ -1674,28 +1848,29 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="+61"/>
         <location line="+129"/>
         <location line="+37"/>
-        <location line="+241"/>
+        <location line="+240"/>
         <source>颜色</source>
         <translation>顏色</translation>
     </message>
     <message>
-        <location line="-374"/>
+        <location line="-373"/>
         <source>种类</source>
         <translation>種類</translation>
     </message>
     <message>
         <location line="+21"/>
-        <location line="+343"/>
+        <location line="+342"/>
         <source>音效</source>
         <translation>音效</translation>
     </message>
     <message>
-        <location line="-333"/>
+        <location line="-332"/>
         <source>抬起</source>
         <translation>抬起</translation>
     </message>
     <message>
         <location line="+14"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="+317"/>
         <source>按下</source>
         <translation>按下</translation>
     </message>
@@ -1705,18 +1880,46 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>跟蹤</translation>
     </message>
     <message>
+        <source>字体</source>
+        <translation type="vanished">字體</translation>
+    </message>
+    <message>
+        <source>样式</source>
+        <translation type="vanished">樣式</translation>
+    </message>
+    <message>
         <location line="+23"/>
         <location line="+37"/>
-        <source>字体</source>
-        <translation>字體</translation>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="-357"/>
+        <location line="+41"/>
+        <location line="+429"/>
+        <source>字体大小（像素）</source>
+        <translation>字型大小（像素）</translation>
     </message>
     <message>
-        <location line="+37"/>
-        <source>样式</source>
-        <translation>樣式</translation>
+        <location line="-6"/>
+        <source>文字</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+43"/>
+        <source>滚动方向</source>
+        <translation>捲動方向</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="-446"/>
+        <source>水平</source>
+        <translation>水平</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="+0"/>
+        <source>垂直</source>
+        <translation>垂直</translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>最小值</source>
         <translation>最小值</translation>
     </message>
@@ -1839,6 +2042,506 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="+17"/>
         <source>窗口高度</source>
         <translation>視窗高度</translation>
+    </message>
+    <message>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="-131"/>
+        <source>九宫格显示边距</source>
+        <translation>九宮格顯示邊距</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>九宫格源边距</source>
+        <translation>九宮格來源邊距</translation>
+    </message>
+    <message>
+        <source>均分正文行（true/false）</source>
+        <translation type="vanished">均分正文行（true/false）</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>悬停背景色</source>
+        <translation>懸停背景色</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>按下背景色</source>
+        <translation>按下背景色</translation>
+    </message>
+    <message>
+        <source>按钮背景色</source>
+        <translation type="vanished">按鈕背景色</translation>
+    </message>
+    <message>
+        <location line="+108"/>
+        <location line="+484"/>
+        <source>文字与显示布局</source>
+        <translation>文字與顯示配置</translation>
+    </message>
+    <message>
+        <source>文字居中（true/false）</source>
+        <translation type="vanished">文字置中（true/false）</translation>
+    </message>
+    <message>
+        <source>最小字号</source>
+        <translation type="vanished">最小字號</translation>
+    </message>
+    <message>
+        <location line="-598"/>
+        <source>正文行距</source>
+        <translation>正文行距</translation>
+    </message>
+    <message>
+        <source>留空沿用运行时默认值</source>
+        <translation type="vanished">留空沿用執行階段預設值</translation>
+    </message>
+    <message>
+        <source>窗口缩放</source>
+        <translation type="vanished">視窗縮放</translation>
+    </message>
+    <message>
+        <source>绘制格框（true/false）</source>
+        <translation type="vanished">繪製格框（true/false）</translation>
+    </message>
+    <message>
+        <source>自动换行（true/false）</source>
+        <translation type="vanished">自動換行（true/false）</translation>
+    </message>
+    <message>
+        <source>均分存档行（true/false）</source>
+        <translation type="vanished">均分存檔行（true/false）</translation>
+    </message>
+    <message>
+        <source>字号</source>
+        <translation type="vanished">字級</translation>
+    </message>
+    <message>
+        <location line="+1581"/>
+        <source>无法修改列表项</source>
+        <translation>無法修改清單項目</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>该文本无法按现有 INI 格式完整保存，请检查前后空白、换行及分号注释。</source>
+        <translation>這段文字無法使用現有 INI 格式完整儲存，請檢查前後空白、換行及分號註解。</translation>
+    </message>
+    <message>
+        <location line="-1568"/>
+        <source>内容水平内缩</source>
+        <translation>內容水平內縮</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>外边距（空白动态默认）</source>
+        <translation>外邊距（空白動態默認）</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>帮助两列间距</source>
+        <translation>幫助兩列間距</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>帮助内框颜色</source>
+        <translation>幫助內框顏色</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>帮助副标题颜色</source>
+        <translation>幫助副標題顏色</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>帮助标题与页脚颜色</source>
+        <translation>幫助標題與頁腳顏色</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>帮助标题字号</source>
+        <translation>幫助標題字號</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>帮助正文字号</source>
+        <translation>幫助正文字號</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>帮助正文附加行距</source>
+        <translation>幫助正文附加行距</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>帮助正文颜色</source>
+        <translation>幫助正文顏色</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>帮助段标题颜色</source>
+        <translation>幫助段標題顏色</translation>
+    </message>
+    <message>
+        <location line="-4"/>
+        <source>帮助示意图（空白沿用默认）</source>
+        <translation>幫助示意圖（空白沿用默認）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>帮助顶部装饰线颜色</source>
+        <translation>幫助頂部裝飾線顏色</translation>
+    </message>
+    <message>
+        <location line="+135"/>
+        <source>垂直位置</source>
+        <translation>垂直位置</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>水平位置／标题偏移</source>
+        <translation>水平位置／標題偏移</translation>
+    </message>
+    <message>
+        <location line="+1633"/>
+        <source>选色…</source>
+        <translation>選色…</translation>
+    </message>
+    <message>
+        <location line="+67"/>
+        <source>留空使用默认：%1</source>
+        <translation>留空使用預設：%1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>运行时必需图片；失效时使用回退界面</source>
+        <translation>執行時必需圖片；失效時使用回退介面</translation>
+    </message>
+    <message>
+        <location line="-1698"/>
+        <source>颜色（含透明度）</source>
+        <translation>顏色（含透明度）</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>骰子显示属性</source>
+        <translation>骰子顯示屬性</translation>
+    </message>
+    <message>
+        <location filename="../ui/ComponentPropertyEditor.ui" line="-1081"/>
+        <location line="+1010"/>
+        <source>窗口资源</source>
+        <translation>視窗資源</translation>
+    </message>
+    <message>
+        <location line="-803"/>
+        <source>资源文件</source>
+        <translation>資源檔案</translation>
+    </message>
+    <message>
+        <location filename="../ui/ComponentPropertyEditor.cpp" line="-116"/>
+        <location line="+521"/>
+        <source>高级属性</source>
+        <translation>進階屬性</translation>
+    </message>
+    <message>
+        <location line="-504"/>
+        <location line="+529"/>
+        <source>内部名称</source>
+        <translation>內部名稱</translation>
+    </message>
+    <message>
+        <location line="+65"/>
+        <location line="+807"/>
+        <source>保留原值：%1</source>
+        <translation>保留原值：%1</translation>
+    </message>
+    <message>
+        <location line="-833"/>
+        <source>不自动对齐</source>
+        <translation>不自動對齊</translation>
+    </message>
+    <message>
+        <location line="-618"/>
+        <source>自动换行</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>最小字体大小（像素）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>文字居中</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>绘制格框</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>按文本框高度分配行距</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>按列表高度分配行高</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>对话行高（像素，0为自动）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>窗口缩放（百分比）</source>
+        <translation>介面縮放（百分比）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>窗口保持宽高比</source>
+        <translation>保持介面長寬比</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>边框颜色</source>
+        <translation>邊框顏色</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>水平位置（像素）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>垂直位置（像素）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>状态条方向</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>小窗口自动缩小</source>
+        <translation>小視窗自動縮小</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>使用纯色外观</source>
+        <translation>使用純色外觀</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>滑块自动适合轨道</source>
+        <translation>滑塊自動符合軌道</translation>
+    </message>
+    <message>
+        <location line="+122"/>
+        <location line="+463"/>
+        <source>使用默认时不写入此属性；点击右侧恢复按钮可撤销该属性的自定义值</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-451"/>
+        <location line="+1316"/>
+        <source>行间距（像素）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-1004"/>
+        <source>按钮外观</source>
+        <translation>按鈕外觀</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>正常／抬起</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>鼠标悬停</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source> 像素</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>选项之间的间距</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+39"/>
+        <source>沿滚动方向，从轨道左端或上端起算。选中滚动条后，橙色虚线框标出起点和终点。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>图片帧号从0开始。三个状态的实际外观显示在下方，缺帧时按游戏规则回退。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+88"/>
+        <source>填满窗口</source>
+        <translation>填滿視窗</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>靠左</source>
+        <translation>靠左</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>靠右</source>
+        <translation>靠右</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>靠上</source>
+        <translation>靠上</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>靠下</source>
+        <translation>靠下</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>左上角</source>
+        <translation>左上角</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>右上角</source>
+        <translation>右上角</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>左下角</source>
+        <translation>左下角</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>右下角</source>
+        <translation>右下角</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>居中</source>
+        <translation>置中</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>左侧居中</source>
+        <translation>左側置中</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>右侧居中</source>
+        <translation>右側置中</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>顶部居中</source>
+        <translation>頂部置中</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>底部居中</source>
+        <translation>底部置中</translation>
+    </message>
+    <message>
+        <location line="-629"/>
+        <location line="+1467"/>
+        <source>制作名单行间距</source>
+        <translation>製作名單行間距</translation>
+    </message>
+    <message>
+        <location line="-1463"/>
+        <source>背景色（含透明度）</source>
+        <translation>背景色（含透明度）</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>对话行数（0自动）</source>
+        <translation>對話行數（0自動）</translation>
+    </message>
+    <message>
+        <source>对话行高（0自动）</source>
+        <translation type="vanished">對話行高（0自動）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>每行字符数（0自动）</source>
+        <translation>每行字元數（0自動）</translation>
+    </message>
+    <message>
+        <source>窗口保持宽高比（true/false）</source>
+        <translation type="vanished">視窗保持長寬比（true/false）</translation>
+    </message>
+    <message>
+        <source>窗口X（空白默认）</source>
+        <translation type="vanished">視窗 X（空白使用預設）</translation>
+    </message>
+    <message>
+        <source>窗口Y（空白默认）</source>
+        <translation type="vanished">視窗 Y（空白使用預設）</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>换行宽度两侧扣除</source>
+        <translation>換行寬度兩側扣除</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>顶部边线颜色</source>
+        <translation>頂部邊線色彩</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>底部边线颜色</source>
+        <translation>底部邊線色彩</translation>
+    </message>
+    <message>
+        <source>行间距</source>
+        <translation type="vanished">行間距</translation>
+    </message>
+    <message>
+        <source>水平状态条（true/false）</source>
+        <translation type="vanished">水平狀態條（true/false）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>水平填充色（alpha固定255）</source>
+        <translation>水平填色（alpha 固定255）</translation>
+    </message>
+    <message>
+        <source>适应窗口（true/false）</source>
+        <translation type="vanished">適應視窗（true/false）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>窗口水平预留</source>
+        <translation>視窗水平預留</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>窗口垂直预留</source>
+        <translation>視窗垂直預留</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>技能方向提示图片</source>
+        <translation>技能方向提示圖片</translation>
+    </message>
+    <message>
+        <source>按钮纯色背景（true/false）</source>
+        <translation type="vanished">按鈕純色背景（true/false）</translation>
     </message>
 </context>
 <context>
@@ -2158,37 +2861,44 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 <context>
     <name>DesktopRunPanel</name>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="+364"/>
-        <location line="+391"/>
+        <location filename="../ui/DesktopRunPanel.cpp" line="+450"/>
+        <location line="+448"/>
         <source>不可用</source>
         <translation>不可用</translation>
     </message>
     <message>
-        <location line="-379"/>
-        <location line="+383"/>
+        <location line="-435"/>
+        <location line="+439"/>
         <source>未配置</source>
         <translation>未設定</translation>
     </message>
     <message>
-        <location line="-379"/>
+        <location line="-433"/>
         <source>配置的桌面游戏可执行文件无效。</source>
         <translation>設定的桌面遊戲可執行檔無效。</translation>
     </message>
     <message>
-        <location line="+35"/>
-        <location line="+2"/>
-        <location line="+2"/>
-        <location line="+2"/>
+        <location line="+74"/>
+        <location line="+3"/>
+        <location line="+3"/>
+        <location line="+3"/>
         <source>正在创建私有会话……</source>
         <translation>正在建立私有工作階段……</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-39"/>
+        <location line="+49"/>
         <source>正在准备私有运行会话……</source>
         <translation>正在準備私有執行工作階段……</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="-59"/>
+        <location line="+391"/>
+        <source>正在清理上次试玩的临时文件……</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-307"/>
         <source>当前地图：%1</source>
         <translation>目前地圖：%1</translation>
     </message>
@@ -2198,7 +2908,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>目前腳本：%1</translation>
     </message>
     <message>
-        <location line="+68"/>
+        <location line="+85"/>
         <source>；退出代码 %1</source>
         <translation>；結束代碼 %1</translation>
     </message>
@@ -2208,32 +2918,28 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>；已強制終止</translation>
     </message>
     <message>
-        <location line="+14"/>
         <source>会话目录已不存在。</source>
-        <translation>工作階段目錄已不存在。</translation>
+        <translation type="vanished">工作階段目錄已不存在。</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>已删除会话目录。</source>
-        <translation>已刪除工作階段目錄。</translation>
+        <translation type="vanished">已刪除工作階段目錄。</translation>
     </message>
     <message>
-        <location line="+20"/>
         <source>清理会话失败：%1</source>
-        <translation>清理工作階段失敗：%1</translation>
+        <translation type="vanished">清理工作階段失敗：%1</translation>
     </message>
     <message>
-        <location line="+130"/>
+        <location line="+104"/>
         <source>诊断流有 %1 个问题。最新问题：%2</source>
         <translation>診斷資料流有 %1 個問題。最新問題：%2</translation>
     </message>
     <message>
-        <location line="+10"/>
         <source>下次运行场景：</source>
         <translation type="vanished">下次執行場景：</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+61"/>
         <source>下次运行 Game.Id：</source>
         <translation>下次執行 Game.Id：</translation>
     </message>
@@ -2248,7 +2954,6 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>目前執行 Game.Id：</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>游戏可执行文件：</source>
         <translation type="vanished">遊戲可執行檔：</translation>
     </message>
@@ -2263,47 +2968,44 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>覆蓋層目錄：</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>运行会话：</source>
         <translation type="vanished">執行工作階段：</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-17"/>
         <source>状态：</source>
         <translation>狀態：</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+18"/>
         <source>准备进度：</source>
         <translation>準備進度：</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-17"/>
         <source>结果：</source>
         <translation>結果：</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+53"/>
         <source>选择……</source>
         <translation>選擇……</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>运行场景</source>
-        <translation>執行場景</translation>
+        <translation type="vanished">執行場景</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+2"/>
         <source>停止</source>
         <translation>停止</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>清理会话</source>
-        <translation>清理工作階段</translation>
+        <translation type="vanished">清理工作階段</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+19"/>
         <location line="+7"/>
         <location line="+7"/>
         <location line="+7"/>
@@ -2311,7 +3013,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>尚未建立</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+5"/>
         <source>输出</source>
         <translation>輸出</translation>
     </message>
@@ -2321,14 +3023,13 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>診斷</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>空闲</source>
         <translation>閒置</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>正在发现保留的会话</source>
-        <translation>正在尋找保留的工作階段</translation>
+        <translation type="vanished">正在尋找保留的工作階段</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2351,9 +3052,8 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>正在停止</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>正在清理保留的会话</source>
-        <translation>正在清理保留的工作階段</translation>
+        <translation type="vanished">正在清理保留的工作階段</translation>
     </message>
     <message>
         <location line="+2"/>
@@ -2411,50 +3111,571 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>[編輯器已截斷此段輸出]</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="427"/>
+        <location line="-632"/>
+        <location line="+166"/>
         <source>未命名场景</source>
         <translation>未命名場景</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="441"/>
+        <location line="-154"/>
+        <location line="+174"/>
         <source>场景 ID：%1</source>
         <translation>場景 ID：%1</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="730"/>
         <source>保留会话 %1</source>
-        <translation>保留工作階段 %1</translation>
+        <translation type="vanished">保留工作階段 %1</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="745"/>
         <source>会话 ID：%1</source>
-        <translation>工作階段 ID：%1</translation>
+        <translation type="vanished">工作階段 ID：%1</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="922"/>
         <source>场景：</source>
-        <translation>場景：</translation>
+        <translation type="vanished">場景：</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="923"/>
+        <location line="+245"/>
         <source>游戏程序：</source>
         <translation>遊戲程式：</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="932"/>
         <source>会话记录：</source>
-        <translation>工作階段記錄：</translation>
+        <translation type="vanished">工作階段記錄：</translation>
     </message>
     <message>
-        <location filename="../ui/DesktopRunPanel.cpp" line="971"/>
+        <location line="+39"/>
         <source>日志与详细信息</source>
         <translation>日誌與詳細資訊</translation>
+    </message>
+    <message>
+        <location line="-62"/>
+        <source>转到问题（%1）</source>
+        <translation>前往問題（%1）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>查看问题（%1）</source>
+        <translation>檢視問題（%1）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>回到编辑器中的第一个问题位置</source>
+        <translation>回到編輯器中的第一個問題位置</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>展开详细信息查看试玩问题</source>
+        <translation>展開詳細資訊檢視試玩問題</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>目标：</source>
+        <translation>目標：</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>请先打开项目</source>
+        <translation>請先開啟專案</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>场景选择：</source>
+        <translation>場景選擇：</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>试玩</source>
+        <translation>試玩</translation>
+    </message>
+</context>
+<context>
+    <name>DialogueEditorWindow</name>
+    <message>
+        <location filename="../ui/DialogueEditorWindow.cpp" line="+696"/>
+        <source>%1
+%2</source>
+        <translation>%1
+%2</translation>
+    </message>
+    <message>
+        <location line="+174"/>
+        <source>%1
+%2×%3，%4 帧</source>
+        <translation>%1
+%2×%3，%4 幀</translation>
+    </message>
+    <message>
+        <location line="-122"/>
+        <source>%1 · %2 句</source>
+        <translation>%1 · %2 句</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>%1. %2：%3</source>
+        <translation>%1. %2：%3</translation>
+    </message>
+    <message>
+        <location line="-137"/>
+        <source>不显示头像</source>
+        <translation>不顯示頭像</translation>
+    </message>
+    <message>
+        <location line="+295"/>
+        <source>从脚本或 NPC 进入时，可在这里返回调用位置。</source>
+        <translation>從腳本或 NPC 進入時，可在這裡返回呼叫位置。</translation>
+    </message>
+    <message>
+        <location line="-292"/>
+        <source>使用头像文件</source>
+        <translation>使用頭像檔案</translation>
+    </message>
+    <message>
+        <location line="-51"/>
+        <source>保存</source>
+        <translation>儲存</translation>
+    </message>
+    <message>
+        <location line="-382"/>
+        <source>保存失败</source>
+        <translation>儲存失敗</translation>
+    </message>
+    <message>
+        <location line="+383"/>
+        <source>保存当前对话</source>
+        <translation>儲存目前對話</translation>
+    </message>
+    <message>
+        <location line="-277"/>
+        <location line="+628"/>
+        <source>保存更改</source>
+        <translation>儲存變更</translation>
+    </message>
+    <message>
+        <location line="-239"/>
+        <source>修改对话</source>
+        <translation>修改對話</translation>
+    </message>
+    <message>
+        <location line="-358"/>
+        <source>切换项目资源</source>
+        <translation>切換專案資源</translation>
+    </message>
+    <message>
+        <location line="+252"/>
+        <source>回到打开这段对话的脚本行</source>
+        <translation>回到開啟這段對話的腳本行</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>头像</source>
+        <translation>頭像</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>头像文件</source>
+        <translation>頭像檔案</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>头像预览</source>
+        <translation>頭像預覽</translation>
+    </message>
+    <message>
+        <location line="+250"/>
+        <source>本句沿用同侧上一句
+该句不显示头像</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+54"/>
+        <source>完成后可返回打开这段对话的脚本位置。</source>
+        <translation>完成後可返回開啟這段對話的腳本位置。</translation>
+    </message>
+    <message>
+        <location line="-10"/>
+        <source>对话 - %1%2</source>
+        <translation>對話 - %1%2</translation>
+    </message>
+    <message>
+        <location line="-607"/>
+        <location line="+628"/>
+        <source>对话“%1”已修改，是否保存？</source>
+        <translation>對話「%1」已修改，是否儲存？</translation>
+    </message>
+    <message>
+        <location line="-776"/>
+        <source>对话文件中没有“%1”，已打开文件供你选择其他段落。</source>
+        <translation>對話檔案中沒有「%1」，已開啟檔案供你選擇其他段落。</translation>
+    </message>
+    <message>
+        <location line="+436"/>
+        <source>对话段落</source>
+        <translation>對話段落</translation>
+    </message>
+    <message>
+        <location line="+219"/>
+        <source>尚未打开对话文件</source>
+        <translation>尚未開啟對話檔案</translation>
+    </message>
+    <message>
+        <location line="-214"/>
+        <source>当前一句</source>
+        <translation>目前一句</translation>
+    </message>
+    <message>
+        <location line="-262"/>
+        <source>当前对话已修改。切换项目资源前是否保存？</source>
+        <translation>目前對話已修改。切換專案資源前是否儲存？</translation>
+    </message>
+    <message>
+        <location line="+252"/>
+        <source>搜索段落或对话内容</source>
+        <translation>搜尋段落或對話內容</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>撤销</source>
+        <translation>復原</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>文本</source>
+        <translation>文字</translation>
+    </message>
+    <message>
+        <location line="+157"/>
+        <source>旁白</source>
+        <translation>旁白</translation>
+    </message>
+    <message>
+        <location line="-564"/>
+        <source>无法保存当前对话：
+%1
+
+%2</source>
+        <translation>無法儲存目前對話：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="-59"/>
+        <source>无法打开对话</source>
+        <translation>無法開啟對話</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法读取对话文件：
+%1
+
+%2</source>
+        <translation>無法讀取對話檔案：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>未找到对话段落</source>
+        <translation>找不到對話段落</translation>
+    </message>
+    <message>
+        <location line="+748"/>
+        <source>未找到预览
+可继续保存引用</source>
+        <translation>找不到預覽
+仍可儲存引用</translation>
+    </message>
+    <message>
+        <location line="-91"/>
+        <source>未显示的 %1 个字段和原有注释会在保存时保留。</source>
+        <translation>未顯示的 %1 個欄位和原有註解會在儲存時保留。</translation>
+    </message>
+    <message>
+        <location line="-585"/>
+        <source>未选择段落</source>
+        <translation>未選擇段落</translation>
+    </message>
+    <message>
+        <location line="+626"/>
+        <source>本句不显示头像</source>
+        <translation>本句不顯示頭像</translation>
+    </message>
+    <message>
+        <source>本句沿用上一句头像</source>
+        <translation type="vanished">本句沿用上一句頭像</translation>
+    </message>
+    <message>
+        <source>沿用上一句</source>
+        <translation type="vanished">沿用上一句</translation>
+    </message>
+    <message>
+        <source>用当前修改进入项目默认场景</source>
+        <translation type="vanished">使用目前修改進入專案預設場景</translation>
+    </message>
+    <message>
+        <location line="-270"/>
+        <source>试玩当前对话</source>
+        <translation>試玩目前對話</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>说话人</source>
+        <translation>說話人</translation>
+    </message>
+    <message>
+        <location line="+280"/>
+        <source>请选择头像</source>
+        <translation>請選擇頭像</translation>
+    </message>
+    <message>
+        <location line="-113"/>
+        <source>请选择对话段落</source>
+        <translation>請選擇對話段落</translation>
+    </message>
+    <message>
+        <location line="-184"/>
+        <source>返回调用位置</source>
+        <translation>返回呼叫位置</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>重做</source>
+        <translation>重做</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>进入匹配地图并直接显示当前段落</source>
+        <translation>進入相符地圖並直接顯示目前段落</translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>沿用同侧上一句（通常为上上句）</source>
+        <translation>沿用同側上一句（通常為上上句）</translation>
+    </message>
+    <message>
+        <location line="+244"/>
+        <source>同侧此前没有可沿用的头像</source>
+        <translation>同側此前沒有可沿用的頭像</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>沿用第 %1 句头像</source>
+        <translation>沿用第 %1 句頭像</translation>
+    </message>
+    <message>
+        <source>
+公共脚本或动态调用可能使用此段落，请先查看引用。</source>
+        <translation>
+公共腳本或動態呼叫可能使用此段落，請先查看引用。</translation>
+    </message>
+    <message>
+        <source>上移</source>
+        <translation>上移</translation>
+    </message>
+    <message>
+        <source>下移</source>
+        <translation>下移</translation>
+    </message>
+    <message>
+        <source>创建调用脚本</source>
+        <translation>建立呼叫腳本</translation>
+    </message>
+    <message>
+        <source>删除</source>
+        <translation>刪除</translation>
+    </message>
+    <message>
+        <source>删除当前一句；段落至少保留一句，可通过撤销恢复。</source>
+        <translation>刪除目前一句；段落至少保留一句，可透過復原恢復。</translation>
+    </message>
+    <message>
+        <source>删除当前段落及其全部台词，可通过撤销恢复。是否继续？</source>
+        <translation>刪除目前段落及其全部台詞，可透過復原恢復。是否繼續？</translation>
+    </message>
+    <message>
+        <source>删除段落</source>
+        <translation>刪除段落</translation>
+    </message>
+    <message>
+        <source>删除段落…</source>
+        <translation>刪除段落…</translation>
+    </message>
+    <message>
+        <source>副本</source>
+        <translation>副本</translation>
+    </message>
+    <message>
+        <source>复制段落</source>
+        <translation>複製段落</translation>
+    </message>
+    <message>
+        <source>将保存对话，并更新同地图下 %1 处明确调用。其它地图和动态调用不改写，是否继续？</source>
+        <translation>將儲存對話，並更新同地圖下 %1 處明確呼叫。其他地圖和動態呼叫不改寫，是否繼續？</translation>
+    </message>
+    <message>
+        <source>插入台词</source>
+        <translation>插入台詞</translation>
+    </message>
+    <message>
+        <source>新台词</source>
+        <translation>新台詞</translation>
+    </message>
+    <message>
+        <source>新建段落</source>
+        <translation>新增段落</translation>
+    </message>
+    <message>
+        <source>新段落名称</source>
+        <translation>新段落名稱</translation>
+    </message>
+    <message>
+        <source>无法写入当前项目的对话目录。</source>
+        <translation>無法寫入目前專案的對話目錄。</translation>
+    </message>
+    <message>
+        <source>无法删除段落</source>
+        <translation>無法刪除段落</translation>
+    </message>
+    <message>
+        <source>无法复制段落</source>
+        <translation>無法複製段落</translation>
+    </message>
+    <message>
+        <source>无法新建段落</source>
+        <translation>無法新增段落</translation>
+    </message>
+    <message>
+        <source>无法调整台词</source>
+        <translation>無法調整台詞</translation>
+    </message>
+    <message>
+        <source>无法调整台词。段落至少保留一句；含不连续编号的旧段落须先整理编号。</source>
+        <translation>無法調整台詞。段落至少保留一句；含不連續編號的舊段落須先整理編號。</translation>
+    </message>
+    <message>
+        <source>无法重命名段落</source>
+        <translation>無法重新命名段落</translation>
+    </message>
+    <message>
+        <source>更多操作…</source>
+        <translation>更多操作…</translation>
+    </message>
+    <message>
+        <source>查看引用…</source>
+        <translation>查看引用…</translation>
+    </message>
+    <message>
+        <source>段落仍被引用，或部分文件无法读取，请先查看并处理引用。</source>
+        <translation>段落仍被引用，或部分檔案無法讀取，請先查看並處理引用。</translation>
+    </message>
+    <message>
+        <source>段落名称不能为空、不能重复，也不能使用 name、方括号或换行。</source>
+        <translation>段落名稱不能為空、不能重複，也不能使用 name、方括號或換行。</translation>
+    </message>
+    <message>
+        <source>段落名称（供脚本选择）</source>
+        <translation>段落名稱（供腳本選擇）</translation>
+    </message>
+    <message>
+        <source>确认重命名</source>
+        <translation>確認重新命名</translation>
+    </message>
+    <message>
+        <source>调整台词</source>
+        <translation>調整台詞</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，不能安全更新引用，请先查看引用。</source>
+        <translation>部分檔案無法讀取，不能安全更新引用，請先查看引用。</translation>
+    </message>
+    <message>
+        <source>重命名段落</source>
+        <translation>重新命名段落</translation>
+    </message>
+    <message>
+        <source>重命名段落…</source>
+        <translation>重新命名段落…</translation>
+    </message>
+    <message>
+        <source>地图：%1。可在“更多操作”中创建调用脚本；脚本须在这张地图运行。</source>
+        <translation>地圖：%1。可在「更多操作」中建立呼叫腳本；腳本須在這張地圖執行。</translation>
+    </message>
+    <message>
+        <source>点击“新建段落”开始编写对话。</source>
+        <translation>按「新增段落」開始編寫對話。</translation>
+    </message>
+    <message>
+        <source>将保存对话，并更新同地图下 %1 处明确调用。公共脚本及动态调用须先检查，不会自动改写。是否继续？</source>
+        <translation>將儲存對話，並更新同地圖下 %1 處明確呼叫。公共腳本及動態呼叫須先檢查，不會自動改寫。是否繼續？</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，未更新引用。</source>
+        <translation>部分文件無法讀取，未更新引用。</translation>
+    </message>
+</context>
+<context>
+    <name>DisplayPropertyEditor</name>
+    <message>
+        <location filename="../ui/DisplayPropertyEditor.cpp" line="+70"/>
+        <location line="+26"/>
+        <location line="+107"/>
+        <source>使用默认</source>
+        <translation>使用預設</translation>
+    </message>
+    <message>
+        <location line="-132"/>
+        <source>开启</source>
+        <translation>開啟</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>关闭</source>
+        <translation>關閉</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>选择颜色</source>
+        <translation>選擇顏色</translation>
+    </message>
+    <message>
+        <location line="+47"/>
+        <source>恢复默认值</source>
+        <translation>還原預設值</translation>
+    </message>
+    <message>
+        <location line="+68"/>
+        <location line="+6"/>
+        <source>默认：%1</source>
+        <translation>預設：%1</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <location line="+14"/>
+        <source>配置值无效：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-9"/>
+        <source>使用默认（点击设置）</source>
+        <translation>使用預設（點擊設定）</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>默认颜色</source>
+        <translation>預設顏色</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>选择颜色…</source>
+        <translation>選擇顏色…</translation>
     </message>
 </context>
 <context>
     <name>DurableFileTransaction</name>
     <message>
-        <location filename="../core/DurableFileTransaction.cpp" line="+66"/>
+        <location filename="../core/DurableFileTransaction.cpp" line="+65"/>
         <source>事务清理路径越界: %1</source>
         <translation>交易清理路徑越界: %1</translation>
     </message>
@@ -2479,7 +3700,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法清理已提交的交易目錄: %1</translation>
     </message>
     <message>
-        <location line="+92"/>
+        <location line="+94"/>
         <source>无法读取事务清单: %1</source>
         <translation>無法讀取交易清單: %1</translation>
     </message>
@@ -2569,17 +3790,15 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>檔案版本已恢復，但無法清理交易目錄: %1</translation>
     </message>
     <message>
-        <location line="+53"/>
         <source>无法创建全局事务屏障目录: %1</source>
-        <translation>無法建立全域交易屏障目錄：%1</translation>
+        <translation type="vanished">無法建立全域交易屏障目錄：%1</translation>
     </message>
     <message>
-        <location line="+10"/>
         <source>另一个编辑器正在保存或恢复资源</source>
-        <translation>另一個編輯器正在儲存或復原資源</translation>
+        <translation type="vanished">另一個編輯器正在儲存或復原資源</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+38"/>
         <source>事务目录越过资源根: %1</source>
         <translation>交易目錄越過資源根目錄: %1</translation>
     </message>
@@ -2594,47 +3813,77 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>交易目錄包含未知檔案: %1</translation>
     </message>
     <message>
-        <location filename="../core/DurableFileTransaction.cpp" line="628"/>
+        <location line="+174"/>
         <source>资源目录正在进行其他写入</source>
         <translation>資源目錄正在進行其他寫入</translation>
     </message>
     <message>
-        <location line="+7"/>
-        <location line="+457"/>
+        <location line="-83"/>
+        <location line="+90"/>
+        <location line="+476"/>
         <source>事务资源根无效: %1</source>
         <translation>交易資源根目錄無效: %1</translation>
     </message>
     <message>
-        <location line="-443"/>
-        <location line="+461"/>
+        <location line="-611"/>
+        <source>在线资源正在更新，无法恢复事务目标: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>无法规范化事务资源根: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <location line="+556"/>
+        <source>在线资源正在更新，无法恢复并锁定资源目录: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-546"/>
+        <location line="+71"/>
+        <location line="+485"/>
         <source>无法创建事务锁目录: %1</source>
         <translation>無法建立交易鎖定目錄: %1</translation>
     </message>
     <message>
-        <location line="-451"/>
-        <location line="+460"/>
+        <location line="-547"/>
+        <location line="+71"/>
+        <location line="+485"/>
         <source>另一个编辑器正在保存或恢复该资源目录: %1</source>
         <translation>另一個編輯器正在儲存或恢復此資源目錄: %1</translation>
     </message>
     <message>
-        <location line="-448"/>
+        <location line="-473"/>
+        <source>无法锁定待恢复事务的在线资源:
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>存在无法恢复的旧事务:
 %1</source>
         <translation>存在無法恢復的舊交易:
 %1</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+11"/>
         <source>无法创建事务暂存目录: %1</source>
         <translation>無法建立交易暫存目錄: %1</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+25"/>
         <source>事务目标越过资源根: %1</source>
         <translation>交易目標越過資源根目錄: %1</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+7"/>
+        <source>在线资源正在更新，无法写入事务目标: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>事务包含重复目标: %1</source>
         <translation>交易包含重複目標: %1</translation>
     </message>
@@ -2649,7 +3898,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>測試故障注入模擬檔案操作失敗</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="+34"/>
+        <source>在线资源正在更新，无法搬运事务暂存源: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
         <source>事务暂存源不存在: %1</source>
         <translation>交易暫存來源不存在: %1</translation>
     </message>
@@ -2704,7 +3958,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+30"/>
         <source>无法备份原文件: %1</source>
         <translation>無法備份原始檔案: %1</translation>
     </message>
@@ -2726,12 +3980,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+50"/>
+        <location line="+48"/>
         <source>资源目录正在进行其他读写，无法恢复并锁定资源</source>
         <translation>資源目錄正在進行其他讀寫，無法復原並鎖定資源</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+53"/>
         <source>无法将事务恢复锁切换为资源读取锁</source>
         <translation>無法將交易復原鎖切換為資源讀取鎖</translation>
     </message>
@@ -3489,9 +4743,8 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>唯讀共用資源 — %1</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>只读路径依赖 %1 — %2</source>
-        <translation>唯讀路徑相依 %1 — %2</translation>
+        <translation type="vanished">唯讀路徑相依 %1 — %2</translation>
     </message>
     <message>
         <location line="+3"/>
@@ -3584,22 +4837,22 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+25"/>
-        <location line="+178"/>
-        <location line="+491"/>
+        <location line="+183"/>
+        <location line="+509"/>
         <source>路径未配置</source>
         <translation>路徑未設定</translation>
     </message>
     <message>
-        <location line="-668"/>
-        <location line="+178"/>
-        <location line="+491"/>
+        <location line="-691"/>
+        <location line="+183"/>
+        <location line="+509"/>
         <source>assets 根目录未设置或不存在，无法选择文件。
 请先打开项目以设置 assets 路径。</source>
         <translation>assets 根目錄未設定或不存在，無法選擇檔案。
 請先開啟專案以設定 assets 路徑。</translation>
     </message>
     <message>
-        <location line="-659"/>
+        <location line="-682"/>
         <source>文件事务恢复失败</source>
         <translation>檔案交易恢復失敗</translation>
     </message>
@@ -3611,15 +4864,15 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+37"/>
         <location line="+15"/>
-        <location line="+157"/>
-        <location line="+475"/>
+        <location line="+158"/>
+        <location line="+495"/>
         <source>文件范围限制</source>
         <translation>檔案範圍限制</translation>
     </message>
     <message>
-        <location line="-646"/>
+        <location line="-667"/>
         <source>所选文件不在当前选择的资源根的逻辑路径范围内，或无法生成安全的相对资源路径。
 
 资源根：%1
@@ -3635,8 +4888,8 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>所選路徑不是可讀取的檔案、不在此欄位對應的邏輯資源目錄內，或無法產生安全的相對資源路徑。</translation>
     </message>
     <message>
-        <location line="+157"/>
-        <location line="+475"/>
+        <location line="+158"/>
+        <location line="+495"/>
         <source>所选路径不是可读取的文件、不在该字段对应的逻辑资源目录内，或无法生成安全的相对资源路径。
 
 字段资源目录: %1
@@ -3647,19 +4900,28 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 檔案路徑：%2</translation>
     </message>
     <message>
-        <location line="-319"/>
+        <location line="-333"/>
         <source>来源或目标路径无效。</source>
         <translation>來源或目標路徑無效。</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+15"/>
+        <source>资源包正在更新或进行其他写入</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>来源文件不存在。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>本地覆盖文件已存在。</source>
         <translation>本機覆寫檔案已存在。</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>资源目录正在进行其他写入</source>
-        <translation>資源目錄正在進行其他寫入。</translation>
+        <translation type="vanished">資源目錄正在進行其他寫入。</translation>
     </message>
     <message>
         <location line="+6"/>
@@ -3667,7 +4929,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法建立目標目錄。</translation>
     </message>
     <message>
-        <location line="+118"/>
+        <location line="+121"/>
         <location line="+27"/>
         <location line="+88"/>
         <source>...</source>
@@ -3693,15 +4955,73 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="-87"/>
         <location line="+5"/>
         <location line="+82"/>
-        <location line="+20"/>
+        <location line="+21"/>
         <source>追加选择文件</source>
         <translation>追加選擇檔案</translation>
+    </message>
+    <message>
+        <source>打开已绑定的脚本</source>
+        <translation>開啟已繫結的指令碼</translation>
+    </message>
+    <message>
+        <source>新建并绑定脚本</source>
+        <translation>新建並繫結指令碼</translation>
+    </message>
+    <message>
+        <source>新建脚本</source>
+        <translation>新建指令碼</translation>
+    </message>
+    <message>
+        <source>无法创建脚本</source>
+        <translation>無法建立指令碼</translation>
+    </message>
+    <message>
+        <source>编辑</source>
+        <translation>編輯</translation>
+    </message>
+    <message>
+        <source>脚本名称</source>
+        <translation>指令碼名稱</translation>
+    </message>
+    <message>
+        <source>脚本未找到</source>
+        <translation>指令碼未找到</translation>
+    </message>
+    <message>
+        <source>请先选择已有脚本，或点击“新建脚本”。</source>
+        <translation>請先選擇已有指令碼，或點選“新建指令碼”。</translation>
+    </message>
+    <message>
+        <source>%1
+%2×%3，%4帧</source>
+        <translation>%1
+%2×%3，%4幀</translation>
+    </message>
+    <message>
+        <source>搜索文件名或路径…</source>
+        <translation>搜索文件名或路徑…</translation>
+    </message>
+    <message>
+        <source>无法查找资源</source>
+        <translation>無法查找資源</translation>
+    </message>
+    <message>
+        <source>查找资源</source>
+        <translation>查找資源</translation>
+    </message>
+    <message>
+        <source>没有匹配的资源，请换一个文件名或路径。</source>
+        <translation>沒有匹配的資源，請換一個文件名或路徑。</translation>
+    </message>
+    <message>
+        <source>输入文件名或路径。项目和基础内容一起查找，同名文件只显示当前生效版本。</source>
+        <translation>輸入文件名或路徑。項目和基礎內容一起查找，同名文件只顯示當前生效版本。</translation>
     </message>
 </context>
 <context>
     <name>FindReplaceBar</name>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="+406"/>
+        <location filename="../ui/ScriptEditorWindow.cpp" line="+407"/>
         <location line="+59"/>
         <source>查找:</source>
         <translation>尋找:</translation>
@@ -3794,6 +5114,919 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="-24"/>
         <source>正则表达式不能匹配空字符串</source>
         <translation>正規表示式不得比對空字串</translation>
+    </message>
+</context>
+<context>
+    <name>GoodsShopEditorWindow</name>
+    <message>
+        <location filename="../ui/GoodsShopEditorWindow.cpp" line="+165"/>
+        <source>无法打开物品</source>
+        <translation>無法開啟物品</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法读取物品文件：
+%1
+
+%2</source>
+        <translation>無法读取物品檔案：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>无法打开商店</source>
+        <translation>無法開啟商店</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法读取商店货单：
+%1
+
+%2</source>
+        <translation>無法读取商店貨單：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>保存失败</source>
+        <translation>儲存失败</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法保存当前内容：
+%1
+
+%2</source>
+        <translation>無法儲存目前內容：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>当前没有可复制的物品。</source>
+        <translation>目前没有可複製的物品。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>新物品必须保存到当前项目的物品目录。</source>
+        <translation>新物品必须儲存到目前專案的物品目錄。</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>目标文件已经存在，请换一个文件名。</source>
+        <translation>目標檔案已经存在，请换一个檔案名。</translation>
+    </message>
+    <message>
+        <location line="+96"/>
+        <location line="+1122"/>
+        <source>保存更改</source>
+        <translation>儲存更改</translation>
+    </message>
+    <message>
+        <location line="-1120"/>
+        <location line="+1122"/>
+        <source>物品“%1”已修改，是否保存？</source>
+        <translation>物品“%1”已修改，是否儲存？</translation>
+    </message>
+    <message>
+        <location line="-1121"/>
+        <location line="+1122"/>
+        <source>商店“%1”已修改，是否保存？</source>
+        <translation>商店“%1”已修改，是否儲存？</translation>
+    </message>
+    <message>
+        <location line="-1092"/>
+        <source>切换项目资源</source>
+        <translation>切换專案資源</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>当前物品或商店已修改。切换项目资源前是否保存？</source>
+        <translation>目前物品或商店已修改。切换專案資源前是否儲存？</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>修改物品说明</source>
+        <translation>修改物品說明</translation>
+    </message>
+    <message>
+        <location line="+55"/>
+        <location line="+1213"/>
+        <source>物品与商店</source>
+        <translation>物品與商店</translation>
+    </message>
+    <message>
+        <location line="-1196"/>
+        <location line="+1202"/>
+        <source>加入当前商店</source>
+        <translation>加入目前商店</translation>
+    </message>
+    <message>
+        <location line="-1197"/>
+        <location line="+1205"/>
+        <source>单击选择；双击打开物品资料。编辑商店时可把选中物品加入货单。</source>
+        <translation>按一下選擇；按兩下開啟物品资料。編輯商店时可把选中物品加入貨單。</translation>
+    </message>
+    <message>
+        <location line="-1189"/>
+        <location line="+1191"/>
+        <source>双击或按 Enter 打开商店货单。</source>
+        <translation>按兩下或按 Enter 開啟商店貨單。</translation>
+    </message>
+    <message>
+        <location line="-1186"/>
+        <location line="+715"/>
+        <location line="+465"/>
+        <location line="+93"/>
+        <source>物品</source>
+        <translation>物品</translation>
+    </message>
+    <message>
+        <location line="-1272"/>
+        <location line="+1180"/>
+        <source>商店</source>
+        <translation>商店</translation>
+    </message>
+    <message>
+        <location line="-1169"/>
+        <location line="+1224"/>
+        <source>物品信息</source>
+        <translation>物品信息</translation>
+    </message>
+    <message>
+        <location line="-1210"/>
+        <location line="+1191"/>
+        <source>名称</source>
+        <translation>名稱</translation>
+    </message>
+    <message>
+        <location line="-1188"/>
+        <location line="+1189"/>
+        <source>类型</source>
+        <translation>類型</translation>
+    </message>
+    <message>
+        <location line="-1186"/>
+        <location line="+1187"/>
+        <source>说明</source>
+        <translation>說明</translation>
+    </message>
+    <message>
+        <location line="-1184"/>
+        <location line="+1185"/>
+        <source>游戏内效果文字</source>
+        <translation>遊戲内效果文字</translation>
+    </message>
+    <message>
+        <location line="-1180"/>
+        <location line="+1197"/>
+        <source>价格</source>
+        <translation>價格</translation>
+    </message>
+    <message>
+        <location line="-1190"/>
+        <location line="+1174"/>
+        <source>基础价格</source>
+        <translation>基礎價格</translation>
+    </message>
+    <message>
+        <location line="-1171"/>
+        <location line="+1172"/>
+        <source>回收价格</source>
+        <translation>回收價格</translation>
+    </message>
+    <message>
+        <location line="-1168"/>
+        <location line="+1169"/>
+        <source>回收价格为 0 时由游戏按基础价格计算；商店比例在商店货单中调整。</source>
+        <translation>回收價格为 0 时由遊戲按基礎價格計算；商店比例在商店貨單中調整。</translation>
+    </message>
+    <message>
+        <location line="-1162"/>
+        <location line="+1177"/>
+        <source>使用或装备效果</source>
+        <translation>使用或裝備效果</translation>
+    </message>
+    <message>
+        <location line="-1165"/>
+        <source>恢复生命</source>
+        <translation>恢復生命</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>恢复体力</source>
+        <translation>恢復體力</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>恢复内力</source>
+        <translation>恢復內力</translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>装备位置</source>
+        <translation>裝備位置</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>生命上限</source>
+        <translation>生命上限</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>体力上限</source>
+        <translation>體力上限</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>内力上限</source>
+        <translation>內力上限</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>攻击</source>
+        <translation>攻擊</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>防御</source>
+        <translation>防禦</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>闪避</source>
+        <translation>閃避</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <location line="+1116"/>
+        <source>这类物品的脚本和其它高级效果会保持原样；第一版不把它们展开为技术字段。</source>
+        <translation>這類物品的指令碼和其他進階效果会保持原樣；第一版不把它们展开为技術欄位。</translation>
+    </message>
+    <message>
+        <location line="-1106"/>
+        <location line="+1121"/>
+        <source>图片预览</source>
+        <translation>圖片預覽</translation>
+    </message>
+    <message>
+        <location line="-1117"/>
+        <location line="+1136"/>
+        <source>物品图片</source>
+        <translation>物品圖片</translation>
+    </message>
+    <message>
+        <location line="-1133"/>
+        <location line="+1133"/>
+        <source>背包图标</source>
+        <translation>背包圖示</translation>
+    </message>
+    <message>
+        <location line="-1106"/>
+        <location line="+1110"/>
+        <source>选择…</source>
+        <translation>選擇…</translation>
+    </message>
+    <message>
+        <location line="-1101"/>
+        <source>修改%1</source>
+        <translation>修改%1</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <location line="+1066"/>
+        <source>商店设置</source>
+        <translation>商店設定</translation>
+    </message>
+    <message>
+        <location line="-1062"/>
+        <location line="+1086"/>
+        <source>启用有限库存</source>
+        <translation>啟用有限庫存</translation>
+    </message>
+    <message>
+        <location line="-1074"/>
+        <location line="+1035"/>
+        <source>出售价格比例</source>
+        <translation>售出價格比例</translation>
+    </message>
+    <message>
+        <location line="-1032"/>
+        <location line="+1033"/>
+        <source>回收价格比例</source>
+        <translation>回收價格比例</translation>
+    </message>
+    <message>
+        <location line="-1029"/>
+        <location line="+1030"/>
+        <source>100% 表示使用物品本身的价格；这里只调整比例，不模拟整套经济。</source>
+        <translation>100% 表示使用物品本身的價格；這裡只調整比例，不模拟整套经济。</translation>
+    </message>
+    <message>
+        <location line="-1023"/>
+        <location line="+1037"/>
+        <source>货单内容</source>
+        <translation>貨單內容</translation>
+    </message>
+    <message>
+        <location line="-1033"/>
+        <location line="+1020"/>
+        <source>从左侧物品库选择后加入。表格顺序就是游戏中的商店顺序。</source>
+        <translation>從左侧物品库選擇後加入。表格順序就是遊戲中的商店順序。</translation>
+    </message>
+    <message>
+        <location line="-998"/>
+        <location line="+246"/>
+        <location line="+790"/>
+        <source>移出商店</source>
+        <translation>移出商店</translation>
+    </message>
+    <message>
+        <location line="-1034"/>
+        <location line="+1036"/>
+        <source>上移</source>
+        <translation>上移</translation>
+    </message>
+    <message>
+        <location line="-1034"/>
+        <location line="+1036"/>
+        <source>下移</source>
+        <translation>下移</translation>
+    </message>
+    <message>
+        <location line="-1027"/>
+        <location line="+999"/>
+        <source>当前物品预览</source>
+        <translation>目前物品預覽</translation>
+    </message>
+    <message>
+        <location line="-975"/>
+        <location line="+886"/>
+        <source>保存</source>
+        <translation>儲存</translation>
+    </message>
+    <message>
+        <location line="-882"/>
+        <location line="+884"/>
+        <source>撤销</source>
+        <translation>復原</translation>
+    </message>
+    <message>
+        <location line="-881"/>
+        <location line="+883"/>
+        <source>重做</source>
+        <translation>重做</translation>
+    </message>
+    <message>
+        <location line="-877"/>
+        <location line="+879"/>
+        <source>复制物品…</source>
+        <translation>複製物品…</translation>
+    </message>
+    <message>
+        <location line="-877"/>
+        <location line="+880"/>
+        <source>试玩当前内容</source>
+        <translation>試玩目前內容</translation>
+    </message>
+    <message>
+        <location line="-816"/>
+        <source>修改物品名称</source>
+        <translation>修改物品名稱</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>修改效果文字</source>
+        <translation>修改效果文字</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>修改物品类型</source>
+        <translation>修改物品類型</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>修改装备位置</source>
+        <translation>修改裝備位置</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>修改物品数值</source>
+        <translation>修改物品數值</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>修改库存方式</source>
+        <translation>修改庫存方式</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>修改出售价格比例</source>
+        <translation>修改售出價格比例</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>修改回收价格比例</source>
+        <translation>修改回收價格比例</translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>修改商店库存</source>
+        <translation>修改商店庫存</translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <source>上移商店物品</source>
+        <translation>上移商店物品</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>下移商店物品</source>
+        <translation>下移商店物品</translation>
+    </message>
+    <message>
+        <location line="+100"/>
+        <source>修改物品内容</source>
+        <translation>修改物品內容</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>从左侧列表或项目树打开一个物品或商店货单。</source>
+        <translation>從左侧列表或專案树開啟一个物品或商店貨單。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>正在编辑物品：%1</source>
+        <translation>正在編輯物品：%1</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>正在编辑商店：%1</source>
+        <translation>正在編輯商店：%1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>原文件中还有 %1 项高级内容未在此显示；保存时会保持不变。</source>
+        <translation>原檔案中還有 %1 項進階內容未在此显示；儲存时会保持不变。</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>其它类型 (%1)</source>
+        <translation>其他類型 (%1)</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>当前值使用了随机规则，第一版保持原样；不会在这里改写。</source>
+        <translation>目前值使用了隨機規則，第一版保持原樣；不會在這裡改寫。</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <location line="+516"/>
+        <source>未指定</source>
+        <translation>未指定</translation>
+    </message>
+    <message>
+        <location line="-516"/>
+        <source>其它位置：%1</source>
+        <translation>其他位置：%1</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <location line="+558"/>
+        <source>顺序</source>
+        <translation>順序</translation>
+    </message>
+    <message>
+        <location line="-558"/>
+        <location line="+558"/>
+        <source>文件</source>
+        <translation>檔案</translation>
+    </message>
+    <message>
+        <location line="-558"/>
+        <location line="+558"/>
+        <source>库存</source>
+        <translation>庫存</translation>
+    </message>
+    <message>
+        <location line="-548"/>
+        <source>未找到物品</source>
+        <translation>找不到物品</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>不限</source>
+        <translation>不限</translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>%1
+%2</source>
+        <translation>%1
+%2</translation>
+    </message>
+    <message>
+        <location line="+83"/>
+        <source>选择货单中的物品查看名称、价格和图片。</source>
+        <translation>選擇貨單中的物品查看名稱、價格和圖片。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+1"/>
+        <source>未选择</source>
+        <translation>未選擇</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>未找到物品：%1
+保存货单时仍会保留这个引用。</source>
+        <translation>找不到物品：%1
+儲存貨單时仍會保留这个引用。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+1"/>
+        <source>未找到</source>
+        <translation>找不到</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>%1
+%2
+基础价格：%3
+回收价格：%4</source>
+        <translation>%1
+%2
+基礎價格：%3
+回收價格：%4</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>按游戏默认</source>
+        <translation>按遊戲默认</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>物品与商店编辑器</source>
+        <translation>物品與商店編輯器</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>物品 - %1%2</source>
+        <translation>物品 - %1%2</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>商店 - %1%2</source>
+        <translation>商店 - %1%2</translation>
+    </message>
+    <message>
+        <location line="+66"/>
+        <source>选择物品图片</source>
+        <translation>選擇物品圖片</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>图片文件 (*.mpc *.asf *.imp *.img *.png);;所有文件 (*.*)</source>
+        <translation>圖片檔案 (*.mpc *.asf *.imp *.img *.png);;所有檔案 (*.*)</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>无法选择资源</source>
+        <translation>無法選擇資源</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>请选择当前项目物品图片目录中的文件。</source>
+        <translation>请選擇目前專案物品圖片目錄中的檔案。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>修改物品图片</source>
+        <translation>修改物品圖片</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>-副本.ini</source>
+        <translation>-複本.ini</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>复制为新物品</source>
+        <translation>複製为新物品</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>物品文件 (*.ini)</source>
+        <translation>物品檔案 (*.ini)</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>无法复制物品</source>
+        <translation>無法複製物品</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>加入商店</source>
+        <translation>加入商店</translation>
+    </message>
+    <message>
+        <location line="+78"/>
+        <source>未设置</source>
+        <translation>未設定</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>%1
+%2×%3，%4 帧</source>
+        <translation>%1
+%2×%3，%4 幀</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>未找到预览
+可继续保存引用</source>
+        <translation>找不到預覽
+仍可繼續儲存引用</translation>
+    </message>
+    <message>
+        <source>把当前未保存内容带入项目默认场景；实际购买、使用或装备取决于场景内容</source>
+        <translation type="vanished">把目前未儲存內容带入專案預設場景；實際購買、使用或裝備取決於场景內容</translation>
+    </message>
+    <message>
+        <location line="+61"/>
+        <source>搜索物品名称或文件名</source>
+        <translation>搜尋物品名稱或檔案名</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>搜索商店文件名</source>
+        <translation>搜尋商店檔案名</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>药品</source>
+        <translation>藥品</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>装备</source>
+        <translation>裝備</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>其它物品</source>
+        <translation>其他物品</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>身体</source>
+        <translation>身體</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>脚部</source>
+        <translation>腳部</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>头部</source>
+        <translation>頭部</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>颈部</source>
+        <translation>頸部</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>背部</source>
+        <translation>背部</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>手腕</source>
+        <translation>手腕</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>手持</source>
+        <translation>手持</translation>
+    </message>
+    <message>
+        <location line="-45"/>
+        <source>把当前物品加入隔离试玩背包，再进入试玩场景</source>
+        <translation>把目前物品加入隔離試玩背包，再進入試玩場景</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>进入试玩场景后直接打开当前商店</source>
+        <translation>進入試玩場景後直接開啟目前商店</translation>
+    </message>
+    <message>
+        <source>
+基础资源中的同名文件会重新生效。</source>
+        <translation>
+基礎資源中的同名檔案會重新生效。</translation>
+    </message>
+    <message>
+        <source>
+有动态调用需要自行检查，请先查看引用。</source>
+        <translation>
+有動態呼叫需要自行檢查，請先查看引用。</translation>
+    </message>
+    <message>
+        <source>修改当前内容</source>
+        <translation>修改目前內容</translation>
+    </message>
+    <message>
+        <source>创建使用脚本</source>
+        <translation>建立使用腳本</translation>
+    </message>
+    <message>
+        <source>删除商店文件…</source>
+        <translation>刪除商店檔案…</translation>
+    </message>
+    <message>
+        <source>删除文件</source>
+        <translation>刪除檔案</translation>
+    </message>
+    <message>
+        <source>删除文件…</source>
+        <translation>刪除檔案…</translation>
+    </message>
+    <message>
+        <source>删除物品文件…</source>
+        <translation>刪除物品檔案…</translation>
+    </message>
+    <message>
+        <source>副本</source>
+        <translation>副本</translation>
+    </message>
+    <message>
+        <source>只能删除当前项目中的文件。</source>
+        <translation>只能刪除目前專案中的檔案。</translation>
+    </message>
+    <message>
+        <source>复制</source>
+        <translation>複製</translation>
+    </message>
+    <message>
+        <source>复制为新内容</source>
+        <translation>複製為新內容</translation>
+    </message>
+    <message>
+        <source>将“%1”移入系统回收站，并放弃此文件的未保存修改。是否继续？</source>
+        <translation>將「%1」移入系統資源回收筒，並放棄此檔案的未儲存修改。是否繼續？</translation>
+    </message>
+    <message>
+        <source>将更新 %1 处明确引用。动态调用不会自动改写，是否继续？</source>
+        <translation>將更新 %1 處明確引用。動態呼叫不會自動改寫，是否繼續？</translation>
+    </message>
+    <message>
+        <source>文件已改名，请重新打开列表。</source>
+        <translation>檔案已改名，請重新開啟清單。</translation>
+    </message>
+    <message>
+        <source>文件已被外部修改，请重新打开后再删除。</source>
+        <translation>檔案已被外部修改，請重新開啟後再刪除。</translation>
+    </message>
+    <message>
+        <source>文件来自基础资源或已被外部修改，请复制为新文件，或重新打开后再操作。</source>
+        <translation>檔案來自基礎資源或已被外部修改，請複製為新檔案，或重新開啟後再操作。</translation>
+    </message>
+    <message>
+        <source>新名称</source>
+        <translation>新名稱</translation>
+    </message>
+    <message>
+        <source>新建</source>
+        <translation>新增</translation>
+    </message>
+    <message>
+        <source>新建商店…</source>
+        <translation>新增商店…</translation>
+    </message>
+    <message>
+        <source>新建物品…</source>
+        <translation>新增物品…</translation>
+    </message>
+    <message>
+        <source>新文件名与当前文件名相同。</source>
+        <translation>新檔名與目前檔名相同。</translation>
+    </message>
+    <message>
+        <source>新文件名（已识别的引用会一起更新）</source>
+        <translation>新檔名（已識別的引用會一起更新）</translation>
+    </message>
+    <message>
+        <source>无法创建内容目录。</source>
+        <translation>無法建立內容目錄。</translation>
+    </message>
+    <message>
+        <source>无法删除</source>
+        <translation>無法刪除</translation>
+    </message>
+    <message>
+        <source>无法复制</source>
+        <translation>無法複製</translation>
+    </message>
+    <message>
+        <source>无法新建</source>
+        <translation>無法新增</translation>
+    </message>
+    <message>
+        <source>无法移入系统回收站，原文件已保留。</source>
+        <translation>無法移入系統資源回收筒，原檔案已保留。</translation>
+    </message>
+    <message>
+        <source>无法读取物品内容。</source>
+        <translation>無法讀取物品內容。</translation>
+    </message>
+    <message>
+        <source>无法重命名</source>
+        <translation>無法重新命名</translation>
+    </message>
+    <message>
+        <source>更多操作…</source>
+        <translation>更多操作…</translation>
+    </message>
+    <message>
+        <source>查看引用…</source>
+        <translation>查看引用…</translation>
+    </message>
+    <message>
+        <source>点击“新建”创建物品或商店，或从左侧选择已有内容。</source>
+        <translation>按「新增」建立物品或商店，或從左側選擇既有內容。</translation>
+    </message>
+    <message>
+        <source>目标文件已经在其它编辑页打开，请先处理该编辑页。</source>
+        <translation>目標檔案已在其他編輯頁開啟，請先處理該編輯頁。</translation>
+    </message>
+    <message>
+        <source>确认重命名</source>
+        <translation>確認重新命名</translation>
+    </message>
+    <message>
+        <source>请先选择要复制的物品或商店。</source>
+        <translation>請先選擇要複製的物品或商店。</translation>
+    </message>
+    <message>
+        <source>请先选择项目资源。文件必须位于当前项目的物品或商店目录。</source>
+        <translation>請先選擇專案資源。檔案必須位於目前專案的物品或商店目錄。</translation>
+    </message>
+    <message>
+        <source>请填写单行名称。</source>
+        <translation>請填寫單行名稱。</translation>
+    </message>
+    <message>
+        <source>请输入有效的文件名，不包含目录或特殊字符。</source>
+        <translation>請輸入有效的檔名，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>请选择当前项目可用的物品图片。</source>
+        <translation>請選擇目前專案可用的物品圖片。</translation>
+    </message>
+    <message>
+        <source>资源正在保存，请稍后重试。</source>
+        <translation>資源正在儲存，請稍後重試。</translation>
+    </message>
+    <message>
+        <source>这个名称无法完整保存，请换一个名称。</source>
+        <translation>這個名稱無法完整儲存，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>这个文件仍被使用，请先修改引用。</source>
+        <translation>這個檔案仍被使用，請先修改引用。</translation>
+    </message>
+    <message>
+        <source>这个文件名已经存在，请换一个名称。</source>
+        <translation>這個檔名已存在，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，不能安全更新引用，请先查看引用。</source>
+        <translation>部分檔案無法讀取，不能安全更新引用，請先查看引用。</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，请先处理引用检查中的问题。</source>
+        <translation>部分檔案無法讀取，請先處理引用檢查中的問題。</translation>
+    </message>
+    <message>
+        <source>重命名文件</source>
+        <translation>重新命名檔案</translation>
+    </message>
+    <message>
+        <source>重命名文件…</source>
+        <translation>重新命名檔案…</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，未更新引用。</source>
+        <translation>部分文件無法讀取，未更新引用。</translation>
     </message>
 </context>
 <context>
@@ -3974,12 +6207,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+22"/>
-        <location filename="../ui/ImageBatchImportDialog.cpp" line="+508"/>
+        <location filename="../ui/ImageBatchImportDialog.cpp" line="+540"/>
         <source>队列为空；请添加 PNG。</source>
         <translation>佇列為空；請加入 PNG。</translation>
     </message>
     <message>
-        <location filename="../ui/ImageBatchImportDialog.cpp" line="-452"/>
+        <location filename="../ui/ImageBatchImportDialog.cpp" line="-482"/>
         <source>当前帧之前</source>
         <translation>目前幀之前</translation>
     </message>
@@ -4009,24 +6242,24 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>固定偏移</translation>
     </message>
     <message>
-        <location line="+133"/>
+        <location line="+134"/>
         <source>已加载方案：%1；队列修改不会自动写回。</source>
         <translation>已載入方案：%1；佇列修改不會自動寫回。</translation>
     </message>
     <message>
         <location line="+19"/>
-        <location line="+132"/>
+        <location line="+161"/>
         <source>队列第 %1 项无效，不能保存方案。</source>
         <translation>佇列第 %1 項無效，無法儲存方案。</translation>
     </message>
     <message>
-        <location line="-130"/>
-        <location line="+132"/>
+        <location line="-159"/>
+        <location line="+161"/>
         <source>队列为空或超过 10000 项，不能保存方案。</source>
         <translation>佇列為空或超過 10000 項，無法儲存方案。</translation>
     </message>
     <message>
-        <location line="-118"/>
+        <location line="-147"/>
         <source>已耐久保存方案：%1</source>
         <translation>已耐久儲存方案：%1</translation>
     </message>
@@ -4037,12 +6270,14 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+13"/>
-        <location line="+25"/>
+        <location line="+19"/>
+        <location line="+13"/>
+        <location line="+22"/>
         <source>批量导入失败</source>
         <translation>批次匯入失敗</translation>
     </message>
     <message>
-        <location line="-23"/>
+        <location line="-52"/>
         <source>队列第 %1 项无效，请修正或移除后重试。</source>
         <translation>佇列第 %1 項無效，請修正或移除後重試。</translation>
     </message>
@@ -4050,6 +6285,18 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="+2"/>
         <source>队列为空或导入后超过 10000 帧上限。</source>
         <translation>佇列為空或匯入後超過 10000 幀上限。</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>资源正在进行其他写入，请稍后重试。
+%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>资源目录正在更新或保存，请稍后重试。
+%1</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+16"/>
@@ -4376,57 +6623,54 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>重做</translation>
     </message>
     <message>
-        <location line="+14"/>
         <source>批量导入</source>
-        <translation>批次匯入</translation>
+        <translation type="vanished">批次匯入</translation>
     </message>
     <message>
-        <location line="+7"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="+570"/>
-        <location line="+132"/>
+        <location line="+21"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="+573"/>
+        <location line="+133"/>
         <source>删除图片</source>
         <translation>刪除圖片</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-162"/>
-        <location line="+151"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-163"/>
+        <location line="+152"/>
         <source>替换图片</source>
         <translation>取代圖片</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-153"/>
-        <location line="+152"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-154"/>
+        <location line="+153"/>
         <source>导出图片</source>
         <translation>匯出圖片</translation>
     </message>
     <message>
-        <location line="+9"/>
         <source>帧结构</source>
-        <translation>幀結構</translation>
+        <translation type="vanished">幀結構</translation>
     </message>
     <message>
-        <location line="+6"/>
         <source>文档内缓冲：0 帧</source>
-        <translation>文件內緩衝：0 幀</translation>
+        <translation type="vanished">文件內緩衝：0 幀</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+25"/>
         <source>复制帧</source>
         <translation>複製幀</translation>
     </message>
     <message>
         <location line="+10"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-137"/>
-        <location line="+143"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-138"/>
+        <location line="+144"/>
         <source>粘贴到当前帧之后</source>
         <translation>貼到目前幀之後</translation>
     </message>
     <message>
         <location line="+10"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-141"/>
-        <location line="+142"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-142"/>
+        <location line="+143"/>
         <source>重复所选帧</source>
         <translation>重複所選幀</translation>
     </message>
@@ -4442,15 +6686,15 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+10"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-155"/>
-        <location line="+150"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-156"/>
+        <location line="+151"/>
         <source>批量导出</source>
         <translation>批量匯出</translation>
     </message>
     <message>
         <location line="+10"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-147"/>
-        <location line="+148"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-148"/>
+        <location line="+149"/>
         <source>按清单回导</source>
         <translation>按清單回匯</translation>
     </message>
@@ -4462,7 +6706,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     <message>
         <location line="+15"/>
         <location line="+57"/>
-        <location filename="../ui/ImageEditorWindow.cpp" line="+340"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="+344"/>
         <location line="+2"/>
         <source>没有可播放的帧</source>
         <translation>沒有可播放的幀</translation>
@@ -4489,50 +6733,48 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>幀間隔:</translation>
     </message>
     <message>
-        <location line="+20"/>
         <source>方向数:</source>
-        <translation>方向數:</translation>
+        <translation type="vanished">方向數:</translation>
     </message>
     <message>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-958"/>
         <source>未知</source>
-        <translation>未知</translation>
+        <translation type="vanished">未知</translation>
     </message>
     <message>
-        <location line="+450"/>
-        <location line="+208"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-513"/>
+        <location line="+209"/>
         <source>撤销图片编辑</source>
         <translation>復原圖片編輯</translation>
     </message>
     <message>
-        <location line="-199"/>
-        <location line="+200"/>
+        <location line="-200"/>
+        <location line="+201"/>
         <source>重做图片编辑</source>
         <translation>重做圖片編輯</translation>
     </message>
     <message>
-        <location line="-168"/>
-        <location line="+153"/>
+        <location line="-169"/>
+        <location line="+154"/>
         <source>编辑图片</source>
         <translation>編輯圖片</translation>
     </message>
     <message>
-        <location line="-138"/>
-        <location line="+144"/>
+        <location line="-139"/>
+        <location line="+145"/>
         <source>复制所选帧</source>
         <translation>複製所選幀</translation>
     </message>
     <message>
-        <location line="-137"/>
-        <location line="+140"/>
-        <location line="+1686"/>
+        <location line="-138"/>
+        <location line="+141"/>
+        <location line="+1693"/>
         <source>所选帧前移</source>
         <translation>所選幀前移</translation>
     </message>
     <message>
-        <location line="-1823"/>
-        <location line="+138"/>
-        <location line="+1712"/>
+        <location line="-1831"/>
+        <location line="+139"/>
+        <location line="+1719"/>
         <source>所选帧后移</source>
         <translation>所選幀後移</translation>
     </message>
@@ -4542,27 +6784,24 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>未命名</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>图片编辑器 - %1%2 [%3]</source>
-        <translation>圖片編輯器 - %1%2 [%3]</translation>
+        <translation type="vanished">圖片編輯器 - %1%2 [%3]</translation>
     </message>
     <message>
-        <location line="+51"/>
+        <location line="+53"/>
         <source>共 %1 帧</source>
         <translation>共 %1 幀</translation>
     </message>
     <message>
-        <location line="+20"/>
         <source>[%7] 帧 %1/%2 | %3x%4 | 偏移(%5, %6)</source>
-        <translation>[%7] 幀 %1/%2 | %3x%4 | 偏移(%5, %6)</translation>
+        <translation type="vanished">[%7] 幀 %1/%2 | %3x%4 | 偏移(%5, %6)</translation>
     </message>
     <message>
-        <location line="+80"/>
         <source>文档内缓冲：%1 帧</source>
-        <translation>文件內緩衝：%1 幀</translation>
+        <translation type="vanished">文件內緩衝：%1 幀</translation>
     </message>
     <message>
-        <location line="+626"/>
+        <location line="+723"/>
         <location line="+37"/>
         <source>保存更改</source>
         <translation>儲存變更</translation>
@@ -4578,26 +6817,26 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location line="+272"/>
         <location line="+29"/>
         <location line="+17"/>
-        <location line="+65"/>
+        <location line="+69"/>
         <location line="+18"/>
-        <location line="+415"/>
+        <location line="+414"/>
         <source>错误</source>
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="-1610"/>
-        <location line="+135"/>
+        <location line="-1618"/>
+        <location line="+136"/>
         <source>批量插入图片</source>
         <translation>批次插入圖片</translation>
     </message>
     <message>
-        <location line="-133"/>
-        <location line="+134"/>
+        <location line="-134"/>
+        <location line="+135"/>
         <source>批量导入到末尾</source>
         <translation>批次匯入至末尾</translation>
     </message>
     <message>
-        <location line="+302"/>
+        <location line="+306"/>
         <source>暂停</source>
         <translation>暫停</translation>
     </message>
@@ -4614,13 +6853,13 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     <message>
         <location line="+90"/>
         <location line="+83"/>
-        <location line="+787"/>
+        <location line="+786"/>
         <location line="+116"/>
         <source>当前图片文档无法生成完整帧快照。</source>
         <translation>當前圖片文件無法產生完整幀快照。</translation>
     </message>
     <message>
-        <location line="-984"/>
+        <location line="-983"/>
         <source>没有可导出的所选帧。</source>
         <translation>沒有可匯出的所選幀。</translation>
     </message>
@@ -4792,45 +7031,42 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法開啟檔案！</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+46"/>
         <source>打开图片文件</source>
         <translation>開啟圖片檔案</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+2"/>
         <source>所有支持的格式 (*.img *.mpc *.shd *.asf *.pic *.png);;IMG文件 (*.img);;MPC文件 (*.mpc);;SHD文件 (*.shd);;ASF文件 (*.asf);;PIC文件 (*.pic);;PNG文件 (*.png);;所有文件 (*.*)</source>
         <translation>所有支援的格式 (*.img *.mpc *.shd *.asf *.pic *.png);;IMG 檔案 (*.img);;MPC 檔案 (*.mpc);;SHD 檔案 (*.shd);;ASF 檔案 (*.asf);;PIC 檔案 (*.pic);;PNG 檔案 (*.png);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="+19"/>
+        <location line="+21"/>
         <location line="+18"/>
         <source>没有打开的文件！</source>
         <translation>沒有開啟的檔案！</translation>
     </message>
     <message>
-        <location line="+74"/>
-        <location line="+12"/>
-        <location line="+15"/>
+        <location line="+72"/>
+        <location line="+13"/>
         <source>保存失败</source>
         <translation>儲存失敗</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-12"/>
         <source>无法保存文件: %1</source>
         <translation>無法儲存檔案: %1</translation>
     </message>
     <message>
-        <location line="+12"/>
         <source>无法备份原文件: %1</source>
-        <translation>無法備份原始檔案: %1</translation>
+        <translation type="vanished">無法備份原始檔案: %1</translation>
     </message>
     <message>
-        <location line="+15"/>
         <source>无法完成保存: %1</source>
-        <translation>無法完成儲存: %1</translation>
+        <translation type="vanished">無法完成儲存: %1</translation>
     </message>
     <message>
-        <location line="+153"/>
+        <location line="+177"/>
         <location line="+31"/>
         <location line="+24"/>
         <source>批量导出失败</source>
@@ -4898,7 +7134,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>按清單回匯 %1 幀</translation>
     </message>
     <message>
-        <location line="+132"/>
+        <location line="+136"/>
         <source>复制帧失败</source>
         <translation>複製幀失敗</translation>
     </message>
@@ -4914,8 +7150,8 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>貼上幀失敗</translation>
     </message>
     <message>
-        <location line="-994"/>
-        <location line="+984"/>
+        <location line="-997"/>
+        <location line="+987"/>
         <source>无法读取当前图片帧，未修改文档。</source>
         <translation>無法讀取目前圖片幀，未修改文件。</translation>
     </message>
@@ -4969,7 +7205,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>幀排序失敗</translation>
     </message>
     <message>
-        <location line="-651"/>
+        <location line="-650"/>
         <location line="+23"/>
         <source>提示</source>
         <translation>提示</translation>
@@ -4991,7 +7227,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>IMG 檔案 (*.img);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="-408"/>
+        <location line="-412"/>
         <source>请先打开一个图片文件。</source>
         <translation>請先開啟一個圖片檔案。</translation>
     </message>
@@ -5001,18 +7237,19 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>選擇圖片檔案</translation>
     </message>
     <message>
-        <location line="-186"/>
-        <location line="+187"/>
+        <location line="-202"/>
+        <location line="+204"/>
         <source>PNG图片 (*.png);;所有文件 (*.*)</source>
         <translation>PNG 圖片 (*.png);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="-188"/>
+        <location line="-205"/>
         <source>导出帧图片</source>
         <translation>匯出幀圖片</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+16"/>
+        <location line="+24"/>
         <source>导出失败</source>
         <translation>匯出失敗</translation>
     </message>
@@ -5022,17 +7259,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法寫入檔案: %1</translation>
     </message>
     <message>
-        <location line="+172"/>
+        <location line="+176"/>
         <source>无法加载图片！</source>
         <translation>無法載入圖片！</translation>
     </message>
     <message>
-        <location filename="../ui/ImageEditorWindow.ui" line="-88"/>
         <source>批量帧偏移</source>
-        <translation>批次幀偏移</translation>
+        <translation type="vanished">批次幀偏移</translation>
     </message>
     <message>
-        <location line="-168"/>
+        <location filename="../ui/ImageEditorWindow.ui" line="-236"/>
         <location line="+174"/>
         <source>已选择 0 帧</source>
         <translation>已選擇 0 幀</translation>
@@ -5063,13 +7299,13 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>套用至所選幀</translation>
     </message>
     <message>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-1628"/>
-        <location line="+146"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-1636"/>
+        <location line="+147"/>
         <source>批量设置所选帧偏移</source>
         <translation>批次設定所選幀偏移</translation>
     </message>
     <message>
-        <location line="+144"/>
+        <location line="+148"/>
         <source>已选 %1/%2 帧 | %3</source>
         <translation>已選 %1/%2 幀 | %3</translation>
     </message>
@@ -5080,7 +7316,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>已選擇 %1 幀</translation>
     </message>
     <message>
-        <location line="+1037"/>
+        <location line="+1021"/>
         <location line="+8"/>
         <source>编辑失败</source>
         <translation>編輯失敗</translation>
@@ -5096,7 +7332,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法更新幀偏移。</translation>
     </message>
     <message>
-        <location line="+269"/>
+        <location line="+288"/>
         <location line="+23"/>
         <location line="+10"/>
         <source>批量偏移失败</source>
@@ -5148,7 +7384,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>垂直翻轉</translation>
     </message>
     <message>
-        <location filename="../ui/ImageEditorWindow.cpp" line="-1045"/>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-1048"/>
         <source>没有可变换的所选帧。</source>
         <translation>沒有可變換的所選幀。</translation>
     </message>
@@ -5206,7 +7442,18 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+1080"/>
+        <location line="+513"/>
+        <source>无法完成保存: %1
+%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+129"/>
+        <source>目标资源包正在更新或进行其他写入。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+441"/>
         <source>所选帧左转 90°</source>
         <translation>所選幀左轉 90°</translation>
     </message>
@@ -5225,6 +7472,132 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <source>垂直翻转所选帧</source>
         <translation>垂直翻轉所選幀</translation>
     </message>
+    <message>
+        <location filename="../ui/ImageEditorWindow.ui" line="-162"/>
+        <source>添加图片</source>
+        <translation>加入圖片</translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>整理图片</source>
+        <translation>整理圖片</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>已复制：0 帧</source>
+        <translation>已複製：0 幀</translation>
+    </message>
+    <message>
+        <location line="+254"/>
+        <source>多帧位置</source>
+        <translation>多幀位置</translation>
+    </message>
+    <message>
+        <location line="+88"/>
+        <source>动画方向:</source>
+        <translation>動畫方向:</translation>
+    </message>
+    <message>
+        <location filename="../ui/ImageEditorWindow.cpp" line="-1987"/>
+        <location line="+229"/>
+        <source>高级帧工具</source>
+        <translation>進階幀工具</translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>图片编辑器 - %1%2</source>
+        <translation>圖片編輯器 - %1%2</translation>
+    </message>
+    <message>
+        <location line="+69"/>
+        <source>帧 %1/%2 | %3x%4 | 位置(%5, %6)</source>
+        <translation>幀 %1/%2 | %3x%4 | 位置(%5, %6)</translation>
+    </message>
+    <message>
+        <location line="+79"/>
+        <source>已复制：%1 帧</source>
+        <translation>已複製：%1 幀</translation>
+    </message>
+    <message>
+        <source>%1：%2帧→%3帧。按钮状态或角色动作的引用编号不会自动修改，可撤销后对照。</source>
+        <translation>%1：%2幀→%3幀。按鈕狀態或角色動作的引用編號不會自動修改，可撤銷後對照。</translation>
+    </message>
+    <message>
+        <source>从图片新建</source>
+        <translation>從圖片新建</translation>
+    </message>
+    <message>
+        <source>保存图片文件</source>
+        <translation>儲存圖片檔案</translation>
+    </message>
+    <message>
+        <source>删除%1帧</source>
+        <translation>刪除%1幀</translation>
+    </message>
+    <message>
+        <source>删除帧</source>
+        <translation>刪除幀</translation>
+    </message>
+    <message>
+        <source>删除所选帧</source>
+        <translation>刪除所選幀</translation>
+    </message>
+    <message>
+        <source>图片 (*.png *.bmp *.jpg *.jpeg);;所有文件 (*)</source>
+        <translation>圖片 (*.png *.bmp *.jpg *.jpeg);;所有檔案 (*)</translation>
+    </message>
+    <message>
+        <source>图片至少保留一帧；文件删除与帧编辑是不同操作。</source>
+        <translation>圖片至少保留一幀；檔案刪除與幀編輯是不同操作。</translation>
+    </message>
+    <message>
+        <source>导入帧</source>
+        <translation>匯入幀</translation>
+    </message>
+    <message>
+        <source>导出当前帧</source>
+        <translation>匯出當前幀</translation>
+    </message>
+    <message>
+        <source>帧编号从0开始；按钮的普通／按下等状态按编号使用图片。插入、删除或排序后请检查对应状态。</source>
+        <translation>幀編號從0開始；按鈕的普通／按下等狀態按編號使用圖片。插入、刪除或排序後請檢查對應狀態。</translation>
+    </message>
+    <message>
+        <source>当前%1帧，编号0—%2。按钮状态或角色动作的引用编号不会自动修改，请对照检查。</source>
+        <translation>當前%1幀，編號0—%2。按鈕狀態或角色動作的引用編號不會自動修改，請對照檢查。</translation>
+    </message>
+    <message>
+        <source>批量插入帧</source>
+        <translation>批次插入幀</translation>
+    </message>
+    <message>
+        <source>无法创建图片文档。</source>
+        <translation>無法建立圖片文件。</translation>
+    </message>
+    <message>
+        <source>无法新建图片</source>
+        <translation>無法新建圖片</translation>
+    </message>
+    <message>
+        <source>替换当前帧</source>
+        <translation>替換當前幀</translation>
+    </message>
+    <message>
+        <source>有图片无法读取，当前文档保持不变。</source>
+        <translation>有圖片無法讀取，當前文件保持不變。</translation>
+    </message>
+    <message>
+        <source>编辑当前帧</source>
+        <translation>編輯當前幀</translation>
+    </message>
+    <message>
+        <source>请选择1至10000张有效图片。</source>
+        <translation>請選擇1至10000張有效圖片。</translation>
+    </message>
+    <message>
+        <source>选择图片创建动画（按选择顺序）</source>
+        <translation>選擇圖片建立動畫（按選擇順序）</translation>
+    </message>
 </context>
 <context>
     <name>ImageFramePreviewWidget</name>
@@ -5232,6 +7605,49 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <location filename="../ui/ImageEditDialog.cpp" line="-184"/>
         <source>无图片</source>
         <translation>無圖片</translation>
+    </message>
+</context>
+<context>
+    <name>JxAssetMigrator</name>
+    <message>
+        <location filename="../core/JxAssetMigrator.cpp" line="+6993"/>
+        <source>UI 基底存在未支持的有效变换：%1</source>
+        <translation>UI 基底存在未支援的有效變換：%1</translation>
+    </message>
+    <message>
+        <location line="-35"/>
+        <source>图片可能来自其它内容依赖，无法确认有效尺寸</source>
+        <translation>圖片可能來自其它內容依賴，無法確認有效尺寸</translation>
+    </message>
+    <message>
+        <location line="-42"/>
+        <source>保留菜单 %1：%2</source>
+        <translation>保留選單 %1：%2</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>已声明 UI 基底未提供可核实的窗口锚点</source>
+        <translation>已宣告 UI 基底未提供可核實的視窗錨點</translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>本地位置、布局字段或图片引用与基底不同，无法确定原布局意图</source>
+        <translation>本機位置、版面欄位或圖片參照與基底不同，無法確定原版面意圖</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>无法读取本地或基底底图尺寸</source>
+        <translation>無法讀取本機或基底底圖尺寸</translation>
+    </message>
+    <message>
+        <location line="+46"/>
+        <source>窗口尺寸或基底锚点不足以计算布局</source>
+        <translation>視窗尺寸或基底錨點不足以計算版面</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>窗口 %1；底图 %2；UI 基底 %3</source>
+        <translation>視窗 %1；底圖 %2；UI 基底 %3</translation>
     </message>
 </context>
 <context>
@@ -5273,10 +7689,1596 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
 </context>
 <context>
+    <name>MagicEditorWindow</name>
+    <message>
+        <location filename="../ui/MagicEditorWindow.cpp" line="+167"/>
+        <source>无法打开武功</source>
+        <translation>無法開啟武功</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法读取武功文件：
+%1
+
+%2</source>
+        <translation>無法讀取武功檔案：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="+23"/>
+        <source>保存失败</source>
+        <translation>儲存失敗</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法保存武功文件：
+%1
+
+%2</source>
+        <translation>無法儲存武功檔案：
+%1
+
+%2</translation>
+    </message>
+    <message>
+        <location line="+95"/>
+        <location line="+1058"/>
+        <source>保存更改</source>
+        <translation>儲存變更</translation>
+    </message>
+    <message>
+        <location line="-1057"/>
+        <location line="+1058"/>
+        <source>武功“%1”已修改，是否保存？</source>
+        <translation>武功「%1」已修改，是否儲存？</translation>
+    </message>
+    <message>
+        <location line="-1029"/>
+        <source>切换项目资源</source>
+        <translation>切換專案資源</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>当前武功已修改。切换项目资源前是否保存？</source>
+        <translation>目前武功已修改。切換專案資源前是否儲存？</translation>
+    </message>
+    <message>
+        <location line="+49"/>
+        <source>修改武功说明</source>
+        <translation>修改武功說明</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <location line="+1179"/>
+        <source>武功列表</source>
+        <translation>武功清單</translation>
+    </message>
+    <message>
+        <location line="-1171"/>
+        <location line="+1156"/>
+        <source>搜索名称或文件名</source>
+        <translation>搜尋名稱或檔名</translation>
+    </message>
+    <message>
+        <location line="-1149"/>
+        <location line="+1167"/>
+        <source>双击或按 Enter 打开；已打开的武功会切回原标签。</source>
+        <translation>按兩下或按 Enter 開啟；已開啟的武功會切回原分頁。</translation>
+    </message>
+    <message>
+        <location line="-1149"/>
+        <location line="+1154"/>
+        <source>概览与效果</source>
+        <translation>概覽與效果</translation>
+    </message>
+    <message>
+        <location line="-1153"/>
+        <location line="+1154"/>
+        <source>等级参数</source>
+        <translation>等級參數</translation>
+    </message>
+    <message>
+        <location line="-1136"/>
+        <location line="+1115"/>
+        <source>保存</source>
+        <translation>儲存</translation>
+    </message>
+    <message>
+        <location line="-1111"/>
+        <location line="+1113"/>
+        <source>撤销</source>
+        <translation>復原</translation>
+    </message>
+    <message>
+        <location line="-1110"/>
+        <location line="+1112"/>
+        <source>重做</source>
+        <translation>重做</translation>
+    </message>
+    <message>
+        <location line="-1106"/>
+        <location line="+1109"/>
+        <source>试玩当前武功</source>
+        <translation>試玩目前武功</translation>
+    </message>
+    <message>
+        <source>使用当前内存中的武功内容进入项目默认场景；在游戏中使用该武功查看效果</source>
+        <translation type="vanished">使用目前記憶體中的武功內容進入專案預設場景；在遊戲中使用該武功檢查效果</translation>
+    </message>
+    <message>
+        <location line="-1055"/>
+        <location line="+1074"/>
+        <source>武功信息</source>
+        <translation>武功資訊</translation>
+    </message>
+    <message>
+        <location line="-1069"/>
+        <location line="+1072"/>
+        <location line="+82"/>
+        <source>名称</source>
+        <translation>名稱</translation>
+    </message>
+    <message>
+        <location line="-1147"/>
+        <location line="+1069"/>
+        <location line="+79"/>
+        <source>说明</source>
+        <translation>說明</translation>
+    </message>
+    <message>
+        <location line="-1143"/>
+        <location line="+1069"/>
+        <source>作用方式与范围</source>
+        <translation>作用方式與範圍</translation>
+    </message>
+    <message>
+        <location line="-1054"/>
+        <location line="+1059"/>
+        <source>作用方式</source>
+        <translation>作用方式</translation>
+    </message>
+    <message>
+        <location line="-1056"/>
+        <location line="+1061"/>
+        <source>区域形状</source>
+        <translation>區域形狀</translation>
+    </message>
+    <message>
+        <location line="-1051"/>
+        <location line="+1066"/>
+        <source>范围图是便于理解的示意；最终速度、碰撞和连锁效果以试玩为准。</source>
+        <translation>範圍圖是便於理解的示意；最終速度、碰撞和連鎖效果以試玩為準。</translation>
+    </message>
+    <message>
+        <location line="-1002"/>
+        <location line="+1033"/>
+        <source>图片与声音</source>
+        <translation>圖片與聲音</translation>
+    </message>
+    <message>
+        <location line="-1029"/>
+        <location line="+1035"/>
+        <source>技能展示</source>
+        <translation>技能展示</translation>
+    </message>
+    <message>
+        <location line="-1032"/>
+        <location line="+1033"/>
+        <source>武功图标</source>
+        <translation>武功圖示</translation>
+    </message>
+    <message>
+        <location line="-1030"/>
+        <location line="+1031"/>
+        <source>飞行特效</source>
+        <translation>飛行特效</translation>
+    </message>
+    <message>
+        <location line="-1028"/>
+        <location line="+1029"/>
+        <source>命中特效</source>
+        <translation>命中特效</translation>
+    </message>
+    <message>
+        <location line="-1026"/>
+        <location line="+1027"/>
+        <source>施放声音</source>
+        <translation>施放聲音</translation>
+    </message>
+    <message>
+        <location line="-1025"/>
+        <location line="+1026"/>
+        <source>命中声音</source>
+        <translation>命中聲音</translation>
+    </message>
+    <message>
+        <location line="-976"/>
+        <source>修改武功名称</source>
+        <translation>修改武功名稱</translation>
+    </message>
+    <message>
+        <source>修改作用方式</source>
+        <translation type="vanished">修改作用方式</translation>
+    </message>
+    <message>
+        <source>修改区域形状</source>
+        <translation type="vanished">修改區域形狀</translation>
+    </message>
+    <message>
+        <location line="+120"/>
+        <location line="+910"/>
+        <source>每行对应游戏中的一个武功等级。浅色斜体值表示该等级沿用前一级；直接修改即可为本级保存。</source>
+        <translation>每列對應遊戲中的一個武功等級。淺色斜體值表示該等級沿用前一級；直接修改即可為本級儲存。</translation>
+    </message>
+    <message>
+        <location line="-883"/>
+        <source>修改第 %1 级参数</source>
+        <translation>修改第 %1 級參數</translation>
+    </message>
+    <message>
+        <location line="+38"/>
+        <location line="+32"/>
+        <location line="+798"/>
+        <location line="+5"/>
+        <source>选择…</source>
+        <translation>選擇…</translation>
+    </message>
+    <message>
+        <location line="-826"/>
+        <location line="+34"/>
+        <source>修改%1</source>
+        <translation>修改%1</translation>
+    </message>
+    <message>
+        <location line="-28"/>
+        <source>图片文件 (*.mpc *.asf *.imp *.img *.png);;所有文件 (*.*)</source>
+        <translation>圖片檔案 (*.mpc *.asf *.imp *.img *.png);;所有檔案 (*.*)</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <location line="+807"/>
+        <source>试听</source>
+        <translation>試聽</translation>
+    </message>
+    <message>
+        <location line="-791"/>
+        <source>音频文件 (*.wav *.mp3 *.ogg);;所有文件 (*.*)</source>
+        <translation>音訊檔案 (*.wav *.mp3 *.ogg);;所有檔案 (*.*)</translation>
+    </message>
+    <message>
+        <location line="+81"/>
+        <source>修改武功内容</source>
+        <translation>修改武功內容</translation>
+    </message>
+    <message>
+        <location line="+111"/>
+        <source>其它作用方式 (%1)</source>
+        <translation>其他作用方式 (%1)</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>其它区域 (%1)</source>
+        <translation>其他區域 (%1)</translation>
+    </message>
+    <message>
+        <location line="-86"/>
+        <location line="+696"/>
+        <source>从左侧列表或项目树打开一个武功文件。</source>
+        <translation>從左側清單或專案樹開啟一個武功檔案。</translation>
+    </message>
+    <message>
+        <location line="-1019"/>
+        <source>修改第 %1 级附加效果</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>修改第 %1 级画面混合</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+17"/>
+        <source>修改第 %1 级飞行速度</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>修改第 %1 级出现延迟</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>修改第 %1 级持续时间</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>修改第 %1 级飞行亮度</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>修改第 %1 级命中亮度</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+7"/>
+        <source>修改修炼时的攻击效果</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>无法打开</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>关联武功文件不存在或尚未选择。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+258"/>
+        <location line="+696"/>
+        <source>正在编辑：%1</source>
+        <translation>正在編輯：%1</translation>
+    </message>
+    <message>
+        <location line="-692"/>
+        <location line="+699"/>
+        <source>原文件中还有 %1 项高级内容未在此显示；保存时会保持不变。</source>
+        <translation>原始檔案中還有 %1 項進階內容未在此顯示；儲存時會保持不變。</translation>
+    </message>
+    <message>
+        <location line="-690"/>
+        <source>等级</source>
+        <translation>等級</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>效果值</source>
+        <translation>效果值</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>生命消耗</source>
+        <translation>生命消耗</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>体力消耗</source>
+        <translation>體力消耗</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>内力消耗</source>
+        <translation>內力消耗</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>升级经验</source>
+        <translation>升級經驗</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>攻击距离</source>
+        <translation>攻擊距離</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>本级未单独设置，当前显示沿用值；编辑后会为本级保存。</source>
+        <translation>本級未單獨設定，目前顯示沿用值；編輯後會為本級儲存。</translation>
+    </message>
+    <message>
+        <location line="+68"/>
+        <source>隐身（保持）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>隐身（攻击显形）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>格挡伤害</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>变身</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>更换轻功</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>定身</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>其它附加效果 (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>其它混合方式 (%1)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+48"/>
+        <source>未设置</source>
+        <translation>未設定</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>%1
+%2×%3，%4 帧</source>
+        <translation>%1
+%2×%3，%4 個影格</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>未找到预览
+可继续保存引用</source>
+        <translation>找不到預覽
+仍可儲存引用</translation>
+    </message>
+    <message>
+        <location line="+38"/>
+        <source>%1
+%2</source>
+        <translation>%1
+%2</translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>武功与特效编辑器</source>
+        <translation>武功與特效編輯器</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>武功 - %1%2</source>
+        <translation>武功 - %1%2</translation>
+    </message>
+    <message>
+        <location line="+52"/>
+        <source>选择资源</source>
+        <translation>選擇資源</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>无法选择资源</source>
+        <translation>無法選擇資源</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>请选择当前项目对应资源目录中的文件。</source>
+        <translation>請選擇目前專案對應資源目錄中的檔案。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>修改资源引用</source>
+        <translation>修改資源引用</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>无法试听</source>
+        <translation>無法試聽</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>当前声音引用未设置或文件不存在。</source>
+        <translation>目前聲音引用未設定或檔案不存在。</translation>
+    </message>
+    <message>
+        <location line="+122"/>
+        <source>目标点</source>
+        <translation>目標點</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>飞行</source>
+        <translation>飛行</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>连续飞行</source>
+        <translation>連續飛行</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>环形</source>
+        <translation>環形</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>心形环绕</source>
+        <translation>心形環繞</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>螺旋环绕</source>
+        <translation>螺旋環繞</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>扇形</source>
+        <translation>扇形</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>随机扇形</source>
+        <translation>隨機扇形</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>直线</source>
+        <translation>直線</translation>
+    </message>
+    <message>
+        <source>移动直线</source>
+        <translation type="vanished">移動直線</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>区域</source>
+        <translation>區域</translation>
+    </message>
+    <message>
+        <source>自身周围</source>
+        <translation type="vanished">自身周圍</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>全屏</source>
+        <translation>全螢幕</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>追踪目标</source>
+        <translation>追蹤目標</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>投掷</source>
+        <translation>投擲</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>轨迹</source>
+        <translation>軌跡</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>位移</source>
+        <translation>位移</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>控制</source>
+        <translation>控制</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>召唤</source>
+        <translation>召喚</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>时间停止</source>
+        <translation>時間停止</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>V 形移动</source>
+        <translation>V 形移動</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>未指定</source>
+        <translation>未指定</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>方形</source>
+        <translation>方形</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>十字</source>
+        <translation>十字</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>波浪</source>
+        <translation>波浪</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>三角</source>
+        <translation>三角</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>V 形</source>
+        <translation>V 形</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>自定义区域文件</source>
+        <translation>自訂區域檔案</translation>
+    </message>
+    <message>
+        <location line="-1090"/>
+        <location line="+1108"/>
+        <source>只带入当前武功和所选等级，并以战斗状态进入试玩场景</source>
+        <translation>只帶入目前武功和所選等級，並以戰鬥狀態進入試玩場景</translation>
+    </message>
+    <message>
+        <location line="-1016"/>
+        <location line="+1065"/>
+        <source>本级效果值</source>
+        <translation>本級效果值</translation>
+    </message>
+    <message>
+        <location line="-1077"/>
+        <location line="+1072"/>
+        <source>当前等级</source>
+        <translation>目前等級</translation>
+    </message>
+    <message>
+        <location line="-82"/>
+        <source>对自身</source>
+        <translation>對自身</translation>
+    </message>
+    <message>
+        <location line="-826"/>
+        <source>修改第 %1 级区域形状</source>
+        <translation>修改第 %1 級區域形狀</translation>
+    </message>
+    <message>
+        <location line="-8"/>
+        <source>修改第 %1 级作用方式</source>
+        <translation>修改第 %1 級作用方式</translation>
+    </message>
+    <message>
+        <location line="+834"/>
+        <source>直线移动</source>
+        <translation>直線移動</translation>
+    </message>
+    <message>
+        <location line="-964"/>
+        <location line="+1061"/>
+        <source>当前等级的速度与表现</source>
+        <translation>目前等級的速度與表現</translation>
+    </message>
+    <message>
+        <location line="-1040"/>
+        <location line="+1047"/>
+        <source>附加效果</source>
+        <translation>附加效果</translation>
+    </message>
+    <message>
+        <location line="-1046"/>
+        <location line="+1047"/>
+        <source>飞行速度</source>
+        <translation>飛行速度</translation>
+    </message>
+    <message>
+        <location line="-1046"/>
+        <location line="+1047"/>
+        <source>延迟出现（帧）</source>
+        <translation>延遲出現（幀）</translation>
+    </message>
+    <message>
+        <location line="-1046"/>
+        <location line="+1047"/>
+        <source>持续时间（帧）</source>
+        <translation>持續時間（幀）</translation>
+    </message>
+    <message>
+        <location line="-1046"/>
+        <location line="+1047"/>
+        <source>画面混合</source>
+        <translation>畫面混合</translation>
+    </message>
+    <message>
+        <location line="-1046"/>
+        <location line="+1047"/>
+        <source>飞行亮度</source>
+        <translation>飛行亮度</translation>
+    </message>
+    <message>
+        <location line="-1046"/>
+        <location line="+1047"/>
+        <source>命中亮度</source>
+        <translation>命中亮度</translation>
+    </message>
+    <message>
+        <location line="-1000"/>
+        <location line="+1025"/>
+        <source>全屏特效</source>
+        <translation>全螢幕特效</translation>
+    </message>
+    <message>
+        <location line="-1022"/>
+        <location line="+1023"/>
+        <source>全屏声音</source>
+        <translation>全螢幕聲音</translation>
+    </message>
+    <message>
+        <location line="-1020"/>
+        <location line="+1041"/>
+        <source>施展动作与修炼攻击</source>
+        <translation>施展動作與修煉攻擊</translation>
+    </message>
+    <message>
+        <location line="-1037"/>
+        <location line="+1017"/>
+        <source>关联攻击时的动作</source>
+        <translation>關聯攻擊時的動作</translation>
+    </message>
+    <message>
+        <location line="-1014"/>
+        <location line="+1015"/>
+        <source>施展动作（优先）</source>
+        <translation>施展動作（優先）</translation>
+    </message>
+    <message>
+        <location line="-1013"/>
+        <location line="+1014"/>
+        <source>修炼时的攻击效果</source>
+        <translation>修煉時的攻擊效果</translation>
+    </message>
+    <message>
+        <location line="-1008"/>
+        <location line="+1032"/>
+        <source>角色修炼此武功后，普通攻击会附带这里选择的武功效果。</source>
+        <translation>角色修煉此武功後，普通攻擊會附帶這裡選擇的武功效果。</translation>
+    </message>
+    <message>
+        <location line="-1018"/>
+        <location line="+1023"/>
+        <source>打开关联武功</source>
+        <translation>開啟關聯武功</translation>
+    </message>
+    <message>
+        <location line="-565"/>
+        <source>无</source>
+        <translation>無</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>恢复生命</source>
+        <translation>恢復生命</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>恢复体力</source>
+        <translation>恢復體力</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>减伤护盾</source>
+        <translation>減傷護盾</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>清除异常状态</source>
+        <translation>清除異常狀態</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>吸收伤害护盾</source>
+        <translation>吸收傷害護盾</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>临时改变属性</source>
+        <translation>暫時改變屬性</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>冻结</source>
+        <translation>凍結</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>中毒</source>
+        <translation>中毒</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>石化</source>
+        <translation>石化</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>普通</source>
+        <translation>一般</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>透明叠加</source>
+        <translation>透明疊加</translation>
+    </message>
+    <message>
+        <source>
+删除的是当前项目版本；基础资源中的同名武功会重新生效。</source>
+        <translation>
+刪除的是目前專案版本；基礎資源中的同名武功會重新生效。</translation>
+    </message>
+    <message>
+        <source>
+另有 %1 处动态武功调用需自行检查，不会自动改写。</source>
+        <translation>
+另有 %1 處動態武功呼叫需自行檢查，不會自動改寫。</translation>
+    </message>
+    <message>
+        <source>创建学习脚本</source>
+        <translation>建立學習腳本</translation>
+    </message>
+    <message>
+        <source>删除武功</source>
+        <translation>刪除武功</translation>
+    </message>
+    <message>
+        <source>删除武功…</source>
+        <translation>刪除武功…</translation>
+    </message>
+    <message>
+        <source>副本</source>
+        <translation>副本</translation>
+    </message>
+    <message>
+        <source>动态调用：%1；无法读取的文件：%2。静态未发现引用不代表动态调用不会使用此武功。</source>
+        <translation>動態呼叫：%1；無法讀取的檔案：%2。靜態未發現引用不代表動態呼叫不會使用此武功。</translation>
+    </message>
+    <message>
+        <source>只能删除当前项目中的武功文件。</source>
+        <translation>只能刪除目前專案中的武功檔案。</translation>
+    </message>
+    <message>
+        <source>复制</source>
+        <translation>複製</translation>
+    </message>
+    <message>
+        <source>复制武功</source>
+        <translation>複製武功</translation>
+    </message>
+    <message>
+        <source>将“%1”移入系统回收站。未保存的修改也会放弃。是否继续？</source>
+        <translation>將「%1」移入系統資源回收筒。未儲存的修改也會放棄。是否繼續？</translation>
+    </message>
+    <message>
+        <source>将更新 %1 处明确引用。是否继续？</source>
+        <translation>將更新 %1 處明確引用。是否繼續？</translation>
+    </message>
+    <message>
+        <source>当前文件来自基础资源或已被外部修改。请复制为新武功，或重新打开后再操作。</source>
+        <translation>目前檔案來自基礎資源或已被外部修改。請複製為新武功，或重新開啟後再操作。</translation>
+    </message>
+    <message>
+        <source>找到 %1 处明确引用；双击可打开。删除前请先修改引用。动态调用不会自动改写。</source>
+        <translation>找到 %1 處明確引用；按兩下可開啟。刪除前請先修改引用。動態呼叫不會自動改寫。</translation>
+    </message>
+    <message>
+        <source>文件</source>
+        <translation>檔案</translation>
+    </message>
+    <message>
+        <source>文件已改名，请重新打开武功列表。</source>
+        <translation>檔案已改名，請重新開啟武功清單。</translation>
+    </message>
+    <message>
+        <source>文件已被外部修改，请重新打开后再删除。</source>
+        <translation>檔案已被外部修改，請重新開啟後再刪除。</translation>
+    </message>
+    <message>
+        <source>新建</source>
+        <translation>新增</translation>
+    </message>
+    <message>
+        <source>新建武功</source>
+        <translation>新增武功</translation>
+    </message>
+    <message>
+        <source>新文件名与当前文件名相同。</source>
+        <translation>新檔名與目前檔名相同。</translation>
+    </message>
+    <message>
+        <source>新文件名（显示名称在右侧属性中修改；已识别的引用会一起更新）</source>
+        <translation>新檔名（顯示名稱在右側屬性中修改；已識別的引用會一起更新）</translation>
+    </message>
+    <message>
+        <source>新武功名称</source>
+        <translation>新武功名稱</translation>
+    </message>
+    <message>
+        <source>无法创建武功目录。</source>
+        <translation>無法建立武功目錄。</translation>
+    </message>
+    <message>
+        <source>无法删除武功</source>
+        <translation>無法刪除武功</translation>
+    </message>
+    <message>
+        <source>无法复制武功</source>
+        <translation>無法複製武功</translation>
+    </message>
+    <message>
+        <source>无法新建武功</source>
+        <translation>無法新增武功</translation>
+    </message>
+    <message>
+        <source>无法移入系统回收站，原文件已保留。</source>
+        <translation>無法移入系統資源回收筒，原檔案已保留。</translation>
+    </message>
+    <message>
+        <source>无法重命名</source>
+        <translation>無法重新命名</translation>
+    </message>
+    <message>
+        <source>更多操作…</source>
+        <translation>更多操作…</translation>
+    </message>
+    <message>
+        <source>有文件无法读取，请先处理引用检查中的问题。</source>
+        <translation>有檔案無法讀取，請先處理引用檢查中的問題。</translation>
+    </message>
+    <message>
+        <source>查看引用…</source>
+        <translation>查看引用…</translation>
+    </message>
+    <message>
+        <source>武功名称</source>
+        <translation>武功名稱</translation>
+    </message>
+    <message>
+        <source>武功引用</source>
+        <translation>武功引用</translation>
+    </message>
+    <message>
+        <source>用途</source>
+        <translation>用途</translation>
+    </message>
+    <message>
+        <source>目标文件已经在其它编辑页打开，请先处理该编辑页。</source>
+        <translation>目標檔案已在其他編輯頁開啟，請先處理該編輯頁。</translation>
+    </message>
+    <message>
+        <source>确认重命名</source>
+        <translation>確認重新命名</translation>
+    </message>
+    <message>
+        <source>行</source>
+        <translation>行</translation>
+    </message>
+    <message>
+        <source>请先选择要复制的武功。</source>
+        <translation>請先選擇要複製的武功。</translation>
+    </message>
+    <message>
+        <source>请填写武功名称，不能包含换行。</source>
+        <translation>請填寫武功名稱，不能包含換行。</translation>
+    </message>
+    <message>
+        <source>请输入有效的武功文件名，不包含目录或特殊字符。</source>
+        <translation>請輸入有效的武功檔名，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>请选择当前项目可用的资源文件。</source>
+        <translation>請選擇目前專案可用的資源檔案。</translation>
+    </message>
+    <message>
+        <source>请选择项目资源后再编辑武功。文件必须位于当前项目的武功目录。</source>
+        <translation>請選擇專案資源後再編輯武功。檔案必須位於目前專案的武功目錄。</translation>
+    </message>
+    <message>
+        <source>资源正在保存，请稍后重试。</source>
+        <translation>資源正在儲存，請稍後重試。</translation>
+    </message>
+    <message>
+        <source>这个名称无法完整保存，请换一个名称。</source>
+        <translation>這個名稱無法完整儲存，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>这个文件名已经存在，请换一个名称。</source>
+        <translation>這個檔名已存在，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>这个武功仍被使用：
+%1:%2
+请先修改引用，再删除。</source>
+        <translation>這個武功仍被使用：
+%1:%2
+請先修改引用，再刪除。</translation>
+    </message>
+    <message>
+        <source>部分文件无法按当前文本格式读取，不能安全更新引用：
+%1</source>
+        <translation>部分檔案無法依目前文字格式讀取，不能安全更新引用：
+%1</translation>
+    </message>
+    <message>
+        <source>重命名文件…</source>
+        <translation>重新命名檔案…</translation>
+    </message>
+    <message>
+        <source>重命名武功文件</source>
+        <translation>重新命名武功檔案</translation>
+    </message>
+    <message>
+        <source>动态调用：%1</source>
+        <translation>動態呼叫：%1</translation>
+    </message>
+    <message>
+        <source>无法读取或文本格式不受支持</source>
+        <translation>無法讀取或文字格式不受支援</translation>
+    </message>
+    <message>
+        <source>当前武功：%1（%2）</source>
+        <translation>目前武功：%1（%2）</translation>
+    </message>
+    <message>
+        <source>点击“新建”开始创作，或从左侧选择已有武功。</source>
+        <translation>按「新增」開始創作，或從左側選擇既有武功。</translation>
+    </message>
+    <message>
+        <source>选择武功后可修改、复制或试玩。</source>
+        <translation>選擇武功後可修改、複製或試玩。</translation>
+    </message>
+    <message>
+        <source>带入当前武功和所选等级；F6 打开武功栏，右键放入快捷栏，按 A 施放第一格。</source>
+        <translation>帶入目前武功與所選等級；F6 開啟武功欄，按右鍵放入快捷列，按 A 施放第一格。</translation>
+    </message>
+    <message>
+        <source>快捷栏图标</source>
+        <translation>快捷列圖示</translation>
+    </message>
+    <message>
+        <source>放入快捷栏后显示的图标，不影响飞行特效。</source>
+        <translation>放入快捷列後顯示的圖示，不影響飛行特效。</translation>
+    </message>
+    <message>
+        <source>武功列表中显示的图片。留空时游戏中可能没有可见图片。</source>
+        <translation>武功清單中顯示的圖片。留空時遊戲中可能沒有可見圖片。</translation>
+    </message>
+    <message>
+        <source>武功列表图片</source>
+        <translation>武功清單圖片</translation>
+    </message>
+    <message>
+        <source>试玩时按 F6 打开武功栏，右键放入快捷栏，再按 A 施放第一格武功。</source>
+        <translation>試玩時按 F6 開啟武功欄，按右鍵放入快捷列，再按 A 施放第一格武功。</translation>
+    </message>
+    <message>
+        <source>%1/%2帧</source>
+        <translation>%1/%2幀</translation>
+    </message>
+    <message>
+        <source>上一帧</source>
+        <translation>上一幀</translation>
+    </message>
+    <message>
+        <source>下一帧</source>
+        <translation>下一幀</translation>
+    </message>
+    <message>
+        <source>当前文件帧编号：%1（从0开始）</source>
+        <translation>當前檔案幀編號：%1（從0開始）</translation>
+    </message>
+    <message>
+        <source>拖动到指定帧，动画会暂停；只影响查看，不修改武功。</source>
+        <translation>拖動到指定幀，動畫會暫停；隻影響檢視，不修改武功。</translation>
+    </message>
+    <message>
+        <source>按素材保存顺序选择方向；不修改武功或素材。</source>
+        <translation>按素材儲存順序選擇方向；不修改武功或素材。</translation>
+    </message>
+    <message>
+        <source>播放</source>
+        <translation>播放</translation>
+    </message>
+    <message>
+        <source>方向%1</source>
+        <translation>方向%1</translation>
+    </message>
+    <message>
+        <source>暂停</source>
+        <translation>暫停</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，未更新引用。</source>
+        <translation>部分文件無法讀取，未更新引用。</translation>
+    </message>
+    <message>
+        <source>打开</source>
+        <translation>打開</translation>
+    </message>
+    <message>
+        <source>关联触发</source>
+        <translation>關聯觸發</translation>
+    </message>
+    <message>
+        <source>还原通用</source>
+        <translation>還原通用</translation>
+    </message>
+    <message>
+        <source>还原关联触发通用值</source>
+        <translation>還原關聯觸發通用值</translation>
+    </message>
+    <message>
+        <source>通用值（没有单独设置的等级使用）</source>
+        <translation>通用值（沒有單獨設置的等級使用）</translation>
+    </message>
+    <message>
+        <source>仅第 %1 级</source>
+        <translation>僅第 %1 級</translation>
+    </message>
+    <message>
+        <source>选择触发时使用的武功及参数。等级未单独设置时沿用通用值；还原通用会移除该等级的单独设置。留空的关联不触发，完整连锁效果请试玩检查。</source>
+        <translation>選擇觸發時使用的武功及參數。等級未單獨設置時沿用通用值；還原通用會移除該等級的單獨設置。留空的關聯不觸發，完整連鎖效果請試玩檢查。</translation>
+    </message>
+    <message>
+        <source>飞行途中触发</source>
+        <translation>飛行途中觸發</translation>
+    </message>
+    <message>
+        <source>爆炸时触发</source>
+        <translation>爆炸時觸發</translation>
+    </message>
+    <message>
+        <source>寄生时触发</source>
+        <translation>寄生時觸發</translation>
+    </message>
+    <message>
+        <source>概率追加武功</source>
+        <translation>概率追加武功</translation>
+    </message>
+    <message>
+        <source>施放后追加武功</source>
+        <translation>施放後追加武功</translation>
+    </message>
+    <message>
+        <source>移到新格时触发</source>
+        <translation>移到新格時觸發</translation>
+    </message>
+    <message>
+        <source>击败目标后触发</source>
+        <translation>擊敗目標後觸發</translation>
+    </message>
+    <message>
+        <source>击退结束时触发</source>
+        <translation>擊退結束時觸發</translation>
+    </message>
+    <message>
+        <source>累计命中后替换武功</source>
+        <translation>累計命中後替換武功</translation>
+    </message>
+    <message>
+        <source>跳跃结束时触发</source>
+        <translation>跳躍結束時觸發</translation>
+    </message>
+    <message>
+        <source>飞行触发间隔（毫秒）</source>
+        <translation>飛行觸發間隔（毫秒）</translation>
+    </message>
+    <message>
+        <source>追加概率（0—100%）</source>
+        <translation>追加概率（0—100%）</translation>
+    </message>
+    <message>
+        <source>追加等待（毫秒）</source>
+        <translation>追加等待（毫秒）</translation>
+    </message>
+    <message>
+        <source>启用寄生</source>
+        <translation>啟用寄生</translation>
+    </message>
+    <message>
+        <source>寄生触发间隔（毫秒）</source>
+        <translation>寄生觸發間隔（毫秒）</translation>
+    </message>
+    <message>
+        <source>寄生最大累计效果值</source>
+        <translation>寄生最大累計效果值</translation>
+    </message>
+    <message>
+        <source>替换所需命中次数</source>
+        <translation>替換所需命中次數</translation>
+    </message>
+    <message>
+        <source>启用击退</source>
+        <translation>啟用擊退</translation>
+    </message>
+    <message>
+        <source>启用跳向目标</source>
+        <translation>啟用跳向目標</translation>
+    </message>
+    <message>
+        <source>持续时间结束时也爆炸（所有等级）</source>
+        <translation>持續時間結束時也爆炸（所有等級）</translation>
+    </message>
+    <message>
+        <source>请检查关联路径和参数：文件使用相对路径，数值使用非负整数，概率为0至100。当前输入已保留。</source>
+        <translation>請檢查關聯路徑和參數：文件使用相對路徑，數值使用非負整數，概率為0至100。當前輸入已保留。</translation>
+    </message>
+</context>
+<context>
+    <name>MagicRangePreview</name>
+    <message>
+        <location filename="../ui/MagicRangePreview.cpp" line="+353"/>
+        <source>第 %1 级 · %2</source>
+        <translation>第 %1 級 · %2</translation>
+    </message>
+    <message>
+        <source>橙色为施放者；蓝色为大致作用位置</source>
+        <translation type="vanished">橙色為施放者；藍色為大致作用位置</translation>
+    </message>
+    <message>
+        <location line="+181"/>
+        <source>目标点</source>
+        <translation>目標點</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>飞行</source>
+        <translation>飛行</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>连续飞行</source>
+        <translation>連續飛行</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>环形</source>
+        <translation>環形</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>心形环绕</source>
+        <translation>心形環繞</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>螺旋环绕</source>
+        <translation>螺旋環繞</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>扇形</source>
+        <translation>扇形</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>随机扇形</source>
+        <translation>隨機扇形</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>直线</source>
+        <translation>直線</translation>
+    </message>
+    <message>
+        <source>移动直线</source>
+        <translation type="vanished">移動直線</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>区域</source>
+        <translation>區域</translation>
+    </message>
+    <message>
+        <source>自身周围</source>
+        <translation type="vanished">自身周圍</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>全屏</source>
+        <translation>全螢幕</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>追踪目标</source>
+        <translation>追蹤目標</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>投掷</source>
+        <translation>投擲</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>轨迹</source>
+        <translation>軌跡</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>位移</source>
+        <translation>位移</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>控制</source>
+        <translation>控制</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>召唤</source>
+        <translation>召喚</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>时间停止</source>
+        <translation>時間停止</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>V 形移动</source>
+        <translation>V 形移動</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>其它作用方式 (%1)</source>
+        <translation>其他作用方式 (%1)</translation>
+    </message>
+    <message>
+        <source>方形区域</source>
+        <translation type="vanished">方形區域</translation>
+    </message>
+    <message>
+        <source>十字区域</source>
+        <translation type="vanished">十字區域</translation>
+    </message>
+    <message>
+        <source>波浪区域</source>
+        <translation type="vanished">波浪區域</translation>
+    </message>
+    <message>
+        <source>三角区域</source>
+        <translation type="vanished">三角區域</translation>
+    </message>
+    <message>
+        <source>V 形区域</source>
+        <translation type="vanished">V 形區域</translation>
+    </message>
+    <message>
+        <source>自定义区域文件</source>
+        <translation type="vanished">自訂區域檔案</translation>
+    </message>
+    <message>
+        <location line="+57"/>
+        <source>未指定区域形状</source>
+        <translation>未指定區域形狀</translation>
+    </message>
+    <message>
+        <source>攻击距离：%1 格</source>
+        <translation type="vanished">攻擊距離：%1 格</translation>
+    </message>
+    <message>
+        <source>未单独设置攻击距离</source>
+        <translation type="vanished">未單獨設定攻擊距離</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>V 形排列 %1 道并向施放方向移动</source>
+        <translation>V 形排列 %1 道並向施放方向移動</translation>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>橙色为施放者；蓝色按当前等级显示；施放方向向右</source>
+        <translation>橙色為施放者；藍色按目前等級顯示；施放方向向右</translation>
+    </message>
+    <message>
+        <location line="-11"/>
+        <source>橙色为施放者；深蓝为起始，浅蓝为移动后；箭头为移动方向</source>
+        <translation>橙色為施放者；深藍為起始，淺藍為移動後；箭頭為移動方向</translation>
+    </message>
+    <message>
+        <location line="-141"/>
+        <source>对自身</source>
+        <translation>對自身</translation>
+    </message>
+    <message>
+        <location line="+61"/>
+        <source>目标处 %1 × %1 格方形区域</source>
+        <translation>目標處 %1 × %1 格方形區域</translation>
+    </message>
+    <message>
+        <location line="-12"/>
+        <source>目标处横排 %1 格</source>
+        <translation>目標處橫排 %1 格</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>起始宽度 %1 格，整排向施放方向移动</source>
+        <translation>起始寬度 %1 格，整排向施放方向移動</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>十字四向各延伸 %1 格</source>
+        <translation>十字四向各延伸 %1 格</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>向前 %1 排，V 形展开</source>
+        <translation>向前 %1 排，V 形展開</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>向前 %1 排，每排 5 格</source>
+        <translation>向前 %1 排，每排 5 格</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>向前 %1 排，逐排展开</source>
+        <translation>向前 %1 排，逐排展開</translation>
+    </message>
+    <message>
+        <location line="-66"/>
+        <source>直线移动</source>
+        <translation>直線移動</translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>只对施放者生效</source>
+        <translation>只對施放者生效</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>自定义范围需通过试玩查看</source>
+        <translation>自訂範圍需透過試玩查看</translation>
+    </message>
+    <message>
+        <location line="+37"/>
+        <source>当前类型没有可用的静态范围示意</source>
+        <translation>目前類型沒有可用的靜態範圍示意</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>%1；攻击距离：%2 格</source>
+        <translation>%1；攻擊距離：%2 格</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>橙色为施放者；当前类型不绘制猜测范围</source>
+        <translation>橙色為施放者；目前類型不繪製推測範圍</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>橙色为施放者；蓝色为目标落点；施放方向向右</source>
+        <translation>橙色為施放者；藍色為目標落點；施放方向向右</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>橙色为施放者；深蓝为起点，浅蓝为目标；箭头为移动方向</source>
+        <translation>橙色為施放者；深藍為起點，淺藍為目標；箭頭為移動方向</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>橙色为施放者；浅蓝为发散方向；箭头为弹道方向</source>
+        <translation>橙色為施放者；淺藍為發散方向；箭頭為彈道方向</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>橙色格为施放者，也是效果起点</source>
+        <translation>橙色格為施放者，也是效果起點</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>蓝色为留下的效果；橙色为移动后位置；箭头为角色移动方向</source>
+        <translation>藍色為留下的效果；橙色為移動後位置；箭頭為角色移動方向</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>橙色为起点，浅橙为目标位置；箭头为角色移动方向</source>
+        <translation>橙色為起點，淺橙為目標位置；箭頭為角色移動方向</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>橙色为施放者，蓝色为受控目标；虚线表示控制关系</source>
+        <translation>橙色為施放者，藍色為受控目標；虛線表示控制關係</translation>
+    </message>
+    <message>
+        <location line="-75"/>
+        <source>作用于整个画面</source>
+        <translation>作用於整個畫面</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>飞向并持续追踪移动目标</source>
+        <translation>飛向並持續追蹤移動目標</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>从施放者投掷到目标位置</source>
+        <translation>從施放者投擲到目標位置</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>施放者移动时，在经过位置留下效果</source>
+        <translation>施放者移動時，在經過位置留下效果</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>施放者从起点移动到目标位置</source>
+        <translation>施放者從起點移動到目標位置</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>效果附着施放者，并控制选定目标</source>
+        <translation>效果附著施放者，並控制選定目標</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>在目标位置产生召唤</source>
+        <translation>在目標位置產生召喚</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>由施放者触发时间停止，不表示周围范围</source>
+        <translation>由施放者觸發時間停止，不表示周圍範圍</translation>
+    </message>
+    <message>
+        <location line="-76"/>
+        <source>未定义作用方式，不显示推测范围</source>
+        <translation>未定義作用方式，不顯示推測範圍</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>只在目标落点生成效果</source>
+        <translation>只在目標落點產生效果</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>从施放者飞向目标</source>
+        <translation>從施放者飛向目標</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>连续发射 %1 道，均飞向目标</source>
+        <translation>連續發射 %1 道，均飛向目標</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>从施放者向四周同时发散 32 道</source>
+        <translation>從施放者向四周同時發散 32 道</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>向四周发散，飞行时序形成心形</source>
+        <translation>向四周發散，飛行時序形成心形</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>向四周依次发射，形成螺旋效果</source>
+        <translation>向四周依次發射，形成螺旋效果</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>向前方扇形发射 %1 道</source>
+        <translation>向前方扇形發射 %1 道</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>向前方随机错开发射 %1 道</source>
+        <translation>向前方隨機錯開發射 %1 道</translation>
+    </message>
+</context>
+<context>
     <name>MainWindow</name>
     <message>
         <location filename="../ui/MainWindow.ui" line="+6"/>
-        <location filename="../ui/MainWindow.cpp" line="+5442"/>
+        <location filename="../ui/MainWindow.cpp" line="+7712"/>
         <source>UPEdit-JXQY</source>
         <translation>UPEdit-JXQY</translation>
     </message>
@@ -5286,22 +9288,21 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>UPEdit-JXQY - %1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.ui" line="+41"/>
+        <location filename="../ui/MainWindow.ui" line="+53"/>
         <source>文件(&amp;F)</source>
         <translation>檔案(&amp;F)</translation>
     </message>
     <message>
-        <location line="+25"/>
         <source>更多工具(&amp;T)</source>
-        <translation>更多工具(&amp;T)</translation>
+        <translation type="vanished">更多工具(&amp;T)</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+54"/>
         <source>视图(&amp;V)</source>
         <translation>檢視(&amp;V)</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+5"/>
         <source>主题(&amp;P)</source>
         <translation>主題(&amp;P)</translation>
     </message>
@@ -5311,18 +9312,18 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>說明(&amp;H)</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="-5209"/>
+        <location filename="../ui/MainWindow.cpp" line="-7275"/>
         <source>语言(&amp;L)</source>
         <translation>語言(&amp;L)</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.ui" line="-50"/>
+        <location filename="../ui/MainWindow.ui" line="-62"/>
         <source>最近打开的文件</source>
         <translation>最近開啟的檔案</translation>
     </message>
     <message>
-        <location line="+83"/>
-        <location filename="../ui/MainWindow.cpp" line="+4554"/>
+        <location line="+97"/>
+        <location filename="../ui/MainWindow.cpp" line="+6594"/>
         <source>新建项目</source>
         <translation>新增專案</translation>
     </message>
@@ -5333,7 +9334,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+8"/>
-        <location filename="../ui/MainWindow.cpp" line="+259"/>
+        <location filename="../ui/MainWindow.cpp" line="+268"/>
         <source>打开项目</source>
         <translation>開啟專案</translation>
     </message>
@@ -5343,17 +9344,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>Ctrl+Shift+O</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>保存项目</source>
-        <translation>儲存專案</translation>
+        <translation type="vanished">儲存專案</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+11"/>
         <source>Ctrl+Shift+S</source>
         <translation>Ctrl+Shift+S</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+33"/>
         <source>项目设置</source>
         <translation>專案設定</translation>
     </message>
@@ -5374,7 +9374,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location filename="../ui/MainWindow.cpp" line="-1277"/>
+        <location filename="../ui/MainWindow.cpp" line="-1759"/>
         <location line="+4"/>
         <source>资源格式转换</source>
         <translation>資源格式轉換</translation>
@@ -5385,8 +9385,8 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>Ctrl+B</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location filename="../ui/MainWindow.cpp" line="+236"/>
+        <location line="+16"/>
+        <location filename="../ui/MainWindow.cpp" line="+344"/>
         <location line="+3"/>
         <source>图片编辑器</source>
         <translation>圖片編輯器</translation>
@@ -5409,20 +9409,20 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>Ctrl+G</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location filename="../ui/MainWindow.cpp" line="+25"/>
-        <location line="+3"/>
+        <location filename="../ui/MainWindow.cpp" line="-504"/>
+        <location line="+532"/>
+        <location line="+5"/>
         <source>菜单编辑器</source>
         <translation>選單編輯器</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location filename="../ui/MainWindow.ui" line="+11"/>
         <source>Ctrl+M</source>
         <translation>Ctrl+M</translation>
     </message>
     <message>
         <location line="+8"/>
-        <location filename="../ui/MainWindow.cpp" line="+19"/>
+        <location filename="../ui/MainWindow.cpp" line="+20"/>
         <location line="+3"/>
         <source>脚本编辑器</source>
         <translation>腳本編輯器</translation>
@@ -5445,24 +9445,20 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>Ctrl+Shift+D</translation>
     </message>
     <message>
-        <location line="+8"/>
-        <location filename="../ui/MainWindow.cpp" line="+34"/>
-        <location line="+2"/>
         <source>资源清单编辑器</source>
-        <translation>資源清單編輯器</translation>
+        <translation type="vanished">資源清單編輯器</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+11"/>
         <source>Ctrl+Shift+R</source>
         <translation>Ctrl+Shift+R</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>编辑 game_profile.ini 资源清单，支持多资源包选择与创建</source>
-        <translation>編輯 game_profile.ini 資源清單，支援多資源包選擇與建立</translation>
+        <translation type="vanished">編輯 game_profile.ini 資源清單，支援多資源包選擇與建立</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+8"/>
         <source>资源引用搜索...</source>
         <translation>資源引用搜尋...</translation>
     </message>
@@ -5482,12 +9478,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>在目前專案的活動內容根中搜尋腳本、預覽變更，並以交易方式取代所選檔案</translation>
     </message>
     <message>
-        <location line="+5"/>
         <source>设置资源目录</source>
-        <translation>設定資源目錄</translation>
+        <translation type="vanished">設定資源目錄</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+13"/>
         <source>Windows 文件关联...</source>
         <translation>Windows 檔案關聯...</translation>
     </message>
@@ -5507,17 +9502,47 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>Alt+F4</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-164"/>
         <source>撤销</source>
         <translation>復原</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-116"/>
+        <source>内容编辑(&amp;E)</source>
+        <translation>內容編輯(&amp;E)</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>工具(&amp;T)</source>
+        <translation>工具(&amp;T)</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>查找</source>
+        <translation>尋找</translation>
+    </message>
+    <message>
+        <location line="+89"/>
+        <source>保存项目设置</source>
+        <translation>儲存專案設定</translation>
+    </message>
+    <message>
+        <location line="+25"/>
         <source>重做</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+71"/>
+        <source>游戏界面编辑器</source>
+        <translation>遊戲介面編輯器</translation>
+    </message>
+    <message>
+        <location line="+63"/>
+        <source>临时打开资源目录…</source>
+        <translation>暫時開啟資源目錄…</translation>
+    </message>
+    <message>
+        <location line="+27"/>
         <source>关闭当前文档</source>
         <translation>關閉目前文件</translation>
     </message>
@@ -5547,29 +9572,30 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>清除最近檔案清單</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="-4041"/>
-        <location line="+149"/>
-        <location line="+4458"/>
+        <location filename="../ui/MainWindow.cpp" line="-5742"/>
+        <location line="+209"/>
+        <location line="+19"/>
+        <location line="+6472"/>
         <source>就绪 - 拖放文件到此处可直接打开</source>
         <translation>就緒 - 將檔案拖放至此即可開啟</translation>
     </message>
     <message>
-        <location line="-1027"/>
+        <location line="-1490"/>
         <source>不支持的文件格式: %1</source>
         <translation>不支援的檔案格式：%1</translation>
     </message>
     <message>
-        <location line="-230"/>
+        <location line="-375"/>
         <source>文件不存在: %1</source>
         <translation>檔案不存在：%1</translation>
     </message>
     <message>
-        <location line="+848"/>
+        <location line="+1157"/>
         <source>选择游戏资源目录</source>
         <translation>選擇遊戲資源目錄</translation>
     </message>
     <message>
-        <location line="+378"/>
+        <location line="+403"/>
         <source>设置失败</source>
         <translation>設定失敗</translation>
     </message>
@@ -5579,44 +9605,39 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法儲存資源目錄設定，所有編輯器仍使用原目錄。</translation>
     </message>
     <message>
-        <location line="-300"/>
+        <location line="-313"/>
         <source>资源目录已清除</source>
         <translation>資源目錄已清除</translation>
     </message>
     <message>
-        <location line="-57"/>
+        <location line="-66"/>
         <source>文件关联启动路径修复失败：%1</source>
         <translation>檔案關聯啟動路徑修復失敗：%1</translation>
     </message>
     <message>
-        <location line="-898"/>
+        <location line="-1423"/>
         <source>启动时一次只能打开一个路径。</source>
         <translation>啟動時一次只能開啟一個路徑。</translation>
     </message>
     <message>
-        <location line="-3169"/>
         <source>桌面运行</source>
-        <translation>桌面執行</translation>
+        <translation type="vanished">桌面執行</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>运行已保存场景</source>
-        <translation>執行已儲存場景</translation>
+        <translation type="vanished">執行已儲存場景</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>在私有会话中运行当前选择的已保存场景</source>
-        <translation>在私有工作階段中執行目前選取的已儲存場景</translation>
+        <translation type="vanished">在私有工作階段中執行目前選取的已儲存場景</translation>
     </message>
     <message>
-        <location line="+4"/>
         <source>停止桌面运行</source>
-        <translation>停止桌面執行</translation>
+        <translation type="vanished">停止桌面執行</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>停止当前桌面游戏进程</source>
-        <translation>停止目前的桌面遊戲處理程序</translation>
+        <translation type="vanished">停止目前的桌面遊戲處理程序</translation>
     </message>
     <message>
         <source>桌面场景运行结束；失败现场已保留：%1</source>
@@ -5627,12 +9648,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation type="vanished">桌面場景執行在建立可清理工作階段前失敗：%1</translation>
     </message>
     <message>
-        <location line="+321"/>
         <source>清理运行会话失败</source>
-        <translation>清理執行工作階段失敗</translation>
+        <translation type="vanished">清理執行工作階段失敗</translation>
     </message>
     <message>
-        <location line="+267"/>
+        <location line="-3517"/>
         <source>选择桌面游戏可执行文件</source>
         <translation>選擇桌面遊戲可執行檔</translation>
     </message>
@@ -5707,19 +9727,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>桌面遊戲可執行檔無效。</translation>
     </message>
     <message>
-        <location line="+231"/>
         <source>无法运行场景</source>
-        <translation>無法執行場景</translation>
+        <translation type="vanished">無法執行場景</translation>
     </message>
     <message>
-        <location line="-208"/>
         <source>资源转换或脚本检查仍在进行；请先取消或等待任务结束。</source>
-        <translation>資源轉換或指令碼檢查仍在進行；請先取消或等待工作結束。</translation>
+        <translation type="vanished">資源轉換或指令碼檢查仍在進行；請先取消或等待工作結束。</translation>
     </message>
     <message>
-        <location line="+220"/>
         <source>请先打开项目并选择一个已保存的场景。</source>
-        <translation>請先開啟專案並選擇一個已儲存的場景。</translation>
+        <translation type="vanished">請先開啟專案並選擇一個已儲存的場景。</translation>
     </message>
     <message>
         <source>场景包含未保存内容</source>
@@ -5732,7 +9749,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="-98"/>
+        <location line="+204"/>
         <source>准备错误 %1</source>
         <translation>準備錯誤 %1</translation>
     </message>
@@ -5752,84 +9769,74 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>；路徑：%1</translation>
     </message>
     <message>
-        <location line="+100"/>
         <source>场景运行准备失败</source>
-        <translation>場景執行準備失敗</translation>
+        <translation type="vanished">場景執行準備失敗</translation>
     </message>
     <message>
         <source>场景或资源上下文不可用于桌面运行。</source>
         <translation type="vanished">場景或資源內容無法用於桌面執行。</translation>
     </message>
     <message>
-        <location line="-66"/>
         <source>无法创建私有运行目录</source>
-        <translation>無法建立私有執行目錄</translation>
+        <translation type="vanished">無法建立私有執行目錄</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+33"/>
+        <location line="+293"/>
+        <location line="+143"/>
+        <location line="+101"/>
+        <location line="+103"/>
+        <location line="+107"/>
         <source>%1
 路径：%2</source>
         <translation>%1
 路徑：%2</translation>
     </message>
     <message>
-        <location line="+28"/>
         <source>无法启动桌面运行</source>
-        <translation>無法啟動桌面執行</translation>
+        <translation type="vanished">無法啟動桌面執行</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>运行请求未被接受；请重新检查游戏路径和当前进程状态。</source>
-        <translation>執行要求未被接受；請重新檢查遊戲路徑和目前的處理程序狀態。</translation>
+        <translation type="vanished">執行要求未被接受；請重新檢查遊戲路徑和目前的處理程序狀態。</translation>
     </message>
     <message>
-        <location line="+37"/>
         <source>正在准备已保存场景的私有桌面运行会话...</source>
-        <translation>正在準備已儲存場景的私有桌面執行工作階段...</translation>
+        <translation type="vanished">正在準備已儲存場景的私有桌面執行工作階段...</translation>
     </message>
     <message>
-        <location line="+847"/>
-        <location line="+19"/>
         <source>无法清理运行会话</source>
-        <translation>無法清理執行工作階段</translation>
+        <translation type="vanished">無法清理執行工作階段</translation>
     </message>
     <message>
-        <location line="-18"/>
         <source>所选终态会话不再由当前编辑器实例持有。</source>
-        <translation>選取的終止狀態工作階段已不再由目前的編輯器執行個體持有。</translation>
+        <translation type="vanished">選取的終止狀態工作階段已不再由目前的編輯器執行個體持有。</translation>
     </message>
     <message>
-        <location line="+5"/>
         <source>清理运行会话</source>
         <translation type="vanished">清理執行工作階段</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>仅删除以下已终止的私有会话目录吗？
 %1</source>
         <translation type="vanished">只刪除下列已終止的私有工作階段目錄嗎？
 %1</translation>
     </message>
     <message>
-        <location line="+13"/>
         <source>会话正在使用，或运行记录身份不匹配。</source>
-        <translation>工作階段正在使用中，或執行記錄身分不相符。</translation>
+        <translation type="vanished">工作階段正在使用中，或執行記錄身分不相符。</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+744"/>
         <location line="+21"/>
-        <location line="+16"/>
-        <location line="+40"/>
+        <location line="+56"/>
         <location line="+18"/>
-        <location line="+39"/>
-        <location line="+10"/>
-        <location line="+42"/>
-        <location line="+22"/>
+        <location line="+63"/>
         <source>无法打开诊断位置</source>
         <translation>無法開啟診斷位置</translation>
     </message>
     <message>
-        <location line="-207"/>
+        <location line="-157"/>
         <source>诊断记录不属于当前显示的桌面运行会话。</source>
         <translation>診斷記錄不屬於目前顯示的桌面執行工作階段。</translation>
     </message>
@@ -5839,22 +9846,19 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>診斷檔案不屬於目前執行場景已驗證的直接參照：%1</translation>
     </message>
     <message>
-        <location line="+16"/>
         <source>诊断行列超出编辑器支持范围。</source>
-        <translation>診斷行列超出編輯器支援範圍。</translation>
+        <translation type="vanished">診斷行列超出編輯器支援範圍。</translation>
     </message>
     <message>
-        <location line="+97"/>
         <source>诊断源文件在本次运行启动后已发生变化；为避免显示错误行列，请重新运行场景后再打开：%1</source>
-        <translation>診斷來源檔案在本次執行啟動後已發生變更；為避免顯示錯誤行列，請重新執行場景後再開啟：%1</translation>
+        <translation type="vanished">診斷來源檔案在本次執行啟動後已發生變更；為避免顯示錯誤行列，請重新執行場景後再開啟：%1</translation>
     </message>
     <message>
-        <location line="+10"/>
         <source>诊断源文件已缺失、越界、不再是普通文件，或启动内容绑定无效：%1</source>
-        <translation>診斷來源檔案已遺失、越界、不再是一般檔案，或啟動內容繫結無效：%1</translation>
+        <translation type="vanished">診斷來源檔案已遺失、越界、不再是一般檔案，或啟動內容繫結無效：%1</translation>
     </message>
     <message>
-        <location line="+42"/>
+        <location line="+137"/>
         <source>诊断源文件已由不兼容的文档编辑器占用：%1</source>
         <translation>診斷來源檔案已由不相容的文件編輯器占用：%1</translation>
     </message>
@@ -5863,190 +9867,168 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation type="vanished">指令碼編輯緩衝區包含未儲存的修改，未覆寫目前內容：%1</translation>
     </message>
     <message>
-        <location line="-72"/>
-        <location line="+142"/>
         <source>无法定位诊断位置</source>
-        <translation>無法定位診斷位置</translation>
+        <translation type="vanished">無法定位診斷位置</translation>
     </message>
     <message>
-        <location line="-2052"/>
-        <location line="+2252"/>
         <source>运行当前地图</source>
-        <translation>執行目前地圖</translation>
+        <translation type="vanished">執行目前地圖</translation>
     </message>
     <message>
-        <location line="-2250"/>
-        <location line="+2255"/>
         <source>使用当前内存 MAP 和已打开伴随列表启动私有桌面运行</source>
-        <translation>使用目前記憶體中的 MAP 與已開啟的隨附清單啟動私有桌面執行</translation>
+        <translation type="vanished">使用目前記憶體中的 MAP 與已開啟的隨附清單啟動私有桌面執行</translation>
     </message>
     <message>
-        <location line="-2248"/>
-        <location line="+2143"/>
         <source>运行当前脚本</source>
-        <translation>執行目前腳本</translation>
+        <translation type="vanished">執行目前腳本</translation>
     </message>
     <message>
-        <location line="-2141"/>
-        <location line="+2147"/>
         <source>使用当前脚本缓冲区和已保存场景环境启动私有桌面运行</source>
-        <translation>使用目前腳本緩衝區與已儲存的場景環境啟動私有桌面執行</translation>
+        <translation type="vanished">使用目前腳本緩衝區與已儲存的場景環境啟動私有桌面執行</translation>
     </message>
     <message>
-        <location line="-2140"/>
-        <location line="+1171"/>
-        <location line="+982"/>
+        <location line="-2770"/>
+        <location line="+1969"/>
+        <location line="+1000"/>
         <source>剧情图</source>
         <translation>劇情圖</translation>
     </message>
     <message>
-        <location line="-2151"/>
-        <location line="+2157"/>
+        <location line="-2976"/>
+        <location line="+9"/>
+        <location line="+2958"/>
+        <location line="+14"/>
         <source>分析当前脚本的控制流、剧情语义和跨文件关系</source>
         <translation>分析目前腳本的控制流程、劇情語意及跨檔案關係</translation>
     </message>
     <message>
-        <location line="-1895"/>
         <source>桌面运行完成。</source>
-        <translation>桌面執行完成。</translation>
+        <translation type="vanished">桌面執行完成。</translation>
     </message>
     <message>
-        <location line="+5"/>
         <source>桌面运行结束；失败现场已保留：%1</source>
-        <translation>桌面執行結束；失敗現場已保留：%1</translation>
+        <translation type="vanished">桌面執行結束；失敗現場已保留：%1</translation>
     </message>
     <message>
-        <location line="+7"/>
         <source>桌面运行在创建可清理会话前失败：%1</source>
-        <translation>桌面執行在建立可清理工作階段前失敗：%1</translation>
+        <translation type="vanished">桌面執行在建立可清理工作階段前失敗：%1</translation>
     </message>
     <message>
-        <location line="+397"/>
+        <location line="-2083"/>
         <source>请先打开一个带已保存运行配置的项目。</source>
         <translation>請先開啟具有已儲存執行設定的專案。</translation>
     </message>
     <message>
-        <location line="+95"/>
         <source>以下相关文档包含无法安全序列化的未保存内容，运行已在创建会话和游戏进程前停止。请保存、丢弃或关闭这些文档后重试：
 %1</source>
-        <translation>下列相關文件包含無法安全序列化的未儲存內容，執行已在建立工作階段與遊戲處理程序前停止。請儲存、捨棄或關閉這些文件後再試：
+        <translation type="vanished">下列相關文件包含無法安全序列化的未儲存內容，執行已在建立工作階段與遊戲處理程序前停止。請儲存、捨棄或關閉這些文件後再試：
 %1</translation>
     </message>
     <message>
-        <location line="+32"/>
         <source>当前目标或资源上下文不可用于桌面运行。</source>
-        <translation>目前目標或資源內容無法用於桌面執行。</translation>
+        <translation type="vanished">目前目標或資源內容無法用於桌面執行。</translation>
     </message>
     <message>
-        <location line="+101"/>
         <source>无法运行当前地图</source>
-        <translation>無法執行目前地圖</translation>
+        <translation type="vanished">無法執行目前地圖</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+454"/>
         <source>地图窗口尚未加载 MAP。</source>
         <translation>地圖視窗尚未載入 MAP。</translation>
     </message>
     <message>
-        <location line="+15"/>
         <source>editor_run.current_target.outside_active_root
 地图窗口的资源根不是当前项目的活动内容根。</source>
-        <translation>editor_run.current_target.outside_active_root
+        <translation type="vanished">editor_run.current_target.outside_active_root
 地圖視窗的資源根目錄不是目前專案的作用中內容根目錄。</translation>
     </message>
     <message>
-        <location line="+16"/>
         <source>%1
 当前 MAP 必须先保存到活动内容根中的稳定路径。
 路径：%2</source>
-        <translation>%1
+        <translation type="vanished">%1
 目前 MAP 必須先儲存至作用中內容根目錄內的穩定路徑。
 路徑：%2</translation>
     </message>
     <message>
-        <location line="+23"/>
         <source>editor_run.current_map.companion_path_required
 已打开的 %1 列表必须先另存到活动内容根。</source>
-        <translation>editor_run.current_map.companion_path_required
+        <translation type="vanished">editor_run.current_map.companion_path_required
 已開啟的 %1 清單必須先另存至作用中內容根目錄。</translation>
     </message>
     <message>
-        <location line="+15"/>
         <source>%1
 已打开的 %2 列表必须使用活动内容根中的稳定文件。
 路径：%3</source>
-        <translation>%1
+        <translation type="vanished">%1
 已開啟的 %2 清單必須使用作用中內容根目錄內的穩定檔案。
 路徑：%3</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+80"/>
         <source>NPC</source>
         <translation>NPC</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+7"/>
         <source>OBJ</source>
         <translation>OBJ</translation>
     </message>
     <message>
-        <location line="+23"/>
-        <location line="+82"/>
+        <location line="+26"/>
+        <location line="+118"/>
         <source>
 匹配场景：%1</source>
         <translation>
 相符場景：%1</translation>
     </message>
     <message>
-        <location line="-51"/>
         <source>正在准备当前地图的私有桌面运行会话...</source>
-        <translation>正在準備目前地圖的私有桌面執行工作階段...</translation>
+        <translation type="vanished">正在準備目前地圖的私有桌面執行工作階段...</translation>
     </message>
     <message>
-        <location line="+7"/>
         <source>无法运行当前脚本</source>
-        <translation>無法執行目前腳本</translation>
+        <translation type="vanished">無法執行目前腳本</translation>
     </message>
     <message>
-        <location line="+23"/>
         <source>%1
 当前脚本必须先保存到活动内容根中的稳定路径。
 路径：%2</source>
-        <translation>%1
+        <translation type="vanished">%1
 目前腳本必須先儲存至作用中內容根目錄內的穩定路徑。
 路徑：%2</translation>
     </message>
     <message>
-        <location line="+63"/>
         <source>正在准备当前脚本的私有桌面运行会话...</source>
-        <translation>正在準備目前腳本的私有桌面執行工作階段...</translation>
+        <translation type="vanished">正在準備目前腳本的私有桌面執行工作階段...</translation>
     </message>
     <message>
-        <location line="+94"/>
+        <location line="+472"/>
         <source>无法生成剧情图</source>
         <translation>無法產生劇情圖</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+107"/>
+        <location line="+108"/>
         <source>%1
 %2</source>
         <translation>%1
 %2</translation>
     </message>
     <message>
-        <location line="-92"/>
+        <location line="-93"/>
         <source>请先打开项目，再从活动内容根中的脚本生成剧情图。</source>
         <translation>請先開啟專案，再從作用中內容根目錄內的腳本產生劇情圖。</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+939"/>
+        <location line="+978"/>
         <source>入口脚本窗口已关闭；请从另一个脚本窗口重新打开剧情图。</source>
         <translation>入口腳本視窗已關閉；請從另一個腳本視窗重新開啟劇情圖。</translation>
     </message>
     <message>
-        <location line="-913"/>
+        <location line="-951"/>
         <source>无法按当前项目和活动资源包解析有序内容根。</source>
         <translation>無法依目前專案和作用中資源包解析內容根目錄順序。</translation>
     </message>
@@ -6067,72 +10049,65 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>無法透過目前作用中資源根目錄路徑安全讀取入口腳本。</translation>
     </message>
     <message>
-        <location line="+190"/>
-        <location line="+39"/>
-        <location line="+126"/>
+        <location line="+188"/>
+        <location line="+85"/>
+        <location line="+83"/>
         <source>无法定位剧情图节点</source>
         <translation>無法定位劇情圖節點</translation>
     </message>
     <message>
-        <location line="-164"/>
+        <location line="-167"/>
         <source>该节点没有可导航的源码位置。</source>
         <translation>此節點沒有可跳轉的原始碼位置。</translation>
     </message>
     <message>
-        <location line="+39"/>
+        <location line="+85"/>
         <source>目标源码已由不兼容的文档编辑器占用：%1</source>
         <translation>目標原始碼已由不相容的文件編輯器占用：%1</translation>
     </message>
     <message>
+        <location line="+83"/>
         <source>当前逻辑资源路径中未找到目标源码：%1</source>
         <translation>目前邏輯資源路徑中找不到目標原始碼：%1</translation>
     </message>
     <message>
-        <location line="+16"/>
         <source>剧情图结果已过期</source>
-        <translation>劇情圖結果已過期</translation>
+        <translation type="vanished">劇情圖結果已過期</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>%1
 为避免跳转到错误位置，已禁用当前结果并请求重新分析。
 来源：%2</source>
-        <translation>%1
+        <translation type="vanished">%1
 為避免跳轉到錯誤位置，目前結果已停用，並已要求重新分析。
 來源：%2</translation>
     </message>
     <message>
-        <location line="+13"/>
         <source>分析绑定的编辑缓冲区已经关闭。</source>
-        <translation>與分析綁定的編輯緩衝區已關閉。</translation>
+        <translation type="vanished">與分析綁定的編輯緩衝區已關閉。</translation>
     </message>
     <message>
-        <location line="+16"/>
         <source>编辑缓冲区在分析后已经变化。</source>
-        <translation>編輯緩衝區在分析後已變更。</translation>
+        <translation type="vanished">編輯緩衝區在分析後已變更。</translation>
     </message>
     <message>
-        <location line="+10"/>
         <source>磁盘源码在分析后已变化、缺失或不再能从原资源根安全读取。</source>
-        <translation>磁碟上的原始碼在分析後已變更、遺失，或無法再從原資源根目錄安全讀取。</translation>
+        <translation type="vanished">磁碟上的原始碼在分析後已變更、遺失，或無法再從原資源根目錄安全讀取。</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>目标脚本窗口包含未保存修改，与分析使用的磁盘内容不同。</source>
-        <translation>目標腳本視窗包含未儲存的修改，與分析所用的磁碟內容不同。</translation>
+        <translation type="vanished">目標腳本視窗包含未儲存的修改，與分析所用的磁碟內容不同。</translation>
     </message>
     <message>
-        <location line="+15"/>
         <source>已打开脚本的缓冲区与分析使用的磁盘内容不同。</source>
-        <translation>已開啟腳本的緩衝區與分析所用的磁碟內容不同。</translation>
+        <translation type="vanished">已開啟腳本的緩衝區與分析所用的磁碟內容不同。</translation>
     </message>
     <message>
-        <location line="+47"/>
         <source>源码内容仍匹配，但节点行列超出当前编辑器范围：%1:%2:%3</source>
-        <translation>原始碼內容仍相符，但節點行列超出目前編輯器範圍：%1:%2:%3</translation>
+        <translation type="vanished">原始碼內容仍相符，但節點行列超出目前編輯器範圍：%1:%2:%3</translation>
     </message>
     <message>
-        <location line="+139"/>
+        <location line="+171"/>
         <source>editor_run.source.binding_missing
 诊断绑定的是启动时的编辑缓冲区，但该缓冲区已关闭：%1</source>
         <translation>editor_run.source.binding_missing
@@ -6140,39 +10115,36 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+18"/>
-        <location line="+113"/>
         <source>editor_run.source.buffer_changed
 脚本缓冲区在本次运行启动后已变化；为避免定位到错误内容，请重新运行后再打开：%1</source>
         <translation>editor_run.source.buffer_changed
 腳本緩衝區在本次執行啟動後已變更；為避免定位到錯誤內容，請重新執行後再開啟：%1</translation>
     </message>
     <message>
-        <location line="-93"/>
         <source>文件缓冲区未被覆盖，但诊断行列在启动内容中无效：%1:%2:%3</source>
-        <translation>檔案緩衝區未被覆寫，但診斷行列在啟動時的內容中無效：%1:%2:%3</translation>
+        <translation type="vanished">檔案緩衝區未被覆寫，但診斷行列在啟動時的內容中無效：%1:%2:%3</translation>
     </message>
     <message>
-        <location line="+142"/>
         <source>文件已打开，但诊断行列在当前文档中无效：%1:%2:%3</source>
-        <translation>檔案已開啟，但診斷行列在目前文件中無效：%1:%2:%3</translation>
+        <translation type="vanished">檔案已開啟，但診斷行列在目前文件中無效：%1:%2:%3</translation>
     </message>
     <message>
-        <location line="+1103"/>
+        <location line="+1613"/>
         <source>启动文件路径不能为空。</source>
         <translation>啟動檔案路徑不能為空。</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+226"/>
         <source>项目资源导入/转换期间不能打开内容文件。</source>
         <translation>專案資源匯入/轉換期間無法開啟內容檔案。</translation>
     </message>
     <message>
-        <location line="+337"/>
+        <location line="+475"/>
         <source>项目资源导入/转换</source>
         <translation>專案資源匯入/轉換</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+63"/>
         <source>项目未配置原始资源根</source>
         <translation>專案尚未設定原始資源根</translation>
     </message>
@@ -6182,7 +10154,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>請先在「專案設定」中選擇唯讀原始資源根，再開始專案資源匯入/轉換。</translation>
     </message>
     <message>
-        <location line="+69"/>
+        <location line="+126"/>
         <source>项目导入正在进行</source>
         <translation>專案匯入進行中</translation>
     </message>
@@ -6192,12 +10164,12 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>目前轉換視窗仍在工作，無法重新繫結專案資源上下文。</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+18"/>
         <source>已有项目资源导入正在进行。</source>
         <translation>已有專案資源匯入正在進行。</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+14"/>
         <source>项目、资源根或活动资源包已改变，请重新打开项目导入入口。</source>
         <translation>專案、資源根或活動資源包已變更，請重新開啟專案匯入入口。</translation>
     </message>
@@ -6227,7 +10199,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>轉換期間專案上下文發生變更；輸出已保留，但專案未自動切換。</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+12"/>
         <source>重新解析转换输出或保存项目资源设置失败。</source>
         <translation>重新解析轉換輸出或儲存專案資源設定失敗。</translation>
     </message>
@@ -6237,7 +10209,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>專案資源已匯入並重新載入</translation>
     </message>
     <message>
-        <location line="+191"/>
+        <location line="+224"/>
         <location line="+19"/>
         <location line="+56"/>
         <source>资源引用搜索</source>
@@ -6295,7 +10267,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+23"/>
         <source>资源引用搜索完成：静态引用 %1，缺失 %2，问题 %3。</source>
         <translation>資源引用搜尋完成：靜態引用 %1，缺少 %2，問題 %3。</translation>
     </message>
@@ -6316,7 +10288,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>目前專案的活動內容根無法使用。</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+39"/>
         <source>项目脚本事务替换完成：文件 %1，匹配 %2。</source>
         <translation>專案腳本交易取代完成：檔案 %1，符合項目 %2。</translation>
     </message>
@@ -6326,27 +10298,25 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation> 警告：%1</translation>
     </message>
     <message>
-        <location line="+95"/>
+        <location line="+111"/>
         <source>资源目录已设置: %1</source>
         <translation>資源目錄已設定：%1</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+41"/>
         <source>项目活动资源包已设置: %1</source>
         <translation>專案作用中資源包已設定: %1</translation>
     </message>
     <message>
-        <location line="+35"/>
         <source>资源包 ID 重复</source>
-        <translation>資源包 ID 重複</translation>
+        <translation type="vanished">資源包 ID 重複</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>资源集合中有多个资源包使用 ID“%1”。项目不能用该 ID 唯一定位活动包，请先在 resources.ini 或 game_profile.ini 中修复重复 ID。</source>
-        <translation>資源集合中有多個資源包使用 ID「%1」。專案無法用該 ID 唯一定位作用中包，請先在 resources.ini 或 game_profile.ini 中修正重複 ID。</translation>
+        <translation type="vanished">資源集合中有多個資源包使用 ID「%1」。專案無法用該 ID 唯一定位作用中包，請先在 resources.ini 或 game_profile.ini 中修正重複 ID。</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+37"/>
         <source>资源目录无效</source>
         <translation>資源目錄無效</translation>
     </message>
@@ -6365,19 +10335,17 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
 %1</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>资源配置无效</source>
-        <translation>資源設定無效</translation>
+        <translation type="vanished">資源設定無效</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>资源目录包含 resources.ini 或 game_profile.ini，但没有可读取的活动资源包。请先修复资源清单：
 %1</source>
-        <translation>資源目錄包含 resources.ini 或 game_profile.ini，但沒有可讀取的作用中資源包。請先修正資源清單：
+        <translation type="vanished">資源目錄包含 resources.ini 或 game_profile.ini，但沒有可讀取的作用中資源包。請先修正資源清單：
 %1</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+17"/>
         <source>活动资源包无效</source>
         <translation>作用中資源包無效</translation>
     </message>
@@ -6412,7 +10380,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>內容編輯器將從所選資源包根目錄載入和儲存檔案：</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+55"/>
         <location line="+12"/>
         <location line="+12"/>
         <source>项目设置无效</source>
@@ -6438,17 +10406,17 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>原始資源根與可編輯資源根必須分離，不能選擇同一目錄。</translation>
     </message>
     <message>
-        <location line="+317"/>
+        <location line="+604"/>
         <source>项目已创建: %1</source>
         <translation>專案已建立：%1</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+12"/>
         <source>无法创建项目文件: %1</source>
         <translation>無法建立專案檔案: %1</translation>
     </message>
     <message>
-        <location line="+55"/>
+        <location line="+53"/>
         <source>保存运行配置失败</source>
         <translation>儲存執行設定失敗</translation>
     </message>
@@ -6483,7 +10451,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>專案執行設定已儲存</translation>
     </message>
     <message>
-        <location line="+50"/>
+        <location line="+56"/>
         <source>无法保存项目资源设置，所有编辑器仍使用原目录。</source>
         <translation>無法儲存專案資源設定，所有編輯器仍使用原目錄。</translation>
     </message>
@@ -6493,86 +10461,81 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>專案資源設定已儲存</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+105"/>
         <source>项目已打开: %1</source>
         <translation>專案已開啟：%1</translation>
     </message>
     <message>
-        <location line="-1732"/>
+        <location line="-2595"/>
         <source>项目已打开，%1 个会话文档未恢复</source>
         <translation>專案已開啟，%1 個工作階段文件未還原</translation>
     </message>
     <message>
-        <location line="+1774"/>
+        <location line="+2636"/>
         <source>项目已保存: %1</source>
         <translation>專案已儲存：%1</translation>
     </message>
     <message>
-        <location line="+31"/>
         <source>桌面游戏或会话准备仍在进行。是否停止运行并关闭编辑器？</source>
-        <translation>桌面遊戲或工作階段準備仍在進行。是否停止執行並關閉編輯器？</translation>
+        <translation type="vanished">桌面遊戲或工作階段準備仍在進行。是否停止執行並關閉編輯器？</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>桌面运行正在停止。是否直接关闭编辑器？</source>
-        <translation>桌面執行正在停止。是否直接關閉編輯器？</translation>
+        <translation type="vanished">桌面執行正在停止。是否直接關閉編輯器？</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>桌面运行尚未结束</source>
-        <translation>桌面執行尚未結束</translation>
+        <translation type="vanished">桌面執行尚未結束</translation>
     </message>
     <message>
-        <location line="+9"/>
         <source>项目资源导入正在进行</source>
-        <translation>專案資源匯入進行中</translation>
+        <translation type="vanished">專案資源匯入進行中</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>请先在转换窗口中取消并等待当前任务结束，再关闭编辑器。</source>
-        <translation>請先在轉換視窗中取消並等待目前工作結束，再關閉編輯器。</translation>
+        <translation type="vanished">請先在轉換視窗中取消並等待目前工作結束，再關閉編輯器。</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+63"/>
         <source>无法保存项目文件，关闭将导致未保存的项目设置丢失。是否仍要关闭？</source>
         <translation>無法儲存專案檔案，關閉將導致未儲存的專案設定丟失。是否仍要關閉？</translation>
     </message>
     <message>
-        <location line="-166"/>
-        <location line="+49"/>
+        <location line="-155"/>
+        <location line="+63"/>
         <source>打开失败</source>
         <translation>開啟失敗</translation>
     </message>
     <message>
-        <location line="-217"/>
+        <location line="-253"/>
         <source>创建失败</source>
         <translation>建立失敗</translation>
     </message>
     <message>
-        <location line="+124"/>
-        <location line="+130"/>
-        <location line="+79"/>
+        <location line="+128"/>
+        <location line="+158"/>
+        <location line="+58"/>
         <source>保存失败</source>
         <translation>儲存失敗</translation>
     </message>
     <message>
-        <location line="-164"/>
-        <location line="+49"/>
+        <location line="-153"/>
+        <location line="+63"/>
         <source>无法打开项目文件: %1</source>
         <translation>無法開啟專案檔案：%1</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+33"/>
         <source>无法保存项目文件。</source>
         <translation>無法儲存專案檔案。</translation>
     </message>
     <message>
-        <location line="-4839"/>
+        <location line="-6874"/>
         <source>语言切换失败</source>
         <translation>語言切換失敗</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.ui" line="-207"/>
+        <location filename="../ui/MainWindow.ui" line="-221"/>
         <source>创建新的编辑器项目文件</source>
         <translation>建立新的編輯器專案檔案</translation>
     </message>
@@ -6587,17 +10550,16 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>儲存目前專案設定</translation>
     </message>
     <message>
-        <location line="+33"/>
+        <location line="+55"/>
         <source>把原始资源转换为当前资源包格式</source>
         <translation>將原始資源轉換為目前資源包格式</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>编辑MPC/SHD/ASF/IMP图片文件</source>
-        <translation>編輯 MPC/SHD/ASF/IMP 圖片檔案</translation>
+        <translation type="vanished">編輯 MPC/SHD/ASF/IMP 圖片檔案</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+30"/>
         <source>编辑地图瓦片、障碍、陷阱、NPC和物体</source>
         <translation>編輯地圖圖塊、障礙、陷阱、NPC 與物件</translation>
     </message>
@@ -6607,12 +10569,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>編輯遊戲 UI 選單配置與元件屬性</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>编辑Lua脚本文件，支持语法高亮和游戏API自动补全</source>
-        <translation>編輯 Lua 腳本，支援語法醒目提示與遊戲 API 自動完成</translation>
+        <translation type="vanished">編輯 Lua 腳本，支援語法醒目提示與遊戲 API 自動完成</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+22"/>
         <source>编辑 NPC/物体实例表和 ini/npcres 动作资源；保留未知字段并支持图像帧参数预览</source>
         <translation>編輯 NPC/物件實例表與 ini/npcres 動作資源；保留未知欄位並支援圖像影格參數預覽</translation>
     </message>
@@ -6627,17 +10588,17 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>結束程式</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-164"/>
         <source>撤销当前文档中的上一步编辑</source>
         <translation>復原目前文件中的上一步編輯</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+11"/>
         <source>重做当前文档中已撤销的编辑</source>
         <translation>重做目前文件中已復原的編輯</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+164"/>
         <source>关闭当前活动文档</source>
         <translation>關閉目前作用中的文件</translation>
     </message>
@@ -6657,132 +10618,1014 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>關於 UPEdit-JXQY</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="+3134"/>
+        <location filename="../ui/MainWindow.cpp" line="+4520"/>
         <source>资源格式转换 - %1</source>
         <translation>資源格式轉換 - %1</translation>
     </message>
     <message>
-        <location line="+1336"/>
-        <location line="+259"/>
+        <location line="+1947"/>
+        <location line="+269"/>
         <source>剑侠情缘项目文件 (*.jxqyproj);;所有文件 (*)</source>
         <translation>劍俠情緣專案檔案 (*.jxqyproj);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="-894"/>
-        <location line="+269"/>
-        <location line="+37"/>
+        <location line="-1726"/>
+        <location line="+489"/>
+        <location line="+316"/>
+        <location line="+31"/>
         <source>文件事务恢复失败</source>
         <translation>檔案交易恢復失敗</translation>
     </message>
     <message>
-        <location line="-36"/>
+        <location line="-30"/>
         <source>资源目录中存在未能安全恢复的保存事务。为避免覆盖可恢复数据，编辑器不会切换到该资源目录：
 %1</source>
         <translation>資源目錄中存在未能安全恢復的儲存交易。為避免覆蓋可恢復資料，編輯器不會切換到該資源目錄：
 %1</translation>
     </message>
     <message>
-        <location line="-4179"/>
+        <location line="-5908"/>
         <source>项目</source>
         <translation>專案</translation>
     </message>
     <message>
-        <location line="+2435"/>
+        <location line="+3407"/>
         <source>文档已打开: %1</source>
         <translation>文件已開啟：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2290"/>
         <source>删除运行记录</source>
-        <translation>刪除執行記錄</translation>
+        <translation type="vanished">刪除執行記錄</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2291"/>
         <source>删除运行记录“%1”吗？</source>
-        <translation>要刪除執行記錄「%1」嗎？</translation>
+        <translation type="vanished">要刪除執行記錄「%1」嗎？</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2299"/>
         <source>只会删除这次隔离运行产生的临时文件，不会修改正式资源。</source>
-        <translation>只會刪除這次隔離執行產生的暫存檔案，不會修改正式資源。</translation>
+        <translation type="vanished">只會刪除這次隔離執行產生的暫存檔案，不會修改正式資源。</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2301"/>
         <source>会话 ID：%1
 目录：%2</source>
-        <translation>工作階段 ID：%1
+        <translation type="vanished">工作階段 ID：%1
 目錄：%2</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2467"/>
         <source>地图 · %1</source>
-        <translation>地圖 · %1</translation>
+        <translation type="vanished">地圖 · %1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2474"/>
         <source>脚本 · %1</source>
-        <translation>腳本 · %1</translation>
+        <translation type="vanished">腳本 · %1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2538"/>
+        <location line="-2861"/>
         <source>未命名场景</source>
         <translation>未命名場景</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2497"/>
-        <location line="+14"/>
         <source>运行记录</source>
-        <translation>執行記錄</translation>
+        <translation type="vanished">執行記錄</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2524"/>
         <source>（当前）</source>
-        <translation>（目前）</translation>
+        <translation type="vanished">（目前）</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2527"/>
         <source>运行目标：%1</source>
-        <translation>執行目標：%1</translation>
+        <translation type="vanished">執行目標：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2529"/>
         <source>会话 ID：%1</source>
-        <translation>工作階段 ID：%1</translation>
+        <translation type="vanished">工作階段 ID：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2541"/>
         <source>资源包：%1</source>
-        <translation>資源包：%1</translation>
+        <translation type="vanished">資源包：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2552"/>
         <source>会话目录：%1</source>
-        <translation>工作階段目錄：%1</translation>
+        <translation type="vanished">工作階段目錄：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="4083"/>
+        <location line="+4109"/>
         <source>不支持的地图格式: %1（仅支持 MAP File Ver2.0/Ver3.0；文本 .map 文件可直接用文本编辑器打开）</source>
         <translation>不支援的地圖格式：%1（僅支援 MAP File Ver2.0/Ver3.0；文字 .map 檔案可直接用文字編輯器開啟）</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="4303"/>
+        <location line="+315"/>
         <source>已作为文本打开: %1</source>
         <translation>已作為文字開啟：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2577"/>
         <source>时间未知</source>
-        <translation>時間未知</translation>
+        <translation type="vanished">時間未知</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="2601"/>
         <source>运行时间：%1</source>
-        <translation>執行時間：%1</translation>
+        <translation type="vanished">執行時間：%1</translation>
     </message>
     <message>
-        <location filename="../ui/MainWindow.cpp" line="4189"/>
+        <location line="-334"/>
         <source>无法读取地图文件: %1（%2）</source>
         <translation>無法讀取地圖檔案：%1（%2）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MainWindow.ui" line="-134"/>
+        <location filename="../ui/MainWindow.cpp" line="+446"/>
+        <source>导出 Android 外部资源</source>
+        <translation>匯出 Android 外部資源</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>把当前活动资源包导出为 Android 公共 Download 目录结构</source>
+        <translation>把目前使用中的資源包匯出為 Android 公共 Download 目錄結構</translation>
+    </message>
+    <message>
+        <location filename="../ui/MainWindow.cpp" line="+1"/>
+        <source>请先打开项目或配置资源集合目录。</source>
+        <translation>請先開啟專案或設定資源集合目錄。</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>没有可导出的活动资源包</source>
+        <translation>沒有可匯出的使用中資源包</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>请选择包含根级 game_profile.ini 和非空 Game.Id 的活动资源包后再导出。</source>
+        <translation>請先選擇包含根層級 game_profile.ini 和非空白 Game.Id 的使用中資源包，再進行匯出。</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Android 外部资源导出</source>
+        <translation>Android 外部資源匯出</translation>
+    </message>
+    <message>
+        <location line="-5120"/>
+        <location line="+3"/>
+        <source>试玩</source>
+        <translation>試玩</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>试玩当前地图、当前脚本或项目默认场景</source>
+        <translation>試玩目前地圖、目前腳本或專案預設場景</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>停止试玩</source>
+        <translation>停止試玩</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>停止当前试玩</source>
+        <translation>停止目前試玩</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <location line="+3101"/>
+        <source>试玩当前地图</source>
+        <translation>試玩目前地圖</translation>
+    </message>
+    <message>
+        <location line="-3099"/>
+        <location line="+3104"/>
+        <source>使用当前地图和已打开的 NPC、物体列表试玩</source>
+        <translation>使用目前地圖和已開啟的 NPC、物件清單試玩</translation>
+    </message>
+    <message>
+        <location line="-3097"/>
+        <location line="+2949"/>
+        <source>试玩当前脚本</source>
+        <translation>試玩目前腳本</translation>
+    </message>
+    <message>
+        <location line="-2947"/>
+        <location line="+2953"/>
+        <source>使用当前脚本内容试玩</source>
+        <translation>使用目前腳本內容試玩</translation>
+    </message>
+    <message>
+        <location line="-2838"/>
+        <source>开始编辑</source>
+        <translation>開始編輯</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>地图与场景</source>
+        <translation>地圖與場景</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>游戏界面</source>
+        <translation>遊戲介面</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>剧情脚本</source>
+        <translation>劇情腳本</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>图像素材</source>
+        <translation>圖像素材</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>打开项目 → 选择内容 → 修改并保存 → 试玩
+项目会自动载入自己的资源位置；需要更换时使用“文件 → 项目设置”。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>打开项目…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>新建项目…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>当前项目：%1
+资源包：%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>先打开或新建项目，再选择要编辑的内容。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+196"/>
+        <source>试玩完成，可以继续编辑。</source>
+        <translation>試玩完成，可以繼續編輯。</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>试玩结束；可在详细信息中查看问题。</source>
+        <translation>試玩結束；可在詳細資訊中檢視問題。</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>试玩未能启动：%1</source>
+        <translation>試玩無法啟動：%1</translation>
+    </message>
+    <message>
+        <location line="+64"/>
+        <source>请先打开项目</source>
+        <translation>請先開啟專案</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>当前地图：尚未加载</source>
+        <translation>目前地圖：尚未載入</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>当前地图：%1</source>
+        <translation>目前地圖：%1</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>当前脚本：未保存脚本</source>
+        <translation>目前腳本：未儲存腳本</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>当前脚本：%1</source>
+        <translation>目前腳本：%1</translation>
+    </message>
+    <message>
+        <location line="+43"/>
+        <source>默认场景：%1</source>
+        <translation>預設場景：%1</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>请选择地图、脚本，或设置默认场景</source>
+        <translation>請選擇地圖、腳本，或設定預設場景</translation>
+    </message>
+    <message>
+        <location line="+555"/>
+        <source>未保存文档</source>
+        <translation>未儲存文件</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>有相关内容尚未准备好。请先保存或关闭这些文档后再试玩：
+%1</source>
+        <translation>有相關內容尚未準備好。請先儲存或關閉這些文件後再試玩：
+%1</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>当前内容暂时不能试玩。请检查项目运行设置和相关资源；详细原因可按需展开查看。</source>
+        <translation>目前內容暫時無法試玩。請檢查專案執行設定和相關資源；詳細原因可依需要展開檢視。</translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <source>无法准备试玩</source>
+        <translation>無法準備試玩</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>编辑器无法准备试玩所需的临时空间。</source>
+        <translation>編輯器無法準備試玩所需的暫存空間。</translation>
+    </message>
+    <message>
+        <location line="+64"/>
+        <source>无法启动试玩</source>
+        <translation>無法啟動試玩</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>试玩请求未被接受；请重新检查游戏程序和当前运行状态。</source>
+        <translation>試玩要求未被接受；請重新檢查遊戲程式和目前執行狀態。</translation>
+    </message>
+    <message>
+        <location line="+58"/>
+        <source>无法试玩</source>
+        <translation>無法試玩</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>没有可试玩的内容</source>
+        <translation>沒有可試玩的內容</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>请打开地图或脚本文档，或者在项目运行设置中指定默认场景。</source>
+        <translation>請開啟地圖或腳本文件，或者在專案執行設定中指定預設場景。</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>无法试玩场景</source>
+        <translation>無法試玩場景</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>请在项目运行设置中指定默认场景，或打开要试玩的地图、脚本。</source>
+        <translation>請在專案執行設定中指定預設場景，或開啟要試玩的地圖、腳本。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>场景试玩准备失败</source>
+        <translation>場景試玩準備失敗</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>正在准备默认场景...</source>
+        <translation>正在準備預設場景...</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>无法试玩当前地图</source>
+        <translation>無法試玩目前地圖</translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>当前地图不属于这个项目，无法直接试玩。</source>
+        <translation>目前地圖不屬於這個專案，無法直接試玩。</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>请先把当前地图保存到项目资源中，再重新试玩。</source>
+        <translation>請先把目前地圖儲存到專案資源中，再重新試玩。</translation>
+    </message>
+    <message>
+        <location line="+29"/>
+        <source>请先把已打开的 %1 列表保存到项目资源中，再重新试玩。</source>
+        <translation>請先把已開啟的 %1 清單儲存到專案資源中，再重新試玩。</translation>
+    </message>
+    <message>
+        <location line="+54"/>
+        <source>没有找到可用于当前地图的场景环境。请在项目运行设置中补充或选择匹配场景。</source>
+        <translation>找不到可用於目前地圖的場景環境。請在專案執行設定中補充或選擇相符場景。</translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>正在准备当前地图...</source>
+        <translation>正在準備目前地圖...</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source> 玩家起点超出地图，试玩将从左上角开始。</source>
+        <translation> 玩家起點超出地圖，試玩將從左上角開始。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>无法试玩当前脚本</source>
+        <translation>無法試玩目前腳本</translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>请先把当前脚本保存到项目资源中，再重新试玩。</source>
+        <translation>請先把目前腳本儲存到專案資源中，再重新試玩。</translation>
+    </message>
+    <message>
+        <location line="+28"/>
+        <source>没有找到可用于当前脚本的场景环境。请在项目运行设置中补充或选择匹配场景。</source>
+        <translation>找不到可用於目前腳本的場景環境。請在專案執行設定中補充或選擇相符場景。</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>正在准备当前脚本...</source>
+        <translation>正在準備目前腳本...</translation>
+    </message>
+    <message>
+        <location line="+4272"/>
+        <source>资源 ID 冲突</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>当前资源集合存在重复 Game.Id。请先修改其中一个资源的 ID，再进入或编辑该资源。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1041"/>
+        <source>试玩尚未结束</source>
+        <translation>試玩尚未結束</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>试玩仍在进行。是否停止试玩并关闭编辑器？</source>
+        <translation>試玩仍在進行。是否停止試玩並關閉編輯器？</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>试玩正在停止。是否直接关闭编辑器？</source>
+        <translation>試玩正在停止。是否直接關閉編輯器？</translation>
+    </message>
+    <message>
+        <location line="-6480"/>
+        <source>当前武功：%1（默认场景）</source>
+        <translation>目前武功：%1（預設場景）</translation>
+    </message>
+    <message>
+        <location line="-723"/>
+        <source>保存当前内容</source>
+        <translation>儲存目前內容</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>保存当前活动编辑页。项目资源位置和窗口会话由“保存项目设置”单独保存。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1888"/>
+        <source>无法试玩当前武功</source>
+        <translation>無法試玩目前武功</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>请先在项目运行设置中指定默认场景；试玩会带入当前武功内容，进入游戏后可直接检查效果。</source>
+        <translation>請先在專案執行設定中指定預設場景；試玩會帶入目前武功內容，進入遊戲後可直接檢查效果。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>当前武功不属于这个项目，无法直接试玩。</source>
+        <translation>目前武功不屬於這個專案，無法直接試玩。</translation>
+    </message>
+    <message>
+        <location line="+70"/>
+        <source>正在准备当前武功“%1”的默认场景试玩...</source>
+        <translation>正在準備目前武功「%1」的預設場景試玩...</translation>
+    </message>
+    <message>
+        <location line="+2982"/>
+        <source>武功 - %1</source>
+        <translation>武功 - %1</translation>
+    </message>
+    <message>
+        <location line="-4234"/>
+        <source>当前物品：%1（默认场景）</source>
+        <translation>目前物品：%1（預設場景）</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>当前商店：%1（默认场景）</source>
+        <translation>目前商店：%1（預設場景）</translation>
+    </message>
+    <message>
+        <location line="+1260"/>
+        <source>无法试玩当前物品</source>
+        <translation>無法試玩目前物品</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>无法试玩当前商店</source>
+        <translation>無法試玩目前商店</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>请先在项目运行设置中指定默认场景；试玩会带入当前物品或商店内容，实际购买、使用和装备取决于场景。</source>
+        <translation>请先在專案运行設定中指定預設場景；試玩会带入目前物品或商店內容，實際購買、使用和裝備取決於场景。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>当前物品或商店不属于这个项目，无法直接试玩。</source>
+        <translation>目前物品或商店不屬於这个專案，無法直接試玩。</translation>
+    </message>
+    <message>
+        <location line="+76"/>
+        <source>正在准备当前物品“%1”的默认场景试玩...</source>
+        <translation>正在準備目前物品“%1”的預設場景試玩...</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>正在准备当前商店“%1”的默认场景试玩...</source>
+        <translation>正在準備目前商店“%1”的預設場景試玩...</translation>
+    </message>
+    <message>
+        <location line="+2901"/>
+        <source>物品 - %1</source>
+        <translation>物品 - %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>商店 - %1</source>
+        <translation>商店 - %1</translation>
+    </message>
+    <message>
+        <location line="+955"/>
+        <source> %1 个已打开文档未能重新载入，请手动检查。</source>
+        <translation> %1 个已開啟文档無法重新載入，请手动检查。</translation>
+    </message>
+    <message>
+        <location line="-1308"/>
+        <source>%1（脚本第 %2 行）</source>
+        <translation>%1（腳本第 %2 行）</translation>
+    </message>
+    <message>
+        <location line="-22"/>
+        <source>“%1”的脚本不是可识别的文本：
+%2</source>
+        <translation>「%1」的腳本不是可識別的文字：
+%2</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>“%1”的脚本中没有直接引用 talk(&quot;段落&quot;)。你仍可打开脚本继续查找。</source>
+        <translation>「%1」的腳本中沒有直接引用 talk(&quot;段落&quot;)。你仍可開啟腳本繼續查找。</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>“%1”的脚本引用了多段对话：</source>
+        <translation>「%1」的腳本引用了多段對話：</translation>
+    </message>
+    <message>
+        <location line="+111"/>
+        <source>对话 - %1</source>
+        <translation>對話 - %1</translation>
+    </message>
+    <message>
+        <location line="-80"/>
+        <source>当前地图没有找到对话文件：
+%1</source>
+        <translation>目前地圖找不到對話檔案：
+%1</translation>
+    </message>
+    <message>
+        <location line="-2558"/>
+        <source>当前对话不属于这个项目，无法直接试玩。</source>
+        <translation>目前對話不屬於這個專案，無法直接試玩。</translation>
+    </message>
+    <message>
+        <location line="-1382"/>
+        <source>当前对话：%1（默认场景）</source>
+        <translation>目前對話：%1（預設場景）</translation>
+    </message>
+    <message>
+        <location line="-474"/>
+        <location line="+2983"/>
+        <source>把光标放在 talk(&quot;段落&quot;) 调用所在行后打开对话</source>
+        <translation>把游標放在 talk(&quot;段落&quot;) 呼叫所在行後開啟對話</translation>
+    </message>
+    <message>
+        <location line="+1470"/>
+        <source>无法打开对话</source>
+        <translation>無法開啟對話</translation>
+    </message>
+    <message>
+        <location line="-110"/>
+        <location line="+10"/>
+        <location line="+52"/>
+        <location line="+8"/>
+        <source>无法编辑对话</source>
+        <translation>無法編輯對話</translation>
+    </message>
+    <message>
+        <location line="-2580"/>
+        <source>无法试玩当前对话</source>
+        <translation>無法試玩目前對話</translation>
+    </message>
+    <message>
+        <location line="+2511"/>
+        <source>无法读取“%1”的脚本：
+%2</source>
+        <translation>無法讀取「%1」的腳本：
+%2</translation>
+    </message>
+    <message>
+        <location line="+163"/>
+        <location line="+15"/>
+        <source>无法返回调用位置</source>
+        <translation>無法返回呼叫位置</translation>
+    </message>
+    <message>
+        <location line="-2581"/>
+        <source>正在准备对话“%1”的默认场景试玩...</source>
+        <translation>正在準備對話「%1」的預設場景試玩...</translation>
+    </message>
+    <message>
+        <location line="+2386"/>
+        <location line="+37"/>
+        <source>没有可编辑的对话</source>
+        <translation>沒有可編輯的對話</translation>
+    </message>
+    <message>
+        <location line="-4366"/>
+        <location line="+2981"/>
+        <source>编辑当前对话</source>
+        <translation>編輯目前對話</translation>
+    </message>
+    <message>
+        <location line="+1427"/>
+        <source>请先保存脚本，再从 talk(&quot;段落&quot;) 调用进入对话。</source>
+        <translation>請先儲存腳本，再從 talk(&quot;段落&quot;) 呼叫進入對話。</translation>
+    </message>
+    <message>
+        <source>请先在项目运行设置中指定默认场景；试玩会带入当前对话修改，进入游戏后可从相应剧情位置检查效果。</source>
+        <translation type="vanished">請先在專案執行設定中指定預設場景；試玩會帶入目前對話修改，進入遊戲後可從相應劇情位置檢查效果。</translation>
+    </message>
+    <message>
+        <location line="-78"/>
+        <source>请把光标放在 talk(&quot;段落&quot;) 调用所在行，再选择“编辑当前对话”。</source>
+        <translation>請把游標放在 talk(&quot;段落&quot;) 呼叫所在行，再選擇「編輯目前對話」。</translation>
+    </message>
+    <message>
+        <location line="+195"/>
+        <source>调用文件当前不是脚本编辑视图。</source>
+        <translation>呼叫檔案目前不是腳本編輯檢視。</translation>
+    </message>
+    <message>
+        <location line="-15"/>
+        <source>调用脚本已经不存在或无法打开：
+%1</source>
+        <translation>呼叫腳本已不存在或無法開啟：
+%1</translation>
+    </message>
+    <message>
+        <location line="-54"/>
+        <source>这个对话文件已经在其他编辑视图中打开。</source>
+        <translation>這個對話檔案已在其他編輯檢視中開啟。</translation>
+    </message>
+    <message>
+        <location line="-72"/>
+        <source>选择要编辑的对话</source>
+        <translation>選擇要編輯的對話</translation>
+    </message>
+    <message>
+        <source>高级工具</source>
+        <translation type="vanished">進階工具</translation>
+    </message>
+    <message>
+        <location line="-4401"/>
+        <location line="+2963"/>
+        <source>高级调试</source>
+        <translation>進階偵錯</translation>
+    </message>
+    <message>
+        <location filename="../ui/MainWindow.ui" line="-145"/>
+        <source>发布(&amp;R)</source>
+        <translation>發佈(&amp;R)</translation>
+    </message>
+    <message>
+        <location line="+205"/>
+        <source>MOD 发布与资源设置...</source>
+        <translation>MOD 發佈與資源設定...</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>设置 MOD 名称、版本、封面、简介和资源关系</source>
+        <translation>設定 MOD 名稱、版本、封面、簡介和資源關係</translation>
+    </message>
+    <message>
+        <location filename="../ui/MainWindow.cpp" line="+2566"/>
+        <location line="+2"/>
+        <source>MOD 发布与资源设置</source>
+        <translation>MOD 發佈與資源設定</translation>
+    </message>
+    <message>
+        <location filename="../ui/MainWindow.ui" line="-55"/>
+        <source>编辑游戏图片和动画</source>
+        <translation>編輯遊戲圖片與動畫</translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <source>编辑游戏脚本，支持搜索、补全和函数导航</source>
+        <translation>編輯遊戲腳本，支援搜尋、補全與函式導覽</translation>
+    </message>
+    <message>
+        <location filename="../ui/MainWindow.cpp" line="-3847"/>
+        <location line="+103"/>
+        <source>项目默认场景已经不存在。请在项目运行设置中重新选择试玩场景。</source>
+        <translation>專案預設場景已不存在。請在專案執行設定中重新選擇試玩場景。</translation>
+    </message>
+    <message>
+        <location line="-84"/>
+        <location line="+104"/>
+        <source>默认试玩场景还是空白初始配置。请先在项目运行设置中填写合适的玩家坐标，并按需要选择 NPC、物件列表。</source>
+        <translation>預設試玩場景仍是空白初始設定。請先在專案執行設定中填寫合適的玩家座標，並按需要選擇 NPC、物件列表。</translation>
+    </message>
+    <message>
+        <location line="+98"/>
+        <source>匹配的试玩场景还是空白初始配置。请先在项目运行设置中填写合适的玩家坐标，并按需要选择 NPC、物件列表。</source>
+        <translation>相符的試玩場景仍是空白初始設定。請先在專案執行設定中填寫合適的玩家座標，並按需要選擇 NPC、物件列表。</translation>
+    </message>
+    <message>
+        <location line="-201"/>
+        <source>无法为当前武功准备可直接使用的试玩场景。</source>
+        <translation>無法為目前武功準備可直接使用的試玩場景。</translation>
+    </message>
+    <message>
+        <location line="+105"/>
+        <source>无法为当前物品准备加入背包的试玩场景。</source>
+        <translation>無法為目前物品準備加入背包的試玩場景。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无法为当前商店准备直接打开的试玩场景。</source>
+        <translation>無法為目前商店準備直接開啟的試玩場景。</translation>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>请先在项目运行设置中添加当前对话所属地图的试玩场景。</source>
+        <translation>請先在專案執行設定中加入目前對話所屬地圖的試玩場景。</translation>
+    </message>
+    <message>
+        <location line="+43"/>
+        <source>当前对话没有匹配的地图场景。请在项目运行设置中添加该地图后再试玩。</source>
+        <translation>目前對話沒有相符的地圖場景。請在專案執行設定中加入該地圖後再試玩。</translation>
+    </message>
+    <message>
+        <source>试玩设置…</source>
+        <translation>試玩設定…</translation>
+    </message>
+    <message>
+        <source>试玩设置</source>
+        <translation>試玩設定</translation>
+    </message>
+    <message>
+        <source>在选定场景中从头执行当前脚本，包括尚未保存的修改</source>
+        <translation>在選定場景中從頭執行目前腳本，包括尚未儲存的修改</translation>
+    </message>
+    <message>
+        <source>选择脚本运行时使用的地图、玩家起点及NPC；配置可反复使用</source>
+        <translation>選擇腳本執行時使用的地圖、玩家起點及NPC；設定可重複使用</translation>
+    </message>
+    <message>
+        <source>首次先点“试玩设置”新建场景，选择地图和玩家起点；然后点“试玩当前脚本”，游戏会从头执行当前编辑内容。保存用于保留修改。</source>
+        <translation>首次先點「試玩設定」新增場景，選擇地圖和玩家起點；然後點「試玩目前腳本」，遊戲會從頭執行目前編輯內容。儲存用於保留修改。</translation>
+    </message>
+    <message>
+        <source>请先打开项目，再通过“试玩设置”选择地图和玩家起点。</source>
+        <translation>請先開啟專案，再透過「試玩設定」選擇地圖和玩家起點。</translation>
+    </message>
+    <message>
+        <source>选择游戏程序…</source>
+        <translation>選擇遊戲程式…</translation>
+    </message>
+    <message>
+        <source>脚本需要在游戏地图中执行。请先添加一个试玩场景，选择地图和玩家起点，并设为默认；之后可在这个场景中运行当前脚本。</source>
+        <translation>腳本需要在遊戲地圖中執行。請先新增一個試玩場景，選擇地圖和玩家起點，並設為預設；之後可在這個場景中執行目前腳本。</translation>
+    </message>
+    <message>
+        <source>配置试玩场景…</source>
+        <translation>設定試玩場景…</translation>
+    </message>
+    <message>
+        <source>请先打开或新建项目，试玩场景会保存在该项目中。</source>
+        <translation>請先開啟或新增專案，試玩場景會儲存在該專案中。</translation>
+    </message>
+    <message>
+        <source>试玩设置已保存，可以回到脚本点击“试玩当前脚本”。</source>
+        <translation>試玩設定已儲存，可以回到腳本點擊「試玩目前腳本」。</translation>
+    </message>
+    <message>
+        <source>当前脚本匹配多个试玩场景。请在下方试玩面板中选择一个，或在“试玩设置”中调整默认场景。</source>
+        <translation>目前腳本符合多個試玩場景。請在下方試玩面板中選擇一個，或在「試玩設定」中調整預設場景。</translation>
+    </message>
+    <message>
+        <source>引用列表正在地图编辑器中使用，请保存并关闭该地图编辑页后再操作：
+%1</source>
+        <translation>引用清單正在地圖編輯器中使用，請儲存並關閉該地圖編輯頁後再操作：
+%1</translation>
+    </message>
+    <message>
+        <source>引用文件还有未保存修改，请先保存后再操作：
+%1</source>
+        <translation>引用檔案還有未儲存修改，請先儲存後再操作：
+%1</translation>
+    </message>
+    <message>
+        <source>新建、复制和编辑武功，查看引用并试玩</source>
+        <translation>新增、複製和編輯武功，查看引用並試玩</translation>
+    </message>
+    <message>
+        <source>武功学习脚本</source>
+        <translation>武功學習腳本</translation>
+    </message>
+    <message>
+        <source>武功编辑器</source>
+        <translation>武功編輯器</translation>
+    </message>
+    <message>
+        <source>请先打开项目并选择资源。</source>
+        <translation>請先開啟專案並選擇資源。</translation>
+    </message>
+    <message>
+        <source>还有尚未保存的新脚本，请先保存，才能检查并更新武功引用。</source>
+        <translation>還有尚未儲存的新腳本，請先儲存，才能檢查並更新武功引用。</translation>
+    </message>
+    <message>
+        <source>当前武功：尚未选择</source>
+        <translation>目前武功：尚未選擇</translation>
+    </message>
+    <message>
+        <source>请先新建或选择一个武功。</source>
+        <translation>請先新增或選擇一個武功。</translation>
+    </message>
+    <message>
+        <source>地图对话</source>
+        <translation>地圖對話</translation>
+    </message>
+    <message>
+        <source>对话调用脚本</source>
+        <translation>對話呼叫腳本</translation>
+    </message>
+    <message>
+        <source>当前物品或商店：尚未选择</source>
+        <translation>目前物品或商店：尚未選擇</translation>
+    </message>
+    <message>
+        <source>新建物品和商店，编辑货单并试玩</source>
+        <translation>新增物品和商店，編輯貨單並試玩</translation>
+    </message>
+    <message>
+        <source>无法创建地图对话</source>
+        <translation>無法建立地圖對話</translation>
+    </message>
+    <message>
+        <source>无法创建对话目录。</source>
+        <translation>無法建立對話目錄。</translation>
+    </message>
+    <message>
+        <source>物品与商店</source>
+        <translation>物品與商店</translation>
+    </message>
+    <message>
+        <source>物品与商店脚本</source>
+        <translation>物品與商店腳本</translation>
+    </message>
+    <message>
+        <source>请先新建或选择一个物品或商店。</source>
+        <translation>請先新增或選擇一個物品或商店。</translation>
+    </message>
+    <message>
+        <source>还有尚未保存的新脚本，请先保存，才能检查并更新文件引用。</source>
+        <translation>還有尚未儲存的新腳本，請先儲存，才能檢查並更新檔案引用。</translation>
+    </message>
+    <message>
+        <source>选择地图，新建段落、编排台词并试玩</source>
+        <translation>選擇地圖，新增段落、編排台詞並試玩</translation>
+    </message>
+    <message>
+        <source>选择对话所属地图</source>
+        <translation>選擇對話所屬地圖</translation>
+    </message>
+    <message>
+        <source>项目还没有地图，请先创建或导入地图。</source>
+        <translation>專案還沒有地圖，請先建立或匯入地圖。</translation>
+    </message>
+    <message>
+        <source>先点“试玩设置”选择地图和玩家起点；点击“试玩当前脚本”会从头执行当前内容，包含尚未保存的修改。</source>
+        <translation>先點“試玩設定”選擇地圖和玩家起點；點選“試玩當前指令碼”會從頭執行當前內容，包含尚未儲存的修改。</translation>
+    </message>
+    <message>
+        <source>已停止试玩，可以继续编辑。</source>
+        <translation>已停止試玩，可以繼續編輯。</translation>
+    </message>
+    <message>
+        <source>点击“试玩当前脚本”从头执行当前内容，包含尚未保存的修改；“试玩设置”可选择地图和玩家起点。</source>
+        <translation>點選“試玩當前指令碼”從頭執行當前內容，包含尚未儲存的修改；“試玩設定”可選擇地圖和玩家起點。</translation>
+    </message>
+    <message>
+        <source>试玩场景：%1。点击“试玩当前脚本”从头执行当前内容，包含尚未保存的修改；“试玩设置”可更换场景。</source>
+        <translation>試玩場景：%1。點選“試玩當前指令碼”從頭執行當前內容，包含尚未儲存的修改；“試玩設定”可更換場景。</translation>
+    </message>
+    <message>
+        <source>默认场景：%1；保存后在游戏中打开对应界面</source>
+        <translation>預設場景：%1；儲存後在遊戲中開啟對應介面</translation>
+    </message>
+    <message>
+        <source>默认场景：%1；图片须在引用它的内容中检查</source>
+        <translation>預設場景：%1；圖片須在引用它的內容中檢查</translation>
+    </message>
+    <message>
+        <source>默认场景：%1；请在试玩设置中选择要加载的列表</source>
+        <translation>預設場景：%1；請在試玩設定中選擇要載入的列表</translation>
+    </message>
+    <message>
+        <source>下面的内容需要先保存，再更新引用：
+%1</source>
+        <translation>下面的內容需要先保存，再更新引用：
+%1</translation>
+    </message>
+    <message>
+        <source>保存并继续</source>
+        <translation>保存並繼續</translation>
+    </message>
+    <message>
+        <source>保存相关修改</source>
+        <translation>保存相關修改</translation>
+    </message>
+    <message>
+        <source>保存脚本修改</source>
+        <translation>保存腳本修改</translation>
+    </message>
+    <message>
+        <source>未命名脚本</source>
+        <translation>未命名腳本</translation>
+    </message>
+    <message>
+        <source>相关内容尚未保存，未更改文件名和引用。请先处理保存问题。</source>
+        <translation>相關內容尚未保存，未更改文件名和引用。請先處理保存問題。</translation>
+    </message>
+    <message>
+        <source>编辑脚本 — %1</source>
+        <translation>編輯腳本 — %1</translation>
+    </message>
+    <message>
+        <source>脚本单独保存；返回后可继续编辑实体属性。</source>
+        <translation>腳本單獨保存；返回後可繼續編輯實體屬性。</translation>
+    </message>
+    <message>
+        <source>返回属性</source>
+        <translation>返回屬性</translation>
+    </message>
+    <message>
+        <source>这个脚本已在其它编辑页修改。先保存，再从属性窗口继续编辑？</source>
+        <translation>這個腳本已在其它編輯頁修改。先保存，再從屬性窗口繼續編輯？</translation>
+    </message>
+    <message>
+        <source>脚本分析与运行记录</source>
+        <translation>腳本分析與運行記錄</translation>
+    </message>
+    <message>
+        <source>查看剧情流程及本次试玩记录；不提供暂停、断点或运行中改写变量</source>
+        <translation>查看劇情流程及本次試玩記錄；不提供暫停、斷點或運行中改寫變量</translation>
+    </message>
+    <message>
+        <source>试玩当前列表</source>
+        <translation>試玩當前列表</translation>
+    </message>
+    <message>
+        <source>当前%1列表：%2（%3）</source>
+        <translation>當前%1列表：%2（%3）</translation>
+    </message>
+    <message>
+        <source>物体</source>
+        <translation>物體</translation>
+    </message>
+    <message>
+        <source>选定场景</source>
+        <translation>選定場景</translation>
+    </message>
+    <message>
+        <source>无法试玩当前列表</source>
+        <translation>無法試玩當前列表</translation>
+    </message>
+    <message>
+        <source>当前列表不属于这个项目，请先保存到项目中。</source>
+        <translation>當前列表不屬於這個項目，請先保存到項目中。</translation>
+    </message>
+    <message>
+        <source>请在试玩设置中为列表所属地图配置场景和玩家起点。</source>
+        <translation>請在試玩設置中為列表所屬地圖配置場景和玩家起點。</translation>
+    </message>
+    <message>
+        <source>当前列表包含不能用于试玩的内容，请检查字段后重试。</source>
+        <translation>當前列表包含不能用於試玩的內容，請檢查字段後重試。</translation>
+    </message>
+    <message>
+        <source>正在准备当前列表，包括未保存的修改…</source>
+        <translation>正在準備當前列表，包括未保存的修改…</translation>
     </message>
 </context>
 <context>
@@ -6798,32 +11641,32 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>地圖工具</translation>
     </message>
     <message>
-        <location filename="../ui/MapEditorWindow.cpp" line="+840"/>
-        <location line="+181"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="+850"/>
+        <location line="+192"/>
         <source>文件</source>
         <translation>檔案</translation>
     </message>
     <message>
-        <location line="-170"/>
-        <location line="+171"/>
+        <location line="-181"/>
+        <location line="+182"/>
         <source>编辑</source>
         <translation>編輯</translation>
     </message>
     <message>
-        <location line="-66"/>
-        <location line="+67"/>
+        <location line="-77"/>
+        <location line="+78"/>
         <source>视图</source>
         <translation>檢視</translation>
     </message>
     <message>
-        <location line="-56"/>
-        <location line="+57"/>
+        <location line="-67"/>
+        <location line="+68"/>
         <source>工具</source>
         <translation>工具</translation>
     </message>
     <message>
-        <location line="-45"/>
-        <location line="+46"/>
+        <location line="-56"/>
+        <location line="+57"/>
         <source>列表</source>
         <translation>清單</translation>
     </message>
@@ -6834,7 +11677,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="+1308"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="+1355"/>
         <source>新建地图</source>
         <translation>新增地圖</translation>
     </message>
@@ -6850,7 +11693,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-14"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-18"/>
         <source>打开地图文件</source>
         <translation>開啟地圖檔案</translation>
     </message>
@@ -6861,14 +11704,14 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-1811"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-1898"/>
         <location line="+35"/>
         <source>保存</source>
         <translation>儲存</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="+1830"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="+1921"/>
         <source>保存地图文件</source>
         <translation>儲存地圖檔案</translation>
     </message>
@@ -6909,9 +11752,9 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+8"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-1638"/>
-        <location line="+1687"/>
-        <location line="+4077"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-1719"/>
+        <location line="+1808"/>
+        <location line="+4120"/>
         <source>选择</source>
         <translation>選擇</translation>
     </message>
@@ -6932,9 +11775,9 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-6168"/>
-        <location line="+2887"/>
-        <location line="+741"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-6345"/>
+        <location line="+3036"/>
+        <location line="+747"/>
         <source>障碍</source>
         <translation>障礙</translation>
     </message>
@@ -6945,8 +11788,8 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-3626"/>
-        <location line="+2892"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-3781"/>
+        <location line="+3041"/>
         <source>陷阱</source>
         <translation>陷阱</translation>
     </message>
@@ -6962,11 +11805,11 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-2888"/>
-        <location line="+218"/>
-        <location line="+2397"/>
-        <location line="+307"/>
-        <location line="+2507"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-3037"/>
+        <location line="+221"/>
+        <location line="+2541"/>
+        <location line="+313"/>
+        <location line="+2535"/>
         <source>物体</source>
         <translation>物件</translation>
     </message>
@@ -7037,7 +11880,7 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-3378"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-3465"/>
         <source>导出缩略图</source>
         <translation>匯出縮圖</translation>
     </message>
@@ -7087,49 +11930,49 @@ UPEdit 系列作品，由 Upwinded 開發。</translation>
         <translation>統計</translation>
     </message>
     <message>
-        <location filename="../ui/MapEditorWindow.cpp" line="-1531"/>
-        <location line="+171"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-1589"/>
+        <location line="+182"/>
         <source>复制选中区域</source>
         <translation>複製選取區域</translation>
     </message>
     <message>
-        <location line="-155"/>
-        <location line="+156"/>
+        <location line="-166"/>
+        <location line="+167"/>
         <source>粘贴区域</source>
         <translation>貼上區域</translation>
     </message>
     <message>
-        <location line="-130"/>
-        <location line="+131"/>
+        <location line="-141"/>
+        <location line="+142"/>
         <source>清空剪贴板</source>
         <translation>清空剪貼簿</translation>
     </message>
     <message>
-        <location line="-120"/>
-        <location line="+123"/>
+        <location line="-131"/>
+        <location line="+134"/>
         <source>填充当前选区</source>
         <translation>填滿目前選取區</translation>
     </message>
     <message>
-        <location line="-115"/>
-        <location line="+121"/>
+        <location line="-126"/>
+        <location line="+132"/>
         <source>清除当前选区</source>
         <translation>清除目前選取區</translation>
     </message>
     <message>
-        <location line="-127"/>
-        <location line="+122"/>
+        <location line="-138"/>
+        <location line="+133"/>
         <source>用当前画笔填充区域选区。单图层写当前绘制层；全部图层按画笔写回三层</source>
         <translation>以目前畫筆填滿區域選取區。單一圖層寫入目前繪製圖層；全部圖層依畫筆寫回三層</translation>
     </message>
     <message>
-        <location line="-114"/>
-        <location line="+120"/>
+        <location line="-125"/>
+        <location line="+131"/>
         <source>清除区域选区内的 tile。单图层清当前绘制层；全部图层清三层，保留障碍/陷阱</source>
         <translation>清除區域選取區內的 tile。單一圖層清除目前繪製圖層；全部圖層清除三層，保留障礙/陷阱</translation>
     </message>
     <message>
-        <location line="+836"/>
+        <location line="+863"/>
         <source>检测到运行时存档文件:
 %1
 
@@ -7159,14 +12002,14 @@ NPC 資料將儲存到執行時模板/編輯目標:
 （不會覆寫目前存檔；執行時仍優先讀取 save/game）</translation>
     </message>
     <message>
-        <location line="+2127"/>
+        <location line="+2208"/>
         <source>受管目录已存在同名但内容不同的 MPC &quot;%1&quot;。
 为避免影响其他地图，编辑器不会覆盖共享资源；请先将源文件改名。</source>
         <translation>受管目錄已存在同名但內容不同的 MPC &quot;%1&quot;。
 為避免影響其他地圖，編輯器不會覆蓋共享資源；請先將源檔案改名。</translation>
     </message>
     <message>
-        <location line="+1167"/>
+        <location line="+1187"/>
         <source>受管目录已存在同名但内容不同的 MPC &quot;%1&quot;。
 为避免影响其他地图，不能覆盖共享资源。是否改用新文件名？</source>
         <translation>受管目錄已存在同名但內容不同的 MPC &quot;%1&quot;。
@@ -7184,7 +12027,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>MPC 目標目錄已失效，資源未提交。</translation>
     </message>
     <message>
-        <location line="+581"/>
+        <location line="-70"/>
+        <source>MPC 目标路径不安全，修改未保存。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+657"/>
         <location line="+93"/>
         <source>请先框选区域</source>
         <translation>請先框選區域</translation>
@@ -7205,99 +12053,99 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>已清除選取區的%1（%2 個圖塊）</translation>
     </message>
     <message>
-        <location line="-5280"/>
-        <location line="+115"/>
+        <location line="-5425"/>
+        <location line="+126"/>
         <source>清除所有障碍</source>
         <translation>清除所有障礙</translation>
     </message>
     <message>
-        <location line="-110"/>
-        <location line="+111"/>
+        <location line="-121"/>
+        <location line="+122"/>
         <source>清除所有陷阱</source>
         <translation>清除所有陷阱</translation>
     </message>
     <message>
-        <location line="-104"/>
-        <location line="+105"/>
+        <location line="-115"/>
+        <location line="+116"/>
         <source>编辑MPC信息...</source>
         <translation>編輯 MPC 資訊...</translation>
     </message>
     <message>
-        <location line="-100"/>
-        <location line="+101"/>
+        <location line="-111"/>
+        <location line="+112"/>
         <source>编辑陷阱脚本...</source>
         <translation>編輯陷阱腳本...</translation>
     </message>
     <message>
-        <location line="-96"/>
-        <location line="+97"/>
+        <location line="-107"/>
+        <location line="+108"/>
         <source>调整地图尺寸...</source>
         <translation>調整地圖尺寸...</translation>
     </message>
     <message>
-        <location line="-62"/>
-        <location line="+65"/>
-        <location line="+1054"/>
-        <location line="+1534"/>
+        <location line="-73"/>
+        <location line="+76"/>
+        <location line="+1096"/>
+        <location line="+1600"/>
         <location line="+127"/>
-        <location line="+2475"/>
+        <location line="+2501"/>
         <source>保存NPC列表</source>
         <translation>儲存 NPC 清單</translation>
     </message>
     <message>
-        <location line="-5250"/>
-        <location line="+61"/>
+        <location line="-5395"/>
+        <location line="+72"/>
         <source>NPC列表另存为...</source>
         <translation>NPC 清單另存新檔...</translation>
     </message>
     <message>
-        <location line="-56"/>
-        <location line="+57"/>
+        <location line="-67"/>
+        <location line="+68"/>
         <source>关闭NPC列表</source>
         <translation>關閉 NPC 清單</translation>
     </message>
     <message>
-        <location line="-50"/>
-        <location line="+51"/>
-        <location line="+1096"/>
-        <location line="+1495"/>
+        <location line="-61"/>
+        <location line="+62"/>
+        <location line="+1138"/>
+        <location line="+1561"/>
         <location line="+144"/>
-        <location line="+2547"/>
+        <location line="+2573"/>
         <source>保存物体列表</source>
         <translation>儲存物件清單</translation>
     </message>
     <message>
-        <location line="-5328"/>
-        <location line="+47"/>
+        <location line="-5473"/>
+        <location line="+58"/>
         <source>物体列表另存为...</source>
         <translation>物件清單另存新檔...</translation>
     </message>
     <message>
-        <location line="-42"/>
-        <location line="+43"/>
+        <location line="-53"/>
+        <location line="+54"/>
         <source>关闭物体列表</source>
         <translation>關閉物件清單</translation>
     </message>
     <message>
-        <location line="-736"/>
+        <location line="-783"/>
         <source>图层</source>
         <translation>圖層</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location line="+60"/>
+        <location line="+59"/>
         <source>地面层</source>
         <translation>地面層</translation>
     </message>
     <message>
-        <location line="-58"/>
-        <location line="+59"/>
+        <location line="-57"/>
+        <location line="+58"/>
         <source>建筑层</source>
         <translation>建築層</translation>
     </message>
     <message>
-        <location line="-57"/>
-        <location line="+58"/>
+        <location line="-56"/>
+        <location line="+57"/>
         <source>空中层</source>
         <translation>空中層</translation>
     </message>
@@ -7307,38 +12155,41 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>全部圖層</translation>
     </message>
     <message>
-        <location line="-48"/>
+        <location line="-47"/>
         <source>网格</source>
         <translation>格線</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+2802"/>
+        <location line="+2951"/>
         <source>坐标</source>
         <translation>座標</translation>
     </message>
     <message>
-        <location filename="../ui/MapEditorWindow.cpp" line="655"/>
+        <location line="-2644"/>
+        <location line="+410"/>
         <source>绘制</source>
         <translation>繪製</translation>
     </message>
     <message>
-        <location filename="../ui/MapEditorWindow.cpp" line="656"/>
+        <location line="-409"/>
+        <location line="+410"/>
         <source>NPC / 物体</source>
         <translation>NPC / 物件</translation>
     </message>
     <message>
-        <location filename="../ui/MapEditorWindow.cpp" line="657"/>
+        <location line="-409"/>
+        <location line="+410"/>
         <source>查看</source>
         <translation>檢視</translation>
     </message>
     <message>
-        <location line="-2766"/>
+        <location line="-685"/>
         <source>绘制设置</source>
         <translation>繪製設定</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>方形区域选择</source>
         <translation>矩形區域選取</translation>
     </message>
@@ -7348,31 +12199,38 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>無（清除）</translation>
     </message>
     <message>
-        <location line="+180"/>
+        <location line="+206"/>
         <source>瓦片信息</source>
         <translation>圖塊資訊</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+10"/>
         <source>小地图</source>
         <translation>小地圖</translation>
     </message>
     <message>
-        <location line="-116"/>
+        <location line="-128"/>
         <location line="+35"/>
-        <location line="+66"/>
-        <location line="+5082"/>
+        <location line="+51"/>
+        <location line="+6"/>
+        <location line="+31"/>
+        <location line="+437"/>
+        <location line="+2"/>
+        <location line="+4799"/>
         <source>属性</source>
         <translation>屬性</translation>
     </message>
     <message>
-        <location line="-5082"/>
-        <location line="+5082"/>
+        <location line="-5269"/>
+        <location line="+31"/>
+        <location line="+437"/>
+        <location line="+2"/>
+        <location line="+4799"/>
         <source>值</source>
         <translation>值</translation>
     </message>
     <message>
-        <location line="-5186"/>
+        <location line="-5364"/>
         <location line="+35"/>
         <source>添加</source>
         <translation>新增</translation>
@@ -7413,37 +12271,37 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>連續放置</translation>
     </message>
     <message>
-        <location line="+548"/>
-        <location line="+5420"/>
+        <location line="+602"/>
+        <location line="+5540"/>
         <source>区域选择</source>
         <translation>區域選取</translation>
     </message>
     <message>
-        <location line="-5416"/>
-        <location line="+5420"/>
+        <location line="-5536"/>
+        <location line="+5540"/>
         <source>拖拽地图</source>
         <translation>拖曳地圖</translation>
     </message>
     <message>
-        <location line="-5358"/>
-        <location line="+1255"/>
-        <location line="+1175"/>
-        <location line="+2900"/>
+        <location line="-5478"/>
+        <location line="+1332"/>
+        <location line="+1196"/>
+        <location line="+2922"/>
         <source>瓦片绘制</source>
         <translation>圖塊繪製</translation>
     </message>
     <message>
-        <location line="-5400"/>
-        <location line="+5420"/>
+        <location line="-5520"/>
+        <location line="+5540"/>
         <source>吸管工具</source>
         <translation>滴管工具</translation>
     </message>
     <message>
-        <location line="-4982"/>
-        <location line="+312"/>
+        <location line="-5102"/>
+        <location line="+329"/>
         <location line="+6"/>
-        <location line="+172"/>
-        <location line="+3961"/>
+        <location line="+187"/>
+        <location line="+4053"/>
         <location line="+238"/>
         <location line="+26"/>
         <location line="+69"/>
@@ -7452,23 +12310,23 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="-3937"/>
+        <location line="-3984"/>
         <source>导出完成</source>
         <translation>匯出完成</translation>
     </message>
     <message>
-        <location line="+1218"/>
+        <location line="+1239"/>
         <location line="+102"/>
         <source>保存更改</source>
         <translation>儲存變更</translation>
     </message>
     <message>
-        <location line="-779"/>
+        <location line="-787"/>
         <source>确认删除</source>
         <translation>確認刪除</translation>
     </message>
     <message>
-        <location line="+2835"/>
+        <location line="+2869"/>
         <location line="+46"/>
         <source>确认清除</source>
         <translation>確認清除</translation>
@@ -7587,16 +12445,16 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="-169"/>
-        <location filename="../ui/MapEditorWindow.cpp" line="-5577"/>
-        <location line="+185"/>
-        <location line="+2432"/>
-        <location line="+307"/>
-        <location line="+2501"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-5758"/>
+        <location line="+188"/>
+        <location line="+2576"/>
+        <location line="+313"/>
+        <location line="+2529"/>
         <source>NPC</source>
         <translation>NPC</translation>
     </message>
     <message>
-        <location filename="../ui/MapEditorWindow.cpp" line="-5417"/>
+        <location filename="../ui/MapEditorWindow.cpp" line="-5598"/>
         <source>在瓦片上显示坐标（缩放较小时会抽样显示）</source>
         <translation>在圖塊上顯示座標（縮小時會抽樣顯示）</translation>
     </message>
@@ -7611,7 +12469,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>輔助顯示：</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+30"/>
         <source>勾选后下一次区域选择使用视觉矩形（staggeredX = 2*tileX + (tileY&amp;1)），不会为了每行 Tile 数一致而向外扩展。未勾选使用菱形（UPEdit 风格）。切换只影响下一次新选择。</source>
         <translation>勾選後下一次區域選取使用視覺矩形（staggeredX = 2*tileX + (tileY&amp;1)），不會為了每行 Tile 數一致而向外擴展。未勾選使用菱形（UPEdit 風格）。切換隻影響下一次新選取。</translation>
     </message>
@@ -7622,30 +12480,30 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+1"/>
-        <location line="+5325"/>
+        <location line="+5507"/>
         <source>透明 (0x40)</source>
         <translation>透明 (0x40)</translation>
     </message>
     <message>
-        <location line="-5324"/>
-        <location line="+5325"/>
+        <location line="-5506"/>
+        <location line="+5507"/>
         <source>跳透 (0x60)</source>
         <translation>跳透 (0x60)</translation>
     </message>
     <message>
-        <location line="-5324"/>
-        <location line="+5325"/>
+        <location line="-5506"/>
+        <location line="+5507"/>
         <source>实体 (0x80)</source>
         <translation>實體 (0x80)</translation>
     </message>
     <message>
-        <location line="-5324"/>
-        <location line="+5325"/>
+        <location line="-5506"/>
+        <location line="+5507"/>
         <source>跳障 (0xA0)</source>
         <translation>跳障 (0xA0)</translation>
     </message>
     <message>
-        <location line="-5318"/>
+        <location line="-5500"/>
         <source>0=无（清除），1-19=陷阱脚本索引</source>
         <translation>0=無（清除），1-19=陷阱腳本索引</translation>
     </message>
@@ -7660,7 +12518,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>區域形狀：</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+11"/>
         <source>+</source>
         <translation>+</translation>
     </message>
@@ -7725,7 +12583,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>幀列表：</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+23"/>
         <source>搜索NPC...</source>
         <translation>搜尋 NPC...</translation>
     </message>
@@ -7765,7 +12623,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>NPC：未載入 | 物件：未載入</translation>
     </message>
     <message>
-        <location line="+287"/>
+        <location line="+320"/>
         <source>请先用区域选择工具框选区域再复制</source>
         <translation>請先用區域選取工具框選區域再複製</translation>
     </message>
@@ -7785,29 +12643,29 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>剪貼簿已清空</translation>
     </message>
     <message>
-        <location line="+176"/>
-        <location line="+5158"/>
+        <location line="+187"/>
+        <location line="+5292"/>
         <source>NPC列表文件 (*.ini *.npc);;所有文件 (*.*)</source>
         <translation>NPC 清單檔案 (*.ini *.npc);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="-5156"/>
+        <location line="-5289"/>
         <source>加载NPC列表</source>
         <translation>載入 NPC 清單</translation>
     </message>
     <message>
-        <location line="+6"/>
-        <location line="+5245"/>
+        <location line="+10"/>
+        <location line="+5374"/>
         <source>物体列表文件 (*.ini *.obj);;所有文件 (*.*)</source>
         <translation>物件清單檔案 (*.ini *.obj);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="-5243"/>
+        <location line="-5371"/>
         <source>加载物体列表</source>
         <translation>載入物件清單</translation>
     </message>
     <message>
-        <location line="+86"/>
+        <location line="+90"/>
         <source>已拾取空 tile（画笔切到空图层）</source>
         <translation>已拾取空 tile（畫筆切到空圖層）</translation>
     </message>
@@ -7818,47 +12676,47 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+9"/>
-        <location line="+1233"/>
-        <location line="+404"/>
-        <location line="+368"/>
+        <location line="+1310"/>
+        <location line="+417"/>
+        <location line="+370"/>
         <source>可通过</source>
         <translation>可通過</translation>
     </message>
     <message>
-        <location line="-2004"/>
-        <location line="+1233"/>
-        <location line="+404"/>
-        <location line="+368"/>
+        <location line="-2096"/>
+        <location line="+1310"/>
+        <location line="+417"/>
+        <location line="+370"/>
         <source>透明</source>
         <translation>透明</translation>
     </message>
     <message>
-        <location line="-2004"/>
-        <location line="+1233"/>
-        <location line="+404"/>
-        <location line="+368"/>
+        <location line="-2096"/>
+        <location line="+1310"/>
+        <location line="+417"/>
+        <location line="+370"/>
         <source>跳透</source>
         <translation>跳透</translation>
     </message>
     <message>
-        <location line="-2004"/>
-        <location line="+1233"/>
-        <location line="+404"/>
-        <location line="+368"/>
-        <location line="+2541"/>
+        <location line="-2096"/>
+        <location line="+1310"/>
+        <location line="+417"/>
+        <location line="+370"/>
+        <location line="+2573"/>
         <source>实体</source>
         <translation>實體</translation>
     </message>
     <message>
-        <location line="-4545"/>
-        <location line="+1233"/>
-        <location line="+404"/>
-        <location line="+368"/>
+        <location line="-4669"/>
+        <location line="+1310"/>
+        <location line="+417"/>
+        <location line="+370"/>
         <source>跳障</source>
         <translation>跳障</translation>
     </message>
     <message>
-        <location line="-2003"/>
+        <location line="-2095"/>
         <source>已拾取障碍 [%1]</source>
         <translation>已拾取障礙 [%1]</translation>
     </message>
@@ -7906,12 +12764,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="+30"/>
         <location line="+175"/>
-        <location line="+4286"/>
+        <location line="+4410"/>
         <source>地图: %1x%2</source>
         <translation>地圖：%1x%2</translation>
     </message>
     <message>
-        <location line="-4208"/>
+        <location line="-4332"/>
         <source>保存目标冲突</source>
         <translation>儲存目標衝突</translation>
     </message>
@@ -7921,7 +12779,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>地圖、NPC 清單和物件清單不能儲存到同一個檔案。請先使用清單“另存新檔”選擇不同路徑。</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+23"/>
         <source>确认覆盖 NPC 模板</source>
         <translation>確認覆蓋 NPC 模板</translation>
     </message>
@@ -7969,14 +12827,31 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>執行時存檔偵測</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="-70"/>
+        <location line="+8"/>
+        <location line="+102"/>
         <location line="+131"/>
         <location line="+13"/>
         <source>保存失败</source>
         <translation>儲存失敗</translation>
     </message>
     <message>
-        <location line="-25"/>
+        <location line="-254"/>
+        <source>目标资源包正在更新，请稍后重试。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>MPC 资源包正在更新，请稍后重试。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+103"/>
+        <source>地图、实体列表与待提交 MPC 必须位于同一个资源根内；请取消跨资源根联动保存，或先分别另存相关文件。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+118"/>
         <source>无法保存文件: %1
 原文件未修改。</source>
         <translation>無法儲存檔案：%1
@@ -8022,7 +12897,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+151"/>
-        <location line="+54"/>
+        <location line="+59"/>
         <source>地图文件 (*.map);;所有文件 (*.*)</source>
         <translation>地圖檔案 (*.map);;所有檔案 (*.*)</translation>
     </message>
@@ -8042,7 +12917,27 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>PNG 圖片 (*.png);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+12"/>
+        <location line="+13"/>
+        <location line="+22"/>
+        <location line="+17"/>
+        <source>导出失败</source>
+        <translation type="unfinished">匯出失敗</translation>
+    </message>
+    <message>
+        <location line="-51"/>
+        <location line="+35"/>
+        <source>目标资源包正在更新或进行其他写入。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-23"/>
+        <location line="+39"/>
+        <source>无法写入文件: %1</source>
+        <translation type="unfinished">無法寫入檔案: %1</translation>
+    </message>
+    <message>
+        <location line="-29"/>
         <source>BMP图片 (*.bmp);;PNG图片 (*.png);;所有文件 (*.*)</source>
         <translation>BMP 圖片 (*.bmp);;PNG 圖片 (*.png);;所有檔案 (*.*)</translation>
     </message>
@@ -8052,30 +12947,30 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>匯出地圖大圖</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+32"/>
         <source>地图已导出到: %1</source>
         <translation>地圖已匯出到：%1</translation>
     </message>
     <message>
         <location line="+29"/>
-        <location line="+404"/>
+        <location line="+417"/>
         <source>障碍工具 [%1] 左键拾取/右键绘制</source>
         <translation>障礙工具 [%1] 左鍵拾取／右鍵繪製</translation>
     </message>
     <message>
-        <location line="-393"/>
-        <location line="+404"/>
+        <location line="-406"/>
+        <location line="+417"/>
         <source>陷阱工具 [无（清除）] 左键拾取/右键绘制</source>
         <translation>陷阱工具 [無（清除）] 左鍵拾取／右鍵繪製</translation>
     </message>
     <message>
-        <location line="-402"/>
-        <location line="+404"/>
+        <location line="-415"/>
+        <location line="+417"/>
         <source>陷阱工具 [索引=%1] 左键拾取/右键绘制</source>
         <translation>陷阱工具 [索引=%1] 左鍵拾取／右鍵繪製</translation>
     </message>
     <message>
-        <location line="-377"/>
+        <location line="-390"/>
         <source>NPC放置 - 点击地图放置</source>
         <translation>NPC 放置 - 點擊地圖放置</translation>
     </message>
@@ -8111,7 +13006,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>重做失敗後無法完整恢復原 MPC 狀態。請勿儲存，並重新開啟地圖。</translation>
     </message>
     <message>
-        <location line="+357"/>
+        <location line="+370"/>
         <source>NPC放置 - 点击地图放置，可在属性中填写资源</source>
         <translation>NPC 放置 - 點擊地圖放置，可在屬性中填寫資源</translation>
     </message>
@@ -8173,7 +13068,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>（無法載入）</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+20"/>
         <source>[选中]</source>
         <translation>[選中]</translation>
     </message>
@@ -8184,12 +13079,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+2"/>
-        <location line="+178"/>
+        <location line="+182"/>
         <source>状态</source>
         <translation>狀態</translation>
     </message>
     <message>
-        <location line="-158"/>
+        <location line="-162"/>
         <source>图层 %1</source>
         <translation>圖層 %1</translation>
     </message>
@@ -8234,18 +13129,18 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>無</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+36"/>
         <source>类型</source>
         <translation>類型</translation>
     </message>
     <message>
         <location line="+6"/>
-        <location line="+693"/>
+        <location line="+695"/>
         <source>名称</source>
         <translation>名稱</translation>
     </message>
     <message>
-        <location line="-687"/>
+        <location line="-689"/>
         <source>NPCIni</source>
         <translation>NPCIni</translation>
     </message>
@@ -8335,7 +13230,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>動作時間</translation>
     </message>
     <message>
-        <location line="+162"/>
+        <location line="+164"/>
         <source>NPC:%1 物体:%2</source>
         <translation>NPC：%1 物件：%2</translation>
     </message>
@@ -8404,23 +13299,24 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+21"/>
-        <location line="+241"/>
+        <location line="+242"/>
         <location line="+23"/>
-        <location line="+329"/>
-        <location line="+606"/>
+        <location line="+339"/>
+        <location line="+615"/>
         <location line="+107"/>
+        <location line="+161"/>
         <source>资源目录无效</source>
         <translation>資源目錄無效</translation>
     </message>
     <message>
-        <location line="-1305"/>
-        <location line="+1199"/>
+        <location line="-1486"/>
+        <location line="+1219"/>
         <location line="+107"/>
         <source>请先设置有效的 assets 根目录，并确保地图 MPC 路径不包含绝对路径或 ..。</source>
         <translation>請先設定有效的 assets 根目錄，並確保地圖 MPC 路徑不包含絕對路徑或 ..。</translation>
     </message>
     <message>
-        <location line="-1301"/>
+        <location line="-1321"/>
         <source>MPC信息编辑器</source>
         <translation>MPC 資訊編輯器</translation>
     </message>
@@ -8451,25 +13347,25 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+23"/>
-        <location line="+1167"/>
+        <location line="+1187"/>
         <location line="+168"/>
         <source>同名 MPC 冲突</source>
         <translation>同名 MPC 衝突</translation>
     </message>
     <message>
-        <location line="-1311"/>
-        <location line="+1129"/>
+        <location line="-1331"/>
+        <location line="+1149"/>
         <source>无空槽</source>
         <translation>無空槽</translation>
     </message>
     <message>
-        <location line="-1128"/>
-        <location line="+1129"/>
+        <location line="-1148"/>
+        <location line="+1149"/>
         <source>MPC 信息表已满（255 个槽位），无法添加更多 MPC。</source>
         <translation>MPC 資訊表已滿（255 個槽位），無法新增更多 MPC。</translation>
     </message>
     <message>
-        <location line="-1076"/>
+        <location line="-1096"/>
         <source>槽位 %1 的动态值 %2（有效范围 0-1）</source>
         <translation>槽位 %1 的動態值 %2（有效範圍 0-1）</translation>
     </message>
@@ -8485,12 +13381,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+10"/>
-        <location line="+1332"/>
+        <location line="+1352"/>
         <source>字段值超出范围</source>
         <translation>欄位值超出範圍</translation>
     </message>
     <message>
-        <location line="-1331"/>
+        <location line="-1351"/>
         <source>以下 MPC 字段的值超出有效范围，修改未保存：
 
 %1
@@ -8506,51 +13402,51 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+19"/>
-        <location line="+220"/>
+        <location line="+226"/>
         <source>名称大小写冲突</source>
         <translation>名稱大小寫衝突</translation>
     </message>
     <message>
-        <location line="-219"/>
+        <location line="-225"/>
         <source>槽位 %1 只修改了 MPC 名称大小写（%2 → %3）。为保证 Windows 与大小写敏感平台一致，请保留原大小写或使用不同名称。</source>
         <translation>槽位 %1 只修改了 MPC 名稱大小寫（%2 → %3）。為保證 Windows 與大小寫敏感平臺一致，請保留原大小寫或使用不同名稱。</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+192"/>
+        <location line="+198"/>
         <source>名称过长</source>
         <translation>名稱過長</translation>
     </message>
     <message>
-        <location line="-191"/>
+        <location line="-197"/>
         <source>槽位 %1 的 MPC 名称 UTF-8 字节长度超过 31（当前 %2）。修改未保存。</source>
         <translation>槽位 %1 的 MPC 名稱 UTF-8 位元組長度超過 31（目前 %2）。修改未儲存。</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+215"/>
+        <location line="+221"/>
         <source>名称重复</source>
         <translation>名稱重複</translation>
     </message>
     <message>
-        <location line="-214"/>
+        <location line="-220"/>
         <source>MPC 名称 &quot;%1&quot; 重复出现，修改未保存。</source>
         <translation>MPC 名稱「%1」重複出現，修改未儲存。</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>MPC 编辑期间资源目录发生变化，修改未保存。</source>
         <translation>MPC 編輯期間資源目錄發生變化，修改未儲存。</translation>
     </message>
     <message>
         <location line="+15"/>
-        <location line="+142"/>
+        <location line="+147"/>
         <location line="+18"/>
         <source>名称无效</source>
         <translation>名稱無效</translation>
     </message>
     <message>
-        <location line="-159"/>
+        <location line="-164"/>
         <source>槽位 %1 的名称必须是只包含文件名的 .mpc 文件。</source>
         <translation>槽位 %1 的名稱必須是只包含檔名的 .mpc 檔案。</translation>
     </message>
@@ -8560,18 +13456,15 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>槽位 %1 的 MPC 目標路徑不再安全，修改未儲存。</translation>
     </message>
     <message>
-        <location line="+6"/>
-        <location line="+1197"/>
         <source>资源不存在</source>
-        <translation>資源不存在</translation>
+        <translation type="vanished">資源不存在</translation>
     </message>
     <message>
-        <location line="-1196"/>
         <source>槽位 %1 的 MPC 文件 %2 不在当前地图资源目录中。请使用“添加 MPC”选择文件。</source>
-        <translation>槽位 %1 的 MPC 檔案 %2 不在目前地圖資源目錄中。請使用「新增 MPC」選擇檔案。</translation>
+        <translation type="vanished">槽位 %1 的 MPC 檔案 %2 不在目前地圖資源目錄中。請使用「新增 MPC」選擇檔案。</translation>
     </message>
     <message>
-        <location line="+22"/>
+        <location line="+27"/>
         <source>确认清理引用</source>
         <translation>確認清理引用</translation>
     </message>
@@ -8587,7 +13480,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="+22"/>
         <location line="+7"/>
-        <location line="+950"/>
+        <location line="+971"/>
         <location line="+6"/>
         <location line="+257"/>
         <location line="+6"/>
@@ -8595,7 +13488,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>提交失敗</translation>
     </message>
     <message>
-        <location line="-1225"/>
+        <location line="-1246"/>
         <source>MPC 目标目录已失效，地图数据未修改。</source>
         <translation>MPC 目標目錄已失效，地圖資料未修改。</translation>
     </message>
@@ -8615,7 +13508,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>編輯 MPC 資訊表</translation>
     </message>
     <message>
-        <location line="+64"/>
+        <location line="+4"/>
+        <source>MPC 占位引用已保存，以下文件尚未创建：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+67"/>
         <source>MPC 名称不能为空。</source>
         <translation>MPC 名稱不能為空。</translation>
     </message>
@@ -8645,12 +13543,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>MPC 檔案 (*.mpc);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+5"/>
         <source>选择MPC文件</source>
         <translation>選擇 MPC 檔案</translation>
     </message>
     <message>
-        <location line="+33"/>
+        <location line="+37"/>
         <source>文件无效</source>
         <translation>檔案無效</translation>
     </message>
@@ -8665,7 +13563,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>地圖 MPC 路徑不是 assets 根目錄內的安全相對路徑，不能寫入資源。</translation>
     </message>
     <message>
-        <location line="+153"/>
+        <location line="+147"/>
         <source>资源同步失败</source>
         <translation>資源同步失敗</translation>
     </message>
@@ -8675,13 +13573,13 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>目前地圖 MPC 目錄已失效，未修改任何 pending 資源。</translation>
     </message>
     <message>
-        <location line="+214"/>
-        <location line="+88"/>
+        <location line="+219"/>
+        <location line="+98"/>
         <source>资源回滚失败</source>
         <translation>資源回滾失敗</translation>
     </message>
     <message>
-        <location line="-80"/>
+        <location line="-90"/>
         <source>MPC 文件恢复失败</source>
         <translation>MPC 檔案恢復失敗</translation>
     </message>
@@ -8691,7 +13589,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>資源同步失敗後，部分已執行的檔案操作無法補償。請勿儲存，並重新開啟地圖以核對 MPC 檔案。</translation>
     </message>
     <message>
-        <location line="+80"/>
+        <location line="+90"/>
         <source>以下未保存 MPC 资源已被占用或外部修改，未自动删除：
 %1</source>
         <translation>以下未儲存 MPC 資源已被占用或外部修改，未自動刪除：
@@ -8748,12 +13646,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+17"/>
-        <location line="+253"/>
+        <location line="+259"/>
         <source>未选择 MPC</source>
         <translation>未選擇 MPC</translation>
     </message>
     <message>
-        <location line="-252"/>
+        <location line="-258"/>
         <source>请先在下拉框选择一个 MPC 槽位再编辑。</source>
         <translation>請先在下拉框選擇一個 MPC 槽位再編輯。</translation>
     </message>
@@ -8867,12 +13765,11 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>新資源：%1</translation>
     </message>
     <message>
-        <location line="+30"/>
         <source>当前地图 MPC 目录中不存在 %1。请使用“替换资源文件”选择文件。</source>
-        <translation>目前地圖 MPC 目錄中不存在 %1。請使用「取代資源檔案」選擇檔案。</translation>
+        <translation type="vanished">目前地圖 MPC 目錄中不存在 %1。請使用「取代資源檔案」選擇檔案。</translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+57"/>
         <source>动态值 %1（有效范围 0-1）</source>
         <translation>動態值 %1（有效範圍 0-1）</translation>
     </message>
@@ -8907,7 +13804,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>編輯 MPC：%1 (槽位 %2)</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+4"/>
+        <source>MPC 占位引用 %1 已保存；文件尚未创建。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+14"/>
         <source>请先在下拉框选择一个 MPC 槽位再删除。</source>
         <translation>請先在下拉框選擇一個 MPC 槽位再刪除。</translation>
     </message>
@@ -9189,7 +14091,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
 是否儲存？</translation>
     </message>
     <message>
-        <location line="+143"/>
+        <location line="+139"/>
         <source>障碍绘制</source>
         <translation>障礙繪製</translation>
     </message>
@@ -9209,7 +14111,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>物件放置</translation>
     </message>
     <message>
-        <location line="+270"/>
+        <location line="+337"/>
         <source>已拾取全部图层：地面 %1/%2，建筑 %3/%4，空中 %5/%6</source>
         <translation>已拾取全部圖層：地面 %1/%2，建筑 %3/%4，空中 %5/%6</translation>
     </message>
@@ -9265,19 +14167,18 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>幀 %1</translation>
     </message>
     <message>
-        <location line="-4643"/>
+        <location line="-4798"/>
         <source>无法准备多文件事务：
 %1</source>
         <translation>無法準備多檔案交易：
 %1</translation>
     </message>
     <message>
-        <location line="-131"/>
         <source>无法确定地图、实体列表与 MPC 资源的公共事务根；请将它们保存到同一磁盘的资源目录内。</source>
-        <translation>無法確定地圖、實體清單與 MPC 資源的共同交易根；請將它們儲存到同一磁碟的資源目錄內。</translation>
+        <translation type="vanished">無法確定地圖、實體清單與 MPC 資源的共同交易根；請將它們儲存到同一磁碟的資源目錄內。</translation>
     </message>
     <message>
-        <location line="+144"/>
+        <location line="+13"/>
         <source>地图同代事务提交失败：
 %1</source>
         <translation>地圖同代交易提交失敗：
@@ -9289,7 +14190,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>交易清理警告</translation>
     </message>
     <message>
-        <location line="+2843"/>
+        <location line="+2919"/>
         <source>以下尚未保存的 MPC 资源无法同步，请检查文件占用：
 %1%2</source>
         <translation>以下尚未儲存的 MPC 資源無法同步，請檢查檔案占用：
@@ -9302,11 +14203,71 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>
 交易錯誤：%1</translation>
     </message>
+    <message>
+        <source>副本</source>
+        <translation>副本</translation>
+    </message>
+    <message>
+        <source>地图副本未保存，原地图及列表仍保留。</source>
+        <translation>地圖副本未儲存，原地圖及列表仍保留。</translation>
+    </message>
+    <message>
+        <source>复制地图</source>
+        <translation>複製地圖</translation>
+    </message>
+    <message>
+        <source>复制地图及已加载列表…</source>
+        <translation>複製地圖及已載入列表…</translation>
+    </message>
+    <message>
+        <source>新地图名（复制已加载的NPC／物体列表及地图脚本；图片资源沿用）</source>
+        <translation>新地圖名（複製已載入的NPC／物體列表及地圖指令碼；圖片資源沿用）</translation>
+    </message>
+    <message>
+        <source>新地图或同名列表已经存在，请换一个名称。</source>
+        <translation>新地圖或同名列表已經存在，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>无法创建地图目录。</source>
+        <translation>無法建立地圖目錄。</translation>
+    </message>
+    <message>
+        <source>无法创建地图目录：%1</source>
+        <translation>無法建立地圖目錄：%1</translation>
+    </message>
+    <message>
+        <source>无法复制</source>
+        <translation>無法複製</translation>
+    </message>
+    <message>
+        <source>无法复制地图脚本</source>
+        <translation>無法複製地圖指令碼</translation>
+    </message>
+    <message>
+        <source>无法读取地图脚本：%1</source>
+        <translation>無法讀取地圖指令碼：%1</translation>
+    </message>
+    <message>
+        <source>目标地图脚本目录已有同名文件，请换一个地图名称。</source>
+        <translation>目標地圖指令碼目錄已有同名檔案，請換一個地圖名稱。</translation>
+    </message>
+    <message>
+        <source>请先打开地图，并将副本保存在当前项目中。</source>
+        <translation>請先開啟地圖，並將副本儲存在當前專案中。</translation>
+    </message>
+    <message>
+        <source>请输入有效地图名，不包含目录或特殊字符。</source>
+        <translation>請輸入有效地圖名，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>无法保存列表：%1</source>
+        <translation>無法保存列表：%1</translation>
+    </message>
 </context>
 <context>
     <name>MapRenderCanvas</name>
     <message>
-        <location filename="../ui/MapRenderCanvas.cpp" line="+1881"/>
+        <location filename="../ui/MapRenderCanvas.cpp" line="+1915"/>
         <source>人</source>
         <translation>人</translation>
     </message>
@@ -9315,11 +14276,15 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <source>物</source>
         <translation>物</translation>
     </message>
+    <message>
+        <source>从“文件”打开地图，或新建地图开始编辑。</source>
+        <translation>從“檔案”開啟地圖，或新建地圖開始編輯。</translation>
+    </message>
 </context>
 <context>
     <name>MenuEditorWindow</name>
     <message>
-        <location filename="../ui/MenuEditorWindow.cpp" line="+2173"/>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+3079"/>
         <source>上</source>
         <translation>上</translation>
     </message>
@@ -9375,16 +14340,17 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location filename="../ui/MenuEditorWindow.ui" line="+6"/>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-2629"/>
+        <location line="+1470"/>
         <source>菜单编辑器</source>
         <translation>選單編輯器</translation>
     </message>
     <message>
-        <location line="+63"/>
         <source>菜单名称:</source>
-        <translation>選單名稱:</translation>
+        <translation type="vanished">選單名稱:</translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="+73"/>
         <source>可见</source>
         <translation>可見</translation>
     </message>
@@ -9404,13 +14370,11 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>名稱</translation>
     </message>
     <message>
-        <location line="+5"/>
         <source>INI</source>
-        <translation>INI</translation>
+        <translation type="vanished">INI</translation>
     </message>
     <message>
-        <location line="+10"/>
-        <location filename="../ui/MenuEditorWindow.cpp" line="-1085"/>
+        <location line="+15"/>
         <source>添加组件</source>
         <translation>新增元件</translation>
     </message>
@@ -9420,7 +14384,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>新增子選單</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+11"/>
         <source>删除</source>
         <translation>刪除</translation>
     </message>
@@ -9440,123 +14404,108 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>資源瀏覽器</translation>
     </message>
     <message>
-        <location filename="../ui/MenuEditorWindow.cpp" line="-778"/>
-        <location line="+46"/>
         <source>新建</source>
-        <translation>新增</translation>
+        <translation type="vanished">新增</translation>
     </message>
     <message>
-        <location line="-45"/>
-        <location line="+47"/>
         <source>打开</source>
-        <translation>開啟</translation>
+        <translation type="vanished">開啟</translation>
     </message>
     <message>
-        <location line="-46"/>
-        <location line="+48"/>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-1541"/>
+        <location line="+660"/>
         <source>撤销</source>
         <translation>復原</translation>
     </message>
     <message>
-        <location line="-47"/>
-        <location line="+49"/>
+        <location line="-659"/>
+        <location line="+661"/>
         <source>重做</source>
         <translation>重做</translation>
     </message>
     <message>
-        <location line="-48"/>
-        <location line="+50"/>
+        <location line="-660"/>
+        <location line="+662"/>
         <source>保存</source>
         <translation>儲存</translation>
     </message>
     <message>
-        <location line="-49"/>
-        <location line="+51"/>
         <source>另存为</source>
-        <translation>另存新檔</translation>
+        <translation type="vanished">另存新檔</translation>
     </message>
     <message>
-        <location line="-50"/>
-        <location line="+52"/>
+        <location line="-661"/>
+        <location line="+663"/>
         <source>刷新预览</source>
         <translation>重新整理預覽</translation>
     </message>
     <message>
-        <location line="+22"/>
         <source>打开菜单定义文件</source>
-        <translation>開啟選單定義檔案</translation>
+        <translation type="vanished">開啟選單定義檔案</translation>
     </message>
     <message>
-        <location line="-51"/>
-        <location line="+419"/>
+        <location line="-612"/>
+        <location line="+883"/>
         <source>本地 UI — %1</source>
         <translation>本地 UI — %1</translation>
     </message>
     <message>
-        <location line="-418"/>
-        <location line="+419"/>
+        <location line="-882"/>
+        <location line="+883"/>
         <source>只读回退 %1 — %2</source>
         <translation>唯讀後援 %1 — %2</translation>
     </message>
     <message>
-        <location line="-329"/>
-        <location line="+494"/>
+        <location line="-110"/>
+        <location line="+526"/>
         <location line="+37"/>
         <source>保存更改</source>
         <translation>儲存變更</translation>
     </message>
     <message>
-        <location line="-531"/>
-        <location line="+495"/>
+        <location line="-563"/>
+        <location line="+527"/>
         <location line="+37"/>
         <source>菜单已修改，是否保存？</source>
         <translation>選單已修改，是否儲存？</translation>
     </message>
     <message>
-        <location line="-611"/>
-        <location line="+691"/>
-        <location line="+1367"/>
+        <location line="-1320"/>
+        <location line="+1431"/>
+        <location line="+1484"/>
         <source>菜单编辑器 - </source>
         <translation>選單編輯器 - </translation>
     </message>
     <message>
-        <location line="-2059"/>
-        <location line="+722"/>
         <source>菜单编辑器 - 新建</source>
-        <translation>選單編輯器 - 新增</translation>
+        <translation type="vanished">選單編輯器 - 新增</translation>
     </message>
     <message>
-        <location line="+17"/>
         <source>选择组件类型:</source>
-        <translation>選擇元件類型:</translation>
+        <translation type="vanished">選擇元件類型:</translation>
     </message>
     <message>
-        <location line="+97"/>
         <source>选择子菜单定义文件</source>
-        <translation>選擇子選單定義檔案</translation>
+        <translation type="vanished">選擇子選單定義檔案</translation>
     </message>
     <message>
-        <location line="+11"/>
         <source>无法添加子菜单</source>
-        <translation>無法新增子選單</translation>
+        <translation type="vanished">無法新增子選單</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>所选文件不在当前资源包或 UI 回退根中。</source>
-        <translation>所選檔案不在目前資源包或 UI 後援根目錄中。</translation>
+        <translation type="vanished">所選檔案不在目前資源包或 UI 後援根目錄中。</translation>
     </message>
     <message>
-        <location line="+58"/>
         <source>确认删除</source>
-        <translation>確認刪除</translation>
+        <translation type="vanished">確認刪除</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>确定要删除组件 &quot;%1&quot; 吗？</source>
-        <translation>確認要刪除元件 &quot;%1&quot; 嗎？</translation>
+        <translation type="vanished">確認要刪除元件 &quot;%1&quot; 嗎？</translation>
     </message>
     <message>
-        <location line="+765"/>
+        <location line="-780"/>
         <source>写入目标越过当前资源包: %1</source>
         <translation>寫入目標越過目前資源包: %1</translation>
     </message>
@@ -9571,9 +14520,9 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>提交前路徑復核失敗，原檔案未修改: %1</translation>
     </message>
     <message>
-        <location line="+1165"/>
-        <location line="+8"/>
-        <location line="+85"/>
+        <location line="+1794"/>
+        <location line="+19"/>
+        <location line="+88"/>
         <source>错误</source>
         <translation>錯誤</translation>
     </message>
@@ -9583,10 +14532,10 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>選單檔案缺少 [menu] 段，原始文件保持不變: %1</translation>
     </message>
     <message>
-        <location line="-1260"/>
+        <location line="-1903"/>
         <location line="+14"/>
         <location line="+9"/>
-        <location line="+119"/>
+        <location line="+507"/>
         <location line="+17"/>
         <location line="+7"/>
         <location line="+9"/>
@@ -9599,39 +14548,37 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <location line="+6"/>
         <location line="+11"/>
         <location line="+49"/>
-        <location line="+36"/>
-        <location line="+23"/>
+        <location filename="../ui/MenuEditorNpcInfo.cpp" line="+104"/>
+        <location line="+5"/>
+        <location filename="../ui/MenuEditorDice.cpp" line="+185"/>
+        <location line="+3"/>
         <source>保存失败</source>
         <translation>儲存失敗</translation>
     </message>
     <message>
-        <location line="-2205"/>
-        <location line="+85"/>
         <source>选择浏览的 UI 资源根；继承根只读，保存始终写入当前资源包</source>
-        <translation>選擇瀏覽的 UI 資源根；繼承根唯讀，儲存始終寫入目前資源包</translation>
+        <translation type="vanished">選擇瀏覽的 UI 資源根；繼承根唯讀，儲存始終寫入目前資源包</translation>
     </message>
     <message>
-        <location line="+198"/>
-        <location line="+1662"/>
+        <location line="-240"/>
         <source>文件事务恢复失败</source>
         <translation>檔案交易恢復失敗</translation>
     </message>
     <message>
-        <location line="-1661"/>
         <source>资源目录中存在未能安全恢复的保存事务。为避免覆盖可恢复数据，菜单保存功能已停用：
 %1</source>
-        <translation>資源目錄中存在無法安全恢復的儲存交易。為避免覆蓋可恢復資料，選單儲存功能已停用：
+        <translation type="vanished">資源目錄中存在無法安全恢復的儲存交易。為避免覆蓋可恢復資料，選單儲存功能已停用：
 %1</translation>
     </message>
     <message>
-        <location line="+1662"/>
+        <location line="+1"/>
         <source>当前资源目录仍有未恢复事务，菜单保存功能保持停用：
 %1</source>
         <translation>目前資源目錄仍有未恢復交易，選單儲存功能保持停用：
 %1</translation>
     </message>
     <message>
-        <location line="+27"/>
+        <location line="+66"/>
         <source>%1 含无效或越界资源路径: %2</source>
         <translation>%1 含無效或越界資源路徑: %2</translation>
     </message>
@@ -9689,48 +14636,45 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>部分檔案寫入失敗，原檔案未修改。</translation>
     </message>
     <message>
-        <location line="+36"/>
         <source>当前菜单不在可识别的 UI 资源根中。</source>
-        <translation>目前選單不在可識別的 UI 資源根中。</translation>
+        <translation type="vanished">目前選單不在可識別的 UI 資源根中。</translation>
     </message>
     <message>
-        <location line="+9"/>
         <source>保存菜单定义文件</source>
-        <translation>儲存選單定義檔案</translation>
+        <translation type="vanished">儲存選單定義檔案</translation>
     </message>
     <message>
-        <location line="+14"/>
         <source>菜单只能保存到当前可写资源包内:
 %1</source>
-        <translation>選單只能儲存到目前可寫資源包內:
+        <translation type="vanished">選單只能儲存到目前可寫資源包內:
 %1</translation>
     </message>
     <message>
-        <location line="-2132"/>
-        <location line="+2522"/>
+        <location line="-2932"/>
+        <location line="+3311"/>
         <source>[窗口]</source>
         <translation>[視窗]</translation>
     </message>
     <message>
-        <location line="-2517"/>
-        <location line="+2564"/>
+        <location line="-3306"/>
+        <location line="+3357"/>
         <source>[子菜单]</source>
         <translation>[子選單]</translation>
     </message>
     <message>
-        <location line="+344"/>
+        <location line="+651"/>
         <source>菜单文件不在当前资源包或其 UI 回退根中，已拒绝打开:
 %1</source>
         <translation>選單檔案不在目前資源包或其 UI 後援根目錄中，已拒絕開啟:
 %1</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+19"/>
         <source>无法打开文件: %1</source>
         <translation>無法開啟檔案: %1</translation>
     </message>
     <message>
-        <location line="-1160"/>
+        <location line="-1800"/>
         <source>无法准备多文件事务：
 %1</source>
         <translation>無法準備多檔案交易：
@@ -9748,11 +14692,2503 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <source>事务清理警告</source>
         <translation>交易清理警告</translation>
     </message>
+    <message>
+        <location line="+133"/>
+        <source>不能完整识别阵列或某方向没有相邻格；请明确填写全部参数后应用。</source>
+        <translation>無法完整識別陣列或某方向沒有相鄰格；請明確填寫全部參數後套用。</translation>
+    </message>
+    <message>
+        <location line="-2383"/>
+        <location line="+729"/>
+        <source>仅切换预览；游戏仍决定实际显示状态。示例文字及分页不写入资源。</source>
+        <translation>僅切換預覽；遊戲仍決定實際顯示狀態。範例文字及分頁不寫入資源。</translation>
+    </message>
+    <message>
+        <location line="+1651"/>
+        <source>仅调整显示，不改变背包容量。底图中画死的格线不会重绘。
+应用后只生成当前菜单引用的局部覆盖；共享原文件保留。</source>
+        <translation>僅調整顯示，不改變背包容量。底圖中畫死的格線不會重繪。
+套用後只產生目前選單引用的局部覆蓋；共用原檔案保留。</translation>
+    </message>
+    <message>
+        <location line="+1456"/>
+        <source>价格：100（示例）</source>
+        <translation>價格：100（範例）</translation>
+    </message>
+    <message>
+        <location line="-1451"/>
+        <source>列数</source>
+        <translation>列數</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>垂直间距</source>
+        <translation>垂直間距</translation>
+    </message>
+    <message>
+        <location line="+1378"/>
+        <location line="+8"/>
+        <source>展开详情：中间页</source>
+        <translation>展開詳情：中間頁</translation>
+    </message>
+    <message>
+        <location line="-8"/>
+        <location line="+8"/>
+        <source>展开详情：末页</source>
+        <translation>展開詳情：末頁</translation>
+    </message>
+    <message>
+        <location line="-8"/>
+        <location line="+8"/>
+        <source>展开详情：第一页</source>
+        <translation>展開詳情：第一頁</translation>
+    </message>
+    <message>
+        <location line="-1280"/>
+        <source>布局字段 %1 的值无效：%2</source>
+        <translation>配置欄位 %1 的值無效：%2</translation>
+    </message>
+    <message>
+        <location line="+1270"/>
+        <location line="+6"/>
+        <location filename="../ui/MenuEditorStoragePages.cpp" line="+132"/>
+        <location line="+2"/>
+        <source>布局编辑（全部组件）</source>
+        <translation>配置編輯（全部元件）</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>悬停提示（示例）</source>
+        <translation>懸停提示（範例）</translation>
+    </message>
+    <message>
+        <location line="-1409"/>
+        <source>无法准备当前资源包的局部覆盖。</source>
+        <translation>無法準備目前資源包的局部覆蓋。</translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <source>格子宽</source>
+        <translation>格子寬</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>格子高</source>
+        <translation>格子高</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>水平间距</source>
+        <translation>水平間距</translation>
+    </message>
+    <message>
+        <location line="+1195"/>
+        <source>所有选项共用这套位置、行高和样式。实际文字与选择后的剧情由脚本提供，可在“预览游戏窗口”中输入临时选项检查效果。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>功能：%1。显示文字可编辑，按钮的游戏操作保持固定。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>功能：%1。文字绘制在按钮图片内；可通过图片和三个状态帧调整外观。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>功能：%1。文字随游戏设置或状态更新；此处调整外观，切换下方按钮状态可检查对应效果。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>内容由游戏或剧情提供。此处调整显示布局，预览中的示例内容不会保存为游戏数据。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+249"/>
+        <source>物品名称（示例）</source>
+        <translation>物品名稱（範例）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>物品说明示例，用于检查文字区域、换行与字号。实际内容由游戏生成。
+第二行说明。</source>
+        <translation>物品說明範例，用於檢查文字區域、換行與字號。實際內容由遊戲產生。
+第二行說明。</translation>
+    </message>
+    <message>
+        <source>背包或提示框组件必须有唯一名称、类型和配置引用。</source>
+        <translation type="vanished">背包或提示框元件必須有唯一名稱、類型和設定引用。</translation>
+    </message>
+    <message>
+        <location line="-3864"/>
+        <location line="+750"/>
+        <location line="+1654"/>
+        <location line="+26"/>
+        <source>背包阵列</source>
+        <translation>背包陣列</translation>
+    </message>
+    <message>
+        <location line="-96"/>
+        <source>背包阵列参数无效。</source>
+        <translation>背包陣列參數無效。</translation>
+    </message>
+    <message>
+        <location line="+77"/>
+        <source>行数</source>
+        <translation>行數</translation>
+    </message>
+    <message>
+        <source>读取：%1
+写入根：%2
+背包／提示框修改会生成独立引用，避免影响其它菜单。</source>
+        <translation type="vanished">讀取：%1
+寫入根：%2
+背包／提示框修改會產生獨立引用，避免影響其他選單。</translation>
+    </message>
+    <message>
+        <source>读取：%1
+写入：当前包局部覆盖（原文件保留）
+预览按布局坐标；动态缩放与文字适配以游戏为准。</source>
+        <translation type="vanished">讀取：%1
+寫入：目前包局部覆蓋（原檔案保留）
+預覽依配置座標；動態縮放與文字調整以遊戲為準。</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>起点 X</source>
+        <translation>起點 X</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>起点 Y</source>
+        <translation>起點 Y</translation>
+    </message>
+    <message>
+        <location line="+122"/>
+        <source>运行时需要组件 %1（%2），不能删除或改名／类型。</source>
+        <translation>執行階段需要元件 %1（%2），不能刪除或更改名稱／類型。</translation>
+    </message>
+    <message>
+        <location line="-2446"/>
+        <source>事件／备忘</source>
+        <translation>事件／備忘</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>修炼</source>
+        <translation>修煉</translation>
+    </message>
+    <message>
+        <location line="+3805"/>
+        <source>修炼武功（示例）</source>
+        <translation>修煉武功（範例）</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>修炼说明由游戏生成。此处检查换行与缩字。
+第二行示例。</source>
+        <translation>修煉說明由遊戲產生。此處檢查換行與縮字。
+第二行範例。</translation>
+    </message>
+    <message>
+        <location line="-3552"/>
+        <source>备忘固定显示五行；FitLines 按高度等分，否则使用 LineSize 行距。剧情内容只读，示例不保存。</source>
+        <translation>備忘固定顯示五行；FitLines 按高度等分，否則使用 LineSize 行距。劇情內容唯讀，範例不儲存。</translation>
+    </message>
+    <message>
+        <location line="+3545"/>
+        <source>属性数值：100（示例）</source>
+        <translation>屬性數值：100（範例）</translation>
+    </message>
+    <message>
+        <location line="-89"/>
+        <source>属性面板（示例）</source>
+        <translation>屬性面板（範例）</translation>
+    </message>
+    <message>
+        <location line="-3533"/>
+        <source>当前资源包禁用修炼入口；配置仅供预览，不修改功能开关。</source>
+        <translation>目前資源包停用修煉入口；設定僅供預覽，不修改功能開關。</translation>
+    </message>
+    <message>
+        <location line="+3616"/>
+        <source>放入快捷栏</source>
+        <translation>放入快捷列</translation>
+    </message>
+    <message>
+        <location line="-3542"/>
+        <source>武功内容、数量、页码与功能状态由游戏控制；只调整已有组件的显示。示例状态不保存。</source>
+        <translation>武功內容、數量、頁碼與功能狀態由遊戲控制；只調整既有元件的顯示。範例狀態不儲存。</translation>
+    </message>
+    <message>
+        <location line="+3456"/>
+        <source>武功列表（示例）</source>
+        <translation>武功列表（範例）</translation>
+    </message>
+    <message>
+        <location line="+82"/>
+        <source>武功名称（示例）</source>
+        <translation>武功名稱（範例）</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>武功等级：1
+升级经验：0 / 100
+消耗：气 10
+说明内容由游戏生成。
+分页示例。</source>
+        <translation>武功等級：1
+升級經驗：0 / 100
+消耗：氣 10
+說明內容由遊戲產生。
+分頁範例。</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>武功详情（示例）</source>
+        <translation>武功詳情（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>武功（示例）</source>
+        <translation>武功（範例）</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>第一条事件（示例）
+第二条事件（示例）
+第三条事件（示例）
+第四条事件（示例）
+第五条事件（示例）</source>
+        <translation>第一條事件（範例）
+第二條事件（範例）
+第三條事件（範例）
+第四條事件（範例）
+第五條事件（範例）</translation>
+    </message>
+    <message>
+        <location line="-105"/>
+        <source>装备面板（示例）</source>
+        <translation>裝備面板（範例）</translation>
+    </message>
+    <message>
+        <location line="+82"/>
+        <source>设为修炼</source>
+        <translation>設為修煉</translation>
+    </message>
+    <message>
+        <location line="-81"/>
+        <source>运行内容（示例）</source>
+        <translation>執行內容（範例）</translation>
+    </message>
+    <message>
+        <location line="-3596"/>
+        <source>当前布局不使用此独立菜单；请选择菜单列表中的有效入口。</source>
+        <translation>目前版面不使用此獨立選單；請選擇選單列表中的有效入口。</translation>
+    </message>
+    <message>
+        <location line="-89"/>
+        <source>／</source>
+        <translation>／</translation>
+    </message>
+    <message>
+        <location line="+142"/>
+        <source>请选择当前布局中的菜单。禁用的功能不列出，缺失的配置会明确标记。</source>
+        <translation>請選擇目前版面中的選單。停用的功能不列出，缺少的設定會明確標記。</translation>
+    </message>
+    <message>
+        <location line="+96"/>
+        <source>原版固定窗口与按钮文件；逐项来源见属性区</source>
+        <translation>原版固定視窗與按鈕檔案；各項來源見屬性區</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorSystemPages.cpp" line="+32"/>
+        <source>原聚合定义未被运行时采用，以下原文仅作保留：</source>
+        <translation>原聚合定義未被執行階段採用，以下原文僅作保留：</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-44"/>
+        <source>固定组件回退</source>
+        <translation>固定元件備援</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorSystemPages.cpp" line="-12"/>
+        <source>固定组件类型与运行时不符：%1</source>
+        <translation>固定元件類型與執行階段不符：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+7"/>
+        <source>提示内容与确认结果由调用方提供。青玉仅用于游戏内；标题／全局无 GameManager 的确认框使用原版，请切换原版编辑。</source>
+        <translation>提示內容與確認結果由呼叫端提供。青玉僅用於遊戲內；標題／全域無 GameManager 的確認框使用原版，請切換原版編輯。</translation>
+    </message>
+    <message>
+        <location line="-232"/>
+        <source>是／否确认</source>
+        <translation>是／否確認</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>普通标题</source>
+        <translation>一般標題</translation>
+    </message>
+    <message>
+        <location line="+228"/>
+        <source>普通标题（无 GameManager）不使用青玉替换；设计宽高与按钮共用运行时等比变换。锚点、缩放和按钮拉伸由游戏固定；预览不模拟动态镜像、天气与载入遮罩，节日标题另行处理。</source>
+        <translation>一般標題（無 GameManager）不使用青玉替換；設計寬高與按鈕共用執行階段等比變換。錨點、縮放和按鈕拉伸由遊戲固定；預覽不模擬動態鏡像、天氣與載入遮罩，節日標題另行處理。</translation>
+    </message>
+    <message>
+        <location line="+3536"/>
+        <source>确认操作？（示例，不保存）</source>
+        <translation>確認操作？（範例，不儲存）</translation>
+    </message>
+    <message>
+        <location line="-1321"/>
+        <source>窗口设计尺寸必须大于 16。</source>
+        <translation>視窗設計尺寸必須大於 16。</translation>
+    </message>
+    <message>
+        <location line="-2214"/>
+        <source>窗口高度由页脚派生；滑块沿轨道的位置由数值计算，仅编辑轨道几何、范围和滑块显示，不修改音量、速度或开关。禁用阴影等状态由游戏决定。</source>
+        <translation>視窗高度由頁尾派生；滑塊沿軌道的位置由數值計算，僅編輯軌道幾何、範圍和滑塊顯示，不修改音量、速度或開關。停用陰影等狀態由遊戲決定。</translation>
+    </message>
+    <message>
+        <location line="+3471"/>
+        <source>设计画布</source>
+        <translation>設計畫布</translation>
+    </message>
+    <message>
+        <location line="-3469"/>
+        <source>运行时使用原版固定窗口和按钮文件回退；首次修改建立有效聚合，未使用的旧聚合原文作为注释保留。提示内容与确认结果不保存。</source>
+        <translation>執行階段使用原版固定視窗和按鈕檔案備援；首次修改建立有效聚合，未使用的舊聚合原文作為註解保留。提示內容與確認結果不儲存。</translation>
+    </message>
+    <message>
+        <location line="-102"/>
+        <source>确认框固定回退文件缺失、不可读取或为空：%1</source>
+        <translation>確認框固定備援檔案遺失、無法讀取或為空：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorStoragePages.cpp" line="-45"/>
+        <source>%1：缺少固定组件或类型不符：%2（%3）</source>
+        <translation>%1：缺少固定元件或類型不符：%2（%3）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-127"/>
+        <source>买卖</source>
+        <translation>買賣</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorStoragePages.cpp" line="+45"/>
+        <source>仅保存（示例）</source>
+        <translation>僅儲存（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>仅读取（示例）</source>
+        <translation>僅讀取（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>保存＋读取（示例）</source>
+        <translation>儲存＋讀取（範例）</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>出售／回购（示例）</source>
+        <translation>出售／回購（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>只买（示例）</source>
+        <translation>只買（範例）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+256"/>
+        <source>只编辑已有商品格与滚动条的显示；商品、库存、银两、价格和滚动业务参数由游戏控制。玩家物品侧使用背包页面；示例不执行买卖。</source>
+        <translation>只編輯已有商品格與捲動條的顯示；商品、庫存、銀兩、價格和捲動業務參數由遊戲控制。玩家物品側使用背包頁面；範例不執行買賣。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorStoragePages.cpp" line="-32"/>
+        <source>存档列表的数量、字号或行高设置无效：%1</source>
+        <translation>存檔列表的數量、字級或行高設定無效：%1</translation>
+    </message>
+    <message>
+        <location line="+69"/>
+        <source>存档截图（示例）</source>
+        <translation>存檔截圖（範例）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-257"/>
+        <source>存读档</source>
+        <translation>存讀檔</translation>
+    </message>
+    <message>
+        <location line="-21"/>
+        <location line="+621"/>
+        <source>标题存读档</source>
+        <translation>標題存讀檔</translation>
+    </message>
+    <message>
+        <location line="-344"/>
+        <source>槽位数量、编号与自动槽规则保持；FitItems 按有效槽位数均分高度，开启时 ItemHeight 不生效。截图来自存档并强制裁剪拉伸。空槽读取无动作，事件中或禁止保存时由游戏拒绝保存；示例状态不写盘。</source>
+        <translation>槽位數量、編號與自動槽規則保持；FitItems 按有效槽位數均分高度，開啟時 ItemHeight 不生效。截圖來自存檔並強制裁剪拉伸。空槽讀取無動作，事件中或禁止儲存時由遊戲拒絕儲存；範例狀態不寫入磁碟。</translation>
+    </message>
+    <message>
+        <location line="-278"/>
+        <location line="+622"/>
+        <source>游戏内存读档</source>
+        <translation>遊戲內存讀檔</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorStoragePages.cpp" line="-35"/>
+        <source>空槽（读取无动作）</source>
+        <translation>空槽（讀取無動作）</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>自动槽（禁止手动保存）</source>
+        <translation>自動槽（禁止手動儲存）</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>购买：末页（示例）</source>
+        <translation>購買：末頁（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>购买：首页（示例）</source>
+        <translation>購買：首頁（範例）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+1"/>
+        <source>选择存读档的实际打开场景；标题按应用主题候选选源，游戏内按活动世界主题选源，不修改游戏设置。</source>
+        <translation>選擇存讀檔的實際開啟場景；標題按應用主題候選選源，遊戲內按活動世界主題選源，不修改遊戲設定。</translation>
+    </message>
+    <message>
+        <source>银两 1234（示例）</source>
+        <translation type="vanished">銀兩 1234（範例）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorStoragePages.cpp" line="-10"/>
+        <source>列表项 %1 无法按现有 INI 格式完整保存：%2</source>
+        <translation>清單項目 %1 無法使用現有 INI 格式完整儲存：%2</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorControllerHelp.cpp" line="+110"/>
+        <source>
+以下旧字段无效，预览采用默认，原文保留：%1</source>
+        <translation>
+以下舊字段無效，預覽採用默認，原文保留：%1</translation>
+    </message>
+    <message>
+        <location line="-31"/>
+        <source>Nintendo标签（临时示例）</source>
+        <translation>Nintendo標籤（臨時示例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>PlayStation标签（临时示例）</source>
+        <translation>PlayStation標籤（臨時示例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Xbox标签（临时示例）</source>
+        <translation>Xbox標籤（臨時示例）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-356"/>
+        <source>两主题共用可选单文件；空值采用动态默认。640／1100响应分支、18条世界及12条菜单说明、按键标签、触发与关闭由游戏管理，仅编辑有效显示字段。样例不保存，较小视口保持原有内容溢出边界。</source>
+        <translation>兩主題共用可選單文件；空值採用動態默認。640／1100響應分支、18條世界及12條菜單說明、按鍵標籤、觸發與關閉由遊戲管理，僅編輯有效顯示字段。樣例不保存，較小視口保持原有內容溢出邊界。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorControllerHelp.cpp" line="+30"/>
+        <source>两列</source>
+        <translation>兩列</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>单列</source>
+        <translation>單列</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>图片</source>
+        <translation>圖片</translation>
+    </message>
+    <message>
+        <location line="-40"/>
+        <source>手柄帮助使用固定单文件，正文、动作和结构由游戏管理。</source>
+        <translation>手柄幫助使用固定單文件，正文、動作和結構由遊戲管理。</translation>
+    </message>
+    <message>
+        <source>手柄帮助动态默认；首次编辑仅创建必要的当前包单文件覆盖。</source>
+        <translation type="vanished">手柄幫助動態默認；首次編輯僅創建必要的當前包單文件覆蓋。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorNpcInfo.cpp" line="+0"/>
+        <source>手柄帮助布局写入失败，原文件和待保存编辑保留。</source>
+        <translation>手柄幫助布局寫入失敗，原文件和待保存編輯保留。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorControllerHelp.cpp" line="+4"/>
+        <source>手柄帮助布局被其它菜单共享，固定入口不能拆分，已限制写入。</source>
+        <translation>手柄幫助布局被其它菜單共享，固定入口不能拆分，已限制寫入。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorNpcInfo.cpp" line="-72"/>
+        <source>手柄帮助布局解析失败（行%1），运行时采用默认，本页只读。</source>
+        <translation>手柄幫助布局解析失敗（行%1），運行時採用默認，本頁只讀。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorControllerHelp.cpp" line="-17"/>
+        <source>手柄帮助显示字段无效，修改未应用：%1</source>
+        <translation>手柄幫助顯示字段無效，修改未應用：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorNpcInfo.cpp" line="+65"/>
+        <source>手柄帮助配置已被外部修改，请重新打开；待保存编辑保留。</source>
+        <translation>手柄幫助配置已被外部修改，請重新打開；待保存編輯保留。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorControllerHelp.cpp" line="+52"/>
+        <source>手柄帮助：%1；标题字号%2，正文字号%3，行高%4。
+640／1100分支、18条世界说明及12条菜单说明由游戏固定。空值随视口默认；图片失败回退文字。标签样例不保存，Qt与SDL字形及小视口溢出须分别核对。%5</source>
+        <translation>手柄幫助：%1；標題字號%2，正文字號%3，行高%4。
+640／1100分支、18條世界說明及12條菜單說明由遊戲固定。空值隨視口默認；圖片失敗回退文字。標籤樣例不保存，Qt與SDL字形及小視口溢出須分別核對。%5</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-242"/>
+        <source>游戏内手柄帮助</source>
+        <translation>遊戲內手柄幫助</translation>
+    </message>
+    <message>
+        <location line="+3452"/>
+        <source>缺省布局随视口计算；图片及配置分别按实际UI来源解析。</source>
+        <translation>缺省布局隨視口計算；圖片及配置分別按實際UI來源解析。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorDice.cpp" line="-51"/>
+        <source>%1 · %2
+写入当前包：骰子对局%3</source>
+        <translation>%1 · %2
+寫入目前資源包：骰子對局%3</translation>
+    </message>
+    <message>
+        <location line="+79"/>
+        <source>549×300设计画布 · 示例不保存；图片失败时游戏使用原回退界面。</source>
+        <translation>549×300設計畫布 · 範例不儲存；圖片失敗時遊戲使用原回退介面。</translation>
+    </message>
+    <message>
+        <location line="-109"/>
+        <source>人物与对话</source>
+        <translation>人物與對話</translation>
+    </message>
+    <message>
+        <location line="+93"/>
+        <source>平局（示例）</source>
+        <translation>平局（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>揭盅（示例）</source>
+        <translation>揭盅（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>摇骰（示例）</source>
+        <translation>搖骰（範例）</translation>
+    </message>
+    <message>
+        <location line="-93"/>
+        <source>操作按钮</source>
+        <translation>操作按鈕</translation>
+    </message>
+    <message>
+        <location line="+93"/>
+        <source>等待下注（示例）</source>
+        <translation>等待下注（範例）</translation>
+    </message>
+    <message>
+        <location line="-93"/>
+        <source>背景与标题</source>
+        <translation>背景與標題</translation>
+    </message>
+    <message>
+        <location line="+93"/>
+        <source>获胜（示例）</source>
+        <translation>獲勝（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>落败（示例）</source>
+        <translation>落敗（範例）</translation>
+    </message>
+    <message>
+        <location line="-61"/>
+        <source>读取：%1
+写入：%2</source>
+        <translation>讀取：%1
+寫入：%2</translation>
+    </message>
+    <message>
+        <location line="-32"/>
+        <source>骰子与结果</source>
+        <translation>骰子與結果</translation>
+    </message>
+    <message>
+        <location line="-21"/>
+        <location line="+7"/>
+        <source>骰子固定角色和入口不能修改。</source>
+        <translation>骰子固定角色與入口不能修改。</translation>
+    </message>
+    <message>
+        <location line="+64"/>
+        <source>骰子显示字段无效，修改未应用：%1</source>
+        <translation>骰子顯示欄位無效，修改未套用：%1</translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>骰子配置写入失败，原文件和待保存编辑保留。</source>
+        <translation>骰子設定寫入失敗，原檔案與待儲存編輯保留。</translation>
+    </message>
+    <message>
+        <location line="-17"/>
+        <source>骰子配置已被外部修改，请重新打开；待保存编辑保留。</source>
+        <translation>骰子設定已被外部修改，請重新開啟；待儲存編輯保留。</translation>
+    </message>
+    <message>
+        <location line="-73"/>
+        <source>骰子配置被其它菜单共享，固定入口不能拆分，已限制写入。</source>
+        <translation>骰子設定被其他選單共用，固定入口不能拆分，已限制寫入。</translation>
+    </message>
+    <message>
+        <location line="-53"/>
+        <source>骰子配置需要549×300设计画布；原内容只读保留。</source>
+        <translation>骰子設定需要549×300設計畫布；原內容唯讀保留。</translation>
+    </message>
+    <message>
+        <location line="+93"/>
+        <source>（未保存）</source>
+        <translation>（未儲存）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-3209"/>
+        <source>549×300设计画布；仅编辑固定显示角色，玩法和文字由游戏管理。两主题共用。预览状态不保存。</source>
+        <translation>549×300設計畫布；僅編輯固定顯示角色，玩法與文字由遊戲管理。兩主題共用。預覽狀態不儲存。</translation>
+    </message>
+    <message>
+        <location line="-243"/>
+        <source>骰子对局</source>
+        <translation>骰子對局</translation>
+    </message>
+    <message>
+        <source>背景</source>
+        <translation type="vanished">背景</translation>
+    </message>
+    <message>
+        <source>玩家头像</source>
+        <translation type="vanished">玩家頭像</translation>
+    </message>
+    <message>
+        <source>对方头像</source>
+        <translation type="vanished">對方頭像</translation>
+    </message>
+    <message>
+        <source>玩家对话底图</source>
+        <translation type="vanished">玩家對話底圖</translation>
+    </message>
+    <message>
+        <source>对方对话底图</source>
+        <translation type="vanished">對方對話底圖</translation>
+    </message>
+    <message>
+        <source>双方骰盘共用图片</source>
+        <translation type="vanished">雙方骰盤共用圖片</translation>
+    </message>
+    <message>
+        <source>玩家骰盘</source>
+        <translation type="vanished">玩家骰盤</translation>
+    </message>
+    <message>
+        <source>对方骰盘</source>
+        <translation type="vanished">對方骰盤</translation>
+    </message>
+    <message>
+        <source>银两图</source>
+        <translation type="vanished">銀兩圖</translation>
+    </message>
+    <message>
+        <source>对局中图案</source>
+        <translation type="vanished">對局中圖案</translation>
+    </message>
+    <message>
+        <source>获胜图案</source>
+        <translation type="vanished">獲勝圖案</translation>
+    </message>
+    <message>
+        <source>落败图案</source>
+        <translation type="vanished">落敗圖案</translation>
+    </message>
+    <message>
+        <source>平局图案</source>
+        <translation type="vanished">平局圖案</translation>
+    </message>
+    <message>
+        <source>玩家骰子一</source>
+        <translation type="vanished">玩家骰子一</translation>
+    </message>
+    <message>
+        <source>玩家骰子二</source>
+        <translation type="vanished">玩家骰子二</translation>
+    </message>
+    <message>
+        <source>玩家骰子三</source>
+        <translation type="vanished">玩家骰子三</translation>
+    </message>
+    <message>
+        <source>对方骰子一</source>
+        <translation type="vanished">對方骰子一</translation>
+    </message>
+    <message>
+        <source>对方骰子二</source>
+        <translation type="vanished">對方骰子二</translation>
+    </message>
+    <message>
+        <source>对方骰子三</source>
+        <translation type="vanished">對方骰子三</translation>
+    </message>
+    <message>
+        <source>一点骰面</source>
+        <translation type="vanished">一點骰面</translation>
+    </message>
+    <message>
+        <source>二点骰面</source>
+        <translation type="vanished">二點骰面</translation>
+    </message>
+    <message>
+        <source>三点骰面</source>
+        <translation type="vanished">三點骰面</translation>
+    </message>
+    <message>
+        <source>四点骰面</source>
+        <translation type="vanished">四點骰面</translation>
+    </message>
+    <message>
+        <source>五点骰面</source>
+        <translation type="vanished">五點骰面</translation>
+    </message>
+    <message>
+        <source>六点骰面</source>
+        <translation type="vanished">六點骰面</translation>
+    </message>
+    <message>
+        <source>标题（居中偏移）</source>
+        <translation type="vanished">標題（置中偏移）</translation>
+    </message>
+    <message>
+        <source>关闭符号</source>
+        <translation type="vanished">關閉符號</translation>
+    </message>
+    <message>
+        <source>玩家姓名</source>
+        <translation type="vanished">玩家姓名</translation>
+    </message>
+    <message>
+        <source>对方姓名</source>
+        <translation type="vanished">對方姓名</translation>
+    </message>
+    <message>
+        <source>注额文字</source>
+        <translation type="vanished">注額文字</translation>
+    </message>
+    <message>
+        <source>玩家对话正文</source>
+        <translation type="vanished">玩家對話正文</translation>
+    </message>
+    <message>
+        <source>对方对话正文</source>
+        <translation type="vanished">對方對話正文</translation>
+    </message>
+    <message>
+        <source>开始按钮</source>
+        <translation type="vanished">開始按鈕</translation>
+    </message>
+    <message>
+        <source>下注按钮</source>
+        <translation type="vanished">下注按鈕</translation>
+    </message>
+    <message>
+        <source>开盅按钮</source>
+        <translation type="vanished">開盅按鈕</translation>
+    </message>
+    <message>
+        <source>关闭按钮</source>
+        <translation type="vanished">關閉按鈕</translation>
+    </message>
+    <message>
+        <source>设计画布549 × 300</source>
+        <translation type="vanished">設計畫布549 × 300</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.ui" line="-52"/>
+        <source>资源</source>
+        <translation>資源</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+189"/>
+        <source>UI 依赖优先：当前包覆盖仍会被遮蔽，已限制写入。</source>
+        <translation>UI 依賴優先：目前套件覆蓋仍會被遮蔽，已限制寫入。</translation>
+    </message>
+    <message>
+        <source>仅在当前包生成必要的独立局部覆盖。</source>
+        <translation type="vanished">僅在目前套件產生必要的獨立局部覆蓋。</translation>
+    </message>
+    <message>
+        <location line="+403"/>
+        <source>仅选择编辑对象，不修改游戏主题开关。未提供游戏应用设置时使用运行时默认原版。</source>
+        <translation>僅選擇編輯對象，不修改遊戲主題開關。未提供遊戲應用程式設定時使用執行階段預設原版。</translation>
+    </message>
+    <message>
+        <source>任务</source>
+        <translation type="vanished">任務</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.ui" line="-76"/>
+        <source>内部标识:</source>
+        <translation>內部識別:</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+2792"/>
+        <source>内部身份、动态内容或未核实字段由游戏管理；背包格子布局请使用阵列操作。</source>
+        <translation>內部識別、動態內容或未核實欄位由遊戲管理；背包格子配置請使用陣列操作。</translation>
+    </message>
+    <message>
+        <location line="-2829"/>
+        <source>功能标识或结构已改变，拒绝保存。</source>
+        <translation>功能識別或結構已改變，拒絕儲存。</translation>
+    </message>
+    <message>
+        <location line="-582"/>
+        <location line="+290"/>
+        <location line="+1"/>
+        <location line="+6"/>
+        <location line="+320"/>
+        <source>原版</source>
+        <translation>原版</translation>
+    </message>
+    <message>
+        <location line="-44"/>
+        <source>只能保存到当前页面的有效入口，不支持任意另存。</source>
+        <translation>只能儲存至目前頁面的有效入口，不支援任意另存。</translation>
+    </message>
+    <message>
+        <source>只读</source>
+        <translation type="vanished">唯讀</translation>
+    </message>
+    <message>
+        <source>可查看／编辑</source>
+        <translation type="vanished">可檢視／編輯</translation>
+    </message>
+    <message>
+        <location line="+3543"/>
+        <source>子菜单序号不连续，本页只读，未自动修复。</source>
+        <translation>子選單序號不連續，本頁唯讀，未自動修復。</translation>
+    </message>
+    <message>
+        <location line="-3883"/>
+        <source>存在无效或越界的固定引用，本页只读：%1</source>
+        <translation>存在無效或越界的固定引用，本頁唯讀：%1</translation>
+    </message>
+    <message>
+        <location line="-207"/>
+        <source>对话</source>
+        <translation>對話</translation>
+    </message>
+    <message>
+        <location line="-4"/>
+        <source>属性</source>
+        <translation>屬性</translation>
+    </message>
+    <message>
+        <location line="+159"/>
+        <source>当前包</source>
+        <translation>目前套件</translation>
+    </message>
+    <message>
+        <location line="+900"/>
+        <location line="+8"/>
+        <source>当前提示文字的运行时字号上限为 %1，修改未应用。</source>
+        <translation>目前提示文字的執行階段字號上限為 %1，修改未套用。</translation>
+    </message>
+    <message>
+        <location line="-1067"/>
+        <source>提示框</source>
+        <translation>提示框</translation>
+    </message>
+    <message>
+        <location line="+224"/>
+        <source>显示状态由游戏控制，此处仅保留原配置，不代表运行中的可见状态。</source>
+        <translation>顯示狀態由遊戲控制，此處僅保留原設定，不代表執行中的可見狀態。</translation>
+    </message>
+    <message>
+        <location line="-49"/>
+        <source>未确认此文件是当前页面的有效入口，仅供读取和预览。</source>
+        <translation>未確認此檔案是目前頁面的有效入口，僅供讀取及預覽。</translation>
+    </message>
+    <message>
+        <source>标题</source>
+        <translation type="vanished">標題</translation>
+    </message>
+    <message>
+        <location line="+1650"/>
+        <source>格式必须匹配原绑定的整数数量（%d）；绑定本身保持只读。</source>
+        <translation>格式必須符合原綁定的整數數量（%d）；綁定本身保持唯讀。</translation>
+    </message>
+    <message>
+        <location line="-1822"/>
+        <source>武功</source>
+        <translation>武功</translation>
+    </message>
+    <message>
+        <location line="+581"/>
+        <source>游戏页面</source>
+        <translation>遊戲頁面</translation>
+    </message>
+    <message>
+        <location line="+150"/>
+        <source>目标资源包的当前页面不可读取，原文档与编辑状态保持不变。</source>
+        <translation>目標資源套件的目前頁面無法讀取，原文件與編輯狀態保持不變。</translation>
+    </message>
+    <message>
+        <location line="-733"/>
+        <source>系统</source>
+        <translation>系統</translation>
+    </message>
+    <message>
+        <location line="+4075"/>
+        <source>组件序号不连续，游戏会在缺号处停止读取；本页只读。</source>
+        <translation>元件序號不連續，遊戲會在缺號處停止讀取；本頁唯讀。</translation>
+    </message>
+    <message>
+        <location line="-3917"/>
+        <source>继承／公共来源</source>
+        <translation>繼承／共用來源</translation>
+    </message>
+    <message>
+        <location line="-160"/>
+        <source>背包</source>
+        <translation>背包</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>装备</source>
+        <translation>裝備</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>计时</source>
+        <translation>計時</translation>
+    </message>
+    <message>
+        <location line="+131"/>
+        <source>该页面没有可读取的有效配置，原文档保持不变。</source>
+        <translation>該頁面沒有可讀取的有效設定，原文件保持不變。</translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>该页面的显示字段尚未核实，本轮只读。</source>
+        <translation>該頁面的顯示欄位尚未核實，本輪唯讀。</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>请先选择有效的当前资源包。</source>
+        <translation>請先選擇有效的目前資源套件。</translation>
+    </message>
+    <message>
+        <source>读取：%1
+当前包：%2</source>
+        <translation type="vanished">讀取：%1
+目前套件：%2</translation>
+    </message>
+    <message>
+        <location line="+43"/>
+        <source>资源上下文或功能设置已改变，请重新选择页面；待保存编辑保留。</source>
+        <translation>資源上下文或功能設定已改變，請重新選擇頁面；待儲存編輯保留。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源上下文解析失败：%1</source>
+        <translation>資源上下文解析失敗：%1</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>资源事务恢复失败，保存已停用：%1</source>
+        <translation>資源交易復原失敗，儲存已停用：%1</translation>
+    </message>
+    <message>
+        <location line="-405"/>
+        <location line="+146"/>
+        <source>选择浏览的资源根；继承根只读，保存始终写入当前资源包</source>
+        <translation>選擇瀏覽的資源根；繼承根唯讀，儲存一律寫入目前資源套件</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>选项</source>
+        <translation>選項</translation>
+    </message>
+    <message>
+        <source>配置缺失</source>
+        <translation type="vanished">設定缺失</translation>
+    </message>
+    <message>
+        <source>配置读取：%1
+保存策略：%2</source>
+        <translation type="vanished">設定讀取：%1
+儲存原則：%2</translation>
+    </message>
+    <message>
+        <location line="-23"/>
+        <location line="+296"/>
+        <location line="+321"/>
+        <source>青玉</source>
+        <translation>青玉</translation>
+    </message>
+    <message>
+        <location line="-327"/>
+        <source>青玉主题资源缺失，使用原版</source>
+        <translation>青玉主題資源缺失，使用原版</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>青玉候选，缺失回退原版</source>
+        <translation>青玉候選，缺失時退回原版</translation>
+    </message>
+    <message>
+        <location line="+276"/>
+        <source>页面入口或主题已改变，请重新选择页面；待保存编辑保留。</source>
+        <translation>頁面入口或主題已改變，請重新選擇頁面；待儲存編輯保留。</translation>
+    </message>
+    <message>
+        <location line="-344"/>
+        <source>页面来源已改变，请重新选择页面；待保存编辑保留。</source>
+        <translation>頁面來源已改變，請重新選擇頁面；待儲存編輯保留。</translation>
+    </message>
+    <message>
+        <location line="+66"/>
+        <source>页面：%1&#x3000;布局族：%2&#x3000;主题：%3
+读取（%4）：%5
+保存：%6
+%7</source>
+        <translation>頁面：%1&#x3000;配置族：%2&#x3000;主題：%3
+讀取（%4）：%5
+儲存：%6
+%7</translation>
+    </message>
+    <message>
+        <source>配置可读取</source>
+        <translation type="vanished">設定可讀取</translation>
+    </message>
+    <message>
+        <location line="-38"/>
+        <source>内部身份与功能结构只读；仅开放已核实的显示字段，未核实组件保留原内容。</source>
+        <translation>內部身分與功能結構唯讀；僅開放已核實的顯示欄位，未核實元件保留原內容。</translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <source>格子几何与滚动数量由背包阵列维护；物品、金额和可见状态由游戏填充。</source>
+        <translation>格子幾何與捲動數量由背包陣列維護；物品、金額和可見狀態由遊戲填入。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>位置、内容和分页可见状态由游戏计算；自动重排时高度只读。预览状态不保存。</source>
+        <translation>位置、內容和分頁可見狀態由遊戲計算；自動重排時高度唯讀。預覽狀態不儲存。</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>剑二属性文字由游戏填充并紧凑排版；宽高与自动缩字只读，字号上限为 16。</source>
+        <translation>劍二屬性文字由遊戲填入並緊湊排版；寬高與自動縮字唯讀，字號上限為 16。</translation>
+    </message>
+    <message>
+        <location line="+2103"/>
+        <source>功能组件必须有唯一名称、类型和配置引用。</source>
+        <translation>功能元件必須有唯一名稱、類型和設定引用。</translation>
+    </message>
+    <message>
+        <location line="-2105"/>
+        <source>角色面板图片由游戏替换：装备窗口底图、独立属性页的 image 组件图片只读，其它已核实布局仍可编辑。</source>
+        <translation>角色面板圖片由遊戲替換：裝備視窗底圖、獨立屬性頁的 image 元件圖片唯讀，其它已核實配置仍可編輯。</translation>
+    </message>
+    <message>
+        <location line="-342"/>
+        <location line="+758"/>
+        <source>主设置</source>
+        <translation>主設定</translation>
+    </message>
+    <message>
+        <location line="-757"/>
+        <location line="+757"/>
+        <source>作弊面板（关闭）</source>
+        <translation>作弊面板（關閉）</translation>
+    </message>
+    <message>
+        <location line="-756"/>
+        <location line="+756"/>
+        <source>作弊面板（开启）</source>
+        <translation>作弊面板（開啟）</translation>
+    </message>
+    <message>
+        <location line="-754"/>
+        <location line="+757"/>
+        <source>控制器存在（预览）</source>
+        <translation>控制器存在（預覽）</translation>
+    </message>
+    <message>
+        <source>参考 1280×720 的运行时默认布局。示例状态不保存，实际功能和显示条件由游戏决定。</source>
+        <translation type="vanished">參考 1280×720 的執行時預設版面。範例狀態不儲存，實際功能和顯示條件由遊戲決定。</translation>
+    </message>
+    <message>
+        <location line="-455"/>
+        <location line="+2684"/>
+        <source>运行时默认</source>
+        <translation>執行時預設</translation>
+    </message>
+    <message>
+        <source>运行时默认（1280×720参考）；首次修改只创建必要的当前包覆盖。</source>
+        <translation type="vanished">執行時預設（1280×720參考）；首次修改只建立必要的目前包覆寫。</translation>
+    </message>
+    <message>
+        <location line="+540"/>
+        <source>默认来自 Option 的固定控件布局；示例文字和状态不保存。</source>
+        <translation>預設來自 Option 的固定控制項版面；範例文字和狀態不儲存。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorOption.cpp" line="+128"/>
+        <source>选项窗口尺寸无效，无法推导运行时默认控件；原内容只读保留。</source>
+        <translation>選項視窗尺寸無效，無法推導執行時預設控制項；原內容以唯讀保留。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-1043"/>
+        <source>固定功能组件的类型、引用或布局标记无效：%1</source>
+        <translation>固定功能元件的類型、參照或版面標記無效：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorOption.cpp" line="+47"/>
+        <source>界面：青玉 · 重进游戏生效</source>
+        <translation>介面：青玉 · 重新進入遊戲生效</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>作弊模式：开</source>
+        <translation>作弊模式：開</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>作弊模式当前已开启</source>
+        <translation>作弊模式目前已開啟</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-2403"/>
+        <source>伙伴头像</source>
+        <translation>夥伴頭像</translation>
+    </message>
+    <message>
+        <source>功能未启用</source>
+        <translation type="vanished">功能未啟用</translation>
+    </message>
+    <message>
+        <location line="+176"/>
+        <source>当前资源包未启用伙伴头像功能；编辑器不会修改功能开关。</source>
+        <translation>目前資源包未啟用夥伴頭像功能；編輯器不會修改功能開關。</translation>
+    </message>
+    <message>
+        <location line="+74"/>
+        <source>头像使用实际媒体尺寸；开启拉伸后使用模板宽高。等级偏移相对头像右下角；青玉起点相对状态栏底部。伙伴、文字和可用条件由游戏控制。</source>
+        <translation>頭像使用實際媒體尺寸；開啟拉伸後使用範本寬高。等級偏移相對頭像右下角；青玉起點相對狀態欄底部。夥伴、文字和可用條件由遊戲控制。</translation>
+    </message>
+    <message>
+        <source>运行时默认；首次修改只生成必要的当前包覆盖。</source>
+        <translation type="vanished">執行時預設；首次修改只建立必要的目前包覆寫。</translation>
+    </message>
+    <message>
+        <location line="+2122"/>
+        <source>伙伴头像模板类型无效：%1</source>
+        <translation>夥伴頭像範本類型無效：%1</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>头像垂直间距无效。</source>
+        <translation>頭像垂直間距無效。</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>头像与等级模板尺寸、字号必须为正。</source>
+        <translation>頭像與等級範本尺寸、字號必須為正。</translation>
+    </message>
+    <message>
+        <location line="-2457"/>
+        <location filename="../ui/MenuEditorPartnerHead.cpp" line="+51"/>
+        <source>头像模板（布局编辑）</source>
+        <translation>頭像範本（版面編輯）</translation>
+    </message>
+    <message>
+        <location line="-108"/>
+        <source>界面对象</source>
+        <translation>介面物件</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>内部名称</source>
+        <translation type="unfinished">內部名稱</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>配置文件</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+102"/>
+        <location line="+756"/>
+        <source>切换设置或作弊面板，检查对应外观。示例不保存；游戏中的功能和显示条件保持不变。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-749"/>
+        <location filename="../ui/MenuEditorPartnerHead.cpp" line="+0"/>
+        <source>无伙伴（示例）</source>
+        <translation>無夥伴（範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/MenuEditorPartnerHead.cpp" line="+0"/>
+        <source>多个伙伴（原尺寸／权限示例）</source>
+        <translation>多個夥伴（原尺寸／權限範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/MenuEditorPartnerHead.cpp" line="+1"/>
+        <source>示例头像尺寸及等级不保存；等级位置相对头像右下角。不可查看伙伴显示为灰色示例。</source>
+        <translation>範例頭像尺寸及等級不儲存；等級位置相對頭像右下角。不可查看夥伴顯示為灰色範例。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/MenuEditorPartnerHead.cpp" line="+6"/>
+        <source>头像间距：</source>
+        <translation>頭像間距：</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location filename="../ui/MenuEditorPartnerHead.cpp" line="+1"/>
+        <source>头像垂直间距</source>
+        <translation>頭像垂直間距</translation>
+    </message>
+    <message>
+        <location line="+166"/>
+        <source>（配置缺失）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>运行时默认，尚无配置文件；首次编辑保存到：%1</source>
+        <translation>執行時預設，尚無設定檔；首次編輯儲存到：%1</translation>
+    </message>
+    <message>
+        <location line="+161"/>
+        <source>代码默认（尚无配置文件）</source>
+        <translation>程式預設（尚無設定檔）</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>%1 · %2 · 修改保存到当前资源包</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>%1：%2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+312"/>
+        <source>选择或搜索界面…</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>界面</source>
+        <translation>介面</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>主题</source>
+        <translation>主題</translation>
+    </message>
+    <message>
+        <location line="+1210"/>
+        <source>此属性由游戏控制</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+593"/>
+        <source>缺少固定功能组件：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+872"/>
+        <source>选项列表（共用样式）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>尚未自定义</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>可拖动滑块</source>
+        <translation>可拖曳滑塊</translation>
+    </message>
+    <message>
+        <location line="+142"/>
+        <source>修改后点击保存，只影响当前资源包。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>读取：%1
+当前包：%2
+%3</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>继承的配置在保存时自动创建当前包覆盖，依赖资源保持原样。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+11"/>
+        <location line="+6"/>
+        <source>尚未自定义。修改并保存后只影响当前资源包。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-14"/>
+        <source>默认来自 PartnerHeadLayout；示例伙伴和等级不保存。</source>
+        <translation>預設來自 PartnerHeadLayout；範例夥伴和等級不儲存。</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>默认来自 TitleTeamLayout；正文读取当前包，预览状态不保存。</source>
+        <translation>預設來自 TitleTeamLayout；正文讀取目前資源包，預覽狀態不儲存。</translation>
+    </message>
+    <message>
+        <location line="-3436"/>
+        <source>制作名单</source>
+        <translation>製作名單</translation>
+    </message>
+    <message>
+        <source>无有效正文（只读）</source>
+        <translation type="vanished">無有效正文（唯讀）</translation>
+    </message>
+    <message>
+        <location line="+174"/>
+        <source>纯视频制作名单：字幕属于视频内容，本页只读；不生成文字覆盖。</source>
+        <translation>純影片製作名單：字幕屬於影片內容，本頁唯讀；不產生文字覆蓋。</translation>
+    </message>
+    <message>
+        <location line="+55"/>
+        <source>正文及视频仅来自当前包；面板局部布局预览不编辑内容。缺省字段随窗口响应，正文换行、滚动与返回由游戏控制；视频不解码。
+正文：%1
+视频：%2</source>
+        <translation>內文及影片僅來自目前包；面板局部佈局預覽不編輯內容。預設欄位隨視窗響應，內文換行、捲動與返回由遊戲控制；影片不解碼。
+內文：%1
+影片：%2</translation>
+    </message>
+    <message>
+        <location line="+3465"/>
+        <source>本包正文：首屏</source>
+        <translation>本包內文：首屏</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>本包正文：末屏</source>
+        <translation>本包內文：末屏</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>长正文（临时示例）</source>
+        <translation>長內文（暫時範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>文字加视频（兼容示例）</source>
+        <translation>文字加影片（相容範例）</translation>
+    </message>
+    <message>
+        <source>制作名单面板局部预览尺寸；属性缺省值以1280×720为参考，未编辑字段仍由运行时响应窗口尺寸。</source>
+        <translation type="vanished">製作名單面板局部預覽尺寸；屬性預設值以1280×720為參考，未編輯欄位仍由執行階段響應視窗尺寸。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorTitleTeam.cpp" line="+87"/>
+        <source>制作名单不使用子菜单；保留原文件，仅供读取。</source>
+        <translation>製作名單不使用子選單；保留原檔，僅供讀取。</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>制作名单固定角色重复或类型不符：%1</source>
+        <translation>製作名單固定角色重複或類型不符：%1</translation>
+    </message>
+    <message>
+        <location line="+44"/>
+        <source>制作名单显示值无效，修改未应用：%1</source>
+        <translation>製作名單顯示值無效，修改未套用：%1</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>制作名单长文本示例（不保存）
+</source>
+        <translation>製作名單長文字範例（不儲存）
+</translation>
+    </message>
+    <message>
+        <location line="+42"/>
+        <source>↑/↓ 或滚轮滚动</source>
+        <translation>↑/↓ 或滾輪捲動</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>返回</source>
+        <translation>返回</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorConversation.cpp" line="+305"/>
+        <source>
+计算结果：第%1/%2页，%3个可见原始索引。</source>
+        <translation>
+計算結果：第%1/%2頁，%3個可見原始索引。</translation>
+    </message>
+    <message>
+        <location line="-57"/>
+        <source>selectA提供首选矩形与动态按钮样式；selectB的Top参与行距，其余几何不是独立运行结果。姓名和头像由脚本提供。</source>
+        <translation>selectA提供偏好矩形與動態按鈕樣式；selectB的Top參與行距，其餘幾何不是獨立執行結果。姓名和頭像由指令碼提供。</translation>
+    </message>
+    <message>
+        <location line="+52"/>
+        <source>上一页</source>
+        <translation>上一頁</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>下一页</source>
+        <translation>下一頁</translation>
+    </message>
+    <message>
+        <location line="-53"/>
+        <source>内容裁剪模式由head1的CropContent且非Stretch启用；正文左右边界、头像矩形和hint位置由实际头像内容派生。</source>
+        <translation>內容裁剪模式由head1的CropContent且非Stretch啟用；正文左右邊界、頭像矩形和hint位置由實際頭像內容衍生。</translation>
+    </message>
+    <message>
+        <location line="-156"/>
+        <source>右侧姓名头像（示例）</source>
+        <translation>右側姓名頭像（範例）</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>右头像（示例）</source>
+        <translation>右頭像（範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>多选操作（兼容示例）</source>
+        <translation>多選操作（相容範例）</translation>
+    </message>
+    <message>
+        <location line="+272"/>
+        <source>对话内容示例，文字与头像由剧情提供。</source>
+        <translation>對話內容範例，文字與頭像由劇情提供。</translation>
+    </message>
+    <message>
+        <source>对话／选择显示字段无效，修改未应用：%1</source>
+        <translation type="vanished">對話／選擇顯示欄位無效，修改未套用：%1</translation>
+    </message>
+    <message>
+        <location line="-272"/>
+        <source>左侧姓名头像（示例）</source>
+        <translation>左側姓名頭像（範例）</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>左头像（示例）</source>
+        <translation>左頭像（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>无头像（示例）</source>
+        <translation>無頭像（範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>普通两项（示例）</source>
+        <translation>一般兩項（範例）</translation>
+    </message>
+    <message>
+        <location line="+210"/>
+        <source>清空</source>
+        <translation>清空</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>确定</source>
+        <translation>確定</translation>
+    </message>
+    <message>
+        <location line="-18"/>
+        <source>示例人物</source>
+        <translation>範例人物</translation>
+    </message>
+    <message>
+        <location line="-2"/>
+        <source>继续旅程</source>
+        <translation>繼續旅程</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>脚本头像（示例区域）</source>
+        <translation>指令碼頭像（範例區域）</translation>
+    </message>
+    <message>
+        <location line="-29"/>
+        <source>请选择下一步（临时示例）</source>
+        <translation>請選擇下一步（暫時範例）</translation>
+    </message>
+    <message>
+        <location line="-29"/>
+        <source>运行状态示例：位置由现有布局规则计算；Qt字形度量与逐字效果以运行时软件验证为准。</source>
+        <translation>執行狀態範例：位置由現有版面規則計算；Qt字形度量與逐字效果以執行時軟體驗證為準。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-3695"/>
+        <source>选择</source>
+        <translation>選擇</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorConversation.cpp" line="+36"/>
+        <source>选项 %1：</source>
+        <translation>選項 %1：</translation>
+    </message>
+    <message>
+        <location line="-190"/>
+        <source>长中文选项：末屏（示例）</source>
+        <translation>長中文選項：末頁（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>长中文选项：首屏（示例）</source>
+        <translation>長中文選項：首頁（範例）</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>长中文：末屏（示例）</source>
+        <translation>長中文：末頁（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>长中文：首屏（示例）</source>
+        <translation>長中文：首頁（範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>隐藏项与原始索引（示例）</source>
+        <translation>隱藏項與原始索引（範例）</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorPassive.cpp" line="+22"/>
+        <location line="+1"/>
+        <location filename="../ui/MenuEditorNotices.cpp" line="+141"/>
+        <location filename="../ui/MenuEditorConversation.cpp" line="-1"/>
+        <location line="+1"/>
+        <source>首选布局输入</source>
+        <translation>偏好版面輸入</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorConversation.cpp" line="+153"/>
+        <source>首选输入，不代表所有运行状态的最终矩形。剧情内容、索引及状态不保存。</source>
+        <translation>偏好輸入不代表所有執行狀態的最終矩形。劇情內容、索引及狀態不儲存。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+2465"/>
+        <source>固定组件配置缺失或为空，本页只读：%1</source>
+        <translation>固定元件設定缺失或為空，本頁唯讀：%1</translation>
+    </message>
+    <message>
+        <location line="-2464"/>
+        <source>消息提示</source>
+        <translation>訊息提示</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorPassive.cpp" line="-1"/>
+        <source>短中文消息（示例）</source>
+        <translation>短中文訊息（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>长中文消息（示例）</source>
+        <translation>長中文訊息（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>颜色标记消息（示例）</source>
+        <translation>色彩標記訊息（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时可见（本包布局）</source>
+        <translation>計時可見（本包版面）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时隐藏（示例）</source>
+        <translation>計時隱藏（範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>计时：61秒（示例）</source>
+        <translation>計時：61秒（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时：60秒（示例）</source>
+        <translation>計時：60秒（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时：零值（示例）</source>
+        <translation>計時：零值（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时：三位分钟（示例）</source>
+        <translation>計時：三位分鐘（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时：隐藏（示例）</source>
+        <translation>計時：隱藏（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>计时：停止（示例）</source>
+        <translation>計時：停止（範例）</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>正文、计时秒数、显示开关及事件策略由运行时控制。状态与上下文仅用于预览，不保存；Qt字形度量以运行时软件验证为准。</source>
+        <translation>正文、計時秒數、顯示開關及事件策略由執行階段控制。狀態與上下文僅用於預覽，不儲存；Qt字形度量以執行階段軟體驗證為準。</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>获得物品，已放入包裹。</source>
+        <translation>獲得物品，已放入包裹。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>：这是一段用于核对换行与缩字的长中文消息。</source>
+        <translation>：這是一段用於核對換行與縮字的長中文訊息。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>普通消息与</source>
+        <translation>普通訊息與</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>红色文字</source>
+        <translation>紅色文字</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>计时样例：%1；显示：%2。秒数与可见状态不写入配置。</source>
+        <translation>計時範例：%1；顯示：%2。秒數與可見狀態不寫入設定。</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>是</source>
+        <translation>是</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>否</source>
+        <translation>否</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>计时未显示，使用基础位置。消息始终输入透传。</source>
+        <translation>計時未顯示，使用基礎位置。訊息一律允許輸入穿透。</translation>
+    </message>
+    <message>
+        <location line="+22"/>
+        <source>与可见计时相交：消息移至底部栏上方12像素；最终位置只读。</source>
+        <translation>與可見計時相交：訊息移至底部列上方12像素；最終位置唯讀。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>与可见计时不相交，使用基础位置。</source>
+        <translation>與可見計時不相交，使用基礎位置。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>计时（只读位置对照）</source>
+        <translation>計時（唯讀位置對照）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>底部栏（只读位置对照）</source>
+        <translation>底部列（唯讀位置對照）</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>计时／底部布局缺失，无法推导避让，保留基础位置。</source>
+        <translation>計時／底部版面缺失，無法推導避讓，保留基礎位置。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>基础位置：(%1,%2)，最终位置：(%3,%4)。
+%5
+上下文来源：%6</source>
+        <translation>基礎位置：(%1,%2)，最終位置：(%3,%4)。
+%5
+上下文來源：%6</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorConversation.cpp" line="-38"/>
+        <location line="+8"/>
+        <location line="+10"/>
+        <source>显示字段无效，修改未应用：%1</source>
+        <translation>顯示欄位無效，修改未套用：%1</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+0"/>
+        <source>系统通知</source>
+        <translation>系統通知</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>脚本消息</source>
+        <translation>腳本訊息</translation>
+    </message>
+    <message>
+        <location line="+230"/>
+        <source>两主题共用通知配置；系统通知居中，脚本消息左下绘制。空值沿运行时默认，正文、期限、队列和输入策略不保存。</source>
+        <translation>兩主題共用通知設定；系統通知置中，腳本訊息從左下繪製。空值沿執行階段預設，內文、期限、佇列和輸入策略不儲存。</translation>
+    </message>
+    <message>
+        <location line="+3205"/>
+        <source>默认来自 SystemNoticeLayout；仅显示覆盖写入当前包，正文和队列示例不保存。</source>
+        <translation>預設來自 SystemNoticeLayout；僅顯示覆寫寫入目前套件，內文和佇列範例不儲存。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorNotices.cpp" line="-63"/>
+        <source>通知不使用子菜单，本页只读。</source>
+        <translation>通知不使用子選單，本頁唯讀。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>通知引用的配置缺失或为空：%1</source>
+        <translation>通知參照的設定遺失或為空：%1</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>通知固定text角色的类型或引用无效。保留原文件，仅供读取。</source>
+        <translation>通知固定 text 角色的類型或參照無效。保留原始檔案，僅供讀取。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>通知需要且仅允许一个text角色，本页只读。</source>
+        <translation>通知需要且僅允許一個 text 角色，本頁唯讀。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>通知显示字段无效，本页只读：%1</source>
+        <translation>通知顯示欄位無效，本頁唯讀：%1</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>通知显示字段无效，修改未应用：%1</source>
+        <translation>通知顯示欄位無效，變更未套用：%1</translation>
+    </message>
+    <message>
+        <source>通知逻辑视口；空值沿运行时响应默认，属性参考1280×720。</source>
+        <translation type="vanished">通知邏輯視埠；空值沿執行階段響應式預設，屬性參考1280×720。</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>短通知（示例）</source>
+        <translation>短通知（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>长中文通知（示例）</source>
+        <translation>長中文通知（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>颜色与多条消息（示例）</source>
+        <translation>色彩與多條訊息（範例）</translation>
+    </message>
+    <message>
+        <location line="+40"/>
+        <source>系统：这是一条通知样例。</source>
+        <translation>系統：這是一條通知範例。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>，长文末行。</source>
+        <translation>，長文末行。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>&lt;color=Red&gt;红色消息未闭合</source>
+        <translation>&lt;color=Red&gt;紅色訊息未閉合</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>第二条消息恢复默认颜色。</source>
+        <translation>第二條訊息恢復預設色彩。</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>可见末行（示例）</source>
+        <translation>可見末行（範例）</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>系统：&lt;color=Red&gt;彩色提示&lt;color=Default&gt;默认文字</source>
+        <translation>系統：&lt;color=Red&gt;彩色提示&lt;color=Default&gt;預設文字</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>视口位置：(%1,%2)，尺寸：%3×%4；文字宽度：%5，行高：%6。
+正文、期限、队列及输入策略由运行时管理；Qt字形度量以软件运行时为准。</source>
+        <translation>視埠位置：(%1,%2)，尺寸：%3×%4；文字寬度：%5，行高：%6。
+內文、期限、佇列及輸入策略由執行階段管理；Qt 字形度量以軟體執行階段為準。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-3435"/>
+        <source>顶部菜单</source>
+        <translation>頂部選單</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>底部快捷栏</source>
+        <translation>底部快捷欄</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>人物状态条</source>
+        <translation>人物狀態條</translation>
+    </message>
+    <message>
+        <location line="+248"/>
+        <source>固定HUD功能、快捷索引、bind/format和人物数值只读；预览样例不保存。状态条宿主：%1。TransImage透明度固定72；水平状态条忽略颜色alpha。嵌入回退状态条使用视口坐标，不再次偏移到底栏。</source>
+        <translation>固定 HUD 功能、快捷索引、bind/format 和人物數值唯讀；預覽範例不儲存。狀態條宿主：%1。TransImage 透明度固定72；水平狀態條忽略色彩 alpha。嵌入回退狀態條使用視埠座標，不再次偏移至底欄。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorHud.cpp" line="+81"/>
+        <source>当前功能组合未构造此HUD实例；配置仅供读取。</source>
+        <translation>目前功能組合未建立此 HUD 實例；設定僅供讀取。</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>HUD功能组件名称或类型重复／无效。</source>
+        <translation>HUD 功能元件名稱或類型重複／無效。</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>HUD固定组件类型无效：%1</source>
+        <translation>HUD 固定元件類型無效：%1</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>HUD组件配置缺失或为空：%1</source>
+        <translation>HUD 元件設定遺失或為空：%1</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>HUD显示组件尺寸必须为正。</source>
+        <translation>HUD 顯示元件尺寸必須為正。</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+8"/>
+        <source>HUD显示字段无效：%1</source>
+        <translation>HUD 顯示欄位無效：%1</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>HUD缺少固定组件：%1</source>
+        <translation>HUD 缺少固定元件：%1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>HUD窗口配置缺失或为空。</source>
+        <translation>HUD 視窗設定遺失或為空。</translation>
+    </message>
+    <message>
+        <location line="+33"/>
+        <location line="+12"/>
+        <source>HUD显示字段无效，修改未应用：%1</source>
+        <translation>HUD 顯示欄位無效，變更未套用：%1</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>布局输入（HUD）</source>
+        <translation>版面輸入（HUD）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>空快捷位／空状态条（示例）</source>
+        <translation>空快捷欄位／空狀態條（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>占用与半满（示例）</source>
+        <translation>占用與半滿（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>数量／冷却与全满（示例）</source>
+        <translation>數量／冷卻與全滿（範例）</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>HUD视口矩形：(%1,%2) %3×%4；状态条宿主：%5。
+数量、占用标记、冷却和数值仅为示例；布局变换后的画布只读，请用属性编辑输入。字体／实际图标以运行时软件联测为准。</source>
+        <translation>HUD 視埠矩形：(%1,%2) %3×%4；狀態條宿主：%5。
+數量、占用標記、冷卻和數值僅為範例；版面變換後的畫布唯讀，請用屬性編輯輸入。字型／實際圖示以執行階段軟體聯測為準。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-248"/>
+        <source>小地图</source>
+        <translation>小地圖</translation>
+    </message>
+    <message>
+        <location line="+245"/>
+        <source>地图图像、拉伸、标记和导航由游戏管理；地图名称清空并隐藏。布局分支：%1。月影缩略图位置由游戏派生，新剑显示扩边结果；青玉即使回退原文件也不扩边。</source>
+        <translation>地圖影像、拉伸、標記和導覽由遊戲管理；地圖名稱清空並隱藏。版面分支：%1。月影縮圖位置由遊戲推導，新劍顯示擴邊結果；青玉即使回退原檔案也不擴邊。</translation>
+    </message>
+    <message>
+        <location line="-10"/>
+        <location line="+5"/>
+        <location line="+7"/>
+        <source>当前青玉回退到原版聚合；编辑此文件也会影响使用它的原版主题。</source>
+        <translation>目前青玉回退至原版聚合；編輯此檔案也會影響使用它的原版主題。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorMapThumbnail.cpp" line="+86"/>
+        <source>小地图窗口配置缺失或为空。</source>
+        <translation>小地圖視窗設定遺失或為空。</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>小地图显示字段无效：%1</source>
+        <translation>小地圖顯示欄位無效：%1</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>小地图组件名称重复：%1</source>
+        <translation>小地圖元件名稱重複：%1</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>小地图固定组件类型无效：%1</source>
+        <translation>小地圖固定元件類型無效：%1</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>小地图组件配置缺失或为空：%1</source>
+        <translation>小地圖元件設定遺失或為空：%1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>小地图缺少固定缩略图组件。</source>
+        <translation>小地圖缺少固定縮圖元件。</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>小地图显示字段无效，修改未应用：%1</source>
+        <translation>小地圖顯示欄位無效，變更未套用：%1</translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>布局输入（小地图）</source>
+        <translation>版面輸入（小地圖）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>地图与标记（临时示例）</source>
+        <translation>地圖與標記（暫時範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>无底图的标记（临时示例）</source>
+        <translation>無底圖的標記（暫時範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>光标边界（临时示例）</source>
+        <translation>游標邊界（暫時範例）</translation>
+    </message>
+    <message>
+        <location line="+70"/>
+        <source>窗口视口矩形：(%1,%2) %3×%4；缩略图输入：(%5,%6) %7×%8；实际：(%9,%10) %11×%12。
+画布使用窗口局部坐标。地图、标记和光标是临时样例；派生矩形只读，使用属性编辑原始输入。实际字体、图片和输入以运行时软件联测为准。</source>
+        <translation>視窗視埠矩形：(%1,%2) %3×%4；縮圖輸入：(%5,%6) %7×%8；實際：(%9,%10) %11×%12。
+畫布使用視窗區域座標。地圖、標記和游標是暫時範例；推導矩形唯讀，使用屬性編輯原始輸入。實際字型、圖片和輸入以執行階段軟體聯測為準。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-247"/>
+        <source>NPC信息／目标血条</source>
+        <translation>NPC資訊／目標血條</translation>
+    </message>
+    <message>
+        <location line="+263"/>
+        <source>两主题共用</source>
+        <translation>兩種主題共用</translation>
+    </message>
+    <message>
+        <location line="-19"/>
+        <source>两主题共用可选window.ini；只编辑血条宽高和偏移。名称按视口居中，不随AlignX移动；字体、关系颜色、生命、目标和输入由游戏管理。缺省或无效尺寸整组使用140×18、偏移0/50；预览状态不保存。</source>
+        <translation>兩種主題共用可選window.ini；僅編輯血條寬高與偏移。名稱依視埠置中，不隨AlignX移動；字型、關係顏色、生命、目標與輸入由遊戲管理。缺省或無效尺寸整組使用140×18、偏移0/50；預覽狀態不儲存。</translation>
+    </message>
+    <message>
+        <location line="+3191"/>
+        <source>默认来自NpcInfoPanel；只写四项布局覆盖，不生成聚合。</source>
+        <translation>預設來自NpcInfoPanel；僅寫入四項版面覆寫，不產生聚合選單。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorNpcInfo.cpp" line="-65"/>
+        <source>NPC布局配置解析失败（行%1），运行时使用整组默认，本页只读。</source>
+        <translation>NPC版面設定解析失敗（第%1行），執行階段使用整組預設，本頁唯讀。</translation>
+    </message>
+    <message>
+        <location line="+53"/>
+        <source>NPC信息使用固定单文件，不能修改结构或引用。</source>
+        <translation>NPC資訊使用固定單檔，無法變更結構或參照。</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>NPC布局文件还被其它菜单引用；固定入口不能拆分，已限制写入。</source>
+        <translation>NPC版面檔案亦被其他選單參照；固定入口無法拆分，已限制寫入。</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>NPC布局写入失败，原文件和待保存编辑保留。</source>
+        <translation>NPC版面寫入失敗，保留原始檔案與待儲存編輯。</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>敌对：半血与滞后（示例）</source>
+        <translation>敵對：半血與滯後（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>友方（示例）</source>
+        <translation>友方（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>中立（示例）</source>
+        <translation>中立（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>满血（示例）</source>
+        <translation>滿血（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>零血（示例）</source>
+        <translation>零血（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>空名称（示例）</source>
+        <translation>空名稱（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>最大生命为零（示例）</source>
+        <translation>最大生命為零（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>无有效目标（示例）</source>
+        <translation>無有效目標（範例）</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>目标名称（示例）</source>
+        <translation>目標名稱（範例）</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>血条视口矩形：(%1,%2) %3×%4。名称始终按视口居中，AlignX仅偏移血条。
+默认140×18、偏移0/50；旧无效尺寸整组回退，原文保留。字体12和颜色固定；名称、生命与目标是临时样例，实际字形和输入以软件联测为准。</source>
+        <translation>血條視埠矩形：(%1,%2) %3×%4。名稱始終依視埠置中，AlignX僅偏移血條。
+預設140×18、偏移0/50；舊有無效尺寸整組回復預設，原文保留。字型12與顏色固定；名稱、生命與目標為暫時範例，實際字形與輸入以軟體聯測為準。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-3435"/>
+        <source>移动摇杆</source>
+        <translation>移動搖桿</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorJoystick.cpp" line="+32"/>
+        <source>移动摇杆窗口配置缺失或为空。</source>
+        <translation>移動搖桿視窗設定缺失或空白。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+9"/>
+        <source>移动摇杆窗口或操作范围无效，保留原内容只读。</source>
+        <translation>移動搖桿視窗或操作範圍無效，保留原內容唯讀。</translation>
+    </message>
+    <message>
+        <location line="-5"/>
+        <source>移动摇杆组件名称重复或类型缺失。</source>
+        <translation>移動搖桿元件名稱重複或缺少類型。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+5"/>
+        <source>移动摇杆固定组件缺失、类型错误或配置为空。</source>
+        <translation>移動搖桿固定元件缺失、類型錯誤或設定空白。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>移动摇杆入口还被其它菜单引用，不能拆分固定入口，已限制写入。</source>
+        <translation>移動搖桿入口仍被其他選單參照，無法拆分固定入口，已限制寫入。</translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>移动摇杆显示字段无效，修改未应用：%1</source>
+        <translation>移動搖桿顯示欄位無效，未套用修改：%1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>未触摸（摇杆示例）</source>
+        <translation>未觸碰（搖桿範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>按住中心（摇杆示例）</source>
+        <translation>按住中心（搖桿範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>移动（摇杆示例）</source>
+        <translation>移動（搖桿範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>命中区域（辅助）</source>
+        <translation>命中區域（輔助）</translation>
+    </message>
+    <message>
+        <location line="+32"/>
+        <source>窗口视口矩形：(%1,%2) %3×%4；摇杆：(%5,%6) %7×%8。
+画布为窗口局部坐标；Range是操作圆直径，与图像宽高独立。底图固定拉伸，摇杆头保持原图尺寸。样例不保存；调整窗口时游戏会重读配置并重建摇杆。</source>
+        <translation>視窗視埠矩形：(%1,%2) %3×%4；搖桿：(%5,%6) %7×%8。
+畫布採用視窗區域座標；Range是操作圓直徑，與影像寬高獨立。底圖固定延展，搖桿頭維持原圖尺寸。範例不儲存；調整視窗時遊戲會重新讀取設定並重建搖桿。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="+233"/>
+        <source>游戏管理摇杆显示；只编辑窗口和摇杆实际读取的字段。Range为操作圆直径，与宽高独立。BaseImage或ThumbImage任一非空时使用两图，缺项不回退Image；两项均空才使用Image第0／1帧。底图固定拉伸，摇杆头使用原图尺寸；Stretch、Bitmap和按钮文字不生效。推导画布只读，样例不保存。</source>
+        <translation>遊戲管理搖桿顯示；僅編輯視窗及搖桿實際讀取的欄位。Range為操作圓直徑，與寬高獨立。BaseImage或ThumbImage任一非空時採用兩圖，缺項不退回Image；兩項皆空才採用Image第0／1影格。底圖固定延展，搖桿頭維持原圖尺寸；Stretch、Bitmap與按鈕文字不生效。推導畫布唯讀，範例不儲存。</translation>
+    </message>
+    <message>
+        <location line="-233"/>
+        <source>移动技能／操作按钮</source>
+        <translation>移動技能／操作按鈕</translation>
+    </message>
+    <message>
+        <location line="+239"/>
+        <source>固定12个操作组件与代码创建的小地图按钮；小地图始终读取原版固定文件，不写入聚合。fast正文／颜色／可见性、五技能槽内容与冷却由游戏管理。圆形文字字号来自Range；IndicateType／IndicateImage不作为有效编辑项。样例不保存，触控开关保持游戏设置。</source>
+        <translation>固定12個操作元件與程式建立的小地圖按鈕；小地圖始終讀取原版固定檔案，不寫入聚合。fast正文／顏色／可見性、五技能槽內容與冷卻由遊戲管理。圓形文字字號來自Range；IndicateType／IndicateImage不作為有效編輯項。範例不儲存，觸控開關維持遊戲設定。</translation>
+    </message>
+    <message>
+        <location line="+3217"/>
+        <source>固定小地图配置缺失；游戏保留构造默认0×0，本控件只读。</source>
+        <translation>固定小地圖設定缺失；遊戲保留建構預設0×0，本控制項唯讀。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorSkills.cpp" line="+86"/>
+        <source>移动操作窗口配置缺失或为空。</source>
+        <translation>移動操作視窗設定缺失或空白。</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>移动操作组件身份重复或无效。</source>
+        <translation>移動操作元件身分重複或無效。</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>小地图按钮由代码创建，不能追加到聚合。</source>
+        <translation>小地圖按鈕由程式建立，不能附加到聚合。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>移动操作固定组件缺失、类型错误或配置为空：%1</source>
+        <translation>移動操作固定元件缺失、類型錯誤或設定空白：%1</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>移动操作组件尺寸或范围无效：%1</source>
+        <translation>移動操作元件尺寸或範圍無效：%1</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>移动操作固定结构不完整，保留原内容只读。</source>
+        <translation>移動操作固定結構不完整，保留原內容唯讀。</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>移动操作固定入口或小地图文件被其它菜单共享，已限制写入。</source>
+        <translation>移動操作固定入口或小地圖檔案與其他選單共用，已限制寫入。</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>UI依赖优先会遮蔽固定小地图覆盖，已限制写入。</source>
+        <translation>UI相依優先會遮蔽固定小地圖覆寫，已限制寫入。</translation>
+    </message>
+    <message>
+        <location line="+38"/>
+        <source>移动操作显示字段无效，修改未应用：%1</source>
+        <translation>移動操作顯示欄位無效，未套用修改：%1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>布局编辑（全部操作控件）</source>
+        <translation>配置編輯（全部操作控制項）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>空技能槽（示例）</source>
+        <translation>空技能槽（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>按住（按钮示例）</source>
+        <translation>按住（按鈕範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>技能与冷却（示例色块）</source>
+        <translation>技能與冷卻（範例色塊）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>快捷目标与小地图开启（示例）</source>
+        <translation>快捷目標與小地圖開啟（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>方向图片（示例）</source>
+        <translation>方向圖片（範例）</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>操作范围（辅助）</source>
+        <translation>操作範圍（輔助）</translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>目标（临时示例）</source>
+        <translation>目標（暫時範例）</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>移动操作窗口：(%1,%2) %3×%4；12个聚合控件＋代码创建的小地图按钮。
+画布为父窗口局部坐标；圆形Range独立，图标覆盖背景，已有技能与冷却覆盖图标／文字。样例、目标文字、选中标记及方向图不保存；动画取代表帧，Qt字形和方向世界投影以运行时软件联测为准。</source>
+        <translation>移動操作視窗：(%1,%2) %3×%4；12個聚合控制項＋程式建立的小地圖按鈕。
+畫布採用父視窗區域座標；圓形Range獨立，圖示覆蓋背景，已有技能與冷卻覆蓋圖示／文字。範例、目標文字、選中標記及方向圖不儲存；動畫採用代表影格，Qt字形及方向世界投影以執行階段軟體聯測為準。</translation>
+    </message>
+    <message>
+        <location filename="../ui/MenuEditorPreview.cpp" line="+31"/>
+        <source>编辑界面</source>
+        <translation>編輯介面</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>预览游戏窗口</source>
+        <translation>預覽遊戲視窗</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>显示辅助框</source>
+        <translation>顯示輔助框</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>配置来源…</source>
+        <translation>設定來源…</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>当前界面的配置来源</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>适合窗口</source>
+        <translation>符合視窗</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>100%</source>
+        <translation type="unfinished">100%</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>查看倍率只改变编辑器显示，不改变游戏布局</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>游戏窗口</source>
+        <translation>遊戲視窗</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>像素</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>按钮状态</source>
+        <translation>按鈕狀態</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>正常</source>
+        <translation>正常</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>悬停</source>
+        <translation>滑鼠停留</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>按下</source>
+        <translation>按下</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>滑块位置</source>
+        <translation>滑塊位置</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>仅预览，不保存</source>
+        <translation>僅供預覽，不儲存</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>每行一个预览选项；留空使用示例。实际文字和分支在剧情脚本中修改。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>编辑剧情脚本…</source>
+        <translation>編輯劇情腳本…</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>脚本中的选择指令提供文字，返回的选项序号用于判断剧情分支。此处只编辑列表外观。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>未找到小地图按钮配置，此按钮无法编辑。</source>
+        <translation>未找到小地圖按鈕配置，此按鈕無法編輯。</translation>
+    </message>
+</context>
+<context>
+    <name>MenuPageContext</name>
+    <message>
+        <location filename="../core/MenuPageContext.cpp" line="+68"/>
+        <source>本包制作名单正文缺失、超过64KiB、为空或不是有效UTF-8：%1</source>
+        <translation>本包製作名單內文缺失、超過64KiB、為空或不是有效UTF-8：%1</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>本包制作名单视频缺失：%1</source>
+        <translation>本包製作名單影片缺失：%1</translation>
+    </message>
+</context>
+<context>
+    <name>MenuPreviewCanvas</name>
+    <message>
+        <location filename="../ui/MenuPreviewCanvas.cpp" line="+745"/>
+        <source>下注50</source>
+        <translation>下注50</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>不要走，决战到天亮。</source>
+        <translation>不要走，決戰到天亮。</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>庄家</source>
+        <translation>莊家</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>开始</source>
+        <translation>開始</translation>
+    </message>
+    <message>
+        <location line="+438"/>
+        <source>起点</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>终点</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-439"/>
+        <source>开盅</source>
+        <translation>開盅</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>玩家</source>
+        <translation>玩家</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>谁掌控全局谁就能笑到最后。</source>
+        <translation>誰掌控全局誰就能笑到最後。</translation>
+    </message>
+    <message>
+        <location line="-1"/>
+        <source>骰子</source>
+        <translation>骰子</translation>
+    </message>
+    <message>
+        <location line="-29"/>
+        <source>骰子图片缺失：游戏采用原回退控件，当前为设计画布示意。</source>
+        <translation>骰子圖片缺失：遊戲採用原回退控制項，目前為設計畫布示意。</translation>
+    </message>
 </context>
 <context>
     <name>MinimapWidget</name>
     <message>
-        <location filename="../ui/MinimapWidget.cpp" line="+504"/>
+        <location filename="../ui/MinimapWidget.cpp" line="+513"/>
         <source>无地图</source>
         <translation>無地圖</translation>
     </message>
@@ -9760,6 +17196,14 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <location line="+15"/>
         <source>小地图创建失败</source>
         <translation>小地圖建立失敗</translation>
+    </message>
+</context>
+<context>
+    <name>MpcPreviewLabel</name>
+    <message>
+        <location filename="../ui/MpcPreviewLabel.cpp" line="+65"/>
+        <source>没有可播放的帧</source>
+        <translation type="unfinished">沒有可播放的幀</translation>
     </message>
 </context>
 <context>
@@ -9828,7 +17272,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="-519"/>
         <location line="+461"/>
-        <location filename="../ui/NpcDataEditorWindow.cpp" line="+3941"/>
+        <location filename="../ui/NpcDataEditorWindow.cpp" line="+3993"/>
         <location line="+127"/>
         <source>脚本文件</source>
         <translation>腳本檔案</translation>
@@ -10058,7 +17502,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+6"/>
-        <location filename="../ui/NpcDataEditorWindow.cpp" line="-2394"/>
+        <location filename="../ui/NpcDataEditorWindow.cpp" line="-2426"/>
         <source>打开NPC/物体数据文件</source>
         <translation>開啟 NPC/物件資料檔案</translation>
     </message>
@@ -10138,7 +17582,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>複製選中實體</translation>
     </message>
     <message>
-        <location filename="../ui/NpcDataEditorWindow.cpp" line="-998"/>
+        <location filename="../ui/NpcDataEditorWindow.cpp" line="-1007"/>
         <source>INI Files (*.ini);;All Files (*)</source>
         <translation>INI 檔案 (*.ini);;所有檔案 (*)</translation>
     </message>
@@ -10158,7 +17602,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>音效檔案 (*.wav *.mp3 *.ogg);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="+194"/>
+        <location line="+197"/>
         <location line="+278"/>
         <source>0 - 普通</source>
         <translation>0 - 普通</translation>
@@ -10424,7 +17868,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="+142"/>
         <location line="+34"/>
-        <location line="+331"/>
+        <location line="+335"/>
         <source>保存更改</source>
         <translation>儲存更改</translation>
     </message>
@@ -10432,7 +17876,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <location line="-239"/>
         <location line="+54"/>
         <location line="+7"/>
-        <location line="+303"/>
+        <location line="+308"/>
         <location line="+15"/>
         <location line="+14"/>
         <location line="+66"/>
@@ -10454,12 +17898,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>無法儲存物件檔案: %1</translation>
     </message>
     <message>
-        <location line="-142"/>
+        <location line="-146"/>
         <source>NPC/物体文件 (*.npc *.obj *_npc.ini *_obj.ini);;所有文件 (*)</source>
         <translation>NPC/物件檔案 (*.npc *.obj *_npc.ini *_obj.ini);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="+87"/>
+        <location line="+91"/>
         <source>NPC文件 (*.npc *_npc.ini);;所有文件 (*)</source>
         <translation>NPC 檔案 (*.npc *_npc.ini);;所有檔案 (*)</translation>
     </message>
@@ -10519,7 +17963,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>Ctrl+D</translation>
     </message>
     <message>
-        <location filename="../ui/NpcDataEditorWindow.cpp" line="-1663"/>
+        <location filename="../ui/NpcDataEditorWindow.cpp" line="-1685"/>
         <source>无法读取文件: %1</source>
         <translation>無法讀取檔案: %1</translation>
     </message>
@@ -10565,35 +18009,35 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+22"/>
-        <location line="+389"/>
+        <location line="+402"/>
         <source>%1 - 自定义值</source>
         <translation>%1 - 自訂值</translation>
     </message>
     <message>
-        <location line="+426"/>
+        <location line="+420"/>
         <location line="+11"/>
-        <location line="+312"/>
-        <location line="+74"/>
+        <location line="+322"/>
+        <location line="+79"/>
         <location line="+98"/>
         <source>保存目标冲突</source>
         <translation>儲存目標衝突</translation>
     </message>
     <message>
-        <location line="-494"/>
+        <location line="-509"/>
         <source>NPC 与物体文档指向同一文件，无法安全地依次保存。
 %1</source>
         <translation>NPC 與物件文件指向同一檔案，無法安全地依次儲存。
 %1</translation>
     </message>
     <message>
-        <location line="+397"/>
+        <location line="+412"/>
         <source>NPC 与物体文档指向同一文件；请先将其中一个文档另存到不同目标。
 %1</source>
         <translation>NPC 與物件文件指向同一檔案；請先將其中一個文件另存到不同目標。
 %1</translation>
     </message>
     <message>
-        <location line="+1047"/>
+        <location line="+1074"/>
         <location line="+9"/>
         <location line="+11"/>
         <location line="+47"/>
@@ -10603,14 +18047,14 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="-192"/>
         <location line="+135"/>
-        <location line="+97"/>
+        <location line="+99"/>
         <source>INI 语法无效: %1</source>
         <translation>INI 語法無效: %1</translation>
     </message>
     <message>
-        <location line="-243"/>
+        <location line="-245"/>
         <location line="+157"/>
-        <location line="+97"/>
+        <location line="+99"/>
         <source>%1
 
 文件: %2</source>
@@ -10619,12 +18063,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
 檔案: %2</translation>
     </message>
     <message>
-        <location line="-50"/>
+        <location line="-52"/>
         <source>NPC 段数量与 [Head].Count 不一致: %1</source>
         <translation>NPC 段數量與 [Head].Count 不一致: %1</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+31"/>
         <location line="+9"/>
         <location line="+11"/>
         <location line="+51"/>
@@ -10663,8 +18107,8 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>魔法 INI</translation>
     </message>
     <message>
-        <location line="-1269"/>
-        <location line="+1250"/>
+        <location line="-1271"/>
+        <location line="+1252"/>
         <location line="+26"/>
         <location line="+123"/>
         <source>资源引用无效</source>
@@ -10704,7 +18148,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
 目前值: %1</translation>
     </message>
     <message>
-        <location line="-2712"/>
+        <location line="-2746"/>
         <source>无法确定 NPC/物体同代事务的公共资源根。</source>
         <translation>無法確定 NPC/物件同代交易的共同資源根。</translation>
     </message>
@@ -10733,7 +18177,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>交易清理警告</translation>
     </message>
     <message>
-        <location line="-507"/>
+        <location line="-511"/>
         <location line="+51"/>
         <source>动作段按文件原顺序显示；未证实的段会明确标为自定义并原样保留。</source>
         <translation>動作段依檔案原順序顯示；未證實的段會明確標為自訂並原樣保留。</translation>
@@ -10747,26 +18191,26 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="-40"/>
         <location line="+65"/>
-        <location line="+1671"/>
+        <location line="+1707"/>
         <source>动作图像</source>
         <translation>動作圖像</translation>
     </message>
     <message>
-        <location line="-1735"/>
+        <location line="-1771"/>
         <location line="+65"/>
-        <location line="+1671"/>
+        <location line="+1707"/>
         <source>阴影图像</source>
         <translation>陰影圖像</translation>
     </message>
     <message>
-        <location line="-1735"/>
+        <location line="-1771"/>
         <location line="+65"/>
-        <location line="+1671"/>
+        <location line="+1707"/>
         <source>动作音效</source>
         <translation>動作音效</translation>
     </message>
     <message>
-        <location line="-1735"/>
+        <location line="-1771"/>
         <location line="+167"/>
         <source>其他字段</source>
         <translation>其他欄位</translation>
@@ -10774,12 +18218,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="-166"/>
         <location line="+168"/>
-        <location line="+1306"/>
+        <location line="+1342"/>
         <source>添加字段</source>
         <translation>新增欄位</translation>
     </message>
     <message>
-        <location line="-1473"/>
+        <location line="-1509"/>
         <location line="+171"/>
         <source>删除字段</source>
         <translation>刪除欄位</translation>
@@ -10817,14 +18261,14 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="-205"/>
         <location line="+206"/>
-        <location line="+1127"/>
+        <location line="+1163"/>
         <location line="+270"/>
         <location line="+7"/>
         <source>未加载帧信息</source>
         <translation>未載入影格資訊</translation>
     </message>
     <message>
-        <location line="-2405"/>
+        <location line="-2454"/>
         <source>第 %1 行的段名为空。</source>
         <translation>第 %1 行的段名為空。</translation>
     </message>
@@ -10859,33 +18303,33 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>檔案不包含可辨識的 NPC 動作資源段或 Image/Shade/Sound 欄位。</translation>
     </message>
     <message>
-        <location line="+1004"/>
+        <location line="+1017"/>
         <location line="+34"/>
-        <location line="+330"/>
+        <location line="+334"/>
         <source>NPC/物体/NPC资源数据已修改，是否保存？</source>
         <translation>NPC、物件或 NPC 資源資料已修改，是否儲存？</translation>
     </message>
     <message>
-        <location line="-273"/>
-        <location line="+312"/>
+        <location line="-283"/>
+        <location line="+322"/>
         <source>NPC资源文档不能与 NPC/物体文档使用同一保存目标。
 %1</source>
         <translation>NPC 資源文件不能與 NPC/物件文件使用同一儲存目標。
 %1</translation>
     </message>
     <message>
-        <location line="+48"/>
-        <location line="+96"/>
+        <location line="+49"/>
+        <location line="+100"/>
         <source>NPC资源文件 (*.ini);;所有文件 (*)</source>
         <translation>NPC 資源檔案 (*.ini);;所有檔案 (*)</translation>
     </message>
     <message>
-        <location line="-89"/>
+        <location line="-92"/>
         <source>打开 NPC 资源文件</source>
         <translation>開啟 NPC 資源檔案</translation>
     </message>
     <message>
-        <location line="+61"/>
+        <location line="+64"/>
         <location line="+84"/>
         <source>无法保存 NPC 资源文件: %1</source>
         <translation>無法儲存 NPC 資源檔案: %1</translation>
@@ -10930,12 +18374,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+7"/>
-        <location line="+472"/>
+        <location line="+499"/>
         <source>添加失败</source>
         <translation>新增失敗</translation>
     </message>
     <message>
-        <location line="-471"/>
+        <location line="-498"/>
         <location line="+190"/>
         <source>动作段名称为空、包含非法字符或已经存在：%1</source>
         <translation>動作段名稱為空、包含非法字元或已存在：%1</translation>
@@ -10971,7 +18415,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>複製失敗</translation>
     </message>
     <message>
-        <location line="+120"/>
+        <location line="+147"/>
         <source>  · 自定义/未证实</source>
         <translation>  · 自訂/未證實</translation>
     </message>
@@ -11064,6 +18508,100 @@ NPC 資料將儲存到執行時模板/編輯目標:
 
 目前值: %3</translation>
     </message>
+    <message>
+        <location line="-516"/>
+        <source>当前 NPC 没有可定位的脚本。请先填写脚本文件，并确认 NPC 文件包含地图名称。</source>
+        <translation>目前 NPC 沒有可定位的腳本。請先填寫腳本檔案，並確認 NPC 檔案包含地圖名稱。</translation>
+    </message>
+    <message>
+        <location line="-1530"/>
+        <location line="+186"/>
+        <source>打开当前 NPC 脚本引用的对话</source>
+        <translation>開啟目前 NPC 腳本引用的對話</translation>
+    </message>
+    <message>
+        <location line="+1343"/>
+        <location line="+7"/>
+        <source>无法编辑对话</source>
+        <translation>無法編輯對話</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>没有找到当前 NPC 的脚本：
+%1</source>
+        <translation>找不到目前 NPC 的腳本：
+%1</translation>
+    </message>
+    <message>
+        <location line="-1539"/>
+        <location line="+186"/>
+        <source>编辑对话</source>
+        <translation>編輯對話</translation>
+    </message>
+    <message>
+        <source>NPC列表…</source>
+        <translation>NPC列表…</translation>
+    </message>
+    <message>
+        <source>NPC动作资源…</source>
+        <translation>NPC動作資源…</translation>
+    </message>
+    <message>
+        <source>另存为独立文件；保留条目、未知字段和原有素材引用。</source>
+        <translation>另存為獨立檔案；保留條目、未知欄位和原有素材引用。</translation>
+    </message>
+    <message>
+        <source>所属地图</source>
+        <translation>所屬地圖</translation>
+    </message>
+    <message>
+        <source>文件名称</source>
+        <translation>檔名稱</translation>
+    </message>
+    <message>
+        <source>新建文件</source>
+        <translation>新建檔案</translation>
+    </message>
+    <message>
+        <source>无法创建项目内容目录。</source>
+        <translation>無法建立專案內容目錄。</translation>
+    </message>
+    <message>
+        <source>无法新建</source>
+        <translation>無法新增</translation>
+    </message>
+    <message>
+        <source>物体列表…</source>
+        <translation>物體列表…</translation>
+    </message>
+    <message>
+        <source>请先创建或导入地图。</source>
+        <translation>請先建立或匯入地圖。</translation>
+    </message>
+    <message>
+        <source>请先选择列表所属的地图。</source>
+        <translation>請先選擇列表所屬的地圖。</translation>
+    </message>
+    <message>
+        <source>请输入单行名称，不包含目录或特殊字符。</source>
+        <translation>請輸入單行名稱，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>请选择NPC列表、物体列表或动作资源。</source>
+        <translation>請選擇NPC列表、物體列表或動作資源。</translation>
+    </message>
+    <message>
+        <source>这个文件名已存在，请换一个名称。</source>
+        <translation>這個檔名已存在，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>无法保存文件：%1</source>
+        <translation>無法保存文件：%1</translation>
+    </message>
+    <message>
+        <source>无法创建保存目录：%1</source>
+        <translation>無法創建保存目錄：%1</translation>
+    </message>
 </context>
 <context>
     <name>ProjectExplorerWidget</name>
@@ -11078,9 +18616,13 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>已開啟文件</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>请先打开项目并配置可编辑资源目录。</source>
-        <translation>請先開啟專案並設定可編輯資源目錄。</translation>
+        <translation type="vanished">請先開啟專案並設定可編輯資源目錄。</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>打开项目后自动载入项目资源。新项目请先选择要编辑的资源包。</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+2"/>
@@ -11098,7 +18640,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>狀態</translation>
     </message>
     <message>
-        <location line="+20"/>
+        <location line="+22"/>
         <source>已修改</source>
         <translation>已修改</translation>
     </message>
@@ -11113,7 +18655,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>腳本</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+4"/>
         <source>地图</source>
         <translation>地圖</translation>
     </message>
@@ -11138,30 +18680,50 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>圖片</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+10"/>
         <source>NPC 资源</source>
         <translation>NPC 資源</translation>
     </message>
     <message>
-        <location filename="../ui/ProjectExplorerWidget.cpp" line="133"/>
+        <location line="-20"/>
         <source>文本</source>
         <translation>文字</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>武功</source>
+        <translation>武功</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>物品</source>
+        <translation>物品</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>商店</source>
+        <translation>商店</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>对话</source>
+        <translation>對話</translation>
     </message>
 </context>
 <context>
     <name>ProjectRuntimeConfigurationDialog</name>
     <message>
-        <location filename="../ui/ProjectRuntimeConfigurationDialog.cpp" line="+223"/>
+        <location filename="../ui/ProjectRuntimeConfigurationDialog.cpp" line="+232"/>
         <source>新场景</source>
         <translation>新場景</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+12"/>
         <source>无法添加场景；请检查场景 ID、必填字段和默认场景引用。</source>
         <translation>無法新增場景；請檢查場景 ID、必填欄位與預設場景參照。</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+24"/>
         <source>无法更新场景；请检查场景 ID、必填字段和默认场景引用。</source>
         <translation>無法更新場景；請檢查場景 ID、必填欄位與預設場景參照。</translation>
     </message>
@@ -11171,7 +18733,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>%1 副本</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+13"/>
         <source>无法复制场景；请检查新场景的 ID 和必填字段。</source>
         <translation>無法複製場景；請檢查新場景的 ID 與必填欄位。</translation>
     </message>
@@ -11330,6 +18892,14 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <source>取消</source>
         <translation>取消</translation>
     </message>
+    <message>
+        <source>试玩场景设置</source>
+        <translation>試玩場景設定</translation>
+    </message>
+    <message>
+        <source>首次试玩：新建场景，选择地图和玩家起点，并设为默认。场景可以供多个脚本共用。应用后回到脚本，点击“试玩当前脚本”开始执行。</source>
+        <translation>首次試玩：新增場景，選擇地圖和玩家起點，並設為預設。場景可以供多個腳本共用。套用後回到腳本，點擊「試玩目前腳本」開始執行。</translation>
+    </message>
 </context>
 <context>
     <name>ProjectSceneDialog</name>
@@ -11389,7 +18959,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>目前專案沒有可讀取的作用中內容根目錄，無法選擇資源檔案。</translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="+32"/>
         <source>文件范围限制</source>
         <translation>檔案範圍限制</translation>
     </message>
@@ -11649,7 +19219,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
 <context>
     <name>ProjectSettingsDialog</name>
     <message>
-        <location filename="../ui/ProjectSettingsDialog.cpp" line="+30"/>
+        <location filename="../ui/ProjectSettingsDialog.cpp" line="+32"/>
         <source>创建项目</source>
         <translation>建立專案</translation>
     </message>
@@ -11705,22 +19275,26 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>套用</translation>
     </message>
     <message>
-        <location line="+70"/>
+        <location line="+74"/>
         <source>选择原始资源目录</source>
         <translation>選擇原始資源目錄</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+17"/>
         <source>选择可编辑资源目录</source>
         <translation>選擇可編輯資源目錄</translation>
     </message>
     <message>
-        <location line="+32"/>
-        <source>资源目录包含清单文件，但没有可读取的活动资源包。请先修复 resources.ini 或 game_profile.ini。</source>
-        <translation>資源目錄包含清單檔案，但沒有可讀取的作用中資源包。請先修復 resources.ini 或 game_profile.ini。</translation>
+        <location line="+91"/>
+        <source>资源包必须具有非空 Game.Id；重复 Id 将使用稳定清单条目键区分。</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+6"/>
+        <source>资源目录包含清单文件，但没有可读取的活动资源包。请先修复 resources.ini 或 game_profile.ini。</source>
+        <translation type="vanished">資源目錄包含清單檔案，但沒有可讀取的作用中資源包。請先修復 resources.ini 或 game_profile.ini。</translation>
+    </message>
+    <message>
+        <location line="-51"/>
         <source>资源目录中存在未能安全恢复的保存事务。请先处理事务错误后再选择资源包：%1</source>
         <translation>資源目錄中存在無法安全恢復的儲存交易。請先處理交易錯誤，再選擇資源包：%1</translation>
     </message>
@@ -11731,21 +19305,25 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+6"/>
+        <source>资源集合存在重复 Game.Id。请先修改冲突资源的 ID。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
         <source>创作目录（尚无 game_profile.ini）</source>
         <translation>創作目錄（尚無 game_profile.ini）</translation>
     </message>
     <message>
-        <location line="+23"/>
+        <location line="+18"/>
         <source>%1 — %2 [%3]</source>
         <translation>%1 — %2 [%3]</translation>
     </message>
     <message>
-        <location line="+10"/>
         <source>资源包必须具有非空且不重复的 Game.Id，当前清单不能唯一确定活动资源包。</source>
-        <translation>資源包必須具有非空且不重複的 Game.Id，目前清單無法唯一確定作用中資源包。</translation>
+        <translation type="vanished">資源包必須具有非空且不重複的 Game.Id，目前清單無法唯一確定作用中資源包。</translation>
     </message>
     <message>
-        <location line="+38"/>
+        <location line="+65"/>
         <source>请选择一个活动资源包；项目不会保存资源包目录、名称或 Game.Type 副本。</source>
         <translation>請選擇一個作用中資源包；專案不會儲存資源包目錄、名稱或 Game.Type 副本。</translation>
     </message>
@@ -11798,37 +19376,32 @@ NPC 資料將儲存到執行時模板/編輯目標:
 <context>
     <name>QObject</name>
     <message>
-        <location filename="../ui/BatchConvertWindow.cpp" line="-1441"/>
         <source>无法创建输出目录: %1</source>
-        <translation>無法建立輸出目錄: %1</translation>
+        <translation type="vanished">無法建立輸出目錄: %1</translation>
     </message>
     <message>
-        <location line="+20"/>
         <source>发布转换结果时收到取消请求</source>
-        <translation>發布轉換結果時收到取消請求</translation>
+        <translation type="vanished">發布轉換結果時收到取消請求</translation>
     </message>
     <message>
-        <location line="+15"/>
         <source>无法备份现有输出文件: %1</source>
-        <translation>無法備份現有輸出檔案: %1</translation>
+        <translation type="vanished">無法備份現有輸出檔案: %1</translation>
     </message>
     <message>
-        <location line="+9"/>
         <source>无法发布转换文件: %1</source>
-        <translation>無法發布轉換檔案: %1</translation>
+        <translation type="vanished">無法發布轉換檔案: %1</translation>
     </message>
     <message>
-        <location line="+25"/>
         <source>；回滚未完全成功，备份保留在 %1</source>
-        <translation>；回滾未完全成功，備份保留在 %1</translation>
+        <translation type="vanished">；回滾未完全成功，備份保留在 %1</translation>
     </message>
     <message>
-        <location filename="../core/StoryGraphResourceContext.cpp" line="+267"/>
+        <location filename="../core/StoryGraphResourceContext.cpp" line="+237"/>
         <source>剧情图资源单文件字节上限无效</source>
         <translation>劇情圖資源的單一檔案位元組上限無效</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphView.cpp" line="+186"/>
+        <location filename="../ui/StoryGraphView.cpp" line="+188"/>
         <source>API：%1</source>
         <translation>API：%1</translation>
     </message>
@@ -11848,7 +19421,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>確定性：%1</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="+87"/>
+        <location filename="../ui/StoryGraphWindow.cpp" line="+118"/>
         <source>分析完成</source>
         <translation>分析完成</translation>
     </message>
@@ -11872,54 +19445,299 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <source>分析状态未知</source>
         <translation>分析狀態未知</translation>
     </message>
+    <message>
+        <location filename="../ui/MenuEditorWindow.cpp" line="-3874"/>
+        <source>返回按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>退出按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>关闭按钮</source>
+        <translation type="unfinished">關閉按鈕</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>新游戏按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>读档按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>制作名单按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>正文</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>提示正文</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>继续提示</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>左侧头像</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>右侧头像</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>选项列表（共用样式）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>选项间距参考</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>音乐音量</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>音效音量</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>游戏速度</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>音乐音量滑块</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>音效音量滑块</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>游戏速度滑块</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>打开作弊设置</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>作弊面板背景</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>作弊面板标题</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>作弊开关</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>无敌开关</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>恢复生命与内力</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>提升武功等级</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>提升角色等级</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>增加银两</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>经验倍率</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>关闭作弊设置</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>作弊操作结果</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>触控按钮开关</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>游戏界面主题</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>自动存档开关</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+7"/>
+        <source>列表</source>
+        <translation type="unfinished">清單</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>备忘正文</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>银两数值</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>文字</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>对话正文</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>图片</source>
+        <translation type="unfinished">圖片</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+1"/>
+        <source>文字按钮</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>滚动条</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>物品格</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>状态条</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>移动摇杆</source>
+        <translation type="unfinished">移動搖桿</translation>
+    </message>
 </context>
 <context>
     <name>ResourceProfileEditorWindow</name>
     <message>
+        <source>忽略禁止跑步</source>
+        <translation>忽略禁止跑步</translation>
+    </message>
+    <message>
+        <source>开启后忽略存档和脚本的禁跑限制；仍检查体力和角色状态。</source>
+        <translation>開啟後忽略存檔和腳本的禁跑限制；仍檢查體力和角色狀態。</translation>
+    </message>
+    <message>
+        <location filename="../ui/ResourceProfileEditorWindow.cpp" line="+1029"/>
         <source>[Combat] 战斗规则</source>
         <translation>[Combat] 戰鬥規則</translation>
     </message>
     <message>
+        <location line="+53"/>
         <source>武功最低伤害:</source>
         <translation>武功最低傷害:</translation>
     </message>
     <message>
+        <location line="+3"/>
         <source>武功效果计算:</source>
         <translation>武功效果計算:</translation>
     </message>
     <message>
+        <location line="+82"/>
         <source>Effect 替代人物攻击力</source>
         <translation>Effect 取代人物攻擊力</translation>
     </message>
     <message>
+        <location line="+1"/>
         <source>人物攻击力与 Effect 相加</source>
         <translation>人物攻擊力與 Effect 相加</translation>
     </message>
     <message>
+        <location line="-72"/>
         <source>替代攻击力用于剑二和月影；叠加攻击力用于新剑。</source>
         <translation>取代攻擊力用於劍二和月影；疊加攻擊力用於新劍。</translation>
     </message>
     <message>
-        <location filename="../ui/ResourceProfileEditorWindow.cpp" line="+184"/>
-        <location line="+581"/>
-        <location line="+1857"/>
+        <location line="-809"/>
+        <location line="+1025"/>
+        <location line="+2353"/>
         <source>未保存的修改</source>
         <translation>未儲存的修改</translation>
     </message>
     <message>
-        <location line="-2437"/>
-        <location line="+581"/>
-        <location line="+1857"/>
+        <location line="-3377"/>
+        <location line="+1025"/>
+        <location line="+2353"/>
         <source>当前资源包有未保存的修改，是否保存？</source>
         <translation>目前資源包有未儲存的修改，是否儲存？</translation>
     </message>
     <message>
-        <location line="-2007"/>
         <source>资源清单编辑器</source>
-        <translation>資源清單編輯器</translation>
+        <translation type="vanished">資源清單編輯器</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-2644"/>
         <source>资源包选择</source>
         <translation>資源包選擇</translation>
     </message>
@@ -11929,7 +19747,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>[Game] 遊戲資訊</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+14"/>
         <source>[Resource]/[Save] 依赖与存档</source>
         <translation>[Resource]/[Save] 相依與存檔</translation>
     </message>
@@ -11954,23 +19772,23 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>[Team] MOD 團隊說明</translation>
     </message>
     <message>
-        <location line="+615"/>
-        <location line="+12"/>
-        <location line="+38"/>
-        <location line="+12"/>
-        <location line="+100"/>
-        <location line="+21"/>
+        <location line="+995"/>
+        <location line="+10"/>
+        <location line="+40"/>
+        <location line="+10"/>
+        <location line="+106"/>
+        <location line="+22"/>
         <source>路径无效</source>
         <translation>路徑無效</translation>
     </message>
     <message>
-        <location line="-20"/>
-        <location line="+21"/>
+        <location line="-21"/>
+        <location line="+22"/>
         <source>所选团队说明文件必须位于当前资源包根目录内。</source>
         <translation>所選團隊說明檔案必須位於目前資源包根目錄內。</translation>
     </message>
     <message>
-        <location line="-798"/>
+        <location line="-1183"/>
         <source>[NewGame] 新游戏</source>
         <translation>[NewGame] 新遊戲</translation>
     </message>
@@ -12005,7 +19823,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>MOD 作者：</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+62"/>
         <source>团队说明文件:</source>
         <translation>團隊說明檔案：</translation>
     </message>
@@ -12015,12 +19833,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>團隊說明內容：</translation>
     </message>
     <message>
-        <location line="-4"/>
+        <location line="-45"/>
         <source>功能开关:</source>
         <translation>功能開關：</translation>
     </message>
     <message>
-        <location line="-512"/>
+        <location line="-824"/>
         <source>兼容状态：旧清单（未声明最低引擎版本）</source>
         <translation>相容狀態：舊清單（未宣告最低引擎版本）</translation>
     </message>
@@ -12045,7 +19863,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>相容狀態：目前組建的引擎版本無效</translation>
     </message>
     <message>
-        <location line="+464"/>
+        <location line="+766"/>
+        <source>[Experience] 经验规则</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
         <source>[Release] MOD 发布信息</source>
         <translation>[Release] MOD 發佈資訊</translation>
     </message>
@@ -12085,7 +19908,32 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>MOD 簡介:</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+3"/>
+        <source>击杀 NPC 经验模式:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>示例预览:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+18"/>
+        <source>每次武功伤害结算的最低值；该值只由当前资源包配置决定。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>效果模式:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>新增模式没有新项时沿用依赖效果；替换模式阻止该分支读取更深层的效果。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+16"/>
         <source>创建默认 Manifest</source>
         <translation>建立預設 Manifest</translation>
     </message>
@@ -12115,7 +19963,43 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>保留 WAV 音樂優先邏輯</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+5"/>
+        <location line="+32"/>
+        <location line="+15"/>
+        <location line="+6"/>
+        <location line="+5"/>
+        <location line="+5"/>
+        <source>使用 Game.Type 默认值</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-62"/>
+        <source>读取 NPC.Exp（剑侠情缘二）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>角色等级 × NPC 等级 + ExpBonus</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+34"/>
+        <source>新增：合并依赖效果</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>替换：仅使用当前定义</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <location line="+1"/>
+        <source>写入配置</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+33"/>
         <source>展示字符串，例如 1.041；不按 SemVer 解析</source>
         <translation>顯示字串，例如 1.041；不依 SemVer 解析</translation>
     </message>
@@ -12155,19 +20039,33 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>依 Release.DescriptionFile 從目前 MOD 根目錄讀取 UTF-8 簡介</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+1"/>
+        <source>发布资源...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>生成完整 ZIP、单资源在线目录，并完成 CRC32 与 ZIP 回读校验</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>有序依赖 Game.Id，例如 JXQY2,YYCS（左到右深度优先）</source>
         <translation>有序相依 Game.Id，例如 JXQY2,YYCS（由左至右深度優先）</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>相对当前资源包根目录，例如 ../jxqy2</source>
-        <translation>相對目前資源包根目錄，例如 ../jxqy2</translation>
+        <translation type="vanished">相對目前資源包根目錄，例如 ../jxqy2</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+3"/>
         <source>留空时使用 Game.Id</source>
         <translation>留空時使用 Game.Id</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>文本编码转换已完成（资源文本为 UTF-8）</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+1"/>
@@ -12190,7 +20088,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>每行一項，例如 RageSystem=1；未設定的玩法鍵使用通用預設值，版面配置鍵由 UI.Profile 成套決定；資源轉換會寫入實際基底預設值</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+4"/>
         <source>例如 team.txt；填写正文后留空会自动使用 team.txt</source>
         <translation>例如 team.txt；填寫正文後留空會自動使用 team.txt</translation>
     </message>
@@ -12211,27 +20109,27 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+29"/>
-        <location line="+100"/>
+        <location line="+108"/>
         <source>（资源事务恢复失败）</source>
         <translation>（資源交易恢復失敗）</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+1087"/>
+        <location line="+1439"/>
         <location line="+107"/>
-        <location line="+464"/>
+        <location line="+603"/>
         <source>文件事务恢复失败</source>
         <translation>檔案交易恢復失敗</translation>
     </message>
     <message>
-        <location line="-1657"/>
+        <location line="-2148"/>
         <source>资源目录中存在未能安全恢复的保存事务。为避免覆盖可恢复数据，创建和保存功能已停用：
 %1</source>
         <translation>資源目錄中存在無法安全恢復的儲存交易。為避免覆蓋可恢復資料，建立和儲存功能已停用：
 %1</translation>
     </message>
     <message>
-        <location line="+395"/>
+        <location line="+639"/>
         <source>选择 MOD 封面</source>
         <translation>選擇 MOD 封面</translation>
     </message>
@@ -12241,38 +20139,38 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>圖片 (*.png *.jpg *.jpeg *.bmp *.gif *.webp *.qoi *.tga)</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+14"/>
         <source>封面文件必须位于当前 MOD 根目录内。</source>
         <translation>封面檔案必須位於目前 MOD 根目錄內。</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+10"/>
         <source>封面文件必须使用当前 MOD 根内的安全相对路径。</source>
         <translation>封面檔案必須使用目前 MOD 根目錄內的安全相對路徑。</translation>
     </message>
     <message>
         <location line="+12"/>
-        <location line="+13"/>
+        <location line="+12"/>
         <source>选择 MOD 简介文件</source>
         <translation>選擇 MOD 簡介檔案</translation>
     </message>
     <message>
-        <location line="-12"/>
+        <location line="-11"/>
         <source>选择其他文件会丢弃尚未保存的 MOD 简介正文，是否继续？</source>
         <translation>選擇其他檔案會捨棄尚未儲存的 MOD 簡介正文，是否繼續？</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+13"/>
         <source>文本 (*.txt *.md)</source>
         <translation>文字 (*.txt *.md)</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+14"/>
         <source>简介文件必须位于当前 MOD 根目录内。</source>
         <translation>簡介檔案必須位於目前 MOD 根目錄內。</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+10"/>
         <source>简介文件必须使用当前 MOD 根内的安全相对路径。</source>
         <translation>簡介檔案必須使用目前 MOD 根目錄內的安全相對路徑。</translation>
     </message>
@@ -12307,16 +20205,16 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>重新載入會捨棄尚未儲存的團隊說明正文，是否繼續？</translation>
     </message>
     <message>
-        <location line="+98"/>
+        <location line="+108"/>
         <location line="+22"/>
         <location line="+16"/>
-        <location line="+877"/>
+        <location line="+1178"/>
         <location line="+15"/>
         <source>团队说明无法载入</source>
         <translation>團隊說明無法載入</translation>
     </message>
     <message>
-        <location line="-929"/>
+        <location line="-1230"/>
         <source>Team.InfoFile 必须是当前资源包根目录内的安全相对路径。</source>
         <translation>Team.InfoFile 必須是目前資源包根目錄內的安全相對路徑。</translation>
     </message>
@@ -12327,24 +20225,24 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+1"/>
-        <location line="+123"/>
+        <location line="+121"/>
         <source>当前路径尚无文件；可直接填写正文，保存资源清单时会创建该文件。</source>
         <translation>目前路徑尚無檔案；可直接填寫正文，儲存資源清單時會建立該檔案。</translation>
     </message>
     <message>
-        <location line="-113"/>
-        <location line="+893"/>
+        <location line="-111"/>
+        <location line="+1194"/>
         <source>团队说明文件无法读取，或大小超过 64 KiB。</source>
         <translation>團隊說明檔案無法讀取，或大小超過 64 KiB。</translation>
     </message>
     <message>
-        <location line="-877"/>
-        <location line="+892"/>
+        <location line="-1178"/>
+        <location line="+1193"/>
         <source>团队说明必须是不超过 64 KiB 的有效 UTF-8 文本。</source>
         <translation>團隊說明必須是不超過 64 KiB 的有效 UTF-8 文字。</translation>
     </message>
     <message>
-        <location line="-847"/>
+        <location line="-1148"/>
         <source>团队说明无效</source>
         <translation>團隊說明無效</translation>
     </message>
@@ -12354,7 +20252,151 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>團隊說明必須是不超過 64 KiB 的有效 UTF-8 文字，且不能包含 NUL 或控制字元。</translation>
     </message>
     <message>
-        <location line="+1010"/>
+        <location line="+233"/>
+        <source>当前资源继承 Game.Type，默认经验模式由内容依赖决定；请显式配置经验模式后再查看数值示例。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>示例：角色等级 4、NPC 等级 5、NPC.Exp=100、ExpBonus=0。基础经验为 %1。玩家在游戏选项中选择 1、2 或 3 倍经验，默认 2 倍；修炼武功和当前使用武功按各自 Fraction 乘同一倍率后向下取整；命中经验仍只使用 HitMagicExp.LevelFactor，不乘此倍率。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+86"/>
+        <source>资源包正在更新或进行其他写入，无法保存资源清单。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+415"/>
+        <source>导出前保存</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>在线资源包必须从已保存的清单导出。是否先保存当前修改？</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+26"/>
+        <source>无法导出在线资源包</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>在线资源包必须填写 Game.Id、Game.Version 和 Release.MinimumEngineVersion。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+31"/>
+        <source>资源正在保存或恢复事务，请稍后重试。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源包根目录缺少 game_profile.ini。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>game_profile.ini 缺少有效的 Game.Id、Game.Version 或最低引擎版本。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源包包含符号链接、目录联接或不安全路径。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源路径包含 ASCII 大写字母；在线资源名必须统一为小写。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源包包含在大小写不敏感平台上冲突的路径。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源包文件数量超过上限。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>资源包解压后总大小超过上限。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>读取源文件失败。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>无法安全写入目标文件。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>ZIP 归档写入失败。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>ZIP 已生成，但回读目录结构或资源身份校验失败。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>无法生成对应的单资源在线目录文件。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>归档已生成，但无法计算 CRC32。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>导出参数无效。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>
+
+相关路径：%1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>在线资源包导出失败</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>资源发布制品已生成</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>资源包：%1
+目录文件：%2
+文件数：%3
+解压大小：%4 字节
+归档大小：%5 字节
+CRC32：%6
+
+源资源未被修改。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+24"/>
+        <source>发布资源</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+347"/>
         <source>
 
 创建完成，但清理旧事务文件时出现警告：
@@ -12381,7 +20423,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>建立完成，但資源交易恢復失敗</translation>
     </message>
     <message>
-        <location line="-1863"/>
+        <location line="-2362"/>
         <source>添加</source>
         <translation>新增</translation>
     </message>
@@ -12412,31 +20454,31 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+6"/>
-        <location line="+429"/>
-        <location line="+244"/>
+        <location line="+662"/>
+        <location line="+265"/>
         <source>选择文件</source>
         <translation>選擇檔案</translation>
     </message>
     <message>
-        <location line="-670"/>
-        <location line="+78"/>
+        <location line="-924"/>
+        <location line="+85"/>
         <source>（未设置）</source>
         <translation>（未設定）</translation>
     </message>
     <message>
-        <location line="-75"/>
-        <location line="+98"/>
+        <location line="-82"/>
+        <location line="+106"/>
         <source>（assets 路径无效）</source>
         <translation>（assets 路徑無效）</translation>
     </message>
     <message>
-        <location line="-87"/>
-        <location line="+116"/>
+        <location line="-95"/>
+        <location line="+124"/>
         <source>（未发现资源包，可点击“创建默认 Manifest”）</source>
         <translation>（未發現資源包，可按一下「建立預設 Manifest」）</translation>
     </message>
     <message>
-        <location line="+97"/>
+        <location line="+103"/>
         <source>（未打开项目）</source>
         <translation>（未開啟專案）</translation>
     </message>
@@ -12446,35 +20488,35 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>（未選擇）</translation>
     </message>
     <message>
-        <location line="+208"/>
+        <location line="+427"/>
         <source>选择视频文件</source>
         <translation>選擇影片檔案</translation>
     </message>
     <message>
-        <location line="+443"/>
+        <location line="+471"/>
         <source>MOD 简介文件不存在</source>
         <translation>MOD 簡介檔案不存在</translation>
     </message>
     <message>
         <location line="+7"/>
-        <location line="+805"/>
+        <location line="+1114"/>
         <source>MOD 简介无法载入</source>
         <translation>無法載入 MOD 簡介</translation>
     </message>
     <message>
-        <location line="-804"/>
-        <location line="+805"/>
+        <location line="-1113"/>
+        <location line="+1114"/>
         <source>简介必须是当前 MOD 根内不超过 64 KiB 的有效 UTF-8 文本，且不能包含 NUL 或控制字符。</source>
         <translation>簡介必須是目前 MOD 根目錄內不超過 64 KiB 的有效 UTF-8 文字，且不能包含 NUL 或控制字元。</translation>
     </message>
     <message>
-        <location line="-765"/>
-        <location line="+620"/>
+        <location line="-1073"/>
+        <location line="+911"/>
         <source>Release.DescriptionFile 必须留空，或填写当前 MOD 根内的安全相对路径。</source>
         <translation>Release.DescriptionFile 必須留空，或填寫目前 MOD 根目錄內的安全相對路徑。</translation>
     </message>
     <message>
-        <location line="-607"/>
+        <location line="-898"/>
         <source>Release.DescriptionFile 解析后必须位于当前 MOD 根目录内。</source>
         <translation>Release.DescriptionFile 解析後必須位於目前 MOD 根目錄內。</translation>
     </message>
@@ -12489,26 +20531,25 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>MOD 簡介必須是不超過 64 KiB 的有效 UTF-8 文字，且不能包含 NUL 或控制字元。</translation>
     </message>
     <message>
-        <location line="+44"/>
+        <location line="+51"/>
         <source>无可用封面</source>
         <translation>沒有可用的封面</translation>
     </message>
     <message>
-        <location line="+49"/>
+        <location line="+156"/>
         <source>无法恢复上一次资源清单保存事务：
 %1</source>
         <translation>無法恢復上一次資源清單儲存交易：
 %1</translation>
     </message>
     <message>
-        <location line="+37"/>
+        <location line="+48"/>
         <source>无法读取现有 game_profile.ini；已取消保存以避免丢失未知字段或注释。</source>
         <translation>無法讀取現有 game_profile.ini；已取消儲存，以免遺失未知欄位或註解。</translation>
     </message>
     <message>
-        <location line="+18"/>
         <source>无法读取现有 resources.ini；已取消整个保存事务。</source>
-        <translation>無法讀取現有 resources.ini；已取消整個儲存交易。</translation>
+        <translation type="vanished">無法讀取現有 resources.ini；已取消整個儲存交易。</translation>
     </message>
     <message>
         <location line="+18"/>
@@ -12516,7 +20557,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>無法讀取另存目標；已取消儲存，以免覆蓋未知內容。</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+15"/>
         <source>多个清单字段指向同一个保存目标：%1</source>
         <translation>多個清單欄位指向相同的儲存目標：%1</translation>
     </message>
@@ -12526,7 +20567,7 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>無法讀取待寫入的說明檔案；已取消整個儲存交易。</translation>
     </message>
     <message>
-        <location line="+42"/>
+        <location line="+36"/>
         <source>当前资源目录仍有未恢复事务，保存功能保持停用：
 %1</source>
         <translation>目前資源目錄仍有未恢復交易，儲存功能保持停用：
@@ -12535,19 +20576,21 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="+6"/>
         <location line="+108"/>
-        <location line="+463"/>
+        <location line="+162"/>
+        <location line="+440"/>
         <source>提示</source>
         <translation>提示</translation>
     </message>
     <message>
-        <location line="-571"/>
+        <location line="-710"/>
         <location line="+108"/>
+        <location line="+162"/>
         <source>请先选择一个资源包。</source>
         <translation>請先選擇一個資源包。</translation>
     </message>
     <message>
-        <location line="-26"/>
-        <location line="+170"/>
+        <location line="-188"/>
+        <location line="+169"/>
         <source>
 
 保存完成，但清理旧事务文件时出现警告：
@@ -12558,14 +20601,14 @@ NPC 資料將儲存到執行時模板/編輯目標:
 </translation>
     </message>
     <message>
-        <location line="-167"/>
-        <location line="+170"/>
-        <location line="+384"/>
+        <location line="-166"/>
+        <location line="+169"/>
+        <location line="+524"/>
         <source>成功</source>
         <translation>成功</translation>
     </message>
     <message>
-        <location line="-560"/>
+        <location line="-699"/>
         <source>已保存到：
 </source>
         <translation>已儲存至：
@@ -12573,19 +20616,19 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+10"/>
-        <location line="+172"/>
-        <location line="+328"/>
+        <location line="+171"/>
+        <location line="+468"/>
         <location line="+28"/>
         <source>错误</source>
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="-346"/>
+        <location line="-348"/>
         <source>另存为</source>
         <translation>另存新檔</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-164"/>
         <source>已另存到：
 </source>
         <translation>已另存至：
@@ -12601,34 +20644,40 @@ NPC 資料將儲存到執行時模板/編輯目標:
 目前資源包的原始檔案仍有未儲存的修改。</translation>
     </message>
     <message>
-        <location line="-642"/>
-        <location line="+107"/>
+        <location line="-738"/>
+        <location line="+106"/>
         <location line="+13"/>
-        <location line="+557"/>
+        <location line="+814"/>
+        <location line="+9"/>
         <location line="+6"/>
-        <location line="+19"/>
+        <location line="+23"/>
+        <location line="+21"/>
         <location line="+29"/>
         <location line="+24"/>
         <location line="+13"/>
         <location line="+10"/>
-        <location line="+46"/>
-        <location line="+58"/>
+        <location line="+57"/>
         <source>清单无效</source>
         <translation>清單無效</translation>
     </message>
     <message>
-        <location line="-198"/>
+        <location line="-176"/>
         <source>Game.Id 不能为空。</source>
         <translation>Game.Id 不可為空。</translation>
     </message>
     <message>
-        <location line="-683"/>
-        <location line="+768"/>
+        <location line="-948"/>
+        <location line="+1058"/>
         <source>Team.InfoFile 必须留空，或填写当前资源包根目录内的安全相对路径。</source>
         <translation>Team.InfoFile 必須留空，或填寫目前資源包根目錄內的安全相對路徑。</translation>
     </message>
     <message>
-        <location line="-274"/>
+        <location line="-2174"/>
+        <source>仅作为资源依赖（不显示在游戏选择列表，不能直接启动）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1707"/>
         <source>当前资源目录仍有未恢复事务，另存功能保持停用：
 %1</source>
         <translation>目前資源目錄仍有未恢復交易，另存功能保持停用：
@@ -12647,12 +20696,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
     <message>
         <location line="+18"/>
         <location line="+15"/>
-        <location line="+53"/>
+        <location line="+52"/>
         <source>另存位置无效</source>
         <translation>另存位置無效</translation>
     </message>
     <message>
-        <location line="-67"/>
+        <location line="-66"/>
         <source>资源清单副本必须使用当前 MOD 根目录中的普通 .ini 文件名。</source>
         <translation>資源清單副本必須使用目前 MOD 根目錄中的一般 .ini 檔名。</translation>
     </message>
@@ -12662,17 +20711,17 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>資源清單只能另存到目前 MOD 根目錄。跨目錄複製還需要同時複製封面、簡介和團隊說明，目前操作不會靜默建立不完整的資源包。</translation>
     </message>
     <message>
-        <location line="+53"/>
+        <location line="+52"/>
         <source>资源清单副本不能覆盖当前清单、resources.ini、封面、MOD 简介或团队说明文件。</source>
         <translation>資源清單副本不能覆蓋目前清單、resources.ini、封面、MOD 簡介或團隊說明檔案。</translation>
     </message>
     <message>
-        <location line="+52"/>
+        <location line="+221"/>
         <source>原清单包含无效 UTF-8 发布字段。请逐项重新填写带错误的发布信息后再保存。</source>
         <translation>原清單包含無效的 UTF-8 發佈欄位。請逐項重新填寫有錯誤的發佈資訊，再進行儲存。</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+50"/>
         <source>MOD 发布信息包含无法写入 UTF-8 的字符。</source>
         <translation>MOD 發佈資訊包含無法寫入 UTF-8 的字元。</translation>
     </message>
@@ -12707,12 +20756,12 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>團隊說明和 MOD 簡介不能寫入 .jxqy_editor 內部狀態目錄。</translation>
     </message>
     <message>
-        <location line="+46"/>
+        <location line="+57"/>
         <source>Team.InfoFile 和 Release.DescriptionFile 必须使用彼此独立的正文文件，且不能覆盖 game_profile.ini、resources.ini 或封面文件。</source>
         <translation>Team.InfoFile 和 Release.DescriptionFile 必須使用彼此獨立的正文檔案，且不能覆蓋 game_profile.ini、resources.ini 或封面檔案。</translation>
     </message>
     <message>
-        <location line="+76"/>
+        <location line="+69"/>
         <source>当前资源目录仍有未恢复事务，不能创建或覆盖 Manifest：
 %1</source>
         <translation>目前資源目錄仍有未恢復交易，不能建立或覆蓋 Manifest：
@@ -12752,23 +20801,232 @@ NPC 資料將儲存到執行時模板/編輯目標:
         <translation>已建立預設 Manifest：
 </translation>
     </message>
-    <message><source>普通攻击释放:</source><translation>普通攻擊釋放:</translation></message>
-    <message><source>特殊攻击释放:</source><translation>特殊攻擊釋放:</translation></message>
-    <message><source>施法释放:</source><translation>施法釋放:</translation></message>
-    <message><source>继承</source><translation>繼承</translation></message>
-    <message><source>自定义</source><translation>自訂</translation></message>
-    <message><source>分子/分母</source><translation>分子/分母</translation></message>
-    <message><source>正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。</source><translation>正整數分數，分子不大於分母。先用單方向影格數除以分母取整，再乘分子；不約分。1/1 表示動作結束時釋放。</translation></message>
-    <message><source>释放帧比例必须是正整数分数，且分子不大于分母：%1</source><translation>釋放影格比例必須是正整數分數，且分子不大於分母：%1</translation></message>
-    <message><source>分数无效</source><translation>分數無效</translation></message>
-    <message><source>无法解析有效值</source><translation>無法解析有效值</translation></message>
-    <message><source>有效值 %1；来源：%2</source><translation>有效值 %1；來源：%2</translation></message>
-    <message><source>通用默认</source><translation>通用預設</translation></message>
+    <message>
+        <location line="-2443"/>
+        <source>普通攻击释放:</source>
+        <translation>普通攻擊釋放:</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>特殊攻击释放:</source>
+        <translation>特殊攻擊釋放:</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>施法释放:</source>
+        <translation>施法釋放:</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>继承</source>
+        <translation>繼承</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>自定义</source>
+        <translation>自訂</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>分子/分母</source>
+        <translation>分子/分母</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>正整数分数，分子不大于分母。先用单方向帧数除以分母取整，再乘分子；不约分。1/1 表示动作结束时释放。</source>
+        <translation>正整數分數，分子不大於分母。先用單方向影格數除以分母取整，再乘分子；不約分。1/1 表示動作結束時釋放。</translation>
+    </message>
+    <message>
+        <location line="+2115"/>
+        <source>释放帧比例必须是正整数分数，且分子不大于分母：%1</source>
+        <translation>釋放影格比例必須是正整數分數，且分子不大於分母：%1</translation>
+    </message>
+    <message>
+        <location line="-628"/>
+        <source>分数无效</source>
+        <translation>分數無效</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>无法解析有效值</source>
+        <translation>無法解析有效值</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>有效值 %1；来源：%2</source>
+        <translation>有效值 %1；來源：%2</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>通用默认</source>
+        <translation>通用預設</translation>
+    </message>
+    <message>
+        <location line="-1632"/>
+        <source>MOD 发布与资源设置</source>
+        <translation>MOD 發佈與資源設定</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>[LevelUp] 升级提示与特效</source>
+        <translation>[LevelUp] 升級提示與特效</translation>
+    </message>
+    <message>
+        <location line="+66"/>
+        <source>提示模板:</source>
+        <translation>提示範本:</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>随机特效:</source>
+        <translation>隨機特效:</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>男性特效:</source>
+        <translation>男性特效:</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>女性特效:</source>
+        <translation>女性特效:</translation>
+    </message>
+    <message>
+        <location line="+83"/>
+        <source>支持 {name} 和 {level}，留空则不显示升级提示</source>
+        <translation>支援 {name} 和 {level}，留空則不顯示升級提示</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>每行一个 ini/magic 下的 Magic INI；未配置男女特效时随机选择</source>
+        <translation>每行一個 ini/magic 下的 Magic INI；未設定男女特效時隨機選擇</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <location line="+2"/>
+        <source>ini/magic 下的 Magic INI 文件名，可留空</source>
+        <translation>ini/magic 下的 Magic INI 檔名，可留空</translation>
+    </message>
+    <message>
+        <location line="+2109"/>
+        <source>LevelUp 特效必须是 ini/magic 下的安全相对 INI 路径，且文件名不能包含逗号：%1</source>
+        <translation>LevelUp 特效必須是 ini/magic 下的安全相對 INI 路徑，且檔名不可包含逗號：%1</translation>
+    </message>
+    <message>
+        <location line="-2282"/>
+        <source>[Gameplay] 伙伴行为</source>
+        <translation>[Gameplay] 夥伴行為</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>[Script] 脚本兼容规则</source>
+        <translation>[Script] 指令碼相容規則</translation>
+    </message>
+    <message>
+        <location line="+43"/>
+        <source>升级经验阈值:</source>
+        <translation>升級經驗閾值:</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>伙伴跟随距离:</source>
+        <translation>夥伴跟隨距離:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>伙伴跑动距离:</source>
+        <translation>夥伴跑動距離:</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>NPC 动作编号协议:</source>
+        <translation>NPC 動作編號協定:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>NPC 运行语义:</source>
+        <translation>NPC 執行語義:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>NPC 特殊动作方式:</source>
+        <translation>NPC 特殊動作方式:</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>AddLife 语义:</source>
+        <translation>AddLife 語義:</translation>
+    </message>
+    <message>
+        <location line="+68"/>
+        <source>经验大于或等于阈值</source>
+        <translation>經驗大於或等於閾值</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>经验严格大于阈值</source>
+        <translation>經驗嚴格大於閾值</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>剑侠情缘二动作编号</source>
+        <translation>劍俠情緣二動作編號</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>月影传说动作编号</source>
+        <translation>月影傳說動作編號</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>新剑侠情缘动作编号</source>
+        <translation>新劍俠情緣動作編號</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>剑侠情缘二运行语义</source>
+        <translation>劍俠情緣二執行語義</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>月影/新剑运行语义</source>
+        <translation>月影/新劍執行語義</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>替换当前动作</source>
+        <translation>取代目前動作</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>覆盖在当前动作上</source>
+        <translation>覆蓋在目前動作上</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>使用主角生命规则</source>
+        <translation>使用主角生命規則</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>直接增减并限制范围</source>
+        <translation>直接增減並限制範圍</translation>
+    </message>
+    <message>
+        <location line="-22"/>
+        <source>固定剧情角色名，留空保持原有行为</source>
+        <translation>固定劇情角色名，留空保持原有行為</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>用于替换 #name；不随当前操控角色切换，也不作为存档变量。</source>
+        <translation>用於替換 #name；不隨目前操控角色切換，也不作為存檔變數。</translation>
+    </message>
 </context>
 <context>
     <name>SaveEditContext</name>
     <message>
-        <location filename="../core/SaveEditContext.cpp" line="+140"/>
+        <location filename="../core/SaveEditContext.cpp" line="+141"/>
         <source>新游戏模板（ini/save）</source>
         <translation>新遊戲範本（ini/save）</translation>
     </message>
@@ -12779,11 +21037,16 @@ NPC 資料將儲存到執行時模板/編輯目標:
     </message>
     <message>
         <location line="+3"/>
+        <source>自动存档（save/rpg_auto）</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>临时运行存档（save/game，高风险）</source>
         <translation>臨時執行存檔（save/game，高風險）</translation>
     </message>
     <message>
-        <location line="-56"/>
+        <location line="-58"/>
         <source>素材根目录无效，无法解析存档编辑路径：%1</source>
         <translation>素材根目錄無效，無法解析存檔編輯路徑：%1</translation>
     </message>
@@ -12801,3538 +21064,20 @@ NPC 資料將儲存到執行時模板/編輯目標:
 <context>
     <name>ScriptApiList</name>
     <message>
-        <location filename="../ui/ScriptApiList.cpp" line="+29"/>
-        <source>输出调试信息到日志</source>
-        <translation>輸出偵錯資訊到日誌</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>printf(str)
-输出调试信息到日志控制台
-参数:
-  str (string) - 要输出的字符串
-示例: printf(&quot;调试信息: value=%d&quot;, 10)</source>
-        <translation>printf(str)
-輸出偵錯資訊到日誌主控台
-參數:
-  str (string) - 要輸出的字串
-範例: printf(&quot;偵錯資訊: value=%d&quot;, 10)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>给变量赋值</source>
-        <translation>給變數賦值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Assign(varName, value)
-将指定值赋给脚本变量
-参数:
-  varName (string) - 变量名
-  value (number) - 要赋的值
-示例: Assign(&quot;questState&quot;, 1)</source>
-        <translation>Assign(varName, value)
-將指定值賦給指令碼變數
-參數:
-  varName (string) - 變數名
-  value (number) - 要賦的值
-範例: Assign(&quot;questState&quot;, 1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取变量值</source>
-        <translation>取得變數值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetVar(varName)
-获取指定脚本变量的值
-参数:
-  varName (string) - 变量名
-返回值: (number) 变量的当前值
-示例: local state = GetVar(&quot;questState&quot;)</source>
-        <translation>GetVar(varName)
-取得指定指令碼變數的值
-參數:
-  varName (string) - 變數名
-傳回值: (number) 變數目前的值
-範例: local state = GetVar(&quot;questState&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>变量值增加</source>
-        <translation>變數值增加</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Add(varName, value)
-将指定变量的值增加指定数值
-参数:
-  varName (string) - 变量名
-  value (number) - 增加的值
-示例: Add(&quot;killCount&quot;, 1)</source>
-        <translation>Add(varName, value)
-將指定變數的值增加指定數值
-參數:
-  varName (string) - 變數名
-  value (number) - 增加的值
-範例: Add(&quot;killCount&quot;, 1)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>显示对话（按段落名）</source>
-        <translation>顯示對話（按段落名）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Talk(part)
-根据段落名显示对话，从地图对话文件中读取
-参数:
-  part (string) - 对话段落名
-示例: Talk(&quot;greeting&quot;)
-
-Talk(fromIdx, toIdx)
-根据索引范围显示对话
-参数:
-  fromIdx (number) - 起始对话索引
-  toIdx (number) - 结束对话索引
-示例: Talk(1, 5)</source>
-        <translation>Talk(part)
-根據段落名顯示對話，從地圖對話檔案中讀取
-參數:
-  part (string) - 對話段落名
-範例: Talk(&quot;greeting&quot;)
-
-Talk(fromIdx, toIdx)
-根據索引範圍顯示對話
-參數:
-  fromIdx (number) - 起始對話索引
-  toIdx (number) - 結束對話索引
-範例: Talk(1, 5)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示指定说话者的对话</source>
-        <translation>顯示指定說話者的對話</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Say(str)
-显示对话内容（无头像）
-参数:
-  str (string) - 对话内容文本
-示例: Say(&quot;你好，欢迎来到剑侠世界！&quot;)
-
-Say(str, index)
-显示带头像的对话
-参数:
-  str (string) - 对话内容文本
-  index (number) - 头像索引（-1为无头像）
-示例: Say(&quot;我一定会找到灵儿的！&quot;, 0)</source>
-        <translation>Say(str)
-顯示對話內容（無頭像）
-參數:
-  str (string) - 對話內容文字
-範例: Say(&quot;你好，歡迎來到劍俠世界！&quot;)
-
-Say(str, index)
-顯示含頭像的對話
-參數:
-  str (string) - 對話內容文字
-  index (number) - 頭像索引（-1為無頭像）
-範例: Say(&quot;我一定會找到靈兒的！&quot;, 0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示二选一对话框</source>
-        <translation>顯示二選一對話框</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Choose(message, optionA, optionB, varName)
-显示二选一对话框，将选择结果存入变量
-参数:
-  message (string) - 提示信息文本索引
-  optionA (string) - 选项A文本索引
-  optionB (string) - 选项B文本索引
-  varName (string) - 存储选择结果的变量名（1=选A, 2=选B）
-示例: Choose(&quot;是否接受任务？&quot;, &quot;接受&quot;, &quot;拒绝&quot;, &quot;questChoice&quot;)</source>
-        <translation>Choose(message, optionA, optionB, varName)
-顯示二選一對話框，將選擇結果存入變數
-參數:
-  message (string) - 提示訊息文字索引
-  optionA (string) - 選項A文字索引
-  optionB (string) - 選項B文字索引
-  varName (string) - 儲存選擇結果的變數名（1=選A, 2=選B）
-範例: Choose(&quot;是否接受任務？&quot;, &quot;接受&quot;, &quot;拒絕&quot;, &quot;questChoice&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Display a multi-option choice dialog</source>
-        <translation>顯示多選項選擇對話框</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChooseEx(message, option1, option2, ..., varName)
-Displays a multi-option choice dialog. Options may include conditions in braces, for example {$koucai &gt;= 2}. The selected original option index is stored in varName.
-Example: ChooseEx(&quot;Choose:&quot;, &quot;A&quot;, &quot;B{$Flag == 1}&quot;, &quot;choice&quot;)</source>
-        <translation>ChooseEx(message, option1, option2, ..., varName)
-顯示多選項選擇對話框。選項可包含以大括號標示的條件，例如 {$koucai &gt;= 2}。所選原始選項的索引會儲存至 varName。
-範例: ChooseEx(&quot;Choose:&quot;, &quot;A&quot;, &quot;B{$Flag == 1}&quot;, &quot;choice&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Display a speaker choice dialog</source>
-        <translation>顯示說話者選擇對話框</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChoosePlus(speakerName, portraitIndex, dialogPosition, message, option1, option2, ..., varName)
-Displays a speaker choice dialog and stores the selected zero-based option index in varName. #name uses the current player name when available.
-Example: ChoosePlus(&quot;#name&quot;, &quot;2&quot;, &quot;0&quot;, &quot;Choose:&quot;, &quot;A&quot;, &quot;B&quot;, &quot;choice&quot;)</source>
-        <translation>ChoosePlus(speakerName, portraitIndex, dialogPosition, message, option1, option2, ..., varName)
-顯示說話者選擇對話框，並將所選選項從零起算的索引儲存至 varName。可取得目前玩家名稱時，#name 會使用該名稱。
-範例: ChoosePlus(&quot;#name&quot;, &quot;2&quot;, &quot;0&quot;, &quot;Choose:&quot;, &quot;A&quot;, &quot;B&quot;, &quot;choice&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示选择对话框（按索引）</source>
-        <translation>顯示選擇對話框（按索引）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Select(messageIdx, optionAIdx, optionBIdx, varName)
-按对话索引显示二选一对话框
-参数:
-  messageIdx (number) - 提示信息对话索引
-  optionAIdx (number) - 选项A对话索引
-  optionBIdx (number) - 选项B对话索引
-  varName (string) - 存储选择结果的变量名
-示例: Select(1, 2, 3, &quot;choice&quot;)</source>
-        <translation>Select(messageIdx, optionAIdx, optionBIdx, varName)
-按對話索引顯示二選一對話框
-參數:
-  messageIdx (number) - 提示訊息對話索引
-  optionAIdx (number) - 選項A對話索引
-  optionBIdx (number) - 選項B對話索引
-  varName (string) - 儲存選擇結果的變數名
-範例: Select(1, 2, 3, &quot;choice&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Run a give-goods result script</source>
-        <translation>執行交付物品結果腳本</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowGiveGoodsWin(targetGoodsName, successScript, failScript)
-Checks whether the player has the target goods by ini file or display name, then runs successScript or failScript.
-Example: ShowGiveGoodsWin(&quot;Peach Wood Sword&quot;, &quot;GiveSuccess.txt&quot;, &quot;GiveFail.txt&quot;)</source>
-        <translation>ShowGiveGoodsWin(targetGoodsName, successScript, failScript)
-依 INI 檔名或顯示名稱檢查玩家是否擁有目標物品，接著執行 successScript 或 failScript。
-範例: ShowGiveGoodsWin(&quot;Peach Wood Sword&quot;, &quot;GiveSuccess.txt&quot;, &quot;GiveFail.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Open the NPC stealing dialog</source>
-        <translation>開啟 NPC 偷竊對話框</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowStealWin(npcName, successScript, failScript)
-Opens a stealing choice dialog using the target NPC BagGoods field. On success, adds the selected goods and runs successScript; on failure, runs failScript.
-Example: ShowStealWin(&quot;Innkeeper&quot;, &quot;StealSuccess.txt&quot;, &quot;StealFail.txt&quot;)</source>
-        <translation>ShowStealWin(npcName, successScript, failScript)
-使用目標 NPC 的 BagGoods 欄位開啟偷竊選擇對話框。成功時新增所選物品並執行 successScript；失敗時執行 failScript。
-範例: ShowStealWin(&quot;Innkeeper&quot;, &quot;StealSuccess.txt&quot;, &quot;StealFail.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示消息提示</source>
-        <translation>顯示訊息提示</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowMessage(str)
-在屏幕上显示消息提示
-参数:
-  str (string) - 消息文本
-示例: ShowMessage(&quot;任务完成！&quot;)</source>
-        <translation>ShowMessage(str)
-在螢幕上顯示訊息提示
-參數:
-  str (string) - 訊息文字
-範例: ShowMessage(&quot;任務完成！&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示系统消息提示</source>
-        <translation>顯示系統訊息提示</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowSystemMsg(str)
-显示系统消息提示
-参数:
-  str (string) - 消息文本
-  stayTime (number) - 停留毫秒数，可省略，默认3000
-示例: ShowSystemMsg(&quot;测试消息&quot;, 6000)</source>
-        <translation>ShowSystemMsg(str)
-顯示系統訊息提示
-參數:
-  str (string) - 訊息文字
-  stayTime (number) - 停留毫秒數，可省略，預設 3000
-範例: ShowSystemMsg(&quot;測試訊息&quot;, 6000)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示消息（居中）</source>
-        <translation>顯示訊息（置中）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisplayMessage(text)
-在屏幕中央显示消息
-参数:
-  text (string) - 消息文本
-示例: DisplayMessage(&quot;恭喜通关！&quot;)</source>
-        <translation>DisplayMessage(text)
-在螢幕中央顯示訊息
-參數:
-  text (string) - 訊息文字
-範例: DisplayMessage(&quot;恭喜通關！&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>添加到备忘录</source>
-        <translation>新增到備忘錄</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddToMemo(str)
-将文本添加到游戏备忘录中
-参数:
-  str (string) - 要添加的文本
-示例: AddToMemo(&quot;在长安城找到李大侠&quot;)</source>
-        <translation>AddToMemo(str)
-將文字新增到遊戲備忘錄中
-參數:
-  str (string) - 要新增的文字
-範例: AddToMemo(&quot;在長安城找到李大俠&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>添加到备忘录（同AddToMemo）</source>
-        <translation>新增到備忘錄（同AddToMemo）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Memo(str)
-将文本添加到游戏备忘录中（与AddToMemo功能相同）
-参数:
-  str (string) - 要添加的文本
-示例: Memo(&quot;记住去药店买药&quot;)</source>
-        <translation>Memo(str)
-將文字新增到遊戲備忘錄中（與AddToMemo功能相同）
-參數:
-  str (string) - 要新增的文字
-範例: Memo(&quot;記住去藥店買藥&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>清空备忘录</source>
-        <translation>清空備忘錄</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ClearMemo()
-清空游戏备忘录中的所有内容
-参数: 无
-示例: ClearMemo()</source>
-        <translation>ClearMemo()
-清空遊戲備忘錄中的所有內容
-參數: 無
-範例: ClearMemo()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>画面淡入</source>
-        <translation>畫面淡入</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FadeIn()
-画面从黑色淡入
-参数: 无
-示例: FadeIn()</source>
-        <translation>FadeIn()
-畫面從黑色淡入
-參數: 無
-範例: FadeIn()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>画面淡出</source>
-        <translation>畫面淡出</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FadeOut()
-画面淡出到黑色
-参数: 无
-示例: FadeOut()</source>
-        <translation>FadeOut()
-畫面淡出到黑色
-參數: 無
-範例: FadeOut()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置淡入淡出亮度</source>
-        <translation>設定淡入淡出亮度</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetFadeLum(lum)
-设置画面淡入淡出的亮度值
-参数:
-  lum (number) - 亮度值（0-255）
-示例: SetFadeLum(128)</source>
-        <translation>SetFadeLum(lum)
-設定畫面淡入淡出的亮度值
-參數:
-  lum (number) - 亮度值（0-255）
-範例: SetFadeLum(128)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置主亮度</source>
-        <translation>設定主亮度</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMainLum(lum)
-设置画面主亮度
-参数:
-  lum (number) - 亮度值（0-255）
-示例: SetMainLum(200)</source>
-        <translation>SetMainLum(lum)
-設定畫面主亮度
-參數:
-  lum (number) - 亮度值（0-255）
-範例: SetMainLum(200)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>播放背景音乐</source>
-        <translation>播放背景音樂</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayMusic(fileName)
-播放指定的背景音乐文件
-参数:
-  fileName (string) - 音乐文件名（支持mp3/wav）
-示例: PlayMusic(&quot;bgm_village.mp3&quot;)</source>
-        <translation>PlayMusic(fileName)
-播放指定的背景音樂檔案
-參數:
-  fileName (string) - 音樂檔案名（支援mp3/wav）
-範例: PlayMusic(&quot;bgm_village.mp3&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>随机播放背景音乐</source>
-        <translation>隨機播放背景音樂</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayRandomMusic(fileA, fileB, fileC)
-从给定的音乐文件中随机选择一首播放
-参数:
-  fileA (string) - 音乐文件A
-  fileB (string) - 音乐文件B（可为空串）
-  fileC (string) - 音乐文件C（可为空串）
-示例: PlayRandomMusic(&quot;bgm1.mp3&quot;, &quot;bgm2.mp3&quot;, &quot;bgm3.mp3&quot;)</source>
-        <translation>PlayRandomMusic(fileA, fileB, fileC)
-從給定的音樂檔案中隨機選擇一首播放
-參數:
-  fileA (string) - 音樂檔案A
-  fileB (string) - 音樂檔案B（可為空字串）
-  fileC (string) - 音樂檔案C（可為空字串）
-範例: PlayRandomMusic(&quot;bgm1.mp3&quot;, &quot;bgm2.mp3&quot;, &quot;bgm3.mp3&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>停止背景音乐</source>
-        <translation>停止背景音樂</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>StopMusic()
-停止当前播放的背景音乐
-参数: 无
-示例: StopMusic()</source>
-        <translation>StopMusic()
-停止目前播放的背景音樂
-參數: 無
-範例: StopMusic()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>播放音效</source>
-        <translation>播放音效</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlaySound(fileName)
-播放指定的音效文件
-参数:
-  fileName (string) - 音效文件名
-示例: PlaySound(&quot;se_door.wav&quot;)</source>
-        <translation>PlaySound(fileName)
-播放指定的音效檔案
-參數:
-  fileName (string) - 音效檔案名
-範例: PlaySound(&quot;se_door.wav&quot;)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>运行指定脚本文件</source>
-        <translation>執行指定指令碼檔案</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>RunScript(fileName)
-运行指定的脚本文件，依次在地图目录、物品目录、公共目录中查找
-参数:
-  fileName (string) - 脚本文件名
-示例: RunScript(&quot;scene/scene01.txt&quot;)</source>
-        <translation>RunScript(fileName)
-執行指定的指令碼檔案，依序在地圖目錄、物品目錄、公共目錄中尋找
-參數:
-  fileName (string) - 指令碼檔案名
-範例: RunScript(&quot;scene/scene01.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>暂停脚本执行</source>
-        <translation>暫停指令碼執行</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Sleep(milliseconds)
-暂停脚本执行指定毫秒数
-参数:
-  milliseconds (number) - 暂停时间（毫秒）
-示例: Sleep(1000)</source>
-        <translation>Sleep(milliseconds)
-暫停指令碼執行指定毫秒數
-參數:
-  milliseconds (number) - 暫停時間（毫秒）
-範例: Sleep(1000)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>移动镜头</source>
-        <translation>移動鏡頭</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>MoveScreen(direction, distance, speed)
-按方向移动镜头指定距离
-参数:
-  direction (number) - 方向
-  distance (number) - 移动距离
-  speed (number) - 移动速度（可省略，默认1）
-示例: MoveScreen(0, 100, 2)</source>
-        <translation>MoveScreen(direction, distance, speed)
-按方向移動鏡頭指定距離
-參數:
-  direction (number) - 方向
-  distance (number) - 移動距離
-  speed (number) - 移動速度（可省略，預設1）
-範例: MoveScreen(0, 100, 2)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>移动镜头到指定位置</source>
-        <translation>移動鏡頭到指定位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>MoveScreenEx(x, y, speed)
-将镜头移动到指定坐标位置
-参数:
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-  speed (number) - 移动速度
-示例: MoveScreenEx(500, 300, 3)</source>
-        <translation>MoveScreenEx(x, y, speed)
-將鏡頭移動到指定座標位置
-參數:
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-  speed (number) - 移動速度
-範例: MoveScreenEx(500, 300, 3)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>播放视频</source>
-        <translation>播放影片</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayMovie(fileName)
-播放指定的视频文件
-参数:
-  fileName (string) - 视频文件名
-示例: PlayMovie(&quot;intro.avi&quot;)</source>
-        <translation>PlayMovie(fileName)
-播放指定的影片檔案
-參數:
-  fileName (string) - 影片檔案名
-範例: PlayMovie(&quot;intro.avi&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>停止播放视频</source>
-        <translation>停止播放影片</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>StopMovie()
-停止当前播放的视频
-参数: 无
-示例: StopMovie()</source>
-        <translation>StopMovie()
-停止目前播放的影片
-參數: 無
-範例: StopMovie()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>加载地图</source>
-        <translation>載入地圖</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LoadMap(mapName)
-加载指定的地图文件，会清空当前NPC和物体
-参数:
-  mapName (string) - 地图文件名
-示例: LoadMap(&quot;scene01.map&quot;)</source>
-        <translation>LoadMap(mapName)
-載入指定的地圖檔案，會清空目前NPC和物體
-參數:
-  mapName (string) - 地圖檔案名
-範例: LoadMap(&quot;scene01.map&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>释放当前地图</source>
-        <translation>釋放目前地圖</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FreeMap()
-释放当前加载的地图资源
-参数: 无
-示例: FreeMap()</source>
-        <translation>FreeMap()
-釋放目前載入的地圖資源
-參數: 無
-範例: FreeMap()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>加载存档</source>
-        <translation>載入存檔</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LoadGame(index)
-加载指定索引的存档文件
-参数:
-  index (number) - 存档索引（0开始）
-示例: LoadGame(0)</source>
-        <translation>LoadGame(index)
-載入指定索引的存檔檔案
-參數:
-  index (number) - 存檔索引（0開始）
-範例: LoadGame(0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>保存存档</source>
-        <translation>儲存存檔</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SaveGame()
-保存当前游戏进度到存档
-参数: 无
-示例: SaveGame()</source>
-        <translation>SaveGame()
-儲存目前遊戲進度到存檔
-參數: 無
-範例: SaveGame()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>清除用户存档槽</source>
-        <translation>清除使用者存檔槽</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ClearAllSave()
-清除当前资源包下的 rpg1-rpg7 用户存档和对应截图，不清除当前运行存档或初始模板
-参数: 无
-示例: ClearAllSave()</source>
-        <translation>ClearAllSave()
-清除目前資源包下的 rpg1-rpg7 使用者存檔及對應擷圖；不清除目前執行階段存檔或初始範本
-參數: 無
-範例: ClearAllSave()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>允许手动存档</source>
-        <translation>允許手動存檔</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableSave()
-允许玩家在存读档界面手动保存
-参数: 无
-示例: EnableSave()</source>
-        <translation>EnableSave()
-允許玩家在存讀檔介面手動儲存
-參數: 無
-範例: EnableSave()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁止手动存档</source>
-        <translation>禁止手動存檔</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableSave()
-禁止玩家在存读档界面手动保存
-参数: 无
-示例: DisableSave()</source>
-        <translation>DisableSave()
-禁止玩家在存讀檔介面手動儲存
-參數: 無
-範例: DisableSave()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置地图视口位置</source>
-        <translation>設定地圖視埠位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMapPos(x, y)
-设置地图视口位置，镜头不再跟随玩家
-参数:
-  x (number) - X坐标
-  y (number) - Y坐标
-示例: SetMapPos(100, 200)</source>
-        <translation>SetMapPos(x, y)
-設定地圖視埠位置，鏡頭不再跟隨玩家
-參數:
-  x (number) - X座標
-  y (number) - Y座標
-範例: SetMapPos(100, 200)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置当前地图陷阱</source>
-        <translation>設定目前地圖陷阱</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMapTrap(idx, trapFile)
-设置当前地图指定索引的陷阱触发脚本
-参数:
-  idx (number) - 陷阱索引（1-19，0 表示无陷阱）
-  trapFile (string) - 触发脚本文件名
-示例: SetMapTrap(1, &quot;trap/trap01.txt&quot;)</source>
-        <translation>SetMapTrap(idx, trapFile)
-設定目前地圖指定索引的陷阱觸發指令碼
-參數:
-  idx (number) - 陷阱索引（1-19，0 表示無陷阱）
-  trapFile (string) - 觸發指令碼檔案名
-範例: SetMapTrap(1, &quot;trap/trap01.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>保存地图陷阱数据</source>
-        <translation>儲存地圖陷阱資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SaveMapTrap()
-保存当前地图的陷阱数据
-参数: 无
-示例: SaveMapTrap()</source>
-        <translation>SaveMapTrap()
-儲存目前地圖的陷阱資料
-參數: 無
-範例: SaveMapTrap()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置地图时间</source>
-        <translation>設定地圖時間</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMapTime(time)
-设置地图时间（影响光照等效果）
-参数:
-  time (number) - 时间值
-示例: SetMapTime(12)</source>
-        <translation>SetMapTime(time)
-設定地圖時間（影響光照等效果）
-參數:
-  time (number) - 時間值
-範例: SetMapTime(12)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置指定地图陷阱</source>
-        <translation>設定指定地圖陷阱</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetTrap(mapName, idx, trapFile)
-设置指定地图的陷阱触发脚本
-参数:
-  mapName (string) - 地图名称
-  idx (number) - 陷阱索引（1-19，0 表示无陷阱）
-  trapFile (string) - 触发脚本文件名
-示例: SetTrap(&quot;scene01&quot;, 1, &quot;trap/trap01.txt&quot;)</source>
-        <translation>SetTrap(mapName, idx, trapFile)
-設定指定地圖的陷阱觸發指令碼
-參數:
-  mapName (string) - 地圖名稱
-  idx (number) - 陷阱索引（1-19，0 表示無陷阱）
-  trapFile (string) - 觸發指令碼檔案名
-範例: SetTrap(&quot;scene01&quot;, 1, &quot;trap/trap01.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>改变角色精灵颜色</source>
-        <translation>改變角色精靈顏色</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChangeASFColor(r, g, b)
-改变角色ASF精灵的色调
-参数:
-  r (number) - 红色分量（0-255）
-  g (number) - 绿色分量（0-255）
-  b (number) - 蓝色分量（0-255）
-示例: ChangeASFColor(255, 128, 0)</source>
-        <translation>ChangeASFColor(r, g, b)
-改變角色ASF精靈的色調
-參數:
-  r (number) - 紅色分量（0-255）
-  g (number) - 綠色分量（0-255）
-  b (number) - 藍色分量（0-255）
-範例: ChangeASFColor(255, 128, 0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>改变地图颜色</source>
-        <translation>改變地圖顏色</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChangeMapColor(r, g, b)
-改变地图的色调
-参数:
-  r (number) - 红色分量（0-255）
-  g (number) - 绿色分量（0-255）
-  b (number) - 蓝色分量（0-255）
-示例: ChangeMapColor(100, 100, 200)</source>
-        <translation>ChangeMapColor(r, g, b)
-改變地圖的色調
-參數:
-  r (number) - 紅色分量（0-255）
-  g (number) - 綠色分量（0-255）
-  b (number) - 藍色分量（0-255）
-範例: ChangeMapColor(100, 100, 200)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁用地图滚动</source>
-        <translation>停用地圖捲動</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableMapScroll()
-禁用地图视口跟随玩家滚动
-参数: 无
-示例: DisableMapScroll()</source>
-        <translation>DisableMapScroll()
-停用地圖視埠跟隨玩家捲動
-參數: 無
-範例: DisableMapScroll()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>启用地图滚动</source>
-        <translation>啟用地圖捲動</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableMapScroll()
-启用地图视口跟随玩家滚动
-参数: 无
-示例: EnableMapScroll()</source>
-        <translation>EnableMapScroll()
-啟用地圖視埠跟隨玩家捲動
-參數: 無
-範例: EnableMapScroll()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>加载物体数据</source>
-        <translation>載入物體資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LoadObj(fileName)
-加载指定物体数据文件
-参数:
-  fileName (string) - 物体数据文件名
-示例: LoadObj(&quot;scene01.obj&quot;)</source>
-        <translation>LoadObj(fileName)
-載入指定物體資料檔案
-參數:
-  fileName (string) - 物體資料檔案名
-範例: LoadObj(&quot;scene01.obj&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>保存物体数据</source>
-        <translation>儲存物體資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SaveObj()
-保存物体数据到当前文件
-参数: 无
-示例: SaveObj()
-
-SaveObj(fileName)
-保存物体数据到指定文件
-参数:
-  fileName (string) - 物体数据文件名
-示例: SaveObj(&quot;scene01.obj&quot;)</source>
-        <translation>SaveObj()
-儲存物體資料到目前檔案
-參數: 無
-範例: SaveObj()
-
-SaveObj(fileName)
-儲存物體資料到指定檔案
-參數:
-  fileName (string) - 物體資料檔案名
-範例: SaveObj(&quot;scene01.obj&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>添加物体</source>
-        <translation>新增物體</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddObj(iniName, x, y, dir)
-在指定位置添加物体
-参数:
-  iniName (string) - 物体INI配置名
-  x (number) - X坐标
-  y (number) - Y坐标
-  dir (number) - 方向（可省略，默认0）
-示例: AddObj(&quot;chest&quot;, 100, 200, 0)</source>
-        <translation>AddObj(iniName, x, y, dir)
-在指定位置新增物體
-參數:
-  iniName (string) - 物體INI設定名
-  x (number) - X座標
-  y (number) - Y座標
-  dir (number) - 方向（可省略，預設0）
-範例: AddObj(&quot;chest&quot;, 100, 200, 0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>删除指定物体</source>
-        <translation>刪除指定物體</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DelObj(name)
-删除指定名称的物体
-参数:
-  name (string) - 物体名称（空串则删除当前交互物体）
-示例: DelObj(&quot;chest01&quot;)</source>
-        <translation>DelObj(name)
-刪除指定名稱的物體
-參數:
-  name (string) - 物體名稱（空字串則刪除目前互動物體）
-範例: DelObj(&quot;chest01&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>删除当前物体</source>
-        <translation>刪除目前物體</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DelCurObj()
-删除当前正在交互的物体
-参数: 无
-示例: DelCurObj()</source>
-        <translation>DelCurObj()
-刪除目前正在互動的物體
-參數: 無
-範例: DelCurObj()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置物体位置</source>
-        <translation>設定物體位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetObjPos(name, x, y)
-设置指定物体的位置
-参数:
-  name (string) - 物体名称（空串则操作当前交互物体）
-  x (number) - X坐标
-  y (number) - Y坐标
-示例: SetObjPos(&quot;chest01&quot;, 150, 250)</source>
-        <translation>SetObjPos(name, x, y)
-設定指定物體的位置
-參數:
-  name (string) - 物體名稱（空字串則操作目前互動物體）
-  x (number) - X座標
-  y (number) - Y座標
-範例: SetObjPos(&quot;chest01&quot;, 150, 250)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置物体类型</source>
-        <translation>設定物體類型</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetObjKind(name, kind)
-设置指定物体的类型
-参数:
-  name (string) - 物体名称（空串则操作当前交互物体）
-  kind (number) - 物体类型
-示例: SetObjKind(&quot;chest01&quot;, 2)</source>
-        <translation>SetObjKind(name, kind)
-設定指定物體的類型
-參數:
-  name (string) - 物體名稱（空字串則操作目前互動物體）
-  kind (number) - 物體類型
-範例: SetObjKind(&quot;chest01&quot;, 2)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置物体脚本</source>
-        <translation>設定物體指令碼</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetObjScript(name, scriptFile)
-设置指定物体的关联脚本
-参数:
-  name (string) - 物体名称（空串则操作当前交互物体）
-  scriptFile (string) - 脚本文件名
-示例: SetObjScript(&quot;chest01&quot;, &quot;obj/chest01.txt&quot;)</source>
-        <translation>SetObjScript(name, scriptFile)
-設定指定物體的關聯指令碼
-參數:
-  name (string) - 物體名稱（空字串則操作目前互動物體）
-  scriptFile (string) - 指令碼檔案名
-範例: SetObjScript(&quot;chest01&quot;, &quot;obj/chest01.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>清除尸体</source>
-        <translation>清除屍體</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ClearBody()
-清除场景中的尸体
-参数: 无
-示例: ClearBody()</source>
-        <translation>ClearBody()
-清除場景中的屍體
-參數: 無
-範例: ClearBody()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>打开当前宝箱</source>
-        <translation>開啟目前寶箱</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>OpenBox()
-打开当前交互的宝箱物体
-参数: 无
-示例: OpenBox()</source>
-        <translation>OpenBox()
-開啟目前互動的寶箱物體
-參數: 無
-範例: OpenBox()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>关闭当前宝箱</source>
-        <translation>關閉目前寶箱</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>CloseBox()
-关闭当前交互的宝箱物体
-参数: 无
-示例: CloseBox()</source>
-        <translation>CloseBox()
-關閉目前互動的寶箱物體
-參數: 無
-範例: CloseBox()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>打开物体交互</source>
-        <translation>開啟物體互動</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>OpenObj(name)
-打开指定名称物体的交互（如宝箱）
-参数:
-  name (string) - 物体名称
-示例: OpenObj(&quot;chest01&quot;)</source>
-        <translation>OpenObj(name)
-開啟指定名稱物體的互動（如寶箱）
-參數:
-  name (string) - 物體名稱
-範例: OpenObj(&quot;chest01&quot;)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>加载NPC数据</source>
-        <translation>載入NPC資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LoadNpc(fileName)
-加载指定NPC数据文件
-参数:
-  fileName (string) - NPC数据文件名
-示例: LoadNpc(&quot;scene01.npc&quot;)</source>
-        <translation>LoadNpc(fileName)
-載入指定NPC資料檔案
-參數:
-  fileName (string) - NPC資料檔案名
-範例: LoadNpc(&quot;scene01.npc&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>保存NPC数据</source>
-        <translation>儲存NPC資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SaveNpc()
-保存NPC数据到当前文件
-参数: 无
-示例: SaveNpc()
-
-SaveNpc(fileName)
-保存NPC数据到指定文件
-参数:
-  fileName (string) - NPC数据文件名
-示例: SaveNpc(&quot;scene01.npc&quot;)</source>
-        <translation>SaveNpc()
-儲存NPC資料到目前檔案
-參數: 無
-範例: SaveNpc()
-
-SaveNpc(fileName)
-儲存NPC資料到指定檔案
-參數:
-  fileName (string) - NPC資料檔案名
-範例: SaveNpc(&quot;scene01.npc&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>添加NPC</source>
-        <translation>新增NPC</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddNpc(iniName, x, y, dir)
-在指定位置添加NPC
-参数:
-  iniName (string) - NPC的INI配置名
-  x (number) - X坐标
-  y (number) - Y坐标
-  dir (number) - 朝向（可省略，默认0）
-示例: AddNpc(&quot;hero&quot;, 100, 200, 0)</source>
-        <translation>AddNpc(iniName, x, y, dir)
-在指定位置新增NPC
-參數:
-  iniName (string) - NPC的INI設定名
-  x (number) - X座標
-  y (number) - Y座標
-  dir (number) - 朝向（可省略，預設0）
-範例: AddNpc(&quot;hero&quot;, 100, 200, 0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>删除指定NPC</source>
-        <translation>刪除指定NPC</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DelNpc(name)
-删除指定名称的NPC
-参数:
-  name (string) - NPC名称
-示例: DelNpc(&quot;guard01&quot;)</source>
-        <translation>DelNpc(name)
-刪除指定名稱的NPC
-參數:
-  name (string) - NPC名稱
-範例: DelNpc(&quot;guard01&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC资源文件</source>
-        <translation>設定NPC資源檔案</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcRes(name, resName)
-设置指定NPC的资源文件并重新初始化
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  resName (string) - 资源文件路径
-示例: SetNpcRes(&quot;hero&quot;, &quot;npc/hero2.asf&quot;)</source>
-        <translation>SetNpcRes(name, resName)
-設定指定NPC的資源檔案並重新初始化
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  resName (string) - 資源檔案路徑
-範例: SetNpcRes(&quot;hero&quot;, &quot;npc/hero2.asf&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC脚本</source>
-        <translation>設定NPC指令碼</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcScript(name, scriptFile)
-设置指定NPC的交互脚本
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  scriptFile (string) - 脚本文件路径
-示例: SetNpcScript(&quot;hero&quot;, &quot;npc/hero.txt&quot;)</source>
-        <translation>SetNpcScript(name, scriptFile)
-設定指定NPC的互動指令碼
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  scriptFile (string) - 指令碼檔案路徑
-範例: SetNpcScript(&quot;hero&quot;, &quot;npc/hero.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC死亡脚本</source>
-        <translation>設定NPC死亡指令碼</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcDeathScript(name, scriptFile)
-设置指定NPC死亡时触发的脚本
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  scriptFile (string) - 脚本文件路径
-示例: SetNpcDeathScript(&quot;boss01&quot;, &quot;npc/boss_death.txt&quot;)</source>
-        <translation>SetNpcDeathScript(name, scriptFile)
-設定指定NPC死亡時觸發的指令碼
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  scriptFile (string) - 指令碼檔案路徑
-範例: SetNpcDeathScript(&quot;boss01&quot;, &quot;npc/boss_death.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC移动到指定位置</source>
-        <translation>NPC移動到指定位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>NpcGoto(name, x, y)
-让指定NPC移动到目标位置
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: NpcGoto(&quot;guard01&quot;, 300, 400)</source>
-        <translation>NpcGoto(name, x, y)
-讓指定NPC移動到目標位置
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: NpcGoto(&quot;guard01&quot;, 300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC移动到指定位置（扩展）</source>
-        <translation>NPC移動到指定位置（擴展）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>NpcGotoEx(name, x, y)
-让指定NPC移动到目标位置（扩展模式）
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: NpcGotoEx(&quot;guard01&quot;, 300, 400)</source>
-        <translation>NpcGotoEx(name, x, y)
-讓指定NPC移動到目標位置（擴展模式）
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: NpcGotoEx(&quot;guard01&quot;, 300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC朝指定方向移动</source>
-        <translation>NPC朝指定方向移動</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>NpcGotoDir(name, dir, distance)
-让指定NPC朝指定方向移动指定距离
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  dir (number) - 方向
-  distance (number) - 移动距离
-示例: NpcGotoDir(&quot;guard01&quot;, 2, 100)</source>
-        <translation>NpcGotoDir(name, dir, distance)
-讓指定NPC朝指定方向移動指定距離
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  dir (number) - 方向
-  distance (number) - 移動距離
-範例: NpcGotoDir(&quot;guard01&quot;, 2, 100)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC异步移动目标</source>
-        <translation>設定 NPC 非同步移動目標</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcDestination(name, x, y)
-设置指定NPC的异步移动目标，移动中仍可由战斗AI调度
-参数:
-  name (string) - NPC名称
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: SetNpcDestination(&quot;guard01&quot;, 83, 90)</source>
-        <translation>SetNpcDestination(name, x, y)
-設定指定 NPC 的非同步移動目標；移動期間仍可由戰鬥 AI 排程
-參數:
-  name (string) - NPC 名稱
-  x (number) - 目標 X 座標
-  y (number) - 目標 Y 座標
-範例: SetNpcDestination(&quot;guard01&quot;, 83, 90)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC跟随另一个NPC</source>
-        <translation>NPC跟隨另一個NPC</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FollowNpc(follower, leader)
-让一个NPC跟随另一个NPC移动
-参数:
-  follower (string) - 跟随者NPC名称
-  leader (string) - 被跟随者NPC名称
-示例: FollowNpc(&quot;pet01&quot;, &quot;hero&quot;)</source>
-        <translation>FollowNpc(follower, leader)
-讓一個NPC跟隨另一個NPC移動
-參數:
-  follower (string) - 跟隨者NPC名稱
-  leader (string) - 被跟隨者NPC名稱
-範例: FollowNpc(&quot;pet01&quot;, &quot;hero&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC跟随玩家</source>
-        <translation>NPC跟隨玩家</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FollowPlayer(follower)
-让指定NPC跟随玩家移动
-参数:
-  follower (string) - 跟随者NPC名称
-示例: FollowPlayer(&quot;pet01&quot;)</source>
-        <translation>FollowPlayer(follower)
-讓指定NPC跟隨玩家移動
-參數:
-  follower (string) - 跟隨者NPC名稱
-範例: FollowPlayer(&quot;pet01&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>启用NPC AI</source>
-        <translation>啟用NPC AI</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableNpcAI()
-启用全局NPC AI行为
-参数: 无
-示例: EnableNpcAI()</source>
-        <translation>EnableNpcAI()
-啟用全域NPC AI行為
-參數: 無
-範例: EnableNpcAI()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁用NPC AI</source>
-        <translation>停用NPC AI</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableNpcAI()
-禁用全局NPC AI行为
-参数: 无
-示例: DisableNpcAI()</source>
-        <translation>DisableNpcAI()
-停用全域NPC AI行為
-參數: 無
-範例: DisableNpcAI()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC攻击指定位置</source>
-        <translation>NPC攻擊指定位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>NpcAttack(name, x, y)
-让指定NPC向目标位置发起攻击
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: NpcAttack(&quot;guard01&quot;, 300, 400)</source>
-        <translation>NpcAttack(name, x, y)
-讓指定NPC向目標位置發起攻擊
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: NpcAttack(&quot;guard01&quot;, 300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC位置（瞬移）</source>
-        <translation>設定NPC位置（瞬移）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcPos(name, x, y)
-直接设置指定NPC的位置（瞬移，不播放移动动画）
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  x (number) - X坐标
-  y (number) - Y坐标
-示例: SetNpcPos(&quot;guard01&quot;, 100, 200)</source>
-        <translation>SetNpcPos(name, x, y)
-直接設定指定NPC的位置（瞬移，不播放移動動畫）
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  x (number) - X座標
-  y (number) - Y座標
-範例: SetNpcPos(&quot;guard01&quot;, 100, 200)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC朝向</source>
-        <translation>設定NPC朝向</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcDir(name, dir)
-设置指定NPC的朝向
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  dir (number) - 方向值
-示例: SetNpcDir(&quot;guard01&quot;, 4)</source>
-        <translation>SetNpcDir(name, dir)
-設定指定NPC的朝向
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  dir (number) - 方向值
-範例: SetNpcDir(&quot;guard01&quot;, 4)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC类型</source>
-        <translation>設定NPC類型</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcKind(name, kind)
-设置指定NPC的类型
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  kind (number) - NPC类型
-示例: SetNpcKind(&quot;guard01&quot;, 1)</source>
-        <translation>SetNpcKind(name, kind)
-設定指定NPC的類型
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  kind (number) - NPC類型
-範例: SetNpcKind(&quot;guard01&quot;, 1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC等级</source>
-        <translation>設定NPC等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcLevel(name, level)
-设置指定NPC的等级
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  level (number) - 等级
-示例: SetNpcLevel(&quot;boss01&quot;, 10)</source>
-        <translation>SetNpcLevel(name, level)
-設定指定NPC的等級
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  level (number) - 等級
-範例: SetNpcLevel(&quot;boss01&quot;, 10)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC动作</source>
-        <translation>設定NPC動作</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcAction(name, action, x?, y?)
-设置指定NPC的当前动作
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  action (number) - 脚本动作号（按资源 NpcActionProfile 映射；-1=站立兼容）
-  x, y (number, optional) - 移动、攻击等动作的目标格坐标
-常用编号: 0/1=站立, 2=走, 3=跑, 4=跳, 5-7=攻击, 8=施法, 11=死亡；9/10/12-15 由资源动作协议解释
-示例: SetNpcAction(&quot;guard01&quot;, 2, 10, 20)</source>
-        <translation>SetNpcAction(name, action, x?, y?)
-設定指定NPC的目前動作
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  action (number) - 腳本動作編號（依資源 NpcActionProfile 對應；-1 為站立相容值）
-  x, y (number, optional) - 移動、攻擊等動作的目標格座標
-常用編號: 0/1=站立, 2=走, 3=跑, 4=跳, 5-7=攻擊, 8=施法, 11=死亡；9/10/12-15 由資源動作協定解釋
-範例: SetNpcAction(&quot;guard01&quot;, 2, 10, 20)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC关系</source>
-        <translation>設定NPC關係</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcRelation(name, relation)
-设置指定NPC与玩家的关系类型
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  relation (number) - 关系类型
-示例: SetNpcRelation(&quot;guard01&quot;, 1)</source>
-        <translation>SetNpcRelation(name, relation)
-設定指定NPC與玩家的關係類型
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  relation (number) - 關係類型
-範例: SetNpcRelation(&quot;guard01&quot;, 1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC行为类型</source>
-        <translation>設定NPC行為類型</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcActionType(name, strollIntent)
-设置指定NPC的巡逻/行为意图类型
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  strollIntent (number) - 行为意图值
-示例: SetNpcActionType(&quot;guard01&quot;, 3)</source>
-        <translation>SetNpcActionType(name, strollIntent)
-設定指定NPC的巡邏/行為意圖類型
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  strollIntent (number) - 行為意圖值
-範例: SetNpcActionType(&quot;guard01&quot;, 3)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC动作文件</source>
-        <translation>設定NPC動作檔案</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcActionFile(name, action, fileName)
-加载指定NPC的动作文件
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  action (number) - 动作编号
-  fileName (string) - 动作文件路径
-示例: SetNpcActionFile(&quot;hero&quot;, 1, &quot;action/special.act&quot;)</source>
-        <translation>SetNpcActionFile(name, action, fileName)
-載入指定NPC的動作檔案
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  action (number) - 動作編號
-  fileName (string) - 動作檔案路徑
-範例: SetNpcActionFile(&quot;hero&quot;, 1, &quot;action/special.act&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC执行特殊动作</source>
-        <translation>NPC執行特殊動作</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>NpcSpecialAction(name, fileName)
-让指定NPC执行特殊动作
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  fileName (string) - 特殊动作文件路径
-示例: NpcSpecialAction(&quot;hero&quot;, &quot;action/dance.act&quot;)</source>
-        <translation>NpcSpecialAction(name, fileName)
-讓指定NPC執行特殊動作
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  fileName (string) - 特殊動作檔案路徑
-範例: NpcSpecialAction(&quot;hero&quot;, &quot;action/dance.act&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>NPC执行扩展特殊动作</source>
-        <translation>NPC執行擴展特殊動作</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>NpcSpecialActionEx(name, fileName)
-让指定NPC加载并执行扩展特殊动作
-参数:
-  name (string) - NPC名称（空串则操作当前交互NPC）
-  fileName (string) - 特殊动作文件路径
-示例: NpcSpecialActionEx(&quot;hero&quot;, &quot;action/skill.act&quot;)</source>
-        <translation>NpcSpecialActionEx(name, fileName)
-讓指定NPC載入並執行擴展特殊動作
-參數:
-  name (string) - NPC名稱（空字串則操作目前互動NPC）
-  fileName (string) - 特殊動作檔案路徑
-範例: NpcSpecialActionEx(&quot;hero&quot;, &quot;action/skill.act&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Read an NPC state value</source>
-        <translation>讀取 NPC 狀態值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetNpcState(name, stateName, varName)
-Reads an NPC state such as KindValue, KindValueMax, Attack, Defend, Evade, Life, Thew, or Mana into a script variable.
-Example: GetNpcState(&quot;shopkeeper&quot;, &quot;KindValue&quot;, &quot;kindValue&quot;)</source>
-        <translation>GetNpcState(name, stateName, varName)
-將 KindValue、KindValueMax、Attack、Defend、Evade、Life、Thew 或 Mana 等 NPC 狀態讀入腳本變數。
-範例: GetNpcState(&quot;shopkeeper&quot;, &quot;KindValue&quot;, &quot;kindValue&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Adjust NPC affinity</source>
-        <translation>調整 NPC 好感度</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddKindValue(name, value)
-Adds to the NPC KindValue affinity field, clamped to 0 and KindValueMax when present.
-Example: AddKindValue(&quot;shopkeeper&quot;, -500)</source>
-        <translation>AddKindValue(name, value)
-增加 NPC 的 KindValue 好感度欄位；下限為 0，存在 KindValueMax 時以上限為 KindValueMax。
-範例: AddKindValue(&quot;shopkeeper&quot;, -500)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Update NPC file attributes</source>
-        <translation>更新 NPC 檔案屬性</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMapNpcAttr(name, attributes, npcFileName)
-Updates all matching Name entries in an NPC save/template file. attributes uses Key:Value pairs separated by semicolons.
-Example: SetMapNpcAttr(&quot;shopkeeper&quot;, &quot;Kind:1;Relation:1;KindValue:3500&quot;, &quot;map001.npc&quot;)</source>
-        <translation>SetMapNpcAttr(name, attributes, npcFileName)
-更新 NPC 存檔或範本檔案中所有 Name 相符的項目。attributes 使用分號分隔的 Key:Value 配對。
-範例: SetMapNpcAttr(&quot;shopkeeper&quot;, &quot;Kind:1;Relation:1;KindValue:3500&quot;, &quot;map001.npc&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Update NPC auto talk text</source>
-        <translation>更新 NPC 自動對話文字</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcTalkContent(name, content)
-Sets the current map NPC auto-talk content. With npcFileName, also updates that NPC file.
-Example: SetNpcTalkContent(&quot;shopkeeper&quot;, &quot;I will remember this.&quot;, &quot;map001.npc&quot;)</source>
-        <translation>SetNpcTalkContent(name, content)
-設定目前地圖 NPC 的自動對話內容。提供 npcFileName 時也會更新該 NPC 檔案。
-範例: SetNpcTalkContent(&quot;shopkeeper&quot;, &quot;I will remember this.&quot;, &quot;map001.npc&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Show NPC bubble text</source>
-        <translation>顯示 NPC 對話泡泡文字</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>TalkSelfTip(name, message, appendText)
-Shows NPC self/bubble text; appendText is optional and is concatenated to message.
-Example: TalkSelfTip(&quot;shopkeeper&quot;, &quot;Affinity is &quot;, GetVar(&quot;kindValue&quot;))</source>
-        <translation>TalkSelfTip(name, message, appendText)
-顯示 NPC 自身或對話泡泡文字；appendText 可省略，提供時會串接至 message。
-範例: TalkSelfTip(&quot;shopkeeper&quot;, &quot;Affinity is &quot;, GetVar(&quot;kindValue&quot;))</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Make all NPCs hostile</source>
-        <translation>將所有 NPC 設為敵對</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetAllNpcIsEnemy()
-Sets every NPC on the current map to battle kind and hostile relation.
-Example: SetAllNpcIsEnemy()</source>
-        <translation>SetAllNpcIsEnemy()
-將目前地圖上的所有 NPC 設為戰鬥類型及敵對關係。
-範例: SetAllNpcIsEnemy()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Show NPC head icon</source>
-        <translation>顯示 NPC 頭頂圖示</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowSignalTip(name, signalIndex, signalType)
-Shows a persistent icon above an NPC. signalIndex is read from ini/ui/tips/SignalFile.ini and assets are loaded from asf/signal. signalType t0 shakes and t1 blinks.
-Example: ShowSignalTip(&quot;shopkeeper&quot;, 23, &quot;t1&quot;)</source>
-        <translation>ShowSignalTip(name, signalIndex, signalType)
-在 NPC 上方顯示持續存在的圖示。signalIndex 讀自 ini/ui/tips/SignalFile.ini，資源載入自 asf/signal。signalType 的 t0 會搖動，t1 會閃爍。
-範例: ShowSignalTip(&quot;shopkeeper&quot;, 23, &quot;t1&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Hide NPC head icon</source>
-        <translation>隱藏 NPC 頭頂圖示</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetSignalTipHidden(name)
-Hides the persistent signal icon above an NPC.
-Example: SetSignalTipHidden(&quot;shopkeeper&quot;)</source>
-        <translation>SetSignalTipHidden(name)
-隱藏 NPC 上方持續存在的提示圖示。
-範例: SetSignalTipHidden(&quot;shopkeeper&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示/隐藏NPC</source>
-        <translation>顯示/隱藏NPC</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowNpc(name, isShow)
-设置指定NPC的显示/隐藏状态
-参数:
-  name (string) - NPC名称
-  isShow (number) - 1=显示（切换到站立动作） 0=隐藏（切换到隐藏动作）
-示例: ShowNpc(&quot;spy01&quot;, 0)</source>
-        <translation>ShowNpc(name, isShow)
-設定指定NPC的顯示/隱藏狀態
-參數:
-  name (string) - NPC名稱
-  isShow (number) - 1=顯示（切換到站立動作） 0=隱藏（切換到隱藏動作）
-範例: ShowNpc(&quot;spy01&quot;, 0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC魔法文件</source>
-        <translation>設定NPC魔法檔案</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcMagicFile(name, fileName)
-设置指定NPC的远程攻击魔法资源文件
-参数:
-  name (string) - NPC名称
-  fileName (string) - 魔法文件路径
-示例: SetNpcMagicFile(&quot;mage01&quot;, &quot;magic/fireball.mag&quot;)</source>
-        <translation>SetNpcMagicFile(name, fileName)
-設定指定NPC的遠程攻擊魔法資源檔案
-參數:
-  name (string) - NPC名稱
-  fileName (string) - 魔法檔案路徑
-範例: SetNpcMagicFile(&quot;mage01&quot;, &quot;magic/fireball.mag&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC魔法等级</source>
-        <translation>設定NPC魔法等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcMagicLevel(name, level)
-设置指定NPC的魔法等级
-参数:
-  name (string) - NPC名称
-  level (number) - 魔法等级
-示例: SetNpcMagicLevel(&quot;mage01&quot;, 5)</source>
-        <translation>SetNpcMagicLevel(name, level)
-設定指定NPC的魔法等級
-參數:
-  name (string) - NPC名稱
-  level (number) - 魔法等級
-範例: SetNpcMagicLevel(&quot;mage01&quot;, 5)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置NPC点击脚本</source>
-        <translation>設定NPC點擊指令碼</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetNpcClickScript(name, scriptFile)
-设置指定NPC被点击时触发的脚本
-参数:
-  name (string) - NPC名称
-  scriptFile (string) - 脚本文件路径
-示例: SetNpcClickScript(&quot;npc01&quot;, &quot;npc/click.txt&quot;)</source>
-        <translation>SetNpcClickScript(name, scriptFile)
-設定指定NPC被點擊時觸發的指令碼
-參數:
-  name (string) - NPC名稱
-  scriptFile (string) - 指令碼檔案路徑
-範例: SetNpcClickScript(&quot;npc01&quot;, &quot;npc/click.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>合并NPC数据</source>
-        <translation>合併NPC資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>MergeNpc(fileName)
-将指定NPC数据文件合并到当前场景（不清除已有NPC）
-参数:
-  fileName (string) - NPC数据文件名
-示例: MergeNpc(&quot;reinforce.npc&quot;)</source>
-        <translation>MergeNpc(fileName)
-將指定NPC資料檔案合併到目前場景（不清除已有NPC）
-參數:
-  fileName (string) - NPC資料檔案名
-範例: MergeNpc(&quot;reinforce.npc&quot;)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>改变NPC生命值（百分比）</source>
-        <translation>改變NPC生命值（百分比）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChangeLife(name, value)
-按百分比设置NPC生命值（基于最大生命值）
-参数:
-  name (string) - NPC名称
-  value (number) - 百分比值（如50表示设为50%最大生命值）
-示例: ChangeLife(&quot;boss01&quot;, 50)</source>
-        <translation>ChangeLife(name, value)
-按百分比設定NPC生命值（基於最大生命值）
-參數:
-  name (string) - NPC名稱
-  value (number) - 百分比值（如50表示設為50%最大生命值）
-範例: ChangeLife(&quot;boss01&quot;, 50)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>改变NPC法力值（百分比）</source>
-        <translation>改變NPC法力值（百分比）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChangeMana(name, value)
-按百分比设置NPC法力值（基于最大法力值）
-参数:
-  name (string) - NPC名称
-  value (number) - 百分比值
-示例: ChangeMana(&quot;mage01&quot;, 80)</source>
-        <translation>ChangeMana(name, value)
-按百分比設定NPC法力值（基於最大法力值）
-參數:
-  name (string) - NPC名稱
-  value (number) - 百分比值
-範例: ChangeMana(&quot;mage01&quot;, 80)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>改变NPC体力值（百分比）</source>
-        <translation>改變NPC體力值（百分比）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ChangeThew(name, value)
-按百分比设置NPC体力值（基于最大体力值）
-参数:
-  name (string) - NPC名称
-  value (number) - 百分比值
-示例: ChangeThew(&quot;hero&quot;, 100)</source>
-        <translation>ChangeThew(name, value)
-按百分比設定NPC體力值（基於最大體力值）
-參數:
-  name (string) - NPC名稱
-  value (number) - 百分比值
-範例: ChangeThew(&quot;hero&quot;, 100)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>加载玩家数据</source>
-        <translation>載入玩家資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LoadPlayer(index)
-加载指定索引的玩家数据
-参数:
-  index (number) - 角色索引（可省略，默认-1为当前角色）
-示例: LoadPlayer(0)</source>
-        <translation>LoadPlayer(index)
-載入指定索引的玩家資料
-參數:
-  index (number) - 角色索引（可省略，預設-1為目前角色）
-範例: LoadPlayer(0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>保存玩家数据</source>
-        <translation>儲存玩家資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SavePlayer(index)
-保存玩家数据到指定索引
-参数:
-  index (number) - 角色索引（可省略，默认-1为当前角色）
-示例: SavePlayer(0)</source>
-        <translation>SavePlayer(index)
-儲存玩家資料到指定索引
-參數:
-  index (number) - 角色索引（可省略，預設-1為目前角色）
-範例: SavePlayer(0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置玩家位置（瞬移）</source>
-        <translation>設定玩家位置（瞬移）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPlayerPos(x, y)
-直接设置玩家位置（瞬移，同时移动伙伴位置）
-参数:
-  x (number) - X坐标
-  y (number) - Y坐标
-示例: SetPlayerPos(100, 200)</source>
-        <translation>SetPlayerPos(x, y)
-直接設定玩家位置（瞬移，同時移動夥伴位置）
-參數:
-  x (number) - X座標
-  y (number) - Y座標
-範例: SetPlayerPos(100, 200)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置玩家朝向</source>
-        <translation>設定玩家朝向</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPlayerDir(dir)
-设置玩家朝向
-参数:
-  dir (number) - 方向值
-示例: SetPlayerDir(4)</source>
-        <translation>SetPlayerDir(dir)
-設定玩家朝向
-參數:
-  dir (number) - 方向值
-範例: SetPlayerDir(4)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置镜头跟随玩家</source>
-        <translation>設定鏡頭跟隨玩家</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPlayerScn()
-设置镜头跟随玩家，恢复默认视角
-参数: 无
-示例: SetPlayerScn()</source>
-        <translation>SetPlayerScn()
-設定鏡頭跟隨玩家，恢復預設視角
-參數: 無
-範例: SetPlayerScn()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置玩家亮度</source>
-        <translation>設定玩家亮度</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPlayerLum(lum)
-设置玩家亮度
-参数:
-  lum (number) - 亮度值
-示例: SetPlayerLum(128)</source>
-        <translation>SetPlayerLum(lum)
-設定玩家亮度
-參數:
-  lum (number) - 亮度值
-範例: SetPlayerLum(128)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置等级配置文件</source>
-        <translation>設定等級設定檔案</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetLevelFile(fileName)
-设置玩家等级配置文件并重新加载
-参数:
-  fileName (string) - 等级文件路径
-示例: SetLevelFile(&quot;config/level.dat&quot;)</source>
-        <translation>SetLevelFile(fileName)
-設定玩家等級設定檔案並重新載入
-參數:
-  fileName (string) - 等級檔案路徑
-範例: SetLevelFile(&quot;config/level.dat&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置魔法等级</source>
-        <translation>設定魔法等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMagicLevel(magicName, level)
-设置指定魔法的等级
-参数:
-  magicName (string) - 魔法名称
-  level (number) - 魔法等级
-示例: SetMagicLevel(&quot;fireball&quot;, 5)</source>
-        <translation>SetMagicLevel(magicName, level)
-設定指定魔法的等級
-參數:
-  magicName (string) - 魔法名稱
-  level (number) - 魔法等級
-範例: SetMagicLevel(&quot;fireball&quot;, 5)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>移动魔法到快捷栏位置</source>
-        <translation>移動魔法到快捷欄位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>MoveMagic(magicName, position)
-将指定魔法移动到快捷栏的指定位置
-参数:
-  magicName (string) - 魔法名称
-  position (number) - 快捷栏位置（从1开始）
-示例: MoveMagic(&quot;fireball&quot;, 1)</source>
-        <translation>MoveMagic(magicName, position)
-將指定魔法移動到快捷欄的指定位置
-參數:
-  magicName (string) - 魔法名稱
-  position (number) - 快捷欄位置（從1開始）
-範例: MoveMagic(&quot;fireball&quot;, 1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置玩家等级</source>
-        <translation>設定玩家等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPlayerLevel(level)
-设置玩家等级
-参数:
-  level (number) - 等级
-示例: SetPlayerLevel(10)</source>
-        <translation>SetPlayerLevel(level)
-設定玩家等級
-參數:
-  level (number) - 等級
-範例: SetPlayerLevel(10)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置玩家战斗状态</source>
-        <translation>設定玩家戰鬥狀態</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPlayerState(state)
-设置玩家战斗状态
-参数:
-  state (number) - 状态值（0=非战斗, 非0=战斗）
-示例: SetPlayerState(1)</source>
-        <translation>SetPlayerState(state)
-設定玩家戰鬥狀態
-參數:
-  state (number) - 狀態值（0=非戰鬥, 非0=戰鬥）
-範例: SetPlayerState(1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>启用跑步</source>
-        <translation>啟用跑步</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableRun()
-启用玩家跑步功能
-参数: 无
-示例: EnableRun()</source>
-        <translation>EnableRun()
-啟用玩家跑步功能
-參數: 無
-範例: EnableRun()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁用跑步</source>
-        <translation>停用跑步</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableRun()
-禁用玩家跑步功能
-参数: 无
-示例: DisableRun()</source>
-        <translation>DisableRun()
-停用玩家跑步功能
-參數: 無
-範例: DisableRun()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>启用跳跃</source>
-        <translation>啟用跳躍</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableJump()
-启用玩家跳跃功能
-参数: 无
-示例: EnableJump()</source>
-        <translation>EnableJump()
-啟用玩家跳躍功能
-參數: 無
-範例: EnableJump()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁用跳跃</source>
-        <translation>停用跳躍</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableJump()
-禁用玩家跳跃功能
-参数: 无
-示例: DisableJump()</source>
-        <translation>DisableJump()
-停用玩家跳躍功能
-參數: 無
-範例: DisableJump()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>启用战斗</source>
-        <translation>啟用戰鬥</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableFight()
-启用玩家战斗功能
-参数: 无
-示例: EnableFight()</source>
-        <translation>EnableFight()
-啟用玩家戰鬥功能
-參數: 無
-範例: EnableFight()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁用战斗</source>
-        <translation>停用戰鬥</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableFight()
-禁用玩家战斗功能
-参数: 无
-示例: DisableFight()</source>
-        <translation>DisableFight()
-停用玩家戰鬥功能
-參數: 無
-範例: DisableFight()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>玩家走到指定位置</source>
-        <translation>玩家走到指定位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayerGoto(x, y)
-让玩家走到目标位置
-参数:
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: PlayerGoto(300, 400)</source>
-        <translation>PlayerGoto(x, y)
-讓玩家走到目標位置
-參數:
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: PlayerGoto(300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>玩家走到指定位置（扩展）</source>
-        <translation>玩家走到指定位置（擴展）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayerGotoEx(x, y)
-让玩家走到目标位置（扩展模式）
-参数:
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: PlayerGotoEx(300, 400)</source>
-        <translation>PlayerGotoEx(x, y)
-讓玩家走到目標位置（擴展模式）
-參數:
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: PlayerGotoEx(300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>玩家跑到指定位置</source>
-        <translation>玩家跑到指定位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayerRunTo(x, y)
-让玩家跑到目标位置
-参数:
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: PlayerRunTo(300, 400)</source>
-        <translation>PlayerRunTo(x, y)
-讓玩家跑到目標位置
-參數:
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: PlayerRunTo(300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>玩家跳到指定位置</source>
-        <translation>玩家跳到指定位置</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayerJumpTo(x, y)
-让玩家跳到目标位置
-参数:
-  x (number) - 目标X坐标
-  y (number) - 目标Y坐标
-示例: PlayerJumpTo(300, 400)</source>
-        <translation>PlayerJumpTo(x, y)
-讓玩家跳到目標位置
-參數:
-  x (number) - 目標X座標
-  y (number) - 目標Y座標
-範例: PlayerJumpTo(300, 400)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>玩家朝指定方向移动</source>
-        <translation>玩家朝指定方向移動</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayerGotoDir(dir, distance)
-让玩家朝指定方向移动指定距离
-参数:
-  dir (number) - 方向
-  distance (number) - 移动距离
-示例: PlayerGotoDir(2, 50)</source>
-        <translation>PlayerGotoDir(dir, distance)
-讓玩家朝指定方向移動指定距離
-參數:
-  dir (number) - 方向
-  distance (number) - 移動距離
-範例: PlayerGotoDir(2, 50)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>切换玩家角色</source>
-        <translation>切換玩家角色</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>PlayerChange(index)
-切换到指定索引的角色，保存当前角色数据并加载新角色
-参数:
-  index (number) - 角色索引
-示例: PlayerChange(1)</source>
-        <translation>PlayerChange(index)
-切換到指定索引的角色，儲存目前角色資料並載入新角色
-參數:
-  index (number) - 角色索引
-範例: PlayerChange(1)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>增加玩家生命值</source>
-        <translation>增加玩家生命值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddLife(value)
-增加玩家当前生命值
-参数:
-  value (number) - 增加值
-示例: AddLife(50)</source>
-        <translation>AddLife(value)
-增加玩家目前生命值
-參數:
-  value (number) - 增加值
-範例: AddLife(50)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家生命上限</source>
-        <translation>增加玩家生命上限</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddLifeMax(value)
-增加玩家最大生命值
-参数:
-  value (number) - 增加值
-示例: AddLifeMax(100)</source>
-        <translation>AddLifeMax(value)
-增加玩家最大生命值
-參數:
-  value (number) - 增加值
-範例: AddLifeMax(100)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家体力值</source>
-        <translation>增加玩家體力值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddThew(value)
-增加玩家当前体力值
-参数:
-  value (number) - 增加值
-示例: AddThew(30)</source>
-        <translation>AddThew(value)
-增加玩家目前體力值
-參數:
-  value (number) - 增加值
-範例: AddThew(30)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家体力上限</source>
-        <translation>增加玩家體力上限</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddThewMax(value)
-增加玩家最大体力值
-参数:
-  value (number) - 增加值
-示例: AddThewMax(50)</source>
-        <translation>AddThewMax(value)
-增加玩家最大體力值
-參數:
-  value (number) - 增加值
-範例: AddThewMax(50)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家法力值</source>
-        <translation>增加玩家法力值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddMana(value)
-增加玩家当前法力值
-参数:
-  value (number) - 增加值
-示例: AddMana(20)</source>
-        <translation>AddMana(value)
-增加玩家目前法力值
-參數:
-  value (number) - 增加值
-範例: AddMana(20)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家法力上限</source>
-        <translation>增加玩家法力上限</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddManaMax(value)
-增加玩家最大法力值
-参数:
-  value (number) - 增加值
-示例: AddManaMax(50)</source>
-        <translation>AddManaMax(value)
-增加玩家最大法力值
-參數:
-  value (number) - 增加值
-範例: AddManaMax(50)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家攻击力</source>
-        <translation>增加玩家攻擊力</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddAttack(value)
-增加玩家攻击力
-参数:
-  value (number) - 增加值
-示例: AddAttack(5)</source>
-        <translation>AddAttack(value)
-增加玩家攻擊力
-參數:
-  value (number) - 增加值
-範例: AddAttack(5)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家防御力</source>
-        <translation>增加玩家防禦力</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddDefend(value)
-增加玩家防御力
-参数:
-  value (number) - 增加值
-示例: AddDefend(3)</source>
-        <translation>AddDefend(value)
-增加玩家防禦力
-參數:
-  value (number) - 增加值
-範例: AddDefend(3)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家闪避率</source>
-        <translation>增加玩家閃避率</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddEvade(value)
-增加玩家闪避率
-参数:
-  value (number) - 增加值
-示例: AddEvade(2)</source>
-        <translation>AddEvade(value)
-增加玩家閃避率
-參數:
-  value (number) - 增加值
-範例: AddEvade(2)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加玩家经验值</source>
-        <translation>增加玩家經驗值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddExp(value)
-增加玩家经验值
-参数:
-  value (number) - 增加值
-示例: AddExp(100)</source>
-        <translation>AddExp(value)
-增加玩家經驗值
-參數:
-  value (number) - 增加值
-範例: AddExp(100)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加/减少玩家金钱</source>
-        <translation>增加/減少玩家金錢</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddMoney(value)
-增加或减少玩家金钱，正数增加并提示获得，负数减少并提示失去
-参数:
-  value (number) - 金钱变化值（正数增加，负数减少，0无效果）
-示例: AddMoney(500)</source>
-        <translation>AddMoney(value)
-增加或減少玩家金錢，正數增加並提示獲得，負數減少並提示失去
-參數:
-  value (number) - 金錢變化值（正數增加，負數減少，0無效果）
-範例: AddMoney(500)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加随机金钱</source>
-        <translation>增加隨機金錢</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddRandMoney(minValue, maxValue)
-在指定范围内随机增加金钱
-参数:
-  minValue (number) - 最小值
-  maxValue (number) - 最大值
-示例: AddRandMoney(100, 500)</source>
-        <translation>AddRandMoney(minValue, maxValue)
-在指定範圍內隨機增加金錢
-參數:
-  minValue (number) - 最小值
-  maxValue (number) - 最大值
-範例: AddRandMoney(100, 500)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>装备物品</source>
-        <translation>裝備物品</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EquipGoods(listIndex, partIndex)
-使用/装备指定位置的物品
-参数:
-  listIndex (number) - 物品在列表中的位置（从1开始）
-  partIndex (number) - 装备部位索引
-示例: EquipGoods(1, 1)</source>
-        <translation>EquipGoods(listIndex, partIndex)
-使用/裝備指定位置的物品
-參數:
-  listIndex (number) - 物品在列表中的位置（從1開始）
-  partIndex (number) - 裝備部位索引
-範例: EquipGoods(1, 1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>添加物品</source>
-        <translation>新增物品</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddGoods(name)
-给玩家添加指定名称的物品
-参数:
-  name (string) - 物品名称
-示例: AddGoods(&quot;sword_iron&quot;)</source>
-        <translation>AddGoods(name)
-給玩家新增指定名稱的物品
-參數:
-  name (string) - 物品名稱
-範例: AddGoods(&quot;sword_iron&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>随机添加物品</source>
-        <translation>隨機新增物品</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddRandGoods(fileName)
-从指定物品列表文件中随机添加物品
-参数:
-  fileName (string) - 物品列表文件名
-示例: AddRandGoods(&quot;loot/chest_drop.txt&quot;)</source>
-        <translation>AddRandGoods(fileName)
-從指定物品列表檔案中隨機新增物品
-參數:
-  fileName (string) - 物品列表檔案名
-範例: AddRandGoods(&quot;loot/chest_drop.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>删除物品</source>
-        <translation>刪除物品</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DelGoods(name)
-删除玩家指定名称的物品
-参数:
-  name (string) - 物品名称
-示例: DelGoods(&quot;sword_iron&quot;)</source>
-        <translation>DelGoods(name)
-刪除玩家指定名稱的物品
-參數:
-  name (string) - 物品名稱
-範例: DelGoods(&quot;sword_iron&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>添加魔法/技能</source>
-        <translation>新增魔法/技能</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddMagic(name)
-给当前角色添加指定魔法/技能
-参数:
-  name (string) - 魔法名称
-示例: AddMagic(&quot;fireball&quot;)</source>
-        <translation>AddMagic(name)
-給目前角色新增指定魔法/技能
-參數:
-  name (string) - 魔法名稱
-範例: AddMagic(&quot;fireball&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Add a talent/passive skill</source>
-        <translation>新增天賦或被動技能</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddTalent(name)
-Adds a talent or passive skill using the same storage as magic skills.
-Example: AddTalent(&quot;player-talent-steal.ini&quot;)</source>
-        <translation>AddTalent(name)
-使用與武功技能相同的儲存方式新增天賦或被動技能。
-範例: AddTalent(&quot;player-talent-steal.ini&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>给指定角色添加魔法</source>
-        <translation>給指定角色新增魔法</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddOneMagic(playerName, magicName)
-给指定角色添加魔法/技能
-参数:
-  playerName (string) - 角色名称
-  magicName (string) - 魔法名称
-示例: AddOneMagic(&quot;hero&quot;, &quot;thunder&quot;)</source>
-        <translation>AddOneMagic(playerName, magicName)
-給指定角色新增魔法/技能
-參數:
-  playerName (string) - 角色名稱
-  magicName (string) - 魔法名稱
-範例: AddOneMagic(&quot;hero&quot;, &quot;thunder&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>删除魔法/技能</source>
-        <translation>刪除魔法/技能</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DelMagic(name)
-删除指定名称的魔法/技能
-参数:
-  name (string) - 魔法名称
-示例: DelMagic(&quot;fireball&quot;)</source>
-        <translation>DelMagic(name)
-刪除指定名稱的魔法/技能
-參數:
-  name (string) - 魔法名稱
-範例: DelMagic(&quot;fireball&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>增加魔法经验值</source>
-        <translation>增加魔法經驗值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>AddMagicExp(name, addexp)
-增加指定魔法的经验值
-参数:
-  name (string) - 魔法名称
-  addexp (number) - 增加的经验值
-示例: AddMagicExp(&quot;fireball&quot;, 100)</source>
-        <translation>AddMagicExp(name, addexp)
-增加指定魔法的經驗值
-參數:
-  name (string) - 魔法名稱
-  addexp (number) - 增加的經驗值
-範例: AddMagicExp(&quot;fireball&quot;, 100)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取玩家武功等级</source>
-        <translation>取得玩家武功等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetPlayerMagicLevel(magicName, varName)
-获取当前玩家指定武功等级并存入变量，未学会时为0
-参数:
-  magicName (string) - 武功配置文件名
-  varName (string) - 存储等级的变量名
-示例: GetPlayerMagicLevel(&quot;player-magic-银钩铁划.ini&quot;, &quot;tmp&quot;)</source>
-        <translation>GetPlayerMagicLevel(magicName, varName)
-取得目前玩家指定武功的等級並存入變數，尚未學會時為 0
-參數:
-  magicName (string) - 武功設定檔名
-  varName (string) - 儲存等級的變數名稱
-範例: GetPlayerMagicLevel(&quot;player-magic-银钩铁划.ini&quot;, &quot;tmp&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>恢复满生命值</source>
-        <translation>恢復滿生命值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FullLife()
-将玩家生命值恢复到最大值
-参数: 无
-示例: FullLife()</source>
-        <translation>FullLife()
-將玩家生命值恢復到最大值
-參數: 無
-範例: FullLife()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>恢复满体力值</source>
-        <translation>恢復滿體力值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FullThew()
-将玩家体力值恢复到最大值
-参数: 无
-示例: FullThew()</source>
-        <translation>FullThew()
-將玩家體力值恢復到最大值
-參數: 無
-範例: FullThew()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>恢复满法力值</source>
-        <translation>恢復滿法力值</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>FullMana()
-将玩家法力值恢复到最大值
-参数: 无
-示例: FullMana()</source>
-        <translation>FullMana()
-將玩家法力值恢復到最大值
-參數: 無
-範例: FullMana()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>更新玩家状态显示</source>
-        <translation>更新玩家狀態顯示</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>UpdateState()
-刷新更新玩家界面状态显示
-参数: 无
-示例: UpdateState()</source>
-        <translation>UpdateState()
-重新整理更新玩家介面狀態顯示
-參數: 無
-範例: UpdateState()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>保存物品数据</source>
-        <translation>儲存物品資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SaveGoods(index)
-保存物品数据到指定索引
-参数:
-  index (number) - 存档索引（可省略，默认-1）
-示例: SaveGoods(0)</source>
-        <translation>SaveGoods(index)
-儲存物品資料到指定索引
-參數:
-  index (number) - 存檔索引（可省略，預設-1）
-範例: SaveGoods(0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>加载物品数据</source>
-        <translation>載入物品資料</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LoadGoods(index)
-加载指定索引的物品数据
-参数:
-  index (number) - 存档索引（可省略，默认-1）
-示例: LoadGoods(0)</source>
-        <translation>LoadGoods(index)
-載入指定索引的物品資料
-參數:
-  index (number) - 存檔索引（可省略，預設-1）
-範例: LoadGoods(0)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>清空物品栏</source>
-        <translation>清空物品欄</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ClearGoods()
-清空玩家所有物品
-参数: 无
-示例: ClearGoods()</source>
-        <translation>ClearGoods()
-清空玩家所有物品
-參數: 無
-範例: ClearGoods()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取物品数量</source>
-        <translation>取得物品數量</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetGoodsNum(name)
-获取指定物品的数量
-参数:
-  name (string) - 物品名称
-示例: GetGoodsNum(&quot;potion_hp&quot;)</source>
-        <translation>GetGoodsNum(name)
-取得指定物品的數量
-參數:
-  name (string) - 物品名稱
-範例: GetGoodsNum(&quot;potion_hp&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取金钱数量</source>
-        <translation>取得金錢數量</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetMoneyNum()
-获取玩家当前金钱数量
-参数: 无
-示例: GetMoneyNum()</source>
-        <translation>GetMoneyNum()
-取得玩家目前金錢數量
-參數: 無
-範例: GetMoneyNum()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置金钱数量</source>
-        <translation>設定金錢數量</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetMoneyNum(value)
-直接设置玩家的金钱数量
-参数:
-  value (number) - 金钱数量
-示例: SetMoneyNum(1000)</source>
-        <translation>SetMoneyNum(value)
-直接設定玩家的金錢數量
-參數:
-  value (number) - 金錢數量
-範例: SetMoneyNum(1000)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>限制法力上限</source>
-        <translation>限制法力上限</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>LimitMana(limit)
-设置法力值上限限制
-参数:
-  limit (number) - 法力上限值
-示例: LimitMana(50)</source>
-        <translation>LimitMana(limit)
-設定法力值上限限制
-參數:
-  limit (number) - 法力上限值
-範例: LimitMana(50)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>打开购买界面</source>
-        <translation>開啟購買介面</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>BuyGoods(fileName)
-打开购买物品界面
-参数:
-  fileName (string) - 商品列表文件名
-示例: BuyGoods(&quot;shop/weapon_shop.txt&quot;)</source>
-        <translation>BuyGoods(fileName)
-開啟購買物品介面
-參數:
-  fileName (string) - 商品列表檔案名
-範例: BuyGoods(&quot;shop/weapon_shop.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>打开仅购买界面</source>
-        <translation>開啟僅購買介面</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>BuyGoodsOnly(fileName)
-打开仅购买物品界面，不允许从玩家背包向商店出售；等价于 BuyGoods(..., canSellSelfGoods=false)
-参数:
-  fileName (string) - 商品列表文件名
-示例: BuyGoodsOnly(&quot;衣3级.ini&quot;)</source>
-        <translation>BuyGoodsOnly(fileName)
-開啟僅供購買的物品介面，不允許從玩家背包向商店出售；等同於 BuyGoods(..., canSellSelfGoods=false)
-參數:
-  fileName (string) - 商品清單檔名
-範例: BuyGoodsOnly(&quot;衣3级.ini&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>打开出售界面</source>
-        <translation>開啟出售介面</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SellGoods()
-打开出售物品界面
-参数: 无
-示例: SellGoods()
-
-SellGoods(fileName)
-打开出售界面并加载指定商品列表
-参数:
-  fileName (string) - 商品列表文件名
-示例: SellGoods(&quot;shop/sell_list.txt&quot;)</source>
-        <translation>SellGoods()
-開啟出售物品介面
-參數: 無
-範例: SellGoods()
-
-SellGoods(fileName)
-開啟出售介面並載入指定商品列表
-參數:
-  fileName (string) - 商品列表檔案名
-範例: SellGoods(&quot;shop/sell_list.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>返回标题画面</source>
-        <translation>返回標題畫面</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ReturnToTitle()
-返回游戏标题画面
-参数: 无
-示例: ReturnToTitle()</source>
-        <translation>ReturnToTitle()
-返回遊戲標題畫面
-參數: 無
-範例: ReturnToTitle()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>启用玩家输入</source>
-        <translation>啟用玩家輸入</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EnableInput()
-启用玩家输入控制
-参数: 无
-示例: EnableInput()</source>
-        <translation>EnableInput()
-啟用玩家輸入控制
-參數: 無
-範例: EnableInput()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>禁用玩家输入</source>
-        <translation>停用玩家輸入</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DisableInput()
-禁用玩家输入控制（过场动画时使用）
-参数: 无
-示例: DisableInput()</source>
-        <translation>DisableInput()
-停用玩家輸入控制（過場動畫時使用）
-參數: 無
-範例: DisableInput()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>隐藏游戏界面</source>
-        <translation>隱藏遊戲介面</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>HideInterface()
-隐藏所有游戏界面元素
-参数: 无
-示例: HideInterface()</source>
-        <translation>HideInterface()
-隱藏所有遊戲介面元素
-參數: 無
-範例: HideInterface()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示游戏界面</source>
-        <translation>顯示遊戲介面</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowInterface()
-显示所有游戏界面元素
-参数: 无
-示例: ShowInterface()</source>
-        <translation>ShowInterface()
-顯示所有遊戲介面元素
-參數: 無
-範例: ShowInterface()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>隐藏底部窗口</source>
-        <translation>隱藏底部視窗</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>HideBottomWnd()
-隐藏游戏底部操作窗口
-参数: 无
-示例: HideBottomWnd()</source>
-        <translation>HideBottomWnd()
-隱藏遊戲底部操作視窗
-參數: 無
-範例: HideBottomWnd()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示底部窗口</source>
-        <translation>顯示底部視窗</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowBottomWnd()
-显示游戏底部操作窗口
-参数: 无
-示例: ShowBottomWnd()</source>
-        <translation>ShowBottomWnd()
-顯示遊戲底部操作視窗
-參數: 無
-範例: ShowBottomWnd()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>隐藏鼠标光标</source>
-        <translation>隱藏滑鼠游標</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>HideMouseCursor()
-隐藏游戏鼠标光标
-参数: 无
-示例: HideMouseCursor()</source>
-        <translation>HideMouseCursor()
-隱藏遊戲滑鼠游標
-參數: 無
-範例: HideMouseCursor()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示鼠标光标</source>
-        <translation>顯示滑鼠游標</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowMouseCursor()
-显示游戏鼠标光标
-参数: 无
-示例: ShowMouseCursor()</source>
-        <translation>ShowMouseCursor()
-顯示遊戲滑鼠游標
-參數: 無
-範例: ShowMouseCursor()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>兼容占位（语义未确认）</source>
-        <translation>相容性預留（語意未確認）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>DrawBackground()
-历史脚本兼容占位；原始语义未确认，当前不会触发额外绘制
-参数: 无
-示例: DrawBackground()</source>
-        <translation>DrawBackground()
-歷史腳本相容性預留；原始語意未確認，目前不會觸發額外繪製
-參數: 無
-範例: DrawBackground()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>显示下雪效果</source>
-        <translation>顯示下雪效果</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowSnow(bsnow)
-显示或设置下雪效果
-参数:
-  bsnow (number) - 雪花效果参数
-示例: ShowSnow(1)</source>
-        <translation>ShowSnow(bsnow)
-顯示或設定下雪效果
-參數:
-  bsnow (number) - 雪花效果參數
-範例: ShowSnow(1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示随机下雪效果</source>
-        <translation>顯示隨機下雪效果</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowRandomSnow()
-显示随机下雪效果
-参数: 无
-示例: ShowRandomSnow()</source>
-        <translation>ShowRandomSnow()
-顯示隨機下雪效果
-參數: 無
-範例: ShowRandomSnow()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>显示下雨效果</source>
-        <translation>顯示下雨效果</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ShowRain(brain)
-显示或设置下雨效果
-参数:
-  brain (number) - 雨效果参数
-示例: ShowRain(1)</source>
-        <translation>ShowRain(brain)
-顯示或設定下雨效果
-參數:
-  brain (number) - 雨效果參數
-範例: ShowRain(1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>开始下雨（带配置）</source>
-        <translation>開始下雨（帶設定）</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>BeginRain(configFileName)
-使用指定配置文件开始下雨效果
-参数:
-  configFileName (string) - 雨效果配置文件名
-示例: BeginRain(&quot;config/heavy_rain.txt&quot;)</source>
-        <translation>BeginRain(configFileName)
-使用指定設定檔案開始下雨效果
-參數:
-  configFileName (string) - 雨效果設定檔案名
-範例: BeginRain(&quot;config/heavy_rain.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>停止下雨</source>
-        <translation>停止下雨</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>EndRain()
-停止下雨效果
-参数: 无
-示例: EndRain()</source>
-        <translation>EndRain()
-停止下雨效果
-參數: 無
-範例: EndRain()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>开启水面效果</source>
-        <translation>開啟水面效果</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>OpenWaterEffect()
-开启水面波纹效果
-参数: 无
-示例: OpenWaterEffect()</source>
-        <translation>OpenWaterEffect()
-開啟水面波紋效果
-參數: 無
-範例: OpenWaterEffect()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>关闭水面效果</source>
-        <translation>關閉水面效果</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>CloseWaterEffect()
-关闭水面波纹效果
-参数: 无
-示例: CloseWaterEffect()</source>
-        <translation>CloseWaterEffect()
-關閉水面波紋效果
-參數: 無
-範例: CloseWaterEffect()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>清除所有特效</source>
-        <translation>清除所有特效</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>ClearEffect()
-清除场景中所有特效
-参数: 无
-示例: ClearEffect()</source>
-        <translation>ClearEffect()
-清除場景中所有特效
-參數: 無
-範例: ClearEffect()</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>检查年份并存入变量</source>
-        <translation>檢查年份並存入變數</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>CheckYear(varName)
-获取当前年份并存入指定变量
-参数:
-  varName (string) - 存储年份的变量名
-示例: CheckYear(&quot;currentYear&quot;)</source>
-        <translation>CheckYear(varName)
-取得目前年份並存入指定變數
-參數:
-  varName (string) - 儲存年份的變數名
-範例: CheckYear(&quot;currentYear&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取随机数</source>
-        <translation>取得隨機數</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetRandNum(varName, minVal, maxVal)
-生成指定范围内的随机数并存入变量
-参数:
-  varName (string) - 存储随机数的变量名
-  minVal (number) - 最小值
-  maxVal (number) - 最大值
-示例: GetRandNum(&quot;randResult&quot;, 1, 100)</source>
-        <translation>GetRandNum(varName, minVal, maxVal)
-生成指定範圍內的隨機數並存入變數
-參數:
-  varName (string) - 儲存隨機數的變數名
-  minVal (number) - 最小值
-  maxVal (number) - 最大值
-範例: GetRandNum(&quot;randResult&quot;, 1, 100)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取玩家等级</source>
-        <translation>取得玩家等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetPlayerLevel(varName)
-获取当前玩家等级并存入变量
-参数:
-  varName (string) - 存储等级的变量名
-示例: GetPlayerLevel(&quot;playerLevel&quot;)</source>
-        <translation>GetPlayerLevel(varName)
-取得目前玩家等級並存入變數
-參數:
-  varName (string) - 儲存等級的變數名
-範例: GetPlayerLevel(&quot;playerLevel&quot;)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置行走改为跑步</source>
-        <translation>將行走設定為跑步</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetWalkIsRun(value)
-设置玩家后续行走意图是否按跑步处理
-参数:
-  value (number) - 大于0表示行走按跑步处理，0表示恢复默认
-示例: SetWalkIsRun(1)</source>
-        <translation>SetWalkIsRun(value)
-設定玩家後續的行走意圖是否以跑步處理
-參數:
-  value (number) - 大於 0 表示行走以跑步處理，0 表示恢復預設
-範例: SetWalkIsRun(1)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取NPC数量</source>
-        <translation>取得NPC數量</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetNpcCount(kind, relation)
-获取指定类型和关系的NPC数量
-参数:
-  kind (number) - NPC类型
-  relation (number) - NPC关系
-示例: GetNpcCount(1, 0)</source>
-        <translation>GetNpcCount(kind, relation)
-取得指定類型和關係的NPC數量
-參數:
-  kind (number) - NPC類型
-  relation (number) - NPC關係
-範例: GetNpcCount(1, 0)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>设置伙伴等级</source>
-        <translation>設定夥伴等級</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetPartnerLevel(level)
-设置伙伴的等级
-参数:
-  level (number) - 等级值
-示例: SetPartnerLevel(5)</source>
-        <translation>SetPartnerLevel(level)
-設定夥伴的等級
-參數:
-  level (number) - 等級值
-範例: SetPartnerLevel(5)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>获取伙伴索引</source>
-        <translation>取得夥伴索引</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>GetPartnerIdx(varName)
-获取当前伙伴的索引并存入变量
-参数:
-  varName (string) - 存储伙伴索引的变量名
-示例: GetPartnerIdx(&quot;partnerIndex&quot;)</source>
-        <translation>GetPartnerIdx(varName)
-取得目前夥伴的索引並存入變數
-參數:
-  varName (string) - 儲存夥伴索引的變數名
-範例: GetPartnerIdx(&quot;partnerIndex&quot;)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>设置NPC观察</source>
-        <translation>設定NPC觀察</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>Watch(name1, name2, watchType)
-设置NPC之间的观察关系
-参数:
-  name1 (string) - 观察者NPC名称
-  name2 (string) - 被观察者NPC名称
-  watchType (number) - 观察类型（可省略，默认0）
-示例: Watch(&quot;guard01&quot;, &quot;hero&quot;, 0)</source>
-        <translation>Watch(name1, name2, watchType)
-設定NPC之間的觀察關係
-參數:
-  name1 (string) - 觀察者NPC名稱
-  name2 (string) - 被觀察者NPC名稱
-  watchType (number) - 觀察類型（可省略，預設0）
-範例: Watch(&quot;guard01&quot;, &quot;hero&quot;, 0)</translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <source>开启限时模式</source>
-        <translation>開啟限時模式</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>OpenTimeLimit(seconds)
-开启限时模式，在指定秒数后触发超时
-参数:
-  seconds (number) - 限时秒数
-示例: OpenTimeLimit(60)</source>
-        <translation>OpenTimeLimit(seconds)
-開啟限時模式，在指定秒數後觸發逾時
-參數:
-  seconds (number) - 限時秒數
-範例: OpenTimeLimit(60)</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>关闭限时模式</source>
-        <translation>關閉限時模式</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>CloseTimeLimit()
-关闭限时模式
-参数: 无
-示例: CloseTimeLimit()</source>
-        <translation>CloseTimeLimit()
-關閉限時模式
-參數: 無
-範例: CloseTimeLimit()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>隐藏计时器窗口</source>
-        <translation>隱藏計時器視窗</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>HideTimerWnd()
-隐藏限时模式的计时器窗口
-参数: 无
-示例: HideTimerWnd()</source>
-        <translation>HideTimerWnd()
-隱藏限時模式的計時器視窗
-參數: 無
-範例: HideTimerWnd()</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>设置定时触发脚本</source>
-        <translation>設定定時觸發指令碼</translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>SetTimeScript(seconds, scriptFile)
-设置在指定秒数后自动执行脚本
-参数:
-  seconds (number) - 延迟秒数
-  scriptFile (string) - 要执行的脚本文件名
-示例: SetTimeScript(30, &quot;event/timer_event.txt&quot;)</source>
-        <translation>SetTimeScript(seconds, scriptFile)
-設定在指定秒數後自動執行指令碼
-參數:
-  seconds (number) - 延遲秒數
-  scriptFile (string) - 要執行的指令碼檔案名
-範例: SetTimeScript(30, &quot;event/timer_event.txt&quot;)</translation>
-    </message>
-    <message>
-        <location line="+12"/>
         <source>运行时脚本 API</source>
         <translation>執行階段指令碼 API</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>%1(...)
 该名称已由当前 C++ 运行时注册；参数和返回约定请结合脚本接口实现或现有脚本样本确认。</source>
         <translation>%1(...)
 此名稱已由目前的 C++ 執行階段註冊；參數與回傳約定請配合指令碼介面實作或既有指令碼範例確認。</translation>
+    </message>
+    <message>
+        <source>指令说明未加载：%1
+%2。继续使用其余有效说明。</source>
+        <translation>指令說明未載入：%1
+%2。繼續使用其餘有效說明。</translation>
     </message>
 </context>
 <context>
@@ -16361,6 +21106,46 @@ SellGoods(fileName)
         <location line="+18"/>
         <source>插入</source>
         <translation>插入</translation>
+    </message>
+    <message>
+        <source>游戏指令列表</source>
+        <translation>遊戲指令清單</translation>
+    </message>
+    <message>
+        <source>直接选择指令查看用途和示例。有参数表单的指令可填写后插入；其它指令先插入名称与括号，再按说明填写参数。</source>
+        <translation>直接選擇指令查看用途和範例。有參數表單的指令可填寫後插入；其他指令先插入名稱與括號，再按說明填寫參數。</translation>
+    </message>
+    <message>
+        <source>按指令名称或中文用途搜索；留空浏览全部指令</source>
+        <translation>按指令名稱或用途搜尋；留空瀏覽全部指令</translation>
+    </message>
+    <message>
+        <source>没有匹配的指令，请更换搜索内容。</source>
+        <translation>沒有符合的指令，請更換搜尋內容。</translation>
+    </message>
+    <message>
+        <source>插入后，按上方说明在括号中填写需要的参数。</source>
+        <translation>插入後，按上方說明在括號中填寫需要的參數。</translation>
+    </message>
+    <message>
+        <source>插入名称与括号</source>
+        <translation>插入名稱與括號</translation>
+    </message>
+    <message>
+        <source>插入调用</source>
+        <translation>插入呼叫</translation>
+    </message>
+    <message>
+        <source>无法使用该脚本</source>
+        <translation>無法使用該腳本</translation>
+    </message>
+    <message>
+        <source>这个同名脚本被当前查找范围内的其它文件覆盖，请选择实际生效的脚本。</source>
+        <translation>這個同名腳本被當前查找範圍內的其它文件覆蓋，請選擇實際生效的腳本。</translation>
+    </message>
+    <message>
+        <source>选择…</source>
+        <translation>選擇…</translation>
     </message>
 </context>
 <context>
@@ -16561,12 +21346,12 @@ SellGoods(fileName)
         <translation>UTF-8</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="+248"/>
+        <location filename="../ui/ScriptEditorWindow.cpp" line="+287"/>
         <source>Lua 关键字: %1</source>
         <translation>Lua 關鍵字: %1</translation>
     </message>
     <message>
-        <location line="+91"/>
+        <location line="+101"/>
         <source>跳转到行</source>
         <translation>跳至行</translation>
     </message>
@@ -16576,26 +21361,26 @@ SellGoods(fileName)
         <translation>行號:</translation>
     </message>
     <message>
-        <location line="+96"/>
-        <location line="+37"/>
+        <location line="+115"/>
+        <location line="+39"/>
         <source>保存更改</source>
         <translation>儲存變更</translation>
     </message>
     <message>
-        <location line="-36"/>
-        <location line="+37"/>
+        <location line="-37"/>
+        <location line="+39"/>
         <source>脚本已修改，是否保存？</source>
         <translation>腳本已修改，是否儲存？</translation>
     </message>
     <message>
-        <location line="+54"/>
+        <location line="+55"/>
         <location line="+12"/>
-        <location line="+78"/>
+        <location line="+97"/>
         <source>错误</source>
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="-89"/>
+        <location line="-108"/>
         <source>文件不存在: %1</source>
         <translation>檔案不存在: %1</translation>
     </message>
@@ -16605,28 +21390,28 @@ SellGoods(fileName)
         <translation>無法讀取檔案: %1</translation>
     </message>
     <message>
-        <location line="+78"/>
+        <location line="+98"/>
         <source>无法识别脚本编码: %1</source>
         <translation>無法識別腳本編碼: %1</translation>
     </message>
     <message>
-        <location line="+136"/>
+        <location line="+190"/>
         <source>打开脚本文件</source>
         <translation>開啟腳本檔案</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <location line="+28"/>
+        <location line="+4"/>
+        <location line="+35"/>
         <source>脚本文件 (*.txt *.lua);;所有文件 (*.*)</source>
         <translation>腳本檔案 (*.txt *.lua);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="-1"/>
+        <location line="-4"/>
         <source>保存脚本文件</source>
         <translation>儲存腳本檔案</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+44"/>
         <source>保存失败</source>
         <translation>儲存失敗</translation>
     </message>
@@ -16636,7 +21421,7 @@ SellGoods(fileName)
         <translation>無法以原子方式寫入檔案: %1</translation>
     </message>
     <message>
-        <location line="+35"/>
+        <location line="+41"/>
         <source>local function %1，第 %2 行</source>
         <translation>local function %1，第 %2 行</translation>
     </message>
@@ -16656,47 +21441,271 @@ SellGoods(fileName)
         <translation>未命名</translation>
     </message>
     <message>
-        <location line="+4"/>
+        <location line="+6"/>
         <source>脚本编辑器 - %1%2</source>
         <translation>腳本編輯器 - %1%2</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="1171"/>
+        <location line="-557"/>
         <location line="+39"/>
         <source>文本已修改，是否保存？</source>
         <translation>文字已修改，是否儲存？</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="1358"/>
+        <location line="+167"/>
         <source>无法识别文本编码: %1</source>
         <translation>無法識別文字編碼：%1</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="1503"/>
+        <location line="+189"/>
         <source>打开文本文件</source>
         <translation>開啟文字檔案</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="1507"/>
-        <location line="+33"/>
+        <location line="+4"/>
+        <location line="+35"/>
         <source>文本文件 (*.txt *.ini *.map);;所有文件 (*.*)</source>
         <translation>文字檔案 (*.txt *.ini *.map);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="1536"/>
+        <location line="-4"/>
         <source>保存文本文件</source>
         <translation>儲存文字檔案</translation>
     </message>
     <message>
-        <location filename="../ui/ScriptEditorWindow.cpp" line="1666"/>
+        <location line="+130"/>
         <source>文本编辑器 - %1%2</source>
         <translation>文字編輯器 - %1%2</translation>
+    </message>
+    <message>
+        <source>指令列表…</source>
+        <translation>指令清單…</translation>
+    </message>
+    <message>
+        <source>直接浏览当前游戏指令，查看说明与示例并插入；可按名称或中文用途搜索</source>
+        <translation>直接瀏覽目前遊戲指令，查看說明與範例並插入；可按名稱或用途搜尋</translation>
+    </message>
+    <message>
+        <source>无法创建脚本目录，请检查项目目录是否可写。</source>
+        <translation>無法建立腳本目錄，請檢查專案目錄是否可寫入。</translation>
+    </message>
+    <message>
+        <source>×</source>
+        <translation>×</translation>
+    </message>
+    <message>
+        <source>上一个</source>
+        <translation>上一個</translation>
+    </message>
+    <message>
+        <source>下一个</source>
+        <translation>下一個</translation>
+    </message>
+    <message>
+        <source>不同目录存在同名脚本，无法确定所有调用位置。请先查看引用，或复制为新脚本。</source>
+        <translation>不同目錄存在同名指令碼，無法確定所有呼叫位置。請先檢視引用，或複製為新指令碼。</translation>
+    </message>
+    <message>
+        <source>全字匹配</source>
+        <translation>全字相符</translation>
+    </message>
+    <message>
+        <source>全部替换</source>
+        <translation>全部取代</translation>
+    </message>
+    <message>
+        <source>共替换 %1 处</source>
+        <translation>已取代 %1 處</translation>
+    </message>
+    <message>
+        <source>删除后会重新使用基础资源中的同名脚本。</source>
+        <translation>刪除後會重新使用基礎資源中的同名指令碼。</translation>
+    </message>
+    <message>
+        <source>删除脚本文件</source>
+        <translation>刪除指令碼檔案</translation>
+    </message>
+    <message>
+        <source>删除脚本文件…</source>
+        <translation>刪除指令碼檔案…</translation>
+    </message>
+    <message>
+        <source>副本</source>
+        <translation>副本</translation>
+    </message>
+    <message>
+        <source>区分大小写</source>
+        <translation>區分大小寫</translation>
+    </message>
+    <message>
+        <source>只能删除当前项目中未被外部修改的脚本。</source>
+        <translation>只能刪除當前專案中未被外部修改的指令碼。</translation>
+    </message>
+    <message>
+        <source>只能改名当前项目中未被外部修改的脚本；基础脚本请先复制。</source>
+        <translation>只能改名當前專案中未被外部修改的指令碼；基礎指令碼請先複製。</translation>
+    </message>
+    <message>
+        <source>同名脚本的调用地图尚未确定，请先处理引用。</source>
+        <translation>同名指令碼的呼叫地圖尚未確定，請先處理引用。</translation>
+    </message>
+    <message>
+        <source>复制</source>
+        <translation>複製</translation>
+    </message>
+    <message>
+        <source>将保存当前脚本并更新 %1 处明确引用。动态调用需自行确认。是否继续？</source>
+        <translation>將儲存當前指令碼並更新 %1 處明確引用。動態呼叫需自行確認。是否繼續？</translation>
+    </message>
+    <message>
+        <source>将当前脚本移入系统回收站，并放弃未保存修改。是否继续？</source>
+        <translation>將當前指令碼移入系統回收站，並放棄未儲存修改。是否繼續？</translation>
+    </message>
+    <message>
+        <source>文件已改名，请重新打开。</source>
+        <translation>檔案已改名，請重新開啟。</translation>
+    </message>
+    <message>
+        <source>文件正在保存或已被外部修改，请重新打开。</source>
+        <translation>檔案正在儲存或已被外部修改，請重新開啟。</translation>
+    </message>
+    <message>
+        <source>新建</source>
+        <translation>新增</translation>
+    </message>
+    <message>
+        <source>新文件名</source>
+        <translation>新檔名</translation>
+    </message>
+    <message>
+        <source>无法保存</source>
+        <translation>無法儲存</translation>
+    </message>
+    <message>
+        <source>无法创建脚本</source>
+        <translation>無法建立指令碼</translation>
+    </message>
+    <message>
+        <source>无法创建项目脚本目录。</source>
+        <translation>無法建立專案指令碼目錄。</translation>
+    </message>
+    <message>
+        <source>无法删除</source>
+        <translation>無法刪除</translation>
+    </message>
+    <message>
+        <source>无法移入系统回收站，原文件已保留。</source>
+        <translation>無法移入系統資源回收筒，原檔案已保留。</translation>
+    </message>
+    <message>
+        <source>无法重命名</source>
+        <translation>無法重新命名</translation>
+    </message>
+    <message>
+        <source>更多操作…</source>
+        <translation>更多操作…</translation>
+    </message>
+    <message>
+        <source>替换</source>
+        <translation>取代</translation>
+    </message>
+    <message>
+        <source>替换:</source>
+        <translation>取代:</translation>
+    </message>
+    <message>
+        <source>替换完成</source>
+        <translation>取代完成</translation>
+    </message>
+    <message>
+        <source>有动态调用需要自行检查，请先查看引用。</source>
+        <translation>有動態呼叫需要自行檢查，請先檢視引用。</translation>
+    </message>
+    <message>
+        <source>未找到匹配内容</source>
+        <translation>未找到符合內容</translation>
+    </message>
+    <message>
+        <source>查找</source>
+        <translation>尋找</translation>
+    </message>
+    <message>
+        <source>查找:</source>
+        <translation>尋找:</translation>
+    </message>
+    <message>
+        <source>查看引用…</source>
+        <translation>查看引用…</translation>
+    </message>
+    <message>
+        <source>正则</source>
+        <translation>正規表示式</translation>
+    </message>
+    <message>
+        <source>正则表达式不能匹配空字符串</source>
+        <translation>正規表示式不得比對空字串</translation>
+    </message>
+    <message>
+        <source>目标文件已在其它编辑页中打开。</source>
+        <translation>目標檔案已在其它編輯頁中開啟。</translation>
+    </message>
+    <message>
+        <source>确认重命名</source>
+        <translation>確認重新命名</translation>
+    </message>
+    <message>
+        <source>脚本名称</source>
+        <translation>指令碼名稱</translation>
+    </message>
+    <message>
+        <source>脚本已被外部修改或已有本地版本，请重新打开。当前输入已保留。</source>
+        <translation>指令碼已被外部修改或已有本地版本，請重新開啟。當前輸入已保留。</translation>
+    </message>
+    <message>
+        <source>请先打开项目并选择资源。</source>
+        <translation>請先開啟專案並選擇資源。</translation>
+    </message>
+    <message>
+        <source>请输入单行名称，不包含目录或特殊字符。</source>
+        <translation>請輸入單行名稱，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>请输入有效的文件名，不包含目录或特殊字符。</source>
+        <translation>請輸入有效的檔名，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>这个脚本仍被使用，请先修改引用。</source>
+        <translation>這個指令碼仍被使用，請先修改引用。</translation>
+    </message>
+    <message>
+        <source>这个脚本文件名已经存在，请换一个名称。</source>
+        <translation>這個指令碼檔名已經存在，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，请先查看引用。</source>
+        <translation>部分檔案無法讀取，請先檢視引用。</translation>
+    </message>
+    <message>
+        <source>重命名文件…</source>
+        <translation>重新命名檔案…</translation>
+    </message>
+    <message>
+        <source>重命名脚本</source>
+        <translation>重新命名指令碼</translation>
+    </message>
+    <message>
+        <source>这个脚本名在当前调用范围内已经存在，请换一个名称。</source>
+        <translation>這個腳本名在當前調用範圍內已經存在，請換一個名稱。</translation>
+    </message>
+    <message>
+        <source>部分文件无法读取，未更新引用。</source>
+        <translation>部分文件無法讀取，未更新引用。</translation>
     </message>
 </context>
 <context>
     <name>ScriptProjectSearch</name>
     <message>
-        <location filename="../core/ScriptProjectSearch.cpp" line="+209"/>
+        <location filename="../core/ScriptProjectSearch.cpp" line="+210"/>
         <source>活动内容根不可用</source>
         <translation>活動內容根無法使用</translation>
     </message>
@@ -16721,7 +21730,7 @@ SellGoods(fileName)
         <translation>活動內容根沒有 script 目錄</translation>
     </message>
     <message>
-        <location line="+54"/>
+        <location line="+57"/>
         <source>无法读取脚本文件</source>
         <translation>無法讀取腳本檔案</translation>
     </message>
@@ -16761,7 +21770,7 @@ SellGoods(fileName)
         <translation>檔案已在編輯器中開啟，請關閉後重新搜尋：%1</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+16"/>
         <source>发布前无法读取文件：%1</source>
         <translation>發布前無法讀取檔案：%1</translation>
     </message>
@@ -16771,7 +21780,7 @@ SellGoods(fileName)
         <translation>檔案在搜尋後已變更，請重新搜尋：%1</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+21"/>
         <source>无法准备脚本替换事务：%1</source>
         <translation>無法準備腳本取代交易：%1</translation>
     </message>
@@ -16849,12 +21858,11 @@ SellGoods(fileName)
         <translation>確認交易取代</translation>
     </message>
     <message>
-        <location line="+30"/>
         <source>请至少选择一个有变化且未打开的文件。</source>
-        <translation>請至少選擇一個有變更且未開啟的檔案。</translation>
+        <translation type="vanished">請至少選擇一個有變更且未開啟的檔案。</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+59"/>
         <source>项目脚本替换失败</source>
         <translation>專案腳本取代失敗</translation>
     </message>
@@ -16912,7 +21920,12 @@ SellGoods(fileName)
         <translation>以交易方式取代所選檔案</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="-53"/>
+        <source>请至少选择一个有变化且无未保存冲突的文件。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+56"/>
         <source>取消确认</source>
         <translation>取消確認</translation>
     </message>
@@ -16963,7 +21976,7 @@ SellGoods(fileName)
 <context>
     <name>StoryGraphAnalysisCoordinator</name>
     <message>
-        <location filename="../core/StoryGraphAnalysisCoordinator.cpp" line="+71"/>
+        <location filename="../core/StoryGraphAnalysisCoordinator.cpp" line="+73"/>
         <source>剧情图分析布局已取消。</source>
         <translation>劇情圖分析佈局已取消。</translation>
     </message>
@@ -16978,7 +21991,7 @@ SellGoods(fileName)
         <translation>專案分析僅部分完成；佈局只包含目前可用的圖。</translation>
     </message>
     <message>
-        <location line="+278"/>
+        <location line="+266"/>
         <source>剧情图分析因未知异常而失败。</source>
         <translation>劇情圖分析因未知例外而失敗。</translation>
     </message>
@@ -17246,13 +22259,13 @@ SellGoods(fileName)
 <context>
     <name>StoryGraphProjectResolver</name>
     <message>
-        <location filename="../core/StoryGraphProjectResolver.cpp" line="+501"/>
-        <location filename="../ui/MainWindow.cpp" line="-1014"/>
+        <location filename="../ui/MainWindow.cpp" line="+284"/>
+        <location filename="../core/StoryGraphProjectResolver.cpp" line="+623"/>
         <source>剧情图分析上限无效</source>
         <translation>劇情圖分析上限無效</translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location filename="../core/StoryGraphProjectResolver.cpp" line="+15"/>
         <source>剧情图入口脚本身份或虚拟路径无效</source>
         <translation>劇情圖入口腳本身分或虛擬路徑無效</translation>
     </message>
@@ -17288,70 +22301,79 @@ SellGoods(fileName)
     </message>
     <message>
         <location line="+56"/>
-        <location line="+661"/>
-        <location line="+437"/>
+        <location line="+1311"/>
         <source>剧情图项目分析已取消</source>
         <translation>劇情圖專案分析已取消</translation>
     </message>
     <message>
-        <location line="-1075"/>
-        <location line="+860"/>
         <location filename="../ui/MainWindow.cpp" line="+24"/>
+        <location filename="../core/StoryGraphProjectResolver.cpp" line="-1288"/>
+        <location line="+1510"/>
         <source>剧情图脚本超过单文件字节上限</source>
         <translation>劇情圖腳本超過單一檔案位元組上限</translation>
     </message>
     <message>
-        <location line="-837"/>
-        <location line="+853"/>
-        <location filename="../ui/MainWindow.cpp" line="+15"/>
+        <location line="+15"/>
+        <location filename="../core/StoryGraphProjectResolver.cpp" line="-1487"/>
+        <location line="+1503"/>
         <source>剧情图脚本总字节数超过上限</source>
         <translation>劇情圖腳本總位元組數超過上限</translation>
     </message>
     <message>
-        <location line="-831"/>
-        <location line="+738"/>
-        <location filename="../ui/MainWindow.cpp" line="+10"/>
+        <location line="+10"/>
+        <location filename="../core/StoryGraphProjectResolver.cpp" line="-1481"/>
+        <location line="+1388"/>
         <source>剧情图分析文件数超过上限</source>
         <translation>劇情圖分析檔案數超過上限</translation>
     </message>
     <message>
-        <location line="-589"/>
-        <location line="+222"/>
+        <location filename="../core/StoryGraphProjectResolver.cpp" line="-947"/>
+        <location line="+442"/>
         <source>地图上下文分支过多，已折叠为未知上下文</source>
         <translation>地圖上下文分支過多，已折疊為未知上下文</translation>
     </message>
     <message>
-        <location line="-116"/>
+        <location line="-108"/>
         <source>loadmap 字面量目标不是严格相对路径</source>
         <translation>loadmap 字面值目標不是嚴格相對路徑</translation>
     </message>
     <message>
-        <location line="+45"/>
+        <location line="+43"/>
         <source>地图目录解析回调抛出未知异常</source>
         <translation>地圖目錄解析回呼擲回未知例外</translation>
     </message>
     <message>
-        <location line="+43"/>
+        <location line="+41"/>
         <source>地图目录映射无法静态确定，保留 basename 分支</source>
         <translation>地圖目錄對應無法靜態確定，保留 basename 分支</translation>
     </message>
     <message>
-        <location line="+60"/>
+        <location line="+65"/>
         <source>脚本目标不是可确认的字面量</source>
         <translation>腳本目標不是可確認的字面值</translation>
     </message>
     <message>
-        <location line="+34"/>
+        <location line="+50"/>
         <source>脚本调用不是可确认的直接全局调用</source>
         <translation>腳本呼叫不是可確認的直接全域呼叫</translation>
     </message>
     <message>
-        <location line="+17"/>
+        <location line="+25"/>
         <source>剧情图跨文件调用深度超过上限</source>
         <translation>劇情圖跨檔案呼叫深度超過上限</translation>
     </message>
     <message>
-        <location line="+252"/>
+        <location line="+115"/>
+        <source>目标脚本无法形成可用的剧情语义入口</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>目标脚本剧情语义入口不可遍历</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+212"/>
         <source>地图上下文不确定，脚本目标只能标记为潜在关系</source>
         <translation>地圖上下文不確定，腳本目標只能標記為潛在關係</translation>
     </message>
@@ -17371,7 +22393,7 @@ SellGoods(fileName)
         <translation>安全資源讀取回呼擲回未知例外</translation>
     </message>
     <message>
-        <location line="+128"/>
+        <location line="+226"/>
         <source>脚本跨文件关系依赖运行时地图上下文</source>
         <translation>腳本跨檔案關係依賴執行階段地圖上下文</translation>
     </message>
@@ -17381,12 +22403,12 @@ SellGoods(fileName)
         <translation>腳本跨檔案目標無法確定</translation>
     </message>
     <message>
-        <location line="+74"/>
+        <location line="-647"/>
         <source>剧情图目标超过文件数或字节预算</source>
         <translation>劇情圖目標超過檔案數或位元組預算</translation>
     </message>
     <message>
-        <location line="+65"/>
+        <location line="+712"/>
         <source>未解析脚本目标</source>
         <translation>未解析腳本目標</translation>
     </message>
@@ -17423,32 +22445,30 @@ SellGoods(fileName)
 <context>
     <name>StoryGraphWindow</name>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="389"/>
         <source>运行记录 %1</source>
-        <translation>執行記錄 %1</translation>
+        <translation type="vanished">執行記錄 %1</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="405"/>
         <source>会话 ID：%1</source>
-        <translation>工作階段 ID：%1</translation>
+        <translation type="vanished">工作階段 ID：%1</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="142"/>
+        <location filename="../ui/StoryGraphWindow.cpp" line="+13"/>
         <source>源码行 %1</source>
         <translation>原始碼行 %1</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="153"/>
+        <location line="+11"/>
         <source>%1 条源码行事件被丢弃</source>
         <translation>已捨棄 %1 個原始碼行事件</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1465"/>
+        <location line="+1235"/>
         <source>轨迹读取器报告：%1</source>
         <translation>執行軌跡讀取器報告：%1</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="-56"/>
+        <location line="-1315"/>
         <source>脚本入口</source>
         <translation>腳本入口</translation>
     </message>
@@ -17579,14 +22599,14 @@ SellGoods(fileName)
     </message>
     <message>
         <location line="+1"/>
-        <location line="+699"/>
-        <location line="+96"/>
+        <location line="+987"/>
+        <location line="+512"/>
         <location line="+4"/>
         <source>警告</source>
         <translation>警告</translation>
     </message>
     <message>
-        <location line="-697"/>
+        <location line="-1366"/>
         <source>剧情图资源上下文不可用。</source>
         <translation>劇情圖資源環境無法使用。</translation>
     </message>
@@ -17602,13 +22622,13 @@ SellGoods(fileName)
     </message>
     <message>
         <location line="+26"/>
-        <location line="+480"/>
-        <location line="+144"/>
+        <location line="+733"/>
+        <location line="+560"/>
         <source>错误</source>
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="-251"/>
+        <location line="-686"/>
         <source>控制流</source>
         <translation>控制流程</translation>
     </message>
@@ -17618,12 +22638,12 @@ SellGoods(fileName)
         <translation>劇情語意</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+15"/>
         <source>全部节点</source>
         <translation>所有節點</translation>
     </message>
     <message>
-        <location line="+21"/>
+        <location line="+23"/>
         <source>剧情图</source>
         <translation>劇情圖</translation>
     </message>
@@ -17678,7 +22698,12 @@ SellGoods(fileName)
         <translation>重新整理</translation>
     </message>
     <message>
-        <location line="+3"/>
+        <location line="+4"/>
+        <source>只清除当前运行在编辑器内存中的轨迹叠加</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
         <source>级别</source>
         <translation>嚴重程度</translation>
     </message>
@@ -17689,39 +22714,42 @@ SellGoods(fileName)
     </message>
     <message>
         <location line="+1"/>
+        <location line="+6"/>
         <source>说明</source>
         <translation>說明</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="-5"/>
+        <location line="+6"/>
         <source>来源</source>
         <translation>來源</translation>
     </message>
     <message>
         <location line="+3"/>
-        <location line="+166"/>
+        <location line="+585"/>
         <source>结果已过期，跳转将使用当前源码</source>
         <translation>結果已過期，跳轉將使用目前原始碼</translation>
     </message>
     <message>
-        <location line="-165"/>
-        <location line="+166"/>
+        <location line="-584"/>
+        <location line="+585"/>
         <source>当前结果</source>
         <translation>目前結果</translation>
     </message>
     <message>
-        <location line="-69"/>
-        <location line="+78"/>
+        <location line="-485"/>
+        <location line="+367"/>
+        <location line="+127"/>
         <source>信息</source>
         <translation>資訊</translation>
     </message>
     <message>
-        <location line="-71"/>
+        <location line="-487"/>
         <source>仅显示前 %1 条警告；另有 %2 条未在列表中展开。</source>
         <translation>僅顯示前 %1 則警告；另有 %2 則未在清單中展開。</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+384"/>
         <source>正在后台分析剧情图…</source>
         <translation>正在背景分析劇情圖…</translation>
     </message>
@@ -17741,137 +22769,135 @@ SellGoods(fileName)
         <translation>%1；顯示 %2 / %3 個節點；%4 項警告</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1020"/>
         <source>运行轨迹会话</source>
-        <translation>執行軌跡工作階段</translation>
+        <translation type="vanished">執行軌跡工作階段</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1022"/>
         <source>选择实时或已保留的桌面运行会话</source>
-        <translation>選擇即時或已保留的桌面執行工作階段</translation>
+        <translation type="vanished">選擇即時或已保留的桌面執行工作階段</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1024"/>
+        <location line="-544"/>
         <source>清除叠加</source>
         <translation>清除疊加</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1026"/>
         <source>只清除当前编辑器内存中的轨迹叠加，不删除磁盘会话</source>
-        <translation>只清除目前編輯器記憶體中的軌跡疊加，不刪除磁碟工作階段</translation>
+        <translation type="vanished">只清除目前編輯器記憶體中的軌跡疊加，不刪除磁碟工作階段</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1037"/>
+        <location line="+13"/>
         <source>匹配状态</source>
         <translation>比對狀態</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1038"/>
+        <location line="+1"/>
         <source>序号 / 事件</source>
         <translation>序號 / 事件</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1304"/>
+        <location line="+385"/>
         <source>读取问题</source>
         <translation>讀取問題</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1324"/>
+        <location line="-25"/>
         <source>匹配问题</source>
         <translation>比對問題</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1332"/>
+        <location line="+7"/>
         <source>运行轨迹匹配状态与已读取序列不一致；已停止继续匹配，避免显示错误执行路径。</source>
         <translation>執行軌跡比對狀態與已讀取序列不一致；已停止繼續比對，避免顯示錯誤的執行路徑。</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1313"/>
+        <location line="+31"/>
         <source>JSONL 第 %1 行，字节 %2</source>
         <translation>JSONL 第 %1 行，位元組 %2</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1360"/>
+        <location line="+39"/>
         <source>丢弃汇总</source>
         <translation>丟棄摘要</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1445"/>
+        <location line="+43"/>
         <source>仅显示前 %1 条轨迹问题；另有 %2 条未展开。</source>
         <translation>僅顯示前 %1 則軌跡問題；另有 %2 則未展開。</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1505"/>
+        <location line="+73"/>
         <source>未选择运行轨迹会话</source>
         <translation>未選擇執行軌跡工作階段</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1573"/>
+        <location line="+6"/>
         <source>运行轨迹匹配已停止：内部序列状态不一致</source>
         <translation>執行軌跡比對已停止：內部序列狀態不一致</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1512"/>
+        <location line="+7"/>
         <source>%1；事件 %2；匹配 %3，未匹配 %4，歧义 %5，过期 %6；读取问题 %7；丢弃行 %8</source>
         <translation>%1；事件 %2；已比對 %3，未比對 %4，歧義 %5，過期 %6；讀取問題 %7；丟棄行 %8</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1562"/>
+        <location line="+50"/>
         <source>未绑定</source>
         <translation>未綁定</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1564"/>
+        <location line="+2"/>
         <source>等待轨迹文件</source>
         <translation>等待軌跡檔案</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1566"/>
+        <location line="+2"/>
         <source>实时</source>
         <translation>即時</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1568"/>
+        <location line="+2"/>
         <source>完整</source>
         <translation>完整</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1570"/>
+        <location line="+2"/>
         <source>不完整</source>
         <translation>不完整</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1572"/>
+        <location line="+2"/>
         <source>无效</source>
         <translation>無效</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1574"/>
+        <location line="+2"/>
+        <location line="+20"/>
         <source>状态未知</source>
         <translation>未知狀態</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1584"/>
+        <location line="-10"/>
         <source>不适用</source>
         <translation>不適用</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1586"/>
+        <location line="+2"/>
         <source>已匹配</source>
         <translation>已比對</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1588"/>
+        <location line="+2"/>
         <source>未匹配</source>
         <translation>未比對</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1590"/>
+        <location line="+2"/>
         <source>歧义</source>
         <translation>歧義</translation>
     </message>
     <message>
-        <location filename="../ui/StoryGraphWindow.cpp" line="1592"/>
+        <location line="+2"/>
         <source>过期</source>
         <translation>過期</translation>
     </message>
@@ -17922,12 +22948,12 @@ SellGoods(fileName)
         <translation>瀏覽腳本...</translation>
     </message>
     <message>
-        <location line="+9"/>
+        <location line="+10"/>
         <source>选择陷阱脚本</source>
         <translation>選擇陷阱腳本</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+10"/>
         <source>清空选中脚本</source>
         <translation>清空選取腳本</translation>
     </message>
@@ -17937,14 +22963,15 @@ SellGoods(fileName)
         <translation>錯誤</translation>
     </message>
     <message>
-        <location line="+110"/>
+        <location line="+104"/>
+        <location line="+9"/>
         <location line="+36"/>
         <location line="+26"/>
         <source>无法保存</source>
         <translation>無法儲存</translation>
     </message>
     <message>
-        <location line="-161"/>
+        <location line="-164"/>
         <source>高风险存档上下文</source>
         <translation>高風險存檔內容</translation>
     </message>
@@ -17959,7 +22986,12 @@ SellGoods(fileName)
         <translation>目前陷阱腳本有未儲存修改，確定放棄嗎？</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+73"/>
+        <source>资源正在更新或进行其他写入。</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
         <source>确认写入临时运行存档</source>
         <translation>確認寫入臨時執行存檔</translation>
     </message>
@@ -18014,17 +23046,17 @@ SellGoods(fileName)
         <translation>目前內容有未儲存修改。切換前要如何處理？</translation>
     </message>
     <message>
-        <location line="-304"/>
+        <location line="-312"/>
         <source>地图: %1 | 陷阱脚本索引: 1-19（0 表示无/清除） | 脚本路径: script/map/%2/ 或 script/common/</source>
         <translation>地圖：%1 | 陷阱腳本索引：1-19（0 表示無／清除） | 腳本路徑：script/map/%2/ 或 script/common/</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+29"/>
         <source>脚本文件 (*.txt);;所有文件 (*.*)</source>
         <translation>腳本檔案 (*.txt);;所有檔案 (*.*)</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+43"/>
         <source>无法持久化存档编辑上下文。</source>
         <translation>無法持久化存檔編輯內容。</translation>
     </message>
@@ -18049,7 +23081,7 @@ SellGoods(fileName)
         <translation>檔案尚不存在；只有在你修改內容並確認儲存後才會建立。</translation>
     </message>
     <message>
-        <location line="+32"/>
+        <location line="+35"/>
         <source>即将写入高风险路径：
 %1
 
@@ -18134,1192 +23166,141 @@ SellGoods(fileName)
     </message>
 </context>
 <context>
-    <name>AndroidExternalResourcePackageDialog</name>
-    <message><source>导出 Android 外部资源</source><translation>匯出 Android 外部資源</translation></message>
-    <message><source>导出当前活动资源包</source><translation>匯出目前使用中的資源包</translation></message>
-    <message><source>活动资源包：</source><translation>使用中的資源包：</translation></message>
-    <message><source>源目录：</source><translation>來源目錄：</translation></message>
-    <message><source>%1（%2）</source><translation>%1（%2）</translation></message>
-    <message><source>设备目标：</source><translation>裝置目標：</translation></message>
-    <message><source>外部资源根：%1
-当前包目录：%2
-清单文件：%3</source><translation>外部資源根：%1
-目前包目錄：%2
-清單檔案：%3</translation></message>
-    <message><source>导出包目录：</source><translation>匯出包目錄：</translation></message>
-    <message><source>选择父目录…</source><translation>選擇上層目錄…</translation></message>
-    <message><source>只导出磁盘上已保存的文件。不会校验 Lua、地图、NPC、OBJ、封面、说明或 UI 资源；缺失资源不会阻止导出。资源集合的 common 目录会在可用时自动复制。</source><translation>只匯出磁碟上已儲存的檔案。不會檢查 Lua、地圖、NPC、OBJ、封面、說明或 UI 資源；缺少資源不會阻止匯出。資源集合的 common 目錄可用時會自動複製。</translation></message>
-    <message><source>打开导出目录</source><translation>開啟匯出目錄</translation></message>
-    <message><source>开始导出</source><translation>開始匯出</translation></message>
-    <message><source>取消</source><translation>取消</translation></message>
-    <message><source>关闭</source><translation>關閉</translation></message>
-    <message><source>选择 Android 外部资源导出包的父目录</source><translation>選擇 Android 外部資源匯出包的上層目錄</translation></message>
-    <message><source>无法导出</source><translation>無法匯出</translation></message>
-    <message><source>请选择有效的导出包目录。</source><translation>請選擇有效的匯出包目錄。</translation></message>
-    <message><source>导出包的父目录不存在。</source><translation>匯出包的上層目錄不存在。</translation></message>
-    <message><source>替换已有导出包</source><translation>取代現有匯出包</translation></message>
-    <message><source>导出包目录已经存在。完整导出成功后将替换旧目录；失败或取消时保留旧目录。是否继续？</source><translation>匯出包目錄已經存在。完整匯出成功後將取代舊目錄；失敗或取消時保留舊目錄。是否繼續？</translation></message>
-    <message><source>开始导出：%1</source><translation>開始匯出：%1</translation></message>
-    <message><source>%1/%2  %3</source><translation>%1/%2  %3</translation></message>
-    <message><source>正在取消；旧导出包将保持不变…</source><translation>正在取消；舊匯出包將保持不變…</translation></message>
-    <message><source>导出完成：复制 %1 项，跳过 %2 项，警告 %3 项。</source><translation>匯出完成：複製 %1 項，略過 %2 項，警告 %3 項。</translation></message>
-    <message><source>警告：%1</source><translation>警告：%1</translation></message>
-    <message><source>导出完成</source><translation>匯出完成</translation></message>
-    <message><source>Android 外部资源目录已完整发布。请把导出包中的 Download 目录复制到 Android 共享存储根目录。</source><translation>Android 外部資源目錄已完整發佈。請把匯出包中的 Download 目錄複製到 Android 共用儲存空間根目錄。</translation></message>
-    <message><source>导出已取消；旧导出包未被替换。</source><translation>匯出已取消；舊匯出包未被取代。</translation></message>
-    <message><source>导出已取消</source><translation>匯出已取消</translation></message>
-    <message><source>导出已取消，已有导出包保持不变。</source><translation>匯出已取消，現有匯出包保持不變。</translation></message>
-    <message><source>导出失败：%1</source><translation>匯出失敗：%1</translation></message>
-    <message><source>导出失败</source><translation>匯出失敗</translation></message>
-    <message><source>Android 外部资源未发布，已有导出包保持不变。
-
-%1</source><translation>Android 外部資源未發佈，現有匯出包保持不變。
-
-%1</translation></message>
-</context>
-<context>
-    <name>MainWindow</name>
-    <message><source>导出 Android 外部资源</source><translation>匯出 Android 外部資源</translation></message>
-    <message><source>把当前活动资源包导出为 Android 公共 Download 目录结构</source><translation>把目前使用中的資源包匯出為 Android 公共 Download 目錄結構</translation></message>
-    <message><source>请先打开项目或配置资源集合目录。</source><translation>請先開啟專案或設定資源集合目錄。</translation></message>
-    <message><source>没有可导出的活动资源包</source><translation>沒有可匯出的使用中資源包</translation></message>
-    <message><source>请选择包含根级 game_profile.ini 和非空 Game.Id 的活动资源包后再导出。</source><translation>請先選擇包含根層級 game_profile.ini 和非空白 Game.Id 的使用中資源包，再進行匯出。</translation></message>
-    <message><source>Android 外部资源导出</source><translation>Android 外部資源匯出</translation></message>
-</context>
-<context>
-    <name>DesktopRunPanel</name>
-    <message><source>转到问题（%1）</source><translation>前往問題（%1）</translation></message>
-    <message><source>查看问题（%1）</source><translation>檢視問題（%1）</translation></message>
-    <message><source>回到编辑器中的第一个问题位置</source><translation>回到編輯器中的第一個問題位置</translation></message>
-    <message><source>展开详细信息查看试玩问题</source><translation>展開詳細資訊檢視試玩問題</translation></message>
-    <message><source>目标：</source><translation>目標：</translation></message>
-    <message><source>请先打开项目</source><translation>請先開啟專案</translation></message>
-    <message><source>场景选择：</source><translation>場景選擇：</translation></message>
-    <message><source>试玩</source><translation>試玩</translation></message>
-</context>
-<context>
-    <name>MainWindow</name>
-    <message><source>试玩</source><translation>試玩</translation></message>
-    <message><source>试玩当前地图、当前脚本或项目默认场景</source><translation>試玩目前地圖、目前腳本或專案預設場景</translation></message>
-    <message><source>停止试玩</source><translation>停止試玩</translation></message>
-    <message><source>停止当前试玩</source><translation>停止目前試玩</translation></message>
-    <message><source>试玩当前地图</source><translation>試玩目前地圖</translation></message>
-    <message><source>使用当前地图和已打开的 NPC、物体列表试玩</source><translation>使用目前地圖和已開啟的 NPC、物件清單試玩</translation></message>
-    <message><source>试玩当前脚本</source><translation>試玩目前腳本</translation></message>
-    <message><source>使用当前脚本内容试玩</source><translation>使用目前腳本內容試玩</translation></message>
-    <message><source>试玩完成，可以继续编辑。</source><translation>試玩完成，可以繼續編輯。</translation></message>
-    <message><source>试玩结束；可在详细信息中查看问题。</source><translation>試玩結束；可在詳細資訊中檢視問題。</translation></message>
-    <message><source>试玩未能启动：%1</source><translation>試玩無法啟動：%1</translation></message>
-    <message><source>请先打开项目</source><translation>請先開啟專案</translation></message>
-    <message><source>当前地图：尚未加载</source><translation>目前地圖：尚未載入</translation></message>
-    <message><source>当前地图：%1</source><translation>目前地圖：%1</translation></message>
-    <message><source>当前脚本：未保存脚本</source><translation>目前腳本：未儲存腳本</translation></message>
-    <message><source>当前脚本：%1</source><translation>目前腳本：%1</translation></message>
-    <message><source>默认场景：%1</source><translation>預設場景：%1</translation></message>
-    <message><source>请选择地图、脚本，或设置默认场景</source><translation>請選擇地圖、腳本，或設定預設場景</translation></message>
-    <message><source>未保存文档</source><translation>未儲存文件</translation></message>
-    <message><source>有相关内容尚未准备好。请先保存或关闭这些文档后再试玩：
-%1</source><translation>有相關內容尚未準備好。請先儲存或關閉這些文件後再試玩：
-%1</translation></message>
-    <message><source>当前内容暂时不能试玩。请检查项目运行设置和相关资源；详细原因可按需展开查看。</source><translation>目前內容暫時無法試玩。請檢查專案執行設定和相關資源；詳細原因可依需要展開檢視。</translation></message>
-    <message><source>无法准备试玩</source><translation>無法準備試玩</translation></message>
-    <message><source>编辑器无法准备试玩所需的临时空间。</source><translation>編輯器無法準備試玩所需的暫存空間。</translation></message>
-    <message><source>无法启动试玩</source><translation>無法啟動試玩</translation></message>
-    <message><source>试玩请求未被接受；请重新检查游戏程序和当前运行状态。</source><translation>試玩要求未被接受；請重新檢查遊戲程式和目前執行狀態。</translation></message>
-    <message><source>无法试玩</source><translation>無法試玩</translation></message>
-    <message><source>没有可试玩的内容</source><translation>沒有可試玩的內容</translation></message>
-    <message><source>请打开地图或脚本文档，或者在项目运行设置中指定默认场景。</source><translation>請開啟地圖或腳本文件，或者在專案執行設定中指定預設場景。</translation></message>
-    <message><source>无法试玩场景</source><translation>無法試玩場景</translation></message>
-    <message><source>请在项目运行设置中指定默认场景，或打开要试玩的地图、脚本。</source><translation>請在專案執行設定中指定預設場景，或開啟要試玩的地圖、腳本。</translation></message>
-    <message><source>场景试玩准备失败</source><translation>場景試玩準備失敗</translation></message>
-    <message><source>正在准备默认场景...</source><translation>正在準備預設場景...</translation></message>
-    <message><source>无法试玩当前地图</source><translation>無法試玩目前地圖</translation></message>
-    <message><source>当前地图不属于这个项目，无法直接试玩。</source><translation>目前地圖不屬於這個專案，無法直接試玩。</translation></message>
-    <message><source>请先把当前地图保存到项目资源中，再重新试玩。</source><translation>請先把目前地圖儲存到專案資源中，再重新試玩。</translation></message>
-    <message><source>请先把已打开的 %1 列表保存到项目资源中，再重新试玩。</source><translation>請先把已開啟的 %1 清單儲存到專案資源中，再重新試玩。</translation></message>
-    <message><source>没有找到可用于当前地图的场景环境。请在项目运行设置中补充或选择匹配场景。</source><translation>找不到可用於目前地圖的場景環境。請在專案執行設定中補充或選擇相符場景。</translation></message>
-    <message><source>正在准备当前地图...</source><translation>正在準備目前地圖...</translation></message>
-    <message><source> 玩家起点超出地图，试玩将从左上角开始。</source><translation> 玩家起點超出地圖，試玩將從左上角開始。</translation></message>
-    <message><source>无法试玩当前脚本</source><translation>無法試玩目前腳本</translation></message>
-    <message><source>请先把当前脚本保存到项目资源中，再重新试玩。</source><translation>請先把目前腳本儲存到專案資源中，再重新試玩。</translation></message>
-    <message><source>没有找到可用于当前脚本的场景环境。请在项目运行设置中补充或选择匹配场景。</source><translation>找不到可用於目前腳本的場景環境。請在專案執行設定中補充或選擇相符場景。</translation></message>
-    <message><source>正在准备当前脚本...</source><translation>正在準備目前腳本...</translation></message>
-    <message><source>试玩尚未结束</source><translation>試玩尚未結束</translation></message>
-    <message><source>试玩仍在进行。是否停止试玩并关闭编辑器？</source><translation>試玩仍在進行。是否停止試玩並關閉編輯器？</translation></message>
-    <message><source>试玩正在停止。是否直接关闭编辑器？</source><translation>試玩正在停止。是否直接關閉編輯器？</translation></message>
-</context>
-<context>
-    <name>MainWindow</name>
+    <name>ContentReferenceDialog</name>
     <message>
-        <source>当前武功：%1（默认场景）</source>
-        <translation>目前武功：%1（預設場景）</translation>
+        <source>动态调用：%1</source>
+        <translation>動態呼叫：%1</translation>
     </message>
     <message>
-        <source>无法试玩当前武功</source>
-        <translation>無法試玩目前武功</translation>
+        <source>动态调用：%1；无法读取：%2。静态检查不能确认动态调用是否使用此文件，动态调用不会自动改写。</source>
+        <translation>動態呼叫：%1；無法讀取：%2。靜態檢查不能確認動態呼叫是否使用此檔案，動態呼叫不會自動改寫。</translation>
     </message>
     <message>
-        <source>请先在项目运行设置中指定默认场景；试玩会带入当前武功内容，进入游戏后可直接检查效果。</source>
-        <translation>請先在專案執行設定中指定預設場景；試玩會帶入目前武功內容，進入遊戲後可直接檢查效果。</translation>
+        <source>找到 %1 处明确引用；双击可打开。删除前请先修改引用。</source>
+        <translation>找到 %1 處明確引用；按兩下可開啟。刪除前請先修改引用。</translation>
     </message>
     <message>
-        <source>当前武功不属于这个项目，无法直接试玩。</source>
-        <translation>目前武功不屬於這個專案，無法直接試玩。</translation>
+        <source>文件</source>
+        <translation>檔案</translation>
     </message>
     <message>
-        <source>正在准备当前武功“%1”的默认场景试玩...</source>
-        <translation>正在準備目前武功「%1」的預設場景試玩...</translation>
+        <source>无法读取或文本格式不受支持</source>
+        <translation>無法讀取或文字格式不受支援</translation>
     </message>
     <message>
-        <source>武功 - %1</source>
-        <translation>武功 - %1</translation>
+        <source>查看引用</source>
+        <translation>查看引用</translation>
+    </message>
+    <message>
+        <source>用途</source>
+        <translation>用途</translation>
+    </message>
+    <message>
+        <source>行</source>
+        <translation>行</translation>
+    </message>
+    <message>
+        <source>有 %1 处调用需要确认，%2 个文件无法读取。动态表达式和调用地图未确定的调用不会自动改写。</source>
+        <translation>有 %1 處呼叫需要確認，%2 個檔案無法讀取。動態運算式和呼叫地圖未確定的呼叫不會自動改寫。</translation>
+    </message>
+    <message>
+        <source>调用地图未确定</source>
+        <translation>呼叫地圖未確定</translation>
+    </message>
+    <message>
+        <source>可按显示名或文件名查找，需确认</source>
+        <translation>可按顯示名或檔名查找，需確認</translation>
+    </message>
+    <message>
+        <source>有 %1 处调用需要确认，%2 个文件无法读取。需要确认的调用不会自动改写，请在列表中查看原因。</source>
+        <translation>有 %1 處呼叫需要確認，%2 個檔案無法讀取。需要確認的呼叫不會自動改寫，請在清單中查看原因。</translation>
+    </message>
+    <message>
+        <source>存在同名脚本，需确认调用地图</source>
+        <translation>存在同名指令碼，需確認呼叫地圖</translation>
     </message>
 </context>
 <context>
-    <name>ProjectExplorerWidget</name>
+    <name>ContentAuthoring</name>
     <message>
-        <source>武功</source>
-        <translation>武功</translation>
+        <source>无法创建项目脚本目录。</source>
+        <translation>無法建立專案指令碼目錄。</translation>
+    </message>
+    <message>
+        <source>请输入有效脚本名称，不包含目录或特殊字符。</source>
+        <translation>請輸入有效指令碼名稱，不包含目錄或特殊字元。</translation>
+    </message>
+    <message>
+        <source>这个脚本名已被使用，请换一个名称。</source>
+        <translation>這個指令碼名已被使用，請換一個名稱。</translation>
     </message>
 </context>
 <context>
-    <name>MagicEditorWindow</name>
+    <name>EditorFileState</name>
     <message>
-        <source>无法打开武功</source>
-        <translation>無法開啟武功</translation>
+        <source>保存位置的文件已被其它程序修改或新建，未覆盖：
+%1
+当前修改仍保留，可以另存为。</source>
+        <translation>保存位置的文件已被其它程序修改或新建，未覆蓋：
+%1
+當前修改仍保留，可以另存為。</translation>
     </message>
     <message>
-        <source>无法读取武功文件：
+        <source>文件已被其它程序修改、删除或无法读取，未覆盖：
+%1
+当前修改仍保留，可以另存为。重新打开前请先保留需要的修改。</source>
+        <translation>文件已被其它程序修改、刪除或無法讀取，未覆蓋：
+%1
+當前修改仍保留，可以另存為。重新打開前請先保留需要的修改。</translation>
+    </message>
+    <message>
+        <source>无法读取保存目标，未覆盖：%1</source>
+        <translation>無法讀取保存目標，未覆蓋：%1</translation>
+    </message>
+    <message>
+        <source>无法读取待保存内容：%1</source>
+        <translation>無法讀取待保存內容：%1</translation>
+    </message>
+    <message>
+        <source>文件已被其它程序修改、删除或新建，未覆盖：
+%1
+当前修改仍保留，可以另存为。</source>
+        <translation>文件已被其它程序修改、刪除或新建，未覆蓋：
+%1
+當前修改仍保留，可以另存為。</translation>
+    </message>
+</context>
+<context>
+    <name>EditorSaveConfirmation</name>
+    <message>
+        <source>以下文件已被其它程序修改、删除或新建：
 %1
 
-%2</source>
-        <translation>無法讀取武功檔案：
+覆盖保存将使用当前编辑内容，替换保存位置的外部版本。取消会保留当前修改，也可以返回后另存为。</source>
+        <translation>以下文件已被其它程序修改、刪除或新建：
 %1
 
-%2</translation>
+覆蓋保存將使用當前編輯內容，替換保存位置的外部版本。取消會保留當前修改，也可以返回後另存為。</translation>
     </message>
     <message>
-        <source>保存失败</source>
-        <translation>儲存失敗</translation>
+        <source>取消</source>
+        <translation>取消</translation>
     </message>
     <message>
-        <source>无法保存武功文件：
-%1
-
-%2</source>
-        <translation>無法儲存武功檔案：
-%1
-
-%2</translation>
+        <source>文件已有外部改动</source>
+        <translation>文件已有外部改動</translation>
     </message>
     <message>
-        <source>保存更改</source>
-        <translation>儲存變更</translation>
+        <source>无法读取保存目标，当前修改已保留：%1</source>
+        <translation>無法讀取保存目標，當前修改已保留：%1</translation>
     </message>
     <message>
-        <source>武功“%1”已修改，是否保存？</source>
-        <translation>武功「%1」已修改，是否儲存？</translation>
+        <source>覆盖保存</source>
+        <translation>覆蓋保存</translation>
     </message>
     <message>
-        <source>切换项目资源</source>
-        <translation>切換專案資源</translation>
+        <source>无法创建保存目录：%1</source>
+        <translation>無法創建保存目錄：%1</translation>
     </message>
-    <message>
-        <source>当前武功已修改。切换项目资源前是否保存？</source>
-        <translation>目前武功已修改。切換專案資源前是否儲存？</translation>
-    </message>
-    <message>
-        <source>修改武功说明</source>
-        <translation>修改武功說明</translation>
-    </message>
-    <message>
-        <source>武功列表</source>
-        <translation>武功清單</translation>
-    </message>
-    <message>
-        <source>搜索名称或文件名</source>
-        <translation>搜尋名稱或檔名</translation>
-    </message>
-    <message>
-        <source>双击或按 Enter 打开；已打开的武功会切回原标签。</source>
-        <translation>按兩下或按 Enter 開啟；已開啟的武功會切回原分頁。</translation>
-    </message>
-    <message>
-        <source>概览与效果</source>
-        <translation>概覽與效果</translation>
-    </message>
-    <message>
-        <source>等级参数</source>
-        <translation>等級參數</translation>
-    </message>
-    <message>
-        <source>保存</source>
-        <translation>儲存</translation>
-    </message>
-    <message>
-        <source>撤销</source>
-        <translation>復原</translation>
-    </message>
-    <message>
-        <source>重做</source>
-        <translation>重做</translation>
-    </message>
-    <message>
-        <source>试玩当前武功</source>
-        <translation>試玩目前武功</translation>
-    </message>
-    <message>
-        <source>使用当前内存中的武功内容进入项目默认场景；在游戏中使用该武功查看效果</source>
-        <translation>使用目前記憶體中的武功內容進入專案預設場景；在遊戲中使用該武功檢查效果</translation>
-    </message>
-    <message>
-        <source>武功信息</source>
-        <translation>武功資訊</translation>
-    </message>
-    <message>
-        <source>名称</source>
-        <translation>名稱</translation>
-    </message>
-    <message>
-        <source>说明</source>
-        <translation>說明</translation>
-    </message>
-    <message>
-        <source>作用方式与范围</source>
-        <translation>作用方式與範圍</translation>
-    </message>
-    <message>
-        <source>作用方式</source>
-        <translation>作用方式</translation>
-    </message>
-    <message>
-        <source>区域形状</source>
-        <translation>區域形狀</translation>
-    </message>
-    <message>
-        <source>范围图是便于理解的示意；最终速度、碰撞和连锁效果以试玩为准。</source>
-        <translation>範圍圖是便於理解的示意；最終速度、碰撞和連鎖效果以試玩為準。</translation>
-    </message>
-    <message>
-        <source>图片与声音</source>
-        <translation>圖片與聲音</translation>
-    </message>
-    <message>
-        <source>技能展示</source>
-        <translation>技能展示</translation>
-    </message>
-    <message>
-        <source>武功图标</source>
-        <translation>武功圖示</translation>
-    </message>
-    <message>
-        <source>飞行特效</source>
-        <translation>飛行特效</translation>
-    </message>
-    <message>
-        <source>命中特效</source>
-        <translation>命中特效</translation>
-    </message>
-    <message>
-        <source>施放声音</source>
-        <translation>施放聲音</translation>
-    </message>
-    <message>
-        <source>命中声音</source>
-        <translation>命中聲音</translation>
-    </message>
-    <message>
-        <source>修改武功名称</source>
-        <translation>修改武功名稱</translation>
-    </message>
-    <message>
-        <source>修改作用方式</source>
-        <translation>修改作用方式</translation>
-    </message>
-    <message>
-        <source>修改区域形状</source>
-        <translation>修改區域形狀</translation>
-    </message>
-    <message>
-        <source>每行对应游戏中的一个武功等级。浅色斜体值表示该等级沿用前一级；直接修改即可为本级保存。</source>
-        <translation>每列對應遊戲中的一個武功等級。淺色斜體值表示該等級沿用前一級；直接修改即可為本級儲存。</translation>
-    </message>
-    <message>
-        <source>修改第 %1 级参数</source>
-        <translation>修改第 %1 級參數</translation>
-    </message>
-    <message>
-        <source>选择…</source>
-        <translation>選擇…</translation>
-    </message>
-    <message>
-        <source>修改%1</source>
-        <translation>修改%1</translation>
-    </message>
-    <message>
-        <source>图片文件 (*.mpc *.asf *.imp *.img *.png);;所有文件 (*.*)</source>
-        <translation>圖片檔案 (*.mpc *.asf *.imp *.img *.png);;所有檔案 (*.*)</translation>
-    </message>
-    <message>
-        <source>试听</source>
-        <translation>試聽</translation>
-    </message>
-    <message>
-        <source>音频文件 (*.wav *.mp3 *.ogg);;所有文件 (*.*)</source>
-        <translation>音訊檔案 (*.wav *.mp3 *.ogg);;所有檔案 (*.*)</translation>
-    </message>
-    <message>
-        <source>修改武功内容</source>
-        <translation>修改武功內容</translation>
-    </message>
-    <message>
-        <source>其它作用方式 (%1)</source>
-        <translation>其他作用方式 (%1)</translation>
-    </message>
-    <message>
-        <source>其它区域 (%1)</source>
-        <translation>其他區域 (%1)</translation>
-    </message>
-    <message>
-        <source>从左侧列表或项目树打开一个武功文件。</source>
-        <translation>從左側清單或專案樹開啟一個武功檔案。</translation>
-    </message>
-    <message>
-        <source>正在编辑：%1</source>
-        <translation>正在編輯：%1</translation>
-    </message>
-    <message>
-        <source>原文件中还有 %1 项高级内容未在此显示；保存时会保持不变。</source>
-        <translation>原始檔案中還有 %1 項進階內容未在此顯示；儲存時會保持不變。</translation>
-    </message>
-    <message>
-        <source>等级</source>
-        <translation>等級</translation>
-    </message>
-    <message>
-        <source>效果值</source>
-        <translation>效果值</translation>
-    </message>
-    <message>
-        <source>生命消耗</source>
-        <translation>生命消耗</translation>
-    </message>
-    <message>
-        <source>体力消耗</source>
-        <translation>體力消耗</translation>
-    </message>
-    <message>
-        <source>内力消耗</source>
-        <translation>內力消耗</translation>
-    </message>
-    <message>
-        <source>升级经验</source>
-        <translation>升級經驗</translation>
-    </message>
-    <message>
-        <source>攻击距离</source>
-        <translation>攻擊距離</translation>
-    </message>
-    <message>
-        <source>本级未单独设置，当前显示沿用值；编辑后会为本级保存。</source>
-        <translation>本級未單獨設定，目前顯示沿用值；編輯後會為本級儲存。</translation>
-    </message>
-    <message>
-        <source>未设置</source>
-        <translation>未設定</translation>
-    </message>
-    <message>
-        <source>%1
-%2×%3，%4 帧</source>
-        <translation>%1
-%2×%3，%4 個影格</translation>
-    </message>
-    <message>
-        <source>未找到预览
-可继续保存引用</source>
-        <translation>找不到預覽
-仍可儲存引用</translation>
-    </message>
-    <message>
-        <source>%1
-%2</source>
-        <translation>%1
-%2</translation>
-    </message>
-    <message>
-        <source>武功与特效编辑器</source>
-        <translation>武功與特效編輯器</translation>
-    </message>
-    <message>
-        <source>武功 - %1%2</source>
-        <translation>武功 - %1%2</translation>
-    </message>
-    <message>
-        <source>选择资源</source>
-        <translation>選擇資源</translation>
-    </message>
-    <message>
-        <source>无法选择资源</source>
-        <translation>無法選擇資源</translation>
-    </message>
-    <message>
-        <source>请选择当前项目对应资源目录中的文件。</source>
-        <translation>請選擇目前專案對應資源目錄中的檔案。</translation>
-    </message>
-    <message>
-        <source>修改资源引用</source>
-        <translation>修改資源引用</translation>
-    </message>
-    <message>
-        <source>无法试听</source>
-        <translation>無法試聽</translation>
-    </message>
-    <message>
-        <source>当前声音引用未设置或文件不存在。</source>
-        <translation>目前聲音引用未設定或檔案不存在。</translation>
-    </message>
-    <message>
-        <source>目标点</source>
-        <translation>目標點</translation>
-    </message>
-    <message>
-        <source>飞行</source>
-        <translation>飛行</translation>
-    </message>
-    <message>
-        <source>连续飞行</source>
-        <translation>連續飛行</translation>
-    </message>
-    <message>
-        <source>环形</source>
-        <translation>環形</translation>
-    </message>
-    <message>
-        <source>心形环绕</source>
-        <translation>心形環繞</translation>
-    </message>
-    <message>
-        <source>螺旋环绕</source>
-        <translation>螺旋環繞</translation>
-    </message>
-    <message>
-        <source>扇形</source>
-        <translation>扇形</translation>
-    </message>
-    <message>
-        <source>随机扇形</source>
-        <translation>隨機扇形</translation>
-    </message>
-    <message>
-        <source>直线</source>
-        <translation>直線</translation>
-    </message>
-    <message>
-        <source>移动直线</source>
-        <translation>移動直線</translation>
-    </message>
-    <message>
-        <source>区域</source>
-        <translation>區域</translation>
-    </message>
-    <message>
-        <source>自身周围</source>
-        <translation>自身周圍</translation>
-    </message>
-    <message>
-        <source>全屏</source>
-        <translation>全螢幕</translation>
-    </message>
-    <message>
-        <source>追踪目标</source>
-        <translation>追蹤目標</translation>
-    </message>
-    <message>
-        <source>投掷</source>
-        <translation>投擲</translation>
-    </message>
-    <message>
-        <source>轨迹</source>
-        <translation>軌跡</translation>
-    </message>
-    <message>
-        <source>位移</source>
-        <translation>位移</translation>
-    </message>
-    <message>
-        <source>控制</source>
-        <translation>控制</translation>
-    </message>
-    <message>
-        <source>召唤</source>
-        <translation>召喚</translation>
-    </message>
-    <message>
-        <source>时间停止</source>
-        <translation>時間停止</translation>
-    </message>
-    <message>
-        <source>V 形移动</source>
-        <translation>V 形移動</translation>
-    </message>
-    <message>
-        <source>未指定</source>
-        <translation>未指定</translation>
-    </message>
-    <message>
-        <source>方形</source>
-        <translation>方形</translation>
-    </message>
-    <message>
-        <source>十字</source>
-        <translation>十字</translation>
-    </message>
-    <message>
-        <source>波浪</source>
-        <translation>波浪</translation>
-    </message>
-    <message>
-        <source>三角</source>
-        <translation>三角</translation>
-    </message>
-    <message>
-        <source>V 形</source>
-        <translation>V 形</translation>
-    </message>
-    <message>
-        <source>自定义区域文件</source>
-        <translation>自訂區域檔案</translation>
-    </message>
-</context>
-<context>
-    <name>MagicRangePreview</name>
-    <message>
-        <source>第 %1 级 · %2</source>
-        <translation>第 %1 級 · %2</translation>
-    </message>
-    <message>
-        <source>橙色为施放者；蓝色为大致作用位置</source>
-        <translation>橙色為施放者；藍色為大致作用位置</translation>
-    </message>
-    <message>
-        <source>目标点</source>
-        <translation>目標點</translation>
-    </message>
-    <message>
-        <source>飞行</source>
-        <translation>飛行</translation>
-    </message>
-    <message>
-        <source>连续飞行</source>
-        <translation>連續飛行</translation>
-    </message>
-    <message>
-        <source>环形</source>
-        <translation>環形</translation>
-    </message>
-    <message>
-        <source>心形环绕</source>
-        <translation>心形環繞</translation>
-    </message>
-    <message>
-        <source>螺旋环绕</source>
-        <translation>螺旋環繞</translation>
-    </message>
-    <message>
-        <source>扇形</source>
-        <translation>扇形</translation>
-    </message>
-    <message>
-        <source>随机扇形</source>
-        <translation>隨機扇形</translation>
-    </message>
-    <message>
-        <source>直线</source>
-        <translation>直線</translation>
-    </message>
-    <message>
-        <source>移动直线</source>
-        <translation>移動直線</translation>
-    </message>
-    <message>
-        <source>区域</source>
-        <translation>區域</translation>
-    </message>
-    <message>
-        <source>自身周围</source>
-        <translation>自身周圍</translation>
-    </message>
-    <message>
-        <source>全屏</source>
-        <translation>全螢幕</translation>
-    </message>
-    <message>
-        <source>追踪目标</source>
-        <translation>追蹤目標</translation>
-    </message>
-    <message>
-        <source>投掷</source>
-        <translation>投擲</translation>
-    </message>
-    <message>
-        <source>轨迹</source>
-        <translation>軌跡</translation>
-    </message>
-    <message>
-        <source>位移</source>
-        <translation>位移</translation>
-    </message>
-    <message>
-        <source>控制</source>
-        <translation>控制</translation>
-    </message>
-    <message>
-        <source>召唤</source>
-        <translation>召喚</translation>
-    </message>
-    <message>
-        <source>时间停止</source>
-        <translation>時間停止</translation>
-    </message>
-    <message>
-        <source>V 形移动</source>
-        <translation>V 形移動</translation>
-    </message>
-    <message>
-        <source>其它作用方式 (%1)</source>
-        <translation>其他作用方式 (%1)</translation>
-    </message>
-    <message>
-        <source>方形区域</source>
-        <translation>方形區域</translation>
-    </message>
-    <message>
-        <source>十字区域</source>
-        <translation>十字區域</translation>
-    </message>
-    <message>
-        <source>波浪区域</source>
-        <translation>波浪區域</translation>
-    </message>
-    <message>
-        <source>三角区域</source>
-        <translation>三角區域</translation>
-    </message>
-    <message>
-        <source>V 形区域</source>
-        <translation>V 形區域</translation>
-    </message>
-    <message>
-        <source>自定义区域文件</source>
-        <translation>自訂區域檔案</translation>
-    </message>
-    <message>
-        <source>未指定区域形状</source>
-        <translation>未指定區域形狀</translation>
-    </message>
-    <message>
-        <source>攻击距离：%1 格</source>
-        <translation>攻擊距離：%1 格</translation>
-    </message>
-    <message>
-        <source>未单独设置攻击距离</source>
-        <translation>未單獨設定攻擊距離</translation>
-    </message>
-</context>
-
-<context>
-    <name>GoodsShopEditorWindow</name>
-    <message><source>无法打开物品</source><translation>無法開啟物品</translation></message>
-    <message><source>无法读取物品文件：&#10;%1&#10;&#10;%2</source><translation>無法读取物品檔案：&#10;%1&#10;&#10;%2</translation></message>
-    <message><source>无法打开商店</source><translation>無法開啟商店</translation></message>
-    <message><source>无法读取商店货单：&#10;%1&#10;&#10;%2</source><translation>無法读取商店貨單：&#10;%1&#10;&#10;%2</translation></message>
-    <message><source>保存失败</source><translation>儲存失败</translation></message>
-    <message><source>无法保存当前内容：&#10;%1&#10;&#10;%2</source><translation>無法儲存目前內容：&#10;%1&#10;&#10;%2</translation></message>
-    <message><source>当前没有可复制的物品。</source><translation>目前没有可複製的物品。</translation></message>
-    <message><source>新物品必须保存到当前项目的物品目录。</source><translation>新物品必须儲存到目前專案的物品目錄。</translation></message>
-    <message><source>目标文件已经存在，请换一个文件名。</source><translation>目標檔案已经存在，请换一个檔案名。</translation></message>
-    <message><source>保存更改</source><translation>儲存更改</translation></message>
-    <message><source>物品“%1”已修改，是否保存？</source><translation>物品“%1”已修改，是否儲存？</translation></message>
-    <message><source>商店“%1”已修改，是否保存？</source><translation>商店“%1”已修改，是否儲存？</translation></message>
-    <message><source>切换项目资源</source><translation>切换專案資源</translation></message>
-    <message><source>当前物品或商店已修改。切换项目资源前是否保存？</source><translation>目前物品或商店已修改。切换專案資源前是否儲存？</translation></message>
-    <message><source>修改物品说明</source><translation>修改物品說明</translation></message>
-    <message><source>物品与商店</source><translation>物品與商店</translation></message>
-    <message><source>加入当前商店</source><translation>加入目前商店</translation></message>
-    <message><source>单击选择；双击打开物品资料。编辑商店时可把选中物品加入货单。</source><translation>按一下選擇；按兩下開啟物品资料。編輯商店时可把选中物品加入貨單。</translation></message>
-    <message><source>双击或按 Enter 打开商店货单。</source><translation>按兩下或按 Enter 開啟商店貨單。</translation></message>
-    <message><source>物品</source><translation>物品</translation></message>
-    <message><source>商店</source><translation>商店</translation></message>
-    <message><source>物品信息</source><translation>物品信息</translation></message>
-    <message><source>名称</source><translation>名稱</translation></message>
-    <message><source>类型</source><translation>類型</translation></message>
-    <message><source>说明</source><translation>說明</translation></message>
-    <message><source>游戏内效果文字</source><translation>遊戲内效果文字</translation></message>
-    <message><source>价格</source><translation>價格</translation></message>
-    <message><source>基础价格</source><translation>基礎價格</translation></message>
-    <message><source>回收价格</source><translation>回收價格</translation></message>
-    <message><source>回收价格为 0 时由游戏按基础价格计算；商店比例在商店货单中调整。</source><translation>回收價格为 0 时由遊戲按基礎價格計算；商店比例在商店貨單中調整。</translation></message>
-    <message><source>使用或装备效果</source><translation>使用或裝備效果</translation></message>
-    <message><source>恢复生命</source><translation>恢復生命</translation></message>
-    <message><source>恢复体力</source><translation>恢復體力</translation></message>
-    <message><source>恢复内力</source><translation>恢復內力</translation></message>
-    <message><source>装备位置</source><translation>裝備位置</translation></message>
-    <message><source>生命上限</source><translation>生命上限</translation></message>
-    <message><source>体力上限</source><translation>體力上限</translation></message>
-    <message><source>内力上限</source><translation>內力上限</translation></message>
-    <message><source>攻击</source><translation>攻擊</translation></message>
-    <message><source>防御</source><translation>防禦</translation></message>
-    <message><source>闪避</source><translation>閃避</translation></message>
-    <message><source>这类物品的脚本和其它高级效果会保持原样；第一版不把它们展开为技术字段。</source><translation>這類物品的指令碼和其他進階效果会保持原樣；第一版不把它们展开为技術欄位。</translation></message>
-    <message><source>图片预览</source><translation>圖片預覽</translation></message>
-    <message><source>物品图片</source><translation>物品圖片</translation></message>
-    <message><source>背包图标</source><translation>背包圖示</translation></message>
-    <message><source>选择…</source><translation>選擇…</translation></message>
-    <message><source>修改%1</source><translation>修改%1</translation></message>
-    <message><source>商店设置</source><translation>商店設定</translation></message>
-    <message><source>启用有限库存</source><translation>啟用有限庫存</translation></message>
-    <message><source>出售价格比例</source><translation>售出價格比例</translation></message>
-    <message><source>回收价格比例</source><translation>回收價格比例</translation></message>
-    <message><source>100% 表示使用物品本身的价格；这里只调整比例，不模拟整套经济。</source><translation>100% 表示使用物品本身的價格；這裡只調整比例，不模拟整套经济。</translation></message>
-    <message><source>货单内容</source><translation>貨單內容</translation></message>
-    <message><source>从左侧物品库选择后加入。表格顺序就是游戏中的商店顺序。</source><translation>從左侧物品库選擇後加入。表格順序就是遊戲中的商店順序。</translation></message>
-    <message><source>移出商店</source><translation>移出商店</translation></message>
-    <message><source>上移</source><translation>上移</translation></message>
-    <message><source>下移</source><translation>下移</translation></message>
-    <message><source>当前物品预览</source><translation>目前物品預覽</translation></message>
-    <message><source>保存</source><translation>儲存</translation></message>
-    <message><source>撤销</source><translation>復原</translation></message>
-    <message><source>重做</source><translation>重做</translation></message>
-    <message><source>复制物品…</source><translation>複製物品…</translation></message>
-    <message><source>试玩当前内容</source><translation>試玩目前內容</translation></message>
-    <message><source>修改物品名称</source><translation>修改物品名稱</translation></message>
-    <message><source>修改效果文字</source><translation>修改效果文字</translation></message>
-    <message><source>修改物品类型</source><translation>修改物品類型</translation></message>
-    <message><source>修改装备位置</source><translation>修改裝備位置</translation></message>
-    <message><source>修改物品数值</source><translation>修改物品數值</translation></message>
-    <message><source>修改库存方式</source><translation>修改庫存方式</translation></message>
-    <message><source>修改出售价格比例</source><translation>修改售出價格比例</translation></message>
-    <message><source>修改回收价格比例</source><translation>修改回收價格比例</translation></message>
-    <message><source>修改商店库存</source><translation>修改商店庫存</translation></message>
-    <message><source>上移商店物品</source><translation>上移商店物品</translation></message>
-    <message><source>下移商店物品</source><translation>下移商店物品</translation></message>
-    <message><source>修改物品内容</source><translation>修改物品內容</translation></message>
-    <message><source>从左侧列表或项目树打开一个物品或商店货单。</source><translation>從左侧列表或專案树開啟一个物品或商店貨單。</translation></message>
-    <message><source>正在编辑物品：%1</source><translation>正在編輯物品：%1</translation></message>
-    <message><source>正在编辑商店：%1</source><translation>正在編輯商店：%1</translation></message>
-    <message><source>原文件中还有 %1 项高级内容未在此显示；保存时会保持不变。</source><translation>原檔案中還有 %1 項進階內容未在此显示；儲存时会保持不变。</translation></message>
-    <message><source>其它类型 (%1)</source><translation>其他類型 (%1)</translation></message>
-    <message><source>当前值使用了随机规则，第一版保持原样；不会在这里改写。</source><translation>目前值使用了隨機規則，第一版保持原樣；不會在這裡改寫。</translation></message>
-    <message><source>未指定</source><translation>未指定</translation></message>
-    <message><source>其它位置：%1</source><translation>其他位置：%1</translation></message>
-    <message><source>顺序</source><translation>順序</translation></message>
-    <message><source>文件</source><translation>檔案</translation></message>
-    <message><source>库存</source><translation>庫存</translation></message>
-    <message><source>未找到物品</source><translation>找不到物品</translation></message>
-    <message><source>不限</source><translation>不限</translation></message>
-    <message><source>%1&#10;%2</source><translation>%1&#10;%2</translation></message>
-    <message><source>选择货单中的物品查看名称、价格和图片。</source><translation>選擇貨單中的物品查看名稱、價格和圖片。</translation></message>
-    <message><source>未选择</source><translation>未選擇</translation></message>
-    <message><source>未找到物品：%1&#10;保存货单时仍会保留这个引用。</source><translation>找不到物品：%1&#10;儲存貨單时仍會保留这个引用。</translation></message>
-    <message><source>未找到</source><translation>找不到</translation></message>
-    <message><source>%1&#10;%2&#10;基础价格：%3&#10;回收价格：%4</source><translation>%1&#10;%2&#10;基礎價格：%3&#10;回收價格：%4</translation></message>
-    <message><source>按游戏默认</source><translation>按遊戲默认</translation></message>
-    <message><source>物品与商店编辑器</source><translation>物品與商店編輯器</translation></message>
-    <message><source>物品 - %1%2</source><translation>物品 - %1%2</translation></message>
-    <message><source>商店 - %1%2</source><translation>商店 - %1%2</translation></message>
-    <message><source>选择物品图片</source><translation>選擇物品圖片</translation></message>
-    <message><source>图片文件 (*.mpc *.asf *.imp *.img *.png);;所有文件 (*.*)</source><translation>圖片檔案 (*.mpc *.asf *.imp *.img *.png);;所有檔案 (*.*)</translation></message>
-    <message><source>无法选择资源</source><translation>無法選擇資源</translation></message>
-    <message><source>请选择当前项目物品图片目录中的文件。</source><translation>请選擇目前專案物品圖片目錄中的檔案。</translation></message>
-    <message><source>修改物品图片</source><translation>修改物品圖片</translation></message>
-    <message><source>-副本.ini</source><translation>-複本.ini</translation></message>
-    <message><source>复制为新物品</source><translation>複製为新物品</translation></message>
-    <message><source>物品文件 (*.ini)</source><translation>物品檔案 (*.ini)</translation></message>
-    <message><source>无法复制物品</source><translation>無法複製物品</translation></message>
-    <message><source>加入商店</source><translation>加入商店</translation></message>
-    <message><source>未设置</source><translation>未設定</translation></message>
-    <message><source>%1&#10;%2×%3，%4 帧</source><translation>%1&#10;%2×%3，%4 幀</translation></message>
-    <message><source>未找到预览&#10;可继续保存引用</source><translation>找不到預覽&#10;仍可繼續儲存引用</translation></message>
-    <message><source>把当前未保存内容带入项目默认场景；实际购买、使用或装备取决于场景内容</source><translation>把目前未儲存內容带入專案預設場景；實際購買、使用或裝備取決於场景內容</translation></message>
-    <message><source>搜索物品名称或文件名</source><translation>搜尋物品名稱或檔案名</translation></message>
-    <message><source>搜索商店文件名</source><translation>搜尋商店檔案名</translation></message>
-    <message><source>药品</source><translation>藥品</translation></message>
-    <message><source>装备</source><translation>裝備</translation></message>
-    <message><source>其它物品</source><translation>其他物品</translation></message>
-    <message><source>身体</source><translation>身體</translation></message>
-    <message><source>脚部</source><translation>腳部</translation></message>
-    <message><source>头部</source><translation>頭部</translation></message>
-    <message><source>颈部</source><translation>頸部</translation></message>
-    <message><source>背部</source><translation>背部</translation></message>
-    <message><source>手腕</source><translation>手腕</translation></message>
-    <message><source>手持</source><translation>手持</translation></message>
-</context>
-
-<context>
-    <name>MainWindow</name>
-    <message><source>当前物品：%1（默认场景）</source><translation>目前物品：%1（預設場景）</translation></message>
-    <message><source>当前商店：%1（默认场景）</source><translation>目前商店：%1（預設場景）</translation></message>
-    <message><source>无法试玩当前物品</source><translation>無法試玩目前物品</translation></message>
-    <message><source>无法试玩当前商店</source><translation>無法試玩目前商店</translation></message>
-    <message><source>请先在项目运行设置中指定默认场景；试玩会带入当前物品或商店内容，实际购买、使用和装备取决于场景。</source><translation>请先在專案运行設定中指定預設場景；試玩会带入目前物品或商店內容，實際購買、使用和裝備取決於场景。</translation></message>
-    <message><source>当前物品或商店不属于这个项目，无法直接试玩。</source><translation>目前物品或商店不屬於这个專案，無法直接試玩。</translation></message>
-    <message><source>正在准备当前物品“%1”的默认场景试玩...</source><translation>正在準備目前物品“%1”的預設場景試玩...</translation></message>
-    <message><source>正在准备当前商店“%1”的默认场景试玩...</source><translation>正在準備目前商店“%1”的預設場景試玩...</translation></message>
-    <message><source>物品 - %1</source><translation>物品 - %1</translation></message>
-    <message><source>商店 - %1</source><translation>商店 - %1</translation></message>
-    <message><source> %1 个已打开文档未能重新载入，请手动检查。</source><translation> %1 个已開啟文档無法重新載入，请手动检查。</translation></message>
-</context>
-
-<context>
-    <name>ProjectExplorerWidget</name>
-    <message><source>物品</source><translation>物品</translation></message>
-    <message><source>商店</source><translation>商店</translation></message>
-</context>
-
-<context>
-    <name>DialogueEditorWindow</name>
-    <message><source>%1
-%2</source><translation>%1
-%2</translation></message>
-    <message><source>%1
-%2×%3，%4 帧</source><translation>%1
-%2×%3，%4 幀</translation></message>
-    <message><source>%1 · %2 句</source><translation>%1 · %2 句</translation></message>
-    <message><source>%1. %2：%3</source><translation>%1. %2：%3</translation></message>
-    <message><source>不显示头像</source><translation>不顯示頭像</translation></message>
-    <message><source>从脚本或 NPC 进入时，可在这里返回调用位置。</source><translation>從腳本或 NPC 進入時，可在這裡返回呼叫位置。</translation></message>
-    <message><source>使用头像文件</source><translation>使用頭像檔案</translation></message>
-    <message><source>保存</source><translation>儲存</translation></message>
-    <message><source>保存失败</source><translation>儲存失敗</translation></message>
-    <message><source>保存当前对话</source><translation>儲存目前對話</translation></message>
-    <message><source>保存更改</source><translation>儲存變更</translation></message>
-    <message><source>修改对话</source><translation>修改對話</translation></message>
-    <message><source>切换项目资源</source><translation>切換專案資源</translation></message>
-    <message><source>回到打开这段对话的脚本行</source><translation>回到開啟這段對話的腳本行</translation></message>
-    <message><source>头像</source><translation>頭像</translation></message>
-    <message><source>头像文件</source><translation>頭像檔案</translation></message>
-    <message><source>头像预览</source><translation>頭像預覽</translation></message>
-    <message><source>完成后可返回打开这段对话的脚本位置。</source><translation>完成後可返回開啟這段對話的腳本位置。</translation></message>
-    <message><source>对话 - %1%2</source><translation>對話 - %1%2</translation></message>
-    <message><source>对话“%1”已修改，是否保存？</source><translation>對話「%1」已修改，是否儲存？</translation></message>
-    <message><source>对话文件中没有“%1”，已打开文件供你选择其他段落。</source><translation>對話檔案中沒有「%1」，已開啟檔案供你選擇其他段落。</translation></message>
-    <message><source>对话段落</source><translation>對話段落</translation></message>
-    <message><source>尚未打开对话文件</source><translation>尚未開啟對話檔案</translation></message>
-    <message><source>当前一句</source><translation>目前一句</translation></message>
-    <message><source>当前对话已修改。切换项目资源前是否保存？</source><translation>目前對話已修改。切換專案資源前是否儲存？</translation></message>
-    <message><source>搜索段落或对话内容</source><translation>搜尋段落或對話內容</translation></message>
-    <message><source>撤销</source><translation>復原</translation></message>
-    <message><source>文本</source><translation>文字</translation></message>
-    <message><source>旁白</source><translation>旁白</translation></message>
-    <message><source>无法保存当前对话：
-%1
-
-%2</source><translation>無法儲存目前對話：
-%1
-
-%2</translation></message>
-    <message><source>无法打开对话</source><translation>無法開啟對話</translation></message>
-    <message><source>无法读取对话文件：
-%1
-
-%2</source><translation>無法讀取對話檔案：
-%1
-
-%2</translation></message>
-    <message><source>未找到对话段落</source><translation>找不到對話段落</translation></message>
-    <message><source>未找到预览
-可继续保存引用</source><translation>找不到預覽
-仍可儲存引用</translation></message>
-    <message><source>未显示的 %1 个字段和原有注释会在保存时保留。</source><translation>未顯示的 %1 個欄位和原有註解會在儲存時保留。</translation></message>
-    <message><source>未选择段落</source><translation>未選擇段落</translation></message>
-    <message><source>本句不显示头像</source><translation>本句不顯示頭像</translation></message>
-    <message><source>本句沿用上一句头像</source><translation>本句沿用上一句頭像</translation></message>
-    <message><source>沿用上一句</source><translation>沿用上一句</translation></message>
-    <message><source>用当前修改进入项目默认场景</source><translation>使用目前修改進入專案預設場景</translation></message>
-    <message><source>试玩当前对话</source><translation>試玩目前對話</translation></message>
-    <message><source>说话人</source><translation>說話人</translation></message>
-    <message><source>请选择头像</source><translation>請選擇頭像</translation></message>
-    <message><source>请选择对话段落</source><translation>請選擇對話段落</translation></message>
-    <message><source>返回调用位置</source><translation>返回呼叫位置</translation></message>
-    <message><source>重做</source><translation>重做</translation></message>
-</context>
-
-<context>
-    <name>MainWindow</name>
-    <message><source>%1（脚本第 %2 行）</source><translation>%1（腳本第 %2 行）</translation></message>
-    <message><source>“%1”的脚本不是可识别的文本：
-%2</source><translation>「%1」的腳本不是可識別的文字：
-%2</translation></message>
-    <message><source>“%1”的脚本中没有直接引用 talk(&quot;段落&quot;)。你仍可打开脚本继续查找。</source><translation>「%1」的腳本中沒有直接引用 talk(&quot;段落&quot;)。你仍可開啟腳本繼續查找。</translation></message>
-    <message><source>“%1”的脚本引用了多段对话：</source><translation>「%1」的腳本引用了多段對話：</translation></message>
-    <message><source>对话 - %1</source><translation>對話 - %1</translation></message>
-    <message><source>当前地图没有找到对话文件：
-%1</source><translation>目前地圖找不到對話檔案：
-%1</translation></message>
-    <message><source>当前对话不属于这个项目，无法直接试玩。</source><translation>目前對話不屬於這個專案，無法直接試玩。</translation></message>
-    <message><source>当前对话：%1（默认场景）</source><translation>目前對話：%1（預設場景）</translation></message>
-    <message><source>把光标放在 talk(&quot;段落&quot;) 调用所在行后打开对话</source><translation>把游標放在 talk(&quot;段落&quot;) 呼叫所在行後開啟對話</translation></message>
-    <message><source>无法打开对话</source><translation>無法開啟對話</translation></message>
-    <message><source>无法编辑对话</source><translation>無法編輯對話</translation></message>
-    <message><source>无法试玩当前对话</source><translation>無法試玩目前對話</translation></message>
-    <message><source>无法读取“%1”的脚本：
-%2</source><translation>無法讀取「%1」的腳本：
-%2</translation></message>
-    <message><source>无法返回调用位置</source><translation>無法返回呼叫位置</translation></message>
-    <message><source>正在准备对话“%1”的默认场景试玩...</source><translation>正在準備對話「%1」的預設場景試玩...</translation></message>
-    <message><source>没有可编辑的对话</source><translation>沒有可編輯的對話</translation></message>
-    <message><source>编辑当前对话</source><translation>編輯目前對話</translation></message>
-    <message><source>请先保存脚本，再从 talk(&quot;段落&quot;) 调用进入对话。</source><translation>請先儲存腳本，再從 talk(&quot;段落&quot;) 呼叫進入對話。</translation></message>
-    <message><source>请先在项目运行设置中指定默认场景；试玩会带入当前对话修改，进入游戏后可从相应剧情位置检查效果。</source><translation>請先在專案執行設定中指定預設場景；試玩會帶入目前對話修改，進入遊戲後可從相應劇情位置檢查效果。</translation></message>
-    <message><source>请把光标放在 talk(&quot;段落&quot;) 调用所在行，再选择“编辑当前对话”。</source><translation>請把游標放在 talk(&quot;段落&quot;) 呼叫所在行，再選擇「編輯目前對話」。</translation></message>
-    <message><source>调用文件当前不是脚本编辑视图。</source><translation>呼叫檔案目前不是腳本編輯檢視。</translation></message>
-    <message><source>调用脚本已经不存在或无法打开：
-%1</source><translation>呼叫腳本已不存在或無法開啟：
-%1</translation></message>
-    <message><source>这个对话文件已经在其他编辑视图中打开。</source><translation>這個對話檔案已在其他編輯檢視中開啟。</translation></message>
-    <message><source>选择要编辑的对话</source><translation>選擇要編輯的對話</translation></message>
-</context>
-
-<context>
-    <name>NpcDataEditorWindow</name>
-    <message><source>当前 NPC 没有可定位的脚本。请先填写脚本文件，并确认 NPC 文件包含地图名称。</source><translation>目前 NPC 沒有可定位的腳本。請先填寫腳本檔案，並確認 NPC 檔案包含地圖名稱。</translation></message>
-    <message><source>打开当前 NPC 脚本引用的对话</source><translation>開啟目前 NPC 腳本引用的對話</translation></message>
-    <message><source>无法编辑对话</source><translation>無法編輯對話</translation></message>
-    <message><source>没有找到当前 NPC 的脚本：
-%1</source><translation>找不到目前 NPC 的腳本：
-%1</translation></message>
-    <message><source>编辑对话</source><translation>編輯對話</translation></message>
-</context>
-
-<context>
-    <name>ProjectExplorerWidget</name>
-    <message><source>对话</source><translation>對話</translation></message>
-</context>
-
-<context>
-    <name>MainWindow</name>
-    <message><source>高级工具</source><translation>進階工具</translation></message>
-    <message><source>高级调试</source><translation>進階偵錯</translation></message>
-    <message><source>发布(&amp;R)</source><translation>發佈(&amp;R)</translation></message>
-    <message><source>MOD 发布与资源设置...</source><translation>MOD 發佈與資源設定...</translation></message>
-    <message><source>设置 MOD 名称、版本、封面、简介和资源关系</source><translation>設定 MOD 名稱、版本、封面、簡介和資源關係</translation></message>
-    <message><source>MOD 发布与资源设置</source><translation>MOD 發佈與資源設定</translation></message>
-</context>
-
-<context>
-    <name>ResourceProfileEditorWindow</name>
-    <message><source>MOD 发布与资源设置</source><translation>MOD 發佈與資源設定</translation></message>
-</context>
-
-<context>
-    <name>ComponentPropertyEditor</name>
-    <message><source>窗口资源</source><translation>視窗資源</translation></message>
-    <message><source>资源文件</source><translation>資源檔案</translation></message>
-    <message><source>高级属性</source><translation>進階屬性</translation></message>
-    <message><source>内部名称</source><translation>內部名稱</translation></message>
-    <message><source>不自动对齐</source><translation>不自動對齊</translation></message>
-    <message><source>填满窗口</source><translation>填滿視窗</translation></message>
-    <message><source>靠左</source><translation>靠左</translation></message>
-    <message><source>靠右</source><translation>靠右</translation></message>
-    <message><source>靠上</source><translation>靠上</translation></message>
-    <message><source>靠下</source><translation>靠下</translation></message>
-    <message><source>左上角</source><translation>左上角</translation></message>
-    <message><source>右上角</source><translation>右上角</translation></message>
-    <message><source>左下角</source><translation>左下角</translation></message>
-    <message><source>右下角</source><translation>右下角</translation></message>
-    <message><source>居中</source><translation>置中</translation></message>
-    <message><source>左侧居中</source><translation>左側置中</translation></message>
-    <message><source>右侧居中</source><translation>右側置中</translation></message>
-    <message><source>顶部居中</source><translation>頂部置中</translation></message>
-    <message><source>底部居中</source><translation>底部置中</translation></message>
-</context>
-
-<context>
-    <name>ImageEditorWindow</name>
-    <message><source>添加图片</source><translation>加入圖片</translation></message>
-    <message><source>整理图片</source><translation>整理圖片</translation></message>
-    <message><source>已复制：0 帧</source><translation>已複製：0 幀</translation></message>
-    <message><source>多帧位置</source><translation>多幀位置</translation></message>
-    <message><source>动画方向:</source><translation>動畫方向:</translation></message>
-    <message><source>高级帧工具</source><translation>進階幀工具</translation></message>
-    <message><source>图片编辑器 - %1%2</source><translation>圖片編輯器 - %1%2</translation></message>
-    <message><source>帧 %1/%2 | %3x%4 | 位置(%5, %6)</source><translation>幀 %1/%2 | %3x%4 | 位置(%5, %6)</translation></message>
-    <message><source>已复制：%1 帧</source><translation>已複製：%1 幀</translation></message>
-</context>
-
-<context>
-    <name>MainWindow</name>
-    <message><source>编辑游戏图片和动画</source><translation>編輯遊戲圖片與動畫</translation></message>
-    <message><source>编辑游戏脚本，支持搜索、补全和函数导航</source><translation>編輯遊戲腳本，支援搜尋、補全與函式導覽</translation></message>
-</context>
-
-<context>
-    <name>MenuEditorWindow</name>
-    <message><source>资源</source><translation>資源</translation></message>
-</context>
-
-<context>
-    <name>MagicEditorWindow</name>
-    <message><source>只带入当前武功和所选等级，并以战斗状态进入试玩场景</source><translation>只帶入目前武功和所選等級，並以戰鬥狀態進入試玩場景</translation></message>
-</context>
-
-<context>
-    <name>GoodsShopEditorWindow</name>
-    <message><source>把当前物品加入隔离试玩背包，再进入试玩场景</source><translation>把目前物品加入隔離試玩背包，再進入試玩場景</translation></message>
-    <message><source>进入试玩场景后直接打开当前商店</source><translation>進入試玩場景後直接開啟目前商店</translation></message>
-</context>
-
-<context>
-    <name>DialogueEditorWindow</name>
-    <message><source>进入匹配地图并直接显示当前段落</source><translation>進入相符地圖並直接顯示目前段落</translation></message>
-</context>
-
-<context>
-    <name>MainWindow</name>
-    <message><source>项目默认场景已经不存在。请在项目运行设置中重新选择试玩场景。</source><translation>專案預設場景已不存在。請在專案執行設定中重新選擇試玩場景。</translation></message>
-    <message><source>默认试玩场景还是空白初始配置。请先在项目运行设置中填写合适的玩家坐标，并按需要选择 NPC、物件列表。</source><translation>預設試玩場景仍是空白初始設定。請先在專案執行設定中填寫合適的玩家座標，並按需要選擇 NPC、物件列表。</translation></message>
-    <message><source>匹配的试玩场景还是空白初始配置。请先在项目运行设置中填写合适的玩家坐标，并按需要选择 NPC、物件列表。</source><translation>相符的試玩場景仍是空白初始設定。請先在專案執行設定中填寫合適的玩家座標，並按需要選擇 NPC、物件列表。</translation></message>
-    <message><source>无法为当前武功准备可直接使用的试玩场景。</source><translation>無法為目前武功準備可直接使用的試玩場景。</translation></message>
-    <message><source>无法为当前物品准备加入背包的试玩场景。</source><translation>無法為目前物品準備加入背包的試玩場景。</translation></message>
-    <message><source>无法为当前商店准备直接打开的试玩场景。</source><translation>無法為目前商店準備直接開啟的試玩場景。</translation></message>
-    <message><source>请先在项目运行设置中添加当前对话所属地图的试玩场景。</source><translation>請先在專案執行設定中加入目前對話所屬地圖的試玩場景。</translation></message>
-    <message><source>当前对话没有匹配的地图场景。请在项目运行设置中添加该地图后再试玩。</source><translation>目前對話沒有相符的地圖場景。請在專案執行設定中加入該地圖後再試玩。</translation></message>
-</context>
-
-<context>
-    <name>MagicEditorWindow</name>
-    <message><source>本级效果值</source><translation>本級效果值</translation></message>
-    <message><source>当前等级</source><translation>目前等級</translation></message>
-    <message><source>对自身</source><translation>對自身</translation></message>
-    <message><source>修改第 %1 级区域形状</source><translation>修改第 %1 級區域形狀</translation></message>
-    <message><source>修改第 %1 级作用方式</source><translation>修改第 %1 級作用方式</translation></message>
-    <message><source>直线移动</source><translation>直線移動</translation></message>
-</context>
-
-<context>
-    <name>MagicRangePreview</name>
-    <message><source>V 形排列 %1 道并向施放方向移动</source><translation>V 形排列 %1 道並向施放方向移動</translation></message>
-    <message><source>橙色为施放者；蓝色按当前等级显示；施放方向向右</source><translation>橙色為施放者；藍色按目前等級顯示；施放方向向右</translation></message>
-    <message><source>橙色为施放者；深蓝为起始，浅蓝为移动后；箭头为移动方向</source><translation>橙色為施放者；深藍為起始，淺藍為移動後；箭頭為移動方向</translation></message>
-    <message><source>对自身</source><translation>對自身</translation></message>
-    <message><source>目标处 %1 × %1 格方形区域</source><translation>目標處 %1 × %1 格方形區域</translation></message>
-    <message><source>目标处横排 %1 格</source><translation>目標處橫排 %1 格</translation></message>
-    <message><source>起始宽度 %1 格，整排向施放方向移动</source><translation>起始寬度 %1 格，整排向施放方向移動</translation></message>
-    <message><source>十字四向各延伸 %1 格</source><translation>十字四向各延伸 %1 格</translation></message>
-    <message><source>向前 %1 排，V 形展开</source><translation>向前 %1 排，V 形展開</translation></message>
-    <message><source>向前 %1 排，每排 5 格</source><translation>向前 %1 排，每排 5 格</translation></message>
-    <message><source>向前 %1 排，逐排展开</source><translation>向前 %1 排，逐排展開</translation></message>
-    <message><source>直线移动</source><translation>直線移動</translation></message>
-    <message><source>只对施放者生效</source><translation>只對施放者生效</translation></message>
-    <message><source>自定义范围需通过试玩查看</source><translation>自訂範圍需透過試玩查看</translation></message>
-    <message><source>当前类型没有可用的静态范围示意</source><translation>目前類型沒有可用的靜態範圍示意</translation></message>
-    <message><source>%1；攻击距离：%2 格</source><translation>%1；攻擊距離：%2 格</translation></message>
-    <message><source>橙色为施放者；当前类型不绘制猜测范围</source><translation>橙色為施放者；目前類型不繪製推測範圍</translation></message>
-    <message><source>橙色为施放者；蓝色为目标落点；施放方向向右</source><translation>橙色為施放者；藍色為目標落點；施放方向向右</translation></message>
-    <message><source>橙色为施放者；深蓝为起点，浅蓝为目标；箭头为移动方向</source><translation>橙色為施放者；深藍為起點，淺藍為目標；箭頭為移動方向</translation></message>
-    <message><source>橙色为施放者；浅蓝为发散方向；箭头为弹道方向</source><translation>橙色為施放者；淺藍為發散方向；箭頭為彈道方向</translation></message>
-    <message><source>橙色格为施放者，也是效果起点</source><translation>橙色格為施放者，也是效果起點</translation></message>
-    <message><source>蓝色为留下的效果；橙色为移动后位置；箭头为角色移动方向</source><translation>藍色為留下的效果；橙色為移動後位置；箭頭為角色移動方向</translation></message>
-    <message><source>橙色为起点，浅橙为目标位置；箭头为角色移动方向</source><translation>橙色為起點，淺橙為目標位置；箭頭為角色移動方向</translation></message>
-    <message><source>橙色为施放者，蓝色为受控目标；虚线表示控制关系</source><translation>橙色為施放者，藍色為受控目標；虛線表示控制關係</translation></message>
-    <message><source>作用于整个画面</source><translation>作用於整個畫面</translation></message>
-    <message><source>飞向并持续追踪移动目标</source><translation>飛向並持續追蹤移動目標</translation></message>
-    <message><source>从施放者投掷到目标位置</source><translation>從施放者投擲到目標位置</translation></message>
-    <message><source>施放者移动时，在经过位置留下效果</source><translation>施放者移動時，在經過位置留下效果</translation></message>
-    <message><source>施放者从起点移动到目标位置</source><translation>施放者從起點移動到目標位置</translation></message>
-    <message><source>效果附着施放者，并控制选定目标</source><translation>效果附著施放者，並控制選定目標</translation></message>
-    <message><source>在目标位置产生召唤</source><translation>在目標位置產生召喚</translation></message>
-    <message><source>由施放者触发时间停止，不表示周围范围</source><translation>由施放者觸發時間停止，不表示周圍範圍</translation></message>
-    <message><source>未定义作用方式，不显示推测范围</source><translation>未定義作用方式，不顯示推測範圍</translation></message>
-    <message><source>只在目标落点生成效果</source><translation>只在目標落點產生效果</translation></message>
-    <message><source>从施放者飞向目标</source><translation>從施放者飛向目標</translation></message>
-    <message><source>连续发射 %1 道，均飞向目标</source><translation>連續發射 %1 道，均飛向目標</translation></message>
-    <message><source>从施放者向四周同时发散 32 道</source><translation>從施放者向四周同時發散 32 道</translation></message>
-    <message><source>向四周发散，飞行时序形成心形</source><translation>向四周發散，飛行時序形成心形</translation></message>
-    <message><source>向四周依次发射，形成螺旋效果</source><translation>向四周依次發射，形成螺旋效果</translation></message>
-    <message><source>向前方扇形发射 %1 道</source><translation>向前方扇形發射 %1 道</translation></message>
-    <message><source>向前方随机错开发射 %1 道</source><translation>向前方隨機錯開發射 %1 道</translation></message>
-</context>
-
-<context>
-    <name>DialogueEditorWindow</name>
-    <message><source>沿用同侧上一句（通常为上上句）</source><translation>沿用同側上一句（通常為上上句）</translation></message>
-    <message><source>同侧此前没有可沿用的头像</source><translation>同側此前沒有可沿用的頭像</translation></message>
-    <message><source>沿用第 %1 句头像</source><translation>沿用第 %1 句頭像</translation></message>
-</context>
-
-<context>
-    <name>MagicEditorWindow</name>
-    <message><source>当前等级的速度与表现</source><translation>目前等級的速度與表現</translation></message>
-    <message><source>附加效果</source><translation>附加效果</translation></message>
-    <message><source>飞行速度</source><translation>飛行速度</translation></message>
-    <message><source>延迟出现（帧）</source><translation>延遲出現（幀）</translation></message>
-    <message><source>持续时间（帧）</source><translation>持續時間（幀）</translation></message>
-    <message><source>画面混合</source><translation>畫面混合</translation></message>
-    <message><source>飞行亮度</source><translation>飛行亮度</translation></message>
-    <message><source>命中亮度</source><translation>命中亮度</translation></message>
-    <message><source>全屏特效</source><translation>全螢幕特效</translation></message>
-    <message><source>全屏声音</source><translation>全螢幕聲音</translation></message>
-    <message><source>施展动作与修炼攻击</source><translation>施展動作與修煉攻擊</translation></message>
-    <message><source>关联攻击时的动作</source><translation>關聯攻擊時的動作</translation></message>
-    <message><source>施展动作（优先）</source><translation>施展動作（優先）</translation></message>
-    <message><source>修炼时的攻击效果</source><translation>修煉時的攻擊效果</translation></message>
-    <message><source>角色修炼此武功后，普通攻击会附带这里选择的武功效果。</source><translation>角色修煉此武功後，普通攻擊會附帶這裡選擇的武功效果。</translation></message>
-    <message><source>打开关联武功</source><translation>開啟關聯武功</translation></message>
-    <message><source>无</source><translation>無</translation></message>
-    <message><source>恢复生命</source><translation>恢復生命</translation></message>
-    <message><source>恢复体力</source><translation>恢復體力</translation></message>
-    <message><source>减伤护盾</source><translation>減傷護盾</translation></message>
-    <message><source>清除异常状态</source><translation>清除異常狀態</translation></message>
-    <message><source>吸收伤害护盾</source><translation>吸收傷害護盾</translation></message>
-    <message><source>临时改变属性</source><translation>暫時改變屬性</translation></message>
-    <message><source>冻结</source><translation>凍結</translation></message>
-    <message><source>中毒</source><translation>中毒</translation></message>
-    <message><source>石化</source><translation>石化</translation></message>
-    <message><source>普通</source><translation>一般</translation></message>
-    <message><source>透明叠加</source><translation>透明疊加</translation></message>
-</context>
-
-<context>
-    <name>ResourceProfileEditorWindow</name>
-    <message><source>[LevelUp] 升级提示与特效</source><translation>[LevelUp] 升級提示與特效</translation></message>
-    <message><source>提示模板:</source><translation>提示範本:</translation></message>
-    <message><source>随机特效:</source><translation>隨機特效:</translation></message>
-    <message><source>男性特效:</source><translation>男性特效:</translation></message>
-    <message><source>女性特效:</source><translation>女性特效:</translation></message>
-    <message><source>支持 {name} 和 {level}，留空则不显示升级提示</source><translation>支援 {name} 和 {level}，留空則不顯示升級提示</translation></message>
-    <message><source>每行一个 ini/magic 下的 Magic INI；未配置男女特效时随机选择</source><translation>每行一個 ini/magic 下的 Magic INI；未設定男女特效時隨機選擇</translation></message>
-    <message><source>ini/magic 下的 Magic INI 文件名，可留空</source><translation>ini/magic 下的 Magic INI 檔名，可留空</translation></message>
-    <message><source>LevelUp 特效必须是 ini/magic 下的安全相对 INI 路径，且文件名不能包含逗号：%1</source><translation>LevelUp 特效必須是 ini/magic 下的安全相對 INI 路徑，且檔名不可包含逗號：%1</translation></message>
-</context>
-
-<context>
-    <name>ResourceProfileEditorWindow</name>
-    <message><source>[Gameplay] 伙伴行为</source><translation>[Gameplay] 夥伴行為</translation></message>
-    <message><source>[Script] 脚本兼容规则</source><translation>[Script] 指令碼相容規則</translation></message>
-    <message><source>升级经验阈值:</source><translation>升級經驗閾值:</translation></message>
-    <message><source>伙伴跟随距离:</source><translation>夥伴跟隨距離:</translation></message>
-    <message><source>伙伴跑动距离:</source><translation>夥伴跑動距離:</translation></message>
-    <message><source>NPC 动作编号协议:</source><translation>NPC 動作編號協定:</translation></message>
-    <message><source>NPC 运行语义:</source><translation>NPC 執行語義:</translation></message>
-    <message><source>NPC 特殊动作方式:</source><translation>NPC 特殊動作方式:</translation></message>
-    <message><source>AddLife 语义:</source><translation>AddLife 語義:</translation></message>
-    <message><source>经验大于或等于阈值</source><translation>經驗大於或等於閾值</translation></message>
-    <message><source>经验严格大于阈值</source><translation>經驗嚴格大於閾值</translation></message>
-    <message><source>剑侠情缘二动作编号</source><translation>劍俠情緣二動作編號</translation></message>
-    <message><source>月影传说动作编号</source><translation>月影傳說動作編號</translation></message>
-    <message><source>新剑侠情缘动作编号</source><translation>新劍俠情緣動作編號</translation></message>
-    <message><source>剑侠情缘二运行语义</source><translation>劍俠情緣二執行語義</translation></message>
-    <message><source>月影/新剑运行语义</source><translation>月影/新劍執行語義</translation></message>
-    <message><source>替换当前动作</source><translation>取代目前動作</translation></message>
-    <message><source>覆盖在当前动作上</source><translation>覆蓋在目前動作上</translation></message>
-    <message><source>使用主角生命规则</source><translation>使用主角生命規則</translation></message>
-    <message><source>直接增减并限制范围</source><translation>直接增減並限制範圍</translation></message>
-</context>
-
-<context>
-    <name>ResourceProfileEditorWindow</name>
-    <message><source>固定剧情角色名，留空保持原有行为</source><translation>固定劇情角色名，留空保持原有行為</translation></message>
-    <message><source>用于替换 #name；不随当前操控角色切换，也不作为存档变量。</source><translation>用於替換 #name；不隨目前操控角色切換，也不作為存檔變數。</translation></message>
 </context>
 </TS>

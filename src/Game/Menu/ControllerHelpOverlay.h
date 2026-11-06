@@ -3,6 +3,8 @@
 #include "../../Element/Element.h"
 #include "../../Component/Label.h"
 #include "ControllerPromptPresenter.h"
+#include "ControllerHelpLayout.h"
+#include "ControllerHelpContent.h"
 
 #include <array>
 #include <string>
@@ -18,11 +20,7 @@ public:
 	void dismiss();
 
 private:
-	struct HelpLine
-	{
-		GameInput::InputAction action;
-		std::string description;
-	};
+	using HelpLine = ControllerHelpContent::Line;
 	static const std::vector<HelpLine>& worldHelpLines();
 	static const std::vector<HelpLine>& menuHelpLines();
 	void drawSection(
@@ -34,11 +32,7 @@ private:
 		int fontSize,
 		int lineHeight,
 		unsigned int textColor);
-	void drawControllerDiagram(
-		int contentLeft,
-		int contentTop,
-		int outerMargin,
-		int lineHeight);
+	void drawControllerDiagram();
 	bool ensureControllerImageLoaded();
 	std::string formatLine(const HelpLine& line) const;
 	void updateLayout(int width, int height);
@@ -48,6 +42,8 @@ private:
 	void onDraw() override;
 	void onWindowResize(int width, int height) override;
 
+	ControllerHelpLayout display;
+	ControllerHelpLayout::Geometry layout;
 	ControllerPromptLabelTheme labelTheme;
 	_shared_image controllerImage = nullptr;
 	std::array<CachedTextTexture, 3> headerAndFooterTextTextures;

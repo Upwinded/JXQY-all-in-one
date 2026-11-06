@@ -5,6 +5,7 @@
 
 #include "../core/DesktopRunDocumentSnapshot.h"
 #include "../core/DialogueDocument.h"
+#include "../core/ContentAuthoring.h"
 #include "../core/ProjectDocumentRegistry.h"
 
 #include <QWidget>
@@ -44,6 +45,15 @@ public:
     QString currentFilePath() const;
     QString currentSectionName() const;
     QString displayName() const;
+    bool createSection(const QString& name, bool copyCurrent = false, QString* errorMessage = nullptr);
+    bool renameSection(const QString& name, QString* errorMessage = nullptr);
+    bool deleteSection(QString* errorMessage = nullptr);
+    bool insertLine(int row, QString* errorMessage = nullptr);
+    bool removeLine(int row, QString* errorMessage = nullptr);
+    bool moveLine(int from, int to, QString* errorMessage = nullptr);
+    ContentReferenceReport currentReferences() const;
+    void setDocumentSnapshotsProvider(std::function<QList<DesktopRunDocumentSnapshot>()> provider);
+    void setFileMutationPreflight(std::function<bool(const QStringList&, QString&)> preflight);
 
     void setCaller(const QString& scriptPath, int line, int column);
     void clearCaller();
@@ -68,6 +78,9 @@ signals:
     void documentStatesChanged();
     void documentClosed();
     void playtestRequested();
+    void filesChanged(const QStringList& paths);
+    void openReferenceRequested(const QString& path, int line);
+    void usageScriptRequested(const QString& source);
     void returnToCallerRequested(
         const QString& scriptPath, int line, int column);
 
@@ -80,6 +93,12 @@ private:
     void setupUi();
     void setupActions();
     void setupConnections();
+    void setupAuthoringActions();
+    void retranslateAuthoringActions();
+    void showReferences();
+    bool applyLineOrder(const std::function<bool()>& mutation, int selectedRow, QString* errorMessage);
+    QByteArray pendingDocumentBytes() const;
+    bool writeDocument(const QByteArray& bytes, QString& error);
     void retranslateDynamicUi();
     bool loadDocumentBytes(const QByteArray& bytes);
     void pushSnapshotChange(const QByteArray& before,
@@ -98,6 +117,8 @@ private:
 
     DialogueDocument document;
     QString filePath;
+    QString loadedSourcePath;
+    QByteArray loadedBytes;
     QString assetsBasePath;
     QString selectedSection;
     int selectedLineRow = -1;
@@ -107,6 +128,8 @@ private:
     std::function<bool(const QString&, const QString&)>
         documentPathValidator;
     bool refreshing = false;
+    std::function<QList<DesktopRunDocumentSnapshot>()> snapshotsProvider;
+    std::function<bool(const QStringList&, QString&)> mutationPreflight;
 
     QToolBar* toolBar = nullptr;
     QAction* saveAction = nullptr;
@@ -114,6 +137,16 @@ private:
     QAction* redoAction = nullptr;
     QAction* playtestAction = nullptr;
     QAction* returnAction = nullptr;
+    QAction* newSectionAction = nullptr;
+    QAction* copySectionAction = nullptr;
+    QAction* renameSectionAction = nullptr;
+    QAction* deleteSectionAction = nullptr;
+    QAction* referencesAction = nullptr;
+    QAction* usageScriptAction = nullptr;
+    QAction* insertLineAction = nullptr;
+    QAction* removeLineAction = nullptr;
+    QAction* moveLineUpAction = nullptr;
+    QAction* moveLineDownAction = nullptr;
     QUndoStack* undoStack = nullptr;
 
     QLineEdit* searchEdit = nullptr;

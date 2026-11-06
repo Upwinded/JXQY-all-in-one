@@ -22,6 +22,10 @@ public:
     void setEntity(const MapEntityData& entity);
     bool applyToEntity(MapEntityData& entity) const;
     void setAssetsBasePath(const QString& path);
+    void setMapName(const QString& name) { mapName = name; }
+
+signals:
+    void editScriptRequested(const QString& path);
 
 private:
     QLineEdit* nameEdit = nullptr;
@@ -107,6 +111,7 @@ private:
 
     bool isNpcEntity = true;
     QString assetsBasePath;
+    QString mapName;
     QDialogButtonBox* buttonBox = nullptr;
 
     struct NormalizedResourceReferences

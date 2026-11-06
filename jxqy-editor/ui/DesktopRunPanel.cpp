@@ -103,6 +103,8 @@ DesktopRunPanel::DesktopRunPanel(QWidget* parent)
     stateValueLabel->setObjectName(
         QStringLiteral("desktopRunStateValueLabel"));
     configureCompactValueLabel(stateValueLabel);
+    stateValueLabel->setSizePolicy(
+        QSizePolicy::Maximum, QSizePolicy::Preferred);
     progressValueLabel = new QLabel(this);
     progressValueLabel->setObjectName(
         QStringLiteral("desktopRunProgressValueLabel"));
@@ -111,6 +113,8 @@ DesktopRunPanel::DesktopRunPanel(QWidget* parent)
     exitValueLabel->setObjectName(
         QStringLiteral("desktopRunExitValueLabel"));
     configureCompactValueLabel(exitValueLabel);
+    exitValueLabel->setSizePolicy(
+        QSizePolicy::Maximum, QSizePolicy::Preferred);
 
     runButton = new QPushButton(this);
     runButton->setObjectName(
@@ -230,17 +234,18 @@ DesktopRunPanel::DesktopRunPanel(QWidget* parent)
     summaryLayout->setVerticalSpacing(4);
     summaryLayout->addWidget(targetCaptionLabel, 0, 0);
     summaryLayout->addWidget(
-        playtestTargetValueLabel, 0, 1, 1, 3);
-    summaryLayout->addWidget(problemButton, 0, 4, 1, 2);
+        playtestTargetValueLabel, 0, 1, 1, 4);
+    summaryLayout->addWidget(problemButton, 0, 5, 1, 2);
     summaryLayout->addWidget(stateCaptionLabel, 1, 0);
     summaryLayout->addWidget(stateValueLabel, 1, 1);
     summaryLayout->addWidget(resultCaptionLabel, 1, 2);
     summaryLayout->addWidget(exitValueLabel, 1, 3);
-    summaryLayout->addWidget(runButton, 1, 4);
-    summaryLayout->addWidget(stopButton, 1, 5);
-    summaryLayout->addWidget(detailsToggleButton, 1, 6);
-    summaryLayout->setColumnStretch(1, 2);
-    summaryLayout->setColumnStretch(3, 1);
+    summaryLayout->addWidget(runButton, 1, 5);
+    summaryLayout->addWidget(stopButton, 1, 6);
+    summaryLayout->addWidget(detailsToggleButton, 1, 7);
+    summaryLayout->setColumnStretch(4, 1);
+    // Keep surplus dock height below the two summary rows.
+    summaryLayout->setRowStretch(2, 1);
 
     auto* mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(6, 6, 6, 6);

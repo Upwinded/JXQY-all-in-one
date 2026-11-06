@@ -1716,6 +1716,44 @@ int NPC::getPartnerCharacterIndex()
 	return registeredPartnerIndex == gm->global.data.characterIndex ? -1 : registeredPartnerIndex;
 }
 
+const std::vector<MagicInfo>& NPC::getPartnerMagicList()
+{
+	const int index = kind == nkPartner && (relation == nrFriendly || relation == nrNeutral)
+		? getPartnerCharacterIndex() : -1;
+	partnerMagicUsedForCombat = kind == nkPartner && relation == nrFriendly;
+	if (index != partnerMagicCharacterIndex)
+	{
+		partnerMagicCharacterIndex = index;
+		partnerMagicList.clear();
+		if (index >= 0)
+		{
+			MagicManager savedMagic;
+			std::string failureReason;
+			if (savedMagic.load(index, &failureReason))
+			{
+				for (int slot = 0; slot < savedMagic.listLength(); ++slot)
+				{
+					if (savedMagic.magicListExists(slot) && (savedMagic.isStoreIndex(slot)
+						|| savedMagic.isBottomIndex(slot) || savedMagic.isPracticeIndex(slot)))
+					{
+						partnerMagicList.push_back(savedMagic.magicList[slot]);
+					}
+				}
+			}
+			else GameLog::write("NPC: cannot load partner magic index=%d reason=%s\n", index, failureReason.c_str());
+		}
+	}
+	return partnerMagicList;
+}
+
+void NPC::reloadPartnerMagic()
+{
+	partnerMagicCharacterIndex = -1;
+	partnerMagicList.clear();
+	partnerMagicUsedForCombat = false;
+	rebuildAttackOptions();
+}
+
 bool NPC::isLivingPartner()
 {
 	return relation == nrFriendly && canViewPartnerDetails();
@@ -1730,7 +1768,7 @@ bool NPC::canViewPartnerDetails()
 bool NPC::canChangePartnerEquipment()
 {
 	return canViewPartnerDetails() && characterEquipmentSynchronized
-		&& (canEquip > 0 || (relation == nrFriendly && getPartnerCharacterIndex() >= 0));
+		&& (canEquip > 0 || getPartnerCharacterIndex() >= 0);
 }
 
 void NPC::resetPartnerRecovery()
@@ -1750,39 +1788,76 @@ void NPC::refillPartnerResources()
 
 void NPC::finishPartnerJoin()
 {
-	if (!isLivingPartner()) return;
+	if (!canViewPartnerDetails()) return;
+	if (relation == nrNeutral)
+	{
+		const int characterIndex = getPartnerCharacterIndex();
+		if (characterIndex >= 0 && !restorePartnerAttributes(true) && characterEquipmentSynchronized)
+		{
+			// A higher map level can skip attribute restoration while equipment still needs loading.
+			gm->partnerManager.restoreCharacterEquipment(*this, characterIndex);
+		}
+		return;
+	}
+	reloadPartnerMagic();
 	restorePartnerAttributes(true);
 	updateEquipmentAttributes(false);
 	refillPartnerResources();
 }
 
-bool NPC::setKindAndRelation(int newKind, int newRelation)
+bool NPC::setKindAndRelation(int newKind, int newRelation, bool changeRelation)
 {
-	const bool wasPartner = kind == nkPartner && relation == nrFriendly;
-	const bool becomesPartner = newKind == nkPartner && newRelation == nrFriendly;
-	const bool leavesEditableNeutral = kind == nkPartner && relation == nrNeutral && canEquip > 0
-		&& (newKind != nkPartner || newRelation != nrNeutral);
-	if (((wasPartner && !becomesPartner) || leavesEditableNeutral) && gm != nullptr
-		&& !gm->partnerManager.saveCharacterSnapshot(std::dynamic_pointer_cast<NPC>(getMySharedPtr())))
+	const bool hadTemporaryRelation = changeToOppositeMilliseconds > 0;
+	const int liveRelation = relation;
+	const int previousRelation = hadTemporaryRelation ? originalRelationBeforeOppositeChange : relation;
+	if (!changeRelation)
 	{
-		GameLog::write("NPC: cannot save departing partner %s\n", npcName.c_str());
-		const std::string message = u8"伙伴资料保存失败，无法离队或改变阵营：" + npcName;
-		gm->showMessage(message);
-		gm->script.reportCommandFailure(message);
-		return false;
+		if (hadTemporaryRelation && newKind == kind) return true;
+		newRelation = previousRelation;
+	}
+	const bool wasPartner = kind == nkPartner && previousRelation == nrFriendly;
+	const bool becomesPartner = newKind == nkPartner && newRelation == nrFriendly;
+	const bool joinsNeutralPartner = newKind == nkPartner && newRelation == nrNeutral
+		&& !wasPartner && (kind != nkPartner || previousRelation != nrNeutral);
+	const bool leavesEditableNeutral = kind == nkPartner && previousRelation == nrNeutral
+		&& (canEquip > 0 || getPartnerCharacterIndex() >= 0)
+		&& (newKind != nkPartner || newRelation != nrNeutral);
+	if (((wasPartner && !becomesPartner) || leavesEditableNeutral) && gm != nullptr)
+	{
+		// Persist the original party membership without committing a change on write failure.
+		relation = previousRelation;
+		const bool saved = gm->partnerManager.saveCharacterSnapshot(std::dynamic_pointer_cast<NPC>(getMySharedPtr()));
+		relation = liveRelation;
+		if (!saved)
+		{
+			GameLog::write("NPC: cannot save departing partner %s\n", npcName.c_str());
+			const std::string message = u8"伙伴资料保存失败，无法离队或改变阵营：" + npcName;
+			gm->showMessage(message);
+			gm->script.reportCommandFailure(message);
+			return false;
+		}
 	}
 	kind = newKind;
 	relation = newRelation;
-	if (!wasPartner && becomesPartner) finishPartnerJoin();
+	if (hadTemporaryRelation)
+	{
+		changeToOppositeMilliseconds = 0;
+		originalRelationBeforeOppositeChange = relation;
+		clearCombatTargetMemory();
+	}
+	if ((!wasPartner && becomesPartner) || joinsNeutralPartner) finishPartnerJoin();
 	else restorePartnerAttributes();
 	if (!becomesPartner) resetPartnerRecovery();
+	if (wasPartner && !becomesPartner) reloadPartnerMagic();
+	if (hadTemporaryRelation) rebuildAttackOptions();
 	return true;
 }
 
 bool NPC::restorePartnerAttributes(bool joining)
 {
+	const bool neutralPartner = kind == nkPartner && relation == nrNeutral;
 	if (gm == nullptr || !gm->global.feature.restorePartnerAttributes ||
-		relation != nrFriendly || npcName.empty() ||
+		(relation != nrFriendly && !neutralPartner) || npcName.empty() ||
 		name == "player" || life <= 0 || isDying() || isHiding())
 	{
 		return false;
@@ -1813,7 +1888,23 @@ bool NPC::restorePartnerAttributes(bool joining)
 			GameLog::write("NPC: invalid partner character record %s\n", fileName.c_str());
 			return false;
 		}
-		if (savedLevel < level || (savedLevel == level && !joining)) return false;
+		if (savedLevel < level || (savedLevel == level && !joining))
+		{
+			if (neutralPartner && npcLevelIni.empty())
+			{
+				const std::string levelFile = attributes->Get("Init", "LevelIni", "");
+				if (!levelFile.empty())
+				{
+					npcLevelIni = levelFile;
+					loadLevel(npcLevelIni);
+					if (levelUpExp <= 0 && level >= 1 && level <= static_cast<int>(npcLevelList.size()))
+					{
+						levelUpExp = npcLevelList[level - 1].levelUpExp;
+					}
+				}
+			}
+			return false;
+		}
 		if (joining && !gm->partnerManager.restoreCharacterEquipment(*this, index)) return false;
 		// Restore only character attributes; the map owns scripts, appearance and position.
 		attack = attributes->GetInteger("Init", "Attack", attack);
@@ -1832,6 +1923,7 @@ bool NPC::restorePartnerAttributes(bool joining)
 		level = savedLevel;
 		npcLevelIni = attributes->Get("Init", "LevelIni", npcLevelIni);
 		loadLevel(npcLevelIni.empty() ? "level-npc.ini" : npcLevelIni);
+		if (neutralPartner) updateEquipmentAttributes(false);
 		refillPartnerResources();
 		return true;
 	}
@@ -1874,7 +1966,8 @@ void NPC::updatePartnerRecovery(UTime frameTime)
 
 void NPC::addPartnerExperience(int amount)
 {
-	if (!isLivingPartner() || amount <= 0 || level < 1 || level >= static_cast<int>(npcLevelList.size())
+	if (!canViewPartnerDetails() || (relation != nrFriendly && getPartnerCharacterIndex() < 0)
+		|| amount <= 0 || level < 1 || level >= static_cast<int>(npcLevelList.size())
 		|| levelUpExp <= 0) return;
 	exp = addRepeatedSaturated(exp, amount, 1);
 	const bool strict = ResourceManager::instance().getActiveManifest().resolvedLevelUpThresholdMode()
@@ -1903,7 +1996,10 @@ void NPC::addPartnerExperience(int amount)
 		increase(manaMax, previous.manaMax, next.manaMax);
 		levelUpExp = next.levelUpExp;
 		++level;
-		refillPartnerResources();
+		life = std::max(0, getLifeMax());
+		thew = std::max(0, getThewMax());
+		mana = std::max(0, getManaMax());
+		resetPartnerRecovery();
 	}
 }
 
@@ -4721,11 +4817,13 @@ void NPC::updateMagicRuntimeStateTimers(UTime frameTime)
 	}
 	if (changeToOppositeMilliseconds > 0)
 	{
-		changeToOppositeMilliseconds = changeToOppositeMilliseconds > frameTime ? changeToOppositeMilliseconds - frameTime : 0;
-		if (changeToOppositeMilliseconds == 0)
+		if (changeToOppositeMilliseconds > frameTime)
 		{
-			relation = originalRelationBeforeOppositeChange;
-			clearCombatTargetMemory();
+			changeToOppositeMilliseconds -= frameTime;
+		}
+		else
+		{
+			clearTemporaryOppositeRelation();
 		}
 	}
 	if (weakMilliseconds > 0)
@@ -4939,9 +5037,7 @@ void NPC::applyTemporaryOppositeRelation(UTime milliseconds)
 	}
 	if (changeToOppositeMilliseconds > 0)
 	{
-		relation = originalRelationBeforeOppositeChange;
-		changeToOppositeMilliseconds = 0;
-		clearCombatTargetMemory();
+		clearTemporaryOppositeRelation();
 		return;
 	}
 
@@ -4953,12 +5049,18 @@ void NPC::applyTemporaryOppositeRelation(UTime milliseconds)
 
 void NPC::clearTemporaryOppositeRelation()
 {
-	if (changeToOppositeMilliseconds > 0)
+	const bool restoringRelation = changeToOppositeMilliseconds > 0;
+	if (restoringRelation)
 	{
 		relation = originalRelationBeforeOppositeChange;
 	}
 	changeToOppositeMilliseconds = 0;
 	originalRelationBeforeOppositeChange = relation;
+	if (restoringRelation)
+	{
+		clearCombatTargetMemory();
+		rebuildAttackOptions();
+	}
 }
 
 void NPC::triggerMagicWhenKillEnemy(const Effect& effect)
@@ -5394,13 +5496,21 @@ void NPC::playSound(NPCActionType act)
 	Point pos = Map::getTilePosition(position, gm->camera->position, { 0, 0 }, soundOffset);
 	float x = float(pos.x) * SOUND_FACTOR / TILE_WIDTH;
 	float y = float(pos.y) * SOUND_FACTOR / TILE_HEIGHT;
+	// Standing animations can loop faster than their voice clips.
+	if ((act == acStand || act == acStand1 || act == acAStand)
+		&& standingSoundChannel != nullptr && engine->getMusicPlaying(standingSoundChannel))
+	{
+		engine->setMusicPosition(standingSoundChannel, x, y);
+		engine->setMusicVolume(standingSoundChannel, engine->getSoundVolume());
+		return;
+	}
 	switch (act)
 	{
 	case NPCActionType::acStand:
-		playSoundFile(res.stand.soundFile, x, y);
+		standingSoundChannel = playSoundFile(res.stand.soundFile, x, y);
 		break;
 	case NPCActionType::acStand1:
-		playSoundFile(res.stand1.soundFile, x, y);
+		standingSoundChannel = playSoundFile(res.stand1.soundFile, x, y);
 		break;
 	case NPCActionType::acWalk:
 		playSoundFile(res.walk.soundFile, x, y);
@@ -5438,7 +5548,7 @@ void NPC::playSound(NPCActionType act)
 	case NPCActionType::acSitting:
 		break;
 	case NPCActionType::acAStand:
-		playSoundFile(res.astand.soundFile, x, y);
+		standingSoundChannel = playSoundFile(res.astand.soundFile, x, y);
 		break;
 	case NPCActionType::acAWalk:
 		playSoundFile(res.awalk.soundFile, x, y);
@@ -5481,6 +5591,7 @@ void NPC::reloadAction()
 bool NPC::usesNativeAttackProtocol() const
 {
 	return gm != nullptr && gm->global.feature.nativeNpcAttackAtAnimationEnd && kind != nkPlayer
+		&& (!partnerMagicUsedForCombat || partnerMagicList.empty())
 		&& flyInis.empty() && temporaryMagicListReplacement.empty()
 		&& equipmentFlyIniReplacements.empty() && temporaryFlyIniReplacements.empty()
 		&& equipmentFlyIni2Replacements.empty()
@@ -5654,7 +5765,7 @@ std::shared_ptr<Magic> NPC::selectAttackMagicForAction(Point dest, std::shared_p
 	return selectedMagic;
 }
 
-bool NPC::releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, std::shared_ptr<GameElement> target, bool applyAdditionalEffect)
+bool NPC::releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, std::shared_ptr<GameElement> target, bool applyAdditionalEffect, int learnedLevel)
 {
 	if (selectedMagic == nullptr)
 	{
@@ -5664,7 +5775,7 @@ bool NPC::releaseAttackMagic(std::shared_ptr<Magic> selectedMagic, Point dest, s
 	// its animation or resource costs have changed the caster's life.
 	int launcher = getLauncherKindForNPC(*this);
 
-	int clampedLevel = getClampedAttackLevel();
+	int clampedLevel = learnedLevel > 0 ? learnedLevel : getClampedAttackLevel();
 	if (target != nullptr && canSee(target->position))
 	{
 		lastCombatTarget = target;
@@ -5691,6 +5802,7 @@ std::shared_ptr<Magic> NPC::prepareAttackMagicForAction(Point dest, std::shared_
 	auto selectedMagic = selectAttackMagicForAction(dest, target, releaseMode);
 	bool applyAdditionalEffect = hasLastUsedAttackOption && lastUsedAttackOption.useAdditionalEffect;
 	setPreparedAttackMagic(selectedMagic, applyAdditionalEffect);
+	preparedAttackMagicLevel = hasLastUsedAttackOption ? lastUsedAttackOption.learnedLevel : 0;
 	preparedAttackUsesNativeProtocol = hasPreparedAttackMagic && usesNativeAttackProtocol();
 	return selectedMagic;
 }
@@ -5704,6 +5816,7 @@ bool NPC::releasePreparedAttackMagic(Point dest, std::shared_ptr<GameElement> ta
 	auto selectedMagic = preparedAttackMagic;
 	bool applyAdditionalEffect = preparedAttackUsesAdditionalEffect;
 	const bool nativeProtocol = preparedAttackUsesNativeProtocol;
+	const int learnedLevel = preparedAttackMagicLevel;
 	clearPreparedAttackMagic();
 	if (nativeProtocol)
 	{
@@ -5712,12 +5825,13 @@ bool NPC::releasePreparedAttackMagic(Point dest, std::shared_ptr<GameElement> ta
 		releaseAttackMagic(selectNativeAttackMagicAtRelease(), dest, nullptr, true);
 		return true;
 	}
-	return releaseAttackMagic(selectedMagic, dest, target, applyAdditionalEffect);
+	return releaseAttackMagic(selectedMagic, dest, target, applyAdditionalEffect, learnedLevel);
 }
 
 void NPC::setPreparedAttackMagic(std::shared_ptr<Magic> magic, bool useAdditionalEffect)
 {
 	preparedAttackMagic = magic;
+	preparedAttackMagicLevel = 0;
 	preparedAttackUsesNativeProtocol = false;
 	hasPreparedAttackMagic = magic != nullptr;
 	preparedAttackUsesAdditionalEffect = hasPreparedAttackMagic && useAdditionalEffect;
@@ -5726,6 +5840,7 @@ void NPC::setPreparedAttackMagic(std::shared_ptr<Magic> magic, bool useAdditiona
 void NPC::clearPreparedAttackMagic()
 {
 	preparedAttackMagic = nullptr;
+	preparedAttackMagicLevel = 0;
 	hasPreparedAttackMagic = false;
 	preparedAttackUsesAdditionalEffect = false;
 	preparedAttackUsesNativeProtocol = false;
@@ -5844,7 +5959,8 @@ bool NPC::doAttack(Point dest, std::shared_ptr<GameElement> target, AttackReleas
 		return releaseAttackMagic(selectNativeAttackMagicAtRelease(), dest, nullptr, true);
 	}
 	bool applyAdditionalEffect = hasLastUsedAttackOption && lastUsedAttackOption.useAdditionalEffect;
-	return releaseAttackMagic(selectedMagic, dest, target, applyAdditionalEffect);
+	return releaseAttackMagic(selectedMagic, dest, target, applyAdditionalEffect,
+		hasLastUsedAttackOption ? lastUsedAttackOption.learnedLevel : 0);
 }
 
 std::shared_ptr<Magic> NPC::resolveMagicReplacement(std::shared_ptr<Magic> magic)
@@ -6563,20 +6679,13 @@ void NPC::awardDefeatedNpcExperience(std::shared_ptr<Effect> effect, std::shared
 	const double scaledExperience = scaleAutomaticExperience(baseExperience, Config::experienceMultiplier);
 	const int playerExperience = roundAutomaticExperience(scaledExperience);
 	gm->player->addExp(playerExperience);
-	for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
+	if (partnerKill && killer->canLevelUp > 0 && killer->isLivingPartner()
+		&& gm->partnerManager.isActivePartner(killer) && killer->getPartnerCharacterIndex() < 0)
 	{
-		if (partner == nullptr || !partner->isLivingPartner()) continue;
-		if (partner->getPartnerCharacterIndex() >= 0)
-		{
-			partner->addPartnerExperience(playerExperience);
-		}
-		else if (partner == killer && partner->canLevelUp > 0)
-		{
-			const int ownBase = calculateDefeatedNpcBaseExperience(manifest, partner->level,
-				level, exp, expBonus, kind == nkBattle && relation == nrHostile);
-			partner->addPartnerExperience(
-				roundAutomaticExperience(scaleAutomaticExperience(ownBase, Config::experienceMultiplier)));
-		}
+		const int ownBase = calculateDefeatedNpcBaseExperience(manifest, killer->level,
+			level, exp, expBonus, kind == nkBattle && relation == nrHostile);
+		killer->addPartnerExperience(
+			roundAutomaticExperience(scaleAutomaticExperience(ownBase, Config::experienceMultiplier)));
 	}
 	if (effect != nullptr && playerKill)
 	{
@@ -8086,6 +8195,14 @@ void NPC::initFromIni(INIReader * ini, const std::string & section)
 
 void NPC::freeResource()
 {
+	if (standingSoundChannel != nullptr)
+	{
+		engine->stopMusic(standingSoundChannel);
+		standingSoundChannel = nullptr;
+	}
+	partnerMagicCharacterIndex = -1;
+	partnerMagicList.clear();
+	partnerMagicUsedForCombat = false;
 	projectileCollisionStartValid = false;
 	clearTemporaryNpcRes(false);
 	freeNPCAction(&scriptSpecialActionOverlayResource);
@@ -8560,7 +8677,7 @@ void NPC::onMouseLeftDown(int x, int y)
     if (player->nowAction != acDeath && player->nowAction != acHide)
     {
         NextAction act;
-        if (player->canRun && player->canPayRunThewCost())
+        if (!player->isRunDisabled() && player->canPayRunThewCost())
         {
             act.action = acRun;
         }
@@ -8667,6 +8784,30 @@ int NPC::estimatePhysicalReach(const Magic& magic, int level) const
 		return 0;
 	}
 	const auto& levelInfo = magic.level[level];
+	const auto movementFrameBudget = [&](UTime legacyFlyTime)
+	{
+		const float rate = getLegacyMovementFrameCount(1.0f, Config::getGameSpeed());
+		if (levelInfo.lifeFrame > 0 && levelInfo.moveKind != mmkThrow && magic.meteorMove <= 0)
+		{
+			const auto mode = gm != nullptr ? gm->global.magicTimingMode : MagicTimingMode::FixedMilliseconds;
+			if (mode == MagicTimingMode::LogicFrames)
+			{
+				return static_cast<float>(levelInfo.lifeFrame);
+			}
+			const int interval = magic.flyImage != nullptr ? std::max(0, magic.flyImage->interval) : 0;
+			if (mode == MagicTimingMode::NativeAnimationFrames)
+			{
+				const float stepsPerAnimation = std::floor(interval * rate + 0.000001f) + 1.0f;
+				return std::max(0.0f, levelInfo.lifeFrame * stepsPerAnimation - 1.0f);
+			}
+			if (mode == MagicTimingMode::CSharpAnimationFrames)
+			{
+				// Conservative: C# can advance at most once per update; slower updates extend this range.
+				return levelInfo.lifeFrame * static_cast<float>(std::max(1, interval)) * rate;
+			}
+		}
+		return getLegacyMovementFrameCount(static_cast<float>(legacyFlyTime), Config::getGameSpeed());
+	};
 
 	if (levelInfo.moveKind == mmkFly || levelInfo.moveKind == mmkFlyContinuous
 		|| levelInfo.moveKind == mmkFollow || levelInfo.moveKind == mmkThrow
@@ -8695,7 +8836,12 @@ int NPC::estimatePhysicalReach(const Magic& magic, int level) const
 			return 0;
 		}
 
-		float rawReach = (float)levelInfo.speed * MAGIC_FLYING_SPEED_SCALE * Config::getGameSpeed() * (float)flyTime / 2.0f;
+		float rawReach = levelInfo.speed * movementFrameBudget(flyTime) / static_cast<float>(TILE_HEIGHT);
+		if (levelInfo.moveKind == mmkFly || levelInfo.moveKind == mmkFlyContinuous)
+		{
+			// Screen-normalized projectiles have their shortest projected reach horizontally.
+			rawReach /= MapXRatio;
+		}
 		int reach = (int)std::floor(rawReach) - ATTACK_REACH_SAFETY_TILES;
 		return reach > 0 ? reach : 1;
 	}
@@ -8718,7 +8864,7 @@ int NPC::estimatePhysicalReach(const Magic& magic, int level) const
 		}
 		if (levelInfo.speed > 0 && flyTime > 0)
 		{
-			float rawReach = (float)levelInfo.speed * MAGIC_FLYING_SPEED_SCALE * Config::getGameSpeed() * (float)flyTime / 2.0f;
+			float rawReach = levelInfo.speed * movementFrameBudget(flyTime) / static_cast<float>(TILE_HEIGHT);
 			int reach = (int)std::floor(rawReach) - ATTACK_REACH_SAFETY_TILES;
 			return reach > 0 ? reach : 1;
 		}
@@ -8737,7 +8883,8 @@ int NPC::estimatePhysicalReach(const Magic& magic, int level) const
 
 int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 {
-	const int maximumDistance = option.magic != nullptr && option.magic->hasPositionCastLimit(getClampedAttackLevel())
+	const int level = option.learnedLevel > 0 ? option.learnedLevel : getClampedAttackLevel();
+	const int maximumDistance = option.magic != nullptr && option.magic->hasPositionCastLimit(level)
 		? MAGIC_MAX_CAST_DISTANCE : (std::numeric_limits<int>::max)();
 	if (usesNativeAttackProtocol() && !option.hasExplicitUseDistance)
 	{
@@ -8750,7 +8897,7 @@ int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 
 	if (option.moveKind == mmkPoint)
 	{
-		int pointDistance = option.hasExplicitUseDistance ? option.configuredUseDistance : attackRadius;
+		int pointDistance = option.hasExplicitUseDistance || option.learnedLevel > 0 ? option.configuredUseDistance : attackRadius;
 		if (pointDistance <= 0)
 		{
 			pointDistance = attackRadius;
@@ -8759,7 +8906,7 @@ int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 		{
 			pointDistance = 1;
 		}
-		if (!option.hasExplicitUseDistance && attackRadius > 0 && pointDistance > attackRadius)
+		if (!option.hasExplicitUseDistance && option.learnedLevel == 0 && attackRadius > 0 && pointDistance > attackRadius)
 		{
 			pointDistance = attackRadius;
 		}
@@ -8772,8 +8919,7 @@ int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 		dist = option.configuredUseDistance;
 	}
 
-	int clampedLevel = getClampedAttackLevel();
-	int physReach = estimatePhysicalReach(*option.magic, clampedLevel);
+	int physReach = estimatePhysicalReach(*option.magic, level);
 	if (physReach > 0)
 	{
 		if (dist <= 0)
@@ -8806,7 +8952,7 @@ int NPC::calcEffectiveUseDistance(const NPCAttackOption& option) const
 	{
 		dist = 1;
 	}
-	if (!option.hasExplicitUseDistance && attackRadius > 0 && dist > attackRadius)
+	if (!option.hasExplicitUseDistance && option.learnedLevel == 0 && attackRadius > 0 && dist > attackRadius)
 	{
 		dist = attackRadius;
 	}
@@ -9001,7 +9147,7 @@ void NPC::parseMagicList(const std::string& listString, int sourceIndexStart)
 	}
 }
 
-void NPC::addAttackOption(const std::string& magicFileName, int distance, int sourceIndex, bool useAdditionalEffect)
+void NPC::addAttackOption(const std::string& magicFileName, int distance, int sourceIndex, bool useAdditionalEffect, int learnedLevel)
 {
 	auto magic = gm->magicManager.loadAttackMagic(magicFileName);
 	if (magic != nullptr && !magic->loadSucceeded)
@@ -9010,11 +9156,17 @@ void NPC::addAttackOption(const std::string& magicFileName, int distance, int so
 	}
 	if (magic != nullptr)
 	{
-		int clampedLevel = getClampedAttackLevel();
+		if (learnedLevel > 0)
+		{
+			attackOptions.erase(std::remove_if(attackOptions.begin(), attackOptions.end(),
+				[&](const NPCAttackOption& option) { return option.magic == magic; }), attackOptions.end());
+		}
+		int clampedLevel = learnedLevel > 0 ? std::clamp(learnedLevel, 1, MAGIC_MAX_LEVEL) : getClampedAttackLevel();
 		auto& levelInfo = magic->level[clampedLevel];
 
 		NPCAttackOption option;
 		option.magic = magic;
+		option.learnedLevel = learnedLevel > 0 ? clampedLevel : 0;
 		option.moveKind = levelInfo.moveKind;
 		option.region = levelInfo.region;
 		option.shapeRange = getAttackOptionShapeRange(option.moveKind, option.region, clampedLevel);
@@ -9026,7 +9178,7 @@ void NPC::addAttackOption(const std::string& magicFileName, int distance, int so
 		option.hasExplicitUseDistance = distance > 0;
 		if (option.configuredUseDistance <= 0)
 		{
-			option.configuredUseDistance = option.moveKind == mmkPoint ? 0 : levelInfo.attackRadius;
+			option.configuredUseDistance = option.moveKind == mmkPoint && learnedLevel == 0 ? 0 : levelInfo.attackRadius;
 		}
 
 		attackOptions.push_back(option);
@@ -9035,6 +9187,7 @@ void NPC::addAttackOption(const std::string& magicFileName, int distance, int so
 
 void NPC::rebuildAttackOptions()
 {
+	getPartnerMagicList();
 	attackOptions.clear();
 	actionPlan.reset();
 	hasLastUsedAttackOption = false;
@@ -9081,6 +9234,13 @@ void NPC::rebuildAttackOptions()
 	{
 		parseMagicList(flyInis, sourceIndex);
 	}
+	if (partnerMagicUsedForCombat)
+	{
+		for (const auto& learned : partnerMagicList)
+		{
+			addAttackOption(learned.iniFile, 0, sourceIndex++, false, learned.level);
+		}
+	}
 	std::sort(attackOptions.begin(), attackOptions.end());
 }
 
@@ -9115,6 +9275,7 @@ bool NPC::isCrossHit(Point casterPosition, Point targetPosition, int crossRange)
 
 bool NPC::canMagicHitTarget(const NPCAttackOption& option, Point casterPosition, Point targetPosition, int level) const
 {
+	if (option.learnedLevel > 0) level = option.learnedLevel;
 	if (option.magic == nullptr)
 	{
 		return false;
@@ -9369,7 +9530,7 @@ bool NPC::shouldUseSelfBuff(const NPCAttackOption& option) const
 	{
 		return false;
 	}
-	int clampedLevel = getClampedAttackLevel();
+	int clampedLevel = option.learnedLevel > 0 ? option.learnedLevel : getClampedAttackLevel();
 	if (clampedLevel < 1 || clampedLevel > MAGIC_MAX_LEVEL)
 	{
 		return false;
@@ -9441,7 +9602,7 @@ bool NPC::trySelfBuff()
 			continue;
 		}
 		nextSelfBuffTime = currentTime + SelfBuffMinInterval + engine->getRand(SelfBuffMaxInterval - SelfBuffMinInterval);
-		int clampedLevel = getClampedAttackLevel();
+		int clampedLevel = option.learnedLevel > 0 ? option.learnedLevel : getClampedAttackLevel();
 		useMagic(option.magic, position, clampedLevel, std::dynamic_pointer_cast<GameElement>(getMySharedPtr()));
 		return true;
 	}
@@ -9529,6 +9690,7 @@ bool NPC::skillRequiresLineOfSight(const NPCAttackOption& option) const
 
 std::optional<Point> NPC::findBestAttackPosition(const NPCAttackOption& option, Point casterPosition, Point targetPosition, int level) const
 {
+	if (option.learnedLevel > 0) level = option.learnedLevel;
 	bool requiresExactPosition = option.moveKind == mmkRegion && isExactPositionRegionShape(option.region);
 	if (!requiresExactPosition)
 	{

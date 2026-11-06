@@ -1215,6 +1215,17 @@ void ProjectManager::clearRecentFiles()
     persistLocalProjectState(captureState());
 }
 
+void ProjectManager::setRecentFiles(const QStringList& fileNames)
+{
+    QStringList files = fileNames;
+    files.removeDuplicates();
+    files = files.mid(0, maxRecentFiles);
+    if (files == m_recentFiles)
+        return;
+    m_recentFiles = files;
+    persistLocalProjectState(captureState());
+}
+
 QString ProjectManager::theme() const
 {
     return m_theme;
@@ -1262,11 +1273,18 @@ void ProjectManager::setWindowMode(WindowDisplayMode mode)
 void ProjectManager::setWindowPlacement(
     const QRect& normalGeometry, WindowDisplayMode mode)
 {
+    setWindowPlacement(normalGeometry, mode, m_windowState);
+}
+
+void ProjectManager::setWindowPlacement(
+    const QRect& normalGeometry, WindowDisplayMode mode, const QByteArray& windowState)
+{
     if (!m_hasWindowPlacement || m_windowGeometry != normalGeometry ||
-        m_windowMode != mode)
+        m_windowMode != mode || m_windowState != windowState)
     {
         m_windowGeometry = normalGeometry;
         m_windowMode = mode;
+        m_windowState = windowState;
         m_hasWindowPlacement = true;
         persistLocalProjectState(captureState());
     }
@@ -1791,22 +1809,22 @@ bool ProjectManager::persistLocalProjectState(
     QSettings settings = EditorSettings::create();
     settings.beginGroup(
         localProjectStateGroup(state.projectFilePath));
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings,
         QStringLiteral("schemaVersion"),
         localProjectStateSchemaVersion);
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings,
         QStringLiteral("projectPath"),
         normalizedProjectPath(state.projectFilePath));
-    settings.setValue(QStringLiteral("theme"), state.theme);
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings, QStringLiteral("theme"), state.theme);
+    EditorSettings::setValueIfChanged(settings,
         QStringLiteral("windowPlacement/hasValue"),
         state.hasWindowPlacement);
     if (state.hasWindowPlacement)
     {
-        settings.setValue(
+        EditorSettings::setValueIfChanged(settings,
             QStringLiteral("windowPlacement/normalGeometry"),
             state.windowGeometry);
-        settings.setValue(
+        EditorSettings::setValueIfChanged(settings,
             QStringLiteral("windowPlacement/mode"),
             WindowPlacementPolicy::modeToString(
                 state.windowMode));
@@ -1818,21 +1836,21 @@ bool ProjectManager::persistLocalProjectState(
         settings.remove(
             QStringLiteral("windowPlacement/mode"));
     }
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings,
         QStringLiteral("windowState"), state.windowState);
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings,
         QStringLiteral("recentFiles"), state.recentFiles);
 
     QJsonObject sessionRoot;
     sessionRoot[QStringLiteral("documentSession")] =
         projectDocumentSessionToJson(state.documentSession);
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings,
         QStringLiteral("documentSession"),
         QJsonDocument(sessionRoot).toJson(
             QJsonDocument::Compact));
     settings.endGroup();
-    settings.sync();
-    if (settings.status() != QSettings::NoError)
+    const auto result = EditorSettings::synchronize(settings);
+    if (!result.succeeded())
     {
         qWarning().noquote()
             << QStringLiteral(
@@ -1842,7 +1860,7 @@ bool ProjectManager::persistLocalProjectState(
                        settings.fileName(),
                        QString::number(
                            static_cast<int>(
-                               settings.status())));
+                               result.status)));
         return false;
     }
     return true;

@@ -57,23 +57,6 @@ void GameElement::getNewPosition(Point pos, PointEx off, Point * newPos, PointEx
 	}
 }
 
-void GameElement::updateEffectPosition(UTime ftime, float flySpeed)
-{
-	if (flySpeed <= 0.0f || ftime == 0)
-	{
-		return;
-	}
-	PointEx movementVector = getEffectProjectedMovementVector(flyingDirection);
-	if (getProjectedMovementLength(movementVector) <= 0.0f)
-	{
-		return;
-	}
-
-	float distance = getProjectedMagicFrameDistance(flySpeed, (float)ftime, Config::getGameSpeed());
-	offset = advanceProjectedMovement(offset, movementVector, distance);
-	updatePosition();
-}
-
 void GameElement::updateJumpingPosition(UTime ftime, float flySpeed)
 {
 	if (flySpeed <= 0.0f || ftime == 0)

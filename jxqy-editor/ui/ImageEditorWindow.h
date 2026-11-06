@@ -16,6 +16,7 @@
 #include <functional>
 
 #include "../core/IMPImageFile.h"
+#include "../core/EditorFileState.h"
 #include "../core/ImageFrameTransform.h"
 #include "../core/PicFileEditor.h"
 #include "../core/ProjectDocumentRegistry.h"
@@ -72,6 +73,7 @@ private:
 
 class QUndoStack;
 class QToolButton;
+class QLabel;
 enum class ImageBatchImportInsertionMode;
 struct ImageFrameBatchDocument;
 struct ImageFrameBatchFailure;
@@ -88,6 +90,7 @@ public:
 
     bool openFile(const QString& fileName);
     bool saveFileAs(const QString& fileName);
+    bool createImageDocument(const QList<QImage>& images, QString* errorMessage = nullptr);
     bool setAssetsBasePath(const QString& path);
     QString currentFilePath() const;
     QList<ProjectDocumentState> currentProjectDocuments() const;
@@ -123,6 +126,7 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
 
 private slots:
+    void onNewFile();
     void onOpenFile();
     void onSaveFile();
     void onSaveAs();
@@ -213,6 +217,7 @@ private:
     IMPImageFile impFile;
     PicFileEditor picEditor;
     std::string currentFileName;
+    EditorFileState fileState;
     PicType currentPicType = PicType::None;
     int currentFrameIndex = -1;
     bool isModified = false;
@@ -235,6 +240,7 @@ private:
     QAction* undoShortcutAction;
     QAction* redoShortcutAction;
     QToolButton* advancedFrameToolsButton = nullptr;
+    QLabel* frameNumberHint = nullptr;
 
     QUndoStack* imageUndoStack;
     bool imageHistoryBaseModified = false;

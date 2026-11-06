@@ -24,6 +24,7 @@ struct TalkString
 class TalkLabel :
 	public Item
 {
+	friend class FontSelectionTestAccess;
 public:
 	TalkLabel();
 	virtual ~TalkLabel();
@@ -41,6 +42,8 @@ public:
 
 	// 当前页文字是否已经全部显示完毕
 	bool isPageComplete() const { return pageComplete; }
+	int getDisplayedCharacterCount() const { return displayedCharCount; }
+	void restoreProgress(const TalkLabel& previous, int displayedCharacters);
 
 	// 设置每个字符的显示间隔（毫秒）
 	void setCharInterval(unsigned int interval) { charInterval = interval; }

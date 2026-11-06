@@ -18,6 +18,7 @@ extern "C" {
 #include "../../File/INIReader.h"
 #include "../../libconvert/libconvert.h"
 #include "../../Launch/EditorRunRuntimeTrace.h"
+#include "../../Resource/ScriptMoveScreenProfile.h"
 
 #include <cstdint>
 #include <optional>
@@ -58,9 +59,10 @@ enum class MoveScreenArgumentMode
 };
 
 constexpr MoveScreenArgumentMode resolveMoveScreenArgumentMode(
-	int argumentCount)
+	int argumentCount,
+	ScriptMoveScreenProfile profile = ScriptMoveScreenProfile::CSharp)
 {
-	return argumentCount >= 3
+	return argumentCount >= 3 && profile == ScriptMoveScreenProfile::CSharp
 		? MoveScreenArgumentMode::FrameCountAndSpeed
 		: MoveScreenArgumentMode::Distance;
 }

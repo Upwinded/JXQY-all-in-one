@@ -3,12 +3,14 @@
 #include "../Config/Config.h"
 #include "ControllerPromptPresenter.h"
 #include "UIFocusManager.h"
+#include "OptionLayout.h"
 
 #include <vector>
 
 class Option :
 	public ConfigDrivenPanel
 {
+	friend class CoreLifecycleTestAccess;
 public:
 	Option();
 	virtual ~Option();
@@ -97,6 +99,10 @@ private:
 	std::string mainOptionsFocusId;
 	bool cheatPanelVisible = false;
 	Rect resourceCheatSettingsButtonRect = {};
+	std::shared_ptr<ImageContainer> cheatPanelBackground;
+	std::map<std::string, OptionLayout::Geometry> configuredOptionGeometry;
+	std::map<std::string, FlatTextButtonStyle> cheatActionStyles;
+	bool hasExplicitOptionLayout(const std::string& name) const;
 
 	int musicPos = 0;
 	int soundPos = 0;

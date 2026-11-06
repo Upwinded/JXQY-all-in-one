@@ -1,10 +1,13 @@
 #include "ScriptEditorWindow.h"
+#include "EditorSaveConfirmation.h"
 #include "ScriptCallDialog.h"
 #include "ui_ScriptEditorWindow.h"
 #include "../core/LuaFunctionOutline.h"
+#include "../core/LuaLexer.h"
 #include "../core/ScriptConverter.h"
 #include "../core/Util.h"
 #include "../core/EditorAssetPath.h"
+#include "../core/DurableFileTransaction.h"
 #include "ThemeManager.h"
 
 #include <QPainter>
@@ -265,7 +268,11 @@ void ScriptEditor::mouseMoveEvent(QMouseEvent* event)
 
 void ScriptEditor::keyPressEvent(QKeyEvent* event)
 {
-    if (completer && completer->popup()->isVisible())
+    const bool isShortcut = event->modifiers().testFlag(Qt::ControlModifier) &&
+        event->key() == Qt::Key_Space;
+    if (isShortcut)
+        emit manualCompletionRequested();
+    if (!isShortcut && completer && completer->popup()->isVisible())
     {
         switch (event->key())
         {
@@ -281,31 +288,53 @@ void ScriptEditor::keyPressEvent(QKeyEvent* event)
         }
     }
 
-    bool isShortcut = (event->modifiers() & Qt::ControlModifier) && event->key() == Qt::Key_Space;
     if (!isShortcut)
         QPlainTextEdit::keyPressEvent(event);
-
-    const bool ctrlOrShift = event->modifiers() & (Qt::ControlModifier | Qt::ShiftModifier);
-    if (ctrlOrShift && event->text().isEmpty())
+    if (!completer)
         return;
 
-    static QString eow("~!@#$%^&*()_+{}|:\"<>?,./;'[]\\-=");
-    bool hasModifier = (event->modifiers() != Qt::NoModifier) && !ctrlOrShift;
-    QString completionPrefix = textUnderCursor();
-
-    if (!completer || (hasModifier || event->text().isEmpty() || completionPrefix.length() < 2
-        || eow.contains(event->text().right(1))))
+    const QString completionPrefix = textUnderCursor();
+    static const QRegularExpression identifier("^[A-Za-z_][A-Za-z0-9_]*$");
+    const bool deletion = event->key() == Qt::Key_Backspace ||
+        event->key() == Qt::Key_Delete;
+    if (!isShortcut &&
+        ((event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) ||
+         (!deletion && event->text().trimmed().isEmpty()) ||
+         !identifier.match(completionPrefix).hasMatch()))
     {
-        if (completer)
-            completer->popup()->hide();
+        completer->popup()->hide();
         return;
+    }
+
+    // Use the shared Lua lexer so strings and both kinds of comments remain text while typing.
+    const QString beforeCursor = toPlainText().left(textCursor().position());
+    const auto lexical = LuaLexer::lex(beforeCursor);
+    for (auto it = lexical.tokens.crbegin(); it != lexical.tokens.crend(); ++it)
+    {
+        if (it->kind == LuaTokenKind::EndOfFile)
+            continue;
+        const bool insideString =
+            (it->kind == LuaTokenKind::String || it->kind == LuaTokenKind::LongString) &&
+            !it->complete;
+        if (it->range.end.utf16Offset == beforeCursor.size()
+            && (it->kind == LuaTokenKind::Comment || insideString))
+        {
+            completer->popup()->hide();
+            return;
+        }
+        break;
     }
 
     if (completionPrefix != completer->completionPrefix())
     {
         completer->setCompletionPrefix(completionPrefix);
-        completer->popup()->setCurrentIndex(completer->completionModel()->index(0, 0));
     }
+    if (completer->completionCount() == 0)
+    {
+        completer->popup()->hide();
+        return;
+    }
+    completer->popup()->setCurrentIndex(completer->completionModel()->index(0, 0));
 
     QRect cr = cursorRect();
     cr.setWidth(completer->popup()->sizeHintForColumn(0)
@@ -842,6 +871,7 @@ ScriptEditorWindow::ScriptEditorWindow(
     if (isRunnableScript())
         setupCompleter();
     setupConnections();
+    setupAuthoringActions();
     applyEditingModeUi();
     ui->scriptSplitter->setStretchFactor(0, 1);
     ui->scriptSplitter->setStretchFactor(1, 0);
@@ -898,12 +928,7 @@ void ScriptEditorWindow::changeEvent(QEvent* event)
 void ScriptEditorWindow::retranslateDynamicUi()
 {
     if (isRunnableScript())
-    {
-        ApiCompleter* previousCompleter = completer;
-        completer = nullptr;
-        setupCompleter();
-        delete previousCompleter;
-    }
+        reloadApiDocumentation();
     QToolTip::hideText();
     applyEditingModeUi();
     if (isRunnableScript())
@@ -932,6 +957,14 @@ void ScriptEditorWindow::setupCompleter()
 
     // Lua 关键字补全与剧情变量补全：与 Script API 共存，按前缀同时提示。
     reloadVariableHints();
+}
+
+void ScriptEditorWindow::reloadApiDocumentation()
+{
+    ApiCompleter* previousCompleter = completer;
+    completer = nullptr;
+    setupCompleter();
+    delete previousCompleter;
 }
 
 void ScriptEditorWindow::reloadVariableHints()
@@ -997,6 +1030,8 @@ void ScriptEditorWindow::setupConnections()
             invalidateSerializedDocumentCache);
     if (isRunnableScript())
     {
+        connect(editor, &ScriptEditor::manualCompletionRequested,
+            this, &ScriptEditorWindow::reloadApiDocumentation);
         connect(editor->document(), &QTextDocument::contentsChanged,
             outlineRefreshTimer, qOverload<>(&QTimer::start));
         connect(
@@ -1317,12 +1352,15 @@ bool ScriptEditorWindow::reloadFromDiskIfClean()
         return false;
     }
 
-    QFile file(currentFileName);
+    QString source = currentFileName;
+    if (isRunnableScript() && !assetsBasePath.isEmpty() && EditorAssetPath::isInside(assetsBasePath, currentFileName))
+        source = ContentAuthoring::resolve(assetsBasePath, QDir(assetsBasePath).relativeFilePath(currentFileName));
+    QFile file(source);
     if (!file.open(QIODevice::ReadOnly))
         return false;
 
     return loadContentBytes(
-        currentFileName,
+        source,
         file.readAll(),
         false);
 }
@@ -1383,9 +1421,8 @@ bool ScriptEditorWindow::loadContentBytes(
 
     if (isRunnableScript())
     {
-        // 刷新剧情变量提示，使切换项目后能拿到最新的项目级变量定义。
-        // 提示文件缺失或损坏不会阻断脚本打开。
-        reloadVariableHints();
+        // 切换项目或重开脚本后，同时刷新指令说明与剧情变量提示。
+        reloadApiDocumentation();
     }
 
     editor->setPlainText(QString::fromUtf8(
@@ -1393,6 +1430,8 @@ bool ScriptEditorWindow::loadContentBytes(
         static_cast<int>(content.size())));
 
     currentFileName = normalizedFileName;
+    loadedSourcePath = normalizedFileName;
+    loadedSourceBytes = bytes;
     editor->document()->setModified(false);
     prewarmSerializedDocumentCache();
     updateWindowTitle();
@@ -1561,12 +1600,16 @@ void ScriptEditorWindow::setDocumentPathValidator(
 
 void ScriptEditorWindow::onOpenFile()
 {
+    QString initialPath = currentFileName.isEmpty() ? suggestedSavePath : currentFileName;
+    if (initialPath.isEmpty())
+        initialPath = assetsBasePath.isEmpty() ? QDir::homePath()
+            : QDir(assetsBasePath).filePath(isRunnableScript() ? "script" : QString());
     QString fileName = QFileDialog::getOpenFileName(
         this,
         isRunnableScript()
             ? tr("打开脚本文件")
             : tr("打开文本文件"),
-        QString(),
+        initialPath,
         isRunnableScript()
             ? tr("脚本文件 (*.txt *.lua);;所有文件 (*.*)")
             : tr("文本文件 (*.txt *.ini *.map);;所有文件 (*.*)"),
@@ -1587,21 +1630,43 @@ void ScriptEditorWindow::onSaveFile()
         return;
     }
 
-    if (saveToFile(currentFileName))
-    {
-        editor->document()->setModified(false);
-        updateWindowTitle();
-        emit documentStateChanged(currentFileName, false);
-    }
+    const QString target = isRunnableScript()
+        ? ContentAuthoring::projectPath(assetsBasePath, currentFileName) : currentFileName;
+    saveAsFile(target);
+}
+
+bool ScriptEditorWindow::saveFile()
+{
+    onSaveFile();
+    return !currentFileName.isEmpty() && !hasUnsavedChanges();
+}
+
+void ScriptEditorWindow::setSingleFileEditing()
+{
+    ui->openButton->hide();
+    ui->saveAsButton->hide();
+    for (const QString& name : {QStringLiteral("newScriptButton"), QStringLiteral("copyScriptButton"), QStringLiteral("scriptMoreButton")})
+        if (auto* button = findChild<QWidget*>(name)) button->hide();
+}
+
+void ScriptEditorWindow::setSuggestedSavePath(const QString& path)
+{
+    suggestedSavePath = path;
 }
 
 void ScriptEditorWindow::onSaveAs()
 {
+    const QString initialPath = currentFileName.isEmpty() ? suggestedSavePath : currentFileName;
+    if (!initialPath.isEmpty() && !QDir().mkpath(QFileInfo(initialPath).path()))
+    {
+        QMessageBox::warning(this, tr("无法保存"), tr("无法创建脚本目录，请检查项目目录是否可写。"));
+        return;
+    }
     QString fileName = QFileDialog::getSaveFileName(this,
         isRunnableScript()
             ? tr("保存脚本文件")
             : tr("保存文本文件"),
-        "",
+        initialPath,
         isRunnableScript()
             ? tr("脚本文件 (*.txt *.lua);;所有文件 (*.*)")
             : tr("文本文件 (*.txt *.ini *.map);;所有文件 (*.*)"));
@@ -1638,6 +1703,37 @@ bool ScriptEditorWindow::saveAsFile(const QString& fileName)
 bool ScriptEditorWindow::saveToFile(const QString& targetPath)
 {
     const QByteArray content = desktopRunDocumentSnapshot().bytes;
+    if (isRunnableScript() && !assetsBasePath.isEmpty() && EditorAssetPath::isInside(assetsBasePath, targetPath))
+    {
+        QString error;
+        const bool sameDocument = ProjectDocumentRegistry::documentPathKey(targetPath) ==
+            ProjectDocumentRegistry::documentPathKey(ContentAuthoring::projectPath(assetsBasePath, currentFileName));
+        const bool exists = QFileInfo(targetPath).isFile();
+        QFile input(targetPath);
+        const QByteArray previous = input.open(QIODevice::ReadOnly) ? input.readAll() : QByteArray();
+        input.close();
+        if (sameDocument && ((loadedSourcePath == targetPath && (!exists || previous != loadedSourceBytes)) ||
+            (loadedSourcePath != targetPath && exists)))
+        {
+            if (!EditorSaveConfirmation::confirmOverwrite(this, {targetPath}))
+                return false;
+        }
+        if (!QDir().mkpath(QFileInfo(targetPath).path())) return false;
+        bool saved = false;
+        {
+            DurableFileTransaction transaction(assetsBasePath);
+            saved = transaction.addBytesWriteChecked(targetPath, content, exists, previous, error) && transaction.commit(error);
+        }
+        if (!saved)
+        {
+            QMessageBox::warning(this, tr("保存失败"), error);
+            return false;
+        }
+        loadedSourcePath = targetPath;
+        loadedSourceBytes = content;
+        emit filesChanged({targetPath});
+        return true;
+    }
     if (!Util::writeFileFromBuffer(
             targetPath.toUtf8().toStdString(),
             content.constData(),
@@ -1661,10 +1757,17 @@ void ScriptEditorWindow::onInsertApiCall()
     if (!isRunnableScript())
         return;
 
-    ScriptCallDialog dialog(this);
+    reloadApiDocumentation();
+    ScriptCallDialog dialog(this, assetsBasePath, currentFileName);
     if (dialog.exec() != QDialog::Accepted)
         return;
     insertScriptCall(dialog.generatedCall());
+    if (dialog.generatedCall().endsWith("()"))
+    {
+        QTextCursor cursor = editor->textCursor();
+        cursor.movePosition(QTextCursor::PreviousCharacter);
+        editor->setTextCursor(cursor);
+    }
 }
 
 void ScriptEditorWindow::refreshScriptOutline()

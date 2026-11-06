@@ -13,6 +13,16 @@ class QFormLayout;
 namespace FilePickerHelper
 {
 
+QString chooseResourceFile(QWidget* parent, const QString& assetsBasePath,
+    const QStringList& folders = {}, const QStringList& nameFilters = {}, const QString& query = {},
+    QString* resourcePath = nullptr);
+
+/// 在已包装的脚本输入框旁增加新建／编辑入口，按当前地图的实际查找顺序解析。
+void addScriptAuthoringButtons(QLineEdit* fileEdit,
+    std::function<QString()> assetsBasePathGetter,
+    std::function<QString()> mapNameGetter, QWidget* parent,
+    std::function<void(const QString&)> openScript);
+
 enum class EntityResourceField
 {
     NpcIni,

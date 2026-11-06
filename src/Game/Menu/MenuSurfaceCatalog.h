@@ -466,9 +466,10 @@ namespace MenuSurfaceCatalog
 		SurfaceId surfaceId;
 	};
 
-	inline constexpr std::array<ResourceBinding, 29> kResourceBindings =
+	inline constexpr std::array<ResourceBinding, 33> kResourceBindings =
 	{{
 		{ "title", SurfaceId::StartupTitle },
+		{ "titleteam", SurfaceId::TitleTeam },
 		{ "system", SurfaceId::System },
 		{ "option", SurfaceId::Option },
 		{ "saveload", SurfaceId::SaveLoadTitle },
@@ -483,6 +484,7 @@ namespace MenuSurfaceCatalog
 		{ "state", SurfaceId::RpgState },
 		{ "equip", SurfaceId::RpgEquipment },
 		{ "partner", SurfaceId::PartnerEquipment },
+		{ "partnerhead", SurfaceId::PartnerHead },
 		{ "xiulian", SurfaceId::RpgPractice },
 		{ "goods", SurfaceId::RpgGoods },
 		{ "magic", SurfaceId::RpgMagic },
@@ -493,6 +495,8 @@ namespace MenuSurfaceCatalog
 		{ "mapthumbnail", SurfaceId::MapThumbnail },
 		{ "littlemap", SurfaceId::MapThumbnail },
 		{ "message", SurfaceId::Message },
+		{ "systemnotice", SurfaceId::SystemNotice },
+		{ "scriptmessages", SurfaceId::SystemNotice },
 		{ "timer", SurfaceId::Timer },
 		{ "tooltip", SurfaceId::Tooltip },
 		{ "mobile/joystick", SurfaceId::MobileJoystick },

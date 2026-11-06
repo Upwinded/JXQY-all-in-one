@@ -241,7 +241,9 @@ void BottomMenu::onEvent()
 		int ret = goodsItem[i]->getResult();
 		int listIndex = gm->goodsManager.bottomIndex(i);
 #ifndef __MOBILE__
-		if (gm->global.feature.qingyuUi && (ret & erClick)
+		if (gm->menu != nullptr && gm->menu->toolTip != nullptr
+			&& gm->menu->toolTip->supportsFullDetails() && (ret & erClick)
+			&& !(ret & (erDropped | erDragEnd))
 			&& gm->goodsManager.goodsListExists(listIndex))
 		{
 			gm->menu->showGoodsToolTip(getMySharedPtr(),
@@ -352,7 +354,7 @@ void BottomMenu::onEvent()
 		int ret = magicItem[i]->getResult();
 		int listIndex = gm->magicManager.bottomIndex(i);
 		if ((ret & erClick) && gm->global.feature.qingyuUi
-			&& gm->menu->magicMenu->showDetails(listIndex))
+			&& gm->menu->magicMenu->showDetails(listIndex, true))
 		{
 			magicItem[i]->resetHint();
 			continue;
@@ -545,7 +547,7 @@ void BottomMenu::configureControllerFocus(
 	{
 		magicBinding.grid.primary = [this](int logicalIndex, int)
 		{
-			gm->menu->magicMenu->showDetails(logicalIndex);
+			gm->menu->magicMenu->showDetails(logicalIndex, true);
 		};
 	}
 	magicBinding.grid.details = [this](int logicalIndex, int visibleIndex)

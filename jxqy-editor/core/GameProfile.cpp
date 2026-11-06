@@ -80,6 +80,8 @@ GameProfile gameProfileFromManifest(
     profile.partnerFollowRunRadiusDefined =
         manifest.partnerFollowRunRadiusDefined;
     profile.minimumMagicDamage = manifest.minimumMagicDamage;
+    profile.magicTimingMode = manifest.magicTimingMode;
+    profile.magicTimingModeDefined = manifest.magicTimingModeDefined;
     profile.minimumMagicDamageDefined =
         manifest.minimumMagicDamageDefined;
     profile.magicEffectCalculationMode =
@@ -96,6 +98,8 @@ GameProfile gameProfileFromManifest(
     profile.magicReleaseFrameRatioDefined = manifest.magicReleaseFrameRatioDefined;
     profile.magicReleaseFrameRatioSourceId = QString::fromStdString(manifest.magicReleaseFrameRatioSourceId);
     profile.scriptPlayerName = QString::fromStdString(manifest.scriptPlayerName);
+    profile.moveScreenProfile = manifest.moveScreenProfile;
+    profile.moveScreenProfileDefined = manifest.moveScreenProfileDefined;
     profile.npcActionProfile = manifest.npcActionProfile;
     profile.npcActionProfileDefined = manifest.npcActionProfileDefined;
     profile.npcRuntimeProfile = manifest.npcRuntimeProfile;
@@ -467,6 +471,14 @@ bool GameProfile::prepareSaveBytes(
     {
         ini.removeKey("Combat", "MinimumMagicDamage");
     }
+    if (magicTimingModeDefined)
+    {
+        ini.set("Combat", "MagicTimingMode", magicTimingModeToString(magicTimingMode));
+    }
+    else
+    {
+        ini.removeKey("Combat", "MagicTimingMode");
+    }
     if (magicEffectCalculationModeDefined)
     {
         ini.set(
@@ -504,6 +516,14 @@ bool GameProfile::prepareSaveBytes(
         return false;
     }
     setOrRemove(ini, "Script", "PlayerName", scriptPlayerName.trimmed());
+    if (moveScreenProfileDefined)
+    {
+        ini.set("Script", "MoveScreenProfile", moveScreenProfile == ScriptMoveScreenProfile::Native ? "Native" : "CSharp");
+    }
+    else
+    {
+        ini.removeKey("Script", "MoveScreenProfile");
+    }
     if (npcActionProfileDefined)
     {
         const char* value = "Legacy";

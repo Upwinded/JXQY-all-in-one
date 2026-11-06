@@ -9,6 +9,7 @@ class GoodsMenu :
 	public ConfigDrivenPanel,
 	public ControllerTransferParticipant
 {
+	friend class MenuMouseWheelTestAccess;
 public:
 	GoodsMenu();
 	virtual ~GoodsMenu();
@@ -23,6 +24,7 @@ public:
 	void updateGoods();
 	void updateGoods(int index);
 	void updateGoodsNumber(int index);
+	bool scrollMouseWheel(int steps);
 	SlotGridView controllerBagView();
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;

@@ -252,7 +252,7 @@ int main(int argc, char* argv[])
 
     TranslationManager::instance().initialize(application);
 
-    QFont defaultFont("Microsoft YaHei", 9);
+    QFont defaultFont("Microsoft YaHei", 11);
     application.setFont(defaultFont);
 
     ThemeManager::instance().initialize(application);

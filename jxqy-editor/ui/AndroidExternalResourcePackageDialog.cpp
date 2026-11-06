@@ -287,10 +287,10 @@ void AndroidExternalResourcePackageDialog::startExport()
     }
 
     QSettings settings = EditorSettings::create();
-    settings.setValue(
+    EditorSettings::setValueIfChanged(settings,
         QString::fromLatin1(LastOutputParentKey),
         QFileInfo(bundleDirectory).dir().absolutePath());
-    settings.sync();
+    EditorSettings::synchronize(settings);
 
     logEdit->clear();
     logEdit->append(tr("开始导出：%1").arg(bundleDirectory));

@@ -31,6 +31,7 @@ class Element : public std::enable_shared_from_this<Element>
 	friend class GamepadWorldRuntimeTestAccess;
 	friend class GambleMenuTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
+	friend class MenuMouseWheelTestAccess;
 	friend class UIFocusTestAccess;
 public:
 	using WindowCloseConfirmationHandler = std::function<bool(Element&)>;
@@ -52,6 +53,9 @@ public:
 	// input. Exclusive loading loops use this after joining their worker so a
 	// close request is neither lost nor handled while live state is mutating.
 	bool dispatchApplicationEvent(AEvent& event);
+	// Menu containers select one wheel owner before its children see the event.
+	// Other event types cannot enter through this targeted dispatch path.
+	bool dispatchMouseWheel(AEvent& event);
 	// Dispatch a semantic UI action to the current run() stack owner. Nested
 	// elements form a modal boundary even before they implement UI actions.
 	static bool dispatchUIAction(UIAction action);
@@ -280,6 +284,7 @@ protected:
 	// consumption. Transaction owners use this to retain the original down
 	// even when the concrete control handles the raw event itself.
 	virtual void onPreviewPointerEvent(AEvent& e) { (void)e; };
+	virtual bool onHandleMouseWheel(AEvent& e) { (void)e; return false; }
 	//处理事件，已处理返回true，未处理返回false，未处理的事件将继续交给其它元素进行处理
 	virtual bool onHandleEvent(AEvent & e) { return false; };
 	// Keyboard and gamepad mappings use this semantic path. Implementations

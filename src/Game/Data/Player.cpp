@@ -395,6 +395,11 @@ bool Player::hasUnlimitedCheatResources() const
 	return gm != nullptr && gm->shouldProtectPlayerFromCheatDamage();
 }
 
+bool Player::isRunDisabled() const
+{
+	return !canRun && (gm == nullptr || !gm->global.feature.ignoreRunDisabled);
+}
+
 bool Player::canPayRunThewCost() const
 {
 	return ignoresRunThewCost()
@@ -1566,6 +1571,18 @@ void Player::hurtLife(int damage, bool ignoreDefense)
 
 void Player::addExp(int aExp)
 {
+	// A capped protagonist can still reward registered partners.
+	if (aExp > 0 && gm != nullptr && gm->player.get() == this && gm->npcManager != nullptr
+		&& gm->global.feature.restorePartnerAttributes)
+	{
+		for (const auto& partner : gm->partnerManager.findPartnersFromNPCManager())
+		{
+			if (partner != nullptr && partner->getPartnerCharacterIndex() >= 0)
+			{
+				partner->addPartnerExperience(aExp);
+			}
+		}
+	}
 	if (levelUpExp <= 0)
 	{
 		return;
@@ -1668,12 +1685,9 @@ void Player::levelUp()
 				0,
 				0,
 				0);
-			for (const auto& effect : effects)
+			if (!effects.empty())
 			{
-				if (effect != nullptr)
-				{
-					effect->playSound(ekFlying);
-				}
+				Magic::playCastSound(levelUpMagic, gm->player);
 			}
 		}
 	}
@@ -1699,7 +1713,7 @@ bool Player::addNextAction(NextAction& act)
 		const bool runThewCostPayable = canPayRunThewCost();
 		bool alternateAction = act.action == acAWalk || act.action == acARun;
 		bool runRequested = act.action == acRun || act.action == acARun;
-		if (runRequested && canRun && !runThewCostPayable)
+		if (runRequested && !isRunDisabled() && !runThewCostPayable)
 		{
 			const UTime now = getTime();
 			if (!runThewLowMessageShown
@@ -1718,7 +1732,7 @@ bool Player::addNextAction(NextAction& act)
 		}
 		bool useRun = shouldUseRunForPlayerMoveIntent(
 			runRequested, walkIsRun,
-			canRun && actionActor != nullptr
+			!isRunDisabled() && actionActor != nullptr
 				&& (actionActor->canDoAction(acRun)
 					|| actionActor->canDoAction(acARun)),
 			runThewCostPayable);
@@ -2305,7 +2319,7 @@ bool Player::resumeStrictQueuedInteraction()
 		return true;
 	}
 
-	bool continueRunning = nextDestRequestedRunning && canRun && canDoAction(acRun)
+	bool continueRunning = nextDestRequestedRunning && !isRunDisabled() && canDoAction(acRun)
 		&& canPayRunThewCost();
 	if (!continueRunning && !canDoAction(acWalk))
 	{
@@ -2488,7 +2502,7 @@ bool Player::changeWalk(Point dest)
 
 bool Player::changeRun(Point dest)
 {
-	if (!canRun || !canDoAction(acRun))
+	if (isRunDisabled() || !canDoAction(acRun))
 	{
 		return false;
 	}
@@ -2736,7 +2750,7 @@ void Player::beginJump(Point dest, bool scripted)
 
 void Player::beginRun(Point dest, bool scripted)
 {
-	if (!canRun || !canDoAction(acRun) || immobilized || petrified)
+	if (isRunDisabled() || !canDoAction(acRun) || immobilized || petrified)
 	{
 		return;
 	}

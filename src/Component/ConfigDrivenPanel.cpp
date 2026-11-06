@@ -105,6 +105,8 @@ void ConfigDrivenPanel::loadMenuDefinition(const std::string& menuDefinitionFile
 		definition.controllerDown = ini.Get(section, "controllerdown", "");
 		definition.controllerLeft = ini.Get(section, "controllerleft", "");
 		definition.controllerRight = ini.Get(section, "controllerright", "");
+		definition.optionLayout = ini.Get(section, "optionlayout", "");
+		definition.spacingY = ini.Get(section, "spacingy", "");
 
 		componentDefinitions.push_back(definition);
 

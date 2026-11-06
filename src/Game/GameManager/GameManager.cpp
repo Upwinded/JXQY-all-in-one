@@ -52,7 +52,7 @@ NPCActionType getInteractionMoveAction(std::shared_ptr<Player> player, bool runn
 {
 	if (running
 		&& player != nullptr
-		&& player->canRun
+		&& !player->isRunDisabled()
 		&& player->canPayRunThewCost())
 	{
 		return acRun;
@@ -487,6 +487,13 @@ EditorRun::SceneApplicationResult GameManager::applyEditorRunSceneTarget()
 			"GameManager: editor-run player resource is unavailable; continuing without a player baseline path=%s reason=%s\n",
 			playerTemplateVirtualPath.c_str(),
 			playerInitializationFailure.c_str());
+	}
+
+	// Apply the scene's default lighting before its optional entry script.
+	if (weather != nullptr)
+	{
+		weather->setLum(global.data.mainLum);
+		weather->setFadeLum(global.data.fadeLum);
 	}
 
 	// Entry scripts and later NPC choices also write variables when the

@@ -8,6 +8,7 @@
 
 class NPC;
 class Goods;
+struct MagicInfo;
 
 class EquipMenu :
 	public ConfigDrivenPanel,
@@ -42,6 +43,7 @@ public:
 	void updatePanelImage();
 	void showAttributes(bool value);
 	bool isShowingAttributes() const { return showingAttributes; }
+	bool scrollMouseWheel(int steps);
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;
 	bool focusControllerEquipment();
@@ -60,6 +62,7 @@ public:
 	int getPartIndex(const std::string & part);
 
 private:
+	const MagicInfo* displayedMagicInfo(int index) const;
 	std::weak_ptr<NPC> selectedPartner;
 	bool showingPartner = false;
 	bool characterSelectorFocused = false;

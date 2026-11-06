@@ -1000,7 +1000,7 @@ void GameplayAutomationSession::execute(Action& action)
 			throw std::runtime_error("blocked_destination");
 		if (command == "JumpTo" && !player->canJump) throw std::runtime_error("jump_disabled");
 		NextAction next;
-		next.action = command == "JumpTo" ? acJump : running && player->canRun && player->canPayRunThewCost() ? acRun : acWalk;
+		next.action = command == "JumpTo" ? acJump : running && !player->isRunDisabled() && player->canPayRunThewCost() ? acRun : acWalk;
 		next.dest = point;
 		queued = player->addNextAction(next);
 	}
@@ -1149,7 +1149,7 @@ void GameplayAutomationSession::updateWorldAction()
 			{
 				const bool running = has(arguments, "running") && boolMember(arguments, "running");
 				NextAction next;
-				next.action = jumping ? acJump : running && manager->player->canRun
+				next.action = jumping ? acJump : running && !manager->player->isRunDisabled()
 					&& manager->player->canPayRunThewCost() ? acRun : acWalk;
 				next.dest = goal;
 				// Queue after an interrupted start; the native action decides when

@@ -150,6 +150,7 @@ set(CORE_SOURCES
     core/INIFileEditor.cpp
     core/MapFileEditor.cpp
     core/MpcImageCache.cpp
+    core/MenuPageContext.cpp
     core/ProjectManager.cpp
     core/ProjectRuntimeConfiguration.cpp
     core/ProjectDocumentRegistry.cpp
@@ -170,12 +171,15 @@ set(CORE_SOURCES
     core/TranslationManager.cpp
     core/GameProfile.cpp
     core/MagicDocument.cpp
+    core/ContentAuthoring.cpp
     core/GoodsShopDocument.cpp
     core/DialogueDocument.cpp
     core/DurableFileTransaction.cpp
+    core/EditorFileState.cpp
 )
 
 set(CORE_HEADERS
+    core/EditorFileState.h
     core/BuildVersion.h
     ${SRC_DIR}/Resource/SemanticVersion.h
     ${SRC_DIR}/Resource/ModReleaseMetadata.h
@@ -220,6 +224,7 @@ set(CORE_HEADERS
     core/ImageResourceCandidates.h
     core/MapFileEditor.h
     core/MpcImageCache.h
+    core/MenuPageContext.h
     core/ProjectManager.h
     core/ProjectRuntimeConfiguration.h
     core/ProjectDocumentRegistry.h
@@ -240,6 +245,7 @@ set(CORE_HEADERS
     core/TranslationManager.h
     core/GameProfile.h
     core/MagicDocument.h
+    core/ContentAuthoring.h
     core/GoodsShopDocument.h
     core/DialogueDocument.h
     core/DurableFileTransaction.h
@@ -266,25 +272,54 @@ set(UI_SOURCES
     ui/AboutDialog.cpp
     ui/MenuPreviewCanvas.cpp
     ui/ComponentPropertyEditor.cpp
+    ui/DisplayPropertyEditor.cpp
     ui/MenuEditorWindow.cpp
+    ui/MenuEditorPreview.cpp
+    ui/MenuEditorSystemPages.cpp
+    ui/MenuEditorStoragePages.cpp
+    ui/MenuEditorOption.cpp
+    ui/MenuEditorPartnerHead.cpp
+    ui/MenuEditorTitleTeam.cpp
+    ui/MenuEditorNotices.cpp
+    ui/MenuEditorHud.cpp
+    ui/MenuEditorMapThumbnail.cpp
+    ui/MenuEditorNpcInfo.cpp
+    ui/MenuEditorDice.cpp
+    ui/MenuEditorControllerHelp.cpp
+    ui/MenuEditorJoystick.cpp
+    ui/MenuEditorSkills.cpp
+    ui/MenuEditorConversation.cpp
+    ui/MenuEditorPassive.cpp
+    ../src/Game/Menu/ChooseMenuLayout.cpp
+    ../src/Component/TextLayout.cpp
     ui/AssetBrowser.cpp
     ui/AssetDragDrop.cpp
     ui/DarkMdiSubWindow.cpp
     ui/ThemeManager.cpp
     ui/ScriptEditorWindow.cpp
+    ui/ScriptEditorAuthoring.cpp
     ui/ScriptApiList.cpp
     ui/ScriptVariableHints.cpp
     ui/MapRenderCanvas.cpp
     ui/MapEditorWindow.cpp
     ui/MagicEditorWindow.cpp
+    ui/MagicEditorLinked.cpp
+    ui/MagicEditorAuthoring.cpp
+    ui/MainWindowContent.cpp
     ui/MagicRangePreview.cpp
+    ui/GoodsShopEditorAuthoring.cpp
+    ui/ContentReferenceDialog.cpp
+    ui/ContentReferenceDialog.h
     ui/GoodsShopEditorWindow.cpp
     ui/DialogueEditorWindow.cpp
+    ui/DialogueEditorAuthoring.cpp
     ui/MpcPreviewLabel.cpp
     ui/EntityPropertyDialog.cpp
     ui/FilePickerHelper.cpp
+    ui/EditorSaveConfirmation.cpp
     ui/MinimapWidget.cpp
     ui/NpcDataEditorWindow.cpp
+    ui/NpcDataEditorAuthoring.cpp
     ui/TrapScriptEditorDialog.cpp
     ui/ResourceProfileEditorWindow.cpp
     ui/ProjectExplorerWidget.cpp
@@ -315,6 +350,7 @@ set(UI_HEADERS
     ui/AboutDialog.h
     ui/MenuPreviewCanvas.h
     ui/ComponentPropertyEditor.h
+    ui/DisplayPropertyEditor.h
     ui/MenuEditorWindow.h
     ui/AssetBrowser.h
     ui/AssetDragDrop.h
@@ -502,6 +538,17 @@ function(deploy_editor_translations target_name)
     target_sources(${target_name} PRIVATE ${deploy_stamps})
 endfunction()
 
+function(deploy_editor_script_api target_name)
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "$<TARGET_FILE_DIR:${target_name}>/config"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/config/script_api.json"
+            "$<TARGET_FILE_DIR:${target_name}>/config/script_api.json"
+        VERBATIM
+    )
+endfunction()
+
 set(MINILZO_SOURCES
     ${THIRD_PARTY_DIR}/minilzo/minilzo.c
 )
@@ -648,6 +695,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 deploy_editor_translations(${PROJECT_NAME})
+deploy_editor_script_api(${PROJECT_NAME})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME "${PROJECT_NAME}-debug")
@@ -668,6 +716,13 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
     BUNDLE DESTINATION "."
 )
+if(APPLE)
+    install(FILES "config/script_api.json"
+        DESTINATION "$<TARGET_BUNDLE_DIR_NAME:${PROJECT_NAME}>/Contents/MacOS/config")
+else()
+    install(FILES "config/script_api.json"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}/config")
+endif()
 if(UNIX AND NOT APPLE)
     install(FILES "${JXQY_EDITOR_GENERATED_LINUX_DESKTOP}"
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
@@ -939,6 +994,24 @@ if(BUILD_TESTING)
 
     add_executable(jxqy-editor-core-tests
         tests/CoreRegressionTests.cpp
+        tests/EditorSettingsPersistenceTests.cpp
+        tests/MenuOptionTests.cpp
+        tests/MenuPartnerTests.cpp
+        tests/MenuDisplayTests.cpp
+        tests/MenuSystemPageTests.cpp
+        tests/MenuStoragePageTests.cpp
+        tests/MenuTitleTeamTests.cpp
+    tests/MenuConversationTests.cpp
+    tests/MenuPassiveTests.cpp
+    tests/MenuNoticeTests.cpp
+    tests/MenuHudTests.cpp
+    tests/MenuMapThumbnailTests.cpp
+        tests/MenuNpcInfoTests.cpp
+        tests/MenuDiceTests.cpp
+        tests/MenuUsabilityTests.cpp
+        tests/MenuControllerHelpTests.cpp
+    tests/MenuJoystickTests.cpp
+    tests/MenuSkillsTests.cpp
         resources.qrc
     )
     target_link_libraries(jxqy-editor-core-tests PRIVATE
@@ -950,11 +1023,13 @@ if(BUILD_TESTING)
         JXQY_EDITOR_DESKTOP_INTEGRATION_PATH="${JXQY_EDITOR_DESKTOP_INTEGRATION_OUTPUT_DIRECTORY}"
     )
     add_test(NAME jxqy-editor-core-tests COMMAND jxqy-editor-core-tests)
+    # The full UI matrix exceeds 300 seconds before the authoring checks on Windows.
     set_tests_properties(jxqy-editor-core-tests PROPERTIES
         RUN_SERIAL TRUE
-        TIMEOUT 300
+        TIMEOUT 600
     )
     deploy_editor_translations(jxqy-editor-core-tests)
+    deploy_editor_script_api(jxqy-editor-core-tests)
 
     add_executable(jxqy-editor-online-resource-package-tests
         tests/OnlineResourcePackageExporterTests.cpp
@@ -1052,6 +1127,26 @@ if(BUILD_TESTING)
         TIMEOUT 120
     )
     deploy_editor_translations(jxqy-editor-dialogue-editor-tests)
+
+    add_executable(jxqy-editor-authoring-workflow-tests tests/AuthoringWorkflowTests.cpp)
+    set_target_properties(jxqy-editor-authoring-workflow-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+    target_link_libraries(jxqy-editor-authoring-workflow-tests PRIVATE jxqy-editor-widgets jxqy-editor-test-support)
+    add_test(NAME jxqy-editor-authoring-workflow-tests COMMAND jxqy-editor-authoring-workflow-tests)
+    set_tests_properties(jxqy-editor-authoring-workflow-tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+    deploy_editor_translations(jxqy-editor-authoring-workflow-tests)
+    add_executable(jxqy-editor-consistency-tests tests/EditorConsistencyTests.cpp)
+    set_target_properties(jxqy-editor-consistency-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+    target_link_libraries(jxqy-editor-consistency-tests PRIVATE jxqy-editor-widgets jxqy-editor-test-support)
+    add_test(NAME jxqy-editor-consistency-tests COMMAND jxqy-editor-consistency-tests)
+    set_tests_properties(jxqy-editor-consistency-tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+    deploy_editor_translations(jxqy-editor-consistency-tests)
+    add_executable(jxqy-editor-resource-workflow-tests tests/ResourceWorkflowTests.cpp)
+    set_target_properties(jxqy-editor-resource-workflow-tests PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+    target_link_libraries(jxqy-editor-resource-workflow-tests PRIVATE jxqy-editor-widgets jxqy-editor-test-support)
+    add_test(NAME jxqy-editor-resource-workflow-tests COMMAND jxqy-editor-resource-workflow-tests)
+    set_tests_properties(jxqy-editor-resource-workflow-tests PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+    deploy_editor_translations(jxqy-editor-resource-workflow-tests)
+    deploy_editor_script_api(jxqy-editor-resource-workflow-tests)
 
     add_executable(jxqy-editor-asset-conversion-tests
         tests/AssetConversionTests.cpp

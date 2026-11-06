@@ -8,11 +8,13 @@
 #include <QCloseEvent>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <utility>
 #include "AssetsPathSwitchParticipant.h"
 #include "CloseTransactionParticipant.h"
 #include "../core/DesktopRunDocumentSnapshot.h"
 #include "../core/ProjectDocumentRegistry.h"
+#include "../core/EditorFileState.h"
 
 namespace Ui
 {
@@ -61,9 +63,14 @@ public:
     bool saveNpcFileAs(const QString& fileName);
     bool saveObjectFileAs(const QString& fileName);
     bool saveNpcResourceFileAs(const QString& fileName);
+    bool saveContentDocument(const QString& path);
+    bool reloadContentDocument(const QString& path);
     static bool isNpcResourceFilePath(const QString& fileName);
     bool setAssetsBasePath(const QString& path);
+    QString createContentFile(ProjectDocumentType type, const QString& name, const QString& mapName, QString* errorMessage = nullptr);
     QList<DesktopRunDocumentSnapshot> desktopRunDocumentSnapshots() const;
+    std::optional<ProjectDocumentState> currentPlaytestList() const;
+    QString currentPlaytestMap() const;
     QList<ProjectDocumentState> currentProjectDocuments() const;
 
     using DocumentPathValidator =
@@ -89,6 +96,8 @@ public:
 signals:
     void documentStatesChanged();
     void documentClosed();
+    void openScriptFileRequested(const QString& path);
+    void openContentFileRequested(const QString& path);
     void editDialogueFromNpcRequested(
         const QString& scriptPath, const QString& npcName);
 
@@ -118,7 +127,9 @@ private slots:
     void onEditDialogueFromNpc();
 
 private:
+    bool writeDocumentBytes(const QString& path, const QByteArray& bytes, EditorFileState& state, bool updateBaseline);
     void initializeCombos();
+    void setupAuthoringActions();
     void retranslateDynamicUi();
     bool loadNpcFromFile(const QString& fileName, bool reportLoadErrors);
     bool loadObjectFromFile(const QString& fileName, bool reportLoadErrors);
@@ -192,7 +203,11 @@ private:
     QStringList originalObjectLines;
 
     QString currentNpcFilePath;
+    EditorFileState npcFileState;
+    EditorFileState objectFileState;
+    EditorFileState npcResourceFileState;
     QString currentNpcMapName;
+    QString currentObjectMapName;
     QString currentObjectFilePath;
     QString currentNpcResourceFilePath;
     bool isNpcFile = false;

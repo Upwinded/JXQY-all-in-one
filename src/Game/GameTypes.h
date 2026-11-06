@@ -238,8 +238,6 @@
 #define MAGIC_FOLLOW_RADIUS 10
 //投掷技能曲线最高点系数（根据目标距离远近计算投掷最大高度）
 #define MAGIC_THROW_HEIGHT 7.0
-// Magic projectile speed multiplier shared by all trilogy games.
-#define MAGIC_FLYING_SPEED_SCALE 2.0f
 //魔法最大施法距离（格子数）
 #define MAGIC_MAX_CAST_DISTANCE 20
 

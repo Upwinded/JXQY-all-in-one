@@ -146,7 +146,13 @@ void Dialog::onWindowResize(int width, int height)
 	std::string savedTalkText = currentTalkText;
 	std::string savedHead1FileName = head1FileName;
 	std::string savedHead2FileName = head2FileName;
-	int savedIndex = index;
+	const auto savedLabel = label;
+	const int savedDisplayedCount = savedLabel ? savedLabel->getDisplayedCharacterCount() : 0;
+	size_t displayedOffset = static_cast<size_t>(savedDisplayedCount);
+	for (int page = 0; page < index && page < static_cast<int>(talkStrList.size()); ++page)
+	{
+		displayedOffset += talkStrList[page].talkChar.size();
+	}
 	bool savedVisible = visible;
 	bool savedLogicRunning = logicRunning;
 
@@ -167,8 +173,22 @@ void Dialog::onWindowResize(int width, int height)
 		setTalkStr(savedTalkText);
 		if (!talkStrList.empty() && label != nullptr)
 		{
-			index = std::max(0, std::min(savedIndex, (int)talkStrList.size() - 1));
+			size_t pageStart = 0;
+			while (index + 1 < static_cast<int>(talkStrList.size()))
+			{
+				const size_t pageEnd = pageStart + talkStrList[index].talkChar.size();
+				if (displayedOffset < pageEnd || (displayedOffset == pageEnd && savedDisplayedCount > 0))
+				{
+					break;
+				}
+				pageStart = pageEnd;
+				++index;
+			}
 			label->setTalkStr(talkStrList[index]);
+			if (savedLabel)
+			{
+				label->restoreProgress(*savedLabel, static_cast<int>(displayedOffset - pageStart));
+			}
 		}
 	}
 }

@@ -205,7 +205,7 @@ public:
 	bool canFight = true;
 	bool canUseMana = true;
 	int walkIsRun = 0;
-	bool isRunDisabled() const { return !canRun; }
+	bool isRunDisabled() const;
 	bool isJumpDisabled() const { return !canJump; }
 	bool isFightDisabled() const { return !canFight; }
 	void setRunDisabled(bool disabled) { canRun = !disabled; }

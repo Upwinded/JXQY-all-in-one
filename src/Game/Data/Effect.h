@@ -1,6 +1,7 @@
 #pragma once
 #include "GameElement.h"
 #include "Magic.h"
+#include "MagicFlightClock.h"
 #include <array>
 #include <cstdint>
 #include <deque>
@@ -89,7 +90,9 @@ class Effect :
 	public GameElement
 {
 	friend class EffectTestAccess;
+	friend class OriginalMovementRuntimeTestAccess;
 	friend class RageSystemTestAccess;
+	friend bool runMediaRuntimeTests();
 	friend class ProjectileCollisionTestAccess;
 	friend class ProjectileCollisionRuntimeTestAccess;
 public:
@@ -165,6 +168,7 @@ public:
 		Point pos,
 		std::optional<PointEx> collisionOffset = std::nullopt);
 	void beginFly();
+	void updateEffectPosition(UTime frameTime, float flySpeed);
 	void beginDrop();
 	void initFromMagic(
 		std::shared_ptr<Magic> m,
@@ -263,6 +267,14 @@ public:
 	bool hasAnyAttachedNPC() const;
 	bool hasMovedAttachedNPC() const;
 private:
+	MagicFlightClock flightClock;
+	MagicTimingMode waitTimingMode = MagicTimingMode::FixedMilliseconds;
+	double waitFramesRemaining = -1.0;
+	void resetFlightClock();
+	void updateEffectPositionForFrames(double movementFrames, float flySpeed);
+	bool flightLifetimeExpired() const;
+	bool flightClockExpired = false;
+	double consumeWaitTime(UTime frameTime);
 	struct AttachedNPC
 	{
 		std::weak_ptr<NPC> npc;

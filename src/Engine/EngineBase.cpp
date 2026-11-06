@@ -4100,6 +4100,7 @@ void EngineBase::setFontName(const std::string & fontName)
 		return;
 	}
 	clearFontCache();
+	clearFallbackFontSource();
 	font = fontName;
 	if (fontData != nullptr)
 	{
@@ -4125,7 +4126,8 @@ void EngineBase::drawTalk(const std::string& text, int x, int y, int size, unsig
 	//freeImage(t);
 }
 
-void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
+void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size,
+	std::unique_ptr<char[]> fallback, int fallbackSize)
 {
 	if (!SDL_IsMainThread())
 	{
@@ -4138,6 +4140,7 @@ void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 		return;
 	}
 	clearFontCache();
+	clearFallbackFontSource();
 	if (fontData != nullptr)
 	{
 		SDL_CloseIO(fontData);
@@ -4149,6 +4152,39 @@ void EngineBase::setFontFromMem(std::unique_ptr<char[]>& data, int size)
 	}
 	fontData = SDL_IOFromMem(data.get(), size);
 	fontBuffer = std::move(data);
+	if (fallback && fallbackSize > 0)
+	{
+		fallbackFontData = SDL_IOFromMem(fallback.get(), fallbackSize);
+		fallbackFontBuffer = std::move(fallback);
+	}
+}
+
+namespace
+{
+int bitmapTextDimension(int value, int size, int nativeHeight)
+{
+	return static_cast<int>(std::min<int64_t>(INT_MAX,
+		(static_cast<int64_t>(value) * size + nativeHeight / 2) / nativeHeight));
+}
+
+SDL_Surface* scaleBitmapTextSurface(TTF_Font* font, SDL_Surface* surface, int size)
+{
+	if (surface == nullptr || TTF_FontIsScalable(font))
+	{
+		return surface;
+	}
+	const int nativeHeight = TTF_GetFontHeight(font);
+	if (nativeHeight <= 0 || nativeHeight == size)
+	{
+		return surface;
+	}
+	// SDL_ttf selects a fixed strike but does not resize it to the requested size.
+	auto* scaled = SDL_ScaleSurface(surface,
+		std::max<int>(1, bitmapTextDimension(surface->w, size, nativeHeight)),
+		std::max<int>(1, bitmapTextDimension(surface->h, size, nativeHeight)), SDL_SCALEMODE_NEAREST);
+	SDL_DestroySurface(surface);
+	return scaled;
+}
 }
 
 TTF_Font* EngineBase::getCachedFont(int size)
@@ -4175,6 +4211,23 @@ TTF_Font* EngineBase::getCachedFont(int size)
 	}
 	if (openedFont != nullptr)
 	{
+		if (fallbackFontData != nullptr)
+		{
+			SDL_SeekIO(fallbackFontData, 0, SDL_IO_SEEK_SET);
+			const int fallbackSize = TTF_FontIsScalable(openedFont) ? size : TTF_GetFontHeight(openedFont);
+			auto* fallbackFont = TTF_OpenFontIO(fallbackFontData, false, fallbackSize);
+			if (fallbackFont != nullptr)
+			{
+				if (TTF_AddFallbackFont(openedFont, fallbackFont))
+				{
+					fallbackFontCache.emplace(size, fallbackFont);
+				}
+				else
+				{
+					TTF_CloseFont(fallbackFont);
+				}
+			}
+		}
 		fontCache.emplace(size, openedFont);
 	}
 	return openedFont;
@@ -4187,6 +4240,21 @@ void EngineBase::clearFontCache()
 		TTF_CloseFont(cachedFont.second);
 	}
 	fontCache.clear();
+	for (auto& cachedFont : fallbackFontCache)
+	{
+		TTF_CloseFont(cachedFont.second);
+	}
+	fallbackFontCache.clear();
+}
+
+void EngineBase::clearFallbackFontSource()
+{
+	if (fallbackFontData != nullptr)
+	{
+		SDL_CloseIO(fallbackFontData);
+		fallbackFontData = nullptr;
+	}
+	fallbackFontBuffer.reset();
 }
 
 bool EngineBase::measureText(const std::string& text, int size, int& width, int& height)
@@ -4204,10 +4272,20 @@ bool EngineBase::measureText(const std::string& text, int size, int& width, int&
 	}
 	if (text.empty())
 	{
-		height = TTF_GetFontHeight(textFont);
+		height = TTF_FontIsScalable(textFont) ? TTF_GetFontHeight(textFont) : size;
 		return true;
 	}
-	return TTF_GetStringSize(textFont, text.c_str(), text.size(), &width, &height);
+	if (!TTF_GetStringSize(textFont, text.c_str(), text.size(), &width, &height))
+	{
+		return false;
+	}
+	if (!TTF_FontIsScalable(textFont) && TTF_GetFontHeight(textFont) > 0)
+	{
+		const int nativeHeight = TTF_GetFontHeight(textFont);
+		width = bitmapTextDimension(width, size, nativeHeight);
+		height = bitmapTextDimension(height, size, nativeHeight);
+	}
+	return true;
 }
 
 _shared_image EngineBase::createText(const std::string& text, int size, unsigned int color, bool safe)
@@ -4230,8 +4308,8 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	c.r = (color & 0xFF0000) >> 16;	
 	c.a = (color & 0xFF000000) >> 24;
 
-	auto text_s = TTF_RenderText_Blended(
-		textFont, text.c_str(), text.size(), c);
+	auto text_s = scaleBitmapTextSurface(textFont,
+		TTF_RenderText_Blended(textFont, text.c_str(), text.size(), c), size);
 	if (text_s == nullptr)
 	{
 		return nullptr;
@@ -4247,6 +4325,10 @@ _shared_image EngineBase::createText(const std::string& text, int size, unsigned
 	}
 
 	setImageAlpha(text_t, c.a);
+	if (text_t && !TTF_FontIsScalable(textFont))
+	{
+		SDL_SetTextureScaleMode(text_t.get(), SDL_SCALEMODE_NEAREST);
+	}
 
 	SDL_DestroySurface(text_s);
 	return text_t;
@@ -4259,7 +4341,8 @@ _shared_image EngineBase::createTextWithFontData(
 	int size,
 	unsigned int color,
 	int wrapWidth,
-	bool safe)
+	bool safe,
+	const void* fallbackData, std::size_t fallbackSize)
 {
 	if (data == nullptr || dataSize == 0 || text.empty() || size <= 0)
 	{
@@ -4276,17 +4359,38 @@ _shared_image EngineBase::createTextWithFontData(
 		SDL_CloseIO(stream);
 		return nullptr;
 	}
+	std::unique_ptr<SDL_IOStream, decltype(&SDL_CloseIO)> fallbackStream(nullptr, SDL_CloseIO);
+	std::unique_ptr<TTF_Font, decltype(&TTF_CloseFont)> fallbackFont(nullptr, TTF_CloseFont);
+	if (fallbackData != nullptr && fallbackSize > 0)
+	{
+		fallbackStream.reset(SDL_IOFromConstMem(fallbackData, fallbackSize));
+		if (fallbackStream)
+		{
+			const int fallbackFontSize = TTF_FontIsScalable(textFont) ? size : TTF_GetFontHeight(textFont);
+			fallbackFont.reset(TTF_OpenFontIO(fallbackStream.get(), false, fallbackFontSize));
+			if (fallbackFont)
+			{
+				TTF_AddFallbackFont(textFont, fallbackFont.get());
+			}
+		}
+	}
 
 	SDL_Color textColor;
 	textColor.b = (color & 0xFF);
 	textColor.g = (color & 0xFF00) >> 8;
 	textColor.r = (color & 0xFF0000) >> 16;
 	textColor.a = (color & 0xFF000000) >> 24;
+	const int nativeHeight = TTF_FontIsScalable(textFont) ? 0 : TTF_GetFontHeight(textFont);
+	if (nativeHeight > 0 && wrapWidth > 0)
+	{
+		wrapWidth = std::max<int>(1, static_cast<int>(static_cast<int64_t>(wrapWidth) * nativeHeight / size));
+	}
 	SDL_Surface* surface = wrapWidth > 0
 		? TTF_RenderText_Blended_Wrapped(
 			textFont, text.c_str(), text.size(), textColor, wrapWidth)
 		: TTF_RenderText_Blended(
 			textFont, text.c_str(), text.size(), textColor);
+	surface = scaleBitmapTextSurface(textFont, surface, size);
 	if (surface == nullptr)
 	{
 		TTF_CloseFont(textFont);
@@ -4305,6 +4409,10 @@ _shared_image EngineBase::createTextWithFontData(
 			SDL_CreateTextureFromSurface(renderer, surface));
 	}
 	setImageAlpha(image, textColor.a);
+	if (image && nativeHeight > 0)
+	{
+		SDL_SetTextureScaleMode(image.get(), SDL_SCALEMODE_NEAREST);
+	}
 	SDL_DestroySurface(surface);
 	TTF_CloseFont(textFont);
 	SDL_CloseIO(stream);
@@ -5267,6 +5375,7 @@ void EngineBase::destroySDL()
 			"Engine: ERROR: cached fonts are being destroyed outside the SDL main thread\n");
 	}
 	clearFontCache();
+	clearFallbackFontSource();
 	if (fontBuffer != nullptr)
 	{
 		fontBuffer = nullptr;
@@ -5604,7 +5713,7 @@ void EngineBase::freeMusic(_music music)
 #endif
 }
 
-_channel EngineBase::playMusic(_music music, float volume)
+_channel EngineBase::playMusic(_music music, float volume, const std::string& magicSoundKey)
 {
 #ifdef SHF_USE_AUDIO
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
@@ -5616,6 +5725,7 @@ _channel EngineBase::playMusic(_music music, float volume)
 	channel->music = music;
 	channel->loop = music->loop;
 	channel->volume = volume;
+	channel->magicSoundKey = magicSoundKey;
 	if (!startChannel(channel.get()))
 	{
 		GameLog::write("Play Sound Error!\n");
@@ -5627,7 +5737,7 @@ _channel EngineBase::playMusic(_music music, float volume)
 #endif
 
 }
-_channel EngineBase::playMusic(_music music, float x, float y, float volume)
+_channel EngineBase::playMusic(_music music, float x, float y, float volume, const std::string& magicSoundKey)
 {
 #ifdef SHF_USE_AUDIO
 	std::lock_guard<std::recursive_mutex> locker(soundMutex);
@@ -5635,11 +5745,44 @@ _channel EngineBase::playMusic(_music music, float x, float y, float volume)
 	{
 		return nullptr;
 	}
-	_channel channel = playMusic(music, volume);
+	_channel channel = playMusic(music, volume, magicSoundKey);
 	setMusicPosition(channel, x, y);
 	return channel;
 #else
 	return nullptr;
+#endif
+}
+
+std::size_t EngineBase::countPlayingMagicSounds(const std::string& key)
+{
+	std::size_t count = 0;
+#ifdef SHF_USE_AUDIO
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	for (std::size_t index = 0; index < channelSlots.size(); index++)
+	{
+		const auto& slot = channelSlots[index];
+		if (slot.channel != nullptr && slot.channel->magicSoundKey == key
+			&& getMusicPlaying(AudioChannelHandle(index, slot.generation)))
+		{
+			count++;
+		}
+	}
+#endif
+	return count;
+}
+
+void EngineBase::setMagicSoundVolume(float volume)
+{
+#ifdef SHF_USE_AUDIO
+	std::lock_guard<std::recursive_mutex> locker(soundMutex);
+	for (auto& slot : channelSlots)
+	{
+		if (slot.channel != nullptr && !slot.channel->magicSoundKey.empty())
+		{
+			slot.channel->volume = volume;
+			updateChannelTrackGain(slot.channel.get());
+		}
+	}
 #endif
 }
 

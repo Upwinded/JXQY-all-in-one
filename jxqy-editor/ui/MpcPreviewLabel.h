@@ -42,10 +42,19 @@ public:
     /// 返回当前缩放后的 pixmap 尺寸（用于测试断言稳定性）。
     QSize currentPixmapSize() const { return scaledPixmap.size(); }
     int currentAnimationFrameIndex() const { return animationFrameIndex; }
+    int animationDirectionCount() const;
+    int animationFramesPerDirection() const;
+    int currentAnimationDirection() const { return animationDirection; }
+    void setAnimationPlaying(bool playing);
+    void setAnimationDirection(int direction);
+    void seekAnimationFrame(int localFrame);
     bool isAnimationPlaying() const
     {
         return animationTimer && animationTimer->isActive();
     }
+
+signals:
+    void animationStateChanged();
 
 protected:
     void resizeEvent(QResizeEvent* event) override;
@@ -67,4 +76,5 @@ private:
     int animationIntervalMilliseconds = 0;
     int animationDirection = 0;
     int animationFrameIndex = -1;
+    qint64 animationElapsedMilliseconds = 0;
 };

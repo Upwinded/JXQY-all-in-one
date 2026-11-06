@@ -171,6 +171,7 @@ struct AudioChannel
 	float volume = 1.0f;
 	float positionX = 0.0f;
 	float positionY = 0.0f;
+	std::string magicSoundKey;
 };
 
 typedef AudioChannel Channel_t;
@@ -311,6 +312,7 @@ class EngineBase
 	friend class GameplayAutomationSession;
 #endif
 	friend class CoreLifecycleTestAccess;
+	friend class FontSelectionTestAccess;
 	friend bool runMediaRuntimeTests();
 	friend class GamepadWorldRuntimeTestAccess;
 	friend class MobileExternalInputRuntimeTestAccess;
@@ -656,10 +658,15 @@ private:
 	SDL_IOStream * fontData = nullptr;
 	std::unique_ptr<char[]> fontBuffer = nullptr;
 	std::unordered_map<int, TTF_Font*> fontCache;
+	SDL_IOStream* fallbackFontData = nullptr;
+	std::unique_ptr<char[]> fallbackFontBuffer;
+	std::unordered_map<int, TTF_Font*> fallbackFontCache;
 	TTF_Font* getCachedFont(int size);
 	void clearFontCache();
+	void clearFallbackFontSource();
 protected:
-	void setFontFromMem(std::unique_ptr<char[]>& data, int size);
+	void setFontFromMem(std::unique_ptr<char[]>& data, int size,
+		std::unique_ptr<char[]> fallback = nullptr, int fallbackSize = 0);
 	bool measureText(const std::string& text, int size, int& width, int& height);
 	_shared_image createText(const std::string& text, int size, unsigned int color, bool safe = false);
 	_shared_image createTextWithFontData(
@@ -669,7 +676,8 @@ protected:
 		int size,
 		unsigned int color,
 		int wrapWidth,
-		bool safe = false);
+		bool safe = false,
+		const void* fallbackData = nullptr, std::size_t fallbackSize = 0);
 	void drawText(const std::string& text,int x, int y, int size, unsigned int color);
 	void setFontName(const std::string& fontName);
 	
@@ -713,9 +721,11 @@ protected:
 	void clearSoundCache();
 #endif
 	//以中心位置播放音乐
-	_channel playMusic(_music music, float volume);
+	_channel playMusic(_music music, float volume, const std::string& magicSoundKey = {});
 	//指定坐标播放音乐
-	_channel playMusic(_music music, float x, float y, float volume);
+	_channel playMusic(_music music, float x, float y, float volume, const std::string& magicSoundKey = {});
+	std::size_t countPlayingMagicSounds(const std::string& key);
+	void setMagicSoundVolume(float volume);
 	void stopMusic(_channel channel);
 	void stopSoundsExcept(_channel keepChannelA = nullptr, _channel keepChannelB = nullptr);
 	void pauseMusic(_channel channel);

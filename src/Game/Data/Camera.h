@@ -1,34 +1,33 @@
 #pragma once
 #include "GameElement.h"
+#include "ProjectedMovement.h"
 #include <algorithm>
 #include <cmath>
 
 class Camera :
 	public GameElement
 {
+	friend class OriginalMovementRuntimeTestAccess;
 public:
 	Camera();
 	virtual ~Camera();
 private:
-	float cameraSpeed = 40;
-
-	const float flyRatio = 0.625 / 10.0;
 	PointEx distanceToFly = { 0.0, 0.0 };
 	PointEx distanceFlied = { 0.0, 0.0 };
-	int flyDirection = 0;
 	int flySpeed = 1;
 	Point flyStartPosition = { 0, 0 };
 	PointEx flyStartOffset = { 0.0, 0.0 };
 	int directionalMoveDirection = 0;
-	int directionalMoveFramesRemaining = 0;
+	double directionalMoveFramesRemaining = 0.0;
 	int directionalMoveSpeed = 0;
-	PointEx directionalMoveRemainder = { 0.0, 0.0 };
+	PointBase<double> directionalMoveRemainder = { 0.0, 0.0 };
+	bool csharpDirectionalMove = false;
 
 public:
 	struct DirectionalFrameMoveStep
 	{
 		Point distance = { 0, 0 };
-		PointEx remainder = { 0.0, 0.0 };
+		PointBase<double> remainder = { 0.0, 0.0 };
 	};
 
 	std::weak_ptr<GameElement> followNPC;
@@ -119,42 +118,57 @@ public:
 		return std::clamp(speed, 1, 1000);
 	}
 	static DirectionalFrameMoveStep calculateDirectionalFrameMoveStep(
-		PointEx remainder,
+		PointBase<double> remainder,
 		int direction,
-		int speed)
+		int speed,
+		double frameCount = 1.0,
+		bool csharpProtocol = false)
 	{
 		const int normalizedDirection =
 			direction >= 0 && direction <= 7 ? direction : 0;
-		const float diagonal = 1.0f / std::sqrt(2.0f);
-		const PointEx directions[8] =
+		const PointBase<double> directions[8] =
 		{
 			{ 0.0f, 1.0f },
-			{ -diagonal, diagonal },
-			{ -1.0f, 0.0f },
-			{ -diagonal, -diagonal },
+			{ -2.0f, 1.0f },
+			{ -2.0f, 0.0f },
+			{ -2.0f, -1.0f },
 			{ 0.0f, -1.0f },
-			{ diagonal, -diagonal },
-			{ 1.0f, 0.0f },
-			{ diagonal, diagonal }
+			{ 2.0f, -1.0f },
+			{ 2.0f, 0.0f },
+			{ 2.0f, 1.0f }
 		};
-		const float frameDistance =
-			static_cast<float>(speed) * 2.0f;
-		PointEx accumulated =
+		auto movementDirection = directions[normalizedDirection];
+		if (csharpProtocol)
 		{
-			remainder.x + directions[normalizedDirection].x * frameDistance,
-			remainder.y + directions[normalizedDirection].y * frameDistance
+			movementDirection.x /= 2.0;
+			const double length = std::hypot(movementDirection.x, movementDirection.y);
+			movementDirection.x *= 2.0 / length;
+			movementDirection.y *= 2.0 / length;
+		}
+		const double frameDistance = static_cast<double>(speed) * std::max(0.0, frameCount);
+		PointBase<double> accumulated =
+		{
+			remainder.x + movementDirection.x * frameDistance,
+			remainder.y + movementDirection.y * frameDistance
 		};
+		const auto snapInteger = [](double value)
+		{
+			const double nearest = std::round(value);
+			return std::abs(value - nearest) < 0.000000001 ? nearest : value;
+		};
+		accumulated.x = snapInteger(accumulated.x);
+		accumulated.y = snapInteger(accumulated.y);
 
 		DirectionalFrameMoveStep step;
 		if (std::abs(accumulated.x) >= 1.0f)
 		{
 			step.distance.x = static_cast<int>(accumulated.x);
-			accumulated.x -= static_cast<float>(step.distance.x);
+			accumulated.x -= step.distance.x;
 		}
 		if (std::abs(accumulated.y) >= 1.0f)
 		{
 			step.distance.y = static_cast<int>(accumulated.y);
-			accumulated.y -= static_cast<float>(step.distance.y);
+			accumulated.y -= step.distance.y;
 		}
 		step.remainder = accumulated;
 		return step;
@@ -176,7 +190,8 @@ private:
 	void clearVibrationOffset();
 	void updateVibrationOffset();
 	void clearDirectionalFrameMove();
-	void updateDirectionalFrameMove();
+	void setDirectionalFrameMove(int direction, double frames, int speed, bool csharpProtocol);
+	void updateDirectionalFrameMove(UTime frameTime);
 	virtual void onUpdate();
 	virtual void onEvent();
 	void onWindowResize(int width, int height) override;

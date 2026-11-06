@@ -1,6 +1,7 @@
 #include "DialogueDocument.h"
 
 #include "AuthoringMutationGate.h"
+#include "LuaLexer.h"
 
 #include <QDir>
 #include <QFile>
@@ -96,7 +97,13 @@ bool DialogueDocument::load(const QByteArray& bytes, QString* errorMessage)
         errorMessage->clear();
     orderedSections.clear();
     loaded = false;
-    if (bytes.isEmpty() || bytes.contains('\0') ||
+    if (bytes.isEmpty())
+    {
+        ini = INIFileEditor();
+        loaded = true;
+        return true;
+    }
+    if (bytes.contains('\0') ||
         !ini.loadFromBuffer(
             bytes.constData(), bytes.size(),
             INIFileEditor::UnrecognizedLinePolicy::Preserve))
@@ -145,12 +152,6 @@ bool DialogueDocument::load(const QByteArray& bytes, QString* errorMessage)
         orderedSections.append(section);
     }
 
-    if (orderedSections.isEmpty())
-    {
-        if (errorMessage)
-            *errorMessage = QStringLiteral("文件中没有可编辑的对话段落。");
-        return false;
-    }
     loaded = true;
     return true;
 }
@@ -246,7 +247,8 @@ DialogueLine DialogueDocument::line(const QString& section, int row) const
     {
         result.portraitReference = QString::fromUtf8(
             ini.get(rawSection, portraitKey, ""));
-        result.portraitMode = result.portraitReference.isEmpty()
+        result.portraitMode = result.portraitReference == "NoHeadChange"
+            ? DialoguePortraitMode::KeepPrevious : result.portraitReference.isEmpty()
             ? DialoguePortraitMode::NoPortrait
             : DialoguePortraitMode::Reference;
     }
@@ -308,6 +310,9 @@ bool DialogueDocument::setPortrait(const QString& section, int row,
 {
     if (line(section, row).number == 0)
         return false;
+    const auto previous = line(section, row);
+    if (previous.portraitMode == mode &&
+        (mode != DialoguePortraitMode::Reference || previous.portraitReference == reference)) return true;
     const std::string rawSection = section.toUtf8().toStdString();
     const std::string portraitKey = "head" + std::to_string(row + 1);
     switch (mode)
@@ -326,6 +331,138 @@ bool DialogueDocument::setPortrait(const QString& section, int row,
         return true;
     }
     return false;
+}
+
+bool DialogueDocument::addSection(const QString& name, const QString& firstText)
+{
+    const QString clean = name.trimmed();
+    if (!loaded || clean.compare("name", Qt::CaseInsensitive) == 0 || firstText.isEmpty() ||
+        clean.contains(QChar('\0')) || !ini.addSection(clean.toUtf8().toStdString())) return false;
+    ini.set(clean.toUtf8().toStdString(), "1", encodeDialogueText(firstText).toUtf8().toStdString());
+    orderedSections.append(clean);
+    return true;
+}
+
+bool DialogueDocument::copySection(const QString& section, const QString& name)
+{
+    const QString clean = name.trimmed();
+    if (!hasSection(section) || clean.compare("name", Qt::CaseInsensitive) == 0 ||
+        clean.contains(QChar('\0')) || !ini.copySection(section.toUtf8().toStdString(), clean.toUtf8().toStdString())) return false;
+    orderedSections.append(clean);
+    return true;
+}
+
+bool DialogueDocument::renameSection(const QString& section, const QString& name)
+{
+    const QString clean = name.trimmed();
+    if (!hasSection(section) || clean.compare("name", Qt::CaseInsensitive) == 0 ||
+        clean.contains(QChar('\0')) || !ini.renameSection(section.toUtf8().toStdString(), clean.toUtf8().toStdString())) return false;
+    for (auto& item : orderedSections)
+        if (item.compare(section, Qt::CaseInsensitive) == 0) { item = clean; break; }
+    return true;
+}
+
+bool DialogueDocument::removeSection(const QString& section)
+{
+    if (!hasSection(section)) return false;
+    ini.removeSection(section.toUtf8().toStdString());
+    for (int index = 0; index < orderedSections.size(); ++index)
+        if (orderedSections[index].compare(section, Qt::CaseInsensitive) == 0) { orderedSections.removeAt(index); break; }
+    return true;
+}
+
+bool DialogueDocument::canReorderLines(const QString& section) const
+{
+    const int count = lineCount(section);
+    if (count <= 0) return false;
+    for (const auto& name : ini.getKeyNames(section.toUtf8().toStdString()))
+    {
+        QString key = QString::fromUtf8(name);
+        if (key.startsWith("head", Qt::CaseInsensitive)) key.remove(0, 4);
+        int number = 0;
+        if (isPositiveNumber(key, &number) && number > count) return false;
+    }
+    return true;
+}
+
+bool DialogueDocument::rewriteLines(const QString& section, const QVector<int>& order, const QString& insertedText)
+{
+    if (!canReorderLines(section) || order.isEmpty() || order.size() > 10000) return false;
+    const int count = lineCount(section);
+    const auto rawSection = section.toUtf8().toStdString();
+    struct Row
+    {
+        std::string text;
+        bool hasPortrait;
+        std::string portrait;
+        DialogueResolvedPortrait resolved;
+    };
+    QVector<Row> rows;
+    for (int index : order)
+    {
+        if (index < -1 || index >= count) return false;
+        if (index < 0)
+        {
+            if (insertedText.isEmpty()) return false;
+            rows.append({encodeDialogueText(insertedText).toUtf8().toStdString(), true, "", {}});
+            continue;
+        }
+        const auto number = std::to_string(index + 1);
+        rows.append({ini.get(rawSection, number, ""), ini.hasKey(rawSection, "head" + number),
+            ini.get(rawSection, "head" + number, ""), resolvedPortrait(section, index)});
+    }
+    for (int index = 1; index <= count; ++index)
+    {
+        ini.removeKey(rawSection, std::to_string(index));
+        ini.removeKey(rawSection, "head" + std::to_string(index));
+    }
+    for (int index = 0; index < rows.size(); ++index)
+    {
+        const auto& row = rows[index];
+        const auto number = std::to_string(index + 1);
+        ini.set(rawSection, number, row.text);
+        if (!row.hasPortrait || row.portrait == "NoHeadChange")
+        {
+            const auto previous = index >= 2 ? resolvedPortrait(section, index - 2) : DialogueResolvedPortrait();
+            if (previous.reference != row.resolved.reference || previous.explicitlyHidden != row.resolved.explicitlyHidden)
+                ini.set(rawSection, "head" + number, row.resolved.reference.toUtf8().toStdString());
+            else if (row.hasPortrait) ini.set(rawSection, "head" + number, row.portrait);
+        }
+        else ini.set(rawSection, "head" + number, row.portrait);
+    }
+    return true;
+}
+
+bool DialogueDocument::insertLine(const QString& section, int row, const QString& text)
+{
+    const int count = lineCount(section);
+    if (row < 0 || row > count) return false;
+    QVector<int> order;
+    for (int index = 0; index <= count; ++index)
+    {
+        if (index == row) order.append(-1);
+        if (index < count) order.append(index);
+    }
+    return rewriteLines(section, order, text);
+}
+
+bool DialogueDocument::removeLine(const QString& section, int row)
+{
+    const int count = lineCount(section);
+    if (row < 0 || row >= count || count <= 1) return false;
+    QVector<int> order;
+    for (int index = 0; index < count; ++index) if (index != row) order.append(index);
+    return rewriteLines(section, order);
+}
+
+bool DialogueDocument::moveLine(const QString& section, int from, int to)
+{
+    const int count = lineCount(section);
+    if (from < 0 || to < 0 || from >= count || to >= count || from == to) return false;
+    QVector<int> order;
+    for (int index = 0; index < count; ++index) order.append(index);
+    order.move(from, to);
+    return rewriteLines(section, order);
 }
 
 int DialogueDocument::hiddenFieldCount() const
@@ -368,28 +505,28 @@ int DialogueDocument::hiddenFieldCount() const
 QVector<DialogueReference> DialogueDocument::findLiteralTalkReferences(
     const QString& scriptText)
 {
-    static const QRegularExpression expression(
-        QStringLiteral(
-            R"dialogue((?<![A-Za-z0-9_])talk\s*\(\s*(?:"((?:\\.|[^"\\])*)"|'((?:\\.|[^'\\])*)')\s*\))dialogue"),
-        QRegularExpression::CaseInsensitiveOption);
+    const auto lexed = LuaLexer::lex(scriptText);
+    QList<LuaToken> tokens;
+    for (const auto& token : lexed.tokens)
+        if (LuaLexer::isSignificant(token)) tokens.append(token);
     QVector<DialogueReference> references;
-    QRegularExpressionMatchIterator iterator =
-        expression.globalMatch(scriptText);
-    while (iterator.hasNext())
+    for (int index = 0; index + 3 < tokens.size(); ++index)
     {
-        const QRegularExpressionMatch match = iterator.next();
+        const auto& call = tokens[index];
+        const auto& argument = tokens[index + 2];
+        if (call.kind != LuaTokenKind::Identifier || call.text.compare("talk", Qt::CaseInsensitive) != 0 ||
+            tokens[index + 1].text != "(" || tokens[index + 3].kind != LuaTokenKind::Symbol ||
+            tokens[index + 3].text != ")" || !argument.complete || argument.decodedText.isEmpty() ||
+            (argument.kind != LuaTokenKind::String && argument.kind != LuaTokenKind::LongString) ||
+            (index > 0 && (tokens[index - 1].text == "." || tokens[index - 1].text == ":" || tokens[index - 1].text == "function")))
+            continue;
         DialogueReference reference;
-        reference.section = unescapeLuaString(
-            match.captured(1).isNull() ? match.captured(2)
-                                       : match.captured(1));
-        reference.startOffset = match.capturedStart();
-        reference.endOffset = match.capturedEnd();
-        const QString prefix = scriptText.left(reference.startOffset);
-        reference.line = prefix.count(QLatin1Char('\n')) + 1;
-        reference.column = reference.startOffset -
-            prefix.lastIndexOf(QLatin1Char('\n'));
-        if (!reference.section.isEmpty())
-            references.append(reference);
+        reference.section = argument.decodedText;
+        reference.startOffset = static_cast<int>(call.range.start.utf16Offset);
+        reference.endOffset = static_cast<int>(tokens[index + 3].range.end.utf16Offset);
+        reference.line = call.range.start.line;
+        reference.column = call.range.start.column;
+        references.append(reference);
     }
     return references;
 }

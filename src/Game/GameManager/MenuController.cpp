@@ -8,6 +8,7 @@
 #include "../Menu/ControllerFocusParticipant.h"
 #include "../Menu/ControllerTransferPolicies.h"
 #include "../Menu/MenuSurfaceCatalog.h"
+#include "../Menu/MenuMouseWheel.h"
 #include "../../Input/PhysicalInputManager.h"
 
 #include <algorithm>
@@ -544,6 +545,147 @@ void MenuController::onPreviewPointerEvent(AEvent& event)
 	}
 }
 
+bool MenuController::onHandleMouseWheel(AEvent& event)
+{
+	if (dragging != TOUCH_UNTOUCHEDID || currentDragItem != nullptr)
+	{
+		return true;
+	}
+	using MenuSurfaceCatalog::SurfaceId;
+	using MenuSurfaceCatalog::ModalKind;
+	using Surface = std::pair<PElement, SurfaceId>;
+	const Surface surfaces[] =
+	{
+		{ stateMenu, SurfaceId::RpgState },
+		{ equipMenu, SurfaceId::RpgEquipment },
+		{ practiceMenu, SurfaceId::RpgPractice },
+		{ goodsMenu, SurfaceId::RpgGoods },
+		{ magicMenu, SurfaceId::RpgMagic },
+		{ memoMenu, SurfaceId::RpgMemo },
+		{ bottomMenu, SurfaceId::HudBottom },
+		{ topMenu, SurfaceId::HudTop },
+		{ columnMenu, SurfaceId::HudColumn },
+		{ partnerHeadMenu, SurfaceId::PartnerHead },
+		{ mapThumbnailMenu, SurfaceId::MapThumbnail },
+		{ dialog, SurfaceId::Dialog },
+		{ chooseMenu, SurfaceId::Choice },
+		{ buySellMenu, SurfaceId::BuySell },
+		{ gambleMenu, SurfaceId::GambleNormal },
+		{ paperMenu, SurfaceId::Paper },
+		{ skillTreeMenu, SurfaceId::SkillTree },
+		{ attributePointMenu, SurfaceId::AttributePoints },
+		{ partnerEquipMenu, SurfaceId::PartnerEquipment },
+		{ toolTip, SurfaceId::Tooltip }
+	};
+
+	// Children are drawn in reverse order. Walk the actual display tree front
+	// to back instead of using focus eligibility or the registration order.
+	std::vector<Surface> displayed;
+	std::function<void(const PElement&)> collect = [&](const PElement& element)
+	{
+		if (element == nullptr || !element->visible || !element->canDraw)
+		{
+			return;
+		}
+		for (const auto& child : element->children)
+		{
+			collect(child);
+		}
+		for (const auto& surface : surfaces)
+		{
+			if (surface.first == element)
+			{
+				displayed.push_back(surface);
+				break;
+			}
+		}
+	};
+	for (const auto& child : children)
+	{
+		collect(child);
+	}
+
+	const int x = event.eventX;
+	const int y = event.eventY;
+	auto acceptsEvents = [this](const PElement& owner)
+	{
+		for (const Element* element = owner.get(); element != nullptr;
+			element = element->parent)
+		{
+			if (!element->activated || !element->needEvents)
+			{
+				return false;
+			}
+			if (element == this) return true;
+		}
+		return false;
+	};
+	for (const auto& surface : displayed)
+	{
+		const auto* policy = MenuSurfaceCatalog::find(surface.second);
+		const bool expandedTip = surface.first == toolTip && toolTip->isExpanded();
+		if (policy->modalKind != ModalKind::Modal && !expandedTip)
+		{
+			continue;
+		}
+		// These two windows own a shared bag and validate their combined region
+		// themselves. Other modals receive their existing handler only inside.
+		if (acceptsEvents(surface.first)
+			&& (surface.first == buySellMenu || surface.first == partnerEquipMenu
+				|| expandedTip || menuMouseWheelContains(surface.first, x, y, toolTip.get())))
+		{
+			surface.first->dispatchMouseWheel(event);
+		}
+		return true;
+	}
+
+	const int steps = menuMouseWheelSteps(event);
+	auto scroll = [&](const PElement& owner)
+	{
+		if (!acceptsEvents(owner))
+		{
+			return;
+		}
+		if (owner == goodsMenu) goodsMenu->scrollMouseWheel(steps);
+		else if (owner == magicMenu) magicMenu->scrollMouseWheel(steps);
+		else if (owner == equipMenu) equipMenu->scrollMouseWheel(steps);
+		else if (owner == memoMenu) memoMenu->scrollMouseWheel(steps);
+		else owner->dispatchMouseWheel(event);
+	};
+	for (const auto& surface : displayed)
+	{
+		if (surface.first == toolTip)
+		{
+			if (!menuMouseWheelContains(toolTip, x, y)) continue;
+			const auto owner = toolTip->getSourceOwner();
+			const auto source = toolTip->getSourceElement();
+			if (menuMouseWheelSourceBelongsTo(source, owner))
+			{
+				const auto found = std::find_if(displayed.begin(), displayed.end(),
+					[&](const Surface& candidate) { return candidate.first == owner; });
+				if (found != displayed.end() && owner != toolTip)
+				{
+					scroll(owner);
+				}
+			}
+			// An expired or hidden source never redirects to a different window.
+			return true;
+		}
+		const auto* policy = MenuSurfaceCatalog::find(surface.second);
+		if (policy->modalKind == ModalKind::PassiveOverlay
+			|| !menuMouseWheelContains(surface.first, x, y, toolTip.get()))
+		{
+			continue;
+		}
+		scroll(surface.first);
+		// Empty, non-scrollable and end-of-list windows still occlude others.
+		return true;
+	}
+	// All in-game wheel targets were considered above. Do not run the legacy
+	// child traversal again: a non-drawn modal may still have needEvents set.
+	return true;
+}
+
 bool MenuController::onHandleEvent(AEvent & e)
 {
 	synchronizeInputLifecycle();
@@ -624,7 +766,16 @@ bool MenuController::onHandleEvent(AEvent & e)
 		}
 		else if (e.eventData == KEY_F3)
 		{
-			togglePracticeView();
+			if (gm != nullptr
+				&& gm->global.feature.menuResourceProfile == mrpXjxqy
+				&& gm->global.feature.practiceMenuDisabled)
+			{
+				toggleGoodsView();
+			}
+			else
+			{
+				togglePracticeView();
+			}
 			return true;
 		}
 		else if (e.eventData == KEY_F4)
@@ -3352,7 +3503,7 @@ bool MenuController::showGoodsToolTip(
 		hideToolTip();
 		return false;
 	}
-	toolTip->showForOwner(owner);
+	toolTip->showForOwner(owner, anchor);
 	auto shop = BuySellMenu::getInstance();
 	if (shop != nullptr && shop->visible)
 	{
@@ -3368,7 +3519,7 @@ bool MenuController::showGoodsToolTip(
 	}
 	toolTip->setGoods(goods, shop != nullptr && shop->visible && anchor->dragType == dtGoods);
 	toolTip->placeNearElement(anchor);
-	if (details && gm != nullptr && gm->global.feature.qingyuUi)
+	if (details && toolTip->supportsFullDetails())
 	{
 		toolTip->runDetails();
 	}
@@ -3387,7 +3538,7 @@ bool MenuController::showMagicToolTip(
 		hideToolTip();
 		return false;
 	}
-	toolTip->showForOwner(owner);
+	toolTip->showForOwner(owner, anchor);
 	upMenu->addChild(toolTip);
 	toolTip->setMagic(magic, level);
 	toolTip->placeNearElement(anchor);

@@ -11,6 +11,7 @@
 #include "../Input/InputAction.h"
 #include "../Resource/ResourceManager.h"
 #include "../Resource/ResourceSelectScene.h"
+#include "../Resource/FontCatalog.h"
 
 namespace
 {
@@ -534,6 +535,17 @@ int Game::run()
 		// installed. A package-owned font takes precedence for the game itself;
 		// the engine font remains the fallback.
 		installGameFont(true);
+	}
+
+	if (Config::fontId != ResourceFonts::DefaultFontId &&
+		!File::activeResourceFileExist(GameFontPath))
+	{
+		auto selectedFont = ResourceFonts::loadGameFont(Config::fontId);
+		if (selectedFont.data && selectedFont.length > 0)
+		{
+			Engine::getInstance()->setFontFromMem(selectedFont.data, selectedFont.length,
+				std::move(selectedFont.fallback), selectedFont.fallbackLength);
+		}
 	}
 
 	GameLog::write("Init Cursor\n");

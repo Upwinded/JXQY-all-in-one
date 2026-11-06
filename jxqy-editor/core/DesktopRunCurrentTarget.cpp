@@ -205,3 +205,25 @@ DesktopRunCurrentTargetResult selectCurrentScriptTarget(
         normalizedVirtualPath(scriptVirtualPath);
     return result;
 }
+
+DesktopRunCurrentTargetResult selectCurrentEntityListTarget(
+    const ProjectRuntimeConfiguration& configuration, const QString& listVirtualPath,
+    bool npcList, const QString& mapVirtualPath, Qt::CaseSensitivity caseSensitivity,
+    const QString& preferredSceneId)
+{
+    auto result = selectBaseline(configuration, mapVirtualPath.isEmpty() ? listVirtualPath : mapVirtualPath,
+        caseSensitivity, preferredSceneId, [&](const ProjectScene& scene)
+        { return !mapVirtualPath.isEmpty() ? scene.mapPath : npcList ? scene.npcPath : scene.objectPath; });
+    if (!result.succeeded()) return result;
+    if (!mapVirtualPath.isEmpty() && !sameVirtualPath(result.target->mapPath, mapVirtualPath, caseSensitivity))
+    {
+        result.target.reset();
+        result.error = DesktopRunCurrentTargetError::BaselineMissing;
+        result.diagnosticCode = "editor_run.current_list.map_scene_missing";
+        return result;
+    }
+    if (npcList) result.target->npcPath = normalizedVirtualPath(listVirtualPath);
+    else result.target->objectPath = normalizedVirtualPath(listVirtualPath);
+    result.target->entryScriptPath.clear();
+    return result;
+}

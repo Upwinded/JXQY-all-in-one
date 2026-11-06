@@ -1,4 +1,5 @@
 #include "NpcDataEditorWindow.h"
+#include "EditorSaveConfirmation.h"
 #include "../core/AuthoringMutationGate.h"
 #include "ui_NpcDataEditorWindow.h"
 #include "AssetDragDrop.h"
@@ -10,6 +11,7 @@
 #include "../core/ScriptConverter.h"
 #include "../core/EditorAssetPath.h"
 #include "../core/DurableFileTransaction.h"
+#include "../core/ContentAuthoring.h"
 
 #include <QAction>
 #include <QFileDialog>
@@ -49,28 +51,6 @@ static QByteArray textLinesToUtf8Bytes(const QStringList& lines)
         result.append('\n');
     }
     return result;
-}
-
-static bool writeTextLinesAtomically(const QString& fileName, const QStringList& lines)
-{
-    auto mutationLease =
-        AuthoringMutationGate::instance().
-            acquireMutationLeaseForPath(fileName);
-    if (!mutationLease)
-        return false;
-
-    QSaveFile file(fileName);
-    if (!file.open(QIODevice::WriteOnly))
-        return false;
-
-    const QByteArray bytes = textLinesToUtf8Bytes(lines);
-    if (file.write(bytes) != bytes.size())
-    {
-        file.cancelWriting();
-        return false;
-    }
-
-    return file.commit();
 }
 
 static bool writeBytesAtomically(const QString& fileName, const QByteArray& data)
@@ -664,6 +644,7 @@ NpcDataEditorWindow::NpcDataEditorWindow(QWidget* parent)
         this, &NpcDataEditorWindow::onObjectPropertyChanged);
 
     ui->npcToolBar->addAction(ui->actionOpen);
+    setupAuthoringActions();
     ui->npcToolBar->addAction(ui->actionSave);
     ui->npcToolBar->addAction(ui->actionSaveAs);
     ui->npcToolBar->addSeparator();
@@ -715,6 +696,13 @@ NpcDataEditorWindow::NpcDataEditorWindow(QWidget* parent)
         getAssetsPath, FilePickerHelper::EntityResourceField::ScriptFile, this);
     FilePickerHelper::addEntityResourcePickerButton(ui->wavFileEdit, wavFilter,
         getAssetsPath, FilePickerHelper::EntityResourceField::WavFile, this);
+    for (auto* field : {ui->scriptEdit, ui->deathScriptEdit})
+        FilePickerHelper::addScriptAuthoringButtons(field, getAssetsPath,
+            [this]() { return currentNpcMapName; }, this,
+            [this](const QString& path) { emit openScriptFileRequested(path); });
+    FilePickerHelper::addScriptAuthoringButtons(ui->objScriptEdit, getAssetsPath,
+        [this]() { return currentObjectMapName; }, this,
+        [this](const QString& path) { emit openScriptFileRequested(path); });
 
     ui->propertyTabWidget->setEnabled(false);
     updatePropertyTabVisibility();
@@ -834,6 +822,21 @@ QList<ProjectDocumentState> NpcDataEditorWindow::currentProjectDocuments() const
              hasNpcResourceUnsavedChanges});
     }
     return documents;
+}
+
+std::optional<ProjectDocumentState> NpcDataEditorWindow::currentPlaytestList() const
+{
+    const auto* current = ui->entityTabWidget->currentWidget();
+    if (current != ui->npcTab && current != ui->objectTab) return std::nullopt;
+    const auto type = current == ui->npcTab ? ProjectDocumentType::NpcList : ProjectDocumentType::ObjectList;
+    for (const auto& document : currentProjectDocuments())
+        if (document.type == type && !document.filePath.isEmpty()) return document;
+    return std::nullopt;
+}
+
+QString NpcDataEditorWindow::currentPlaytestMap() const
+{
+    return ui->entityTabWidget->currentWidget() == ui->npcTab ? currentNpcMapName : currentObjectMapName;
 }
 
 bool NpcDataEditorWindow::canAdoptDocumentPath(
@@ -1362,6 +1365,10 @@ bool NpcDataEditorWindow::saveAllModified()
     }
 
     DurableFileTransaction transaction(transactionRoot);
+    const EditorFileState expectedNpc = npcFileState.forSave(currentNpcFilePath);
+    const EditorFileState expectedObject = objectFileState.forSave(currentObjectFilePath);
+    const EditorFileState expectedResource = npcResourceFileState.forSave(currentNpcResourceFilePath);
+    EditorFileState savedNpcState, savedObjectState, savedResourceState;
     const QString transactionId = QUuid::createUuid().toString(QUuid::Id128);
     QString transactionError;
     QStringList savedNpcLines;
@@ -1372,6 +1379,11 @@ bool NpcDataEditorWindow::saveAllModified()
                                int documentKind)
     {
         const QString temporaryPath = targetPath + ".tmp." + transactionId;
+        if (!QDir().mkpath(QFileInfo(targetPath).absolutePath()))
+        {
+            transactionError = tr("无法创建保存目录：%1").arg(targetPath);
+            return false;
+        }
         bool serialized = false;
         if (documentKind == 0)
         {
@@ -1394,8 +1406,11 @@ bool NpcDataEditorWindow::saveAllModified()
             transactionError = tr("无法序列化文件: %1").arg(targetPath);
             return false;
         }
-        if (!transaction.addPreparedWrite(
-                targetPath, temporaryPath, transactionError))
+        const EditorFileState& expected = documentKind == 0 ? expectedNpc
+            : documentKind == 1 ? expectedObject : expectedResource;
+        EditorFileState& savedState = documentKind == 0 ? savedNpcState
+            : documentKind == 1 ? savedObjectState : savedResourceState;
+        if (!expected.prepareWrite(transaction, targetPath, temporaryPath, savedState, transactionError, EditorSaveConfirmation::forWindow(this)))
         {
             QFile::remove(temporaryPath);
             return false;
@@ -1410,15 +1425,15 @@ bool NpcDataEditorWindow::saveAllModified()
         (hasNpcResourceUnsavedChanges && isNpcResourceFile &&
             !prepareDocument(currentNpcResourceFilePath, 2)))
     {
-        QMessageBox::warning(this, tr("保存失败"),
-            tr("无法准备 NPC/物体同代事务：\n%1").arg(transactionError));
+        if (!transactionError.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"), transactionError);
         return false;
     }
 
     if (!transaction.commit(transactionError))
     {
         QMessageBox::warning(this, tr("保存失败"),
-            tr("NPC/物体同代事务提交失败：\n%1").arg(transactionError));
+            transactionError);
         return false;
     }
     if (!transactionError.isEmpty())
@@ -1427,17 +1442,20 @@ bool NpcDataEditorWindow::saveAllModified()
     if (hasNpcUnsavedChanges && isNpcFile)
     {
         originalNpcLines = savedNpcLines;
+        npcFileState = savedNpcState;
         normalizeNpcSectionIds();
         hasNpcUnsavedChanges = false;
     }
     if (hasObjectUnsavedChanges && isObjectFile)
     {
         originalObjectLines = savedObjectLines;
+        objectFileState = savedObjectState;
         normalizeObjectSectionIds();
         hasObjectUnsavedChanges = false;
     }
     if (hasNpcResourceUnsavedChanges && isNpcResourceFile)
     {
+        npcResourceFileState = savedResourceState;
         npcResourceDocument->loadFromString(
             std::string(savedNpcResourceData.constData(),
                 static_cast<size_t>(savedNpcResourceData.size())));
@@ -1518,10 +1536,44 @@ bool NpcDataEditorWindow::isNpcResourceFilePath(const QString& fileName)
              "npcres", Qt::CaseInsensitive) == 0);
 }
 
+bool NpcDataEditorWindow::saveContentDocument(const QString& path)
+{
+    const auto key = EditorAssetPath::logicalComparisonKey(path);
+    if (key == EditorAssetPath::logicalComparisonKey(currentNpcFilePath))
+        return saveNpcFileAs(currentNpcFilePath);
+    if (key == EditorAssetPath::logicalComparisonKey(currentObjectFilePath))
+        return saveObjectFileAs(currentObjectFilePath);
+    return key == EditorAssetPath::logicalComparisonKey(currentNpcResourceFilePath) &&
+        saveNpcResourceFileAs(currentNpcResourceFilePath);
+}
+
+bool NpcDataEditorWindow::reloadContentDocument(const QString& path)
+{
+    const auto key = EditorAssetPath::logicalComparisonKey(path);
+    const int tab = ui->entityTabWidget->currentIndex();
+    const int npcRow = ui->npcListWidget->currentRow();
+    const int objectRow = ui->objectListWidget->currentRow();
+    bool loaded = false;
+    if (key == EditorAssetPath::logicalComparisonKey(currentNpcFilePath) && !hasNpcUnsavedChanges)
+        loaded = loadNpcFromFile(path, true);
+    else if (key == EditorAssetPath::logicalComparisonKey(currentObjectFilePath) && !hasObjectUnsavedChanges)
+        loaded = loadObjectFromFile(path, true);
+    else if (key == EditorAssetPath::logicalComparisonKey(currentNpcResourceFilePath) && !hasNpcResourceUnsavedChanges)
+        loaded = loadNpcResourceFromFile(path, true);
+    if (loaded)
+    {
+        ui->npcListWidget->setCurrentRow(npcRow);
+        ui->objectListWidget->setCurrentRow(objectRow);
+        ui->entityTabWidget->setCurrentIndex(tab);
+        updatePropertyTabVisibility();
+    }
+    return loaded;
+}
+
 bool NpcDataEditorWindow::openNpcFile(
     const QString& fileName, bool reportLoadErrors)
 {
-    if (!canAdoptDocumentPath(currentNpcFilePath, fileName))
+    if (!canAdoptDocumentPath(currentNpcFilePath, ContentAuthoring::projectPath(assetsBasePath, fileName)))
         return false;
     if (confirmSaveIfModified() == SaveConfirmResult::Cancelled)
         return false;
@@ -1536,7 +1588,7 @@ bool NpcDataEditorWindow::openNpcFile(
 bool NpcDataEditorWindow::openObjectFile(
     const QString& fileName, bool reportLoadErrors)
 {
-    if (!canAdoptDocumentPath(currentObjectFilePath, fileName))
+    if (!canAdoptDocumentPath(currentObjectFilePath, ContentAuthoring::projectPath(assetsBasePath, fileName)))
         return false;
     if (confirmSaveIfModified() == SaveConfirmResult::Cancelled)
         return false;
@@ -1555,7 +1607,7 @@ bool NpcDataEditorWindow::openNpcResourceFile(
          pathsReferToSameTarget(fileName, currentNpcFilePath)) ||
         (isObjectFile &&
          pathsReferToSameTarget(fileName, currentObjectFilePath)) ||
-        !canAdoptDocumentPath(currentNpcResourceFilePath, fileName))
+        !canAdoptDocumentPath(currentNpcResourceFilePath, ContentAuthoring::projectPath(assetsBasePath, fileName)))
     {
         return false;
     }
@@ -1646,9 +1698,12 @@ void NpcDataEditorWindow::commitAssetsPathSwitch(const QString& path)
         originalNpcLines.clear();
         originalObjectLines.clear();
         currentNpcFilePath.clear();
+        npcFileState = {};
         currentNpcMapName.clear();
         currentObjectFilePath.clear();
+        objectFileState = {};
         currentNpcResourceFilePath.clear();
+        npcResourceFileState = {};
         isNpcFile = false;
         isObjectFile = false;
         isNpcResourceFile = false;
@@ -1725,8 +1780,6 @@ void NpcDataEditorWindow::onSave()
             return;
         if (!saveNpcToFilePreserving(currentNpcFilePath))
         {
-            QMessageBox::warning(this, tr("保存失败"),
-                tr("无法保存NPC文件: %1").arg(currentNpcFilePath));
             return;
         }
         hasNpcUnsavedChanges = false;
@@ -1740,8 +1793,6 @@ void NpcDataEditorWindow::onSave()
             return;
         if (!saveObjectToFilePreserving(currentObjectFilePath))
         {
-            QMessageBox::warning(this, tr("保存失败"),
-                tr("无法保存物体文件: %1").arg(currentObjectFilePath));
             return;
         }
         hasObjectUnsavedChanges = false;
@@ -1754,9 +1805,6 @@ void NpcDataEditorWindow::onSave()
             return;
         if (!saveNpcResourceToFile(currentNpcResourceFilePath))
         {
-            QMessageBox::warning(this, tr("保存失败"),
-                tr("无法保存 NPC 资源文件: %1")
-                    .arg(currentNpcResourceFilePath));
             return;
         }
         hasNpcResourceUnsavedChanges = false;
@@ -2240,6 +2288,7 @@ void NpcDataEditorWindow::onEntityTabChanged(int index)
     }
     Q_UNUSED(index);
     updatePropertyTabVisibility();
+    emit documentStatesChanged();
 }
 
 void NpcDataEditorWindow::onNpcPropertyChanged()
@@ -2631,10 +2680,15 @@ void NpcDataEditorWindow::updateNpcResourcePreview()
 bool NpcDataEditorWindow::loadNpcResourceFromFile(
     const QString& fileName, bool reportLoadErrors)
 {
+    const QString target = ContentAuthoring::projectPath(assetsBasePath, fileName);
+    const QString source = QFileInfo(target).isFile() ? target : fileName;
+    const EditorFileState openedState = EditorFileState::read(source, target);
+    if (!openedState.isReadable())
+        return false;
     std::string utf8Text;
     QStringList loadedLines;
     QString errorMessage;
-    if (!readIniTextAsUtf8(fileName, utf8Text, loadedLines, errorMessage))
+    if (!readIniTextAsUtf8(source, utf8Text, loadedLines, errorMessage))
     {
         if (reportLoadErrors)
         {
@@ -2669,7 +2723,8 @@ bool NpcDataEditorWindow::loadNpcResourceFromFile(
 
     npcResourceDocument = std::move(loadedDocument);
     npcResourceSectionOrder = std::move(loadedSectionOrder);
-    currentNpcResourceFilePath = fileName;
+    currentNpcResourceFilePath = target;
+    npcResourceFileState = openedState;
     isNpcResourceFile = true;
     hasNpcResourceUnsavedChanges = false;
     updateOverallDirtyStateAndNotify();
@@ -2744,6 +2799,33 @@ bool NpcDataEditorWindow::validateAndNormalizeNpcResourceDocument()
     return true;
 }
 
+bool NpcDataEditorWindow::writeDocumentBytes(const QString& path, const QByteArray& bytes,
+    EditorFileState& state, bool updateBaseline)
+{
+    if (!updateBaseline)
+        return writeBytesAtomically(path, bytes);
+    auto lease = AuthoringMutationGate::instance().acquireMutationLeaseForPath(path);
+    if (!lease)
+        return false;
+    const EditorFileState expected = state.forSave(path);
+    if (!QDir().mkpath(QFileInfo(path).absolutePath()))
+        return false;
+    const QString temporaryPath = path + ".tmp." + QUuid::createUuid().toString(QUuid::Id128);
+    DurableFileTransaction transaction(QFileInfo(path).absolutePath());
+    EditorFileState saved;
+    QString error = tr("无法保存文件：%1").arg(path);
+    if (!writeBytesAtomically(temporaryPath, bytes) ||
+        !expected.prepareWrite(transaction, path, temporaryPath, saved, error, EditorSaveConfirmation::forWindow(this)) || !transaction.commit(error))
+    {
+        QFile::remove(temporaryPath);
+        if (!error.isEmpty())
+            QMessageBox::warning(this, tr("保存失败"), error);
+        return false;
+    }
+    state = saved;
+    return true;
+}
+
 bool NpcDataEditorWindow::saveNpcResourceToFile(
     const QString& fileName, bool updateBaseline, QByteArray* savedData)
 {
@@ -2761,7 +2843,7 @@ bool NpcDataEditorWindow::saveNpcResourceToFile(
     {
         return false;
     }
-    if (!writeBytesAtomically(fileName, data))
+    if (!writeDocumentBytes(fileName, data, npcResourceFileState, updateBaseline))
         return false;
 
     if (savedData)
@@ -2781,10 +2863,15 @@ bool NpcDataEditorWindow::saveNpcResourceToFile(
 bool NpcDataEditorWindow::loadNpcFromFile(
     const QString& fileName, bool reportLoadErrors)
 {
+    const QString target = ContentAuthoring::projectPath(assetsBasePath, fileName);
+    const QString source = QFileInfo(target).isFile() ? target : fileName;
+    const EditorFileState openedState = EditorFileState::read(source, target);
+    if (!openedState.isReadable())
+        return false;
     std::string utf8Text;
     QStringList loadedLines;
     QString errorMessage;
-    if (!readIniTextAsUtf8(fileName, utf8Text, loadedLines, errorMessage))
+    if (!readIniTextAsUtf8(source, utf8Text, loadedLines, errorMessage))
     {
         if (reportLoadErrors)
             QMessageBox::warning(this, tr("打开 NPC 文件失败"), errorMessage);
@@ -2865,7 +2952,8 @@ bool NpcDataEditorWindow::loadNpcFromFile(
         ini.get("Head", "Map", "")).trimmed();
     originalNpcLines = std::move(loadedLines);
     nextNpcSectionId = expectedCount;
-    currentNpcFilePath = fileName;
+    currentNpcFilePath = target;
+    npcFileState = openedState;
     isNpcFile = true;
     ui->propertyTabWidget->setEnabled(true);
     currentNpcEditRow = -1;
@@ -2880,10 +2968,15 @@ bool NpcDataEditorWindow::loadNpcFromFile(
 bool NpcDataEditorWindow::loadObjectFromFile(
     const QString& fileName, bool reportLoadErrors)
 {
+    const QString target = ContentAuthoring::projectPath(assetsBasePath, fileName);
+    const QString source = QFileInfo(target).isFile() ? target : fileName;
+    const EditorFileState openedState = EditorFileState::read(source, target);
+    if (!openedState.isReadable())
+        return false;
     std::string utf8Text;
     QStringList loadedLines;
     QString errorMessage;
-    if (!readIniTextAsUtf8(fileName, utf8Text, loadedLines, errorMessage))
+    if (!readIniTextAsUtf8(source, utf8Text, loadedLines, errorMessage))
     {
         if (reportLoadErrors)
             QMessageBox::warning(this, tr("打开物体文件失败"), errorMessage);
@@ -2964,9 +3057,11 @@ bool NpcDataEditorWindow::loadObjectFromFile(
     }
 
     objectEntries = std::move(loadedEntries);
+    currentObjectMapName = QString::fromUtf8(ini.get("Head", "Map", "")).trimmed();
     originalObjectLines = std::move(loadedLines);
     nextObjectSectionId = expectedCount;
-    currentObjectFilePath = fileName;
+    currentObjectFilePath = target;
+    objectFileState = openedState;
     isObjectFile = true;
     ui->propertyTabWidget->setEnabled(true);
     currentObjectEditRow = -1;
@@ -3031,7 +3126,7 @@ bool NpcDataEditorWindow::saveNpcToFile(const QString& fileName,
                                         QStringList* savedLines)
 {
     const QStringList lines = serializeNpcLines(npcEntries);
-    if (!writeTextLinesAtomically(fileName, lines))
+    if (!writeDocumentBytes(fileName, textLinesToUtf8Bytes(lines), npcFileState, updateBaseline))
         return false;
 
     if (savedLines)
@@ -3307,7 +3402,7 @@ bool NpcDataEditorWindow::saveNpcToFilePreserving(
 {
     const QStringList outputLines =
         serializeNpcLinesPreserving(npcEntries);
-    if (!writeTextLinesAtomically(fileName, outputLines))
+    if (!writeDocumentBytes(fileName, textLinesToUtf8Bytes(outputLines), npcFileState, updateBaseline))
         return false;
 
     if (savedLines)
@@ -3368,7 +3463,7 @@ bool NpcDataEditorWindow::saveObjectToFile(const QString& fileName,
                                            QStringList* savedLines)
 {
     const QStringList lines = serializeObjectLines(objectEntries);
-    if (!writeTextLinesAtomically(fileName, lines))
+    if (!writeDocumentBytes(fileName, textLinesToUtf8Bytes(lines), objectFileState, updateBaseline))
         return false;
 
     if (savedLines)
@@ -3641,7 +3736,7 @@ bool NpcDataEditorWindow::saveObjectToFilePreserving(
 {
     const QStringList outputLines =
         serializeObjectLinesPreserving(objectEntries);
-    if (!writeTextLinesAtomically(fileName, outputLines))
+    if (!writeDocumentBytes(fileName, textLinesToUtf8Bytes(outputLines), objectFileState, updateBaseline))
         return false;
 
     if (savedLines)
@@ -4148,6 +4243,10 @@ void NpcDataEditorWindow::updatePropertyTabVisibility()
     const bool isNpc = documentKind == 0;
     const bool isObject = documentKind == 1;
     const bool isNpcResource = documentKind == 2;
+    const bool hasDocument = isNpc ? isNpcFile : isObject ? isObjectFile : isNpcResourceFile;
+    ui->actionAddEntry->setEnabled(hasDocument);
+    ui->actionRemoveEntry->setEnabled(hasDocument && (isNpc ? ui->npcListWidget->currentRow() >= 0
+        : isObject ? ui->objectListWidget->currentRow() >= 0 : npcResourceSectionList->currentRow() >= 0));
 
     ui->propertyTabWidget->setTabVisible(0, isNpc);
     ui->propertyTabWidget->setTabVisible(1, isNpc);
@@ -4158,8 +4257,7 @@ void NpcDataEditorWindow::updatePropertyTabVisibility()
 
     ui->actionMoveUp->setEnabled(!isNpcResource);
     ui->actionMoveDown->setEnabled(!isNpcResource);
-    ui->actionDuplicateEntry->setEnabled(
-        !isNpcResource || npcResourceSectionList->currentRow() >= 0);
+    ui->actionDuplicateEntry->setEnabled(ui->actionRemoveEntry->isEnabled());
 
     if (isNpc)
     {
@@ -4230,6 +4328,8 @@ QString NpcDataEditorWindow::currentNpcDialogueScriptPath() const
 
     const QString normalized =
         EditorAssetPath::normalizedAbsolutePath(candidate);
-    return EditorAssetPath::isInside(assetsBasePath, normalized)
-        ? normalized : QString();
+    if (!EditorAssetPath::isInside(assetsBasePath, normalized)) return {};
+    const QString source = ContentAuthoring::resolve(assetsBasePath, QDir(assetsBasePath).relativeFilePath(normalized));
+    return !source.isEmpty() ? source
+        : ContentAuthoring::bindingScript(assetsBasePath, currentNpcMapName, reference);
 }

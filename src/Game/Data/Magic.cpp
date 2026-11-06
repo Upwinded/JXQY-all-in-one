@@ -47,6 +47,7 @@ struct MagicDispatchContext
 	std::shared_ptr<MagicDispatchBudget> budget = nullptr;
 	std::vector<std::string> ancestry;
 	MagicExperienceOwner experienceOwner;
+	bool castSoundRequested = false;
 };
 
 namespace
@@ -1420,6 +1421,9 @@ std::shared_ptr<MagicDispatchContext> Magic::createDerivedDispatchContext(
 	childContext->budget = parentContext->budget;
 	childContext->ancestry = parentContext->ancestry;
 	childContext->ancestry.push_back(childIdentity);
+	// Replacing a spell keeps its cast; independently triggered children start a new one.
+	childContext->castSoundRequested = relationshipName == "ChangeMagic"
+		&& parentContext->castSoundRequested;
 	// These children inherit ItemInfo in the published engine. Independent
 	// second/random/counter casts retain their own experience ownership.
 	childContext->experienceOwner = relationshipName == "FlyMagic"
@@ -1427,6 +1431,20 @@ std::shared_ptr<MagicDispatchContext> Magic::createDerivedDispatchContext(
 		|| relationshipName == "ExplodeMagicFile"
 		? parentContext->experienceOwner : childMagic->experienceOwner;
 	return childContext;
+}
+
+void Magic::playCastSound(const std::shared_ptr<Magic>& magic,
+	const std::shared_ptr<GameElement>& user)
+{
+	if (magic == nullptr || magic->flyingSound.empty() || user == nullptr
+		|| gm == nullptr || gm->camera == nullptr)
+	{
+		return;
+	}
+	const Point position = user->getDrawPosition(gm->camera);
+	Engine::getInstance()->playMagicSoundFile(magic->flyingSound,
+		float(position.x) * SOUND_FACTOR / TILE_WIDTH,
+		float(position.y) * SOUND_FACTOR / TILE_HEIGHT);
 }
 
 std::vector<std::shared_ptr<Effect>> Magic::addEffect(
@@ -1476,6 +1494,11 @@ std::vector<std::shared_ptr<Effect>> Magic::addEffect(
 	}
 	damage += srcMagic->level[lvl].effectExt;
 	damage = applyCasterMagicEffectBonus(user, *srcMagic, damage);
+	if (!dispatchContext->castSoundRequested)
+	{
+		dispatchContext->castSoundRequested = true;
+		playCastSound(srcMagic, user);
+	}
 	auto finish = [&](std::vector<std::shared_ptr<Effect>> effects) -> std::vector<std::shared_ptr<Effect>>
 	{
 		for (auto& effect : effects)
@@ -1838,14 +1861,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addPointEffect(std::shared_ptr<Magic
         dir = getDirection(from, to);
     }
 	e->direction = dir;
-	if (srcMagic->level[lvl].lifeFrame <= 0)
-	{
-		e->lifeTime = e->getFlyingImageTime();
-	}
-	else
-	{
-		e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-	}
+	e->lifeTime = e->getFlyinUTime();
 	e->launcherKind = launcher;
 	e->damage = damage;
 	e->evade = evade;
@@ -1911,14 +1927,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addFlyEffect(std::shared_ptr<Magic> 
         }
 		e->flyingDirection = Map::getTilePosition(to, src);
 	}
-	if (srcMagic->level[lvl].lifeFrame <= 0)
-	{
-		e->lifeTime = e->getFlyingImageTime();
-	}
-	else
-	{
-		e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-	}
+	e->lifeTime = e->getFlyinUTime();
 	e->direction = dir;
 	e->position = from;
 	e->src = from;
@@ -2001,14 +2010,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addContinuousFlyEffect(std::shared_p
 
 		e->launcherKind = launcher;
 		e->waitTime += i * MAGIC_CONTINUOUS_INTERVAL;
-		if (srcMagic->level[lvl].lifeFrame <= 0)
-		{
-			e->lifeTime = e->getFlyingImageTime();
-		}
-		else
-		{
-			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-		}
+		e->lifeTime = e->getFlyinUTime();
 		if (e->waitTime > 0)
 		{
 			e->doing = ekHiding;
@@ -2048,14 +2050,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addCircleEffect(std::shared_ptr<Magi
 		e->damage = damage;
 		e->evade = evade;
 
-		if (srcMagic->level[lvl].lifeFrame <= 0)
-		{
-			e->lifeTime = e->getFlyingImageTime();
-		}
-		else
-		{
-			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-		}
+		e->lifeTime = e->getFlyinUTime();
 
 		if (e->waitTime > 0)
 		{
@@ -2097,14 +2092,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addHeartCircleEffect(std::shared_ptr
 		e->damage = damage;
 		e->evade = evade;
 
-		if (srcMagic->level[lvl].lifeFrame <= 0)
-		{
-			e->lifeTime = e->getFlyingImageTime();
-		}
-		else
-		{
-			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-		}
+		e->lifeTime = e->getFlyinUTime();
 
 		if (i < MAGIC_CIRCLE_COUNT / 4)
 		{
@@ -2183,14 +2171,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addHelixCircleEffect(std::shared_ptr
 		e->damage = damage;
 		e->evade = evade;
 
-		if (srcMagic->level[lvl].lifeFrame <= 0)
-		{
-			e->lifeTime = e->getFlyingImageTime();
-		}
-		else
-		{
-			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-		}
+		e->lifeTime = e->getFlyinUTime();
 		int count = i - startDir;
 		if (count < 0)
 		{
@@ -2253,14 +2234,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addSectorEffect(std::shared_ptr<Magi
 			{
 				e->waitTime += Engine::getInstance()->getRand(200);
 			}
-			if (srcMagic->level[lvl].lifeFrame <= 0)
-			{
-				e->lifeTime = e->getFlyingImageTime();
-			}
-			else
-			{
-				e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-			}
+			e->lifeTime = e->getFlyinUTime();
 			if (e->waitTime > 0)
 			{
 				e->doing = ekHiding;
@@ -2437,14 +2411,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addLineEffect(std::shared_ptr<Magic>
 			e->initFromMagic(srcMagic);
 			e->direction = magicDir;
 			e->flyingDirection = { 0, 0 };
-			if (srcMagic->level[lvl].lifeFrame <= 0)
-			{
-				e->lifeTime = e->getFlyingImageTime();
-			}
-			else
-			{
-				e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-			}
+			e->lifeTime = e->getFlyinUTime();
 			e->position = pos;
 			e->src = e->position;
 			e->launcherKind = launcher;
@@ -2517,14 +2484,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addMoveLineEffect(std::shared_ptr<Ma
 			e->launcherKind = launcher;
 			e->damage = damage;
 			e->evade = evade;
-			if (srcMagic->level[lvl].lifeFrame <= 0)
-			{
-				e->lifeTime = e->getFlyingImageTime();
-			}
-			else
-			{
-				e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-			}
+			e->lifeTime = e->getFlyinUTime();
 			if (e->waitTime > 0)
 			{
 				e->doing = ekHiding;
@@ -2568,14 +2528,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addVMoveEffect(std::shared_ptr<Magic
 		e->launcherKind = launcher;
 		e->damage = damage;
 		e->evade = evade;
-		if (srcMagic->level[lvl].lifeFrame <= 0)
-		{
-			e->lifeTime = e->getFlyingImageTime();
-		}
-		else
-		{
-			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-		}
+		e->lifeTime = e->getFlyinUTime();
 
 		Point startPosition = from;
 		PointEx normalizedOffset = startOffset;
@@ -2676,14 +2629,7 @@ std::vector<std::shared_ptr<Effect>> Magic::addRoundMoveEffect(std::shared_ptr<M
 		e->damage = damage;
 		e->evade = evade;
 		e->initRoundMove(i);
-		if (srcMagic->level[lvl].lifeFrame <= 0)
-		{
-			e->lifeTime = e->getFlyingImageTime();
-		}
-		else
-		{
-			e->lifeTime = (unsigned int)((float)srcMagic->level[lvl].lifeFrame * EFFECT_FRAME_TIME);
-		}
+		e->lifeTime = e->getFlyinUTime();
 		if (e->waitTime > 0)
 		{
 			e->doing = ekHiding;

@@ -8,6 +8,7 @@
 #include "GoodsShopEditorWindow.h"
 #include "DialogueEditorWindow.h"
 #include "MenuEditorWindow.h"
+#include "../core/MenuPageContext.h"
 #include "ScriptEditorWindow.h"
 #include "StoryGraphWindow.h"
 #include "NpcDataEditorWindow.h"
@@ -43,8 +44,11 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QComboBox>
 #include <QDateTime>
 #include <QHBoxLayout>
+#include <QGridLayout>
+#include <QStackedWidget>
 #include <QPushButton>
 #include <QToolButton>
 #include <QToolBar>
@@ -226,6 +230,7 @@ MainWindow::MainWindow(QWidget* parent)
 {
     ui->setupUi(this);
     setupProjectExplorer();
+    setupWorkspaceHome();
 
     setAcceptDrops(true);
 
@@ -252,6 +257,28 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->newProjectAction, &QAction::triggered, this, &MainWindow::onNewProject);
     connect(ui->openProjectAction, &QAction::triggered, this, &MainWindow::onOpenProject);
     connect(ui->saveProjectAction, &QAction::triggered, this, &MainWindow::onSaveProject);
+    auto* saveContent = new QAction(tr("保存当前内容"), this);
+    saveContent->setObjectName("saveCurrentContentAction");
+    saveContent->setEnabled(false);
+    saveContent->setIcon(style()->standardIcon(QStyle::SP_DialogSaveButton));
+    saveContent->setToolTip(tr("保存当前活动编辑页。项目资源位置和窗口会话由“保存项目设置”单独保存。"));
+    ui->fileMenu->insertAction(ui->saveProjectAction, saveContent);
+    ui->mainToolBar->insertAction(ui->saveProjectAction, saveContent);
+    ui->mainToolBar->removeAction(ui->saveProjectAction);
+    connect(saveContent, &QAction::triggered, this, [this]()
+    {
+        const auto* sub = ui->mdiArea->activeSubWindow();
+        if (!sub) return;
+        QWidget* document = sub->widget();
+        if (auto* menu = qobject_cast<MenuEditorWindow*>(document)) menu->saveCurrentPage();
+        else if (auto* magic = qobject_cast<MagicEditorWindow*>(document)) magic->saveFile();
+        else if (auto* goods = qobject_cast<GoodsShopEditorWindow*>(document)) goods->saveFile();
+        else if (auto* dialogue = qobject_cast<DialogueEditorWindow*>(document)) dialogue->saveFile();
+        else if (qobject_cast<MapEditorWindow*>(document)) QMetaObject::invokeMethod(document, "onSaveMap", Qt::DirectConnection);
+        else if (document->metaObject()->indexOfMethod("onSave()") >= 0) QMetaObject::invokeMethod(document, "onSave", Qt::DirectConnection);
+        else if (document->metaObject()->indexOfMethod("onSaveFile()") >= 0) QMetaObject::invokeMethod(document, "onSaveFile", Qt::DirectConnection);
+    });
+
     connect(ui->projectSettingsAction, &QAction::triggered,
         this, &MainWindow::onProjectSettings);
     connect(ui->runtimeConfigurationAction, &QAction::triggered,
@@ -260,6 +287,9 @@ MainWindow::MainWindow(QWidget* parent)
     connect(ui->openMapEditorAction, &QAction::triggered, this, &MainWindow::onOpenMapEditor);
     connect(ui->openMenuEditorAction, &QAction::triggered, this, &MainWindow::onOpenMenuEditor);
     connect(ui->openScriptEditorAction, &QAction::triggered, this, &MainWindow::onOpenScriptEditor);
+    connect(ui->openMagicEditorAction, &QAction::triggered, this, &MainWindow::onOpenMagicEditor);
+    connect(ui->openGoodsShopEditorAction, &QAction::triggered, this, &MainWindow::onOpenGoodsShopEditor);
+    connect(ui->openDialogueEditorAction, &QAction::triggered, this, &MainWindow::onOpenDialogueEditor);
     connect(ui->openNpcDataEditorAction, &QAction::triggered, this, &MainWindow::onOpenNpcDataEditor);
     connect(ui->openResourceProfileEditorAction, &QAction::triggered, this, &MainWindow::onOpenResourceProfileEditor);
     connect(ui->assetReferenceSearchAction, &QAction::triggered,
@@ -329,13 +359,13 @@ MainWindow::MainWindow(QWidget* parent)
         {
             ProjectManager::instance().closeProject();
             settings.remove("lastProject");
-            settings.sync();
+            EditorSettings::synchronize(settings);
         }
     }
     else if (!lastProject.isEmpty())
     {
         settings.remove("lastProject");
-        settings.sync();
+        EditorSettings::synchronize(settings);
     }
 
     if (!restoredProject)
@@ -473,25 +503,33 @@ void MainWindow::retranslateDynamicUi()
         {
             button->setText(tr("试玩当前脚本"));
             button->setToolTip(
-                tr("使用当前脚本内容试玩"));
+                tr("在选定场景中从头执行当前脚本，包括尚未保存的修改"));
         }
+        if (auto* button = subWindow->findChild<QPushButton*>("scriptRunSetupButton"))
+        {
+            button->setText(tr("试玩设置…"));
+            button->setToolTip(tr("选择脚本运行时使用的地图、玩家起点及NPC；配置可反复使用"));
+        }
+        if (auto* guide = subWindow->findChild<QLabel*>("scriptRunGuideLabel"))
+            guide->setText(tr("点击“试玩当前脚本”从头执行当前内容，包含尚未保存的修改；“试玩设置”可选择地图和玩家起点。"));
+        if (auto* action = subWindow->findChild<QAction*>("npcPlaytestCurrentListAction")) action->setText(tr("试玩当前列表"));
         if (QToolButton* button =
                 subWindow->findChild<QToolButton*>(
                     QStringLiteral(
                         "scriptAdvancedDebugButton")))
         {
-            button->setText(tr("高级调试"));
+            button->setText(tr("脚本分析与运行记录"));
             button->setToolTip(
-                tr("分析当前脚本的控制流、剧情语义和跨文件关系"));
+                tr("查看剧情流程及本次试玩记录；不提供暂停、断点或运行中改写变量"));
         }
         if (QAction* action =
                 subWindow->findChild<QAction*>(
                     QStringLiteral(
                         "storyGraphCurrentScriptAction")))
         {
-            action->setText(tr("剧情图"));
+            action->setText(tr("脚本分析与运行记录"));
             action->setToolTip(
-                tr("分析当前脚本的控制流、剧情语义和跨文件关系"));
+                tr("查看剧情流程及本次试玩记录；不提供暂停、断点或运行中改写变量"));
         }
         if (QPushButton* button =
                 subWindow->findChild<QPushButton*>(
@@ -567,9 +605,80 @@ QMdiSubWindow* MainWindow::createMdiSubWindow(
     subWindow->setAttribute(Qt::WA_DeleteOnClose);
     subWindow->setMinimumSize(widget->minimumSize());
     ui->mdiArea->addSubWindow(subWindow);
+    updateWorkspaceHome();
+    connect(subWindow, &QObject::destroyed, this, [this]()
+    {
+        QTimer::singleShot(0, this, [this]() { updateWorkspaceHome(); });
+    });
     connectDocumentEditCommandState(widget);
     updateEditActionStates();
     return subWindow;
+}
+
+void MainWindow::setupWorkspaceHome()
+{
+    workspaceHome = new QWidget(ui->centralWidget);
+    workspaceHome->setObjectName("workspaceHome");
+    workspaceStack = new QStackedWidget(ui->centralWidget);
+    ui->centralWidget->layout()->removeWidget(ui->mdiArea);
+    workspaceStack->addWidget(workspaceHome);
+    workspaceStack->addWidget(ui->mdiArea);
+    ui->centralWidget->layout()->addWidget(workspaceStack);
+    auto* outer = new QVBoxLayout(workspaceHome);
+    outer->addStretch();
+    auto* card = new QWidget(workspaceHome);
+    card->setMinimumWidth(440);
+    card->setMaximumWidth(660);
+    auto* layout = new QVBoxLayout(card);
+    layout->setSpacing(16);
+    auto* title = new QLabel(tr("开始编辑"), card);
+    QFont titleFont = title->font(); titleFont.setPointSize(20); titleFont.setBold(true); title->setFont(titleFont);
+    layout->addWidget(title);
+    auto* context = new QLabel(card);
+    context->setObjectName("workspaceResourceContext");
+    context->setWordWrap(true);
+    layout->addWidget(context);
+    auto* grid = new QGridLayout();
+    grid->setSpacing(12);
+    const QList<QPair<QString, QAction*>> entries = {{tr("地图与场景"), ui->openMapEditorAction},
+        {tr("游戏界面"), ui->openMenuEditorAction}, {tr("剧情脚本"), ui->openScriptEditorAction}, {tr("图像素材"), ui->openImageEditorAction}};
+    for (int index = 0; index < entries.size(); ++index)
+    {
+        auto* button = new QPushButton(entries[index].first, card);
+        button->setObjectName("workspaceEdit" + QString::number(index));
+        button->setMinimumHeight(48);
+        connect(button, &QPushButton::clicked, entries[index].second, &QAction::trigger);
+        grid->addWidget(button, index / 2, index % 2);
+    }
+    layout->addLayout(grid);
+    auto* instructions = new QLabel(tr("打开项目 → 选择内容 → 修改并保存 → 试玩\n项目会自动载入自己的资源位置；需要更换时使用“文件 → 项目设置”。"), card);
+    instructions->setWordWrap(true);
+    layout->addWidget(instructions);
+    auto* projects = new QHBoxLayout();
+    auto* open = new QPushButton(tr("打开项目…"), card);
+    connect(open, &QPushButton::clicked, this, &MainWindow::onOpenProject);
+    auto* create = new QPushButton(tr("新建项目…"), card);
+    connect(create, &QPushButton::clicked, this, &MainWindow::onNewProject);
+    projects->addWidget(open); projects->addWidget(create); projects->addStretch();
+    layout->addLayout(projects);
+    outer->addWidget(card, 0, Qt::AlignHCenter);
+    outer->addStretch();
+    updateWorkspaceHome();
+}
+
+void MainWindow::updateWorkspaceHome()
+{
+    if (!workspaceHome) return;
+    const bool empty = ui->mdiArea->subWindowList().isEmpty();
+    workspaceStack->setCurrentWidget(empty ? workspaceHome : ui->mdiArea);
+    if (!empty) return;
+    const auto& project = ProjectManager::instance();
+    const bool available = project.isProjectOpen() || !resourceCollectionRoot().isEmpty();
+    workspaceHome->findChild<QLabel*>("workspaceResourceContext")->setText(project.isProjectOpen()
+        ? tr("当前项目：%1\n资源包：%2").arg(QFileInfo(project.projectFilePath()).completeBaseName(), QFileInfo(activeAssetsPath()).fileName())
+        : tr("先打开或新建项目，再选择要编辑的内容。"));
+    for (int index = 0; index < 4; ++index)
+        workspaceHome->findChild<QPushButton*>("workspaceEdit" + QString::number(index))->setEnabled(available);
 }
 
 void MainWindow::setupProjectExplorer()
@@ -765,6 +874,10 @@ void MainWindow::setupDesktopRun()
                 statusLabel->setText(
                     tr("试玩完成，可以继续编辑。"));
             }
+            else if (result.outcome == DesktopRunSessionCoordinatorOutcome::StoppedByUser)
+            {
+                statusLabel->setText(tr("已停止试玩，可以继续编辑。"));
+            }
             else if (!result.sessionPath.isEmpty())
             {
                 statusLabel->setText(
@@ -786,6 +899,7 @@ void MainWindow::compactDesktopRunDock()
     if (!desktopRunDock ||
         !desktopRunPanel ||
         desktopRunPanel->detailsExpanded() ||
+        desktopRunDock->isFloating() ||
         dockWidgetArea(desktopRunDock) !=
             Qt::BottomDockWidgetArea)
     {
@@ -793,10 +907,7 @@ void MainWindow::compactDesktopRunDock()
     }
 
     const int requestedHeight =
-        (std::max)(
-            desktopRunPanel->
-                minimumSizeHint().height(),
-            120);
+        desktopRunDock->minimumSizeHint().height();
     resizeDocks(
         {desktopRunDock},
         {requestedHeight},
@@ -876,6 +987,16 @@ void MainWindow::refreshPlaytestTargetPresentation()
             qobject_cast<ScriptEditorWindow*>(document);
         scriptWindow && scriptWindow->isRunnableScript())
     {
+        if (auto* guide = scriptWindow->findChild<QLabel*>("scriptRunGuideLabel"))
+        {
+            QString sceneName;
+            const auto& configuration = projectManager.runtimeConfiguration();
+            for (const auto& scene : configuration.scenes)
+                if (scene.id == configuration.defaultSceneId) sceneName = scene.name;
+            guide->setText(sceneName.isEmpty()
+                ? tr("先点“试玩设置”选择地图和玩家起点；点击“试玩当前脚本”会从头执行当前内容，包含尚未保存的修改。")
+                : tr("试玩场景：%1。点击“试玩当前脚本”从头执行当前内容，包含尚未保存的修改；“试玩设置”可更换场景。").arg(sceneName));
+        }
         const QString fileName = QFileInfo(
             scriptWindow->currentFilePath()).fileName();
         desktopRunPanel->setPlaytestTargetText(
@@ -889,8 +1010,9 @@ void MainWindow::refreshPlaytestTargetPresentation()
             qobject_cast<MagicEditorWindow*>(document))
     {
         desktopRunPanel->setPlaytestTargetText(
-            tr("当前武功：%1（默认场景）")
-                .arg(magicWindow->displayName()));
+            magicWindow->currentFilePath().isEmpty()
+                ? tr("当前武功：尚未选择")
+                : tr("当前武功：%1（默认场景）").arg(magicWindow->displayName()));
         return;
     }
 
@@ -898,6 +1020,7 @@ void MainWindow::refreshPlaytestTargetPresentation()
             qobject_cast<GoodsShopEditorWindow*>(document))
     {
         desktopRunPanel->setPlaytestTargetText(
+            goodsShopWindow->currentFilePath().isEmpty() ? tr("当前物品或商店：尚未选择") :
             goodsShopWindow->documentKind() == GoodsShopDocumentKind::Goods
                 ? tr("当前物品：%1（默认场景）")
                       .arg(goodsShopWindow->displayName())
@@ -914,6 +1037,15 @@ void MainWindow::refreshPlaytestTargetPresentation()
         return;
     }
 
+    if (auto* entityWindow = qobject_cast<NpcDataEditorWindow*>(document); entityWindow && entityWindow->currentPlaytestList())
+    {
+        const auto snapshot = *entityWindow->currentPlaytestList();
+        desktopRunPanel->setPlaytestTargetText(tr("当前%1列表：%2（%3）")
+            .arg(snapshot.type == ProjectDocumentType::NpcList ? "NPC" : tr("物体"), QFileInfo(snapshot.filePath).fileName(),
+                entityWindow->currentPlaytestMap().isEmpty() ? tr("选定场景") : entityWindow->currentPlaytestMap()));
+        return;
+    }
+
     const ProjectRuntimeConfiguration& configuration =
         projectManager.runtimeConfiguration();
     for (const ProjectScene& scene : configuration.scenes)
@@ -924,7 +1056,13 @@ void MainWindow::refreshPlaytestTargetPresentation()
             ? tr("未命名场景")
             : scene.name;
         desktopRunPanel->setPlaytestTargetText(
-            tr("默认场景：%1").arg(name));
+            qobject_cast<ImageEditorWindow*>(document)
+                ? tr("默认场景：%1；图片须在引用它的内容中检查").arg(name)
+                : qobject_cast<MenuEditorWindow*>(document)
+                    ? tr("默认场景：%1；保存后在游戏中打开对应界面").arg(name)
+                    : qobject_cast<NpcDataEditorWindow*>(document)
+                        ? tr("默认场景：%1；请在试玩设置中选择要加载的列表").arg(name)
+                        : tr("默认场景：%1").arg(name));
         return;
     }
 
@@ -934,6 +1072,7 @@ void MainWindow::refreshPlaytestTargetPresentation()
 
 void MainWindow::updateDesktopRunActionStates()
 {
+    updateWorkspaceHome();
     if (!desktopRunCoordinator ||
         !desktopRunPanel)
     {
@@ -981,6 +1120,7 @@ void MainWindow::updateDesktopRunActionStates()
         authoringEnabled);
     ui->setAssetsPathAction->setEnabled(
         authoringEnabled);
+    ui->setAssetsPathAction->setVisible(!projectManager.isProjectOpen());
     ui->openImageEditorAction->setEnabled(
         authoringEnabled);
     ui->openMapEditorAction->setEnabled(
@@ -1004,6 +1144,11 @@ void MainWindow::updateDesktopRunActionStates()
     for (QMdiSubWindow* subWindow :
          ui->mdiArea->subWindowList())
     {
+        if (auto* action = subWindow->findChild<QAction*>("npcPlaytestCurrentListAction"))
+        {
+            auto* entity = qobject_cast<NpcDataEditorWindow*>(subWindow->widget());
+            action->setEnabled(currentTargetRunEnabled && entity && entity->currentPlaytestList().has_value());
+        }
         if (QAction* action =
                 subWindow->findChild<QAction*>(
                     QStringLiteral(
@@ -1314,7 +1459,7 @@ bool MainWindow::desktopRunPrerequisitesReady(
         QMessageBox::information(
             this,
             failureTitle,
-            tr("请先打开一个带已保存运行配置的项目。"));
+            tr("请先打开项目，再通过“试玩设置”选择地图和玩家起点。"));
         return false;
     }
 
@@ -1325,12 +1470,13 @@ bool MainWindow::desktopRunPrerequisitesReady(
                 settings);
     if (!executable.succeeded())
     {
-        QMessageBox::warning(
-            this,
-            failureTitle,
-            desktopExecutableErrorText(
-                static_cast<int>(
-                    executable.error)));
+        QMessageBox dialog(QMessageBox::Warning, failureTitle,
+            desktopExecutableErrorText(static_cast<int>(executable.error)),
+            QMessageBox::Cancel, this);
+        auto* choose = dialog.addButton(tr("选择游戏程序…"), QMessageBox::ActionRole);
+        dialog.exec();
+        if (dialog.clickedButton() == choose)
+            chooseDesktopGameExecutable();
         return false;
     }
     return true;
@@ -1659,6 +1805,11 @@ void MainWindow::playtestActiveTarget()
         runCurrentDialogue(dialogueWindow);
         return;
     }
+    if (auto* entityWindow = qobject_cast<NpcDataEditorWindow*>(document); entityWindow && entityWindow->currentPlaytestList())
+    {
+        runCurrentEntityList(entityWindow);
+        return;
+    }
 
     const ProjectManager& projectManager =
         ProjectManager::instance();
@@ -1943,6 +2094,44 @@ bool MainWindow::runCurrentMap(
         preparingStatus);
 }
 
+bool MainWindow::runCurrentEntityList(NpcDataEditorWindow* window)
+{
+    const QString title = tr("无法试玩当前列表");
+    if (!window || !desktopRunPrerequisitesReady(title)) return false;
+    auto snapshot = window->currentPlaytestList();
+    if (!snapshot) return false;
+    const QString root = activeAssetsPath();
+    QString relative;
+    if (!EditorAssetPath::makeLogicalResourceRelativePath(root, snapshot->filePath, relative))
+    {
+        showPlaytestProblem(title, tr("当前列表不属于这个项目，请先保存到项目中。"), snapshot->filePath);
+        return false;
+    }
+    QString map = window->currentPlaytestMap();
+    map.replace('\\', '/');
+    if (!map.isEmpty() && !map.startsWith("map/", Qt::CaseInsensitive)) map.prepend("map/");
+    if (!map.isEmpty() && !map.endsWith(".map", Qt::CaseInsensitive)) map.append(".map");
+    auto& project = ProjectManager::instance();
+    const auto target = selectCurrentEntityListTarget(project.runtimeConfiguration(), relative,
+        snapshot->type == ProjectDocumentType::NpcList, map, EditorAssetPath::caseSensitivity(root), desktopRunPanel->selectedSceneId());
+    if (!target.succeeded())
+    {
+        showPlaytestProblem(title, tr("请在试玩设置中为列表所属地图配置场景和玩家起点。"), target.diagnosticCode);
+        return false;
+    }
+    auto snapshots = desktopRunDocumentSnapshots();
+    const auto current = std::find_if(snapshots.begin(), snapshots.end(), [&](const auto& item)
+    { return ProjectDocumentRegistry::documentPathKey(item.filePath) == ProjectDocumentRegistry::documentPathKey(snapshot->filePath); });
+    if (current == snapshots.end() || !current->serializationSupported)
+    {
+        showPlaytestProblem(title, tr("当前列表包含不能用于试玩的内容，请检查字段后重试。"), current == snapshots.end() ? QString() : current->diagnosticCode);
+        return false;
+    }
+    current->includeInOverlay = true;
+    return startPreparedDesktopRunTarget(prepareTransientSceneLaunch(project, desktopRunDocumentRegistry(),
+        *target.target, EditorRun::TargetKind::Scene, snapshots), title, tr("正在准备当前列表，包括未保存的修改…"));
+}
+
 bool MainWindow::runCurrentScript(
     ScriptEditorWindow* window)
 {
@@ -2004,10 +2193,16 @@ bool MainWindow::runCurrentScript(
                     target.matchingSceneIds.join(
                         QStringLiteral(", ")));
         }
-        showPlaytestProblem(
-            failureTitle,
-            tr("没有找到可用于当前脚本的场景环境。请在项目运行设置中补充或选择匹配场景。"),
-            details);
+        const QString guidance = target.error == DesktopRunCurrentTargetError::BaselineMissing
+            ? tr("脚本需要在游戏地图中执行。请先添加一个试玩场景，选择地图和玩家起点，并设为默认；之后可在这个场景中运行当前脚本。")
+            : tr("当前脚本匹配多个试玩场景。请在下方试玩面板中选择一个，或在“试玩设置”中调整默认场景。");
+        QMessageBox dialog(QMessageBox::Warning, failureTitle,
+            guidance, QMessageBox::Cancel, this);
+        dialog.setDetailedText(details);
+        auto* configure = dialog.addButton(tr("配置试玩场景…"), QMessageBox::ActionRole);
+        dialog.exec();
+        if (dialog.clickedButton() == configure)
+            onProjectRuntimeConfiguration();
         return false;
     }
 
@@ -2057,7 +2252,14 @@ bool MainWindow::runCurrentMagic(
     MagicEditorWindow* window)
 {
     const QString failureTitle = tr("无法试玩当前武功");
-    if (!window || !desktopRunPrerequisitesReady(failureTitle))
+    if (!window)
+        return false;
+    if (window->currentFilePath().isEmpty())
+    {
+        QMessageBox::information(this, failureTitle, tr("请先新建或选择一个武功。"));
+        return false;
+    }
+    if (!desktopRunPrerequisitesReady(failureTitle))
         return false;
 
     ProjectManager& projectManager = ProjectManager::instance();
@@ -2160,7 +2362,14 @@ bool MainWindow::runCurrentGoodsShop(
         window->documentKind() == GoodsShopDocumentKind::Goods;
     const QString failureTitle = editingGoods
         ? tr("无法试玩当前物品") : tr("无法试玩当前商店");
-    if (!window || !desktopRunPrerequisitesReady(failureTitle))
+    if (!window)
+        return false;
+    if (window->currentFilePath().isEmpty())
+    {
+        QMessageBox::information(this, failureTitle, tr("请先新建或选择一个物品或商店。"));
+        return false;
+    }
+    if (!desktopRunPrerequisitesReady(failureTitle))
         return false;
 
     ProjectManager& projectManager = ProjectManager::instance();
@@ -2914,7 +3123,6 @@ bool MainWindow::openStoryGraphSourceLocation(
     {
         auto* createdWindow =
             new ScriptEditorWindow(this);
-        createdWindow->setMinimumSize(1000, 700);
         if (!createdWindow->openFile(
                 currentAbsolutePath))
         {
@@ -3206,7 +3414,6 @@ bool MainWindow::openDesktopRunSourceLocation(
     {
         auto* newWindow =
             new ScriptEditorWindow(this);
-        newWindow->setMinimumSize(1000, 700);
         if (!newWindow->openFile(
                 reference->absolutePath))
         {
@@ -3346,12 +3553,24 @@ void MainWindow::refreshProjectDocumentList()
 void MainWindow::configureScriptDocumentWindow(
     ScriptEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    window->setAssetsBasePath(activeAssetsPath());
     if (window->isRunnableScript())
     {
-        if (QHBoxLayout* toolbarLayout =
-            window->findChild<QHBoxLayout*>(
-                QStringLiteral("toolbarLayout")))
+        window->setDocumentSnapshotsProvider([this]() { return desktopRunDocumentSnapshots(); });
+        window->setFileMutationPreflight([this, window](const QStringList& paths, QString& error)
         {
+            return prepareContentFileMutation(window->currentFilePath(), paths, error);
+        });
+        connect(window, &ScriptEditorWindow::openScriptFileRequested, this, [this](const QString& path) { openFileByType(path); });
+        connect(window, &ScriptEditorWindow::filesChanged, this, [this, window](const QStringList& paths) { refreshContentFileDocuments(window, paths); });
+        connect(window, &ScriptEditorWindow::openReferenceRequested, this, &MainWindow::openContentReference);
+    }
+    if (window->isRunnableScript())
+    {
+        if (auto* documentLayout = qobject_cast<QVBoxLayout*>(window->layout()))
+        {
+            auto* runToolbarLayout = new QHBoxLayout;
+            documentLayout->insertLayout(1, runToolbarLayout);
             auto* runButton =
                 new QPushButton(
                     tr("试玩当前脚本"),
@@ -3360,8 +3579,8 @@ void MainWindow::configureScriptDocumentWindow(
                 QStringLiteral(
                     "desktopRunCurrentScriptButton"));
             runButton->setToolTip(
-                tr("使用当前脚本内容试玩"));
-            toolbarLayout->insertWidget(3, runButton);
+                tr("在选定场景中从头执行当前脚本，包括尚未保存的修改"));
+            runToolbarLayout->addWidget(runButton);
             connect(
                 runButton,
                 &QPushButton::clicked,
@@ -3371,37 +3590,34 @@ void MainWindow::configureScriptDocumentWindow(
                     runCurrentScript(window);
                 });
 
+            auto* setupButton = new QPushButton(tr("试玩设置…"), window);
+            setupButton->setObjectName("scriptRunSetupButton");
+            setupButton->setToolTip(tr("选择脚本运行时使用的地图、玩家起点及NPC；配置可反复使用"));
+            runToolbarLayout->addWidget(setupButton);
+            connect(setupButton, &QPushButton::clicked,
+                this, &MainWindow::onProjectRuntimeConfiguration);
+            auto* guide = new QLabel(tr("点击“试玩当前脚本”从头执行当前内容，包含尚未保存的修改；“试玩设置”可选择地图和玩家起点。"), window);
+            guide->setObjectName("scriptRunGuideLabel");
+            guide->setWordWrap(true);
+            guide->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Maximum);
+            documentLayout->insertWidget(2, guide);
+
             auto* advancedDebugButton =
                 new QToolButton(window);
             advancedDebugButton->setObjectName(
                 QStringLiteral(
                     "scriptAdvancedDebugButton"));
-            advancedDebugButton->setText(
-                tr("高级调试"));
             advancedDebugButton->setToolButtonStyle(
                 Qt::ToolButtonTextOnly);
-            advancedDebugButton->setPopupMode(
-                QToolButton::InstantPopup);
-            advancedDebugButton->setToolTip(
-                tr("分析当前脚本的控制流、剧情语义和跨文件关系"));
-
-            auto* advancedDebugMenu =
-                new QMenu(advancedDebugButton);
-            advancedDebugMenu->setObjectName(
-                QStringLiteral(
-                    "scriptAdvancedDebugMenu"));
             auto* storyGraphAction =
-                advancedDebugMenu->addAction(
-                    tr("剧情图"));
+                new QAction(tr("脚本分析与运行记录"), advancedDebugButton);
             storyGraphAction->setObjectName(
                 QStringLiteral(
                     "storyGraphCurrentScriptAction"));
             storyGraphAction->setToolTip(
-                tr("分析当前脚本的控制流、剧情语义和跨文件关系"));
-            advancedDebugButton->setMenu(
-                advancedDebugMenu);
-            toolbarLayout->insertWidget(
-                4, advancedDebugButton);
+                tr("查看剧情流程及本次试玩记录；不提供暂停、断点或运行中改写变量"));
+            advancedDebugButton->setDefaultAction(storyGraphAction);
+            runToolbarLayout->addWidget(advancedDebugButton);
             connect(
                 storyGraphAction,
                 &QAction::triggered,
@@ -3417,7 +3633,8 @@ void MainWindow::configureScriptDocumentWindow(
                 QStringLiteral("editCurrentDialogueButton"));
             dialogueButton->setToolTip(
                 tr("把光标放在 talk(\"段落\") 调用所在行后打开对话"));
-            toolbarLayout->insertWidget(5, dialogueButton);
+            runToolbarLayout->insertWidget(2, dialogueButton);
+            runToolbarLayout->addStretch();
             connect(dialogueButton, &QPushButton::clicked,
                     this, [this, window]()
                     {
@@ -3496,6 +3713,13 @@ void MainWindow::configureScriptDocumentWindow(
 void MainWindow::configureMapDocumentWindow(
     MapEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    connect(window, &MapEditorWindow::openScriptFileRequested, this, [this](const QString& path) { openFileByType(path); });
+    connect(window, &MapEditorWindow::editBoundScriptRequested, this, &MainWindow::editBoundScript);
+    window->setCopyPreflight([this, window](const QStringList& paths, QString& error)
+    {
+        const auto bundle = window->desktopRunSnapshotBundle();
+        return prepareContentFileMutation(bundle.currentMapFilePath, paths, error);
+    });
     QAction* runAction =
         new QAction(tr("试玩当前地图"), window);
     runAction->setObjectName(
@@ -3559,6 +3783,7 @@ void MainWindow::configureMapDocumentWindow(
 void MainWindow::configureMagicDocumentWindow(
     MagicEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    configureContentAuthoring(window);
     window->setDocumentPathValidator(
         [this, window](const QString& currentPath,
                        const QString& targetPath)
@@ -3594,6 +3819,7 @@ void MainWindow::configureMagicDocumentWindow(
 void MainWindow::configureGoodsShopDocumentWindow(
     GoodsShopEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    configureContentAuthoring(window);
     window->setDocumentPathValidator(
         [this, window](const QString& currentPath,
                        const QString& targetPath)
@@ -3629,6 +3855,7 @@ void MainWindow::configureGoodsShopDocumentWindow(
 void MainWindow::configureDialogueDocumentWindow(
     DialogueEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    configureContentAuthoring(window);
     window->setDocumentPathValidator(
         [this, window](const QString& currentPath,
                        const QString& targetPath)
@@ -3667,6 +3894,18 @@ void MainWindow::configureDialogueDocumentWindow(
 void MainWindow::configureNpcDataDocumentWindow(
     NpcDataEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    auto* playtest = new QAction(tr("试玩当前列表"), window);
+    playtest->setObjectName("npcPlaytestCurrentListAction");
+    if (auto* bar = window->findChild<QToolBar*>("npcToolBar")) bar->addAction(playtest);
+    playtest->setEnabled(window->currentPlaytestList().has_value());
+    connect(playtest, &QAction::triggered, this, [this, window]() { runCurrentEntityList(window); });
+    connect(window, &NpcDataEditorWindow::documentStatesChanged, this, [this, window, playtest]()
+    {
+        updateDesktopRunActionStates();
+        refreshPlaytestTargetPresentation();
+    });
+    connect(window, &NpcDataEditorWindow::openScriptFileRequested, this, [this](const QString& path) { openFileByType(path); });
+    connect(window, &NpcDataEditorWindow::openContentFileRequested, this, [this](const QString& path) { openFileByType(path); });
     window->setDocumentPathValidator(
         [this, window](const QString& currentPath,
                        const QString& targetPath)
@@ -3683,7 +3922,6 @@ void MainWindow::configureNpcDataDocumentWindow(
     connect(window, &NpcDataEditorWindow::documentClosed,
         this, [this, subWindow]()
         {
-            subWindow->setProperty("jxqyDocumentClosed", true);
             unregisterDocumentWindow(subWindow);
             updateProjectDocumentSession();
         });
@@ -3699,6 +3937,7 @@ void MainWindow::configureNpcDataDocumentWindow(
 void MainWindow::configureMenuDocumentWindow(
     MenuEditorWindow* window, QMdiSubWindow* subWindow)
 {
+    connect(window, &MenuEditorWindow::openScriptEditorRequested, this, &MainWindow::onOpenScriptEditor);
     window->setDocumentPathValidator(
         [this, window](const QString& currentPath,
                        const QString& targetPath)
@@ -3879,10 +4118,21 @@ void MainWindow::synchronizeDocumentWindow(
         documentKeysByWindow.insert(subWindow, acceptedKeys);
     refreshProjectDocumentList();
     updateProjectDocumentSession();
+    if (!oldKeys.isEmpty() && acceptedKeys != oldKeys &&
+        !restoringProjectDocumentSession && ui->mdiArea->currentSubWindow() == subWindow)
+    {
+        for (const auto& document : acceptedDocuments)
+            if (!document.dirty && !oldKeys.contains(ProjectDocumentRegistry::documentPathKey(document.filePath)))
+            {
+                projectExplorerWidget->revealFile(document.filePath);
+                break;
+            }
+    }
 }
 
 void MainWindow::unregisterDocumentWindow(QMdiSubWindow* subWindow)
 {
+    subWindow->setProperty("jxqyDocumentClosed", true);
     const QSet<QString> keys = documentKeysByWindow.take(subWindow);
     if (keys.isEmpty())
         return;
@@ -4455,7 +4705,12 @@ int MainWindow::restoreProjectDocumentSession()
         }
 
         previousSubWindow = documentWindows.value(resolvedPrimaryKey);
-        if (!QFileInfo::exists(primaryPath) || !openFileByType(primaryPath))
+        const QString sourcePath = (window.type == ProjectSessionWindowType::Magic ||
+            window.type == ProjectSessionWindowType::Goods || window.type == ProjectSessionWindowType::Shop ||
+            window.type == ProjectSessionWindowType::Dialogue || window.type == ProjectSessionWindowType::Script ||
+            window.type == ProjectSessionWindowType::Map)
+            ? ContentAuthoring::resolve(contentRoot, window.primaryPath) : primaryPath;
+        if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath) || !openFileByType(sourcePath))
         {
             ++failureCount;
             continue;
@@ -4638,13 +4893,14 @@ int MainWindow::restoreProjectDocumentSession()
                 return QString();
             QString absolutePath;
             if (!EditorAssetPath::resolveLogicalResourcePath(
-                    contentRoot, relativePath, absolutePath) ||
-                !QFileInfo::exists(absolutePath))
+                    contentRoot, relativePath, absolutePath))
             {
                 ++failureCount;
                 return QString();
             }
-            return absolutePath;
+            const QString source = ContentAuthoring::resolve(contentRoot, relativePath);
+            if (source.isEmpty()) ++failureCount;
+            return source;
         };
 
         const QString npcListPath =
@@ -4858,8 +5114,9 @@ bool MainWindow::openDialogueFile(
     const QString& callerScriptPath,
     int callerLine, int callerColumn)
 {
-    const QString normalized =
-        EditorAssetPath::normalizedAbsolutePath(requestedPath);
+    const QString resourceName = ContentAuthoring::referenceName(ContentKind::Dialogue, activeAssetsPath(), requestedPath);
+    const QString normalized = resourceName.isEmpty() ? EditorAssetPath::normalizedAbsolutePath(requestedPath)
+        : QDir(activeAssetsPath()).filePath("script/map/" + resourceName);
     const QString key =
         ProjectDocumentRegistry::documentPathKey(normalized);
     QPointer<QMdiSubWindow> existing = documentWindows.value(key);
@@ -4904,7 +5161,6 @@ bool MainWindow::openDialogueFile(
     }
 
     auto* window = new DialogueEditorWindow(this);
-    window->setMinimumSize(1080, 700);
     const QString assetsPath = activeAssetsPath();
     if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
         window->setAssetsBasePath(assetsPath);
@@ -4972,6 +5228,38 @@ bool MainWindow::openFileByType(const QString& fileName)
         return false;
     }
 
+    const QString root = activeAssetsPath();
+    if (!root.isEmpty() && fileName.endsWith(".map", Qt::CaseInsensitive))
+    {
+        const QString logical = ContentAuthoring::projectPath(root, fileName);
+        if (activateRegisteredDocument(logical)) return true;
+        if (!QFileInfo(fileName).exists() && EditorAssetPath::isLexicallyInside(root, fileName))
+        {
+            const QString source = ContentAuthoring::resolve(root, QDir(root).relativeFilePath(fileName));
+            if (!source.isEmpty()) return openFileByType(source);
+        }
+    }
+    const bool scriptContent = !ContentAuthoring::referenceName(ContentKind::Script, root, fileName).isEmpty() &&
+        !DialogueEditorWindow::isDialogueFilePath(fileName) &&
+        (fileName.endsWith(".lua", Qt::CaseInsensitive) || fileName.endsWith(".txt", Qt::CaseInsensitive));
+    if (!root.isEmpty() && (scriptContent || MagicEditorWindow::isMagicFilePath(fileName) || GoodsShopEditorWindow::isSupportedFilePath(fileName) ||
+        DialogueEditorWindow::isDialogueFilePath(fileName)))
+    {
+        const auto kind = scriptContent ? ContentKind::Script : MagicEditorWindow::isMagicFilePath(fileName) ? ContentKind::Magic
+            : GoodsShopEditorWindow::isShopFilePath(fileName) ? ContentKind::Shop
+            : DialogueEditorWindow::isDialogueFilePath(fileName) ? ContentKind::Dialogue : ContentKind::Goods;
+        const QString name = ContentAuthoring::referenceName(kind, root, fileName);
+        if (!name.isEmpty())
+        {
+            const QString logical = QDir(root).filePath(ContentAuthoring::directory(kind) + '/' + name);
+            if (activateRegisteredDocument(logical)) return true;
+            if (!QFileInfo(fileName).exists())
+            {
+                const QString source = ContentAuthoring::resolve(root, ContentAuthoring::directory(kind) + '/' + name);
+                if (!source.isEmpty()) return openFileByType(source);
+            }
+        }
+    }
     QFileInfo fileInfo(fileName);
     if (!fileInfo.exists())
     {
@@ -5044,7 +5332,6 @@ bool MainWindow::openFileByType(const QString& fileName)
     if (picType != PicType::None)
     {
         auto window = new ImageEditorWindow(this);
-        window->setMinimumSize(800, 600);
 
         QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5075,7 +5362,6 @@ bool MainWindow::openFileByType(const QString& fileName)
     else if (supportedMap)
     {
         auto window = new MapEditorWindow(this);
-        window->setMinimumSize(1000, 700);
 
         QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5110,7 +5396,6 @@ bool MainWindow::openFileByType(const QString& fileName)
     else if (MagicEditorWindow::isMagicFilePath(normalizedFileName))
     {
         auto window = new MagicEditorWindow(this);
-        window->setMinimumSize(1000, 700);
 
         const QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5139,7 +5424,6 @@ bool MainWindow::openFileByType(const QString& fileName)
     else if (GoodsShopEditorWindow::isSupportedFilePath(normalizedFileName))
     {
         auto window = new GoodsShopEditorWindow(this);
-        window->setMinimumSize(1080, 720);
 
         const QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5171,7 +5455,6 @@ bool MainWindow::openFileByType(const QString& fileName)
     else if (NpcDataEditorWindow::isNpcResourceFilePath(fileName))
     {
         auto window = new NpcDataEditorWindow(this);
-        window->setMinimumSize(1000, 700);
 
         QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5201,7 +5484,6 @@ bool MainWindow::openFileByType(const QString& fileName)
              fileName.endsWith("_npc.ini", Qt::CaseInsensitive))
     {
         auto window = new NpcDataEditorWindow(this);
-        window->setMinimumSize(900, 600);
 
         QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5233,7 +5515,6 @@ bool MainWindow::openFileByType(const QString& fileName)
              fileName.endsWith("_obj.ini", Qt::CaseInsensitive))
     {
         auto window = new NpcDataEditorWindow(this);
-        window->setMinimumSize(900, 600);
 
         QString assetsPath = activeAssetsPath();
         if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5261,33 +5542,53 @@ bool MainWindow::openFileByType(const QString& fileName)
         addRecentFile(fileName);
         return true;
     }
-    else if (fileName.endsWith(".menu.ini", Qt::CaseInsensitive))
+    else if (fileName.endsWith(".menu.ini", Qt::CaseInsensitive)
+        || (suffix == "ini" && [this, &normalizedFileName]()
+        {
+            const auto context = MenuPageContext::resolve(activeAssetsPath());
+            for (const QString& theme : {QString("original"), QString("qingyu")})
+                for (const QString& page : MenuPageContext::pages())
+                    if (!context.source(page, theme).isEmpty() && EditorAssetPath::logicalComparisonKey(context.source(page, theme))
+                        == EditorAssetPath::logicalComparisonKey(normalizedFileName)) return true;
+            return false;
+        }()))
     {
-        auto window = new MenuEditorWindow(this);
-        window->setMinimumSize(1000, 600);
-
-        QString assetsPath = activeAssetsPath();
-        if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
+        MenuEditorWindow* window = nullptr;
+        QMdiSubWindow* existingSubWindow = nullptr;
+        for (auto* sub : ui->mdiArea->subWindowList())
         {
-            window->setAssetsBasePath(assetsPath);
-        }
-
-        window->setDocumentPathValidator(
-            [this, window](const QString& currentPath,
-                           const QString& targetPath)
+            if (auto* candidate = qobject_cast<MenuEditorWindow*>(sub->widget()))
             {
-                return canDocumentWindowAdoptPath(
-                    window, currentPath, targetPath);
-            });
-
-        if (!window->openMenuDefinition(fileName))
+                window = candidate;
+                existingSubWindow = sub;
+                break;
+            }
+        }
+        const bool created = window == nullptr;
+        if (created) window = new MenuEditorWindow(this);
+        window->setMinimumSize(1000, 600);
+        const QString assetsPath = activeAssetsPath();
+        if (!window->setAssetsBasePath(assetsPath))
         {
-            delete window;
+            if (created) delete window;
             return false;
         }
-        QMdiSubWindow* subWindow =
-            createMdiSubWindow(window, fileInfo.fileName());
-        configureMenuDocumentWindow(window, subWindow);
+        window->setDocumentPathValidator(
+            [this, window](const QString& currentPath, const QString& targetPath)
+            {
+                return canDocumentWindowAdoptPath(window, currentPath, targetPath);
+            });
+        if (!window->openMenuDefinition(fileName))
+        {
+            if (created) delete window;
+            return false;
+        }
+        if (created)
+        {
+            auto* subWindow = createMdiSubWindow(window, tr("菜单编辑器"));
+            configureMenuDocumentWindow(window, subWindow);
+        }
+        else ui->mdiArea->setActiveSubWindow(existingSubWindow);
         window->show();
         addRecentFile(fileName);
         return true;
@@ -5307,7 +5608,6 @@ bool MainWindow::openFileByType(const QString& fileName)
                       GenericText
                 : ScriptEditorWindow::EditingMode::
                       Script);
-        window->setMinimumSize(1000, 700);
         if (!window->openFile(normalizedFileName))
         {
             delete window;
@@ -5375,7 +5675,8 @@ void MainWindow::addRecentFile(const QString& fileName)
     }
 
     QSettings settings = createSettings();
-    settings.setValue("recentFiles", recentFiles);
+    EditorSettings::setValueIfChanged(settings, "recentFiles", recentFiles);
+    EditorSettings::synchronize(settings);
 
     if (ProjectManager::instance().isProjectOpen())
     {
@@ -5523,6 +5824,10 @@ bool MainWindow::configureProjectAssetMigration(
         context.migrationOptions.saveNamespace = profile.saveNamespace;
         context.migrationOptions.minimumMagicDamage =
             profile.minimumMagicDamage;
+        context.migrationOptions.magicTimingMode = profile.magicTimingMode;
+        context.migrationOptions.magicTimingModeDefined = profile.magicTimingModeDefined;
+        context.migrationOptions.moveScreenProfile = profile.moveScreenProfile;
+        context.migrationOptions.moveScreenProfileDefined = profile.moveScreenProfileDefined;
         context.migrationOptions.minimumMagicDamageDefined =
             profile.minimumMagicDamageDefined;
         context.migrationOptions.attackReleaseFrameRatio =
@@ -5757,7 +6062,6 @@ void MainWindow::onOpenImageEditor()
     }
 
     auto window = new ImageEditorWindow(this);
-    window->setMinimumSize(800, 600);
 
     QString assetsPath = activeAssetsPath();
     if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5775,7 +6079,6 @@ void MainWindow::onOpenImageEditor()
 void MainWindow::onOpenMapEditor()
 {
     auto window = new MapEditorWindow(this);
-    window->setMinimumSize(1000, 700);
 
     QString assetsPath = activeAssetsPath();
     if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -5797,6 +6100,7 @@ void MainWindow::onOpenMenuEditor()
         auto menuWin = qobject_cast<MenuEditorWindow*>(sub->widget());
         if (menuWin)
         {
+            if (!menuWin->setAssetsBasePath(activeAssetsPath())) return;
             ui->mdiArea->setActiveSubWindow(sub);
             return;
         }
@@ -5809,11 +6113,15 @@ void MainWindow::onOpenMenuEditor()
     if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
     {
         window->setAssetsBasePath(assetsPath);
+        if (auto* pages = window->findChild<QComboBox*>("menuPageCombo"); pages && pages->count() > 0)
+            window->selectPage(pages->itemData(0).toString());
     }
 
     QMdiSubWindow* subWindow =
         createMdiSubWindow(window, tr("菜单编辑器"));
     configureMenuDocumentWindow(window, subWindow);
+    if (projectExplorerDock) projectExplorerDock->hide();
+    if (desktopRunDock) desktopRunDock->hide();
     window->show();
     statusLabel->setText(tr("菜单编辑器"));
 }
@@ -5832,7 +6140,6 @@ void MainWindow::onOpenScriptEditor()
     }
 
     auto window = new ScriptEditorWindow(this);
-    window->setMinimumSize(1000, 700);
 
     QMdiSubWindow* subWindow =
         createMdiSubWindow(window, tr("脚本编辑器"));
@@ -5844,7 +6151,6 @@ void MainWindow::onOpenScriptEditor()
 void MainWindow::onOpenNpcDataEditor()
 {
     auto window = new NpcDataEditorWindow(this);
-    window->setMinimumSize(1000, 700);
 
     QString assetsPath = activeAssetsPath();
     if (!assetsPath.isEmpty() && QDir(assetsPath).exists())
@@ -6499,13 +6805,16 @@ bool MainWindow::prepareAssetsPathChange(
 bool MainWindow::persistAssetsPathSetting(const QString& path)
 {
     QSettings settings = createSettings();
-    const QString previousPath = settings.value("assetsPath").toString();
-    settings.setValue("assetsPath", path);
-    settings.sync();
-    if (settings.status() != QSettings::NoError)
+    const bool hadPreviousPath = settings.contains("assetsPath");
+    const QVariant previousPath = settings.value("assetsPath");
+    EditorSettings::setValueIfChanged(settings, "assetsPath", path);
+    if (!EditorSettings::synchronize(settings).succeeded())
     {
-        settings.setValue("assetsPath", previousPath);
-        settings.sync();
+        if (hadPreviousPath)
+            EditorSettings::setValueIfChanged(settings, "assetsPath", previousPath);
+        else
+            settings.remove("assetsPath");
+        EditorSettings::synchronize(settings);
         QMessageBox::warning(this, tr("设置失败"),
             tr("无法保存资源目录设置，所有编辑器仍使用原目录。"));
         return false;
@@ -6720,6 +7029,15 @@ void MainWindow::executeActiveDocumentEditCommand(
 
 void MainWindow::updateEditActionStates()
 {
+    if (auto* save = findChild<QAction*>("saveCurrentContentAction"))
+    {
+        auto* sub = ui->mdiArea->activeSubWindow();
+        auto* widget = sub ? sub->widget() : nullptr;
+        save->setEnabled(widget && (qobject_cast<MenuEditorWindow*>(widget) || qobject_cast<MagicEditorWindow*>(widget)
+            || qobject_cast<GoodsShopEditorWindow*>(widget) || qobject_cast<DialogueEditorWindow*>(widget)
+            || widget->metaObject()->indexOfMethod("onSave()") >= 0 || widget->metaObject()->indexOfMethod("onSaveFile()") >= 0
+            || widget->metaObject()->indexOfMethod("onSaveMap()") >= 0));
+    }
     ui->undoAction->setEnabled(
         canExecuteActiveDocumentEditCommand(true));
     ui->redoAction->setEnabled(
@@ -6837,7 +7155,8 @@ void MainWindow::onClearRecentFiles()
 {
     recentFiles.clear();
     QSettings settings = createSettings();
-    settings.setValue("recentFiles", recentFiles);
+    EditorSettings::setValueIfChanged(settings, "recentFiles", recentFiles);
+    EditorSettings::synchronize(settings);
     updateRecentFileActions();
     if (ProjectManager::instance().isProjectOpen())
     {
@@ -6999,8 +7318,8 @@ bool MainWindow::createProjectInternal(
         updateResourceProfileEditors();
         applyProjectSettings(false);
         QSettings settings = createSettings();
-        settings.setValue("lastProject", filePath);
-        settings.sync();
+        EditorSettings::setValueIfChanged(settings, "lastProject", filePath);
+        EditorSettings::synchronize(settings);
         statusLabel->setText(tr("项目已创建: %1").arg(filePath));
         return true;
     }
@@ -7051,7 +7370,10 @@ void MainWindow::onProjectRuntimeConfiguration()
 
     ProjectManager& projectManager = ProjectManager::instance();
     if (!projectManager.isProjectOpen())
+    {
+        QMessageBox::information(this, tr("试玩设置"), tr("请先打开或新建项目，试玩场景会保存在该项目中。"));
         return;
+    }
 
     ProjectRuntimeConfigurationDialog dialog(
         projectManager.runtimeConfiguration(), activeAssetsPath(), this);
@@ -7085,7 +7407,7 @@ void MainWindow::onProjectRuntimeConfiguration()
     }
 
     refreshDesktopRunProjectContext();
-    statusLabel->setText(tr("项目运行配置已保存"));
+    statusLabel->setText(tr("试玩设置已保存，可以回到脚本点击“试玩当前脚本”。"));
 }
 
 bool MainWindow::applyProjectResourceConfiguration(
@@ -7248,8 +7570,8 @@ bool MainWindow::openProject(const QString& filePath)
         updateResourceProfileEditors();
         applyProjectSettings(false);
         QSettings settings = createSettings();
-        settings.setValue("lastProject", filePath);
-        settings.sync();
+        EditorSettings::setValueIfChanged(settings, "lastProject", filePath);
+        EditorSettings::synchronize(settings);
         if (lastProjectDocumentRestoreFailureCount == 0)
         {
             ui->statusBar->clearMessage();
@@ -7286,16 +7608,14 @@ void MainWindow::onSaveProject()
     pm.setEditableAssetsRoot(resourceCollectionRoot());
     pm.setTheme(ThemeManager::instance().currentThemeName());
     captureProjectWindowPlacement();
-    pm.setWindowState(saveState());
     pm.setDocumentSession(captureProjectDocumentSession());
-    pm.clearRecentFiles();
-    for (auto iterator = recentFiles.crbegin(); iterator != recentFiles.crend(); ++iterator)
-        pm.addRecentFile(*iterator);
+    pm.setRecentFiles(recentFiles);
 
     if (pm.saveProject())
     {
         QSettings settings = createSettings();
-        settings.setValue("lastProject", pm.projectFilePath());
+        EditorSettings::setValueIfChanged(settings, "lastProject", pm.projectFilePath());
+        EditorSettings::synchronize(settings);
         statusLabel->setText(tr("项目已保存: %1").arg(pm.projectFilePath()));
     }
     else
@@ -7355,7 +7675,6 @@ void MainWindow::closeEvent(QCloseEvent* event)
         pm.setEditableAssetsRoot(resourceCollectionRoot());
         pm.setTheme(ThemeManager::instance().currentThemeName());
         captureProjectWindowPlacement();
-        pm.setWindowState(saveState());
         pm.setDocumentSession(captureProjectDocumentSession());
         if (!pm.saveProject())
         {
@@ -7390,8 +7709,9 @@ void MainWindow::closeEvent(QCloseEvent* event)
     closingApplication = false;
 
     QSettings settings = createSettings();
-    settings.setValue("windowGeometry", saveGeometry());
-    settings.setValue("windowState", saveState());
+    EditorSettings::setValueIfChanged(settings, "windowGeometry", saveGeometry());
+    EditorSettings::setValueIfChanged(settings, "windowState", saveState());
+    EditorSettings::synchronize(settings);
 
     if (stopDesktopRunOnAcceptedClose)
         desktopRunCoordinator->requestStop();
@@ -7493,7 +7813,7 @@ void MainWindow::captureProjectWindowPlacement()
         if (normalGeometry().isValid())
             normalWindowGeometry = normalGeometry();
     }
-    projectManager.setWindowPlacement(normalWindowGeometry, mode);
+    projectManager.setWindowPlacement(normalWindowGeometry, mode, saveState());
 }
 
 void MainWindow::applyProjectWindowPlacement()

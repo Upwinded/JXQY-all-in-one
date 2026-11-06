@@ -5,10 +5,14 @@
 #include "SlotGridController.h"
 #include <vector>
 
+class NPC;
+struct MagicInfo;
+
 class MagicMenu :
 	public ConfigDrivenPanel,
 	public ControllerTransferParticipant
 {
+	friend class MenuMouseWheelTestAccess;
 public:
 	MagicMenu();
 	virtual ~MagicMenu();
@@ -26,10 +30,12 @@ public:
 	void updateMagic(int index);
 	void showTalents(bool value);
 	bool isShowingTalents() const { return showingTalents; }
-	bool showDetails(int listIndex);
+	bool showDetails(int listIndex, bool playerMagic = false);
+	void showPartnerMagic(const std::shared_ptr<NPC>& partner);
 	void closeDetails();
 	bool isShowingDetails() const { return showingDetails; }
 	bool assignDetailedMagic(bool practice);
+	bool scrollMouseWheel(int steps);
 	virtual bool activateControllerFocus(
 		ControllerFocusTarget target) override;
 	bool focusControllerDefault();
@@ -43,6 +49,10 @@ public:
 	void cancelControllerInteraction();
 
 private:
+	std::weak_ptr<NPC> selectedPartner;
+	bool showingPartnerMagic = false;
+	std::shared_ptr<NPC> getDisplayedPartner() const;
+	const MagicInfo* displayedMagicInfo(int index) const;
 	std::shared_ptr<FlatTextButton> skillTreeEntry;
 	bool skillTreeEntryFocused = false;
 	void updateSkillTreeEntry();

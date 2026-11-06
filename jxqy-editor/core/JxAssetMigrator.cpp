@@ -12,6 +12,7 @@
 #include "Util.h"
 
 #include <QDir>
+#include <QCoreApplication>
 #include <QDirIterator>
 #include <QCryptographicHash>
 #include <QFile>
@@ -33,6 +34,8 @@
 #include <array>
 #include <cctype>
 #include <cstdint>
+#include <climits>
+#include <cmath>
 #include <filesystem>
 #include <memory>
 #include <sstream>
@@ -3180,11 +3183,42 @@ void setFeatureDefault(
     features.insert(name, value);
 }
 
+bool hasCSharpSourceLayout(const QString& sourceDir)
+{
+    QDir directory(sourceDir);
+    for (const QString& component : {QStringLiteral("content"), QStringLiteral("ui"), QStringLiteral("ui_settings.ini")})
+    {
+        QString match;
+        for (const QString& entry : directory.entryList(QDir::AllEntries | QDir::NoDotAndDotDot))
+        {
+            if (entry.compare(component, Qt::CaseInsensitive) == 0)
+            {
+                match = directory.filePath(entry);
+                break;
+            }
+        }
+        if (match.isEmpty()) return false;
+        if (component == QStringLiteral("ui_settings.ini")) return QFileInfo(match).isFile();
+        directory = QDir(match);
+    }
+    return false;
+}
+
 void applyExplicitProfileValues(
     const GameProfile& profile,
     bool titleMusicIsExplicit,
     AssetMigrationOptions& options)
 {
+    if (!options.moveScreenProfileDefined && profile.moveScreenProfileDefined)
+    {
+        options.moveScreenProfile = profile.moveScreenProfile;
+        options.moveScreenProfileDefined = true;
+    }
+    if (!options.magicTimingModeDefined && profile.magicTimingModeDefined)
+    {
+        options.magicTimingMode = profile.magicTimingMode;
+        options.magicTimingModeDefined = true;
+    }
     if (!options.attackReleaseFrameRatioDefined && profile.attackReleaseFrameRatioDefined)
     {
         options.attackReleaseFrameRatio = profile.attackReleaseFrameRatio;
@@ -3972,6 +4006,63 @@ JxAssetMigrator::resolveMagicEffectCalculationModeDefault(
         : MagicEffectCalculationMode::ReplaceAttack;
 }
 
+MagicTimingMode JxAssetMigrator::resolveMagicTimingModeDefault(
+    const QString& sourceDir, const QString& outputDir,
+    const AssetMigrationOptions& options)
+{
+    if (options.magicTimingModeDefined)
+        return options.magicTimingMode;
+    GameProfile sourceProfile;
+    if (sourceProfile.loadFromFile(ResourcePackScanner::manifestPath(sourceDir)) &&
+        sourceProfile.magicTimingModeDefined)
+        return sourceProfile.magicTimingMode;
+
+    // This is the C# engine's input layout, independent of the selected UI family.
+    if (hasCSharpSourceLayout(sourceDir)) return MagicTimingMode::CSharpAnimationFrames;
+
+    int contentType = options.modType;
+    for (const QString& id : dependencyIds(options.dependencyId))
+    {
+        ResourcePackInfo pack;
+        if (!findDependencyPack(outputDir, options, {id}, pack)) continue;
+        const auto selection = RuntimeResource::resolveExactResourceSelection(
+            std::filesystem::u8path(QFileInfo(pack.rootPath).absolutePath().toUtf8().constData()),
+            pack.profile.id.toUtf8().toStdString());
+        if (!selection.succeeded()) continue;
+        const auto& manifest = selection.selection.activeManifest;
+        if (manifest.magicTimingModeDefined) return manifest.magicTimingMode;
+        if (!pack.profile.resourceOnly && contentType < 0)
+            contentType = manifest.type;
+    }
+    if (contentType == 0) return MagicTimingMode::LogicFrames;
+    if (contentType == 1 || contentType == 2) return MagicTimingMode::NativeAnimationFrames;
+    return MagicTimingMode::FixedMilliseconds;
+}
+
+ScriptMoveScreenProfile JxAssetMigrator::resolveMoveScreenProfileDefault(
+    const QString& sourceDir, const QString& outputDir, const AssetMigrationOptions& options)
+{
+    if (options.moveScreenProfileDefined) return options.moveScreenProfile;
+    GameProfile sourceProfile;
+    if (sourceProfile.loadFromFile(ResourcePackScanner::manifestPath(sourceDir)) && sourceProfile.moveScreenProfileDefined)
+        return sourceProfile.moveScreenProfile;
+    if (hasCSharpSourceLayout(sourceDir)) return ScriptMoveScreenProfile::CSharp;
+    int contentType = options.modType;
+    for (const QString& id : dependencyIds(options.dependencyId))
+    {
+        ResourcePackInfo pack;
+        if (!findDependencyPack(outputDir, options, {id}, pack)) continue;
+        const auto selection = RuntimeResource::resolveExactResourceSelection(
+            std::filesystem::u8path(QFileInfo(pack.rootPath).absolutePath().toUtf8().constData()),
+            pack.profile.id.toUtf8().toStdString());
+        if (!selection.succeeded()) continue;
+        const auto& manifest = selection.selection.activeManifest;
+        if (manifest.moveScreenProfileDefined) return manifest.moveScreenProfile;
+        if (!pack.profile.resourceOnly && contentType < 0) contentType = manifest.type;
+    }
+    return contentType >= 0 && contentType <= 2 ? ScriptMoveScreenProfile::Native : ScriptMoveScreenProfile::CSharp;
+}
+
 MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     const QString& outputDir,
     const AssetMigrationOptions& options,
@@ -4165,6 +4256,15 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     }
 
     const bool completeProject = isCompleteProjectMigration(resourceTypes);
+    effectiveOptions.magicTimingMode = resolveMagicTimingModeDefault(sourceRoot, finalOutputRoot, effectiveOptions);
+    effectiveOptions.magicTimingModeDefined = true;
+    effectiveOptions.moveScreenProfile = resolveMoveScreenProfileDefault(sourceRoot, finalOutputRoot, effectiveOptions);
+    effectiveOptions.moveScreenProfileDefined = true;
+    if (completeProject)
+    {
+        appendReportLog(report, logCallback, QString::fromUtf8("武功计时规则: %1")
+            .arg(QString::fromLatin1(magicTimingModeToString(effectiveOptions.magicTimingMode))));
+    }
     const bool imageSubsetMigration = resourceTypes.size() == 1 &&
         resourceTypes.first() == AssetResourceType::Images &&
         !options.includePrefix.isEmpty();
@@ -4185,6 +4285,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
         return MigrationResult::Failed;
     }
     QString uiBaseRoot;
+    GameProfile selectedUiBaseProfile;
     if (completeProject)
     {
         bool authoritativeUiProfile = false;
@@ -4216,7 +4317,6 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
             // 仅在两个域明确不同时写入独立 UI 基底，避免基础资源包自依赖。
             effectiveOptions.uiBaseId = effectiveOptions.uiProfile.trimmed().toUpper();
         }
-        GameProfile selectedUiBaseProfile;
         uiBaseRoot = findUiBaseRoot(
             finalOutputRoot,
             effectiveOptions,
@@ -5506,7 +5606,7 @@ MigrationResult JxAssetMigrator::migrate(const QString& sourceDir,
     if (completeProject)
     {
         const int previousWrittenFiles = report.writtenFiles;
-        migrateLegacyUiLayout(sourceRoot, outputRoot, uiBaseRoot, effectiveOptions, report);
+        migrateLegacyUiLayout(sourceRoot, outputRoot, uiBaseRoot, selectedUiBaseProfile.id, effectiveOptions, report);
         ensureChooseMenuDefinition(
             outputRoot,
             uiBaseRoot,
@@ -6820,7 +6920,7 @@ std::string JxAssetMigrator::replacePlayMusicWavWithMp3(const std::string& conte
 }
 
 void JxAssetMigrator::migrateLegacyUiLayout(
-    const QString& sourceDir, const QString& outputDir, const QString& uiBaseRoot,
+    const QString& sourceDir, const QString& outputDir, const QString& uiBaseRoot, const QString& resolvedUiBaseId,
     const AssetMigrationOptions& options, AssetMigrationReport& report)
 {
     // The C# edition reads UI_Settings.ini, not the bundled 640x480 window INIs.
@@ -6851,6 +6951,9 @@ void JxAssetMigrator::migrateLegacyUiLayout(
             return;
         }
     }
+    INIFileEditor nativeViewport;
+    if (settingsPath.isEmpty())
+        nativeViewport.loadFromFile(appendPath(outputDir, "ini/ui/title/window.ini").toUtf8().toStdString());
     struct WindowLayout
     {
         const char* directory;
@@ -6881,8 +6984,6 @@ void JxAssetMigrator::migrateLegacyUiLayout(
     };
     for (const auto& layout : layouts)
     {
-        if (settingsPath.isEmpty())
-            break;
         const QString relativePath = QString("ini/ui/%1/window.ini").arg(layout.directory);
         const QString outputPath = appendPath(outputDir, relativePath);
         if (!QFileInfo(outputPath).isFile())
@@ -6893,6 +6994,138 @@ void JxAssetMigrator::migrateLegacyUiLayout(
             continue;
         if (window.hasKey("Init", "Align"))
             continue;
+        if (settingsPath.isEmpty())
+        {
+            INIFileEditor baseWindow;
+            const QString basePath = appendPath(uiBaseRoot, relativePath);
+            const auto imagePath = [](const INIFileEditor& ini)
+            {
+                std::string reference = ini.get("Init", "Image");
+                if (reference.empty()) reference = ini.get("Init", "Bitmap");
+                QString path = QString::fromUtf8(reference.c_str());
+                path.replace('\\', '/');
+                while (path.startsWith('/')) path.remove(0, 1);
+                return path;
+            };
+            const auto preserve = [&](const QString& reason)
+            {
+                report.warningCount++;
+                const QString message = QCoreApplication::translate("JxAssetMigrator",
+                    "保留菜单 %1：%2").arg(relativePath, reason);
+                report.logLines.append(message);
+                appendFileOutcome(report, relativePath, relativePath, AssetResourceType::Other,
+                    AssetMigrationFileAction::Copy, "legacy-ui-layout-unresolved", message, false);
+            };
+            // Pointer/owner placement supersedes the initial rectangle in ToolTip.
+            if (std::string(layout.directory) == "tooltip")
+                continue;
+            if (uiBaseRoot.isEmpty() || !baseWindow.loadFromFile(basePath.toUtf8().toStdString()) ||
+                !baseWindow.hasKey("Init", "Align"))
+            {
+                preserve(QCoreApplication::translate("JxAssetMigrator", "已声明 UI 基底未提供可核实的窗口锚点"));
+                continue;
+            }
+            bool customLayout = false;
+            for (const char* key : {"AlignX", "AlignY", "Scale", "Stretch", "KeepAspect", "FitToWindow", "ScaleChildren"})
+                customLayout = customLayout || window.hasKey("Init", key);
+            const QString image = imagePath(window);
+            const QString baseAnchor = QString::fromUtf8(baseWindow.get("Init", "Align").c_str()).toLower();
+            const bool nativeBottom = baseAnchor == "albottomcenter" &&
+                nativeViewport.getInteger("Init", "Height", 0) > 0 &&
+                window.getInteger("Init", "Top", 0) + window.getInteger("Init", "Height", 0) ==
+                    nativeViewport.getInteger("Init", "Height", 0);
+            if (customLayout ||
+                window.getInteger("Init", "Left", 0) != baseWindow.getInteger("Init", "Left", 0) ||
+                (!nativeBottom && window.getInteger("Init", "Top", 0) != baseWindow.getInteger("Init", "Top", 0)) ||
+                image.compare(imagePath(baseWindow), Qt::CaseInsensitive) != 0)
+            {
+                preserve(QCoreApplication::translate("JxAssetMigrator", "本地位置、布局字段或图片引用与基底不同，无法确定原布局意图"));
+                continue;
+            }
+            PicFileEditor localPicture;
+            PicFileEditor basePicture;
+            QString localImagePath = appendPath(outputDir, image);
+            if (!QFileInfo(localImagePath).isFile()) localImagePath = appendPath(sourceDir, image);
+            if (!QFileInfo(localImagePath).isFile())
+            {
+                const QStringList contentIds = dependencyIds(options.dependencyId);
+                if (!contentIds.isEmpty() && (contentIds.size() != 1 ||
+                    contentIds.first().compare(resolvedUiBaseId, Qt::CaseInsensitive) != 0))
+                {
+                    preserve(QCoreApplication::translate("JxAssetMigrator", "图片可能来自其它内容依赖，无法确认有效尺寸"));
+                    continue;
+                }
+                localImagePath = appendPath(uiBaseRoot, image);
+            }
+            if (image.isEmpty() || !isSafeRelativeSubdirectory(image) ||
+                !localPicture.loadFromFile(localImagePath.toUtf8().toStdString()) ||
+                !basePicture.loadFromFile(appendPath(uiBaseRoot, image).toUtf8().toStdString()))
+            {
+                preserve(QCoreApplication::translate("JxAssetMigrator", "无法读取本地或基底底图尺寸"));
+                continue;
+            }
+            const QImage localFrame = localPicture.getFrameImage(0);
+            const QImage baseFrame = basePicture.getFrameImage(0);
+            const qint64 width = window.getInteger("Init", "Width", 0);
+            const qint64 height = window.getInteger("Init", "Height", 0);
+            const qint64 baseWidth = baseWindow.getInteger("Init", "Width", 0);
+            const qint64 baseHeight = baseWindow.getInteger("Init", "Height", 0);
+            QStringList baseTransforms;
+            const double scale = baseWindow.getReal("Init", "Scale", 1.0f);
+            const double scaledWidth = baseWidth * scale;
+            const double scaledHeight = baseHeight * scale;
+            if (std::isfinite(scale) && scale > 0 &&
+                std::isfinite(scaledWidth) && std::isfinite(scaledHeight) &&
+                scaledWidth >= INT_MIN && scaledWidth <= INT_MAX && scaledHeight >= INT_MIN && scaledHeight <= INT_MAX &&
+                (std::lround(scaledWidth) != baseWidth || std::lround(scaledHeight) != baseHeight))
+                baseTransforms.append("Scale");
+            if (baseWindow.getBoolean("Init", "Stretch", false) &&
+                (baseWidth != baseFrame.width() || baseHeight != baseFrame.height()))
+                baseTransforms.append("Stretch/KeepAspect");
+            if (baseWindow.getBoolean("Init", "FitToWindow", false))
+                baseTransforms.append("FitToWindow");
+            // shortcut: native-image margins cover untransformed base geometry; preserve other transforms until supported.
+            if (!baseTransforms.isEmpty())
+            {
+                preserve(QCoreApplication::translate("JxAssetMigrator", "UI 基底存在未支持的有效变换：%1")
+                    .arg(baseTransforms.join(", ")));
+                continue;
+            }
+            const QString anchor = QString::fromUtf8(baseWindow.get("Init", "Align").c_str()).toLower();
+            qint64 offsetX = baseWindow.getInteger("Init", "AlignX", 0);
+            qint64 offsetY = baseWindow.getInteger("Init", "AlignY", 0);
+            const bool centerX = anchor == "alcenter" || anchor == "altopcenter" || anchor == "albottomcenter";
+            const bool right = anchor == "alright" || anchor == "alrightcenter" || anchor == "alrtcorner" || anchor == "alrbcorner";
+            const bool centerY = anchor == "alcenter" || anchor == "alleftcenter" || anchor == "alrightcenter";
+            const bool bottom = anchor == "albottom" || anchor == "albottomcenter" || anchor == "allbcorner" || anchor == "alrbcorner";
+            if (centerX) offsetX += width / 2 - localFrame.width() / 2 - baseWidth / 2 + baseFrame.width() / 2;
+            if (right) offsetX += width - localFrame.width() - baseWidth + baseFrame.width();
+            if (centerY) offsetY += height / 2 - localFrame.height() / 2 - baseHeight / 2 + baseFrame.height() / 2;
+            if (bottom) offsetY += height - localFrame.height() - baseHeight + baseFrame.height();
+            if (localFrame.isNull() || baseFrame.isNull() || width <= 0 || height <= 0 || baseWidth <= 0 || baseHeight <= 0 ||
+                width > INT_MAX || height > INT_MAX || offsetX < INT_MIN || offsetX > INT_MAX || offsetY < INT_MIN || offsetY > INT_MAX ||
+                (!centerX && !right && anchor != "alleft" && anchor != "altop" && anchor != "albottom" &&
+                 anchor != "alltcorner" && anchor != "allbcorner" && anchor != "alleftcenter"))
+            {
+                preserve(QCoreApplication::translate("JxAssetMigrator", "窗口尺寸或基底锚点不足以计算布局"));
+                continue;
+            }
+            window.set("Init", "Align", baseWindow.get("Init", "Align"));
+            window.setInteger("Init", "AlignX", offsetX);
+            window.setInteger("Init", "AlignY", offsetY);
+            const bool written = writeTextFileUtf8(outputPath, window.saveToString(), false, report);
+            appendFileOutcome(report, relativePath, relativePath, AssetResourceType::Other,
+                written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+                written ? "legacy-native-ui-viewport-layout" : "legacy-ui-layout-write-failed",
+                QCoreApplication::translate("JxAssetMigrator", "窗口 %1；底图 %2；UI 基底 %3")
+                    .arg(relativePath, localImagePath, basePath), false);
+            if (!written)
+            {
+                report.errorCount++;
+                domainReportFor(report, AssetResourceType::Other).failedFiles++;
+            }
+            continue;
+        }
         int width = static_cast<int>(window.getInteger("Init", "Width", 0));
         int height = static_cast<int>(window.getInteger("Init", "Height", 0));
         // C# uses texture dimensions. In particular its practice and dialogue
@@ -6953,6 +7186,30 @@ void JxAssetMigrator::migrateLegacyUiLayout(
         {
             report.errorCount++;
             domainReportFor(report, AssetResourceType::Other).failedFiles++;
+        }
+    }
+    if (options.uiProfile.compare("YYCS", Qt::CaseInsensitive) == 0)
+    {
+        const QString relativePath = "ini/ui/top/window.ini";
+        const QString outputPath = appendPath(outputDir, relativePath);
+        INIFileEditor window;
+        if (QFileInfo(outputPath).isFile() &&
+            window.loadFromFile(outputPath.toUtf8().toStdString()) &&
+            QString::fromUtf8(window.get("Init", "Scale").c_str()).trimmed().isEmpty())
+        {
+            window.set("Init", "Scale", "1.5");
+            if (QString::fromUtf8(window.get("Init", "Stretch").c_str()).trimmed().isEmpty())
+                window.set("Init", "Stretch", "true");
+            const bool written = writeTextFileUtf8(outputPath, window.saveToString(), false, report);
+            appendFileOutcome(report, relativePath, relativePath, AssetResourceType::Other,
+                written ? AssetMigrationFileAction::Convert : AssetMigrationFileAction::Fail,
+                written ? "yycs-top-default-scale" : "legacy-ui-layout-write-failed",
+                QString::fromUtf8("月影顶部菜单缺省缩放设为 1.5"), false);
+            if (!written)
+            {
+                report.errorCount++;
+                domainReportFor(report, AssetResourceType::Other).failedFiles++;
+            }
         }
     }
     if (settings.hasSection("NpcInfoShow"))
@@ -7233,6 +7490,10 @@ bool JxAssetMigrator::writeModProfileFile(const QString& outputDir, const AssetM
     profile.partnerFollowRunRadiusDefined =
         options.partnerFollowRunRadiusDefined;
     profile.minimumMagicDamage = options.minimumMagicDamage;
+    profile.magicTimingMode = options.magicTimingMode;
+    profile.magicTimingModeDefined = options.magicTimingModeDefined;
+    profile.moveScreenProfile = options.moveScreenProfile;
+    profile.moveScreenProfileDefined = options.moveScreenProfileDefined;
     profile.attackReleaseFrameRatio = options.attackReleaseFrameRatio;
     profile.attackReleaseFrameRatioDefined = options.attackReleaseFrameRatioDefined;
     profile.specialAttackReleaseFrameRatio = options.specialAttackReleaseFrameRatio;

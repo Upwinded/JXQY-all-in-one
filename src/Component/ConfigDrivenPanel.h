@@ -48,6 +48,8 @@ public:
 		std::string controllerDown;
 		std::string controllerLeft;
 		std::string controllerRight;
+		std::string optionLayout;
+		std::string spacingY;
 	};
 
 	struct SubMenuDefinition

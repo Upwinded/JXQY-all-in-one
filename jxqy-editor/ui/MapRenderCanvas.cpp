@@ -1452,7 +1452,7 @@ void MapRenderCanvas::paintEvent(QPaintEvent* event)
     if (!mapEditor || !mapEditor->isLoaded())
     {
         painter.setPen(Qt::white);
-        painter.drawText(rect(), Qt::AlignCenter, "No map loaded");
+        painter.drawText(rect(), Qt::AlignCenter, tr("从“文件”打开地图，或新建地图开始编辑。"));
         collectingAnimationRequirements = false;
         updateAnimationTimer();
         recordStage("empty_state");
@@ -1794,8 +1794,8 @@ void MapRenderCanvas::drawEntity(QPainter& painter, const MapEntityData& entity,
 
             if (!mpcCache->getAssetsBasePath().empty())
             {
-                loaded = resIni.loadFromFile(
-                    mpcCache->getAssetsBasePath() + resIniFolder + normalizedEntityIni);
+                const auto source = mpcCache->resolveFilePath(resIniFolder + normalizedEntityIni);
+                loaded = !source.empty() && resIni.loadFromFile(source);
             }
             else
             {

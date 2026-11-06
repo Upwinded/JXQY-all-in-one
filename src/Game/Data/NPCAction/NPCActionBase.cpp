@@ -69,7 +69,7 @@ bool NPCActionBase::tryHandleMoveNextAction(Player* player, bool resetCurrentPat
     auto action = player->nextAction->action;
     bool isWalkAction = (action == acWalk || action == acAWalk);
     bool isRunAction = (action == acRun || action == acARun);
-    if (!isWalkAction && !(isRunAction && player->canRun))
+    if (!isWalkAction && !(isRunAction && !player->isRunDisabled()))
     {
         return false;
     }

@@ -30,7 +30,6 @@ public:
 
 	_channel playSoundFile(const std::string & fileName, float x = 0.0f, float y = 0.0f, float volume = -1.0f);
 	void getNewPosition(Point pos, PointEx off, Point * newPos, PointEx * newOff);
-	void updateEffectPosition(UTime ftime, float flySpeed);
 	void updateJumpingPosition(UTime ftime, float flySpeed);
 	void updatePosition();
 

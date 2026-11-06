@@ -1,5 +1,7 @@
 #pragma once
 
+#include "../core/EditorFileState.h"
+
 #include <QWidget>
 #include <QLabel>
 #include <QComboBox>
@@ -80,16 +82,20 @@ public:
     bool openMapFile(const QString& fileName);
     bool saveMapFile(const QString& fileName);
     bool saveMapFile();
+    bool copyMapFile(const QString& fileName, QString* errorMessage = nullptr);
+    void setCopyPreflight(std::function<bool(const QStringList&, QString&)> preflight) { copyPreflight = std::move(preflight); }
     bool createNewMap(int width, int height);
     EditingViewState editingViewState() const;
     bool restoreEditingViewState(const EditingViewState& state);
 
     bool loadNpcListFromFile(const QString& fileName, bool confirmReplacement = true);
     bool loadObjectListFromFile(const QString& fileName, bool confirmReplacement = true);
-    bool saveNpcListToFile(const QString& fileName) const;
-    bool saveObjectListToFile(const QString& fileName) const;
+    bool saveNpcListToFile(const QString& fileName);
+    bool saveObjectListToFile(const QString& fileName);
     bool saveNpcListAsFile(const QString& fileName);
     bool saveObjectListAsFile(const QString& fileName);
+    bool saveContentDocument(const QString& path);
+    bool reloadContentDocument(const QString& path);
 
     struct ProjectListRestoreResult
     {
@@ -143,6 +149,8 @@ public:
 signals:
     void documentStatesChanged();
     void documentClosed();
+    void openScriptFileRequested(const QString& path);
+    void editBoundScriptRequested(const QString& path, QWidget* propertyDialog);
 
 private slots:
     void onOpenMap();
@@ -397,6 +405,12 @@ private:
 
     QString assetsBasePath;
     QString currentMapFileName;
+    EditorFileState mapFileState;
+    EditorFileState npcFileState;
+    EditorFileState objectFileState;
+    bool saveEntityListToFile(const QString& fileName, bool npc, EditorFileState* savedState = nullptr);
+    QHash<QString, QByteArray> mapCopyScripts;
+    std::function<bool(const QStringList&, QString&)> copyPreflight;
     QString currentNpcFileName;
     QString currentObjectFileName;
     bool isModified = false;

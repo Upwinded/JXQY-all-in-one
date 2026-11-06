@@ -329,6 +329,8 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	scriptPlayerName = manifest.scriptPlayerName;
 	feature = GameFeatureFlags();
 	minimumMagicDamage = manifest.resolvedMinimumMagicDamage();
+	magicTimingMode = manifest.magicTimingModeDefined
+		? manifest.magicTimingMode : MagicTimingMode::FixedMilliseconds;
 	attackReleaseFrameRatio = manifest.attackReleaseFrameRatio;
 	specialAttackReleaseFrameRatio = manifest.specialAttackReleaseFrameRatio;
 	magicReleaseFrameRatio = manifest.magicReleaseFrameRatio;
@@ -339,6 +341,8 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	runSpeedPixelsPerSecond = manifest.runSpeedPixelsPerSecond;
 	levelUpThresholdMode = manifest.resolvedLevelUpThresholdMode();
 	npcActionProfile = manifest.resolvedNpcActionProfile();
+	moveScreenProfile = manifest.moveScreenProfileDefined
+		? manifest.moveScreenProfile : ScriptMoveScreenProfile::CSharp;
 	npcRuntimeProfile = manifest.resolvedNpcRuntimeProfile();
 	specialActionMode = manifest.resolvedSpecialActionMode();
 	addLifeMode = manifest.resolvedAddLifeMode();
@@ -358,6 +362,7 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 	applyBooleanFeatureOverride(manifest, "NativeNpcAttackAtAnimationEnd", feature.nativeNpcAttackAtAnimationEnd);
 	applyBooleanFeatureOverride(manifest, "RestorePartnerAttributes", feature.restorePartnerAttributes);
 	applyBooleanFeatureOverride(manifest, "UseThewWhenNormalRun", feature.useThewWhenNormalRun);
+	applyBooleanFeatureOverride(manifest, "IgnoreRunDisabled", feature.ignoreRunDisabled);
 	applyBooleanFeatureOverride(manifest, "LumAsBrightness", feature.lumAsBrightness);
 	applyBooleanFeatureOverride(manifest, "AmbientLumOverlay", feature.ambientLumOverlay);
 	applyBooleanFeatureOverride(manifest, "TopButtonsLayout", feature.topButtonsLayout);
@@ -393,6 +398,7 @@ void Global::applyResourceManifestFeatures(const ResourceManifest& manifest)
 		"nativenpcattackatanimationend",
 		"restorepartnerattributes",
 		"usethewwhennormalrun",
+		"ignorerundisabled",
 		"lumasbrightness",
 		"ambientlumoverlay",
 		"topbuttonslayout",

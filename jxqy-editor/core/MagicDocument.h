@@ -5,6 +5,7 @@
 #include <QByteArray>
 #include <QString>
 #include <QVector>
+#include <QStringList>
 
 enum class MagicTextField
 {
@@ -54,6 +55,13 @@ public:
     QByteArray serializedBytes() const;
     QString text(MagicTextField field) const;
     void setText(MagicTextField field, const QString& value);
+
+    static QStringList linkedFileKeys();
+    static QStringList linkedParameterKeys();
+    QString linkedValue(const QString& key, int level = 0) const;
+    bool hasLinkedOverride(const QString& key, int level) const;
+    void setLinkedValue(const QString& key, const QString& value, int level = 0);
+    void removeLinkedOverride(const QString& key, int level);
 
     int effectiveInteger(MagicIntegerField field, int level = 0) const;
     bool hasIntegerOverride(MagicIntegerField field, int level) const;

@@ -140,6 +140,11 @@ bool MemoMenu::scrollBy(int delta)
 	return false;
 }
 
+bool MemoMenu::scrollMouseWheel(int steps)
+{
+	return scrollBy(steps * 3);
+}
+
 bool MemoMenu::activateControllerFocus(ControllerFocusTarget target)
 {
 	if (target != ControllerFocusTarget::Default

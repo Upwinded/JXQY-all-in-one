@@ -1,5 +1,9 @@
 #include "MsgBox.h"
 #include "../GameManager/GameManager.h"
+#include "../../Component/TextLayout.h"
+
+#include <algorithm>
+#include <limits>
 
 
 MsgBox::MsgBox()
@@ -21,6 +25,20 @@ void MsgBox::showMessage(const std::string & str, UTime duration)
 {
 	currentMessage = str;
 	showinUTime = duration;
+	if (duration == 0)
+	{
+		std::size_t characterCount = 0;
+		for (const auto& line : TextLayout::wrapColorTaggedUtf8Text(
+			str, std::numeric_limits<int>::max(), 0xFFFFFFFF, {}))
+		{
+			for (const auto& run : line)
+			{
+				characterCount += TextLayout::countUtf8Characters(run.text);
+			}
+		}
+		showinUTime = static_cast<UTime>(
+			std::clamp<std::size_t>(characterCount, 8, 14) * 250);
+	}
 	if (label == nullptr)
 	{
 		label = getComponentByName<Label>("label");

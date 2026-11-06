@@ -94,7 +94,13 @@ constexpr int ProgramActionButtonWidth = 200;
 constexpr int HeaderActionCompactButtonWidth = 88;
 constexpr int HeaderActionFontSize = 17;
 constexpr int HeaderActionCompactFontSize = 12;
-constexpr int DisplaySettingsRowCount = 4;
+constexpr int DisplaySettingsRowCount = 5;
+constexpr int FontSettingsRow = 4;
+#if defined(__MOBILE__)
+constexpr int FirstDisplaySettingsRow = FontSettingsRow;
+#else
+constexpr int FirstDisplaySettingsRow = 0;
+#endif
 constexpr int DisplaySettingsFirstRowTopOffset = 118;
 constexpr int DisplaySettingsRowHeight = 58;
 constexpr int DisplaySettingsArrowButtonSize = 42;
@@ -1536,6 +1542,8 @@ void ResourceSelectScene::freeResource()
 	displayResolutionOptions.clear();
 	pendingDisplaySettings = {};
 	displaySettingsStatusText.clear();
+	fontChoices.clear();
+	pendingFontId.clear();
 	resourceEntries.clear();
 	onlineCatalog = {};
 	onlineApplicationCatalog = {};
@@ -1669,15 +1677,14 @@ void ResourceSelectScene::createControls()
 	saveManagementButton->setStyle(makeHeaderActionButtonStyle());
 	addChild(saveManagementButton);
 
-#if !defined(__MOBILE__)
 	displaySettingsButton = std::make_shared<FlatTextButton>();
 	displaySettingsButton->name = "resource-select-display-settings";
 	displaySettingsButton->setFontSize(HeaderActionFontSize);
-	displaySettingsButton->setUTF8Str(u8"显示设置");
+	displaySettingsButton->setUTF8Str(u8"设置");
 	displaySettingsButton->setStyle(makeHeaderActionButtonStyle());
 	addChild(displaySettingsButton);
 
-	for (int row = 0; row < DisplaySettingsRowCount; row++)
+	for (int row = FirstDisplaySettingsRow; row < DisplaySettingsRowCount; row++)
 	{
 		displaySettingsPreviousButtons[row] =
 			std::make_shared<FlatTextButton>();
@@ -1730,7 +1737,6 @@ void ResourceSelectScene::createControls()
 	displaySettingsBackButton->visible = false;
 	displaySettingsBackButton->activated = false;
 	addChild(displaySettingsBackButton);
-#endif
 
 	cheatHelpCloseButton = std::make_shared<FlatTextButton>();
 	cheatHelpCloseButton->name = "resource-select-cheat-help-close";
@@ -7072,11 +7078,17 @@ void ResourceSelectScene::showDisplaySettings(bool keepSemanticFocus)
 		return;
 	}
 	const bool wasKeyboardSemanticFocus = keyboardSemanticFocus;
+#if !defined(__MOBILE__)
 	desktopDisplays = engine->getDesktopDisplays();
-	if (desktopDisplays.empty())
+#endif
+	fontChoices = ResourceFonts::loadChoices();
+	pendingFontId = Config::fontId;
+	if (std::none_of(fontChoices.begin(), fontChoices.end(), [this](const ResourceFonts::FontChoice& choice)
+		{
+			return choice.id == pendingFontId;
+		}))
 	{
-		catalogStatusText = u8"未能读取桌面显示器信息";
-		return;
+		pendingFontId = ResourceFonts::DefaultFontId;
 	}
 	cancelPointerInteraction();
 	pendingDisplaySettings = engine->getDesktopDisplaySettings();
@@ -7093,7 +7105,7 @@ void ResourceSelectScene::showDisplaySettings(bool keepSemanticFocus)
 	setDisplaySettingsControlsVisible(true);
 	updateDisplaySettingsControlLayout();
 	semanticFocusVisible = focusManager.focusNode(
-		desktopDisplays.size() > 1
+		firstDisplaySettingsRow() == FontSettingsRow ? "display-settings-next-4" : desktopDisplays.size() > 1
 			? "display-settings-next-0"
 			: "display-settings-next-1");
 	keyboardSemanticFocus = keepSemanticFocus && wasKeyboardSemanticFocus;
@@ -7272,7 +7284,28 @@ void ResourceSelectScene::rebuildDisplayResolutionOptions()
 
 void ResourceSelectScene::cycleDisplaySetting(int row, int offset)
 {
-	if (!displaySettingsVisible || desktopDisplays.empty() || offset == 0)
+	if (!displaySettingsVisible || offset == 0)
+	{
+		return;
+	}
+	if (row == FontSettingsRow)
+	{
+		if (fontChoices.empty())
+		{
+			return;
+		}
+		auto found = std::find_if(fontChoices.begin(), fontChoices.end(), [this](const ResourceFonts::FontChoice& choice)
+			{
+				return choice.id == pendingFontId;
+			});
+		int index = found == fontChoices.end() ? 0 : static_cast<int>(found - fontChoices.begin());
+		const int count = static_cast<int>(fontChoices.size());
+		index = ((index + offset) % count + count) % count;
+		pendingFontId = fontChoices[index].id;
+		displaySettingsStatusText.clear();
+		return;
+	}
+	if (desktopDisplays.empty())
 	{
 		return;
 	}
@@ -7372,33 +7405,56 @@ void ResourceSelectScene::applyPendingDisplaySettings()
 	{
 		return;
 	}
-	if (!engine->applyDesktopDisplaySettings(pendingDisplaySettings))
+	if (pendingFontId != ResourceFonts::DefaultFontId)
+	{
+		std::unique_ptr<char[]> data;
+		int length = 0;
+		if (!ResourceFonts::readChoice(pendingFontId, data, length))
+		{
+			displaySettingsStatusText = u8"字体不可用，请更新公共资源或选择默认字体";
+			return;
+		}
+	}
+#if !defined(__MOBILE__)
+	if (!desktopDisplays.empty() && !engine->applyDesktopDisplaySettings(pendingDisplaySettings))
 	{
 		displaySettingsStatusText = u8"应用失败，已恢复原来的显示设置";
 		return;
 	}
-	pendingDisplaySettings = engine->getDesktopDisplaySettings();
-	Config::setDesktopDisplaySettings(pendingDisplaySettings);
+	if (!desktopDisplays.empty())
+	{
+		pendingDisplaySettings = engine->getDesktopDisplaySettings();
+		Config::setDesktopDisplaySettings(pendingDisplaySettings);
+	}
+#endif
+	const bool fontChanged = Config::fontId != pendingFontId;
+	Config::fontId = pendingFontId;
 	Config::save();
+#if !defined(__MOBILE__)
 	desktopDisplays = engine->getDesktopDisplays();
 	refreshDisplaySettingsOptions();
-	displaySettingsStatusText = u8"显示设置已应用并保存";
+#endif
+	displaySettingsStatusText = fontChanged || firstDisplaySettingsRow() == FontSettingsRow
+		? u8"已保存，字体在进入游戏后生效" : u8"显示设置已应用并保存";
 }
 
 void ResourceSelectScene::resetPendingDisplaySettings()
 {
-	if (!displaySettingsVisible || desktopDisplays.empty())
+	if (!displaySettingsVisible)
 	{
 		return;
 	}
-	pendingDisplaySettings = {};
-	pendingDisplaySettings.displayIndex = desktopDisplays.front().index;
-	pendingDisplaySettings.width = DEFAULT_WINDOW_WIDTH;
-	pendingDisplaySettings.height = DEFAULT_WINDOW_HEIGHT;
-	pendingDisplaySettings.fullScreenMode = FullScreenMode::window;
-	pendingDisplaySettings.fullScreenSolutionMode =
-		FullScreenSolutionMode::adjust;
-	rebuildDisplayResolutionOptions();
+	pendingFontId = ResourceFonts::DefaultFontId;
+	if (!desktopDisplays.empty())
+	{
+		pendingDisplaySettings = {};
+		pendingDisplaySettings.displayIndex = desktopDisplays.front().index;
+		pendingDisplaySettings.width = DEFAULT_WINDOW_WIDTH;
+		pendingDisplaySettings.height = DEFAULT_WINDOW_HEIGHT;
+		pendingDisplaySettings.fullScreenMode = FullScreenMode::window;
+		pendingDisplaySettings.fullScreenSolutionMode = FullScreenSolutionMode::adjust;
+		rebuildDisplayResolutionOptions();
+	}
 	displaySettingsStatusText = u8"已恢复默认选项，点击“应用”后生效";
 	setDisplaySettingsControlsVisible(true);
 }
@@ -7407,12 +7463,14 @@ void ResourceSelectScene::setDisplaySettingsControlsVisible(bool visible)
 {
 	for (int row = 0; row < DisplaySettingsRowCount; row++)
 	{
-		const bool rowAvailable = visible &&
+		const bool rowVisible = visible && row >= firstDisplaySettingsRow();
+		const bool rowAvailable = rowVisible &&
 			(row != 0 || desktopDisplays.size() > 1) &&
-			(row != 2 || displayResolutionOptions.size() > 1);
+			(row != 2 || displayResolutionOptions.size() > 1) &&
+			(row != FontSettingsRow || fontChoices.size() > 1);
 		if (displaySettingsPreviousButtons[row] != nullptr)
 		{
-			displaySettingsPreviousButtons[row]->visible = visible;
+			displaySettingsPreviousButtons[row]->visible = rowVisible;
 			displaySettingsPreviousButtons[row]->activated = rowAvailable;
 			if (!rowAvailable)
 			{
@@ -7421,7 +7479,7 @@ void ResourceSelectScene::setDisplaySettingsControlsVisible(bool visible)
 		}
 		if (displaySettingsNextButtons[row] != nullptr)
 		{
-			displaySettingsNextButtons[row]->visible = visible;
+			displaySettingsNextButtons[row]->visible = rowVisible;
 			displaySettingsNextButtons[row]->activated = rowAvailable;
 			if (!rowAvailable)
 			{
@@ -7584,8 +7642,7 @@ void ResourceSelectScene::updateControlLayout()
 	if (displaySettingsButton != nullptr)
 	{
 		displaySettingsButton->setFontSize(headerFontSize);
-		displaySettingsButton->setUTF8Str(
-			compactHeader ? u8"显示" : u8"显示设置");
+		displaySettingsButton->setUTF8Str(u8"设置");
 	}
 	refreshCheckUpdatesButton();
 
@@ -7815,16 +7872,22 @@ Rect ResourceSelectScene::getDisplaySettingsRowValueRect(int row) const
 	};
 }
 
+int ResourceSelectScene::firstDisplaySettingsRow() const
+{
+	return desktopDisplays.empty() ? FontSettingsRow : FirstDisplaySettingsRow;
+}
+
 Rect ResourceSelectScene::getDisplaySettingsPreviousButtonRect(int row) const
 {
 	const int labelWidth = std::min(170, contentWidth * 28 / 100);
 	const int firstRow = panelHeight < 400 ? 86 : DisplaySettingsFirstRowTopOffset;
 	const int rowHeight = std::min(DisplaySettingsRowHeight,
-		std::max(30, (getDisplaySettingsApplyButtonRect().y - panelY - firstRow - 28) / DisplaySettingsRowCount));
+		std::max(24, (getDisplaySettingsApplyButtonRect().y - panelY - firstRow - 28) /
+			(DisplaySettingsRowCount - firstDisplaySettingsRow())));
 	return
 	{
 		panelX + panelPadding + labelWidth,
-		panelY + firstRow + row * rowHeight,
+		panelY + firstRow + (row - firstDisplaySettingsRow()) * rowHeight,
 		DisplaySettingsArrowButtonSize,
 		std::min(DisplaySettingsArrowButtonSize, rowHeight - 6)
 	};
@@ -8720,11 +8783,11 @@ void ResourceSelectScene::drawDisplaySettingsPage()
 		panelWidth, panelHeight, 18, 14, 12, 226);
 	engine->fillRect(panelX + 1, panelY + 1,
 		panelWidth - 2, panelHeight - 2, 56, 42, 28, 96);
-	drawCenteredText(u8"显示设置",
+	drawCenteredText(u8"设置",
 		panelX + panelWidth / 2, panelY + 18,
 		28, 0xFFFFE7B0, contentWidth, 18);
 	drawCenteredText(
-		u8"点击“应用”后立即生效；窗口模式也可直接拖动窗口得到自定义尺寸",
+		u8"字体进入游戏后生效，MOD 自带字体优先",
 		panelX + panelWidth / 2, panelY + 58,
 		16, 0xFFD8C59A, contentWidth, 14);
 	engine->fillRect(panelX + panelPadding, panelY + (panelHeight < 400 ? 78 : 91),
@@ -8732,7 +8795,7 @@ void ResourceSelectScene::drawDisplaySettingsPage()
 
 	std::array<std::string, DisplaySettingsRowCount> labels =
 	{
-		u8"显示器", u8"显示模式", u8"分辨率", u8"画面适配"
+		u8"显示器", u8"显示模式", u8"分辨率", u8"画面适配", u8"游戏字体"
 	};
 	std::array<std::string, DisplaySettingsRowCount> values;
 	auto displayIterator = std::find_if(
@@ -8792,7 +8855,14 @@ void ResourceSelectScene::drawDisplaySettingsPage()
 		break;
 	}
 
-	for (int row = 0; row < DisplaySettingsRowCount; row++)
+	for (const auto& choice : fontChoices)
+	{
+		if (choice.id == pendingFontId)
+		{
+			values[FontSettingsRow] = choice.name;
+		}
+	}
+	for (int row = firstDisplaySettingsRow(); row < DisplaySettingsRowCount; row++)
 	{
 		const Rect previous = getDisplaySettingsPreviousButtonRect(row);
 		const Rect valueRect = getDisplaySettingsRowValueRect(row);

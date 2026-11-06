@@ -1,4 +1,5 @@
 #include "Option.h"
+#include "../Config/GameSpeedMapping.h"
 #include "../../Engine/Engine.h"
 #include "ControllerPromptPresenter.h"
 
@@ -106,9 +107,31 @@ void Option::init()
 	cheatSettingsButton = getComponentByName<FlatTextButton>("cheatSettingsButton");
 	themeButton = getComponentByName<FlatTextButton>("themeButton");
 	automaticSaveButton = getComponentByName<FlatTextButton>("automaticSaveButton");
+	experienceMultiplierButton = getComponentByName<FlatTextButton>("experienceMultiplierButton");
+	cheatPanelBackground = getComponentByName<ImageContainer>("cheatPanelBackground");
+	cheatPanelTitle = getComponentByName<Label>("cheatPanelTitle");
+	cheatResultLabel = getComponentByName<Label>("cheatResultLabel");
+	cheatModeButton = getComponentByName<FlatTextButton>("cheatModeButton");
+	invincibilityButton = getComponentByName<FlatTextButton>("invincibilityButton");
+	restoreResourcesButton = getComponentByName<FlatTextButton>("restoreResourcesButton");
+	increaseMagicLevelButton = getComponentByName<FlatTextButton>("increaseMagicLevelButton");
+	increasePlayerLevelButton = getComponentByName<FlatTextButton>("increasePlayerLevelButton");
+	addMoneyButton = getComponentByName<FlatTextButton>("addMoneyButton");
+	cheatPanelBackButton = getComponentByName<FlatTextButton>("cheatPanelBackButton");
+
 
 	setChildRectReferToParent();
 	resourceCheatSettingsButtonRect = cheatSettingsButton != nullptr ? cheatSettingsButton->rect : Rect{};
+	for (const auto& definition : componentDefinitions)
+	{
+		if (!OptionLayout::find(definition.name)) continue;
+		auto component = getComponentByName(definition.name);
+		if (!component) continue;
+		int font = 0;
+		if (auto button = std::dynamic_pointer_cast<TextButton>(component)) font = button->getFontSize();
+		configuredOptionGeometry[definition.name] = { component->rect, font };
+	}
+
 
 	if (music && getScrollbarFocusElement(music) != nullptr)
 	{
@@ -218,6 +241,9 @@ void Option::init()
 
 void Option::freeResource()
 {
+	configuredOptionGeometry.clear();
+	cheatActionStyles.clear();
+	cheatPanelBackground = nullptr;
 	controllerPromptTextureCache.itemTextTextures.clear();
 	focusManager.clear();
 	touchControlsButton = nullptr;
@@ -611,12 +637,10 @@ void Option::resetSpeedToDefault()
 	{
 		speedCB->checked = defaultPosition <= speed->min;
 	}
-	if (speed->position == defaultPosition)
-	{
-		return;
-	}
 	speed->setPosition(defaultPosition);
-	applySpeedPosition();
+	speedPos = speed->position;
+	Config::setGameSpeed(SPEED_TIME_DEFAULT);
+	Config::save();
 }
 
 void Option::applyPlayerAlpha()
@@ -661,38 +685,12 @@ void Option::toggleDynamicLoading()
 
 int Option::speedToPos(float spd)
 {
-	if (speed == nullptr || speed->max <= speed->min)
-	{
-		return speed == nullptr ? 0 : speed->min;
-	}
-
-	if (spd <= SPEED_TIME_MIN)
-	{
-		return speed->min;
-	}
-	else if (spd >= SPEED_TIME_MAX)
-	{
-		return speed->max;
-	}
-	return (int)round((spd - SPEED_TIME_MIN) / (SPEED_TIME_MAX - SPEED_TIME_MIN) * (speed->max - speed->min) + speed->min);
+	return speed == nullptr ? 0 : GameSpeedMapping::toPosition(spd, speed->min, speed->max);
 }
 
 float Option::posToSpeed(int pos)
 {
-	if (speed == nullptr || speed->max <= speed->min)
-	{
-		return SPEED_TIME_DEFAULT;
-	}
-
-	if (pos <= speed->min)
-	{
-		return SPEED_TIME_MIN;
-	}
-	else if (pos >= speed->max)
-	{
-		return SPEED_TIME_MAX;
-	}
-	return ((float)(pos - speed->min)) / (speed->max - speed->min) * (SPEED_TIME_MAX - SPEED_TIME_MIN) + SPEED_TIME_MIN;
+	return speed == nullptr ? SPEED_TIME_DEFAULT : GameSpeedMapping::fromPosition(pos, speed->min, speed->max);
 }
 
 void Option::onEvent()
@@ -789,6 +787,7 @@ void Option::onDraw()
 		return;
 	}
 	const Rect panelRect = getCheatPanelRect();
+	if (cheatPanelBackground && cheatPanelBackground->drawImagetoRect(panelRect, cheatPanelBackground->stretch)) return;
 	engine->fillRect(panelRect.x, panelRect.y, panelRect.w, panelRect.h,
 		18, 15, 13, 238);
 	engine->fillRect(panelRect.x, panelRect.y, panelRect.w, 2,
@@ -1013,13 +1012,7 @@ void Option::createFooterOptions()
 		if (!gameManager->global.feature.automaticSave) automaticSaveButton.reset();
 	}
 	layoutFooterOptions();
-	const Rect settingsRect = getComponentByName("cheatSettingsButton") != nullptr
-		? resourceCheatSettingsButtonRect : cheatSettingsButton->rect;
-	constexpr int ButtonGap = 8;
-	const int buttonWidth = std::max(1, (settingsRect.w - ButtonGap) / 2);
-	cheatSettingsButton->rect = { settingsRect.x, settingsRect.y, buttonWidth, settingsRect.h };
-	experienceMultiplierButton->rect = { settingsRect.x + buttonWidth + ButtonGap, settingsRect.y,
-		std::max(1, settingsRect.w - buttonWidth - ButtonGap), settingsRect.h };
+
 }
 
 void Option::toggleExperienceMultiplierOption()
@@ -1044,90 +1037,47 @@ void Option::toggleThemeOption()
 	}
 }
 
+bool Option::hasExplicitOptionLayout(const std::string& name) const
+{
+	for (const auto& definition : componentDefinitions)
+		if (definition.name == name) return definition.optionLayout == OptionLayout::Explicit
+			|| definition.optionLayout == OptionLayout::ResourceFooter;
+	return false;
+}
+
 void Option::layoutFooterOptions()
 {
-	// Skins with their own footer controls already position and style them in the menu resources.
-	if (getComponentByName("cheatSettingsButton") != nullptr) return;
-	std::vector<std::shared_ptr<FlatTextButton>> buttons;
-	if (touchControlsButton != nullptr)
+	int width = 0, height = 0;
+	engine->getWindowSize(width, height);
+	bool explicitFooter = false;
+	for (const auto& definition : componentDefinitions)
+		if (definition.name == "cheatSettingsButton") explicitFooter = definition.optionLayout == OptionLayout::Explicit;
+	const bool legacy = getComponentByName("cheatSettingsButton") != nullptr && !explicitFooter;
+	const auto layout = OptionLayout::footer(rect, rtnBtn ? &rtnBtn->rect : nullptr, height,
+		touchControlsButton != nullptr, themeButton != nullptr, automaticSaveButton != nullptr,
+		legacy ? &resourceCheatSettingsButtonRect : nullptr);
+	const std::vector<std::pair<std::string, std::shared_ptr<FlatTextButton>>> buttons = {
+		{ "touchControlsButton", touchControlsButton }, { "cheatSettingsButton", cheatSettingsButton },
+		{ "experienceMultiplierButton", experienceMultiplierButton }, { "themeButton", themeButton },
+		{ "automaticSaveButton", automaticSaveButton }
+	};
+	for (const auto& entry : buttons)
 	{
-		buttons.push_back(touchControlsButton);
-	}
-	if (cheatSettingsButton != nullptr)
-	{
-		buttons.push_back(cheatSettingsButton);
-	}
-	if (buttons.empty())
-	{
-		return;
-	}
-
-	constexpr int ButtonHeight = 30;
-	constexpr int ButtonMaximumWidth = 220;
-	constexpr int PanelMargin = 8;
-	constexpr int ButtonGap = 8;
-	const int availableWidth = std::max(1, rect.w - PanelMargin * 2);
-	const int totalWidth = buttons.size() > 1
-		? std::min(availableWidth, ButtonMaximumWidth * 2 + ButtonGap)
-		: std::min(availableWidth, ButtonMaximumWidth);
-	const int buttonWidth = buttons.size() > 1
-		? std::max(1, (totalWidth - ButtonGap) / 2)
-		: totalWidth;
-	const int maximumY = rect.y + rect.h - ButtonHeight - PanelMargin;
-	const int requestedY = rtnBtn != nullptr
-		? rtnBtn->rect.y + rtnBtn->rect.h + PanelMargin
-		: maximumY;
-	const int buttonY = std::min(requestedY, maximumY);
-	int buttonX = rect.x + (rect.w - totalWidth) / 2;
-	for (std::size_t index = 0; index < buttons.size(); ++index)
-	{
-		const int width = index + 1 == buttons.size()
-			? rect.x + (rect.w + totalWidth) / 2 - buttonX
-			: buttonWidth;
-		buttons[index]->rect = { buttonX, buttonY, width, ButtonHeight };
-		buttonX += width + ButtonGap;
-	}
-	if (!automaticSaveButton)
-	{
-		if (themeButton)
+		if (!entry.second) continue;
+		const auto geometry = layout.controls.find(entry.first);
+		if (geometry != layout.controls.end())
 		{
-			themeButton->rect = { rect.x + (rect.w - 280) / 2, buttonY + ButtonHeight + 8, 280, 30 };
-			int windowWidth = 0, windowHeight = 0;
-			engine->getWindowSize(windowWidth, windowHeight);
-			if (themeButton->rect.y + themeButton->rect.h > windowHeight - 8 && rtnBtn
-				&& rtnBtn->rect.x - rect.x >= themeButton->rect.w + 16)
-			{
-				themeButton->rect.x = rtnBtn->rect.x - themeButton->rect.w - 16;
-				themeButton->rect.y = rtnBtn->rect.y + (rtnBtn->rect.h - themeButton->rect.h) / 2;
-			}
+			entry.second->rect = geometry->second.rectangle;
+			if (geometry->second.font > 0) entry.second->setFontSize(geometry->second.font);
 		}
-		return;
+		const auto configured = configuredOptionGeometry.find(entry.first);
+		if (configured != configuredOptionGeometry.end() && hasExplicitOptionLayout(entry.first))
+		{
+			entry.second->rect = configured->second.rectangle;
+			if (configured->second.font > 0) entry.second->setFontSize(configured->second.font);
+		}
 	}
-	int secondRowWidth = totalWidth;
-	int secondRowX = rect.x + (rect.w - secondRowWidth) / 2;
-	int secondRowY = buttonY + ButtonHeight + ButtonGap;
-	int windowWidth = 0, windowHeight = 0;
-	engine->getWindowSize(windowWidth, windowHeight);
-	if (secondRowY + ButtonHeight > windowHeight - PanelMargin && rtnBtn)
-	{
-		secondRowWidth = std::min(secondRowWidth, rtnBtn->rect.x - rect.x - PanelMargin * 3);
-		secondRowX = rtnBtn->rect.x - secondRowWidth - PanelMargin * 2;
-		secondRowY = rtnBtn->rect.y + (rtnBtn->rect.h - ButtonHeight) / 2;
-	}
-	const int secondButtonWidth = themeButton ? (secondRowWidth - ButtonGap) / 2 : secondRowWidth;
-	if (themeButton)
-	{
-		themeButton->rect = { secondRowX, secondRowY, secondButtonWidth, ButtonHeight };
-		themeButton->setFontSize(secondButtonWidth < 180 ? 14 : 16);
-	}
-	if (automaticSaveButton)
-	{
-		automaticSaveButton->rect = { secondRowX + (themeButton ? secondButtonWidth + ButtonGap : 0),
-			secondRowY, secondButtonWidth, ButtonHeight };
-		automaticSaveButton->setFontSize(secondButtonWidth < 180 ? 14 : 16);
-	}
-	// Include the footer rows in the panel without rescaling the existing controls.
-	rect.h = std::max(rect.h, secondRowY + ButtonHeight + PanelMargin - rect.y);
+	rect.h = layout.windowHeight;
 }
 
 void Option::toggleAutomaticSaveOption()
@@ -1173,128 +1123,81 @@ void Option::toggleTouchControlsOption()
 
 void Option::createCheatPanel()
 {
-	if (cheatModeButton != nullptr || GameManager::getInstance() == nullptr
-		|| rect.w <= 16 || rect.h <= 16)
+	if (GameManager::getInstance() == nullptr || rect.w <= 16 || rect.h <= 16) return;
+	const auto makeLabel = [this](std::shared_ptr<Label>& label, const char* name)
 	{
-		return;
-	}
-
-	cheatPanelTitle = std::make_shared<Label>();
-	cheatPanelTitle->name = "cheatPanelTitle";
-	cheatPanelTitle->fontSize = 18;
-	cheatPanelTitle->minimumFontSize = 14;
-	cheatPanelTitle->autoShrink = true;
-	cheatPanelTitle->horizontalAlignment = TextHorizontalAlignment::Center;
-	cheatPanelTitle->verticalAlignment = TextVerticalAlignment::Center;
-	cheatPanelTitle->color = 0xFFFFE7B0;
-	cheatPanelTitle->setStr("作弊设置（仅本次运行）");
-	addChild(cheatPanelTitle);
-	cheatResultLabel = std::make_shared<Label>();
-	cheatResultLabel->name = "cheatResultLabel";
-	cheatResultLabel->fontSize = 16;
-	cheatResultLabel->minimumFontSize = 12;
-	cheatResultLabel->autoShrink = true;
-	cheatResultLabel->elideOverflow = true;
-	cheatResultLabel->horizontalAlignment = TextHorizontalAlignment::Center;
-	cheatResultLabel->verticalAlignment = TextVerticalAlignment::Center;
-	cheatResultLabel->color = 0xFFFFFFFF;
-	addChild(cheatResultLabel);
-
-	auto makeButton = [this](std::shared_ptr<FlatTextButton>& button,
-		const std::string& name, const std::string& text)
+		if (label) return;
+		const auto* defaults = OptionLayout::find(name);
+		label = std::make_shared<Label>();
+		label->name = name;
+		label->fontSize = defaults->font;
+		label->minimumFontSize = std::string(name) == "cheatPanelTitle" ? 14 : 12;
+		label->autoShrink = true;
+		label->elideOverflow = std::string(name) == "cheatResultLabel";
+		label->horizontalAlignment = TextHorizontalAlignment::Center;
+		label->verticalAlignment = TextVerticalAlignment::Center;
+		label->color = defaults->color;
+		if (!defaults->dynamicText) label->setStr(defaults->text);
+		addChild(label);
+	};
+	makeLabel(cheatPanelTitle, "cheatPanelTitle");
+	makeLabel(cheatResultLabel, "cheatResultLabel");
+	const auto makeButton = [this](std::shared_ptr<FlatTextButton>& button, const char* name)
 	{
+		if (button) return;
+		const auto* defaults = OptionLayout::find(name);
 		button = std::make_shared<FlatTextButton>();
 		button->name = name;
-		button->setFontSize(16);
-		button->setUTF8Str(text);
+		button->setFontSize(defaults->font);
+		button->setUTF8Str(defaults->text);
 		addChild(button);
 	};
-	makeButton(cheatModeButton, "cheatModeButton", "作弊模式：关");
-	makeButton(invincibilityButton, "invincibilityButton", "无敌模式：关");
-	makeButton(restoreResourcesButton, "restoreResourcesButton",
-		"补满生命、内力、体力");
-	makeButton(increaseMagicLevelButton, "increaseMagicLevelButton",
-		"当前修炼武功提升一级");
-	makeButton(increasePlayerLevelButton, "increasePlayerLevelButton",
-		"主角提升一级");
-	makeButton(addMoneyButton, "addMoneyButton", "增加100000两银子");
-	makeButton(cheatPanelBackButton, "cheatPanelBackButton", "返回选项");
+	makeButton(cheatModeButton, "cheatModeButton");
+	makeButton(invincibilityButton, "invincibilityButton");
+	makeButton(restoreResourcesButton, "restoreResourcesButton");
+	makeButton(increaseMagicLevelButton, "increaseMagicLevelButton");
+	makeButton(increasePlayerLevelButton, "increasePlayerLevelButton");
+	makeButton(addMoneyButton, "addMoneyButton");
+	makeButton(cheatPanelBackButton, "cheatPanelBackButton");
+	if (cheatPanelBackground) cheatPanelBackground->visible = cheatPanelBackground->activated = false;
+	for (const auto& entry : std::vector<std::pair<std::string, std::shared_ptr<FlatTextButton>>>{
+		{ "invincibilityButton", invincibilityButton }, { "restoreResourcesButton", restoreResourcesButton },
+		{ "increaseMagicLevelButton", increaseMagicLevelButton }, { "increasePlayerLevelButton", increasePlayerLevelButton },
+		{ "addMoneyButton", addMoneyButton } })
+		cheatActionStyles[entry.first] = entry.second->getStyle();
 	layoutCheatPanel();
 	setCheatPanelElementsVisible(false);
 }
 
 Rect Option::getCheatPanelRect() const
 {
-	constexpr int PanelMargin = 8;
-	return
-	{
-		rect.x + PanelMargin,
-		rect.y + PanelMargin,
-		std::max(1, rect.w - PanelMargin * 2),
-		std::max(1, rect.h - PanelMargin * 2)
-	};
+	const auto configured = configuredOptionGeometry.find("cheatPanelBackground");
+	if (configured != configuredOptionGeometry.end() && hasExplicitOptionLayout("cheatPanelBackground"))
+		return configured->second.rectangle;
+	return OptionLayout::cheatBounds(rect);
 }
 
 void Option::layoutCheatPanel()
 {
-	if (cheatPanelTitle == nullptr || cheatModeButton == nullptr)
+	if (!cheatPanelTitle || !cheatModeButton) return;
+	const auto defaults = OptionLayout::cheat(getCheatPanelRect());
+	for (const auto& entry : std::vector<std::pair<std::string, PElement>>{
+		{ "cheatPanelTitle", cheatPanelTitle }, { "cheatResultLabel", cheatResultLabel },
+		{ "cheatModeButton", cheatModeButton }, { "invincibilityButton", invincibilityButton },
+		{ "restoreResourcesButton", restoreResourcesButton }, { "increaseMagicLevelButton", increaseMagicLevelButton },
+		{ "increasePlayerLevelButton", increasePlayerLevelButton }, { "addMoneyButton", addMoneyButton },
+		{ "cheatPanelBackButton", cheatPanelBackButton } })
 	{
-		return;
-	}
-	const Rect panelRect = getCheatPanelRect();
-	constexpr int ButtonHeight = 32;
-	constexpr int ButtonGap = 4;
-	constexpr int TitleHeight = 24;
-	constexpr int TitleGap = 4;
-	constexpr int ResultHeight = 26;
-	constexpr int ResultGap = 6;
-	constexpr int HorizontalMargin = 12;
-	constexpr int ButtonMaximumWidth = 380;
-	constexpr int ButtonCount = 7;
-	const int contentHeight = TitleHeight + TitleGap + ResultHeight + ResultGap
-		+ ButtonCount * ButtonHeight + (ButtonCount - 1) * ButtonGap;
-	const int contentY = panelRect.y + std::max(4,
-		(panelRect.h - contentHeight) / 2);
-	const int buttonWidth = std::min(ButtonMaximumWidth,
-		std::max(1, panelRect.w - HorizontalMargin * 2));
-	const int buttonX = panelRect.x + (panelRect.w - buttonWidth) / 2;
-	cheatPanelTitle->rect =
-	{
-		buttonX,
-		contentY,
-		buttonWidth,
-		TitleHeight
-	};
-	cheatResultLabel->rect =
-	{
-		buttonX,
-		contentY + TitleHeight + TitleGap,
-		buttonWidth,
-		ResultHeight
-	};
-
-	const std::vector<std::shared_ptr<FlatTextButton>> buttons =
-	{
-		cheatModeButton,
-		invincibilityButton,
-		restoreResourcesButton,
-		increaseMagicLevelButton,
-		increasePlayerLevelButton,
-		addMoneyButton,
-		cheatPanelBackButton
-	};
-	int buttonY = contentY + TitleHeight + TitleGap
-		+ ResultHeight + ResultGap;
-	for (const auto& button : buttons)
-	{
-		button->rect = { buttonX, buttonY, buttonWidth, ButtonHeight };
-		buttonY += ButtonHeight + ButtonGap;
+		const auto configured = configuredOptionGeometry.find(entry.first);
+		entry.second->rect = configured != configuredOptionGeometry.end() && hasExplicitOptionLayout(entry.first)
+			? configured->second.rectangle : defaults.at(entry.first).rectangle;
 	}
 }
 
 bool Option::isCheatPanelElement(const PElement& element) const
 {
-	return element == cheatPanelTitle
+	return element == cheatPanelBackground
+		|| element == cheatPanelTitle
 		|| element == cheatResultLabel
 		|| element == cheatModeButton
 		|| element == invincibilityButton
@@ -1354,17 +1257,12 @@ void Option::syncCheatPanel()
 				? "无敌模式：开"
 				: "无敌模式：关");
 	}
-	const FlatTextButtonStyle actionStyle = enabled
-		? FlatTextButtonStyle()
-		: makeUnavailableCheatActionStyle();
-	for (const auto& button :
-		{ invincibilityButton, restoreResourcesButton, increaseMagicLevelButton,
-			increasePlayerLevelButton, addMoneyButton })
+	for (const auto& entry : std::vector<std::pair<std::string, std::shared_ptr<FlatTextButton>>>{
+		{ "invincibilityButton", invincibilityButton }, { "restoreResourcesButton", restoreResourcesButton },
+		{ "increaseMagicLevelButton", increaseMagicLevelButton }, { "increasePlayerLevelButton", increasePlayerLevelButton },
+		{ "addMoneyButton", addMoneyButton } })
 	{
-		if (button != nullptr)
-		{
-			button->setStyle(actionStyle);
-		}
+		if (entry.second) entry.second->setStyle(enabled ? cheatActionStyles.at(entry.first) : makeUnavailableCheatActionStyle());
 	}
 }
 
