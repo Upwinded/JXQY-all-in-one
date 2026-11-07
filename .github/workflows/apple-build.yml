@@ -4,7 +4,18 @@ on:
   workflow_dispatch:
   push:
     branches: [dev]
-    paths: [.github/workflows/apple-build.yml]
+    paths:
+      - .github/workflows/apple-build.yml
+      - .gitmodules
+      - src/**
+      - macos_ios/**
+      - cmake/**
+      - assets/engine/**
+      - assets/resources.ini
+      - ThirdParty/dependencies.ini
+      - ThirdParty/lua
+      - ThirdParty/miniz
+      - ThirdParty/minilzo
 
 permissions:
   contents: read

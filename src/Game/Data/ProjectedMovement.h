@@ -76,8 +76,7 @@ inline PointEx getEffectProjectedMovementVector(Point flyingDirection)
 
 inline float getEffectProjectedMovementAngle(Point flyingDirection)
 {
-	// Animation directions are spaced before the map's 2:1 projection.
-	// flyingDirection already has that projection removed by its producers.
+	// Tile stepping uses the direction before the map's 2:1 projection.
 	return std::atan2(-(float)flyingDirection.x, (float)flyingDirection.y);
 }
 

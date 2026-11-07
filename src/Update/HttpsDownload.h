@@ -51,9 +51,9 @@ using HttpsDownloadProgress =
 	std::function<bool(std::uint64_t transferredBytes,
 		std::uint64_t expectedBytes)>;
 
-// Builds an artifact URL relative to the catalog file. The catalog URL must be
-// a plain HTTPS URL without a query or fragment. Artifact paths use the strict
-// relative paths accepted by OnlineUpdateCatalog.
+// Builds an artifact URL beside a catalog file, or below a directory URL ending
+// in '/'. The URL must be plain HTTPS without a query or fragment. Artifact paths
+// use the strict relative paths accepted by OnlineUpdateCatalog.
 bool buildHttpsArtifactUrl(
 	const std::string& catalogUrl,
 	const std::string& artifactPath,

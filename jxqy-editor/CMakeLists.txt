@@ -1084,6 +1084,10 @@ if(BUILD_TESTING)
     )
     add_test(NAME jxqy-editor-magic-editor-tests
         COMMAND jxqy-editor-magic-editor-tests)
+    add_test(NAME jxqy-editor-magic-document-tests
+        COMMAND jxqy-editor-magic-editor-tests --document)
+    set_tests_properties(jxqy-editor-magic-document-tests PROPERTIES
+        TIMEOUT 30)
     set_tests_properties(jxqy-editor-magic-editor-tests PROPERTIES
         RUN_SERIAL TRUE
         TIMEOUT 120

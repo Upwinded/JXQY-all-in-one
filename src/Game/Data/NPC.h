@@ -731,7 +731,7 @@ public:
 	void releaseMagicWhenBeAttacked(std::shared_ptr<Magic> magic, int magicDirection, const Effect& effect);
 	void triggerMagicWhenBeAttacked(const Effect& effect);
 	void triggerMagicWhenDeath();
-	int calculateEffectDamage(std::shared_ptr<Effect> effect);
+	int calculateEffectDamage(std::shared_ptr<Effect> effect, bool evaded = false);
 	int getShieldEffectAmount(const Effect& shield, int channel = 0);
 	int applyCriticalDamageFromEffect(const std::shared_ptr<Effect>& effect, int damage, bool* wasCritical = nullptr);
 	void applyEffectManaDamage(std::shared_ptr<Effect> effect);

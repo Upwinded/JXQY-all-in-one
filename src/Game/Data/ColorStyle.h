@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "../../Engine/ImageTypes.h"
+#include "../../Types/ElementTypes.h"
 
 class Engine;
 
@@ -27,5 +28,7 @@ namespace ColorStyle
 		int x,
 		int y,
 		std::uint32_t colorStyle,
-		std::uint8_t alpha = 255);
+		std::uint8_t alpha = 255,
+		float angle = 0.0f,
+		const PointEx* center = nullptr);
 }

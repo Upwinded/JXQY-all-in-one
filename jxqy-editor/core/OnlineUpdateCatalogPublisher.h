@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QString>
+#include <QStringList>
+#include <QMap>
 
 class OnlineUpdateCatalogPublisher
 {
@@ -24,6 +26,8 @@ public:
         QString detail;
         QString catalogPath;
         qsizetype artifactCount = 0;
+        // Empty Release ID denotes artifacts beside the primary catalog.
+        QMap<QString, QStringList> artifactsByRelease;
 
         bool succeeded() const
         {

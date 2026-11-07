@@ -7,6 +7,7 @@ namespace AndroidProgramUpdate
 	// Returns getExternalFilesDir(DIRECTORY_DOWNLOADS) + "/updates".
 	// The application-specific directory needs no public-storage permission.
 	std::string getApplicationUpdateDirectoryPath();
+	bool clearDownloadCache();
 
 	// Asks Android PackageInstaller to install the already downloaded APK.
 	// The system still presents its normal user confirmation UI.

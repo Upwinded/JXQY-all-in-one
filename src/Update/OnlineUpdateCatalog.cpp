@@ -484,7 +484,7 @@ bool validateDependencyGraph(OnlineUpdate::CatalogParseResult& result)
 	return true;
 }
 
-bool isPlainHttpsCatalogUrl(std::string_view url)
+bool isPlainHttpsCatalogUrl(std::string_view url, bool requireDirectory = false)
 {
 	constexpr std::string_view Scheme = "https://";
 	if (url.size() <= Scheme.size() || url.size() > 4096 ||
@@ -497,7 +497,8 @@ bool isPlainHttpsCatalogUrl(std::string_view url)
 		return false;
 	}
 	const std::size_t pathStart = url.find('/', Scheme.size());
-	if (pathStart == std::string_view::npos || pathStart + 1 >= url.size())
+	if (pathStart == std::string_view::npos
+		|| (requireDirectory ? url.back() != '/' : pathStart + 1 >= url.size()))
 	{
 		return false;
 	}
@@ -516,7 +517,8 @@ bool isPlainHttpsCatalogUrl(std::string_view url)
 
 bool parseCatalogUrlList(
 	const std::string& text,
-	std::vector<std::string>& urls)
+	std::vector<std::string>& urls,
+	bool requireDirectory = false)
 {
 	urls.clear();
 	if (trimAscii(text).empty())
@@ -525,7 +527,7 @@ bool parseCatalogUrlList(
 	}
 	for (std::string url : splitCommaList(text))
 	{
-		if (!isPlainHttpsCatalogUrl(url))
+		if (!isPlainHttpsCatalogUrl(url, requireDirectory))
 		{
 			urls.clear();
 			return false;
@@ -578,6 +580,12 @@ bool isValidOnlineGameId(std::string_view gameId)
 		}
 	}
 	return true;
+}
+
+bool isValidReleaseId(std::string_view releaseId)
+{
+	return isValidOnlineGameId(releaseId)
+		&& ResourcePathSafety::isSafeInstallDirectoryName(std::string(releaseId));
 }
 
 bool isSafeArtifactPath(std::string_view path) noexcept
@@ -698,6 +706,36 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 
 	const std::vector<std::string> sectionNames =
 		readSectionNamesInOrder(text);
+	std::size_t releaseCount = 0;
+	for (const std::string& section : sectionNames)
+	{
+		constexpr std::string_view ReleasePrefix = "Release.";
+		if (!startsWithAsciiCaseInsensitive(section, ReleasePrefix))
+		{
+			continue;
+		}
+		if (++releaseCount > MaximumResourcePackageCount)
+		{
+			appendIssue(result, CatalogParseError::TooManyPackages, "Catalog", "Release sections");
+			break;
+		}
+		const std::string releaseId = foldAscii(section.substr(ReleasePrefix.size()));
+		if (!isValidReleaseId(releaseId))
+		{
+			appendIssue(result, CatalogParseError::InvalidRelease, section, "Release", releaseId);
+			continue;
+		}
+		std::vector<std::string> baseUrls;
+		const std::string text = ini.get(section, "ArtifactBaseUrls", "");
+		if (!parseCatalogUrlList(text, baseUrls, true) || baseUrls.empty())
+		{
+			appendIssue(result, CatalogParseError::InvalidList, section, "ArtifactBaseUrls", text);
+		}
+		if (!result.catalog.releaseBaseUrls.emplace(releaseId, std::move(baseUrls)).second)
+		{
+			appendIssue(result, CatalogParseError::DuplicateIdentifier, section, "Release", releaseId);
+		}
+	}
 	std::string commonSection;
 	for (const std::string& section : sectionNames)
 	{
@@ -769,6 +807,12 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 
 		ResourcePackage package;
 		package.gameId = gameId;
+		package.releaseId = foldAscii(trimAscii(ini.get(section, "Release", "")));
+		if (!package.releaseId.empty() &&
+			result.catalog.releaseBaseUrls.find(package.releaseId) == result.catalog.releaseBaseUrls.end())
+		{
+			appendIssue(result, CatalogParseError::InvalidRelease, section, "Release", package.releaseId);
+		}
 		package.installDirectory = trimAscii(ini.get(section, "InstallDirectory", ""));
 		if (!package.installDirectory.empty() &&
 			!ResourcePathSafety::isSafeInstallDirectoryName(package.installDirectory))
@@ -807,6 +851,14 @@ CatalogParseResult parseCatalog(const char* data, std::size_t length)
 		parseVersionField(result, section, "MinimumEngineVersion",
 			package.minimumEngineVersionText,
 			package.minimumEngineVersion);
+		const ModRelease::SemanticVersion firstMultiReleaseVersion{1, 2, 3};
+		if (!package.releaseId.empty() && ModRelease::compareSemanticVersionPrecedence(
+			package.minimumEngineVersion, firstMultiReleaseVersion) < 0)
+		{
+			// Older Schema 1 clients ignore Release and must stop before building its URL.
+			appendIssue(result, CatalogParseError::InvalidVersion, section,
+				"MinimumEngineVersion", package.minimumEngineVersionText);
+		}
 		parseArtifactFields(result, ini, section, package.artifactPath,
 			package.artifactSize, package.crc32Hex);
 		parseIncrementalArtifactFields(

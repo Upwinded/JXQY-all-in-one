@@ -473,6 +473,11 @@ int Game::run()
 		return -1;
 	}
 
+	if (!editorRunMode)
+	{
+		ResourceSelectScene::cleanupProgramUpdateCacheAtStartup();
+	}
+
 	if (!resourcePackIdArg.empty())
 	{
 		ModRelease::CompatibilityResult compatibility;

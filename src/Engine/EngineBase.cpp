@@ -1812,7 +1812,7 @@ _shared_cursor EngineBase::createNativeAnimatedCursor(
 #endif
 }
 
-void EngineBase::drawImage(_shared_image image, int x, int y)
+void EngineBase::drawImage(_shared_image image, int x, int y, float angle, const PointEx* center)
 {
 	if (image == nullptr)
 	{
@@ -1829,7 +1829,15 @@ void EngineBase::drawImage(_shared_image image, int x, int y)
 	d.y = y;
 	d.w = w;
 	d.h = h;
-	drawImage(image, nullptr, &d);
+	if (angle == 0.0f)
+	{
+		drawImage(image, nullptr, &d);
+	}
+	else
+	{
+		Rect destination = {d.x, d.y, d.w, d.h};
+		drawImageEx(image, nullptr, &destination, angle, center);
+	}
 }
 
 void EngineBase::drawImage(_shared_image image, Rect * rect)
@@ -1866,7 +1874,7 @@ void EngineBase::drawImage(_shared_image image, Rect * src, Rect * dst)
 	drawImage(image, pSourceRect, pDestRect);
 }
 
-void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center)
+void EngineBase::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, const PointEx* center)
 {
 	if (image == nullptr ||
 		!canPrepareRenderFrame())
@@ -2460,18 +2468,18 @@ void EngineBase::setImageColorMode(_shared_image image, unsigned char r, unsigne
 	SDL_SetTextureColorMod(image.get(), r, g, b);
 }
 
-void EngineBase::drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b)
+void EngineBase::drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, float angle, const PointEx* center)
 {
 	if (image == nullptr)
 	{
 		return;
 	}
 	SDL_SetTextureColorMod(image.get(), r, g, b);
-	drawImage(image, x, y);
+	drawImage(image, x, y, angle, center);
 	SDL_SetTextureColorMod(image.get(), 255, 255, 255);
 }
 
-void EngineBase::drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode)
+void EngineBase::drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode, float angle, const PointEx* center)
 {
 	if (image == nullptr)
 	{
@@ -2484,7 +2492,7 @@ void EngineBase::drawImageWithBlendAlpha(_shared_image image, int x, int y, unsi
 
 	SDL_SetTextureBlendMode(image.get(), blendMode);
 	SDL_SetTextureAlphaMod(image.get(), alpha);
-	drawImage(image, x, y);
+	drawImage(image, x, y, angle, center);
 
 	SDL_SetTextureBlendMode(image.get(), oldBlendMode);
 	SDL_SetTextureAlphaMod(image.get(), oldAlpha);

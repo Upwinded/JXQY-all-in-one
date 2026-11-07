@@ -1483,6 +1483,50 @@ ResourceSelectScene::~ResourceSelectScene()
 	freeResource();
 }
 
+void ResourceSelectScene::cleanupProgramUpdateCacheAtStartup()
+{
+#if !defined(__ANDROID__)
+	(void)cleanupProgramUpdateCache();
+#endif
+}
+
+bool ResourceSelectScene::cleanupProgramUpdateCache()
+{
+#if defined(__ANDROID__)
+	return AndroidProgramUpdate::clearDownloadCache();
+#elif defined(__APPLE__) && !TARGET_OS_IOS
+	return MacProgramUpdate::cleanupDownloadCache();
+#elif defined(_WIN32) || (defined(__linux__) && !defined(__ANDROID__))
+	DesktopProgramUpdatePaths paths;
+	if (!resolveDesktopProgramUpdatePaths(paths))
+	{
+		return false;
+	}
+	std::error_code error;
+	if (!std::filesystem::exists(paths.workspacePath, error) && !error)
+	{
+		return true;
+	}
+	if (error || !isPlainDirectory(paths.binRoot) || !isPlainDirectory(paths.workspacePath) ||
+		!removePlainOwnedDirectoryIfPresent(paths.workspacePath / "download"))
+	{
+		GameLog::write("Program update: startup cache cleanup failed\n");
+		return false;
+	}
+	// The helper may still need the previous version to finish or recover a switch.
+	if (std::filesystem::exists(paths.previousPath, error) || error)
+	{
+		return !error;
+	}
+	if (!removePlainOwnedDirectoryIfPresent(paths.workspacePath))
+	{
+		GameLog::write("Program update: startup cache cleanup failed\n");
+		return false;
+	}
+#endif
+	return true;
+}
+
 void ResourceSelectScene::freeResource()
 {
 	controllerPromptTextureCache.itemTextTextures.clear();
@@ -1522,6 +1566,7 @@ void ResourceSelectScene::freeResource()
 	}
 	displaySettingsApplyButton = nullptr;
 	displaySettingsDefaultButton = nullptr;
+	displaySettingsClearCacheButton = nullptr;
 	displaySettingsBackButton = nullptr;
 	cheatHelpCloseButton = nullptr;
 	externalResourceConfirmButton = nullptr;
@@ -1728,6 +1773,15 @@ void ResourceSelectScene::createControls()
 	displaySettingsDefaultButton->visible = false;
 	displaySettingsDefaultButton->activated = false;
 	addChild(displaySettingsDefaultButton);
+
+	displaySettingsClearCacheButton = std::make_shared<FlatTextButton>();
+	displaySettingsClearCacheButton->name = "display-settings-clear-cache";
+	displaySettingsClearCacheButton->setFontSize(18);
+	displaySettingsClearCacheButton->setUTF8Str(u8"清理缓存");
+	displaySettingsClearCacheButton->setStyle(makeHeaderActionButtonStyle());
+	displaySettingsClearCacheButton->visible = false;
+	displaySettingsClearCacheButton->activated = false;
+	addChild(displaySettingsClearCacheButton);
 
 	displaySettingsBackButton = std::make_shared<FlatTextButton>();
 	displaySettingsBackButton->name = "display-settings-back";
@@ -6474,9 +6528,14 @@ void ResourceSelectScene::configureFocus()
 		{ "display-settings-actions", 0, 1 },
 		[this]() { resetPendingDisplaySettings(); });
 	focusManager.addNode(
+		"display-settings-clear-cache",
+		displaySettingsClearCacheButton,
+		{ "display-settings-actions", 0, 2 },
+		[this]() { clearDownloadCache(); });
+	focusManager.addNode(
 		"display-settings-back",
 		displaySettingsBackButton,
-		{ "display-settings-actions", 0, 2 },
+		{ "display-settings-actions", 0, 3 },
 		[this]() { hideDisplaySettings(true); });
 	focusManager.addNode(
 		"cheat-help-close",
@@ -7459,6 +7518,69 @@ void ResourceSelectScene::resetPendingDisplaySettings()
 	setDisplaySettingsControlsVisible(true);
 }
 
+void ResourceSelectScene::clearDownloadCache()
+{
+	if (!displaySettingsVisible)
+	{
+		return;
+	}
+	if (resourceInstallRunner != nullptr ||
+		resourceInstallDialogState != ResourceInstallDialogState::Hidden)
+	{
+		displaySettingsStatusText = u8"请先结束下载或安装，再清理缓存";
+		return;
+	}
+	bool cleared = true;
+	try
+	{
+		const auto root = std::filesystem::u8path(
+			ResourceManager::instance().getWritableResourceCollectionRoot());
+		const auto updateDirectory = OnlineUpdate::resourceUpdateDirectoryPath(root);
+		std::error_code error;
+		const bool exists = std::filesystem::exists(updateDirectory, error);
+		if (root.empty() || !isPlainDirectory(root) || error ||
+			(exists && !isPlainDirectory(updateDirectory)))
+		{
+			cleared = false;
+		}
+		else if (exists)
+		{
+			cleared = removePlainOwnedDirectoryIfPresent(updateDirectory / "downloads");
+			const auto workspace = OnlineUpdate::resourceUpdateWorkspacePath(root);
+			bool pendingTransaction = false;
+			for (const char* marker : { "install.ini", "install.ini.tmp", "previous" })
+			{
+				if (std::filesystem::exists(workspace / marker, error) || error)
+				{
+					pendingTransaction = true;
+					break;
+				}
+			}
+			if (pendingTransaction)
+			{
+				cleared = false;
+			}
+			else
+			{
+				cleared = removePlainOwnedDirectoryIfPresent(workspace) && cleared;
+			}
+			if (std::filesystem::is_empty(updateDirectory, error) && !error)
+			{
+				std::filesystem::remove(updateDirectory, error);
+			}
+			cleared = !error && cleared;
+		}
+	}
+	catch (const std::exception&)
+	{
+		cleared = false;
+	}
+	cleared = cleanupProgramUpdateCache() && cleared;
+	displaySettingsStatusText = cleared
+		? u8"缓存已清理，下载将重新开始"
+		: u8"部分缓存清理失败，请结束更新后重试";
+}
+
 void ResourceSelectScene::setDisplaySettingsControlsVisible(bool visible)
 {
 	for (int row = 0; row < DisplaySettingsRowCount; row++)
@@ -7488,7 +7610,7 @@ void ResourceSelectScene::setDisplaySettingsControlsVisible(bool visible)
 		}
 	}
 	for (const auto& button :
-		{ displaySettingsApplyButton, displaySettingsDefaultButton,
+		{ displaySettingsApplyButton, displaySettingsDefaultButton, displaySettingsClearCacheButton,
 			displaySettingsBackButton })
 	{
 		if (button != nullptr)
@@ -7904,7 +8026,7 @@ Rect ResourceSelectScene::getDisplaySettingsApplyButtonRect() const
 {
 	const int gap = 10;
 	const int buttonWidth = std::max(1,
-		(contentWidth - gap * 2) / 3);
+		(contentWidth - gap * 3) / 4);
 	return
 	{
 		panelX + panelPadding,
@@ -7922,6 +8044,13 @@ Rect ResourceSelectScene::getDisplaySettingsDefaultButtonRect() const
 }
 
 Rect ResourceSelectScene::getDisplaySettingsBackButtonRect() const
+{
+	Rect result = getDisplaySettingsClearCacheButtonRect();
+	result.x += result.w + 10;
+	return result;
+}
+
+Rect ResourceSelectScene::getDisplaySettingsClearCacheButtonRect() const
 {
 	Rect result = getDisplaySettingsDefaultButtonRect();
 	result.x += result.w + 10;
@@ -7954,6 +8083,10 @@ void ResourceSelectScene::updateDisplaySettingsControlLayout()
 	if (displaySettingsBackButton != nullptr)
 	{
 		displaySettingsBackButton->rect = getDisplaySettingsBackButtonRect();
+	}
+	if (displaySettingsClearCacheButton != nullptr)
+	{
+		displaySettingsClearCacheButton->rect = getDisplaySettingsClearCacheButtonRect();
 	}
 }
 
@@ -8879,10 +9012,10 @@ void ResourceSelectScene::drawDisplaySettingsPage()
 			fontSize, 0xFFFFFFFF, valueRect.w - 10, 13);
 	}
 
-	if (!displaySettingsStatusText.empty())
 	{
 		const Rect applyRect = getDisplaySettingsApplyButtonRect();
-		drawCenteredText(displaySettingsStatusText,
+		drawCenteredText(displaySettingsStatusText.empty()
+				? u8"清理缓存会删除安装包和未完成下载" : displaySettingsStatusText,
 			panelX + panelWidth / 2, applyRect.y - 29,
 			16,
 			displaySettingsStatusText.find(u8"失败") != std::string::npos
@@ -10101,6 +10234,11 @@ void ResourceSelectScene::onChildCallBack(PElement child)
 	if (child == displaySettingsBackButton)
 	{
 		hideDisplaySettings(false);
+		return;
+	}
+	if (child == displaySettingsClearCacheButton)
+	{
+		clearDownloadCache();
 		return;
 	}
 	if (child == cheatHelpCloseButton)

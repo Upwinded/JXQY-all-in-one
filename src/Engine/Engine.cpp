@@ -580,10 +580,10 @@ void Engine::drawFPSWithoutLock()
 #endif // _DRAW_FPS
 }
 
-void Engine::drawImage(_shared_image image, int x, int y)
+void Engine::drawImage(_shared_image image, int x, int y, float angle, const PointEx* center)
 {
 	ConditionalLock locker(_mutex, multiThreadedMode);
-	EngineBase::drawImage(image, x, y);
+	EngineBase::drawImage(image, x, y, angle / 3.14159265 * 180, center);
 }
 
 void Engine::drawImage(_shared_image image, Rect* src, Rect* dst)
@@ -592,7 +592,7 @@ void Engine::drawImage(_shared_image image, Rect* src, Rect* dst)
 	EngineBase::drawImage(image, src, dst);
 }
 
-void Engine::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center)
+void Engine::drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, const PointEx* center)
 {
 	ConditionalLock locker(_mutex, multiThreadedMode);
 	EngineBase::drawImageEx(image, src, dst, angle / 3.14159265 * 180, center);
@@ -618,10 +618,10 @@ void Engine::drawAspectFitImage(
 		pointerRipples);
 }
 
-void Engine::drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha)
+void Engine::drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha, float angle, const PointEx* center)
 {
 	setImageAlpha(image, alpha);
-	drawImage(image, x, y);
+	drawImage(image, x, y, angle, center);
 	setImageAlpha(image, 255);
 }
 
@@ -632,10 +632,10 @@ void Engine::drawImageWithAlpha(_shared_image image, Rect * src, Rect * dst, uns
 	setImageAlpha(image, 255);
 }
 
-void Engine::drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b)
+void Engine::drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, float angle, const PointEx* center)
 {
 	ConditionalLock locker(_mutex, multiThreadedMode);
-	EngineBase::drawImageWithColor(image, x, y, r, g, b);
+	EngineBase::drawImageWithColor(image, x, y, r, g, b, angle / 3.14159265 * 180, center);
 }
 
 void Engine::drawImageWithColor(_shared_image image, Rect * src, Rect * dst, unsigned char r, unsigned char g, unsigned char b)
@@ -980,10 +980,10 @@ void Engine::setImageAlpha(_shared_image image, unsigned char a)
 	EngineBase::setImageAlpha(image, a);
 }
 
-void Engine::drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode)
+void Engine::drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode, float angle, const PointEx* center)
 {
 	ConditionalLock locker(_mutex, multiThreadedMode);
-	EngineBase::drawImageWithBlendAlpha(image, x, y, alpha, blendMode);
+	EngineBase::drawImageWithBlendAlpha(image, x, y, alpha, blendMode, angle / 3.14159265 * 180, center);
 }
 
 void Engine::setScreenMask(unsigned char r, unsigned char g, unsigned char b, unsigned char a)

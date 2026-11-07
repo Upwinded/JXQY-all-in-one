@@ -129,9 +129,9 @@ public:
 	bool pointInImage(_shared_image image, int x, int y);
 	_shared_image createNewImageFromImage(_shared_image image);
 	_shared_image getGrayscaleImage(_shared_image image);
-	void drawImage(_shared_image image, int x, int y);
+	void drawImage(_shared_image image, int x, int y, float angle = 0.0f, const PointEx* center = nullptr);
 	void drawImage(_shared_image image, Rect* src, Rect* dst);
-	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center);
+	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, const PointEx* center);
 	void drawAspectFitImage(
 		_shared_image image,
 		const Rect& sourceRect,
@@ -140,13 +140,13 @@ public:
 		std::uint8_t alpha = 255,
 		UTime mirroredBarsAnimationTime = 0,
 		const std::vector<AspectFitPointerRipple>* pointerRipples = nullptr);
-	void drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha);
+	void drawImageWithAlpha(_shared_image image, int x, int y, unsigned char alpha, float angle = 0.0f, const PointEx* center = nullptr);
 	void drawImageWithAlpha(_shared_image image, Rect *src, Rect * dst, unsigned char alpha);
-	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
+	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, float angle = 0.0f, const PointEx* center = nullptr);
 	void drawImageWithColor(_shared_image image, Rect* src, Rect* dst, unsigned char r, unsigned char g, unsigned char b);
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
 	void setImageAlpha(_shared_image image, unsigned char a);
-	void drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode);
+	void drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode, float angle = 0.0f, const PointEx* center = nullptr);
 	//void freeImage(_image image);
 	bool getImageSize(_shared_image image, int &w, int &h);
 	bool getImageContentBounds(_shared_image image, Rect& bounds, bool ignoreBlack);

@@ -542,6 +542,7 @@ void Magic::reset()
 	icon = "";
 
 	flyingImage = "";
+	flyingImageDirectionCompensation = true;
 	flyingSound = "";
 	vanishImage = "";
 	vanishSound = "";
@@ -792,6 +793,7 @@ void Magic::initFromIniWithContext(
 		image = ini.Get(section, "Image", "");
 		icon = ini.Get(section, "Icon", "");
 		flyingImage = ini.Get(section, "FlyingImage", "");
+		flyingImageDirectionCompensation = ini.GetInteger(section, "FlyingImageDirectionCompensation", 1) != 0;
 		flyingSound = ini.Get(section, "FlyingSound", "");
 		vanishImage = ini.Get(section, "VanishImage", "");
 		vanishSound = ini.Get(section, "VanishSound", "");
@@ -3599,6 +3601,7 @@ void Magic::copy(Magic & magic)
 	copyData(image);
 	copyData(icon);
 	copyData(flyingImage);
+	copyData(flyingImageDirectionCompensation);
 	copyData(flyingSound);
 	copyData(vanishImage);
 	copyData(vanishSound);

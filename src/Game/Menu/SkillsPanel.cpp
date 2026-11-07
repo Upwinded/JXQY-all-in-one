@@ -297,7 +297,7 @@ void SkillsPanel::drawIndicate(Point pos)
 	// edge at the player and rotate by half a turn so the arrowhead marks the
 	// selected destination instead of pointing back toward the player.
 	dest.y = playerPos.y - dest.h;
-	Point center;
+	PointEx center;
 	center.x = w / 2;
 	center.y = dest.h;
 	engine->drawImageEx(

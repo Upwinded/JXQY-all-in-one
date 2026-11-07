@@ -426,9 +426,8 @@ DesktopProgramUpdateResult applyDesktopProgramUpdate(
 		result.filesystemPath = stagingRoot;
 		return result;
 	}
-	const bool workspaceRemoved =
-		std::filesystem::remove(workspacePath, error);
-	if (error || !workspaceRemoved)
+	std::filesystem::remove(workspacePath, error);
+	if (error)
 	{
 		result.status = DesktopProgramUpdateStatus::CleanupFailed;
 		result.filesystemPath = workspacePath;

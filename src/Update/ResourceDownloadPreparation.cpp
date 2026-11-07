@@ -9,6 +9,23 @@
 
 namespace
 {
+std::string downloadUrlOrigin(std::string url)
+{
+	const auto path = url.find('/', sizeof("https://") - 1);
+	if (path != std::string::npos)
+	{
+		url.resize(path);
+	}
+	for (char& character : url)
+	{
+		if (character >= 'A' && character <= 'Z')
+		{
+			character = static_cast<char>(character + ('a' - 'A'));
+		}
+	}
+	return url;
+}
+
 std::filesystem::path partialArtifactPath(const std::filesystem::path& directory,
 	std::uint64_t size, const std::string& crc32)
 {
@@ -92,7 +109,8 @@ OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
 	const OnlineUpdate::HttpsDownloadProgress& progress,
 	OnlineUpdate::HttpsDownloadResult& downloadResult,
 	const std::filesystem::path& partialDownloadDirectory = {},
-	bool allowFullRestart = true)
+	bool allowFullRestart = true,
+	const std::vector<std::string>& artifactBaseUrls = {})
 {
 	using PreparationStatus =
 		OnlineUpdate::ResourceDownloadPreparationStatus;
@@ -101,6 +119,14 @@ OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
 	{
 		return PreparationStatus::InvalidInput;
 	}
+	std::vector<std::string> releaseSources = artifactBaseUrls;
+	if (!releaseSources.empty())
+	{
+		const std::string preferredOrigin = downloadUrlOrigin(catalogSources.catalogUrls.front());
+		std::stable_partition(releaseSources.begin(), releaseSources.end(),
+			[&preferredOrigin](const std::string& url) { return downloadUrlOrigin(url) == preferredOrigin; });
+	}
+	const auto& artifactSources = releaseSources.empty() ? catalogSources.catalogUrls : releaseSources;
 	std::filesystem::path transferPath = destinationPath;
 	if (!partialDownloadDirectory.empty())
 	{
@@ -122,9 +148,9 @@ OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
 	PreparationStatus failure = PreparationStatus::DownloadFailed;
 	bool rangeRejected = false;
 	for (std::size_t mirrorIndex = 0;
-		mirrorIndex < catalogSources.catalogUrls.size(); mirrorIndex++)
+		mirrorIndex < artifactSources.size(); mirrorIndex++)
 	{
-		if (mirrorIndex != 0)
+		if (mirrorIndex != 0 && artifactBaseUrls.empty())
 		{
 			if (catalogSources.catalogBytes.empty())
 			{
@@ -164,7 +190,7 @@ OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
 		}
 		std::string artifactUrl;
 		if (!OnlineUpdate::buildHttpsArtifactUrl(
-				catalogSources.catalogUrls[mirrorIndex], artifactPath, artifactUrl))
+				artifactSources[mirrorIndex], artifactPath, artifactUrl))
 		{
 			return PreparationStatus::InvalidArtifactUrl;
 		}
@@ -231,7 +257,7 @@ OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
 				rangeRejected = rangeRejected || (!error && size > 0);
 			}
 		}
-		if ((partialDownloadDirectory.empty() && mirrorIndex + 1 < catalogSources.catalogUrls.size()) ||
+		if ((partialDownloadDirectory.empty() && mirrorIndex + 1 < artifactSources.size()) ||
 			failure == PreparationStatus::ArtifactValidationFailed ||
 			downloadResult.status == DownloadStatus::SizeLimitExceeded)
 		{
@@ -253,7 +279,7 @@ OnlineUpdate::ResourceDownloadPreparationStatus downloadArtifactFromMirrors(
 		}
 		return downloadArtifactFromMirrors(catalogSources, artifactPath, destinationPath,
 			artifactSize, expectedCrc32, download, catalogDownloader, progress, downloadResult,
-			partialDownloadDirectory, false);
+			partialDownloadDirectory, false, artifactBaseUrls);
 	}
 	return failure;
 }
@@ -497,6 +523,15 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 			plan.downloadOrder[packageIndex];
 		const ResourcePackage& package = *item.package;
 		result.failedGameId = package.gameId;
+		const auto release = catalog.releaseBaseUrls.find(foldGameId(package.releaseId));
+		if (!package.releaseId.empty() &&
+			(release == catalog.releaseBaseUrls.end() || release->second.empty()))
+		{
+			result.status = ResourceDownloadPreparationStatus::InvalidArtifactUrl;
+			return cleanupFailure(std::move(result));
+		}
+		const std::vector<std::string> primaryRelease;
+		const auto& artifactBaseUrls = package.releaseId.empty() ? primaryRelease : release->second;
 		ResourceDownloadPreparationProgress currentProgress;
 		currentProgress.packageIndex = packageIndex;
 		currentProgress.packageCount = plan.downloadOrder.size();
@@ -547,6 +582,7 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 		}
 		const auto downloadArtifact =
 			[&catalogSources,
+				&artifactBaseUrls,
 				&catalogDownloader,
 				&download,
 				&partialDownloadDirectory,
@@ -609,7 +645,7 @@ ResourceDownloadPreparationResult prepareResourceDownload(
 							return false;
 						}
 					},
-				result.downloadResult, partialDownloadDirectory);
+				result.downloadResult, partialDownloadDirectory, true, artifactBaseUrls);
 			return result.status ==
 				ResourceDownloadPreparationStatus::Success;
 		};

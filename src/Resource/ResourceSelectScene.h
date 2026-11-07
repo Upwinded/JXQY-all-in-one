@@ -40,6 +40,7 @@ public:
 	ResourceSelectScene();
 	virtual ~ResourceSelectScene();
 
+	static void cleanupProgramUpdateCacheAtStartup();
 	void freeResource();
 	virtual void onChildCallBack(PElement child) override;
 
@@ -241,6 +242,8 @@ private:
 	void cycleDisplaySetting(int row, int offset);
 	void applyPendingDisplaySettings();
 	void resetPendingDisplaySettings();
+	void clearDownloadCache();
+	static bool cleanupProgramUpdateCache();
 	void setDisplaySettingsControlsVisible(bool visible);
 	void updateDisplaySettingsControlLayout();
 	int firstDisplaySettingsRow() const;
@@ -259,6 +262,7 @@ private:
 	Rect getDisplaySettingsNextButtonRect(int row) const;
 	Rect getDisplaySettingsApplyButtonRect() const;
 	Rect getDisplaySettingsDefaultButtonRect() const;
+	Rect getDisplaySettingsClearCacheButtonRect() const;
 	Rect getDisplaySettingsBackButtonRect() const;
 	int getDialogAvailableHeight() const;
 	Rect getCheatHelpDialogRect() const;
@@ -399,6 +403,7 @@ private:
 	std::string pendingFontId;
 	std::shared_ptr<FlatTextButton> displaySettingsApplyButton;
 	std::shared_ptr<FlatTextButton> displaySettingsDefaultButton;
+	std::shared_ptr<FlatTextButton> displaySettingsClearCacheButton;
 	std::shared_ptr<FlatTextButton> displaySettingsBackButton;
 	std::shared_ptr<FlatTextButton> cheatHelpCloseButton;
 	std::shared_ptr<FlatTextButton> externalResourceConfirmButton;

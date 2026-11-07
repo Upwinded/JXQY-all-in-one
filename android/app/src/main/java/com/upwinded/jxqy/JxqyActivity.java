@@ -12,9 +12,11 @@ import android.net.NetworkCapabilities;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.Settings;
+import android.util.Log;
 import android.widget.Toast;
 
 import java.io.File;
@@ -53,7 +55,8 @@ public class JxqyActivity extends SDLActivity
 	private static boolean allFilesAccessRequestCompleted = false;
 	private static boolean resourcePackageImportPending = false;
 	private static String resourcePackageImportResult = "";
-	private static File pendingProgramInstallFile = null;
+	private static volatile File pendingProgramInstallFile = null;
+	private static volatile boolean programPackageInstallRunning = false;
 
 	private static boolean beginResourcePackageImport()
 	{
@@ -475,6 +478,21 @@ public class JxqyActivity extends SDLActivity
 	}
 
 	@Override
+	protected void onCreate(Bundle savedInstanceState)
+	{
+		super.onCreate(savedInstanceState);
+		try
+		{
+			ProgramUpdateCleanup.deleteUpdatePackages(
+				getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS));
+		}
+		catch (Exception exception)
+		{
+			Log.w("jxqy-update", "Unable to clean program update cache", exception);
+		}
+	}
+
+	@Override
 	protected void onPause()
 	{
 		observeAllFilesAccessRequestDeparture();
@@ -639,6 +657,34 @@ public class JxqyActivity extends SDLActivity
 		}
 	}
 
+	public static boolean clearApplicationDownloadCache()
+	{
+		SDLActivity activity = mSingleton;
+		if (activity == null)
+		{
+			return false;
+		}
+		synchronized (ResourcePackageImportLock)
+		{
+			if (resourcePackageImportPending || pendingProgramInstallFile != null || programPackageInstallRunning)
+			{
+				return false;
+			}
+			try
+			{
+				ProgramUpdateCleanup.deleteUpdatePackages(
+					activity.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS));
+				ProgramUpdateCleanup.deleteCacheDirectory(activity.getCacheDir(), "resource-import");
+				return true;
+			}
+			catch (Exception exception)
+			{
+				Log.w("jxqy-update", "Unable to clear download cache", exception);
+				return false;
+			}
+		}
+	}
+
 	/**
 	 * 使用 PackageInstaller 请求安装应用专属更新目录中的 APK。
 	 * 返回 true 只表示请求已交给 UI 线程；系统仍会要求用户确认。
@@ -745,10 +791,18 @@ public class JxqyActivity extends SDLActivity
 				@Override
 				public void run()
 				{
-					commitProgramPackageInstall(activity, apkFile);
+					try
+					{
+						commitProgramPackageInstall(activity, apkFile);
+					}
+					finally
+					{
+						programPackageInstallRunning = false;
+					}
 				}
 			},
 			"jxqy-package-installer");
+		programPackageInstallRunning = true;
 		installerThread.start();
 	}
 

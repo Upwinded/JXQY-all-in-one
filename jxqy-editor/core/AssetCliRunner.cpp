@@ -684,6 +684,11 @@ int AssetCliRunner::run(const QStringList& arguments, FILE* stdoutFile, FILE* st
         }
         out << "Published catalog: " << result.catalogPath << "\n";
         out << "Artifacts: " << result.artifactCount << "\n";
+        for (auto release = result.artifactsByRelease.cbegin(); release != result.artifactsByRelease.cend(); ++release)
+        {
+            out << "Release " << (release.key().isEmpty() ? QStringLiteral("primary") : release.key())
+                << " (" << release.value().size() << "): " << release.value().join(", ") << "\n";
+        }
         if (!result.detail.isEmpty())
         {
             out << "Warning: " << result.detail << "\n";

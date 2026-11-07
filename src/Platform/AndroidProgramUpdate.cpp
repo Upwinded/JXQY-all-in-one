@@ -103,6 +103,26 @@ std::string getApplicationUpdateDirectoryPath()
 	return result;
 }
 
+bool clearDownloadCache()
+{
+	ActivityBinding binding;
+	if (!binding.initialize())
+	{
+		return false;
+	}
+	const jmethodID method = binding.environment->GetStaticMethodID(
+		binding.activityClass, "clearApplicationDownloadCache", "()Z");
+	if (clearPendingException(binding.environment, "GetStaticMethodID(clear download cache)") ||
+		method == nullptr)
+	{
+		return false;
+	}
+	const jboolean cleared = binding.environment->CallStaticBooleanMethod(
+		binding.activityClass, method);
+	return !clearPendingException(binding.environment, "CallStaticBooleanMethod(clear download cache)") &&
+		cleared != JNI_FALSE;
+}
+
 bool requestPackageInstall(const std::string& apkPath)
 {
 	if (apkPath.empty() ||
@@ -156,6 +176,7 @@ bool requestPackageInstall(const std::string& apkPath)
 namespace AndroidProgramUpdate
 {
 std::string getApplicationUpdateDirectoryPath() { return {}; }
+bool clearDownloadCache() { return false; }
 bool requestPackageInstall(const std::string&) { return false; }
 }
 

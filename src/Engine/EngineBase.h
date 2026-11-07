@@ -498,10 +498,10 @@ protected:
 		std::unique_ptr<char[]>& data);
 	_shared_surface loadSurfaceFromMem(std::unique_ptr<char[]>& data, int size);
 	_shared_image createImageFromSurface(Surface_t* surface);
-	void drawImage(_shared_image image, int x, int y);
+	void drawImage(_shared_image image, int x, int y, float angle = 0.0f, const PointEx* center = nullptr);
 	void drawImage(_shared_image image, Rect * rect);
 	void drawImage(_shared_image image, Rect * src, Rect * dst);
-	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, Point* center);
+	void drawImageEx(_shared_image image, Rect* src, Rect* dst, float angle, const PointEx* center);
 	void drawAspectFitImage(
 		_shared_image image,
 		const Rect& sourceRect,
@@ -513,8 +513,8 @@ protected:
 	//void freeImage(Image_t* image);
 	void setImageAlpha(_shared_image image, unsigned char a);
 	void setImageColorMode(_shared_image image, unsigned char r, unsigned char g, unsigned char b);
-	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b);
-	void drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode);
+	void drawImageWithColor(_shared_image image, int x, int y, unsigned char r, unsigned char g, unsigned char b, float angle = 0.0f, const PointEx* center = nullptr);
+	void drawImageWithBlendAlpha(_shared_image image, int x, int y, unsigned char alpha, SDL_BlendMode blendMode, float angle = 0.0f, const PointEx* center = nullptr);
 	bool getImageSize(_shared_image image, int& w, int& h);
 	bool getImageContentBounds(_shared_image image, Rect& bounds, bool ignoreBlack);
 

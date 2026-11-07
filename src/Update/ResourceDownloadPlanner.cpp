@@ -114,14 +114,18 @@ public:
 					chainStartIndex = 0;
 				}
 			}
-			const bool chainMatches = installed != installedArtifacts.end() &&
-				chainStartIndex == package.incrementalChain.size() &&
-				installed->second.incrementalChainCrc32s.size() ==
-					package.incrementalChain.size();
 			const bool legacyReceiptMatches =
 				installed != installedArtifacts.end() &&
 				installed->second.incrementalArtifactCrc32 ==
 					package.incrementalChain.back().crc32Hex;
+			// Offline imports record one ZIP, which covers a single-package chain.
+			const bool chainMatches = installed != installedArtifacts.end() &&
+				((chainStartIndex == package.incrementalChain.size() &&
+					installed->second.incrementalChainCrc32s.size() ==
+						package.incrementalChain.size()) ||
+					(package.incrementalChain.size() == 1 &&
+						installed->second.incrementalChainCrc32s.empty() &&
+						legacyReceiptMatches));
 			if (chainMatches && !legacyReceiptMatches)
 			{
 				chainStartIndex = package.incrementalChain.size() - 1;

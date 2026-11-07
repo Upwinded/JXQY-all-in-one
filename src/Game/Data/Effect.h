@@ -12,6 +12,12 @@
 
 inline constexpr int MaximumPersistedEffectCollectionCount = 4096;
 
+struct EffectImageRotation
+{
+	float angle = 0.0f;
+	PointEx center = {0.0f, 0.0f};
+};
+
 class NPC;
 class EffectTestAccess;
 class RageSystemTestAccess;
@@ -205,7 +211,7 @@ public:
 	int getDirection();
 
 	void draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colorStyle);
-	_shared_image loadImage(int * x, int * y);
+	_shared_image loadImage(int * x, int * y, EffectImageRotation* rotation = nullptr);
 	UTime getFlyinUTime();
 	UTime getFlyingImageTime();
 	UTime getExplodinUTime();

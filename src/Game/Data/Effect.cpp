@@ -3774,8 +3774,13 @@ void Effect::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colo
 {
 	Point tile = position;
 	Point pos = Map::getTilePosition(tile, cenTile, cenScreen, coffset);
-	int offsetX, offsetY;
-	_shared_image image = loadImage(&offsetX, &offsetY);
+	int offsetX = 0, offsetY = 0;
+	EffectImageRotation rotation;
+	_shared_image image = loadImage(&offsetX, &offsetY, &rotation);
+	if (image == nullptr)
+	{
+		return;
+	}
 	int offsetH = 0;
 	if (getMoveKind() == mmkThrow && doing == ekThrowing)
 	{
@@ -3791,11 +3796,11 @@ void Effect::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colo
 		if (magic.level[level].alphaBlend > 0)
 		{
 			engine->drawImageWithBlendAlpha(image, drawX,
-				drawY, 255, SDL_BLENDMODE_BLEND);
+				drawY, 255, SDL_BLENDMODE_BLEND, rotation.angle, &rotation.center);
 		}
 		else
 		{
-			engine->drawImage(image, drawX, drawY);
+			engine->drawImage(image, drawX, drawY, rotation.angle, &rotation.center);
 		}
 	}
 	else
@@ -3804,12 +3809,52 @@ void Effect::draw(Point cenTile, Point cenScreen, PointEx coffset, uint32_t colo
 		{
 			engine->setImageAlpha(image, 255);
 		}
-		ColorStyle::drawImage(engine, image, drawX, drawY, colorStyle);
+		ColorStyle::drawImage(engine, image, drawX, drawY, colorStyle, 255, rotation.angle, &rotation.center);
 	}
 }
 
-_shared_image Effect::loadImage(int * x, int * y)
+_shared_image Effect::loadImage(int * x, int * y, EffectImageRotation* rotation)
 {
+	if (rotation != nullptr)
+	{
+		*rotation = {};
+	}
+	auto loadFlightImage = [&](const _shared_imp& image, UTime time)
+	{
+		const PointEx screenDirection = getEffectProjectedMovementVector(flyingDirection);
+		const int imageDirection = flyingDirection.is_zero() || image == nullptr
+			? direction
+			: Magic::getDirection(std::atan2(-screenDirection.x, screenDirection.y), image->directions);
+		const int kind = getMoveKind();
+		const bool movingFlight = kind == mmkFly || kind == mmkFlyContinuous
+			|| kind == mmkCircle || kind == mmkHeartCircle || kind == mmkHelixCircle
+			|| kind == mmkSector || kind == mmkRandSector || kind == mmkMoveLine
+			|| kind == mmkFollow || kind == mmkThrow || kind == mmkVMove;
+		const auto* calibration = rotation != nullptr && movingFlight && speed > 0
+			&& !flyingDirection.is_zero() && magic.flyingImageDirectionCompensation
+			? IMP::prepareRotationCalibration(image) : nullptr;
+		int frameX = 0, frameY = 0;
+		auto texture = IMP::loadImageForDirection(image, imageDirection, time, &frameX, &frameY);
+		if (x != nullptr)
+		{
+			*x = frameX;
+		}
+		if (y != nullptr)
+		{
+			*y = frameY;
+		}
+		if (calibration != nullptr && imageDirection >= 0
+			&& imageDirection < static_cast<int>(calibration->directionAngleOffsets.size()))
+		{
+			constexpr double Pi = 3.14159265358979323846;
+			const double imageAngle = imageDirection * 2.0 * Pi / calibration->directionAngleOffsets.size()
+				+ calibration->directionAngleOffsets[imageDirection];
+			rotation->angle = static_cast<float>(std::remainder(
+				std::atan2(-screenDirection.x, screenDirection.y) - imageAngle, 2.0 * Pi));
+			rotation->center = {frameX + calibration->centerOffset.x, frameY + calibration->centerOffset.y};
+		}
+		return texture;
+	};
 	if (magic.level[level].moveKind == mmkSummon && !vanishing)
 	{
 		if (getTime() - beginTime < getFlyingImageTime())
@@ -3838,11 +3883,11 @@ _shared_image Effect::loadImage(int * x, int * y)
 	{
 		if (leapFlying && magic.leapImage != nullptr)
 		{
-			return IMP::loadImageForDirection(magic.leapImage, direction, getTime() - beginTime, x, y);
+			return loadFlightImage(magic.leapImage, getTime() - beginTime);
 		}
 		if (getMoveKind() == mmkThrow)
 		{
-			return IMP::loadImageForDirection(magic.explodeImage, direction, getTime() - beginTime, x, y);
+			return loadFlightImage(magic.explodeImage, getTime() - beginTime);
 		}
 		else
 		{
@@ -3851,7 +3896,7 @@ _shared_image Effect::loadImage(int * x, int * y)
 			const UTime imageTime = frameTimed && magic.flyImage != nullptr
 				? flightClock.animationFrame * ImageAnimationPlayback::effectiveFrameInterval(magic.flyImage->interval)
 				: getTime() - beginTime;
-			return IMP::loadImageForDirection(magic.flyImage, direction, imageTime, x, y);
+			return loadFlightImage(magic.flyImage, imageTime);
 		}		
 	}
 	else if (doing == ekSuperMode)
@@ -3860,7 +3905,7 @@ _shared_image Effect::loadImage(int * x, int * y)
 	}
 	else if (doing == ekThrowing)
 	{
-		return IMP::loadImageForDirection(magic.flyImage, direction, getTime() - beginTime, x, y);
+		return loadFlightImage(magic.flyImage, getTime() - beginTime);
 	}
 	else
 	{

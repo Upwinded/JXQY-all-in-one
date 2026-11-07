@@ -28,6 +28,12 @@ struct IMPFrame
 #define imgHeadLen 16
 #define imgHeadString "IMG File Ver1.0"
 
+struct ImageRotationCalibration
+{
+	PointEx centerOffset = {0.0f, 0.0f};
+	std::vector<float> directionAngleOffsets;
+};
+
 struct IMPImage
 {
 private:
@@ -43,6 +49,8 @@ public:
 	int interval = 1;
 	int imageNull[imageNullLen];
 	std::vector<IMPFrame> frame;
+	bool rotationCalibrationPrepared = false;
+	std::shared_ptr<const ImageRotationCalibration> rotationCalibration;
 };
 
 
@@ -80,6 +88,7 @@ public:
 	static void cropTransparentEdges(_shared_imp impImage);
 
 	static void copyIMPImage(_shared_imp dst, _shared_imp src);
+	static const ImageRotationCalibration* prepareRotationCalibration(_shared_imp image);
 	
 	static _shared_imp createIMPImage(const std::string& fileName, bool directlyLoad = Directly_Load);
 	static _shared_imp createIMPImageFromMem(std::unique_ptr<char[]>& data, int size, bool directlyLoad = Directly_Load);

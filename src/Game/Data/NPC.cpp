@@ -3265,16 +3265,17 @@ void NPC::hurtLife(int damage, bool ignoreDefense)
 	beginHurt();
 }
 
-int NPC::calculateEffectDamage(std::shared_ptr<Effect> effect)
+int NPC::calculateEffectDamage(std::shared_ptr<Effect> effect, bool evaded)
 {
 	if (effect == nullptr)
 	{
 		return 0;
 	}
 
-	int damage = effect->damage - getDefend();
-	int damage2 = effect->damage2 - getDefend2();
-	int damage3 = effect->damage3 - getDefend3();
+	const int powerDivisor = evaded ? 10 : 1;
+	int damage = effect->damage / powerDivisor - getDefend();
+	int damage2 = effect->damage2 / powerDivisor - getDefend2();
+	int damage3 = effect->damage3 / powerDivisor - getDefend3();
 
 	for (auto it = shieldEffects.begin(); it != shieldEffects.end(); )
 	{
@@ -5288,13 +5289,13 @@ void NPC::hurt(std::shared_ptr<Effect> e, int hitRoll)
 		triggerMagicWhenBeAttacked(*e);
 		return;
 	}
-	int damage = calculateEffectDamage(e);
 	int effectLevel = clampMagicLevelForNpc(e->level);
 	const int targetEvade = getEvade();
 #ifdef JXQY_ENABLE_TEST_HOOKS
 	if (testMagicHitRoll >= 0) hitRoll = testMagicHitRoll;
 #endif
 	if (hitRoll < 0) hitRoll = engine->getRand(99);
+	int damage = calculateEffectDamage(e, !isMagicDamageHit(e->evade, targetEvade, hitRoll));
 	bool handledSpecialEffect = false;
 	if (isMagicAbnormalStateHit(e->evade, targetEvade, hitRoll))
 	{
@@ -5302,98 +5303,88 @@ void NPC::hurt(std::shared_ptr<Effect> e, int hitRoll)
 		handledSpecialEffect = applyPreDamageMagicStatus(*e, effectLevel);
 	}
 
-	if (isMagicDamageHit(e->evade, targetEvade, hitRoll))
+	if (addexp)
 	{
-		if (addexp)
+		gm->magicManager.addHitExp(e, level);
+	}
+	bool wasCritical = false;
+	damage = applyCriticalDamageFromEffect(e, damage, &wasCritical);
+	applyEffectManaDamage(e);
+	if (invincible > 0 || isProtectedByCheatInvincibility())
+	{
+		damage = 0;
+	}
+	if (damage > 0 && shieldLife > 0)
+	{
+		if (damage > shieldLife)
 		{
-			gm->magicManager.addHitExp(e, level);
-		}
-		bool wasCritical = false;
-		damage = applyCriticalDamageFromEffect(e, damage, &wasCritical);
-		applyEffectManaDamage(e);
-		if (invincible > 0 || isProtectedByCheatInvincibility())
-		{
-			damage = 0;
-		}
-		if (damage > 0 && shieldLife > 0)
-		{
-			if (damage > shieldLife)
+			damage -= shieldLife;
+			shieldLife = 0;
+			if (auto shield = shieldEffect.lock())
 			{
-				damage -= shieldLife;
-				shieldLife = 0;
-				if (auto shield = shieldEffect.lock())
-				{
-					shield->vanishing = true;
-					shield->beginExplode(shield->position);
-				}
-				shieldEffect.reset();
+				shield->vanishing = true;
+				shield->beginExplode(shield->position);
 			}
-			else
-			{
-				shieldLife -= damage;
-				damage = 0;
-				triggerMagicWhenBeAttacked(*e);
-				return;
-			}
-		}
-		if (wasCritical && damage > 0)
-		{
-			showCriticalDamageTip(damage);
-		}
-
-		int restoreDamage = damage > life ? life : damage;
-		applyEffectRestore(e, restoreDamage);
-		if (damage >= life)
-		{
-			life = 0;
-			rememberDamageSource(e);
-			awardDefeatedNpcExperience(e);
-			handleDeath();
-			triggerMagicWhenBeAttacked(*e);
-			triggerMagicWhenKillEnemy(*e);
+			shieldEffect.reset();
 		}
 		else
 		{
-			addLife(-damage);
+			shieldLife -= damage;
+			damage = 0;
 			triggerMagicWhenBeAttacked(*e);
-			applyBounceFromEffect(*e);
-			applyBounceFlyFromEffect(*e);
-			if (!isNotFightBackWhenBeHit() && !(blindMilliseconds > 0 && kind != nkPlayer))
-			{
-				fightState.set(true);
-				rememberDamageSource(e);
-			}
-			int d;
-			if (e->flyingDirection.x != 0 || e->flyingDirection.y != 0)
-			{
-				d = getDirection(atan2(e->flyingDirection.x, -e->flyingDirection.y));
-			}
-			else
-			{
-				auto userPtr = e->user.lock();
-				if (userPtr)
-				{
-					d = getDirection(position, userPtr->position);
-				}
-				else
-				{
-					d = direction;
-				}
-			}
-			Point fd = gm->map->getSubPoint(position, d);
-			if (shouldBeginHurtActionAfterMagicDamage(
-				engine->getRand(3), handledSpecialEffect, immobilized, petrified))
-			{
-				beginHurt(fd);
-			}
+			return;
 		}
+	}
+	if (wasCritical && damage > 0)
+	{
+		showCriticalDamageTip(damage);
+	}
+
+	int restoreDamage = damage > life ? life : damage;
+	applyEffectRestore(e, restoreDamage);
+	if (damage >= life)
+	{
+		life = 0;
+		rememberDamageSource(e);
+		awardDefeatedNpcExperience(e);
+		handleDeath();
+		triggerMagicWhenBeAttacked(*e);
+		triggerMagicWhenKillEnemy(*e);
 	}
 	else
 	{
-		// Collision-driven motion is independent of the damage hit roll.
+		addLife(-damage);
+		triggerMagicWhenBeAttacked(*e);
 		applyBounceFromEffect(*e);
 		applyBounceFlyFromEffect(*e);
-		triggerMagicWhenBeAttacked(*e);
+		if (!isNotFightBackWhenBeHit() && !(blindMilliseconds > 0 && kind != nkPlayer))
+		{
+			fightState.set(true);
+			rememberDamageSource(e);
+		}
+		int d;
+		if (e->flyingDirection.x != 0 || e->flyingDirection.y != 0)
+		{
+			d = getDirection(atan2(e->flyingDirection.x, -e->flyingDirection.y));
+		}
+		else
+		{
+			auto userPtr = e->user.lock();
+			if (userPtr)
+			{
+				d = getDirection(position, userPtr->position);
+			}
+			else
+			{
+				d = direction;
+			}
+		}
+		Point fd = gm->map->getSubPoint(position, d);
+		if (shouldBeginHurtActionAfterMagicDamage(
+			engine->getRand(3), handledSpecialEffect, immobilized, petrified))
+		{
+			beginHurt(fd);
+		}
 	}
 }
 

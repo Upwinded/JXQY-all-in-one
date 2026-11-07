@@ -4,9 +4,12 @@
 #include "IMPFormatValidation.h"
 #include "ImageAnimationPlayback.h"
 #include "ImagePackagePathCandidates.h"
+#include "SafeImageDecoder.h"
 
 #include <algorithm>
 #include <cstdint>
+#include <cmath>
+#include <complex>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -136,6 +139,158 @@ void cropTransparentFrame(IMPFrame& frame)
 }
 
 uint32_t IMPImage::IMPImageCount;
+
+const ImageRotationCalibration* IMP::prepareRotationCalibration(_shared_imp image)
+{
+	if (image == nullptr)
+	{
+		return nullptr;
+	}
+	if (image->rotationCalibrationPrepared)
+	{
+		return image->rotationCalibration.get();
+	}
+	image->rotationCalibrationPrepared = true;
+	const auto layout = ImageAnimationPlayback::calculateLayout(image->frame.size(), image->directions);
+	if (layout.directions <= 1 || layout.framesPerDirection == 0)
+	{
+		return nullptr;
+	}
+	try
+	{
+		constexpr double Pi = 3.14159265358979323846;
+		const double sector = 2.0 * Pi / layout.directions;
+		struct DirectionGeometry
+		{
+			std::complex<double> center = 0.0;
+			std::complex<double> axis = 0.0;
+			int frameCount = 0;
+		};
+		std::vector<DirectionGeometry> geometry(layout.directions);
+		for (int direction = 0; direction < layout.directions; ++direction)
+		{
+			auto& group = geometry[direction];
+			for (std::size_t localFrame = 0; localFrame < layout.framesPerDirection; ++localFrame)
+			{
+				const auto& frame = image->frame[direction * layout.framesPerDirection + localFrame];
+				std::unique_ptr<SDL_Surface, decltype(&SDL_DestroySurface)> surface(nullptr, SDL_DestroySurface);
+				const std::uint8_t* pixels = nullptr;
+				int width = frame.pixelWidth, height = frame.pixelHeight;
+				std::size_t pitch = static_cast<std::size_t>(std::max(0, width)) * 4;
+				if (width > 0 && height > 0 &&
+					frame.pixelData.size() / 4 / static_cast<std::size_t>(width) >= static_cast<std::size_t>(height))
+				{
+					pixels = frame.pixelData.data();
+				}
+				else if (frame.data != nullptr && frame.dataLen > 0)
+				{
+					surface.reset(SafeImageDecoder::loadSurface(frame.data.get(), frame.dataLen));
+					if (surface != nullptr && surface->format != SDL_PIXELFORMAT_RGBA32)
+					{
+						surface.reset(SDL_ConvertSurface(surface.get(), SDL_PIXELFORMAT_RGBA32));
+					}
+					if (surface != nullptr)
+					{
+						pixels = static_cast<const std::uint8_t*>(surface->pixels);
+						width = surface->w;
+						height = surface->h;
+						pitch = static_cast<std::size_t>(surface->pitch);
+					}
+				}
+				if (pixels == nullptr)
+				{
+					continue;
+				}
+				double mass = 0.0, sumX = 0.0, sumY = 0.0, sumXX = 0.0, sumXY = 0.0, sumYY = 0.0;
+				for (int y = 0; y < height; ++y)
+				{
+					for (int x = 0; x < width; ++x)
+					{
+						const double alpha = pixels[static_cast<std::size_t>(y) * pitch + static_cast<std::size_t>(x) * 4 + 3];
+						mass += alpha;
+						sumX += alpha * x;
+						sumY += alpha * y;
+						sumXX += alpha * x * x;
+						sumXY += alpha * x * y;
+						sumYY += alpha * y * y;
+					}
+				}
+				if (mass <= 0.0)
+				{
+					continue;
+				}
+				const double centerX = sumX / mass, centerY = sumY / mass;
+				group.center += std::complex<double>(centerX - frame.xOffset, centerY - frame.yOffset);
+				++group.frameCount;
+				const double xx = std::max(0.0, sumXX / mass - centerX * centerX);
+				const double xy = sumXY / mass - centerX * centerY;
+				const double yy = std::max(0.0, sumYY / mass - centerY * centerY);
+				const double difference = std::hypot(xx - yy, 2.0 * xy);
+				const double trace = xx + yy;
+				const double angle = std::atan2(2.0 * xy, xx - yy);
+				const auto axis = std::polar(1.0, angle);
+				if (trace + difference >= 4.0 * std::max(trace - difference, 1e-9))
+				{
+					group.axis += axis;
+				}
+			}
+			if (group.frameCount > 0)
+			{
+				group.center /= group.frameCount;
+			}
+		}
+		auto calibration = std::make_shared<ImageRotationCalibration>();
+		calibration->directionAngleOffsets.resize(layout.directions, 0.0f);
+		const double firstAxis = std::arg(geometry[0].axis) * 0.5;
+		const double reference = std::round(firstAxis / (Pi * 0.5)) * (Pi * 0.5);
+		const bool referenceReliable = std::abs(geometry[0].axis) > 1e-9
+			&& std::abs(std::remainder(firstAxis - reference, Pi)) <= sector * 0.5 + 1e-6;
+		std::complex<double> sumCenter = 0.0, sumRotation = 0.0, sumRotatedCenter = 0.0;
+		int centerCount = 0;
+		for (int direction = 0; direction < layout.directions; ++direction)
+		{
+			const auto& group = geometry[direction];
+			if (referenceReliable && std::abs(group.axis) > 1e-9)
+			{
+				const double correction = std::remainder(std::arg(group.axis) * 0.5 - reference - sector * direction, Pi);
+				if (std::abs(correction) <= sector + 1e-6)
+				{
+					calibration->directionAngleOffsets[direction] = static_cast<float>(correction);
+				}
+			}
+			if (group.frameCount == 0)
+			{
+				continue;
+			}
+			const auto rotation = std::polar(1.0, sector * direction + calibration->directionAngleOffsets[direction]);
+			sumCenter += group.center;
+			sumRotation += rotation;
+			sumRotatedCenter += std::conj(rotation) * group.center;
+			++centerCount;
+		}
+		if (centerCount == 0)
+		{
+			return nullptr;
+		}
+		const double denominator = centerCount - std::norm(sumRotation) / centerCount;
+		const auto meanCenter = sumCenter / static_cast<double>(centerCount);
+		const auto radius = denominator > 1e-9
+			? (sumRotatedCenter - std::conj(sumRotation) * meanCenter) / denominator
+			: std::complex<double>(0.0);
+		const auto pivot = meanCenter - sumRotation / static_cast<double>(centerCount) * radius;
+		calibration->centerOffset = {static_cast<float>(pivot.real()), static_cast<float>(pivot.imag())};
+		image->rotationCalibration = std::move(calibration);
+	}
+	catch (const std::bad_alloc&)
+	{
+		return nullptr;
+	}
+	catch (const std::length_error&)
+	{
+		return nullptr;
+	}
+	return image->rotationCalibration.get();
+}
 
 bool IMP::cmpIMGHead(_shared_imp img)
 {
@@ -395,6 +550,8 @@ void IMP::copyIMPImage(_shared_imp dst, _shared_imp src)
 		}
 		dst->directions = src->directions;
 		dst->interval = src->interval;
+		dst->rotationCalibrationPrepared = src->rotationCalibrationPrepared;
+		dst->rotationCalibration = src->rotationCalibration;
 		for (int i = 0; i < imageNullLen; i++)
 		{
 			dst->imageNull[i] = src->imageNull[i];
@@ -574,6 +731,8 @@ void IMP::clearIMPImage(_shared_imp impImage)
 	{
 		return;
 	}
+	impImage->rotationCalibrationPrepared = false;
+	impImage->rotationCalibration.reset();
 	for (int j = 0; j < (int)impImage->frame.size(); j++)
 	{
 		impImage->frame[j].dataLen = 0;

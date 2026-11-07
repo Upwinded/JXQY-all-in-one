@@ -51,6 +51,8 @@ struct ResourcePackage
 	std::vector<std::string> dependencyGameIds;
 	bool resourceOnly = false;
 	std::string releaseNotes;
+	// Empty keeps full and incremental artifacts beside the selected catalog.
+	std::string releaseId;
 };
 
 struct ProgramPackage
@@ -88,6 +90,8 @@ struct Catalog
 	// Each platform target has exactly one online program package.
 	std::map<std::string, ProgramPackage> programPackages;
 	std::optional<CommonPackage> commonPackage;
+	// ASCII-folded Release ID -> ordered HTTPS artifact directories across hosts.
+	std::map<std::string, std::vector<std::string>> releaseBaseUrls;
 };
 
 enum class CatalogParseError
@@ -110,7 +114,8 @@ enum class CatalogParseError
 	InvalidCrc32,
 	InvalidDependency,
 	UnknownDependency,
-	DependencyCycle
+	DependencyCycle,
+	InvalidRelease
 };
 
 struct CatalogParseIssue
@@ -178,6 +183,7 @@ bool parseUpdateSources(
 
 std::string foldGameId(std::string_view gameId);
 bool isValidOnlineGameId(std::string_view gameId);
+bool isValidReleaseId(std::string_view releaseId);
 bool isSafeArtifactPath(std::string_view path) noexcept;
 bool isValidCrc32Hex(std::string_view text) noexcept;
 bool parseIncrementalChainReceipt(

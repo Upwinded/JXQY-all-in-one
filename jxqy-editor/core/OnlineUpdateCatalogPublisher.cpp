@@ -91,7 +91,23 @@ bool updateArtifact(
         return false;
     }
     QString absolutePath;
-    if (!resolveArtifact(artifactRoot, artifact, absolutePath))
+    std::string localArtifact = artifact;
+    std::string releaseId;
+    if (QString::fromStdString(section).startsWith(QStringLiteral("Resource."), Qt::CaseInsensitive))
+    {
+        releaseId = OnlineUpdate::foldGameId(ini.get(section, "Release", ""));
+        if (!releaseId.empty())
+        {
+            if (!OnlineUpdate::isValidReleaseId(releaseId))
+            {
+                result.status = OnlineUpdateCatalogPublisher::Status::InvalidTemplate;
+                result.detail = QString::fromStdString(section + ".Release=" + releaseId);
+                return false;
+            }
+            localArtifact = OnlineUpdate::foldGameId(releaseId) + "/" + artifact;
+        }
+    }
+    if (!resolveArtifact(artifactRoot, localArtifact, absolutePath))
     {
         result.status = OnlineUpdateCatalogPublisher::Status::ArtifactNotFound;
         result.detail = QString::fromStdString(artifact);
@@ -128,6 +144,10 @@ bool updateArtifact(
     }
     ini.set(section, sizeField, std::to_string(size));
     ini.set(section, crc32Field, OnlineUpdate::crc32ToLowerHex(checksum));
+    auto& releaseArtifacts = result.artifactsByRelease[QString::fromStdString(releaseId)];
+    const QString artifactName = QString::fromStdString(artifact);
+    if (!releaseArtifacts.contains(artifactName))
+        releaseArtifacts.append(artifactName);
     return true;
 }
 }

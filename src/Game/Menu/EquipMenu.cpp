@@ -200,8 +200,15 @@ void EquipMenu::updateMagicDisplay()
 		auto partner = getSelectedPartner();
 		const int count = partner ? static_cast<int>(partner->getPartnerMagicList().size()) : gm->global.magicLayout.storeCount();
 		const int columns = std::max(1, magicScrollbar->lineSize);
+		const int previousMaximum = magicScrollbar->max;
 		magicScrollbar->max = (std::max(0, count - static_cast<int>(magicDisplayItem.size())) + columns - 1) / columns;
-		magicScrollbar->setPosition(std::min(magicScrollbar->position, magicScrollbar->max));
+		// Let the scrollbar consume the thumb's drag coordinates before synchronizing it.
+		if (magicScrollbar->max != previousMaximum
+			|| magicScrollbar->position < magicScrollbar->min
+			|| magicScrollbar->position > magicScrollbar->max)
+		{
+			magicScrollbar->setPosition(magicScrollbar->position);
+		}
 	}
 
 	for (int i = 0; i < static_cast<int>(magicDisplayItem.size()); i++)
@@ -497,7 +504,7 @@ bool EquipMenu::selectPartner(const std::shared_ptr<NPC>& partner)
 	showingPartner = partner != nullptr;
 	configureControllerFocus();
 	if (gm->menu->magicMenu) gm->menu->magicMenu->showPartnerMagic(partner);
-	if (magicScrollbar) magicScrollbar->position = 0;
+	if (magicScrollbar) magicScrollbar->setPosition(0);
 	for (auto& file : magicDisplayIniFile) file.clear();
 	for (auto& item : magicDisplayItem) if (item) item->impImage = nullptr;
 	updateGoods();
