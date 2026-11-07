@@ -396,7 +396,7 @@ public:
 	std::string icon = "";
 
 	std::string flyingImage = "";
-	bool flyingImageDirectionCompensation = true;
+	bool flyingImageDirectionCompensation = false;
 	std::string flyingSound = "";
 	std::string vanishImage = "";
 	std::string vanishSound = "";

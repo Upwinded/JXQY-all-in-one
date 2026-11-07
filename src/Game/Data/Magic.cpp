@@ -542,7 +542,7 @@ void Magic::reset()
 	icon = "";
 
 	flyingImage = "";
-	flyingImageDirectionCompensation = true;
+	flyingImageDirectionCompensation = false;
 	flyingSound = "";
 	vanishImage = "";
 	vanishSound = "";
@@ -793,7 +793,7 @@ void Magic::initFromIniWithContext(
 		image = ini.Get(section, "Image", "");
 		icon = ini.Get(section, "Icon", "");
 		flyingImage = ini.Get(section, "FlyingImage", "");
-		flyingImageDirectionCompensation = ini.GetInteger(section, "FlyingImageDirectionCompensation", 1) != 0;
+		flyingImageDirectionCompensation = ini.GetInteger(section, "FlyingImageDirectionCompensation", 0) != 0;
 		flyingSound = ini.Get(section, "FlyingSound", "");
 		vanishImage = ini.Get(section, "VanishImage", "");
 		vanishSound = ini.Get(section, "VanishSound", "");
